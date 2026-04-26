@@ -4,12 +4,18 @@
 
 ## Статус
 
-Proposed target architecture.
+Каноническая целевая архитектура для планирования реализации. Runtime service
+еще не реализован; notebook и benchmark evidence ниже определяют production
+prototype, которому сервис обязан соответствовать.
 
 Этот документ проектируется поверх:
 
-- `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`;
-- `tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb`;
+- canonical notebook prototype:
+  `tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb`;
+- canonical benchmark evidence:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
+- human-readable benchmark summary:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_summary.md`;
 - текущего trusted artifact publisher/precompute scope в `backtest_artifacts`;
 - текущей DDD / ports-and-adapters структуры репозитория.
 
@@ -23,7 +29,9 @@ historical/compatibility context для v1, а не source of truth. Это вк
 - `POST /backtests` как основной create endpoint вместо `POST /backtests/jobs`;
 - `runs` vocabulary вместо `jobs` vocabulary;
 - `hit_times/1m` вместо target `hit_times/15m`;
-- public `execution profile` vocabulary вместо `risk.mode`.
+- public `execution profile` vocabulary вместо `risk.mode`;
+- старые benchmark notebooks под `tests/notebook_tests/new_engine/*` как
+  canonical algorithm source.
 
 `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md` упоминается старым
 roadmap как source of truth, но отсутствует в текущем рабочем дереве. Пока он не
@@ -43,7 +51,9 @@ defined here.
 - возвращает persisted top N summary;
 - лениво пересчитывает trades для выбранного `variant_key` по запросу UI/API;
 - развивается итерационно, где каждая итерация проходит benchmark на `Mac Studio`;
-- считается завершенной только если каждый pipeline segment держит не ниже 90% baseline по скорости, памяти и CPU-метрикам.
+- считается завершенной только если каждый pipeline segment держит не ниже 90%
+  target baseline по скорости, памяти и CPU-метрикам из canonical benchmark
+  evidence `2026-04-26_engine_test_btcusdt_15m`.
 
 ## Контекст
 
@@ -144,8 +154,8 @@ Job все равно сохраняет artifact identity/watermark metadata:
 {
   "risk": {
     "mode": "tp_sl_grid",
-    "tp": {"start_pct": 0.5, "stop_pct": 5.0, "step_pct": 0.5},
-    "sl": {"start_pct": 0.5, "stop_pct": 3.0, "step_pct": 0.5}
+    "tp": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+    "sl": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5}
   }
 }
 ```
@@ -305,7 +315,7 @@ Request shape:
   ],
   "risk": {"mode": "none"},
   "execution": {
-    "direction_mode": "long-short",
+    "direction_mode": "long_short_reversal",
     "fee_rate": 0.00075,
     "slippage_rate": 0.0001,
     "initial_cash_quote": 10000.0,
@@ -395,6 +405,7 @@ Requests cancellation. The endpoint is idempotent:
 Returns public defaults and limits used to build valid requests:
 
 - supported timeframes;
+- supported and maximum indicator arity (`backtest.max_indicator_arity = 10`);
 - available ranking metrics;
 - execution defaults;
 - sizing mode defaults and required fields;
@@ -440,128 +451,330 @@ validation and remains the authoritative create path.
 Runtime has two stage vocabularies:
 
 - lifecycle stages: request/job/queue states visible to API and persistence;
-- benchmark stages: notebook-compatible measured compute stages after warmup.
+- benchmark stages: notebook-compatible measured compute stages from canonical
+  `btcusdt_15m_research_engine.ipynb`.
+
+The production implementation must preserve the algorithmic semantics of the
+notebook and expose benchmark records with the same timer names as
+`benchmark_results.json`. Old five-stage vocabulary with `count_trades` is
+superseded: trade counting remains inside self-check/reference paths and exact
+scoring outputs, but it is not a production pipeline stage.
+
+### Algorithm scope and backends
+
+Canonical prototype validates:
+
+- coordinates: `binance` / `spot` / `BTCUSDT`;
+- timeframe: `15m`;
+- period semantics: `[start, end)` by 15m `open_time`;
+- target public arity: 1..10 indicators for both `risk.mode = "none"` and
+  `risk.mode = "tp_sl_grid"`;
+- current canonical benchmark evidence covers arity 1..7; arity 8..10 must get
+  a new Mac Studio benchmark iteration before v1 is accepted for those arities;
+- benchmark directions: `long_only`, `long_short_reversal`;
+- risk modes: `none`, `tp_sl_grid`;
+- TP/SL target grid: `2.0..25.0` inclusive, step `0.5`
+  (`47 x 47 = 2209` cells).
+
+Backend registry:
+
+| Backend | Risk mode | Arity | Role |
+|---|---|---:|---|
+| `event_segments_2_no_risk` | `none` | 2 | Default specialized two-indicator no-risk backend. |
+| `streaming_2_no_risk` | `none` | 2 | Fallback/parity backend, not default production target. |
+| `event_segments_n_no_risk` | `none` | 1, 3..10 | Generic no-risk backend. |
+| `event_segments_n_tp_sl_15m_grid` | `tp_sl_grid` | 1..10 | Generic risk-on backend backed by `hit_times/15m`. |
+
+Direction semantics:
+
+- `long_only`: raw consensus `+1` opens/holds long; raw `0` or `-1`
+  closes an open long; short trades are never opened;
+- `long_short_reversal`: raw consensus `+1` opens/holds long; raw `-1`
+  opens/holds short; opposite signal closes and reverses.
 
 ### Lifecycle stage: request normalization
 
 - validate coordinates;
 - validate timeframe excludes `1m` and `5m`;
 - validate `[start, end)`;
-- validate indicator ids against `configs/prod/indicators.yaml` loaded through registry/defaults;
-- materialize requested `source` and `window` row selections;
-- validate request TP/SL grid is covered by published artifact grid when `risk.mode = "tp_sl_grid"`;
+- validate indicator ids against `configs/prod/indicators.yaml` loaded through
+  registry/defaults;
+- validate `source` and `window` ranges, then materialize row selections;
+- validate `direction_mode`, `sizing`, `profit_lock`, fees, slippage,
+  `initial_cash_quote` and `close_on_end`;
+- validate request TP/SL grid is covered by published artifact grid when
+  `risk.mode = "tp_sl_grid"`;
 - apply execution defaults;
-- compute canonical request/config hashes and estimated request cost.
+- compute canonical `request_hash`, result-affecting config hash and estimated
+  request cost.
+
+Notebook method equivalents:
+
+- `validate_request_indicators`;
+- `canonical_json_hash`;
+- `row_ids_for_sources`.
 
 ### Lifecycle stage: job creation
 
 - create `backtest_jobs` row with canonical request snapshot;
 - record artifact metadata/watermark for audit and cache identity;
-- state starts as `queued`.
+- state starts as `queued`;
+- worker pins the resolved artifact root and manifest hashes for the job.
 
-### Benchmark stage 1: `prepare_indicator_pools`
+### Benchmark stage: `sample_warmup` / `service_warmup` / `numba_warmup`
 
-Notebook-compatible meaning:
+Warmup is measured separately from user-facing runtime. Canonical benchmark uses
+sample warmup, not a full dry-run:
 
-- resolve artifact root;
-- read strict `current.yaml` and slot `manifest.yaml`;
-- load `.npy` via `np.load(..., mmap_mode="r")`;
-- load `prices/<tf>`, `prices/1m`, `mappings/<tf>`, requested `signals/<tf>/<indicator_id>`, and `hit_times/15m` only when risk mode requires it;
-- slice `[start, end)` on the signal timeframe and corresponding execution window;
-- map `{indicator_id, source, window}` to artifact row ids using manifest grid contract;
-- copy only selected rows into contiguous working arrays when kernels need contiguous memory;
-- preserve source-major/window-minor ordering from artifacts.
+- warmup rows per indicator: `min(2, rows_per_indicator)`;
+- same arity, risk mode, direction mode and backend as the measured run;
+- JIT compilation and first-touch array costs are attributed to warmup;
+- measured `total_without_warmup` excludes warmup.
 
-Reference notebook example:
+The service must record warmup metrics and compare them to the canonical target,
+but warmup is not added to `total_without_warmup`.
 
-```text
-prepare indicator pools    0.964s
-```
+### Benchmark stage: `load_hit_times`
 
-### Benchmark stage 2: `combo_proxy_prefilter`
+Risk-on only. Notebook method: `load_tp_sl_hit_times_15m`.
 
-Notebook-compatible meaning:
+This stage:
 
-- single-indicator row prefilter;
-- combo proxy prefilter;
-- bounded combo chunk planning;
-- deterministic combo ordering for downstream exact scoring.
+- reads `hit_times/15m/manifest.yaml`;
+- reads `tp_values.f32.npy`, `sl_values.f32.npy`;
+- maps requested TP/SL percentages to artifact indexes;
+- loads selected rows from `long_tp.u32.npy`, `long_sl.u32.npy`,
+  `short_tp.u32.npy`, `short_sl.u32.npy`;
+- copies the selected subset into contiguous arrays for kernels;
+- precomputes fee-adjusted log factors for long and short TP/SL outcomes;
+- records `hit_times_manifest_hash`.
 
-Reference notebook example:
+### Benchmark stage: `tp_sl_grid_validation`
 
-```text
-combo proxy prefilter      0.595s
-```
+Risk-on only. This is timed separately from hit-time array loading.
 
-### Benchmark stage 3: `count_trades`
+Validation:
 
-Notebook-compatible meaning:
+- request values are interpreted as percentages and converted to decimal levels;
+- every requested TP and SL level must match exactly one published artifact value
+  using bounded float tolerance;
+- missing levels fail deterministically before compute with
+  `422 backtest.tp_sl_grid_not_covered`;
+- target benchmark grid is `2.0..25.0` inclusive with `0.5` step.
 
-- build compact trade-count evidence for surviving combos;
-- reject combos with invalid/empty trade count;
-- keep count arrays compact enough for exact scoring.
+### Benchmark stage: `prepare_pools`
 
-Reference notebook example:
+Notebook methods:
 
-```text
-count trades               0.637s
-```
+- `extract_signal_rows`;
+- `prefilter_indicator_rows`;
+- `fused_row_prefilter_stats`;
+- `topk_fraction_idx`;
+- `build_signal_segments`;
+- `fill_signal_segments_i8`;
+- `prepare_indicator_pool`;
+- `prepare_indicator_pools`.
 
-### Benchmark stage 4: `exact_scoring`
+This stage:
+
+- resolves artifact root through trusted configuration/current pointer;
+- reads slot `manifest.yaml` and requested indicator manifests;
+- loads `.npy` arrays with `np.load(..., mmap_mode="r")`;
+- loads `prices/<tf>`, `prices/1m`, `mappings/<tf>` and requested
+  `signals/<tf>/<indicator_id>/signals.i8.npy`;
+- slices 15m bars by `[start, end)` using `open_time`;
+- derives 15m return intervals from close prices;
+- derives 15m-to-1m execution mapping for no-risk mode:
+  signal at 15m bar `t` enters at the next 15m bar open mapped to 1m;
+- copies only requested signal rows into contiguous `int8` matrices;
+- applies row prefilter per indicator:
+  - `nonzero`: number of non-zero signal intervals;
+  - `proxy`: dot-product-like directional return proxy;
+  - `change_count`: number of signal change points;
+  - `adjusted = proxy - fee_rate * nonzero`;
+  - keeps top fraction after `min_nonzero`;
+- builds per-row metadata `{indicator_id, row_id, source, window}`;
+- builds compressed signal segments:
+  `starts`, `ends`, `values`, `counts`, `change_count`;
+- returns indicator pools with `trade_T`, `eval_T`, `segments`, row ids,
+  scores and metadata.
+
+### Benchmark stage: `build_exact_context`
+
+Notebook method: `build_segment_stack`.
+
+This stage prepares arity-first segment arrays used by generic exact kernels:
+
+- `starts[arity, max_rows, max_segments]`;
+- `ends[arity, max_rows, max_segments]`;
+- `values[arity, max_rows, max_segments]`;
+- `counts[arity, max_rows]`.
+
+For no-risk arity 2 with the specialized backend, the service may read segments
+directly from each pool and `build_exact_context` can be near zero. For generic
+no-risk and all TP/SL risk-on runs, this stage is required.
+
+### Benchmark stage: `build_proxy_context`
+
+Notebook methods:
+
+- `build_eval_stack`;
+- `build_combo_proxy_cache_two`;
+- `gather_combo_proxy_cache_two`.
+
+This stage exists only when combo prefilter is active:
+
+- active when `combo_top_frac < 1.0` or `combo_min_confirm > 1`;
+- for arity 2, builds matrix-backed confirm/proxy lookup tables using
+  `eval_T` and 15m returns;
+- for generic N, packs `eval_T` into `eval_stack[arity, max_rows, n_intervals]`;
+- in the canonical target benchmark combo prefilter is configured as pass-through
+  (`combo_top_frac = 1.0`, `combo_min_confirm = 1`), so this stage is expected
+  to be near zero but still must be recorded.
+
+### Benchmark stage: `combo_iteration`
+
+Notebook method: `iter_combo_chunks`.
+
+This stage:
+
+- builds deterministic Cartesian product over filtered local row pools;
+- preserves indicator order from the normalized request;
+- emits chunks as `{indicator_id: int32[K]}`;
+- uses bounded chunk size (`4096` in canonical benchmark);
+- records `cartesian_combinations`, `combo_chunks_processed` and
+  `exact_candidates_evaluated`.
+
+### Benchmark stage: `proxy_filter`
+
+Notebook methods:
+
+- `proxy_prefilter_combos_chunk_two`;
+- `proxy_prefilter_combos_chunk_n`;
+- `topk_fraction_idx`.
+
+When combo prefilter is inactive, this stage selects the full chunk and records
+near-zero time. When active, it:
+
+- computes consensus confirmation count per combo;
+- computes cheap directional proxy score from 15m returns;
+- applies `combo_min_confirm`;
+- keeps top fraction by proxy score;
+- passes only selected combos to exact scoring.
+
+### Benchmark stage: `self_check`
+
+Self-check is part of benchmark evidence and must fail fast on parity drift.
+Canonical benchmark uses `self_check_n = 2`.
+
+No-risk methods:
+
+- `build_trade_list_for_indicator_rows_slow`;
+- `evaluate_no_risk_reference_rows_slow`;
+- `run_fast_vs_reference_self_check_two`.
+
+TP/SL methods:
+
+- `build_trade_list_15m_for_indicator_rows_slow`;
+- `evaluate_tp_sl_reference_trade_list_direct`;
+- `evaluate_tp_sl_reference_rows_slow`;
+- `run_tp_sl_self_check`.
+
+Checks:
+
+- backend `trade_count` equals slow reference;
+- no-risk `total_return_pct` differs by at most `1e-4`;
+- TP/SL best return differs by at most `5e-5`;
+- TP/SL best cell indexes are valid;
+- TP/SL best TP/SL cell must match reference unless the return difference is
+  numerically immaterial.
+
+### Benchmark stage: `exact_scoring`
+
+This is the dominant hot path. It dispatches by `risk.mode`.
 
 For `risk.mode = "none"`:
 
-- build compact trade list from consensus signals;
-- execute no-risk scoring with fees/slippage/sizing/profit-lock;
-- apply `direction_mode` and `close_on_end`.
+- default backend is `event_segments_2_no_risk` for arity 2;
+- generic backend is `event_segments_n_no_risk` for arity 1 and 3..10;
+- `streaming_2_no_risk` exists only as fallback/parity comparator;
+- segment intersections produce raw consensus direction;
+- `apply_direction_mode` maps raw direction to `long_only` or
+  `long_short_reversal`;
+- entries use the next 15m signal bar open mapped to 1m execution index;
+- exits use signal close/reversal mapped to 1m open, or final 1m close when
+  `close_on_end = true`;
+- `apply_no_risk_trade_to_state` updates cash/equity state without allocating
+  a full trade list in the hot path;
+- summary metrics include `total_return_pct`, `max_drawdown_pct`,
+  `return_over_max_drawdown`, `profit_factor`, `trade_count`, `sharpe_trades`,
+  `win_rate_pct`, `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`.
 
 For `risk.mode = "tp_sl_grid"`:
 
-- build compact trade list from consensus signals;
-- use `hit_times/15m` and request TP/SL subset;
-- run fast monotone TP/SL search;
-- run bounded self-check against reference path per benchmark/test policy;
-- select best TP/SL cell per variant.
+- backend is `event_segments_n_tp_sl_15m_grid` for arity 1..10;
+- `exact_scoring` and `tp_sl_exact_scoring` record the same hot-path elapsed time;
+- entries and signal exits are represented as absolute 15m bar indexes;
+- TP/SL hit tables are `hit_times/15m`;
+- scoring uses log-return accumulation for numerical stability;
+- for each candidate trade, `tp_sl_apply_trade_to_diff` writes contribution
+  ranges into three difference buffers:
+  - `row_diff` for TP-only ranges;
+  - `col_diff` for SL-only ranges;
+  - `rect_diff` for signal/final-close fallback rectangles;
+- prefix sums materialize the full TP/SL grid contribution for one combo;
+- the best cell is the max log-return cell converted back to
+  `total_return_pct = (exp(best_log) - 1) * 100`;
+- if TP and SL hit on the same bar, SL wins the tie: TP requires
+  `t_tp < t_sl`, SL accepts `t_sl <= t_tp`;
+- persisted summary must include the same full metric set as no-risk
+  (`total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+  `profit_factor`, `trade_count`, `sharpe_trades`, `win_rate_pct`,
+  `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`) plus
+  `best_tp_pct` and `best_sl_pct` for the selected best cell.
 
-Reference notebook example:
+### Benchmark stage: `heap_update`
 
-```text
-exact scoring              0.775s
-```
+Notebook uses Python `heapq` to keep top K.
 
-### Benchmark stage 5: `heap_top_k_python_work`
+This stage:
 
-Notebook-compatible meaning:
+- ranks by selected metric, default `total_return_pct desc`;
+- builds a deterministic heap key from score and original row ids;
+- keeps only top N in memory;
+- attaches compact per-indicator metadata;
+- produces deterministic ordering for persisted top-N rows.
 
-- rank by selected metric;
-- maintain heap/top-K shortlist;
-- assemble persisted top-N summary rows in deterministic order.
+### Benchmark stage: `top_result_proxy_fill`
 
-Reference notebook example:
+This stage is not lazy trades.
 
-```text
-heap/top-K Python work     0.026s
-```
-
-Persistence writes are measured separately as service overhead because notebook
-baseline does not include network/DB IO. The service still records
-`persist_top_n_io` with an absolute budget.
+It runs only when final top rows did not receive proxy metadata from active combo
+prefilter. It recomputes `confirm_count` and `proxy_score` for top rows using
+`proxy_for_indicator_rows`. It must not be mapped to the UI/API
+`show trades` endpoint.
 
 ### Runtime total without warmup
 
-Every benchmark record must show the canonical notebook-compatible runtime table:
+Every benchmark record must expose notebook-compatible timer names:
 
-| Stage | Reference example |
-|---|---:|
-| `total_without_warmup` | `3.012s` |
-| `prepare_indicator_pools` | `0.964s` |
-| `combo_proxy_prefilter` | `0.595s` |
-| `count_trades` | `0.637s` |
-| `exact_scoring` | `0.775s` |
-| `heap_top_k_python_work` | `0.026s` |
-
-Implementation-specific subsegments are allowed, but they must roll up to these
-five stages for acceptance comparison.
+| Timer | Required | Notes |
+|---|---:|---|
+| `sample_warmup` / `service_warmup` / `numba_warmup` | yes | Measured separately, excluded from total. |
+| `load_hit_times` | risk-on only | Hit-time subset loading. |
+| `tp_sl_grid_validation` | risk-on only | Request grid coverage. |
+| `prepare_pools` | yes | Artifact load, slicing, row selection, row prefilter, segment build. |
+| `build_exact_context` | yes | Arity-first segment context where required. |
+| `build_proxy_context` | yes | May be near zero when proxy prefilter is pass-through. |
+| `combo_iteration` | yes | Cartesian chunk generation. |
+| `proxy_filter` | yes | Pass-through or active combo pruning. |
+| `self_check` | benchmark/test yes | Bounded parity check. |
+| `exact_scoring` | yes | No-risk or TP/SL exact scorer. |
+| `tp_sl_exact_scoring` | risk-on only | Alias/subsegment of `exact_scoring` for risk-on. |
+| `heap_update` | yes | Top-N heap maintenance. |
+| `top_result_proxy_fill` | no-risk yes | Top-row proxy metadata fill. |
+| `total_without_warmup` | yes | User-facing measured runtime after warmup. |
+| `persist_top_n_io` | service only | DB write overhead; not part of notebook baseline. |
 
 ### Lazy trades
 
@@ -580,12 +793,19 @@ progress exposes the finer pipeline stage.
 | API `progress.pipeline_stage` | Persisted stage | Notes |
 |---|---|---|
 | `queued` | `stage_a` | Job exists but worker has not started. |
-| `prepare_indicator_pools` | `stage_a` | Artifact load, slicing and row selection. |
-| `combo_proxy_prefilter` | `stage_a` | Prefilter and combo planning. |
-| `count_trades` | `stage_a` | Trade-count pass before exact scoring. |
-| `exact_scoring` with `risk.mode = "none"` | `stage_a` | No Stage B risk grid; transition to `finalizing` happens before heap/top-K persistence. |
-| `exact_scoring` with `risk.mode = "tp_sl_grid"` | `stage_b` | Hit-times backed TP/SL scoring. |
-| `heap_top_k_python_work` | `finalizing` | Ranking, top-K assembly and summary persistence. |
+| `service_warmup` | `stage_a` | Sample/JIT warmup before measured runtime. |
+| `load_hit_times` | `stage_b` | Risk-on hit-times subset load. |
+| `tp_sl_grid_validation` | `stage_b` | Risk-on grid coverage validation. |
+| `prepare_pools` | `stage_a` | Artifact load, slicing, row selection, prefilter and segment build. |
+| `build_exact_context` | `stage_a` / `stage_b` | Segment stack for exact kernels. |
+| `build_proxy_context` | `stage_a` | Optional combo proxy context. |
+| `combo_iteration` | `stage_a` / `stage_b` | Cartesian chunk planning. |
+| `proxy_filter` | `stage_a` / `stage_b` | Optional combo pruning. |
+| `self_check` | `stage_a` / `stage_b` | Benchmark/test parity check. |
+| `exact_scoring` with `risk.mode = "none"` | `stage_a` | No Stage B risk grid. |
+| `exact_scoring` / `tp_sl_exact_scoring` with `risk.mode = "tp_sl_grid"` | `stage_b` | Hit-times backed TP/SL scoring. |
+| `heap_update` | `finalizing` | Ranking and top-N assembly. |
+| `top_result_proxy_fill` | `finalizing` | Top-row proxy metadata, not lazy trades. |
 | `persist_top_n_io` | `finalizing` | Service-only DB write overhead. |
 | `succeeded`, `failed`, `cancelled` | terminal state | Terminal state wins over stage. |
 
@@ -593,7 +813,7 @@ Contract:
 
 - API consumers must use `state` for lifecycle and `progress.pipeline_stage` for UI detail;
 - persisted stage is an implementation/read-model compatibility field;
-- benchmark records use `progress.pipeline_stage` names, not legacy persisted stage names.
+- benchmark records use canonical notebook timer names, not legacy persisted stage names.
 
 ## Целевая структура модулей
 
@@ -625,10 +845,39 @@ apps/api routes
 
 Benchmark execution is allowed only on `Mac Studio`.
 
-Baseline sources:
+Canonical benchmark sources:
 
-- `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`;
-- `tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb`.
+- canonical algorithm:
+  `tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb`;
+- target numeric evidence:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
+- target human-readable summary:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_summary.md`.
+
+The JSON evidence is the source of truth for numeric target values. The summary
+is for review convenience only and must not be manually edited independently.
+
+Canonical benchmark identity:
+
+- host: `macstudio`;
+- period: `[2020-01-11T20:08:00Z, 2026-04-11T20:08:00Z)`;
+- rows per indicator: `6`;
+- warmup rows per indicator: `2`;
+- current evidence arities: `1..7`;
+- target public arities: `1..10` for both no-risk and TP/SL; arity 8..10
+  is part of the v1 contract but requires a follow-up benchmark iteration before
+  v1 acceptance for those arities;
+- direction modes: `long_only`, `long_short_reversal`;
+- risk modes: `none`, `tp_sl_grid`;
+- TP/SL grid: `2.0..25.0` inclusive with `0.5` step;
+- TP/SL cells per combo: `2209`;
+- runs: `28` (`7 arities x 2 risk modes x 2 direction modes`);
+- request hash:
+  `22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1`;
+- artifact manifest hash:
+  `a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259`;
+- hit-times manifest hash:
+  `2366cc2f5a44ccc7faf716ed65a4f37bcbb91150471eec177d7f633a615dbaba`.
 
 Each implementation iteration must record:
 
@@ -640,7 +889,7 @@ Each implementation iteration must record:
 - request fixture;
 - canonical `request_hash` and result-affecting config hash;
 - service warmup metrics;
-- canonical five-stage runtime metrics without warmup;
+- canonical notebook timer metrics without warmup;
 - service-only overhead metrics;
 - speed ratio vs baseline;
 - absolute latency budget result;
@@ -651,58 +900,105 @@ Each implementation iteration must record:
 
 Warmup policy:
 
-- service warmup is a first-class measured pipeline segment;
+- `service_warmup`, `numba_warmup` and `sample_warmup` are first-class measured
+  segments;
+- canonical benchmark uses sample warmup on `min(2, rows_per_indicator)` rows per
+  indicator for the same arity/risk/direction/backend;
 - user-facing runtime benchmark is measured after warmup;
-- both warmup and warm runtime must stay within accepted 90% envelope for their segment.
+- warmup and warm runtime must both stay within accepted 90% envelope for their
+  matching segment.
 
 Required benchmark segments:
 
 1. `service_warmup`
-2. `total_without_warmup`
-3. `prepare_indicator_pools`
-4. `combo_proxy_prefilter`
-5. `count_trades`
-6. `exact_scoring`
-7. `heap_top_k_python_work`
-8. `persist_top_n_io`
-9. `lazy_trades_compute`
-10. `lazy_trades_cache_hit`
+2. `numba_warmup`
+3. `sample_warmup`
+4. `total_without_warmup`
+5. `load_hit_times` for `risk.mode = "tp_sl_grid"`
+6. `tp_sl_grid_validation` for `risk.mode = "tp_sl_grid"`
+7. `prepare_pools`
+8. `build_exact_context`
+9. `build_proxy_context`
+10. `combo_iteration`
+11. `proxy_filter`
+12. `self_check`
+13. `exact_scoring`
+14. `tp_sl_exact_scoring` for `risk.mode = "tp_sl_grid"`
+15. `heap_update`
+16. `top_result_proxy_fill`
+17. `persist_top_n_io`
+18. `lazy_trades_compute`
+19. `lazy_trades_cache_hit`
 
 Acceptance comparison:
 
-- stages 2-7 are compared with notebook-compatible baseline stages;
-- `service_warmup`, `persist_top_n_io`, `lazy_trades_compute` and
+- stages 1-16 are compared with notebook-compatible target values by tuple
+  `{arity, risk_mode, direction_mode, backend}`;
+- for arity 1..7, the target source is
+  `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
+- for arity 8..10, target values must be created by a follow-up Mac Studio
+  benchmark iteration before the implementation is accepted for those requests;
+- `persist_top_n_io`, `lazy_trades_compute` and
   `lazy_trades_cache_hit` use service-specific absolute budgets plus regression
   comparison after their own baseline exists;
-- an implementation may record lower-level subsegments, but pass/fail is decided
-  on canonical rollups.
+- an implementation may record lower-level subsegments, but pass/fail must include
+  every canonical timer exposed by the notebook;
+- latency target passes when service wall time is no worse than the canonical
+  target divided by `0.90` for the same segment;
+- memory target passes when service peak RSS / RSS delta is no worse than the
+  canonical target divided by `0.90`, unless a stricter absolute budget is set;
+- CPU target passes when service CPU time is no worse than the canonical target
+  divided by `0.90`, with process CPU percent and thread count recorded for
+  diagnosis.
 
-Initial notebook-style baseline example:
+Canonical target table excerpt:
 
-```text
-total                       3.012s
-prepare indicator pools     0.964s
-combo proxy prefilter       0.595s
-count trades                0.637s
-exact scoring               0.775s
-heap/top-K Python work      0.026s
-```
+| arity | risk | direction | backend | combos | exact target | total target |
+|---:|---|---|---|---:|---:|---:|
+| 1 | `none` | `long_only` | `event_segments_1_no_risk` | 6 | `0.003169s` | `0.132407s` |
+| 1 | `tp_sl_grid` | `long_only` | `event_segments_1_tp_sl_15m_grid` | 6 | `0.003561s` | `0.937853s` |
+| 7 | `none` | `long_only` | `event_segments_7_no_risk` | 279936 | `139.585680s` | `140.746091s` |
+| 7 | `tp_sl_grid` | `long_only` | `event_segments_7_tp_sl_15m_grid` | 279936 | `146.899213s` | `147.415075s` |
+| 1 | `none` | `long_short_reversal` | `event_segments_1_no_risk` | 6 | `0.002300s` | `0.166162s` |
+| 1 | `tp_sl_grid` | `long_short_reversal` | `event_segments_1_tp_sl_15m_grid` | 6 | `0.008307s` | `1.956840s` |
+| 7 | `none` | `long_short_reversal` | `event_segments_7_no_risk` | 279936 | `136.112667s` | `137.263877s` |
+| 7 | `tp_sl_grid` | `long_short_reversal` | `event_segments_7_tp_sl_15m_grid` | 279936 | `140.994417s` | `141.519415s` |
+
+The full target table, per-stage timers, runtime metrics and result hashes live
+only in `benchmark_results.json`.
 
 Benchmark records live under:
 
 - `docs/architecture/backtest/benchmark_iterations/`
 
+Stage completion rule:
+
+- every implementation stage ends with a benchmark record in
+  `docs/architecture/backtest/benchmark_iterations/<date>_<stage>/`;
+- a stage is not complete until its benchmark record includes code version,
+  request hash, artifact hashes, canonical timers, CPU/RSS metrics and
+  correctness/parity evidence;
+- the next stage must not be treated as accepted until the previous stage passes
+  its benchmark gate.
+
 ## Test matrix
 
 Implementation is not complete until functional and benchmark coverage includes:
 
+- benchmark matrix for target public support:
+  `arity 1..10 x risk.mode none/tp_sl_grid x direction_mode long_only/long_short_reversal`;
 - `risk.mode = "none"`;
 - `risk.mode = "tp_sl_grid"` with request TP/SL subset covered by `hit_times/15m`;
+- TP/SL benchmark grid `2.0..25.0` inclusive, step `0.5`;
 - every sizing mode: `all_in`, `fixed_quote`, `fixed_equity_pct`,
   `fixed_equity_pct_min_quote`, `fixed_equity_pct_max_quote`;
 - `profit_lock` disabled and enabled;
-- every supported `direction_mode` from runtime defaults;
-- `close_on_end = true` and `close_on_end = false`;
+- every supported `direction_mode` from runtime defaults:
+  `long_only`, `long_short_reversal`;
+- `close_on_end = true` and `close_on_end = false`, where `close_on_end = false`
+  is covered by service-level correctness tests rather than a required notebook
+  benchmark;
+- full persisted summary metrics for both no-risk and TP/SL risk-on variants;
 - public API contract tests for create/status/list/top/variant/trades/cancel/defaults/preflight;
 - idempotency tests for replay and key conflict;
 - ownership/authz tests for job, top and lazy trades reads;
@@ -711,6 +1007,13 @@ Implementation is not complete until functional and benchmark coverage includes:
   request too expensive, queue saturation and lazy cache failure;
 - cache identity tests covering `job_id`, `variant_key`, `variant_hash`,
   `request_hash`, `engine_params_hash` and `artifact_manifest_hash`.
+
+Current canonical `sizing_smoke` evidence has compiled parity for `all_in` and
+`fixed_quote`; equity-percent sizing modes are reference-only in the notebook
+evidence. The service implementation is the first compiled parity point for
+`fixed_equity_pct`, `fixed_equity_pct_min_quote` and
+`fixed_equity_pct_max_quote`, and must record service-level parity evidence for
+those modes before v1 is considered functionally complete.
 
 ## Операционные аспекты
 
@@ -747,6 +1050,7 @@ Resource guardrails:
 | Queued jobs per user | `backtest.max_queued_jobs_per_user` | `429 backtest.rate_limited` |
 | Global active jobs | `backtest.max_active_jobs_global` | `503 backtest.queue_saturated` |
 | `top_n` | `backtest.max_top_n` | `422 backtest.request_too_expensive` |
+| Indicator arity | `backtest.max_indicator_arity` = `10` | `422 backtest.request_too_expensive` |
 | Indicator rows after source/window expansion | `backtest.max_indicator_rows` | `422 backtest.request_too_expensive` |
 | Candidate combinations before prefilter | `backtest.max_candidate_combinations` | `422 backtest.request_too_expensive` |
 | TP/SL cells | `backtest.max_tp_sl_cells` | `422 backtest.request_too_expensive` |
@@ -768,65 +1072,191 @@ Failure behavior:
 
 ## План внедрения
 
+Rule for all iterations:
+
+- every iteration has an explicit benchmark/evidence gate;
+- benchmark records are written before the iteration is marked complete;
+- a later stage may be prototyped locally, but it must not be considered accepted
+  until all earlier stage gates have passed.
+
 ### Iteration 0: docs and benchmark harness
 
-- finalize this architecture document;
+- finalize this architecture document against canonical notebook prototype;
 - mark conflicting roadmap/runtime docs as superseded or compatibility-only where needed;
-- create benchmark iteration workspace;
-- extract notebook fixtures into reproducible benchmark inputs with five-stage output;
-- define Mac Studio benchmark command contract.
+- keep `tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb`
+  as canonical algorithm source;
+- keep `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`
+  as canonical target values;
+- define Mac Studio benchmark command contract for future iteration records.
 
 Exit criteria:
 
-- benchmark folder exists;
-- baseline notebook scenarios are named;
-- five canonical benchmark stages and service overhead stages are fixed;
+- benchmark folder exists and contains JSON + Markdown evidence;
+- canonical notebook and benchmark evidence are named;
+- canonical timer names and service overhead stages are fixed;
 - source-of-truth status is explicit in backtest docs;
 - `variant_key`/`variant_hash` and progress mapping contracts are documented.
 
-### Iteration 1: `prepare_indicator_pools`
+Benchmark gate:
+
+- `docs/architecture/README.md` index is up to date;
+- canonical benchmark evidence paths are readable;
+- future benchmark record template contains commit, request hash, artifact hashes,
+  stage timers, CPU/RSS metrics and correctness result fields.
+
+### Iteration 1: request normalization and artifact context
 
 - implement strict artifact context resolver;
-- implement mmap loaders for `prices`, `signals`, `mappings`, `hit_times/15m`;
-- implement `[start, end)` slicing and row selection;
-- expose subsegment timings that roll up into `prepare_indicator_pools`.
+- implement request normalization for coordinates/timeframe/period/indicator grids;
+- implement execution defaults and validation for `direction_mode`, `sizing`,
+  `profit_lock`, fees, slippage and `close_on_end`;
+- implement canonical `request_hash` and result-affecting config hash;
+- implement cost estimate for rows, combinations and TP/SL cells;
+- expose `POST /backtests/preflight` and `GET /backtests/runtime-defaults`
+  as API shell.
 
 Benchmark gate:
 
-- `prepare_indicator_pools` vs notebook baseline;
+- request normalization and preflight smoke benchmark;
+- artifact current/root resolution timing;
+- parity check that request hash matches canonical fixture hash where applicable;
+- failure evidence for invalid indicator/source/window and request-too-expensive.
+
+### Iteration 2: artifact arrays and `prepare_pools`
+
+- implement mmap loaders for `prices`, `signals`, `mappings`;
+- implement `[start, end)` slicing by 15m `open_time`;
+- implement 15m return interval derivation;
+- implement 15m-to-1m execution mapping for no-risk;
+- implement signal row extraction and source/window row mapping;
+- implement row prefilter with `fused_row_prefilter_stats`;
+- implement compressed signal segments with `build_signal_segments`;
+- expose `prepare_pools` timing.
+
+Benchmark gate:
+
+- `prepare_pools` vs canonical notebook target for arity 1..7 fixture;
 - optional subsegments: `artifact_manifest_load`, `artifact_array_mmap_load`,
-  `time_range_slice`, `signal_row_selection`.
+  `time_range_slice`, `signal_row_selection`, `row_prefilter`,
+  `segment_build`;
+- row metadata/order hash equals notebook fixture;
+- stage record written before moving to combo planning.
 
-### Iteration 2: no-risk compute and persisted top-N
+### Iteration 3: combo planning contexts
 
-- implement job create/status/top;
-- implement list/cancel/defaults/preflight contracts as minimal API shell;
-- implement idempotency and request guardrails;
-- implement `risk.mode = "none"` scorer;
-- persist top N summary;
+- implement backend registry for `event_segments_2_no_risk`,
+  `event_segments_n_no_risk`, `streaming_2_no_risk` and
+  `event_segments_n_tp_sl_15m_grid`;
+- implement `build_exact_context`;
+- implement `build_proxy_context`;
+- implement deterministic `combo_iteration`;
+- implement pass-through and active `proxy_filter`.
+
+Benchmark gate:
+
+- `build_exact_context`;
+- `build_proxy_context`;
+- `combo_iteration`;
+- `proxy_filter`;
+- deterministic combo ordering and candidate-count evidence;
+- active and inactive proxy-filter fixture evidence;
+- stage record written before exact scoring.
+
+### Iteration 4: no-risk exact scoring and top-N
+
+- implement `event_segments_2_no_risk`;
+- implement `event_segments_n_no_risk` for arity 1..10;
+- implement `streaming_2_no_risk` fallback/parity comparator;
+- implement no-risk self-check against generic slow reference;
+- implement full no-risk summary metric set;
+- implement `heap_update` and `top_result_proxy_fill`;
+- implement persisted top-N summary for no-risk;
 - map public `variant_key` to storage `variant_hash` safely.
 
 Benchmark gate:
 
 - `service_warmup`;
-- `combo_proxy_prefilter`;
-- `count_trades`;
+- `self_check`;
 - `exact_scoring` for no-risk;
-- `heap_top_k_python_work`;
-- `persist_top_n_io`.
+- `heap_update`;
+- `top_result_proxy_fill`;
+- arity 1..7 target comparison against current canonical evidence;
+- arity 8..10 benchmark extension record before accepting those arities;
+- persisted top-N summary hash/parity evidence.
 
-### Iteration 3: TP/SL grid path
+### Iteration 5: TP/SL grid loading and validation
 
 - validate request TP/SL subset against artifact grid;
-- implement hit-times backed Stage B scoring;
-- persist `best_tp_pct`, `best_sl_pct`.
+- implement `load_hit_times` and `tp_sl_grid_validation`;
+- implement hit-times manifest hashing;
+- implement requested subset materialization for long/short TP/SL arrays;
+- implement deterministic 422 for grid-not-covered failure.
 
 Benchmark gate:
 
-- five-stage table with `exact_scoring` for TP/SL grid vs notebook-derived baseline;
-- request grid coverage validation and failure path.
+- `load_hit_times`;
+- `tp_sl_grid_validation`;
+- request grid coverage success and failure evidence;
+- target grid `2.0..25.0` step `0.5` evidence;
+- stage record written before TP/SL exact scoring.
 
-### Iteration 4: lazy trades detail
+### Iteration 6: TP/SL exact scoring and full metrics
+
+- implement `event_segments_n_tp_sl_15m_grid` for arity 1..10;
+- implement TP/SL self-check against slow direct reference;
+- implement TP/SL full persisted summary metric set:
+  `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+  `profit_factor`, `trade_count`, `sharpe_trades`, `win_rate_pct`,
+  `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`,
+  `best_tp_pct`, `best_sl_pct`;
+- persist risk-on top-N summary.
+
+Benchmark gate:
+
+- `build_exact_context`;
+- `combo_iteration`;
+- `self_check`;
+- `exact_scoring` / `tp_sl_exact_scoring` for TP/SL grid vs canonical target;
+- `heap_update`;
+- arity 1..7 target comparison against current canonical evidence;
+- arity 8..10 benchmark extension record before accepting those arities;
+- full metric-set correctness evidence for selected best TP/SL cell.
+
+### Iteration 7: job orchestration and persistence
+
+- implement job create/status/top/list/cancel contracts;
+- implement idempotency and request guardrails;
+- persist canonical request snapshot, artifact metadata and top-N rows;
+- expose progress using canonical pipeline stage names;
+- implement ownership/authz checks.
+
+Benchmark gate:
+
+- `persist_top_n_io`;
+- end-to-end job benchmark for no-risk and TP/SL with current canonical fixtures;
+- API contract tests for create/status/list/top/cancel/defaults/preflight;
+- idempotency replay/conflict evidence;
+- authz/ownership failure evidence.
+
+### Iteration 8: execution/sizing completion
+
+- implement all public sizing modes in service compiled path:
+  `all_in`, `fixed_quote`, `fixed_equity_pct`,
+  `fixed_equity_pct_min_quote`, `fixed_equity_pct_max_quote`;
+- implement `profit_lock` parity for every sizing mode;
+- implement `close_on_end = false`;
+- verify no-risk and TP/SL semantics remain stable across execution settings.
+
+Benchmark and correctness gate:
+
+- sizing smoke vs canonical notebook evidence;
+- service compiled parity for equity-percent modes, which are reference-only in
+  current notebook evidence;
+- service-level correctness tests for `close_on_end = true/false`;
+- regression check that canonical arity/risk/direction benchmark remains within
+  target envelope.
+
+### Iteration 9: lazy trades detail
 
 - implement variant lookup;
 - implement lazy trades recompute;
@@ -844,7 +1274,7 @@ Verification:
 - ownership failure;
 - variant key/hash mismatch failure.
 
-### Iteration 5: UI integration
+### Iteration 10: UI integration
 
 - use same public API;
 - show job progress/top N;
@@ -868,8 +1298,15 @@ Implementation-phase checks will be added per iteration. Benchmark checks must r
 ## Риски и открытые вопросы
 
 - Risk: no immutable artifact version retention means reproducibility depends on strict historical-prefix immutability.
-- Risk: `tests/notebook_tests/new_engine/02...` currently has no executed notebook outputs; baseline extraction must execute it on Mac Studio and record results.
-- Risk: `hit_times/15m` contract must be reconciled across docs, contracts, publisher and notebooks before implementation uses it.
+- Risk: canonical benchmark values are tied to `rows_per_indicator = 6`; wider production
+  requests need guardrails and may need additional budget tiers.
+- Risk: current canonical benchmark evidence covers arity 1..7; target public
+  support is arity 1..10, so arity 8..10 requires a follow-up Mac Studio
+  benchmark iteration before v1 acceptance for those arities.
+- Risk: full metric set for TP/SL best-cell summary can add CPU/memory cost;
+  Iteration 6 must measure that cost explicitly instead of assuming it is free.
+- Risk: equity-percent sizing modes are reference-only in current notebook
+  evidence; service implementation is the first compiled parity point.
 - Risk: full `configs/prod/indicators.yaml` catalog expansion can create large combo spaces; prefilter and guards are not optional.
 - Risk: current persistence/domain code may still treat `variant_key` as a SHA-only storage key; adapters or schema migration must protect the public readable `variant_key` contract.
 - Risk: multi-host API/worker deployment requires shared lazy trades cache before production scale-out.
