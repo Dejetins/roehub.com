@@ -28,7 +28,7 @@ historical/compatibility context для v1, а не source of truth. Это вк
 
 - `POST /backtests` как основной create endpoint вместо `POST /backtests/jobs`;
 - `runs` vocabulary вместо `jobs` vocabulary;
-- `hit_times/1m` вместо target `hit_times/15m`;
+- any hit-times wording that contradicts target `hit_times/15m`;
 - public `execution profile` vocabulary вместо `risk.mode`;
 - старые benchmark notebooks под `tests/notebook_tests/new_engine/*` как
   canonical algorithm source.
@@ -469,8 +469,12 @@ Canonical prototype validates:
 - period semantics: `[start, end)` by 15m `open_time`;
 - target public arity: 1..10 indicators for both `risk.mode = "none"` and
   `risk.mode = "tp_sl_grid"`;
-- current canonical benchmark evidence covers arity 1..7; arity 8..10 must get
-  a new Mac Studio benchmark iteration before v1 is accepted for those arities;
+- canonical production acceptance benchmark covers arity 1..7; if the service
+  reaches 90% of the target for arity 1..7, the algorithm transfer to production
+  runtime is considered successful;
+- arity 8..10 are allowed by request validation but controlled by cost guardrails;
+  a separate Mac Studio benchmark iteration for them is needed only before
+  expanding production budget tiers, not for v1 completion;
 - benchmark directions: `long_only`, `long_short_reversal`;
 - risk modes: `none`, `tp_sl_grid`;
 - TP/SL target grid: `2.0..25.0` inclusive, step `0.5`
@@ -863,10 +867,10 @@ Canonical benchmark identity:
 - period: `[2020-01-11T20:08:00Z, 2026-04-11T20:08:00Z)`;
 - rows per indicator: `6`;
 - warmup rows per indicator: `2`;
-- current evidence arities: `1..7`;
-- target public arities: `1..10` for both no-risk and TP/SL; arity 8..10
-  is part of the v1 contract but requires a follow-up benchmark iteration before
-  v1 acceptance for those arities;
+- canonical production acceptance arities: `1..7`;
+- target public request arities: `1..10` for both no-risk and TP/SL; arity 8..10
+  are allowed only within cost guardrails and are not part of the mandatory 90%
+  acceptance benchmark for v1 completion;
 - direction modes: `long_only`, `long_short_reversal`;
 - risk modes: `none`, `tp_sl_grid`;
 - TP/SL grid: `2.0..25.0` inclusive with `0.5` step;
@@ -936,8 +940,9 @@ Acceptance comparison:
   `{arity, risk_mode, direction_mode, backend}`;
 - for arity 1..7, the target source is
   `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
-- for arity 8..10, target values must be created by a follow-up Mac Studio
-  benchmark iteration before the implementation is accepted for those requests;
+- arity 8..10 do not block v1 completion if arity 1..7 passes the 90% threshold;
+  before raising production budgets for broad arity 8..10 workloads, create a
+  follow-up Mac Studio benchmark iteration;
 - `persist_top_n_io`, `lazy_trades_compute` and
   `lazy_trades_cache_hit` use service-specific absolute budgets plus regression
   comparison after their own baseline exists;
@@ -985,8 +990,11 @@ Stage completion rule:
 
 Implementation is not complete until functional and benchmark coverage includes:
 
-- benchmark matrix for target public support:
-  `arity 1..10 x risk.mode none/tp_sl_grid x direction_mode long_only/long_short_reversal`;
+- benchmark matrix for production acceptance:
+  `arity 1..7 x risk.mode none/tp_sl_grid x direction_mode long_only/long_short_reversal`;
+- service-level correctness smoke for arity 8..10 on small row pools to confirm
+  contract support without including those arities in the mandatory v1
+  performance gate;
 - `risk.mode = "none"`;
 - `risk.mode = "tp_sl_grid"` with request TP/SL subset covered by `hit_times/15m`;
 - TP/SL benchmark grid `2.0..25.0` inclusive, step `0.5`;
@@ -1044,23 +1052,30 @@ Security and access:
 
 Resource guardrails:
 
-| Guardrail | Config key | Failure |
-|---|---|---|
-| Active jobs per user | `backtest.max_active_jobs_per_user` | `429 backtest.rate_limited` |
-| Queued jobs per user | `backtest.max_queued_jobs_per_user` | `429 backtest.rate_limited` |
-| Global active jobs | `backtest.max_active_jobs_global` | `503 backtest.queue_saturated` |
-| `top_n` | `backtest.max_top_n` | `422 backtest.request_too_expensive` |
-| Indicator arity | `backtest.max_indicator_arity` = `10` | `422 backtest.request_too_expensive` |
-| Indicator rows after source/window expansion | `backtest.max_indicator_rows` | `422 backtest.request_too_expensive` |
-| Candidate combinations before prefilter | `backtest.max_candidate_combinations` | `422 backtest.request_too_expensive` |
-| TP/SL cells | `backtest.max_tp_sl_cells` | `422 backtest.request_too_expensive` |
-| Lazy trades requests per user window | `backtest.lazy_trades_rate_limit` | `429 backtest.rate_limited` |
-| Job queue wait | `backtest.job_queue_timeout_seconds` | terminal job failure |
-| Job wall time | `backtest.job_wall_timeout_seconds` | terminal job failure |
-| Lazy trades wall time | `backtest.lazy_trades_timeout_seconds` | `503` retryable |
+| Guardrail | Config key | v1 default | What it limits | Failure |
+|---|---|---:|---|---|
+| Active jobs per user | `backtest.max_active_jobs_per_user` | `1` | How many jobs one user may run in `running/warming/scoring` at the same time. One arity 7 benchmark already loads CPU at roughly one heavy-worker level. | `429 backtest.rate_limited` |
+| Queued jobs per user | `backtest.max_queued_jobs_per_user` | `3` | How many jobs one user may keep queued beyond the active job. | `429 backtest.rate_limited` |
+| Global active jobs | `backtest.max_active_jobs_global` | `1` | How many heavy jobs the service runs concurrently. Increase to `2+` only after a separate concurrency benchmark; otherwise the 90% latency/CPU target becomes unstable. | `503 backtest.queue_saturated` |
+| `top_n` | `backtest.max_top_n` | `100` | How many summary rows are persisted and returned per job. Larger values increase heap work, payload size and DB write cost. | `422 backtest.request_too_expensive` |
+| Indicator arity | `backtest.max_indicator_arity` | `10` | Maximum indicators in one request. Production acceptance benchmark is mandatory for arity 1..7; arity 8..10 is allowed only when the other cost guardrails pass. | `422 backtest.request_too_expensive` |
+| Indicator rows after source/window expansion | `backtest.max_indicator_rows` | `1000` | Total signal rows after expanding all `source` and `window` ranges, before row prefilter. Example: 5 sources x 200 windows = 1000 rows already consumes the default budget. | `422 backtest.request_too_expensive` |
+| Candidate combinations after row prefilter | `backtest.max_candidate_combinations` | `300000` | Combinations before exact scoring after row prefilter. Default covers the canonical arity 7 fixture (`6^7 = 279936`) and rejects requests like `20^5 = 3200000`. | `422 backtest.request_too_expensive` |
+| TP/SL cells | `backtest.max_tp_sl_cells` | `2209` | Request TP/SL grid size. Default equals the canonical `47 x 47` grid for `2.0..25.0` step `0.5`. | `422 backtest.request_too_expensive` |
+| Lazy trades requests per user window | `backtest.lazy_trades_rate_limit` | `30 / 10 min` | Lazy trades detail requests per user sliding window. | `429 backtest.rate_limited` |
+| Job queue wait | `backtest.job_queue_timeout_seconds` | `300` | Maximum time a job may wait in queue before terminal failure. | terminal job failure |
+| Job wall time | `backtest.job_wall_timeout_seconds` | `900` | Maximum job wall-clock runtime. Requests estimated to exceed this budget must be rejected by preflight. | terminal job failure |
+| Lazy trades wall time | `backtest.lazy_trades_timeout_seconds` | `30` | Maximum lazy trade recompute time for one `variant_key`. | `503` retryable |
+
+The default tier intentionally stays close to the canonical benchmark workload.
+Paid or admin tiers may expand `max_top_n`, `max_indicator_rows`,
+`max_candidate_combinations`, `max_active_jobs_global` and
+`job_wall_timeout_seconds`, but only after a separate `Mac Studio` benchmark
+record for that tier.
 
 Production rollout is blocked if these config keys are unset or if preflight cannot
-explain which guardrail rejected a request.
+explain which guardrail rejected a request and how the user can narrow that
+request.
 
 Failure behavior:
 
@@ -1181,7 +1196,7 @@ Benchmark gate:
 - `heap_update`;
 - `top_result_proxy_fill`;
 - arity 1..7 target comparison against current canonical evidence;
-- arity 8..10 benchmark extension record before accepting those arities;
+- service-level correctness smoke for arity 8..10 on small row pools;
 - persisted top-N summary hash/parity evidence.
 
 ### Iteration 5: TP/SL grid loading and validation
@@ -1219,7 +1234,7 @@ Benchmark gate:
 - `exact_scoring` / `tp_sl_exact_scoring` for TP/SL grid vs canonical target;
 - `heap_update`;
 - arity 1..7 target comparison against current canonical evidence;
-- arity 8..10 benchmark extension record before accepting those arities;
+- service-level correctness smoke for arity 8..10 on small row pools;
 - full metric-set correctness evidence for selected best TP/SL cell.
 
 ### Iteration 7: job orchestration and persistence
@@ -1295,21 +1310,113 @@ python -m tools.docs.generate_docs_index --check
 
 Implementation-phase checks will be added per iteration. Benchmark checks must run on `Mac Studio`, not on local non-production-equivalent hosts.
 
-## Риски и открытые вопросы
+## Риски, пояснения и открытые решения
 
-- Risk: no immutable artifact version retention means reproducibility depends on strict historical-prefix immutability.
-- Risk: canonical benchmark values are tied to `rows_per_indicator = 6`; wider production
-  requests need guardrails and may need additional budget tiers.
-- Risk: current canonical benchmark evidence covers arity 1..7; target public
-  support is arity 1..10, so arity 8..10 requires a follow-up Mac Studio
-  benchmark iteration before v1 acceptance for those arities.
-- Risk: full metric set for TP/SL best-cell summary can add CPU/memory cost;
-  Iteration 6 must measure that cost explicitly instead of assuming it is free.
-- Risk: equity-percent sizing modes are reference-only in current notebook
-  evidence; service implementation is the first compiled parity point.
-- Risk: full `configs/prod/indicators.yaml` catalog expansion can create large combo spaces; prefilter and guards are not optional.
-- Risk: current persistence/domain code may still treat `variant_key` as a SHA-only storage key; adapters or schema migration must protect the public readable `variant_key` contract.
-- Risk: multi-host API/worker deployment requires shared lazy trades cache before production scale-out.
-- Risk: roadmap docs still contain superseded `runs`, `POST /backtests`, `hit_times/1m` and `execution profile` vocabulary; implementation must not use those as v1 source of truth.
-- Question: exact chart payload shape for UI candles/trades overlay remains a UI iteration decision.
-- Question: exact numeric defaults for resource guardrails must be set in runtime config before production rollout.
+Не риск: artifact reproducibility. Artifact store для backtest считается
+практически immutable на уровне опубликованных файлов. Даже если publisher
+дописывает новый хвост, benchmark и jobs читают `[start, end)` внутри historical
+prefix, который не изменяется. Инвариант v1: published historical prefix never
+rewrites. Поэтому отсутствие отдельного immutable version retention не является
+самостоятельным production blocker для текущей модели.
+
+Риск: production request может быть шире canonical benchmark fixture.
+Canonical target измерен на `rows_per_indicator = 6`. Это означает: у каждого
+indicator после отбора в benchmark остается 6 signal rows, и combo count растет
+как произведение rows по indicators. Простой пример: `7` indicators x `6` rows =
+`6^7 = 279936` combos, это покрыто benchmark. Но `5` indicators x `20` rows =
+`20^5 = 3200000` combos, то есть больше чем в 11 раз. Решения:
+
+- default public tier держит `max_indicator_rows = 1000` и
+  `max_candidate_combinations = 300000`;
+- `POST /backtests/preflight` заранее считает cost и объясняет, что нужно сузить:
+  меньше sources, уже window range, больше step или меньше indicators;
+- row prefilter обязателен и должен сокращать широкие source/window ranges до
+  ограниченного числа rows перед exact scoring;
+- отдельные paid/admin tiers могут иметь более высокий budget, но только после
+  отдельного Mac Studio benchmark для такого tier.
+
+Не риск для v1 completion: arity 8..10. Production acceptance benchmark
+обязателен для arity 1..7. Если сервис достигает 90% target по arity 1..7,
+перенос алгоритма в production runtime считается успешным. Arity 8..10 остаются
+разрешенной формой request, но проходят только при соблюдении cost guardrails.
+Отдельный benchmark для arity 8..10 нужен перед расширением budgets, а не для
+закрытия v1.
+
+Риск/implementation decision: full metrics для TP/SL best-cell summary. Данных
+хватает: hit-times, prices, signals и выбранная best TP/SL cell есть. Не хватает
+доказанного production-способа посчитать полный metric set дешево. Fast TP/SL path
+быстро находит best cell по return через difference buffers и log-return sums. Но
+`max_drawdown_pct`, `profit_factor`, `sharpe_trades`, `win_rate_pct`,
+`avg_trade_ret_pct`, `avg_trade_exec_bars` и `exposure_pct` требуют пройти сделки
+для выбранной cell и восстановить equity/trade stats. Решения:
+
+- предпочтительно: hot path ранжирует combos по return, а полный metric set
+  пересчитывается только для persisted top-N variants по их selected best cell;
+- если пользователь ранжирует по метрике не `total_return_pct`, нужен отдельный
+  compiled path или bounded shortlist, иначе придется считать много trade stats;
+- Iteration 6 должна записать CPU/RSS cost именно этого second-pass metrics step.
+
+Риск: equity-percent sizing modes пока reference-only в notebook evidence.
+`all_in` и `fixed_quote` уже имеют compiled parity smoke. Для
+`fixed_equity_pct`, `fixed_equity_pct_min_quote` и
+`fixed_equity_pct_max_quote` текущий notebook evidence является reference-only.
+Пример: при `initial_cash_quote = 10000` и `fixed_equity_pct = 10%` первая сделка
+использует `1000` quote, но после прибыли/убытка следующая сделка должна считать
+10% уже от нового equity; min/max modes дополнительно clamp-ят quote size. Решения:
+
+- основной путь: реализовать эти sizing modes в compiled service path и сравнить
+  с notebook/reference fixtures как first compiled parity point;
+- дополнительный путь: сначала добавить compiled parity в notebook, но это
+  задержит service implementation;
+- fallback с отключением equity-percent modes в публичном API не подходит для v1,
+  потому что эти modes входят в публичный request contract.
+
+Риск: полный catalog `configs/prod/indicators.yaml` может создать большие combo
+spaces. Пользователь может выбрать несколько indicators, все sources и широкий
+window range. Даже если каждый indicator валиден сам по себе, Cartesian product
+может стать слишком дорогим. Пример: `4` indicators, у каждого после expansion
+`50` rows, дают `50^4 = 6250000` combos. Решения:
+
+- `runtime-defaults` должен показывать limits до запуска;
+- `preflight` должен считать rows, combos и TP/SL cells до создания job;
+- row prefilter и combo proxy prefilter обязательны, а не performance luxury;
+- requests выше default budget получают `422 backtest.request_too_expensive` с
+  понятной подсказкой, какой параметр сузить.
+
+Риск: `variant_key` может конфликтовать с текущим storage identity. Public v1
+хочет readable route key, например
+`job_f7d2c378__dema_close_w192__risk_none__vh_a13f09c2`. Legacy/current DB code
+может ожидать, что `variant_key` это 64-char SHA. Если положить readable key в
+SHA-only column, можно сломать validation, indexes или lazy-trades lookup. Решения:
+
+- preferred: добавить отдельные persisted fields `public_variant_key` и
+  `variant_hash`, где `variant_hash` остается stable SHA-256;
+- transition: adapter принимает public `variant_key`, резолвит его в top-N row
+  внутри `job_id`, а в legacy SHA-only field временно хранит `variant_hash`;
+- rejected: сделать public key только hash-ем, потому что UI/debuggability хуже и
+  это противоречит readable route contract.
+
+Риск: lazy trades cache зависит от deployment topology. В single-host v1 local
+file/object cache на 48h достаточен: cache miss просто запускает deterministic
+recompute для одного variant. В multi-host deployment запрос `show trades` может
+попасть на другой API/worker host, где local cache файла нет. Это не ломает
+correctness, но может давать лишний recompute и нестабильную latency. Решения:
+
+- v1 default: single API/worker host или sticky routing + local cache;
+- scale-out trigger: перед несколькими API/worker hosts включить shared object
+  storage для lazy trades payload;
+- Postgres JSONB допустим только для малых payloads и metadata, но не как
+  безлимитное хранилище всех trades.
+
+Docs cleanup: `docs/architecture/roadmap/*.md` не содержат прямых упоминаний
+старой hit-times модели. Canonical docs должны использовать `hit_times/15m`.
+Исторический deep-research report может сохранять старый анализ как архивный
+контекст, но он не является source of truth для реализации.
+
+Отложенное решение без production risk: точная форма chart payload для UI
+candles/trades overlay будет спроектирована в UI iteration.
+
+Решение по guardrails: v1 default values зафиксированы в таблице `Resource
+guardrails` выше. Перед production rollout эти значения должны попасть в runtime
+config и быть видимы через `GET /backtests/runtime-defaults` и
+`POST /backtests/preflight`.

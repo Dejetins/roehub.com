@@ -29,7 +29,7 @@
 
 - `POST /backtests` как основной create endpoint вместо `POST /backtests/jobs`;
 - `runs` вместо `jobs`;
-- `hit_times/1m` вместо `hit_times/15m`;
+- любые hit-times формулировки, которые противоречат target `hit_times/15m`;
 - public `execution profile` вместо `risk.mode`;
 - SHA-only public `variant_key` вместо readable public `variant_key` +
   stable `variant_hash`.
