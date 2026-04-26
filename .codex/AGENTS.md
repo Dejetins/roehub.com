@@ -158,6 +158,7 @@ Commit only durable coordination artifacts:
 - `.codex/agents/*.toml`
 - `.codex/agents/*template*.md`
 - `.codex/agents/promt_temlate.md`
+- `.codex/agents/generated/**/*.md`
 
 Do not commit local state, secrets, logs, or generated session artifacts:
 - `.codex/agents/.context/`

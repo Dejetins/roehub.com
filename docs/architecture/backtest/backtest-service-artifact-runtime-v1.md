@@ -1,12 +1,17 @@
 # Backtest Service Artifact Runtime v1
 
-Документ фиксирует целевую архитектуру artifact-backed backtest service, его публичный API, job flow, lazy trades detail и benchmark-gate по итерациям.
+Companion/reference copy for the artifact-backed backtest service architecture.
+Canonical implementation source is
+`docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md`; if the
+two documents diverge, the Russian document wins for implementation.
 
 ## Статус
 
-Каноническая целевая архитектура для планирования реализации. Runtime service
-еще не реализован; notebook и benchmark evidence ниже определяют production
-prototype, которому сервис обязан соответствовать.
+Reference target architecture for planning implementation. Runtime service еще
+не реализован; notebook и benchmark evidence ниже определяют production
+prototype, которому сервис обязан соответствовать. The canonical target contract
+for implementation is the Russian document:
+`docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md`.
 
 Этот документ проектируется поверх:
 
@@ -19,11 +24,11 @@ prototype, которому сервис обязан соответствова
 - текущего trusted artifact publisher/precompute scope в `backtest_artifacts`;
 - текущей DDD / ports-and-adapters структуры репозитория.
 
-Этот документ является каноническим target contract для нового `Backtest Service
-Artifact Runtime v1`.
+Этот документ является companion/reference copy для нового `Backtest Service
+Artifact Runtime v1`; implementation source of truth остается в `.ru.md`.
 
 Старые backtest runtime docs и удаленный runtime compute path не восстанавливаются.
-Roadmap-формулировки, которые противоречат этому документу, считаются
+Roadmap-формулировки, которые противоречат canonical `.ru.md` runtime document, считаются
 historical/compatibility context для v1, а не source of truth. Это включает:
 
 - `POST /backtests` как основной create endpoint вместо `POST /backtests/jobs`;
@@ -38,7 +43,7 @@ roadmap как source of truth, но отсутствует в текущем р
 восстановлен отдельным ADR/документом, он не переопределяет этот v1 contract.
 Существующие code/schema элементы со старым словарем рассматриваются как
 compatibility inputs: adapters may translate them, but public v1 contract stays
-defined here.
+defined by the canonical `.ru.md` runtime document.
 
 ## Цель
 

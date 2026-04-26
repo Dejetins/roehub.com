@@ -1,6 +1,10 @@
 # Backtest Benchmark Iterations
 
 Рабочая папка для фиксации benchmark evidence по каждой итерации backtest service.
+Активный контракт имен стадий берется из
+`docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` и
+канонического JSON evidence
+`docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`.
 
 ## Назначение
 
@@ -14,11 +18,29 @@
 - прошел ли stage gate `>= 90%` по скорости, памяти и CPU-метрикам;
 - прошли ли service-only absolute budgets.
 
-Benchmark вне `Mac Studio` не считается acceptance evidence.
+Benchmark вне `Mac Studio` не считается acceptance evidence. Локальные docs/static
+checks можно записывать как developer evidence, но не как acceptance benchmark.
+
+## Канонический baseline
+
+- Notebook baseline:
+  `tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb`
+- Числовые целевые значения:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`
+- Человекочитаемое summary:
+  `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_summary.md`
+- Runtime target: `hit_times/15m`
+- Словарь public API: `jobs`, `risk.mode`, readable `variant_key` plus
+  stable `variant_hash`
+
+Старый пятистадийный runtime словарь с `count_trades`,
+`combo_proxy_prefilter` и `heap_top_k_python_work` не является active target для
+v1 records. Такие имена допустимы только в historical notes, если они явно
+помечены как superseded.
 
 ## Имя файла
 
-Формат:
+Формат для одиночной Markdown-записи:
 
 ```text
 YYYY-MM-DD-iteration-<n>-<short-name>.md
@@ -28,6 +50,12 @@ YYYY-MM-DD-iteration-<n>-<short-name>.md
 
 ```text
 2026-04-25-iteration-1-artifact-load.md
+```
+
+Если итерация требует рядом JSON/PNG/log evidence, допускается директория:
+
+```text
+YYYY-MM-DD_iteration_<n>_<short_name>/README.md
 ```
 
 ## Шаблон записи
@@ -83,28 +111,44 @@ YYYY-MM-DD-iteration-<n>-<short-name>.md
 | Segment | Baseline wall s | Service wall s | Speed ratio | Baseline peak RSS | Service peak RSS | Memory ratio | CPU evidence | Pass |
 |---|---:|---:|---:|---:|---:|---:|---|---|
 | service_warmup | | | | | | | | |
+| numba_warmup | | | | | | | | |
+| sample_warmup | | | | | | | | |
 
 ## Runtime Metrics Without Warmup
 
 Canonical notebook-compatible stages:
 
 ```text
-total                       3.012s
-prepare indicator pools     0.964s
-combo proxy prefilter       0.595s
-count trades                0.637s
-exact scoring               0.775s
-heap/top-K Python work      0.026s
+total_without_warmup
+load_hit_times              risk-on only
+tp_sl_grid_validation       risk-on only
+prepare_pools
+build_exact_context
+build_proxy_context
+combo_iteration
+proxy_filter
+self_check                  benchmark/test evidence
+exact_scoring
+tp_sl_exact_scoring         risk-on only
+heap_update
+top_result_proxy_fill
 ```
 
-| Stage | Notebook wall s | Service wall s | Speed ratio | Notebook peak RSS | Service peak RSS | Memory ratio | CPU evidence | Pass |
-|---|---:|---:|---:|---:|---:|---:|---|---|
-| total_without_warmup | | | | | | | | |
-| prepare_indicator_pools | | | | | | | | |
-| combo_proxy_prefilter | | | | | | | | |
-| count_trades | | | | | | | | |
-| exact_scoring | | | | | | | | |
-| heap_top_k_python_work | | | | | | | | |
+| Stage | Required | Notebook wall s | Service wall s | Speed ratio | Notebook peak RSS | Service peak RSS | Memory ratio | CPU evidence | Pass |
+|---|---|---:|---:|---:|---:|---:|---:|---|---|
+| total_without_warmup | yes | | | | | | | | |
+| load_hit_times | `risk.mode=tp_sl_grid` | | | | | | | | |
+| tp_sl_grid_validation | `risk.mode=tp_sl_grid` | | | | | | | | |
+| prepare_pools | yes | | | | | | | | |
+| build_exact_context | yes | | | | | | | | |
+| build_proxy_context | yes | | | | | | | | |
+| combo_iteration | yes | | | | | | | | |
+| proxy_filter | yes | | | | | | | | |
+| self_check | benchmark/test | | | | | | | | |
+| exact_scoring | yes | | | | | | | | |
+| tp_sl_exact_scoring | `risk.mode=tp_sl_grid` | | | | | | | | |
+| heap_update | yes | | | | | | | | |
+| top_result_proxy_fill | no-risk/top metadata | | | | | | | | |
 
 ## Service-Only Overhead
 

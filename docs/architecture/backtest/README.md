@@ -5,8 +5,8 @@
 
 ## Канонические документы
 
-- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — каноническая целевая архитектура нового artifact-backed backtest service.
-- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` — русская версия канонической целевой архитектуры.
+- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` — канонический implementation source и целевой contract нового artifact-backed backtest service.
+- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — companion/reference copy; если расходится с русским документом, для реализации побеждает `.ru.md`.
 - `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md` — executable prompt pack для Iteration 0/1 реализации.
 - `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.
 
@@ -26,7 +26,7 @@
 ## Superseded vocabulary
 
 Для нового runtime v1 source of truth находится в
-`backtest-service-artifact-runtime-v1.md`. Старые формулировки в roadmap/doc/code
+`backtest-service-artifact-runtime-v1.ru.md`. Старые формулировки в roadmap/doc/code
 не переопределяют v1 contract, если говорят про:
 
 - `POST /backtests` как основной create endpoint вместо `POST /backtests/jobs`;
@@ -35,6 +35,9 @@
 - public `execution profile` вместо `risk.mode`;
 - SHA-only public `variant_key` вместо readable public `variant_key` +
   stable `variant_hash`.
+
+Deep-research reports под этой папкой являются background/review evidence, а не
+реализационным source of truth для v1.
 
 ## Индексы
 

@@ -9,6 +9,8 @@
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md`
 - `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md`
 - `docs/architecture/backtest/benchmark_iterations/README.md`
+- `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`
+- `docs/architecture/backtest/benchmark_iterations/2026-04-26_iteration_0_docs_benchmark_harness/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ## Notes
@@ -17,3 +19,5 @@
 - Новая документация backtest ядра ведётся через
   `backtest-service-artifact-runtime-v1.ru.md`, prompt pack текущих итераций и
   benchmark evidence records.
+- Английский `backtest-service-artifact-runtime-v1.md` является companion/reference
+  copy; при расхождении для реализации побеждает `.ru.md`.

@@ -16,6 +16,7 @@ Language policy
 
 Primary objective
 - Convert user requests into complete executor prompts with clear scope, constraints, measurable acceptance criteria, and minimal context waste.
+- Save every generated prompt as a standalone `.md` file under `.codex/agents/generated/<prompt_or_pack_folder>/`.
 - Optimize for implementation success per token, not for maximum repository reading coverage.
 - Enforce the bounded-context prompt shape even when old examples, old prompts, or legacy template fragments suggest a broader format.
 - For browser-visible tasks, require runtime verification through the available browser surface when available and relevant.
@@ -377,6 +378,17 @@ Hard requirements to encode in generated prompts
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
 
+Generated prompt artifact storage (mandatory)
+- Every generated prompt MUST be written as a full standalone `.md` file.
+- The storage root MUST be `.codex/agents/generated`.
+- Prompt packs MUST use one dedicated folder: `.codex/agents/generated/<pack_folder>/`.
+- A single prompt without an explicit pack MUST still use its own folder under `.codex/agents/generated/<prompt_slug>/`.
+- Use the user's requested folder name when provided, after removing unsafe path traversal.
+- If no folder name is provided, infer a concise lowercase slug from the task.
+- Use stable sortable filenames for packs, such as `01-implement-<topic>.md`, `02-review-<topic>.md`, or `<prompt_name>.md` when ordering is not relevant.
+- Do not create README, index, manifest, or auxiliary documentation files unless explicitly requested.
+- Do not paste full prompt contents in chat unless explicitly requested; report generated file paths and validation.
+
 Default quality gates to include (adapt only when justified)
 - `ruff check .`
 - `pyright`
@@ -476,6 +488,7 @@ Output contract
 - The prompt must be immediately executable without manual cleanup.
 - The generated prompt must follow the canonical current schema, not any legacy prompt shape.
 - For browser-visible tasks, the generated prompt must explicitly require runtime browser verification when available and relevant.
+- The generated prompt must be saved as a standalone `.md` file under `.codex/agents/generated/<prompt_or_pack_folder>/`.
 """
 
 [mcp_servers.context7]

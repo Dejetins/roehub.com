@@ -15,6 +15,7 @@ from apps.api.monitoring import install_metrics_middleware
 from apps.api.routes import build_indicators_router, build_operations_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
+    build_backtests_router,
     build_identity_api_module,
     build_indicators_compute,
     build_indicators_registry,
@@ -86,6 +87,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         log.info("strategy API router disabled by strategy runtime config")
     app.include_router(
         build_market_data_reference_router(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
+        )
+    )
+    app.include_router(
+        build_backtests_router(
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
         )

@@ -1,3 +1,9 @@
+from .backtests import (
+    BacktestPreflightResponse,
+    BacktestRuntimeDefaultsResponse,
+    build_backtest_preflight_response,
+    build_backtest_runtime_defaults_response,
+)
 from .indicators import (
     ComputeAxisResponse,
     ComputeMetaResponse,
@@ -42,6 +48,8 @@ from .market_data_reference import (
 )
 
 __all__ = [
+    "BacktestPreflightResponse",
+    "BacktestRuntimeDefaultsResponse",
     "ComputeAxisResponse",
     "ComputeMetaResponse",
     "DefaultSpecResponse",
@@ -74,6 +82,8 @@ __all__ = [
     "build_risk_specs",
     "build_time_range",
     "build_timeframe",
+    "build_backtest_preflight_response",
+    "build_backtest_runtime_defaults_response",
     "MarketDataMarketItemResponse",
     "MarketDataMarketsResponse",
     "MarketDataInstrumentItemResponse",

@@ -1,6 +1,7 @@
 from .artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
+    FilesystemBacktestArtifactContextResolver,
 )
 from .config import (
     BacktestArtifactHitTimesGridRuntimeConfig,
@@ -35,6 +36,7 @@ __all__ = [
     "BacktestArtifactValidationPlanRuntimeConfig",
     "BacktestArtifactsRuntimeConfig",
     "BacktestPostgresGateway",
+    "FilesystemBacktestArtifactContextResolver",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PsycopgBacktestPostgresGateway",
