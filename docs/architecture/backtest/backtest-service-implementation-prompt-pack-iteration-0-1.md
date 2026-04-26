@@ -84,13 +84,6 @@ context_sources:
         - docs/architecture/README.md
         - docs/INDEX.md
 
-    superseded_vocabulary_scan:
-      read_when: "rg finds active legacy wording in roadmap or backtest docs"
-      paths:
-        - docs/architecture/roadmap/milestone-4-epics-v1.md
-        - docs/architecture/roadmap/milestone-5-epics-v1.md
-        - docs/architecture/roadmap/milestone-6-epics-v1.md
-
     current_code_contracts:
       read_when: "documenting current compatibility gaps against code"
       paths:
@@ -113,12 +106,13 @@ hard_requirements:
   russian_docs_by_default: true
   benchmark_acceptance_macstudio_only: true
   no_legacy_source_of_truth_revival: true
+  runtime_doc_is_sole_implementation_source: true
   keep_existing_user_changes: true
 
 task_toggles:
   update_docs_navigation: true
   update_benchmark_template_if_stale: true
-  classify_superseded_vocabulary: true
+  verify_current_backtest_entrypoints: true
   create_iteration_0_evidence_record_if_needed: true
 
 skill_routing:
@@ -175,8 +169,8 @@ quality_gates:
     expect: "passes"
   - cmd: "python - <<'PY'\nimport json\np='docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json'\nwith open(p) as f: d=json.load(f)\nrequired={'methodology','request_hash','artifact_manifest_hash','hit_times_manifest_hash','runs','sizing_smoke'}\nmissing=required-set(d)\nassert not missing, missing\nassert len(d['runs']) == 28, len(d['runs'])\nPY"
     expect: "canonical benchmark JSON has required keys and 28 runs"
-  - cmd: "rg -n \"hit_times/1m|execution profile|POST /backtests\\b|\\bruns\\b\" docs/architecture/backtest docs/architecture/roadmap || true"
-    expect: "any matches are either fixed or explicitly classified as superseded/compatibility"
+  - cmd: "rg -n \"hit_times/1m|execution profile|POST /backtests\\b|\\bruns\\b\" docs/INDEX.md docs/architecture/README.md docs/architecture/backtest/README.md docs/architecture/backtest/backtest-service-artifact-runtime-v1*.md docs/architecture/backtest/benchmark_iterations/README.md || true"
+    expect: "matches in current entrypoints are either absent or explicitly classified as superseded/compatibility"
   - cmd: "git diff --check"
     expect: "passes"
 
@@ -190,11 +184,10 @@ expected_primary_touches:
 possible_secondary_touches:
   - "docs/architecture/backtest/benchmark_iterations/<date>_iteration_0_docs_benchmark_harness/"
   - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.md"
-  - "docs/architecture/roadmap/*.md"
 
 safety_notes:
   - "Do not revert unrelated user changes in .codex, docs, or code."
-  - "If old docs conflict with the runtime document, mark them superseded instead of reviving them."
+  - "Do not read roadmap docs as implementation context; use the runtime document as the sole target contract."
   - "Benchmark numbers must come from the canonical JSON, not from manual summary edits."
 ---
 
@@ -264,7 +257,7 @@ Additional context:
 
 - Prefer the Russian runtime document as the human-readable canonical doc.
 - Keep English code identifiers, API routes, config keys, metric names and file paths unchanged.
-- If changing roadmap docs is too broad, add clear compatibility notes instead of broad rewrites.
+- Do not read or patch roadmap docs in this iteration unless the user explicitly asks for roadmap cleanup.
 
 ## Requirements (Nice-to-have)
 
@@ -328,7 +321,7 @@ Skill routing for this task:
 
 1. Inspect the runtime document and current benchmark iteration template.
 2. Compare benchmark template timer names with the current required canonical timers.
-3. Inspect docs navigation only if links are stale or new references are needed.
+3. Inspect current backtest docs navigation only if links are stale or new references are needed.
 4. Patch the smallest set of docs needed for source-of-truth closure.
 5. Run docs index generation/checks and benchmark JSON shape check.
 6. Record unresolved issues only if they block Iteration 1.
@@ -348,14 +341,14 @@ Skill routing for this task:
 - Keep docs in Russian unless preserving code identifiers or paths.
 - Do not edit notebooks.
 - Do not create service runtime modules.
-- Do not make broad roadmap rewrites unless needed to remove a direct contradiction.
+- Do not read or rewrite roadmap docs in this iteration.
 - Preserve unrelated user changes.
 
 # Files to indicate (expected touched areas)
 
 Expected primary touched areas are listed in front matter.
 
-If you touch roadmap docs or code contract files, explain why that was necessary.
+If you touch code contract files, explain why that was necessary.
 If you do not touch optional areas, say so in the final report.
 
 # Non-goals
