@@ -4,7 +4,7 @@ import hashlib
 import json
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Mapping, Sequence
 
@@ -27,12 +27,19 @@ from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactMappingArraysV2,
+    ArtifactPriceArraysV2,
     ArtifactSignalMatrixV2,
     ArtifactSlotPinnedRuntimeContextV2,
 )
 from trading.contexts.indicators.domain.specifications.grid_param_spec import GridValue
 
-PREPARE_POOLS_STAGE_NAME = "prepare_pools"
+PREPARE_POOLS_CORE_STAGE_NAME = "prepare_pools_core"
+PREPARE_POOLS_TOTAL_STAGE_NAME = "prepare_pools_total"
+PREPARE_POOLS_STAGE_NAME = PREPARE_POOLS_TOTAL_STAGE_NAME
+ARTIFACT_CONTEXT_RESOLVE_SEGMENT = "artifact_context_resolve"
+ARTIFACT_ARRAY_OPEN_SEGMENT = "artifact_array_open"
+REQUEST_SLICE_PREPARE_SEGMENT = "request_slice_prepare"
 ARTIFACT_MANIFEST_LOAD_SEGMENT = "artifact_manifest_load"
 ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT = "artifact_array_mmap_load"
 TIME_RANGE_SLICE_SEGMENT = "time_range_slice"
@@ -51,6 +58,31 @@ class BacktestPreparePoolsRejected(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestPreparePoolsRuntimeArrays:
+    """
+    Resolved artifact context and opened mmap handles for one normalized request.
+    """
+
+    context: ArtifactSlotPinnedRuntimeContextV2
+    timeframe: str
+    price_arrays_15m: ArtifactPriceArraysV2
+    price_arrays_1m: ArtifactPriceArraysV2
+    mapping_arrays: ArtifactMappingArraysV2
+    signal_matrices: Mapping[str, ArtifactSignalMatrixV2]
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestPreparePoolsRequestSlice:
+    """
+    Prepared request-time slice inputs consumed by notebook-compatible pool compute.
+    """
+
+    time_slice: slice
+    signal_returns_15m: np.ndarray
+    execution_mapping: PreparedExecutionMapping
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestPreparePoolsService:
     """
     Internal application service for Iteration 2 `prepare_pools`.
@@ -66,32 +98,99 @@ class BacktestPreparePoolsService:
         normalized_request: Mapping[str, Any],
         artifact_metadata: BacktestArtifactMetadata,
     ) -> BacktestPreparePoolsResult:
-        total_start = time.perf_counter()
-        subsegments: dict[str, float] = {
-            ARTIFACT_MANIFEST_LOAD_SEGMENT: 0.0,
-            ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT: 0.0,
-            TIME_RANGE_SLICE_SEGMENT: 0.0,
-            SIGNAL_ROW_SELECTION_SEGMENT: 0.0,
-            ROW_PREFILTER_SEGMENT: 0.0,
-            SEGMENT_BUILD_SEGMENT: 0.0,
-        }
+        """
+        Compatibility facade that measures aggregate service telemetry.
 
+        The notebook-comparable scope is exposed by `prepare_pools_core`; this
+        facade keeps resolve/open/slice overhead visible without folding it into
+        the core benchmark target.
+        """
+
+        total_start = time.perf_counter()
         coordinates = _coordinates_from_normalized(normalized_request)
         timeframe = _timeframe_from_normalized(normalized_request)
-        indicator_requests = _indicator_requests_from_normalized(normalized_request)
-        fee_rate = _fee_rate_from_normalized(normalized_request)
+        total_subsegments: dict[str, float] = {}
 
         segment_start = time.perf_counter()
-        context = self.artifact_array_loader.resolve_context(
+        context = self.resolve_artifact_context(
             coordinates=coordinates,
             artifact_metadata=artifact_metadata,
         )
-        _add_elapsed(subsegments, ARTIFACT_MANIFEST_LOAD_SEGMENT, segment_start)
+        _record_elapsed_aliases(
+            total_subsegments,
+            segment_start,
+            ARTIFACT_CONTEXT_RESOLVE_SEGMENT,
+            ARTIFACT_MANIFEST_LOAD_SEGMENT,
+        )
 
         segment_start = time.perf_counter()
-        price_arrays_15m = self.artifact_array_loader.load_price_arrays(
+        runtime_arrays = self.open_artifact_arrays(
+            normalized_request=normalized_request,
             context=context,
             timeframe=timeframe,
+        )
+        _record_elapsed_aliases(
+            total_subsegments,
+            segment_start,
+            ARTIFACT_ARRAY_OPEN_SEGMENT,
+            ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT,
+        )
+
+        segment_start = time.perf_counter()
+        request_slice = self.prepare_request_slice(
+            normalized_request=normalized_request,
+            runtime_arrays=runtime_arrays,
+        )
+        _record_elapsed_aliases(
+            total_subsegments,
+            segment_start,
+            REQUEST_SLICE_PREPARE_SEGMENT,
+            TIME_RANGE_SLICE_SEGMENT,
+        )
+
+        core_result = self.prepare_pools_core(
+            normalized_request=normalized_request,
+            runtime_arrays=runtime_arrays,
+            request_slice=request_slice,
+        )
+        total_subsegments.update(core_result.timing.subsegments)
+        total_subsegments[PREPARE_POOLS_TOTAL_STAGE_NAME] = time.perf_counter() - total_start
+        return replace(
+            core_result,
+            timing=PreparePoolsTiming(
+                stage_name=PREPARE_POOLS_TOTAL_STAGE_NAME,
+                wall_time_s=total_subsegments[PREPARE_POOLS_TOTAL_STAGE_NAME],
+                subsegments=total_subsegments,
+            ),
+        )
+
+    def resolve_artifact_context(
+        self,
+        *,
+        coordinates: BacktestCoordinates,
+        artifact_metadata: BacktestArtifactMetadata,
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
+        return self.artifact_array_loader.resolve_context(
+            coordinates=coordinates,
+            artifact_metadata=artifact_metadata,
+        )
+
+    def open_artifact_arrays(
+        self,
+        *,
+        normalized_request: Mapping[str, Any],
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str | None = None,
+    ) -> BacktestPreparePoolsRuntimeArrays:
+        opened_timeframe = (
+            _timeframe_from_normalized(normalized_request)
+            if timeframe is None
+            else timeframe
+        )
+        indicator_requests = _indicator_requests_from_normalized(normalized_request)
+        price_arrays_15m = self.artifact_array_loader.load_price_arrays(
+            context=context,
+            timeframe=opened_timeframe,
         )
         price_arrays_1m = self.artifact_array_loader.load_price_arrays(
             context=context,
@@ -99,20 +198,32 @@ class BacktestPreparePoolsService:
         )
         mapping_arrays = self.artifact_array_loader.load_mapping_arrays(
             context=context,
-            timeframe=timeframe,
+            timeframe=opened_timeframe,
         )
         signal_matrices = _load_signal_matrices(
             artifact_array_loader=self.artifact_array_loader,
             context=context,
-            timeframe=timeframe,
+            timeframe=opened_timeframe,
             indicator_requests=indicator_requests,
         )
-        _add_elapsed(subsegments, ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT, segment_start)
+        return BacktestPreparePoolsRuntimeArrays(
+            context=context,
+            timeframe=opened_timeframe,
+            price_arrays_15m=price_arrays_15m,
+            price_arrays_1m=price_arrays_1m,
+            mapping_arrays=mapping_arrays,
+            signal_matrices=signal_matrices,
+        )
 
-        segment_start = time.perf_counter()
+    def prepare_request_slice(
+        self,
+        *,
+        normalized_request: Mapping[str, Any],
+        runtime_arrays: BacktestPreparePoolsRuntimeArrays,
+    ) -> BacktestPreparePoolsRequestSlice:
         time_slice = time_range_slice(
-            open_time_15m=price_arrays_15m.open_time,
-            close_time_15m=price_arrays_15m.close_time,
+            open_time_15m=runtime_arrays.price_arrays_15m.open_time,
+            close_time_15m=runtime_arrays.price_arrays_15m.close_time,
             time_range=_required_mapping(
                 normalized_request,
                 "time_range",
@@ -120,28 +231,56 @@ class BacktestPreparePoolsService:
             ),
         )
         signal_returns_15m = _signal_returns_15m(
-            ohlcv_15m=price_arrays_15m.ohlcv,
+            ohlcv_15m=runtime_arrays.price_arrays_15m.ohlcv,
             time_slice=time_slice,
         )
         execution_mapping = _execution_mapping_no_risk_15m_to_1m(
-            mapping_open_1m_idx_15m=mapping_arrays.bar_open_1m_idx,
-            mapping_close_1m_idx_15m=mapping_arrays.bar_close_1m_idx,
-            price_1m_length=int(price_arrays_1m.ohlcv.shape[0]),
+            mapping_open_1m_idx_15m=runtime_arrays.mapping_arrays.bar_open_1m_idx,
+            mapping_close_1m_idx_15m=runtime_arrays.mapping_arrays.bar_close_1m_idx,
+            price_1m_length=int(runtime_arrays.price_arrays_1m.ohlcv.shape[0]),
             time_slice=time_slice,
         )
-        _add_elapsed(subsegments, TIME_RANGE_SLICE_SEGMENT, segment_start)
+        return BacktestPreparePoolsRequestSlice(
+            time_slice=time_slice,
+            signal_returns_15m=signal_returns_15m,
+            execution_mapping=execution_mapping,
+        )
+
+    def prepare_pools_core(
+        self,
+        *,
+        normalized_request: Mapping[str, Any],
+        runtime_arrays: BacktestPreparePoolsRuntimeArrays,
+        request_slice: BacktestPreparePoolsRequestSlice,
+    ) -> BacktestPreparePoolsResult:
+        """
+        Notebook-compatible `prepare_indicator_pools(...)` scope.
+        """
+
+        core_start = time.perf_counter()
+        subsegments: dict[str, float] = {}
+        timeframe = _timeframe_from_normalized(normalized_request)
+        if runtime_arrays.timeframe != timeframe:
+            raise BacktestPreparePoolsRejected(
+                f"runtime arrays timeframe {runtime_arrays.timeframe!r} does not match "
+                f"request timeframe {timeframe!r}"
+            )
+        indicator_requests = _indicator_requests_from_normalized(normalized_request)
+        fee_rate = _fee_rate_from_normalized(normalized_request)
 
         segment_start = time.perf_counter()
         selected_rows = tuple(
             _select_indicator_rows(
                 defaults_provider=self.defaults_provider,
-                signal_matrix=signal_matrices[indicator_request["indicator_id"]],
+                signal_matrix=runtime_arrays.signal_matrices[
+                    indicator_request["indicator_id"]
+                ],
                 indicator_request=indicator_request,
-                time_slice=time_slice,
+                time_slice=request_slice.time_slice,
             )
             for indicator_request in indicator_requests
         )
-        _add_elapsed(subsegments, SIGNAL_ROW_SELECTION_SEGMENT, segment_start)
+        _record_elapsed(subsegments, SIGNAL_ROW_SELECTION_SEGMENT, segment_start)
 
         segment_start = time.perf_counter()
         filtered_rows = tuple(
@@ -150,7 +289,7 @@ class BacktestPreparePoolsService:
                 indicator_id=selection.indicator_id,
                 row_ids=selection.row_ids,
                 metadata=selection.metadata,
-                signal_returns_15m=signal_returns_15m,
+                signal_returns_15m=request_slice.signal_returns_15m,
                 top_frac=self.config.row_prefilter_top_fraction,
                 min_nonzero=self.config.row_prefilter_min_nonzero,
                 fee_rate=fee_rate,
@@ -158,32 +297,36 @@ class BacktestPreparePoolsService:
             )
             for selection in selected_rows
         )
-        _add_elapsed(subsegments, ROW_PREFILTER_SEGMENT, segment_start)
+        _record_elapsed(subsegments, ROW_PREFILTER_SEGMENT, segment_start)
 
         segment_start = time.perf_counter()
         indicator_pools = tuple(
             prepare_indicator_pool(
                 filtered_rows=filtered,
-                segments=build_signal_segments(filtered.trade_T),
+                segments=build_signal_segments(
+                    filtered.trade_T,
+                    change_count=filtered.change_count,
+                ),
             )
             for filtered in filtered_rows
         )
-        _add_elapsed(subsegments, SEGMENT_BUILD_SEGMENT, segment_start)
+        _record_elapsed(subsegments, SEGMENT_BUILD_SEGMENT, segment_start)
+        subsegments[PREPARE_POOLS_CORE_STAGE_NAME] = time.perf_counter() - core_start
 
         result = BacktestPreparePoolsResult(
             timeframe=timeframe,
             indicator_ids=tuple(request["indicator_id"] for request in indicator_requests),
             indicator_pools=indicator_pools,
-            signal_returns_15m=signal_returns_15m,
-            execution_mapping=execution_mapping,
-            time_slice_start_15m=int(time_slice.start or 0),
-            time_slice_stop_15m=int(time_slice.stop or 0),
+            signal_returns_15m=request_slice.signal_returns_15m,
+            execution_mapping=request_slice.execution_mapping,
+            time_slice_start_15m=int(request_slice.time_slice.start or 0),
+            time_slice_stop_15m=int(request_slice.time_slice.stop or 0),
             trade_T_length=int(indicator_pools[0].trade_T_length),
             eval_T_length=int(indicator_pools[0].eval_T_length),
             row_metadata_order_hash=row_metadata_order_hash(indicator_pools),
             timing=PreparePoolsTiming(
-                stage_name=PREPARE_POOLS_STAGE_NAME,
-                wall_time_s=time.perf_counter() - total_start,
+                stage_name=PREPARE_POOLS_CORE_STAGE_NAME,
+                wall_time_s=subsegments[PREPARE_POOLS_CORE_STAGE_NAME],
                 subsegments=subsegments,
             ),
         )
@@ -240,7 +383,10 @@ def prepare_indicator_pools(
         pools.append(
             prepare_indicator_pool(
                 filtered_rows=filtered,
-                segments=build_signal_segments(filtered.trade_T),
+                segments=build_signal_segments(
+                    filtered.trade_T,
+                    change_count=filtered.change_count,
+                ),
             )
         )
     return tuple(pools)
@@ -432,15 +578,29 @@ def fill_signal_segments_i8(
         counts[row_idx] = np.int32(segment_idx + 1)
 
 
-def build_signal_segments(trade_T: np.ndarray) -> PreparedSignalSegments:
+def build_signal_segments(
+    trade_T: np.ndarray,
+    *,
+    change_count: np.ndarray | None = None,
+) -> PreparedSignalSegments:
     """
     Build padded compressed signal segments for one filtered int8 matrix.
     """
 
     if trade_T.ndim != 2 or int(trade_T.shape[0]) == 0 or int(trade_T.shape[1]) == 0:
         raise ValueError("trade_T must be a non-empty 2D signal matrix")
-    change_count = (trade_T[:, 1:] != trade_T[:, :-1]).sum(axis=1).astype(np.int32)
-    counts_expected = change_count + np.int32(1)
+    if change_count is None:
+        resolved_change_count = (trade_T[:, 1:] != trade_T[:, :-1]).sum(axis=1).astype(
+            np.int32
+        )
+    else:
+        resolved_change_count = np.asarray(change_count, dtype=np.int32)
+        if resolved_change_count.ndim != 1 or int(resolved_change_count.shape[0]) != int(
+            trade_T.shape[0]
+        ):
+            raise ValueError("change_count must align to trade_T rows")
+        resolved_change_count = np.ascontiguousarray(resolved_change_count)
+    counts_expected = resolved_change_count + np.int32(1)
     max_segments = int(counts_expected.max())
     starts = np.zeros((trade_T.shape[0], max_segments), dtype=np.int32)
     ends = np.zeros((trade_T.shape[0], max_segments), dtype=np.int32)
@@ -454,7 +614,7 @@ def build_signal_segments(trade_T: np.ndarray) -> PreparedSignalSegments:
         ends=ends,
         values=values,
         counts=counts,
-        change_count=change_count,
+        change_count=resolved_change_count,
     )
 
 
@@ -517,6 +677,21 @@ def row_metadata_order_hash(indicator_pools: Sequence[PreparedIndicatorPool]) ->
     ]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def notebook_compatible_prepare_pools_core_s(timing: PreparePoolsTiming) -> float:
+    """
+    Return the canonical notebook-comparable prepare-pools duration.
+    """
+
+    value = timing.subsegments.get(PREPARE_POOLS_CORE_STAGE_NAME)
+    if value is not None:
+        return float(value)
+    return float(
+        timing.subsegments.get(SIGNAL_ROW_SELECTION_SEGMENT, 0.0)
+        + timing.subsegments.get(ROW_PREFILTER_SEGMENT, 0.0)
+        + timing.subsegments.get(SEGMENT_BUILD_SEGMENT, 0.0)
+    )
 
 
 def _load_signal_matrices(
@@ -806,17 +981,38 @@ def _contiguous_row_selector(row_ids: np.ndarray) -> slice | np.ndarray:
     return row_ids
 
 
-def _add_elapsed(subsegments: dict[str, float], segment_name: str, segment_start: float) -> None:
-    subsegments[segment_name] = subsegments.get(segment_name, 0.0) + (
-        time.perf_counter() - segment_start
-    )
+def _record_elapsed(
+    subsegments: dict[str, float],
+    segment_name: str,
+    segment_start: float,
+) -> float:
+    elapsed = time.perf_counter() - segment_start
+    subsegments[segment_name] = elapsed
+    return elapsed
+
+
+def _record_elapsed_aliases(
+    subsegments: dict[str, float],
+    segment_start: float,
+    segment_name: str,
+    legacy_segment_name: str,
+) -> None:
+    elapsed = _record_elapsed(subsegments, segment_name, segment_start)
+    subsegments[legacy_segment_name] = elapsed
 
 
 __all__ = [
+    "ARTIFACT_ARRAY_OPEN_SEGMENT",
     "ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT",
+    "ARTIFACT_CONTEXT_RESOLVE_SEGMENT",
     "ARTIFACT_MANIFEST_LOAD_SEGMENT",
+    "BacktestPreparePoolsRequestSlice",
     "BacktestPreparePoolsRejected",
+    "BacktestPreparePoolsRuntimeArrays",
     "BacktestPreparePoolsService",
+    "PREPARE_POOLS_CORE_STAGE_NAME",
+    "PREPARE_POOLS_TOTAL_STAGE_NAME",
+    "REQUEST_SLICE_PREPARE_SEGMENT",
     "ROW_PREFILTER_SEGMENT",
     "SEGMENT_BUILD_SEGMENT",
     "SIGNAL_ROW_SELECTION_SEGMENT",
@@ -825,6 +1021,7 @@ __all__ = [
     "extract_signal_rows",
     "fill_signal_segments_i8",
     "fused_row_prefilter_stats",
+    "notebook_compatible_prepare_pools_core_s",
     "prepare_indicator_pool",
     "prepare_indicator_pools",
     "prefilter_indicator_rows",

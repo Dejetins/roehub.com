@@ -32,6 +32,9 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
 class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
     """
     Strict filesystem mmap loader for Iteration 2 runtime arrays.
+
+    Service timing records these mmap handle opens under `artifact_array_open`
+    while keeping `np.load(..., mmap_mode="r")` validation inside this adapter.
     """
 
     artifact_loader: BacktestArtifactLoaderV2

@@ -571,7 +571,7 @@ warmup не добавляется в `total_without_warmup`.
   `422 backtest.tp_sl_grid_not_covered`;
 - target benchmark grid: `2.0..25.0` inclusive, step `0.5`.
 
-### Измеряемая стадия бенчмарка: `prepare_pools`
+### Измеряемые стадии бенчмарка: artifact подготовка и `prepare_pools_core`
 
 Методы notebook:
 
@@ -584,17 +584,27 @@ warmup не добавляется в `total_without_warmup`.
 - `prepare_indicator_pool`;
 - `prepare_indicator_pools`.
 
-Эта stage:
+Stage contract разделяет notebook-compatible compute и service overhead.
+Canonical notebook `prepare_pools` timer замеряет уже прогретые/opened arrays и
+оборачивает только `prepare_indicator_pools(...)`. Поэтому 90% comparison с
+canonical notebook prepare_pools применяется только к `prepare_pools_core`.
 
-- resolves artifact root через trusted configuration/current pointer;
-- читает slot `manifest.yaml` и requested indicator manifests;
-- загружает `.npy` arrays через `np.load(..., mmap_mode="r")`;
-- загружает `prices/<tf>`, `prices/1m`, `mappings/<tf>` и requested
+Service overhead stages измеряются отдельно и не сравниваются с canonical
+notebook prepare_pools:
+
+- `artifact_context_resolve`: trusted configuration/current pointer, slot
+  `manifest.yaml`, manifest hash validation и typed runtime context;
+- `artifact_array_open`: manifest-backed dtype/shape validation и открытие
+  `.npy` handles через `np.load(..., mmap_mode="r")` для `prices/<tf>`,
+  `prices/1m`, `mappings/<tf>` и requested
   `signals/<tf>/<indicator_id>/signals.i8.npy`;
-- slices 15m bars по `[start, end)` через `open_time`;
-- derives 15m return intervals из close prices;
-- derives 15m-to-1m execution mapping для no-risk mode:
-  signal на 15m bar `t` входит на open следующего 15m bar, mapped to 1m;
+- `request_slice_prepare`: slices 15m bars по `[start, end)` через `open_time`,
+  derives 15m return intervals из close prices и derives 15m-to-1m execution
+  mapping для no-risk mode:
+  signal на 15m bar `t` входит на open следующего 15m bar, mapped to 1m.
+
+Notebook-compatible `prepare_pools_core`:
+
 - копирует только requested signal rows в contiguous `int8` matrices;
 - применяет row prefilter per indicator:
   - `nonzero`: количество non-zero signal intervals;
@@ -607,6 +617,11 @@ warmup не добавляется в `total_without_warmup`.
   `starts`, `ends`, `values`, `counts`, `change_count`;
 - возвращает indicator pools с `trade_T`, `eval_T`, `segments`, row ids,
   scores и metadata.
+
+`prepare_pools_total` является aggregate service telemetry:
+`artifact_context_resolve + artifact_array_open + request_slice_prepare +
+prepare_pools_core`. Он нужен для production observability и service overhead
+budgeting, но не является прямой notebook-compatible comparison metric.
 
 ### Измеряемая стадия бенчмарка: `build_exact_context`
 
@@ -805,7 +820,11 @@ Persisted job state может оставаться coarse (`stage_a`, `stage_b`
 | `service_warmup` | `stage_a` | Sample/JIT warmup перед measured runtime. |
 | `load_hit_times` | `stage_b` | Risk-on загрузка hit-times subset. |
 | `tp_sl_grid_validation` | `stage_b` | Risk-on validation grid coverage. |
-| `prepare_pools` | `stage_a` | Artifact load, slicing, row selection, prefilter и segment build. |
+| `artifact_context_resolve` | `stage_a` | Service overhead: current pointer, manifest identity и typed context. |
+| `artifact_array_open` | `stage_a` | Service overhead: mmap open через `np.load(..., mmap_mode="r")` и manifest validation. |
+| `request_slice_prepare` | `stage_a` | Service overhead: `[start, end)` slice, returns и execution mapping. |
+| `prepare_pools_core` | `stage_a` | Notebook-compatible row selection, prefilter и segment build. |
+| `prepare_pools_total` | `stage_a` | Aggregate service telemetry, не notebook comparison target. |
 | `build_exact_context` | `stage_a` / `stage_b` | Segment stack для exact kernels. |
 | `build_proxy_context` | `stage_a` | Optional combo proxy context. |
 | `combo_iteration` | `stage_a` / `stage_b` | Cartesian chunk planning. |
@@ -899,7 +918,8 @@ JSON evidence является источником истины для numeric 
 - canonical `request_hash` и result-affecting config hash;
 - service warmup metrics;
 - canonical notebook timer metrics без warmup;
-- service-only overhead metrics;
+- service-only overhead metrics (`artifact_context_resolve`, `artifact_array_open`,
+  `request_slice_prepare`, `prepare_pools_total`);
 - speed ratio vs baseline;
 - absolute latency budget result;
 - peak RSS / memory delta;
@@ -925,24 +945,35 @@ JSON evidence является источником истины для numeric 
 4. `total_without_warmup`
 5. `load_hit_times` для `risk.mode = "tp_sl_grid"`
 6. `tp_sl_grid_validation` для `risk.mode = "tp_sl_grid"`
-7. `prepare_pools`
-8. `build_exact_context`
-9. `build_proxy_context`
-10. `combo_iteration`
-11. `proxy_filter`
-12. `self_check`
-13. `exact_scoring`
-14. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
-15. `heap_update`
-16. `top_result_proxy_fill`
-17. `persist_top_n_io`
-18. `lazy_trades_compute`
-19. `lazy_trades_cache_hit`
+7. `artifact_context_resolve`
+8. `artifact_array_open`
+9. `request_slice_prepare`
+10. `prepare_pools_core`
+11. `prepare_pools_total`
+12. `build_exact_context`
+13. `build_proxy_context`
+14. `combo_iteration`
+15. `proxy_filter`
+16. `self_check`
+17. `exact_scoring`
+18. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
+19. `heap_update`
+20. `top_result_proxy_fill`
+21. `persist_top_n_io`
+22. `lazy_trades_compute`
+23. `lazy_trades_cache_hit`
 
 Сравнение acceptance:
 
-- stages 1-16 сравниваются с notebook-compatible target values по tuple
+- notebook-compatible stages сравниваются с target values по tuple
   `{arity, risk_mode, direction_mode, backend}`;
+- для Iteration 2 canonical notebook prepare_pools сравнивается только с
+  `prepare_pools_core`;
+- `artifact_context_resolve`, `artifact_array_open`, `request_slice_prepare`,
+  `prepare_pools_total`, `persist_top_n_io`, `lazy_trades_compute` и
+  `lazy_trades_cache_hit` являются service overhead/telemetry stages; они
+  измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook
+  prepare_pools;
 - для arity 1..7 target source:
   `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
 - arity 8..10 не блокируют v1 completion, если arity 1..7 проходят 90%
@@ -1150,14 +1181,19 @@ request.
 - реализовать signal row extraction и source/window row mapping;
 - реализовать row prefilter через `fused_row_prefilter_stats`;
 - реализовать compressed signal segments через `build_signal_segments`;
-- expose timing `prepare_pools`.
+- expose timings `artifact_context_resolve`, `artifact_array_open`,
+  `request_slice_prepare`, `prepare_pools_core`, `prepare_pools_total`.
 
 Гейт бенчмарка:
 
-- `prepare_pools` vs canonical notebook target для arity 1..7 fixture;
-- optional subsegments: `artifact_manifest_load`, `artifact_array_mmap_load`,
-  `time_range_slice`, `signal_row_selection`, `row_prefilter`,
-  `segment_build`;
+- `prepare_pools_core` vs canonical notebook prepare_pools target для arity
+  1..7 fixture;
+- service overhead измеряется отдельно:
+  `artifact_context_resolve`, `artifact_array_open`,
+  `request_slice_prepare`, `prepare_pools_total`;
+- compatibility subsegments остаются доступными для historical evidence:
+  `artifact_manifest_load`, `artifact_array_mmap_load`, `time_range_slice`,
+  `signal_row_selection`, `row_prefilter`, `segment_build`;
 - row metadata/order hash равен notebook fixture;
 - stage record записан до перехода к combo planning.
 

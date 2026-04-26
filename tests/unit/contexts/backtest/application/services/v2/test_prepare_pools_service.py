@@ -21,7 +21,12 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT,
+    ARTIFACT_ARRAY_OPEN_SEGMENT,
+    ARTIFACT_CONTEXT_RESOLVE_SEGMENT,
     ARTIFACT_MANIFEST_LOAD_SEGMENT,
+    PREPARE_POOLS_CORE_STAGE_NAME,
+    PREPARE_POOLS_TOTAL_STAGE_NAME,
+    REQUEST_SLICE_PREPARE_SEGMENT,
     ROW_PREFILTER_SEGMENT,
     SEGMENT_BUILD_SEGMENT,
     SIGNAL_ROW_SELECTION_SEGMENT,
@@ -29,6 +34,7 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestPreparePoolsRejected,
     BacktestPreparePoolsService,
     build_signal_segments,
+    notebook_compatible_prepare_pools_core_s,
     time_range_slice,
 )
 
@@ -76,15 +82,80 @@ def test_prepare_pools_prepares_indicator_pool_from_normalized_request(
     assert pool.segments.counts.tolist() == [2, 2]
     assert len(first.row_metadata_order_hash) == 64
     assert first.row_metadata_order_hash == second.row_metadata_order_hash
-    assert first.timing.stage_name == "prepare_pools"
+    assert first.timing.stage_name == PREPARE_POOLS_TOTAL_STAGE_NAME
+    assert first.timing.prepare_pools_core_s == first.timing.subsegments[
+        PREPARE_POOLS_CORE_STAGE_NAME
+    ]
+    assert first.timing.prepare_pools_total_s == first.timing.wall_time_s
+    assert notebook_compatible_prepare_pools_core_s(first.timing) == first.timing.subsegments[
+        PREPARE_POOLS_CORE_STAGE_NAME
+    ]
     assert set(first.timing.subsegments) == {
+        ARTIFACT_CONTEXT_RESOLVE_SEGMENT,
+        ARTIFACT_ARRAY_OPEN_SEGMENT,
+        REQUEST_SLICE_PREPARE_SEGMENT,
         ARTIFACT_MANIFEST_LOAD_SEGMENT,
         ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT,
         TIME_RANGE_SLICE_SEGMENT,
         SIGNAL_ROW_SELECTION_SEGMENT,
         ROW_PREFILTER_SEGMENT,
         SEGMENT_BUILD_SEGMENT,
+        PREPARE_POOLS_CORE_STAGE_NAME,
+        PREPARE_POOLS_TOTAL_STAGE_NAME,
     }
+
+
+def test_prepare_pools_core_excludes_context_open_and_slice_overhead(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    spy_loader = _CountingArtifactArrayLoader(
+        FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
+    )
+    service = _service(store=store, top_fraction=1.0, loader=spy_loader)
+    request = _normalized_request()
+    coordinates = BacktestCoordinates(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
+
+    context = service.resolve_artifact_context(
+        coordinates=coordinates,
+        artifact_metadata=_artifact_metadata(store=store),
+    )
+    runtime_arrays = service.open_artifact_arrays(
+        normalized_request=request,
+        context=context,
+    )
+    request_slice = service.prepare_request_slice(
+        normalized_request=request,
+        runtime_arrays=runtime_arrays,
+    )
+    counts_before_core = dict(spy_loader.counts)
+
+    result = service.prepare_pools_core(
+        normalized_request=request,
+        runtime_arrays=runtime_arrays,
+        request_slice=request_slice,
+    )
+
+    assert spy_loader.counts == counts_before_core
+    assert result.timing.stage_name == PREPARE_POOLS_CORE_STAGE_NAME
+    assert result.timing.prepare_pools_core_s == result.timing.wall_time_s
+    assert ARTIFACT_CONTEXT_RESOLVE_SEGMENT not in result.timing.subsegments
+    assert ARTIFACT_ARRAY_OPEN_SEGMENT not in result.timing.subsegments
+    assert REQUEST_SLICE_PREPARE_SEGMENT not in result.timing.subsegments
+    assert ARTIFACT_MANIFEST_LOAD_SEGMENT not in result.timing.subsegments
+    assert ARTIFACT_ARRAY_MMAP_LOAD_SEGMENT not in result.timing.subsegments
+    assert TIME_RANGE_SLICE_SEGMENT not in result.timing.subsegments
+    assert set(result.timing.subsegments) == {
+        SIGNAL_ROW_SELECTION_SEGMENT,
+        ROW_PREFILTER_SEGMENT,
+        SEGMENT_BUILD_SEGMENT,
+        PREPARE_POOLS_CORE_STAGE_NAME,
+    }
+    assert result.indicator_pools[0].trade_T.tolist() == [[-1, 0], [1, 0]]
 
 
 def test_prepare_pools_row_prefilter_keeps_top_adjusted_row(tmp_path: Path) -> None:
@@ -162,11 +233,11 @@ def _service(
     *,
     store: Any,
     top_fraction: float,
+    loader: Any | None = None,
 ) -> BacktestPreparePoolsService:
     return BacktestPreparePoolsService(
-        artifact_array_loader=FilesystemBacktestArtifactArrayLoader(
-            artifact_loader=store.loader,
-        ),
+        artifact_array_loader=loader
+        or FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader),
         defaults_provider=YamlBacktestGridDefaultsProvider.from_yaml(
             config_path="configs/prod/indicators.yaml",
         ),
@@ -220,3 +291,35 @@ def _normalized_request(*, fee_rate: float = 0.00075) -> dict[str, Any]:
         },
         "top_n": 100,
     }
+
+
+class _CountingArtifactArrayLoader:
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.counts = {
+            "resolve_context": 0,
+            "load_price_arrays": 0,
+            "load_mapping_arrays": 0,
+            "load_signal_matrix": 0,
+            "load_signal_rows": 0,
+        }
+
+    def resolve_context(self, **kwargs: Any) -> Any:
+        self.counts["resolve_context"] += 1
+        return self._inner.resolve_context(**kwargs)
+
+    def load_price_arrays(self, **kwargs: Any) -> Any:
+        self.counts["load_price_arrays"] += 1
+        return self._inner.load_price_arrays(**kwargs)
+
+    def load_mapping_arrays(self, **kwargs: Any) -> Any:
+        self.counts["load_mapping_arrays"] += 1
+        return self._inner.load_mapping_arrays(**kwargs)
+
+    def load_signal_matrix(self, **kwargs: Any) -> Any:
+        self.counts["load_signal_matrix"] += 1
+        return self._inner.load_signal_matrix(**kwargs)
+
+    def load_signal_rows(self, **kwargs: Any) -> Any:
+        self.counts["load_signal_rows"] += 1
+        return self._inner.load_signal_rows(**kwargs)

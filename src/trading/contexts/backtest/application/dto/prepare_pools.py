@@ -102,7 +102,11 @@ class PreparedExecutionMapping:
 @dataclass(frozen=True, slots=True)
 class PreparePoolsTiming:
     """
-    Measured wall timing for `prepare_pools` and optional notebook-compatible subsegments.
+    Measured wall timing for prepare-pools stages.
+
+    `prepare_pools_core` is the notebook-compatible timing scope. `prepare_pools_total`
+    is aggregate service telemetry that may include artifact context resolution, mmap
+    opening, and request slicing overhead.
     """
 
     stage_name: str
@@ -122,6 +126,18 @@ class PreparePoolsTiming:
             "wall_time_s": self.wall_time_s,
             "subsegments": dict(self.subsegments),
         }
+
+    @property
+    def prepare_pools_core_s(self) -> float | None:
+        value = self.subsegments.get("prepare_pools_core")
+        return None if value is None else float(value)
+
+    @property
+    def prepare_pools_total_s(self) -> float | None:
+        if self.stage_name == "prepare_pools_total":
+            return float(self.wall_time_s)
+        value = self.subsegments.get("prepare_pools_total")
+        return None if value is None else float(value)
 
 
 @dataclass(frozen=True, slots=True)
