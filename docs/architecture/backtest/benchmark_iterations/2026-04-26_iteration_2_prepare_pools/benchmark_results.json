@@ -1,0 +1,40 @@
+{
+  "acceptance_status": "pending_macstudio",
+  "artifact_manifest_hash": "b7a2970e8bb8f240c92ef55b3926467f642ad8d25f625f731496d13c092d51eb",
+  "benchmark_stage": "prepare_pools",
+  "canonical_target_source": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "fixture": "synthetic_unit_fixture_non_acceptance",
+  "host": "Mac",
+  "is_mac_studio_acceptance_host": false,
+  "notes": [
+    "Local synthetic smoke is developer evidence only.",
+    "Mac Studio canonical arity 1..7 benchmark is required for acceptance."
+  ],
+  "numba_threads": 11,
+  "peak_rss_mb": 157.328125,
+  "platform": "macOS-15.7.4-arm64-arm-64bit",
+  "prepare_pools_ratio_vs_canonical_target": null,
+  "prepare_pools_timing": {
+    "stage_name": "prepare_pools",
+    "subsegments": {
+      "artifact_array_mmap_load": 0.006055750011000782,
+      "artifact_manifest_load": 0.0033002079580910504,
+      "row_prefilter": 0.48249816696625203,
+      "segment_build": 0.241826250043232,
+      "signal_row_selection": 0.00008920795517042279,
+      "time_range_slice": 0.0003587499959394336
+    },
+    "wall_time_s": 0.734178124985192
+  },
+  "prepared_pool_sizes": {
+    "ma.ema": 2
+  },
+  "process_cpu_percent_equivalent": 93.13624997128422,
+  "process_cpu_time_s": 0.683835064,
+  "recorded_at_utc": "2026-04-26T17:54:33Z",
+  "request_hash": "99577549d04783838e3c325657b601a0830c36280417533d413420b952aecce2",
+  "row_metadata_order_hash": "45876855a2852ec2e3a2a023aaa1890e8b9dc25ef7aae0fde06414195dc0127b",
+  "rss_delta_mb": 58.578125,
+  "thread_count": 12,
+  "wall_time_s": 0.7342308330116794
+}

@@ -1,5 +1,14 @@
 """DTO package for the reset backtest scope."""
 
+from .prepare_pools import (
+    BacktestPreparePoolsConfig,
+    BacktestPreparePoolsResult,
+    PreparedExecutionMapping,
+    PreparedIndicatorPool,
+    PreparedIndicatorRowMetadata,
+    PreparedSignalSegments,
+    PreparePoolsTiming,
+)
 from .runtime_preflight import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
@@ -17,9 +26,16 @@ __all__ = [
     "BacktestCoordinates",
     "BacktestCostEstimate",
     "BacktestExecutionDefaults",
+    "BacktestPreparePoolsConfig",
+    "BacktestPreparePoolsResult",
     "BacktestPreflightResult",
     "BacktestRuntimeDefaults",
     "BacktestRuntimeGuardrails",
     "BacktestValidationIssue",
     "JsonMapping",
+    "PreparedExecutionMapping",
+    "PreparedIndicatorPool",
+    "PreparedIndicatorRowMetadata",
+    "PreparedSignalSegments",
+    "PreparePoolsTiming",
 ]
