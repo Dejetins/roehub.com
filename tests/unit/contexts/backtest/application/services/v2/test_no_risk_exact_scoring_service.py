@@ -22,6 +22,7 @@ from trading.contexts.backtest.application.services.v2 import (
     HEAP_UPDATE_STAGE_NAME,
     SELF_CHECK_STAGE_NAME,
     STREAMING_2_NO_RISK_BACKEND,
+    TOP_RESULT_ASSEMBLY_STAGE_NAME,
     TOP_RESULT_PROXY_FILL_STAGE_NAME,
     TOTAL_WITHOUT_WARMUP_STAGE_NAME,
     BacktestComboPlanningService,
@@ -88,6 +89,7 @@ def test_event_segments_two_no_risk_matches_streaming_and_slow_reference() -> No
         EXACT_SCORING_STAGE_NAME,
         HEAP_UPDATE_STAGE_NAME,
         TOP_RESULT_PROXY_FILL_STAGE_NAME,
+        TOP_RESULT_ASSEMBLY_STAGE_NAME,
         TOTAL_WITHOUT_WARMUP_STAGE_NAME,
     }
 

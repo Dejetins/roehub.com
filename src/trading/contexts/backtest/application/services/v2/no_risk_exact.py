@@ -50,6 +50,7 @@ SELF_CHECK_STAGE_NAME = "self_check"
 EXACT_SCORING_STAGE_NAME = "exact_scoring"
 HEAP_UPDATE_STAGE_NAME = "heap_update"
 TOP_RESULT_PROXY_FILL_STAGE_NAME = "top_result_proxy_fill"
+TOP_RESULT_ASSEMBLY_STAGE_NAME = "top_result_assembly"
 TOTAL_WITHOUT_WARMUP_STAGE_NAME = "total_without_warmup"
 PERSIST_TOP_N_IO_STAGE_NAME = "persist_top_n_io"
 
@@ -213,20 +214,29 @@ class BacktestNoRiskExactScoringService:
                 ranking_direction=ranking_direction,
             ),
         )
-        top_rows, proxy_filled = _build_top_rows_with_proxy_fill(
+        filled_proxy_by_candidate_pos, proxy_filled = _proxy_fill_missing_candidates(
             candidates=ordered_candidates,
             prepared_result=prepared_result,
             proxy_context=combo_planning_result.proxy_context,
+        )
+        stage_timings[TOP_RESULT_PROXY_FILL_STAGE_NAME] += time.perf_counter() - stage_start
+
+        stage_start = time.perf_counter()
+        top_rows = _build_top_rows_with_proxy_fill(
+            candidates=ordered_candidates,
+            filled_proxy_by_candidate_pos=filled_proxy_by_candidate_pos,
+            prepared_result=prepared_result,
             execution_config=execution_config,
             normalized_request=normalized_request,
             ranking_metric=ranking_metric,
         )
-        stage_timings[TOP_RESULT_PROXY_FILL_STAGE_NAME] += time.perf_counter() - stage_start
+        stage_timings[TOP_RESULT_ASSEMBLY_STAGE_NAME] += time.perf_counter() - stage_start
         stage_timings[TOTAL_WITHOUT_WARMUP_STAGE_NAME] = (
             stage_timings[SELF_CHECK_STAGE_NAME]
             + stage_timings[EXACT_SCORING_STAGE_NAME]
             + stage_timings[HEAP_UPDATE_STAGE_NAME]
             + stage_timings[TOP_RESULT_PROXY_FILL_STAGE_NAME]
+            + stage_timings[TOP_RESULT_ASSEMBLY_STAGE_NAME]
         )
 
         return BacktestNoRiskScoringResult(
@@ -2089,17 +2099,12 @@ def _candidate_sort_key(
 def _build_top_rows_with_proxy_fill(
     *,
     candidates: Sequence[_TopCandidate],
+    filled_proxy_by_candidate_pos: Mapping[int, tuple[int, float]],
     prepared_result: BacktestPreparePoolsResult,
-    proxy_context: BacktestProxyContext,
     execution_config: BacktestNoRiskExecutionConfig,
     normalized_request: Mapping[str, Any],
     ranking_metric: str,
-) -> tuple[tuple[BacktestNoRiskTopRow, ...], int]:
-    filled_proxy_by_candidate_pos, proxy_filled = _proxy_fill_missing_candidates(
-        candidates=candidates,
-        prepared_result=prepared_result,
-        proxy_context=proxy_context,
-    )
+) -> tuple[BacktestNoRiskTopRow, ...]:
     rows: list[BacktestNoRiskTopRow] = []
     for candidate_pos, candidate in enumerate(candidates):
         rank = candidate_pos + 1
@@ -2143,7 +2148,7 @@ def _build_top_rows_with_proxy_fill(
                 variant_params=variant_params,
             )
         )
-    return tuple(rows), proxy_filled
+    return tuple(rows)
 
 
 def _proxy_fill_missing_candidates(
@@ -2260,6 +2265,7 @@ def _zero_stage_timings() -> dict[str, float]:
         EXACT_SCORING_STAGE_NAME: 0.0,
         HEAP_UPDATE_STAGE_NAME: 0.0,
         TOP_RESULT_PROXY_FILL_STAGE_NAME: 0.0,
+        TOP_RESULT_ASSEMBLY_STAGE_NAME: 0.0,
         TOTAL_WITHOUT_WARMUP_STAGE_NAME: 0.0,
     }
 
@@ -2385,6 +2391,7 @@ __all__ = [
     "SAMPLE_WARMUP_STAGE_NAME",
     "SELF_CHECK_STAGE_NAME",
     "SERVICE_WARMUP_STAGE_NAME",
+    "TOP_RESULT_ASSEMBLY_STAGE_NAME",
     "TOP_RESULT_PROXY_FILL_STAGE_NAME",
     "TOTAL_WITHOUT_WARMUP_STAGE_NAME",
     "BacktestNoRiskExactScoringRejected",
