@@ -716,6 +716,44 @@ def proxy_for_indicator_rows(
     return confirms, float(proxy)
 
 
+@nb.njit(parallel=True, cache=True)
+def proxy_for_indicator_rows_batch(
+    local_rows_by_candidate: np.ndarray,
+    eval_stack: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+    out_confirm: np.ndarray,
+    out_proxy: np.ndarray,
+) -> None:
+    n_candidates = local_rows_by_candidate.shape[0]
+    arity = local_rows_by_candidate.shape[1]
+    n_intervals = ret_15m.shape[0]
+    for candidate_pos in nb.prange(n_candidates):
+        confirms = np.int32(0)
+        proxy = np.float32(0.0)
+        for interval_idx in range(n_intervals):
+            direction = eval_stack[0, local_rows_by_candidate[candidate_pos, 0], interval_idx]
+            if direction == 0:
+                continue
+            for indicator_pos in range(1, arity):
+                local_row = local_rows_by_candidate[candidate_pos, indicator_pos]
+                if eval_stack[indicator_pos, local_row, interval_idx] != direction:
+                    direction = np.int8(0)
+                    break
+            if direction == 1:
+                confirms += 1
+                proxy += ret_15m[interval_idx]
+            elif direction == -1:
+                confirms += 1
+                proxy -= ret_15m[interval_idx]
+        out_confirm[candidate_pos] = confirms
+        if confirms < min_confirm:
+            out_proxy[candidate_pos] = _NEG_INF
+        else:
+            out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
+
+
 def build_persisted_top_n_summary_rows(
     *,
     job_id: UUID,
@@ -2002,24 +2040,18 @@ def _build_top_rows_with_proxy_fill(
     normalized_request: Mapping[str, Any],
     ranking_metric: str,
 ) -> tuple[tuple[BacktestNoRiskTopRow, ...], int]:
-    pools_by_id = {pool.indicator_id: pool for pool in prepared_result.indicator_pools}
+    filled_proxy_by_candidate_pos, proxy_filled = _proxy_fill_missing_candidates(
+        candidates=candidates,
+        prepared_result=prepared_result,
+        proxy_context=proxy_context,
+    )
     rows: list[BacktestNoRiskTopRow] = []
-    proxy_filled = 0
-    for rank, candidate in enumerate(candidates, start=1):
+    for candidate_pos, candidate in enumerate(candidates):
+        rank = candidate_pos + 1
         confirm_count = candidate.confirm_count
         proxy_score = candidate.proxy_score
         if confirm_count is None or proxy_score is None:
-            eval_rows = tuple(
-                pools_by_id[indicator_id].eval_T[candidate.local_rows[pos]]
-                for pos, indicator_id in enumerate(prepared_result.indicator_ids)
-            )
-            confirm_count, proxy_score = proxy_for_indicator_rows(
-                eval_rows=eval_rows,
-                ret_15m=prepared_result.signal_returns_15m,
-                min_confirm=proxy_context.combo_min_confirm,
-                fee_penalty_per_confirm=proxy_context.fee_penalty_per_confirm,
-            )
-            proxy_filled += 1
+            confirm_count, proxy_score = filled_proxy_by_candidate_pos[candidate_pos]
 
         variant_params = _variant_params(
             prepared_result=prepared_result,
@@ -2057,6 +2089,59 @@ def _build_top_rows_with_proxy_fill(
             )
         )
     return tuple(rows), proxy_filled
+
+
+def _proxy_fill_missing_candidates(
+    *,
+    candidates: Sequence[_TopCandidate],
+    prepared_result: BacktestPreparePoolsResult,
+    proxy_context: BacktestProxyContext,
+) -> tuple[dict[int, tuple[int, float]], int]:
+    missing_positions = [
+        candidate_pos
+        for candidate_pos, candidate in enumerate(candidates)
+        if candidate.confirm_count is None or candidate.proxy_score is None
+    ]
+    if len(missing_positions) == 0:
+        return {}, 0
+
+    local_rows = np.ascontiguousarray(
+        np.asarray(
+            [candidates[candidate_pos].local_rows for candidate_pos in missing_positions],
+            dtype=np.int32,
+        )
+    )
+    eval_stack = _proxy_fill_eval_stack(prepared_result=prepared_result)
+    confirm_out = np.empty(len(missing_positions), dtype=np.int32)
+    proxy_out = np.empty(len(missing_positions), dtype=np.float32)
+    proxy_for_indicator_rows_batch(
+        local_rows,
+        eval_stack,
+        prepared_result.signal_returns_15m,
+        np.int32(proxy_context.combo_min_confirm),
+        np.float32(proxy_context.fee_penalty_per_confirm),
+        confirm_out,
+        proxy_out,
+    )
+    return (
+        {
+            candidate_pos: (int(confirm_out[out_pos]), float(proxy_out[out_pos]))
+            for out_pos, candidate_pos in enumerate(missing_positions)
+        },
+        len(missing_positions),
+    )
+
+
+def _proxy_fill_eval_stack(*, prepared_result: BacktestPreparePoolsResult) -> np.ndarray:
+    pools = tuple(prepared_result.indicator_pools)
+    arity = len(pools)
+    max_rows = max(int(pool.eval_T.shape[0]) for pool in pools)
+    eval_t_length = int(prepared_result.eval_T_length)
+    eval_stack = np.zeros((arity, max_rows, eval_t_length), dtype=np.int8)
+    for indicator_pos, pool in enumerate(pools):
+        row_count = int(pool.eval_T.shape[0])
+        eval_stack[indicator_pos, :row_count, :] = pool.eval_T[:, :eval_t_length]
+    return np.ascontiguousarray(eval_stack)
 
 
 def _variant_params(
