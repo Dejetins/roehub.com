@@ -181,15 +181,18 @@ class BacktestNoRiskExactScoringService:
                 top_n=top_n,
             )
             heap_candidates_seen += len(new_candidates)
-            top_candidates = heapq.nsmallest(
-                top_n,
-                [*top_candidates, *new_candidates],
-                key=lambda candidate: _candidate_sort_key(
-                    candidate=candidate,
-                    ranking_metric=ranking_metric,
-                    ranking_direction=ranking_direction,
-                ),
-            )
+            if len(top_candidates) == 0 and len(new_candidates) <= top_n:
+                top_candidates = new_candidates
+            else:
+                top_candidates = heapq.nsmallest(
+                    top_n,
+                    [*top_candidates, *new_candidates],
+                    key=lambda candidate: _candidate_sort_key(
+                        candidate=candidate,
+                        ranking_metric=ranking_metric,
+                        ranking_direction=ranking_direction,
+                    ),
+                )
             stage_timings[HEAP_UPDATE_STAGE_NAME] += time.perf_counter() - stage_start
             combo_global_start += combo_chunk.size
 
@@ -784,6 +787,40 @@ def proxy_for_indicator_rows_batch_two(
             out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
 
 
+@nb.njit(cache=True, fastmath=True)
+def proxy_for_indicator_rows_batch_two_serial(
+    local_rows_by_candidate: np.ndarray,
+    eval_t0: np.ndarray,
+    eval_t1: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+    out_confirm: np.ndarray,
+    out_proxy: np.ndarray,
+) -> None:
+    n_candidates = local_rows_by_candidate.shape[0]
+    n_intervals = ret_15m.shape[0]
+    for candidate_pos in range(n_candidates):
+        row0 = local_rows_by_candidate[candidate_pos, 0]
+        row1 = local_rows_by_candidate[candidate_pos, 1]
+        confirms = np.int32(0)
+        proxy = np.float32(0.0)
+        for interval_idx in range(n_intervals):
+            direction = eval_t0[row0, interval_idx]
+            if direction == 0 or eval_t1[row1, interval_idx] != direction:
+                continue
+            confirms += 1
+            if direction == 1:
+                proxy += ret_15m[interval_idx]
+            else:
+                proxy -= ret_15m[interval_idx]
+        out_confirm[candidate_pos] = confirms
+        if confirms < min_confirm:
+            out_proxy[candidate_pos] = _NEG_INF
+        else:
+            out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
+
+
 @nb.njit(parallel=True, cache=True, fastmath=True)
 def proxy_for_indicator_rows_batch_three(
     local_rows_by_candidate: np.ndarray,
@@ -799,6 +836,46 @@ def proxy_for_indicator_rows_batch_three(
     n_candidates = local_rows_by_candidate.shape[0]
     n_intervals = ret_15m.shape[0]
     for candidate_pos in nb.prange(n_candidates):
+        row0 = local_rows_by_candidate[candidate_pos, 0]
+        row1 = local_rows_by_candidate[candidate_pos, 1]
+        row2 = local_rows_by_candidate[candidate_pos, 2]
+        confirms = np.int32(0)
+        proxy = np.float32(0.0)
+        for interval_idx in range(n_intervals):
+            direction = eval_t0[row0, interval_idx]
+            if (
+                direction == 0
+                or eval_t1[row1, interval_idx] != direction
+                or eval_t2[row2, interval_idx] != direction
+            ):
+                continue
+            confirms += 1
+            if direction == 1:
+                proxy += ret_15m[interval_idx]
+            else:
+                proxy -= ret_15m[interval_idx]
+        out_confirm[candidate_pos] = confirms
+        if confirms < min_confirm:
+            out_proxy[candidate_pos] = _NEG_INF
+        else:
+            out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
+
+
+@nb.njit(cache=True, fastmath=True)
+def proxy_for_indicator_rows_batch_three_serial(
+    local_rows_by_candidate: np.ndarray,
+    eval_t0: np.ndarray,
+    eval_t1: np.ndarray,
+    eval_t2: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+    out_confirm: np.ndarray,
+    out_proxy: np.ndarray,
+) -> None:
+    n_candidates = local_rows_by_candidate.shape[0]
+    n_intervals = ret_15m.shape[0]
+    for candidate_pos in range(n_candidates):
         row0 = local_rows_by_candidate[candidate_pos, 0]
         row1 = local_rows_by_candidate[candidate_pos, 1]
         row2 = local_rows_by_candidate[candidate_pos, 2]
@@ -2334,7 +2411,7 @@ def _proxy_fill_missing_candidates(
             proxy_out=proxy_out,
         )
     elif arity == 2:
-        proxy_for_indicator_rows_batch_two(
+        proxy_for_indicator_rows_batch_two_serial(
             local_rows,
             eval_arrays[0],
             eval_arrays[1],
@@ -2345,7 +2422,7 @@ def _proxy_fill_missing_candidates(
             proxy_out,
         )
     elif arity == 3:
-        proxy_for_indicator_rows_batch_three(
+        proxy_for_indicator_rows_batch_three_serial(
             local_rows,
             eval_arrays[0],
             eval_arrays[1],
