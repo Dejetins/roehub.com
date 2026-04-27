@@ -729,6 +729,101 @@ def proxy_for_indicator_rows(
     return confirms, float(proxy)
 
 
+def _proxy_fill_arity_one(
+    *,
+    local_rows: np.ndarray,
+    pool: PreparedIndicatorPool,
+    min_confirm: int,
+    fee_penalty_per_confirm: np.float32,
+    confirm_out: np.ndarray,
+    proxy_out: np.ndarray,
+) -> None:
+    for candidate_pos in range(int(local_rows.shape[0])):
+        row = int(local_rows[candidate_pos, 0])
+        confirms = int(pool.nonzero[row])
+        confirm_out[candidate_pos] = confirms
+        if confirms < int(min_confirm):
+            proxy_out[candidate_pos] = _NEG_INF
+        else:
+            proxy_out[candidate_pos] = np.float32(
+                pool.proxy[row] - (fee_penalty_per_confirm * np.float32(confirms))
+            )
+
+
+@nb.njit(parallel=True, cache=True, fastmath=True)
+def proxy_for_indicator_rows_batch_two(
+    local_rows_by_candidate: np.ndarray,
+    eval_t0: np.ndarray,
+    eval_t1: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+    out_confirm: np.ndarray,
+    out_proxy: np.ndarray,
+) -> None:
+    n_candidates = local_rows_by_candidate.shape[0]
+    n_intervals = ret_15m.shape[0]
+    for candidate_pos in nb.prange(n_candidates):
+        row0 = local_rows_by_candidate[candidate_pos, 0]
+        row1 = local_rows_by_candidate[candidate_pos, 1]
+        confirms = np.int32(0)
+        proxy = np.float32(0.0)
+        for interval_idx in range(n_intervals):
+            direction = eval_t0[row0, interval_idx]
+            if direction == 0 or eval_t1[row1, interval_idx] != direction:
+                continue
+            confirms += 1
+            if direction == 1:
+                proxy += ret_15m[interval_idx]
+            else:
+                proxy -= ret_15m[interval_idx]
+        out_confirm[candidate_pos] = confirms
+        if confirms < min_confirm:
+            out_proxy[candidate_pos] = _NEG_INF
+        else:
+            out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
+
+
+@nb.njit(parallel=True, cache=True, fastmath=True)
+def proxy_for_indicator_rows_batch_three(
+    local_rows_by_candidate: np.ndarray,
+    eval_t0: np.ndarray,
+    eval_t1: np.ndarray,
+    eval_t2: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+    out_confirm: np.ndarray,
+    out_proxy: np.ndarray,
+) -> None:
+    n_candidates = local_rows_by_candidate.shape[0]
+    n_intervals = ret_15m.shape[0]
+    for candidate_pos in nb.prange(n_candidates):
+        row0 = local_rows_by_candidate[candidate_pos, 0]
+        row1 = local_rows_by_candidate[candidate_pos, 1]
+        row2 = local_rows_by_candidate[candidate_pos, 2]
+        confirms = np.int32(0)
+        proxy = np.float32(0.0)
+        for interval_idx in range(n_intervals):
+            direction = eval_t0[row0, interval_idx]
+            if (
+                direction == 0
+                or eval_t1[row1, interval_idx] != direction
+                or eval_t2[row2, interval_idx] != direction
+            ):
+                continue
+            confirms += 1
+            if direction == 1:
+                proxy += ret_15m[interval_idx]
+            else:
+                proxy -= ret_15m[interval_idx]
+        out_confirm[candidate_pos] = confirms
+        if confirms < min_confirm:
+            out_proxy[candidate_pos] = _NEG_INF
+        else:
+            out_proxy[candidate_pos] = proxy - (fee_penalty_per_confirm * np.float32(confirms))
+
+
 @nb.njit(parallel=True, cache=True, fastmath=True)
 def proxy_for_indicator_rows_batch(
     local_rows_by_candidate: np.ndarray,
@@ -2103,6 +2198,8 @@ def _selected_top_score_indexes_from_chunk(
     size = chunk_scores.size
     if size <= 0:
         return np.empty(0, dtype=np.int32)
+    if size <= top_n:
+        return np.arange(size, dtype=np.int32)
 
     metric_values = np.asarray(
         getattr(chunk_scores, ranking_metric),
@@ -2227,25 +2324,58 @@ def _proxy_fill_missing_candidates(
         eval_arrays.append(eval_arrays[0])
     confirm_out = np.empty(len(missing_positions), dtype=np.int32)
     proxy_out = np.empty(len(missing_positions), dtype=np.float32)
-    proxy_for_indicator_rows_batch(
-        local_rows,
-        eval_arrays[0],
-        eval_arrays[1],
-        eval_arrays[2],
-        eval_arrays[3],
-        eval_arrays[4],
-        eval_arrays[5],
-        eval_arrays[6],
-        eval_arrays[7],
-        eval_arrays[8],
-        eval_arrays[9],
-        np.int32(arity),
-        prepared_result.signal_returns_15m,
-        np.int32(proxy_context.combo_min_confirm),
-        np.float32(proxy_context.fee_penalty_per_confirm),
-        confirm_out,
-        proxy_out,
-    )
+    if arity == 1:
+        _proxy_fill_arity_one(
+            local_rows=local_rows,
+            pool=prepared_result.indicator_pools[0],
+            min_confirm=proxy_context.combo_min_confirm,
+            fee_penalty_per_confirm=proxy_context.fee_penalty_per_confirm,
+            confirm_out=confirm_out,
+            proxy_out=proxy_out,
+        )
+    elif arity == 2:
+        proxy_for_indicator_rows_batch_two(
+            local_rows,
+            eval_arrays[0],
+            eval_arrays[1],
+            prepared_result.signal_returns_15m,
+            np.int32(proxy_context.combo_min_confirm),
+            np.float32(proxy_context.fee_penalty_per_confirm),
+            confirm_out,
+            proxy_out,
+        )
+    elif arity == 3:
+        proxy_for_indicator_rows_batch_three(
+            local_rows,
+            eval_arrays[0],
+            eval_arrays[1],
+            eval_arrays[2],
+            prepared_result.signal_returns_15m,
+            np.int32(proxy_context.combo_min_confirm),
+            np.float32(proxy_context.fee_penalty_per_confirm),
+            confirm_out,
+            proxy_out,
+        )
+    else:
+        proxy_for_indicator_rows_batch(
+            local_rows,
+            eval_arrays[0],
+            eval_arrays[1],
+            eval_arrays[2],
+            eval_arrays[3],
+            eval_arrays[4],
+            eval_arrays[5],
+            eval_arrays[6],
+            eval_arrays[7],
+            eval_arrays[8],
+            eval_arrays[9],
+            np.int32(arity),
+            prepared_result.signal_returns_15m,
+            np.int32(proxy_context.combo_min_confirm),
+            np.float32(proxy_context.fee_penalty_per_confirm),
+            confirm_out,
+            proxy_out,
+        )
     return (
         {
             candidate_pos: (int(confirm_out[out_pos]), float(proxy_out[out_pos]))
