@@ -1,5 +1,15 @@
 """DTO package for the reset backtest scope."""
 
+from .combo_planning import (
+    BacktestComboChunk,
+    BacktestComboPlanningConfig,
+    BacktestComboPlanningResult,
+    BacktestComboPlanningTelemetry,
+    BacktestExactContext,
+    BacktestProxyContext,
+    BacktestProxyFilterResult,
+    BacktestSelectedBackend,
+)
 from .prepare_pools import (
     BacktestPreparePoolsConfig,
     BacktestPreparePoolsResult,
@@ -23,14 +33,22 @@ from .runtime_preflight import (
 
 __all__ = [
     "BacktestArtifactMetadata",
+    "BacktestComboChunk",
+    "BacktestComboPlanningConfig",
+    "BacktestComboPlanningResult",
+    "BacktestComboPlanningTelemetry",
     "BacktestCoordinates",
     "BacktestCostEstimate",
     "BacktestExecutionDefaults",
+    "BacktestExactContext",
     "BacktestPreparePoolsConfig",
     "BacktestPreparePoolsResult",
     "BacktestPreflightResult",
+    "BacktestProxyContext",
+    "BacktestProxyFilterResult",
     "BacktestRuntimeDefaults",
     "BacktestRuntimeGuardrails",
+    "BacktestSelectedBackend",
     "BacktestValidationIssue",
     "JsonMapping",
     "PreparedExecutionMapping",
