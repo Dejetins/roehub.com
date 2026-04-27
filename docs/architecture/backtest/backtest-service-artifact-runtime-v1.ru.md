@@ -1129,6 +1129,13 @@ request.
 - более поздняя stage может прототипироваться локально, но она не должна считаться
   accepted, пока все предыдущие stage gates не пройдены.
 
+Текущий статус accepted iterations:
+
+| Iteration | Status | Accepted evidence |
+|---:|---|---|
+| 1 | `pass` | [`2026-04-26_iteration_1_request_normalization_artifact_context`](benchmark_iterations/2026-04-26_iteration_1_request_normalization_artifact_context/) |
+| 2 | `pass` | [`2026-04-26_iteration_2_prepare_pools`](benchmark_iterations/2026-04-26_iteration_2_prepare_pools/) |
+
 ### Итерация 0: документы и benchmark harness
 
 - финализировать этот architecture document относительно canonical notebook prototype;
@@ -1172,6 +1179,9 @@ request.
 - parity check, что request hash совпадает с canonical fixture hash, где применимо;
 - failure evidence для invalid indicator/source/window и request-too-expensive.
 
+Accepted evidence:
+[`2026-04-26_iteration_1_request_normalization_artifact_context`](benchmark_iterations/2026-04-26_iteration_1_request_normalization_artifact_context/).
+
 ### Итерация 2: artifact arrays и `prepare_pools`
 
 - реализовать mmap loaders для `prices`, `signals`, `mappings`;
@@ -1196,6 +1206,12 @@ request.
   `signal_row_selection`, `row_prefilter`, `segment_build`;
 - row metadata/order hash равен notebook fixture;
 - stage record записан до перехода к combo planning.
+
+Accepted evidence:
+[`2026-04-26_iteration_2_prepare_pools`](benchmark_iterations/2026-04-26_iteration_2_prepare_pools/).
+Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
+`prepare_pools_total` failure remains preserved in the evidence as
+`stage_boundary_mismatch`.
 
 ### Итерация 3: combo planning contexts
 
