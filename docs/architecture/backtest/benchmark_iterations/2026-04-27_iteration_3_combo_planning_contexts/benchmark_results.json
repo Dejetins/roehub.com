@@ -1,0 +1,3365 @@
+{
+  "acceptance": {
+    "decision": "pass",
+    "host_required": "Mac Studio",
+    "hostname_actual": "MacStudioDaniil",
+    "hostname_required": "MacStudioDaniil",
+    "macstudio_acceptance": true,
+    "status": "pass"
+  },
+  "active_proxy_filter_fixture_evidence": {
+    "arity_2_matrix_cache": {
+      "build_proxy_context_s": 6.200000643730164e-05,
+      "config": {
+        "combo_min_confirm": 1,
+        "combo_top_frac": 0.5
+      },
+      "confirm": [
+        2,
+        1
+      ],
+      "context": {
+        "active": true,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 0.5,
+        "confirm_matrix_shape": [
+          2,
+          3
+        ],
+        "context_type": "matrix_two",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0,
+        "indicator_ids": [
+          "alpha",
+          "beta"
+        ],
+        "proxy_matrix_shape": [
+          2,
+          3
+        ],
+        "ret_15m_shape": null
+      },
+      "expected_selected_indexes": [
+        1,
+        4
+      ],
+      "input_candidate_count": 6,
+      "pass": true,
+      "proxy": [
+        3.0,
+        2.0
+      ],
+      "proxy_filter_s": 5.7415993069298565e-05,
+      "selected_candidate_count": 2,
+      "selected_indexes": [
+        1,
+        4
+      ],
+      "valid_candidate_count": 4
+    },
+    "generic_n_eval_stack": {
+      "build_proxy_context_s": 1.9583996618166566e-05,
+      "config": {
+        "combo_min_confirm": 2,
+        "combo_top_frac": 1.0
+      },
+      "confirm": [
+        2,
+        2
+      ],
+      "context": {
+        "active": true,
+        "combo_min_confirm": 2,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "generic_n",
+        "eval_stack_shape": [
+          3,
+          3,
+          3
+        ],
+        "fee_penalty_per_confirm": 0.0,
+        "indicator_ids": [
+          "alpha",
+          "beta",
+          "gamma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": [
+          3
+        ]
+      },
+      "expected_selected_indexes": [
+        2,
+        11
+      ],
+      "input_candidate_count": 12,
+      "pass": true,
+      "proxy": [
+        3.0,
+        1.0
+      ],
+      "proxy_filter_s": 6.887500057928264e-05,
+      "selected_candidate_count": 2,
+      "selected_indexes": [
+        2,
+        11
+      ],
+      "valid_candidate_count": 2
+    }
+  },
+  "deterministic_order_evidence": {
+    "chunk_size": 10,
+    "expected_first_10": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        3
+      ],
+      [
+        0,
+        0,
+        4
+      ],
+      [
+        0,
+        0,
+        5
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1
+      ],
+      [
+        0,
+        1,
+        2
+      ],
+      [
+        0,
+        1,
+        3
+      ]
+    ],
+    "indicator_ids": [
+      "a",
+      "b",
+      "c"
+    ],
+    "observed_first_10": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        3
+      ],
+      [
+        0,
+        0,
+        4
+      ],
+      [
+        0,
+        0,
+        5
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1
+      ],
+      [
+        0,
+        1,
+        2
+      ],
+      [
+        0,
+        1,
+        3
+      ]
+    ],
+    "pass": true
+  },
+  "identity": {
+    "artifact_asof_date": "2026-04-27",
+    "artifact_manifest_hash": "bd81f5d19b1b13ddd843143236b90780802ad9baf395bb047bf549d24f71d40e",
+    "artifact_published_at_utc": "2026-04-27T01:34:12Z",
+    "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+    "artifact_slot": "slot_b",
+    "artifact_slot_generation": 4,
+    "baseline_request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1",
+    "git_branch": "main",
+    "git_commit": "c4dbfc79eb7fa7be481a3fab8a04093da9d23d20",
+    "git_status_short": [
+      "## main...origin/main"
+    ],
+    "hit_times_manifest_hash": "1f5d3bf464f4beba3e73105d7c561cdd523255db5e27329ae5b22ddd63f170a9",
+    "host": "Mac Studio",
+    "hostname": "MacStudioDaniil",
+    "platform": "macOS-15.7.5-arm64-arm-64bit",
+    "python": "3.12.13",
+    "request_hash": "ceaaec911055082f9c1ecbe8c9e806f1372d0b084ba146e3dc02b70b953e3754"
+  },
+  "methodology": {
+    "active_proxy_fixture_policy": "small deterministic fixtures only",
+    "combo_config": {
+      "COMBO_CHUNK_SIZE": 4096,
+      "combo_min_confirm": 1,
+      "combo_top_frac": 1.0
+    },
+    "direction_modes": [
+      "long_only",
+      "long_short_reversal"
+    ],
+    "full_matrix_proxy_mode": "pass_through",
+    "indicator_sets": {
+      "1": [
+        "ma.dema"
+      ],
+      "2": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "3": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "4": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "5": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "6": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "7": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ]
+    },
+    "non_goals_enforced": [
+      "no exact_scoring",
+      "no tp_sl_exact_scoring",
+      "no heap_update",
+      "no load_hit_times",
+      "no persistence"
+    ],
+    "period": {
+      "end": "2026-04-11T20:08:00+00:00",
+      "semantics": "[start, end)",
+      "start": "2020-01-11T20:08:00+00:00"
+    },
+    "risks": [
+      "none",
+      "tp_sl_grid"
+    ],
+    "rows_per_indicator": 6,
+    "scope": "Iteration 3 only: build_exact_context, build_proxy_context, combo_iteration, proxy_filter before exact scoring."
+  },
+  "recorded_at_utc": "2026-04-27T19:51:19.052485+00:00",
+  "runs": [
+    {
+      "arity": 1,
+      "backend": {
+        "arity": 1,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 6,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.00042299999999984017,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "exact_context": {
+        "counts_shape": [
+          1,
+          6
+        ],
+        "ends_shape": [
+          1,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6
+        ],
+        "starts_shape": [
+          1,
+          6,
+          82792
+        ],
+        "values_shape": [
+          1,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 6,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "outer_wall_s": 0.00038445899554062635,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.0,
+      "proxy_candidates_seen": 6,
+      "proxy_candidates_selected": 6,
+      "proxy_candidates_valid": 6,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "7ed083bcdbd37e7538560fcf18d3e5a8958faf980f7d43d545506f0d2dc55ac3",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0003260839876020327,
+        "build_proxy_context": 6.50000583846122e-06,
+        "combo_iteration": 1.3791999663226306e-05,
+        "proxy_filter": 8.125003660097718e-06
+      }
+    },
+    {
+      "arity": 1,
+      "backend": {
+        "arity": 1,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 6,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.00044599999999994644,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "exact_context": {
+        "counts_shape": [
+          1,
+          6
+        ],
+        "ends_shape": [
+          1,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6
+        ],
+        "starts_shape": [
+          1,
+          6,
+          82792
+        ],
+        "values_shape": [
+          1,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 6,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "outer_wall_s": 0.0004130000015720725,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.0,
+      "proxy_candidates_seen": 6,
+      "proxy_candidates_selected": 6,
+      "proxy_candidates_valid": 6,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "2421d7d9a17f719c9437cd57f397c8ba8b639d94dbc0fe26b84cb158bb2a9038",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.00038150000909809023,
+        "build_proxy_context": 3.5840057535097003e-06,
+        "combo_iteration": 9.500014130026102e-06,
+        "proxy_filter": 4.084009560756385e-06
+      }
+    },
+    {
+      "arity": 2,
+      "backend": {
+        "arity": 2,
+        "backend_id": "event_segments_2_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": false,
+        "risk_mode": "none",
+        "role": "default"
+      },
+      "cartesian_combinations": 36,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.00011399999999994748,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "exact_context": {
+        "counts_shape": null,
+        "ends_shape": null,
+        "materialized": false,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": false,
+        "row_counts": [
+          6,
+          6
+        ],
+        "starts_shape": null,
+        "values_shape": null
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 36,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "outer_wall_s": 4.112500755582005e-05,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.0,
+      "proxy_candidates_seen": 36,
+      "proxy_candidates_selected": 36,
+      "proxy_candidates_valid": 36,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "06d61e59371f9d9c5e636f3e9cfdd558dd301b1b6ec2ed9e5dbf2d989c7e1629",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 5.4580013966187835e-06,
+        "build_proxy_context": 2.3750035325065255e-06,
+        "combo_iteration": 1.6876001609489322e-05,
+        "proxy_filter": 3.1669915188103914e-06
+      }
+    },
+    {
+      "arity": 2,
+      "backend": {
+        "arity": 2,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 36,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0005279999999998619,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "exact_context": {
+        "counts_shape": [
+          2,
+          6
+        ],
+        "ends_shape": [
+          2,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6
+        ],
+        "starts_shape": [
+          2,
+          6,
+          82792
+        ],
+        "values_shape": [
+          2,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 36,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "outer_wall_s": 0.0004932089941576123,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.0,
+      "proxy_candidates_seen": 36,
+      "proxy_candidates_selected": 36,
+      "proxy_candidates_valid": 36,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "d21541d9421274f68bb90533daf41409886a290d16438418ee1fca17c546d6dd",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.00046358299732673913,
+        "build_proxy_context": 2.2500025806948543e-06,
+        "combo_iteration": 1.5083991456776857e-05,
+        "proxy_filter": 2.792003215290606e-06
+      }
+    },
+    {
+      "arity": 3,
+      "backend": {
+        "arity": 3,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 216,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0011929999999999996,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "exact_context": {
+        "counts_shape": [
+          3,
+          6
+        ],
+        "ends_shape": [
+          3,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          3,
+          6,
+          82792
+        ],
+        "values_shape": [
+          3,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 216,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "outer_wall_s": 0.0011259169987170026,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 2.0625,
+      "proxy_candidates_seen": 216,
+      "proxy_candidates_selected": 216,
+      "proxy_candidates_valid": 216,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "2c0860d5f4b63b4dab67c055cb1c22f5d23481e1a2d317c7c0f41fc5c58a9249",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0010276250104652718,
+        "build_proxy_context": 2.3750035325065255e-06,
+        "combo_iteration": 8.191600500140339e-05,
+        "proxy_filter": 3.416993422433734e-06
+      }
+    },
+    {
+      "arity": 3,
+      "backend": {
+        "arity": 3,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 216,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0010259999999999714,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "exact_context": {
+        "counts_shape": [
+          3,
+          6
+        ],
+        "ends_shape": [
+          3,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          3,
+          6,
+          82792
+        ],
+        "values_shape": [
+          3,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 216,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "outer_wall_s": 0.0008975840028142557,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 5.6875,
+      "proxy_candidates_seen": 216,
+      "proxy_candidates_selected": 216,
+      "proxy_candidates_valid": 216,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "1e01985aafd0e3b4343559dfce8a628cbfa15fd6a35a4a75aa67854ef5c0bc23",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0008030409953789786,
+        "build_proxy_context": 2.2909953258931637e-06,
+        "combo_iteration": 7.937500777188689e-05,
+        "proxy_filter": 2.91600008495152e-06
+      }
+    },
+    {
+      "arity": 4,
+      "backend": {
+        "arity": 4,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 1296,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.001778999999999753,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "exact_context": {
+        "counts_shape": [
+          4,
+          6
+        ],
+        "ends_shape": [
+          4,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          4,
+          6,
+          82792
+        ],
+        "values_shape": [
+          4,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 1296,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "outer_wall_s": 0.0016438750026281923,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 7.59375,
+      "proxy_candidates_seen": 1296,
+      "proxy_candidates_selected": 1296,
+      "proxy_candidates_valid": 1296,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "fea101b329dff13a4779b8541a08cfc75a8ddb1c54b380e424a334ee17283a69",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0011359170021023601,
+        "build_proxy_context": 2.2500025806948543e-06,
+        "combo_iteration": 0.0004909590061288327,
+        "proxy_filter": 3.374996595084667e-06
+      }
+    },
+    {
+      "arity": 4,
+      "backend": {
+        "arity": 4,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 1296,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0017499999999996962,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "exact_context": {
+        "counts_shape": [
+          4,
+          6
+        ],
+        "ends_shape": [
+          4,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          4,
+          6,
+          82792
+        ],
+        "values_shape": [
+          4,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 1296,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "outer_wall_s": 0.001629125006729737,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 7.59375,
+      "proxy_candidates_seen": 1296,
+      "proxy_candidates_selected": 1296,
+      "proxy_candidates_valid": 1296,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "68cac3b4230f4a0cbc7073a1eba31a64a93ee220eefe20d33481d536747425e1",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.001130749995354563,
+        "build_proxy_context": 2.0419975044205785e-06,
+        "combo_iteration": 0.00048266598605550826,
+        "proxy_filter": 3.1660019885748625e-06
+      }
+    },
+    {
+      "arity": 5,
+      "backend": {
+        "arity": 5,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 7776,
+      "combo_chunks_processed": 2,
+      "cpu_time_delta_s": 0.004658999999999969,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "exact_context": {
+        "counts_shape": [
+          5,
+          6
+        ],
+        "ends_shape": [
+          5,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          5,
+          6,
+          82792
+        ],
+        "values_shape": [
+          5,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 2,
+      "expected_combinations": 7776,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "outer_wall_s": 0.0044415419979486614,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 10.59375,
+      "proxy_candidates_seen": 7776,
+      "proxy_candidates_selected": 7776,
+      "proxy_candidates_valid": 7776,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "cd7be770417e985ad51a0c3e28f4fee5a3f288e6f420261382d0e8198877f54f",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0009798340033739805,
+        "build_proxy_context": 2.125001628883183e-06,
+        "combo_iteration": 0.00343970897665713,
+        "proxy_filter": 7.99899862613529e-06
+      }
+    },
+    {
+      "arity": 5,
+      "backend": {
+        "arity": 5,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 7776,
+      "combo_chunks_processed": 2,
+      "cpu_time_delta_s": 0.0045359999999998735,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "exact_context": {
+        "counts_shape": [
+          5,
+          6
+        ],
+        "ends_shape": [
+          5,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          5,
+          6,
+          82792
+        ],
+        "values_shape": [
+          5,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 2,
+      "expected_combinations": 7776,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "outer_wall_s": 0.004487915997742675,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 10.40625,
+      "proxy_candidates_seen": 7776,
+      "proxy_candidates_selected": 7776,
+      "proxy_candidates_valid": 7776,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "4d133d881c598adee01388f9e37205a6a8f73421ff9e412e203d357b224d795e",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0009682090021669865,
+        "build_proxy_context": 2.0840088836848736e-06,
+        "combo_iteration": 0.0034978340117959306,
+        "proxy_filter": 7.6669966802001e-06
+      }
+    },
+    {
+      "arity": 6,
+      "backend": {
+        "arity": 6,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 46656,
+      "combo_chunks_processed": 12,
+      "cpu_time_delta_s": 0.023947000000000163,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "exact_context": {
+        "counts_shape": [
+          6,
+          6
+        ],
+        "ends_shape": [
+          6,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          6,
+          6,
+          82792
+        ],
+        "values_shape": [
+          6,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 12,
+      "expected_combinations": 46656,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "outer_wall_s": 0.02389845899597276,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 12.796875,
+      "proxy_candidates_seen": 46656,
+      "proxy_candidates_selected": 46656,
+      "proxy_candidates_valid": 46656,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "cbbc8cdb01bd660e8fa21372c87d4c4de467c1e72e4a09a84913d00476f1f80d",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.001241791993379593,
+        "build_proxy_context": 1.9999861251562834e-06,
+        "combo_iteration": 0.0225950419990113,
+        "proxy_filter": 4.4998014345765114e-05
+      }
+    },
+    {
+      "arity": 6,
+      "backend": {
+        "arity": 6,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 46656,
+      "combo_chunks_processed": 12,
+      "cpu_time_delta_s": 0.023963999999999652,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "exact_context": {
+        "counts_shape": [
+          6,
+          6
+        ],
+        "ends_shape": [
+          6,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          6,
+          6,
+          82792
+        ],
+        "values_shape": [
+          6,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 12,
+      "expected_combinations": 46656,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "outer_wall_s": 0.023916666992590763,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 12.84375,
+      "proxy_candidates_seen": 46656,
+      "proxy_candidates_selected": 46656,
+      "proxy_candidates_valid": 46656,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "d985bda6e027847e13fb06ce010e44992989bd5815e1e6c446a1d74e15404192",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0011784999951487407,
+        "build_proxy_context": 2.5000044843181968e-06,
+        "combo_iteration": 0.022676626016618684,
+        "proxy_filter": 4.3871012167073786e-05
+      }
+    },
+    {
+      "arity": 7,
+      "backend": {
+        "arity": 7,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 279936,
+      "combo_chunks_processed": 69,
+      "cpu_time_delta_s": 0.15714399999999973,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "exact_context": {
+        "counts_shape": [
+          7,
+          6
+        ],
+        "ends_shape": [
+          7,
+          6,
+          122201
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 122201,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          7,
+          6,
+          122201
+        ],
+        "values_shape": [
+          7,
+          6,
+          122201
+        ]
+      },
+      "expected_chunks": 69,
+      "expected_combinations": 279936,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "outer_wall_s": 0.1570191659993725,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 18.53125,
+      "proxy_candidates_seen": 279936,
+      "proxy_candidates_selected": 279936,
+      "proxy_candidates_valid": 279936,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma",
+          "ma.zlema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "1dffba82d24b7b9395bb1f1b420d71dd0eab060e6c28639b7f9e1d06bb36920c",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0019140840013278648,
+        "build_proxy_context": 2.4170003598555923e-06,
+        "combo_iteration": 0.15480804408434778,
+        "proxy_filter": 0.0002698290045373142
+      }
+    },
+    {
+      "arity": 7,
+      "backend": {
+        "arity": 7,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_only",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 279936,
+      "combo_chunks_processed": 69,
+      "cpu_time_delta_s": 0.15987899999999988,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "exact_context": {
+        "counts_shape": [
+          7,
+          6
+        ],
+        "ends_shape": [
+          7,
+          6,
+          122201
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 122201,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          7,
+          6,
+          122201
+        ],
+        "values_shape": [
+          7,
+          6,
+          122201
+        ]
+      },
+      "expected_chunks": 69,
+      "expected_combinations": 279936,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "outer_wall_s": 0.1594455409940565,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 20.03125,
+      "proxy_candidates_seen": 279936,
+      "proxy_candidates_selected": 279936,
+      "proxy_candidates_valid": 279936,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma",
+          "ma.zlema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "745595dd3ffe28b92cd0d09033ddb3415ff20068ce9affd6f41e98e92e5d3f4e",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.002011792006669566,
+        "build_proxy_context": 2.4170003598555923e-06,
+        "combo_iteration": 0.15708729287143797,
+        "proxy_filter": 0.0003060390008613467
+      }
+    },
+    {
+      "arity": 1,
+      "backend": {
+        "arity": 1,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 6,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0014019999999999033,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "exact_context": {
+        "counts_shape": [
+          1,
+          6
+        ],
+        "ends_shape": [
+          1,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6
+        ],
+        "starts_shape": [
+          1,
+          6,
+          82792
+        ],
+        "values_shape": [
+          1,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 6,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "outer_wall_s": 0.0005199169972911477,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 3.8125,
+      "proxy_candidates_seen": 6,
+      "proxy_candidates_selected": 6,
+      "proxy_candidates_valid": 6,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "e33bae5130841042a2ce769845ad23125f243ba98a56ace3c38445c1a84e78aa",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0004554170009214431,
+        "build_proxy_context": 1.1500000255182385e-05,
+        "combo_iteration": 2.2916996385902166e-05,
+        "proxy_filter": 5.08299854118377e-06
+      }
+    },
+    {
+      "arity": 1,
+      "backend": {
+        "arity": 1,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 6,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0003789999999999072,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "exact_context": {
+        "counts_shape": [
+          1,
+          6
+        ],
+        "ends_shape": [
+          1,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6
+        ],
+        "starts_shape": [
+          1,
+          6,
+          82792
+        ],
+        "values_shape": [
+          1,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 6,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "outer_wall_s": 0.0003369170008227229,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.046875,
+      "proxy_candidates_seen": 6,
+      "proxy_candidates_selected": 6,
+      "proxy_candidates_valid": 6,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "035861f9457fe225ecc199fabd25a84f2fb71e61b8d7bc7691d2330de18a75f2",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.00030795800557825714,
+        "build_proxy_context": 3.4999975468963385e-06,
+        "combo_iteration": 7.70699989516288e-06,
+        "proxy_filter": 3.1249946914613247e-06
+      }
+    },
+    {
+      "arity": 2,
+      "backend": {
+        "arity": 2,
+        "backend_id": "event_segments_2_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": false,
+        "risk_mode": "none",
+        "role": "default"
+      },
+      "cartesian_combinations": 36,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.00013799999999997148,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "exact_context": {
+        "counts_shape": null,
+        "ends_shape": null,
+        "materialized": false,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": false,
+        "row_counts": [
+          6,
+          6
+        ],
+        "starts_shape": null,
+        "values_shape": null
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 36,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "outer_wall_s": 3.954199200961739e-05,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.0,
+      "proxy_candidates_seen": 36,
+      "proxy_candidates_selected": 36,
+      "proxy_candidates_valid": 36,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "48231b0f03098c43a7508d05988f5ad2200fbc2910a029c66cb50d5919d75b94",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 5.49999822396785e-06,
+        "build_proxy_context": 2.2089952835813165e-06,
+        "combo_iteration": 1.8625010852701962e-05,
+        "proxy_filter": 2.792003215290606e-06
+      }
+    },
+    {
+      "arity": 2,
+      "backend": {
+        "arity": 2,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 36,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0006690000000002527,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "exact_context": {
+        "counts_shape": [
+          2,
+          6
+        ],
+        "ends_shape": [
+          2,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6
+        ],
+        "starts_shape": [
+          2,
+          6,
+          82792
+        ],
+        "values_shape": [
+          2,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 36,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "outer_wall_s": 0.000636667013168335,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 3.828125,
+      "proxy_candidates_seen": 36,
+      "proxy_candidates_selected": 36,
+      "proxy_candidates_valid": 36,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "cf4df1c447a9777e5609e41439e128bde59b5cf867b20bbc0f97692df2b8926c",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.000607542009674944,
+        "build_proxy_context": 2.5420013116672635e-06,
+        "combo_iteration": 1.4792007277719676e-05,
+        "proxy_filter": 2.70901364274323e-06
+      }
+    },
+    {
+      "arity": 3,
+      "backend": {
+        "arity": 3,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 216,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0011719999999999509,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "exact_context": {
+        "counts_shape": [
+          3,
+          6
+        ],
+        "ends_shape": [
+          3,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          3,
+          6,
+          82792
+        ],
+        "values_shape": [
+          3,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 216,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "outer_wall_s": 0.001134125006501563,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 11.390625,
+      "proxy_candidates_seen": 216,
+      "proxy_candidates_selected": 216,
+      "proxy_candidates_valid": 216,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "015d3f636ff7bc11f7e86eb03fd3205b150b00653dceb965962b62ec39edc454",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0010301669972250238,
+        "build_proxy_context": 2.291009877808392e-06,
+        "combo_iteration": 8.845800766721368e-05,
+        "proxy_filter": 3.082997864112258e-06
+      }
+    },
+    {
+      "arity": 3,
+      "backend": {
+        "arity": 3,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 216,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0012840000000000629,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "exact_context": {
+        "counts_shape": [
+          3,
+          6
+        ],
+        "ends_shape": [
+          3,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          3,
+          6,
+          82792
+        ],
+        "values_shape": [
+          3,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 216,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "outer_wall_s": 0.001105750008719042,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 11.40625,
+      "proxy_candidates_seen": 216,
+      "proxy_candidates_selected": 216,
+      "proxy_candidates_valid": 216,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "be0d55162a2dde16f30b8741872d74892701c3a0c97d4e3cf669f47817d2d89f",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0010158749937545508,
+        "build_proxy_context": 2.415996277704835e-06,
+        "combo_iteration": 7.537499186582863e-05,
+        "proxy_filter": 2.91600008495152e-06
+      }
+    },
+    {
+      "arity": 4,
+      "backend": {
+        "arity": 4,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 1296,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.002170999999999923,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "exact_context": {
+        "counts_shape": [
+          4,
+          6
+        ],
+        "ends_shape": [
+          4,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          4,
+          6,
+          82792
+        ],
+        "values_shape": [
+          4,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 1296,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "outer_wall_s": 0.0020322919881436974,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 0.03125,
+      "proxy_candidates_seen": 1296,
+      "proxy_candidates_selected": 1296,
+      "proxy_candidates_valid": 1296,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "ec1dc9c3631105724e5c27fed5f1665c110e9246a99f97ba282c8a468ecb2693",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0015143749915296212,
+        "build_proxy_context": 2.125001628883183e-06,
+        "combo_iteration": 0.0005008759908378124,
+        "proxy_filter": 3.7080026231706142e-06
+      }
+    },
+    {
+      "arity": 4,
+      "backend": {
+        "arity": 4,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 1296,
+      "combo_chunks_processed": 1,
+      "cpu_time_delta_s": 0.0019049999999998235,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "exact_context": {
+        "counts_shape": [
+          4,
+          6
+        ],
+        "ends_shape": [
+          4,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          4,
+          6,
+          82792
+        ],
+        "values_shape": [
+          4,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 1,
+      "expected_combinations": 1296,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "outer_wall_s": 0.001760750004905276,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 7.609375,
+      "proxy_candidates_seen": 1296,
+      "proxy_candidates_selected": 1296,
+      "proxy_candidates_valid": 1296,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "40d14d70272970ed28fce525155390b27a8a5dc1b1d90031a73abc9637a761b7",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0012548329978017136,
+        "build_proxy_context": 1.9169965526089072e-06,
+        "combo_iteration": 0.00048733300354797393,
+        "proxy_filter": 3.249995643272996e-06
+      }
+    },
+    {
+      "arity": 5,
+      "backend": {
+        "arity": 5,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 7776,
+      "combo_chunks_processed": 2,
+      "cpu_time_delta_s": 0.004865000000000119,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "exact_context": {
+        "counts_shape": [
+          5,
+          6
+        ],
+        "ends_shape": [
+          5,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          5,
+          6,
+          82792
+        ],
+        "values_shape": [
+          5,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 2,
+      "expected_combinations": 7776,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "outer_wall_s": 0.004638124999473803,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 9.0625,
+      "proxy_candidates_seen": 7776,
+      "proxy_candidates_selected": 7776,
+      "proxy_candidates_valid": 7776,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "b77c953993f212a91545479dac58f024d7c90ce3a96472808b800ff92e92b615",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0010565419943304732,
+        "build_proxy_context": 2.1669984562322497e-06,
+        "combo_iteration": 0.0034543329966254532,
+        "proxy_filter": 0.00010862400813493878
+      }
+    },
+    {
+      "arity": 5,
+      "backend": {
+        "arity": 5,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 7776,
+      "combo_chunks_processed": 2,
+      "cpu_time_delta_s": 0.004726000000000008,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "exact_context": {
+        "counts_shape": [
+          5,
+          6
+        ],
+        "ends_shape": [
+          5,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          5,
+          6,
+          82792
+        ],
+        "values_shape": [
+          5,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 2,
+      "expected_combinations": 7776,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "outer_wall_s": 0.004559791996143758,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 8.59375,
+      "proxy_candidates_seen": 7776,
+      "proxy_candidates_selected": 7776,
+      "proxy_candidates_valid": 7776,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "0a341f1944f627045ec6665bec2d12188baac0ae379e73c9b3a84ab86e63d5d0",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0010740420111687854,
+        "build_proxy_context": 3.583001671358943e-06,
+        "combo_iteration": 0.003452165998169221,
+        "proxy_filter": 1.1916999937966466e-05
+      }
+    },
+    {
+      "arity": 6,
+      "backend": {
+        "arity": 6,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 46656,
+      "combo_chunks_processed": 12,
+      "cpu_time_delta_s": 0.02488800000000002,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "exact_context": {
+        "counts_shape": [
+          6,
+          6
+        ],
+        "ends_shape": [
+          6,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          6,
+          6,
+          82792
+        ],
+        "values_shape": [
+          6,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 12,
+      "expected_combinations": 46656,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "outer_wall_s": 0.024817207988235168,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 10.21875,
+      "proxy_candidates_seen": 46656,
+      "proxy_candidates_selected": 46656,
+      "proxy_candidates_valid": 46656,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "3b7ed02f7cf83194d16c529f189a4253e8291ab6563519621378dff0217a7915",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0019111670117126778,
+        "build_proxy_context": 2.749991836026311e-06,
+        "combo_iteration": 0.022832210001070052,
+        "proxy_filter": 5.233297997619957e-05
+      }
+    },
+    {
+      "arity": 6,
+      "backend": {
+        "arity": 6,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 46656,
+      "combo_chunks_processed": 12,
+      "cpu_time_delta_s": 0.024350000000000094,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "exact_context": {
+        "counts_shape": [
+          6,
+          6
+        ],
+        "ends_shape": [
+          6,
+          6,
+          82792
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 82792,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          6,
+          6,
+          82792
+        ],
+        "values_shape": [
+          6,
+          6,
+          82792
+        ]
+      },
+      "expected_chunks": 12,
+      "expected_combinations": 46656,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "outer_wall_s": 0.02429241599747911,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 12.875,
+      "proxy_candidates_seen": 46656,
+      "proxy_candidates_selected": 46656,
+      "proxy_candidates_valid": 46656,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "834e112fb4c2587612cd489b10de135fe1268199838a5c7cd1280044864a33c1",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.0013204999995650724,
+        "build_proxy_context": 6.499991286545992e-06,
+        "combo_iteration": 0.022902001001057215,
+        "proxy_filter": 4.46220365120098e-05
+      }
+    },
+    {
+      "arity": 7,
+      "backend": {
+        "arity": 7,
+        "backend_id": "event_segments_n_no_risk",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "none",
+        "role": "generic"
+      },
+      "cartesian_combinations": 279936,
+      "combo_chunks_processed": 69,
+      "cpu_time_delta_s": 0.15859200000000007,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "exact_context": {
+        "counts_shape": [
+          7,
+          6
+        ],
+        "ends_shape": [
+          7,
+          6,
+          122201
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 122201,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          7,
+          6,
+          122201
+        ],
+        "values_shape": [
+          7,
+          6,
+          122201
+        ]
+      },
+      "expected_chunks": 69,
+      "expected_combinations": 279936,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "outer_wall_s": 0.1581247499998426,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 25.609375,
+      "proxy_candidates_seen": 279936,
+      "proxy_candidates_selected": 279936,
+      "proxy_candidates_valid": 279936,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma",
+          "ma.zlema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "ceaaec911055082f9c1ecbe8c9e806f1372d0b084ba146e3dc02b70b953e3754",
+      "risk_mode": "none",
+      "timers": {
+        "build_exact_context": 0.0031204999977489933,
+        "build_proxy_context": 3.4170079743489623e-06,
+        "combo_iteration": 0.15469374605163466,
+        "proxy_filter": 0.00027036902611143887
+      }
+    },
+    {
+      "arity": 7,
+      "backend": {
+        "arity": 7,
+        "backend_id": "event_segments_n_tp_sl_15m_grid",
+        "direction_mode": "long_short_reversal",
+        "requires_exact_context": true,
+        "risk_mode": "tp_sl_grid",
+        "role": "generic"
+      },
+      "cartesian_combinations": 279936,
+      "combo_chunks_processed": 69,
+      "cpu_time_delta_s": 0.15997700000000004,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "exact_context": {
+        "counts_shape": [
+          7,
+          6
+        ],
+        "ends_shape": [
+          7,
+          6,
+          122201
+        ],
+        "materialized": true,
+        "max_rows": 6,
+        "max_segments": 122201,
+        "required": true,
+        "row_counts": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "starts_shape": [
+          7,
+          6,
+          122201
+        ],
+        "values_shape": [
+          7,
+          6,
+          122201
+        ]
+      },
+      "expected_chunks": 69,
+      "expected_combinations": 279936,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "outer_wall_s": 0.15946979199361522,
+      "pass": true,
+      "pass_conditions": {
+        "backend_id": true,
+        "cartesian_count": true,
+        "chunk_count": true,
+        "exact_candidates": true,
+        "exact_context_requirement": true,
+        "proxy_context_pass_through": true,
+        "proxy_seen": true,
+        "proxy_selected": true,
+        "proxy_valid": true,
+        "stage_names_present": true
+      },
+      "peak_rss_delta_mb": 25.5625,
+      "proxy_candidates_seen": 279936,
+      "proxy_candidates_selected": 279936,
+      "proxy_candidates_valid": 279936,
+      "proxy_context": {
+        "active": false,
+        "combo_min_confirm": 1,
+        "combo_top_frac": 1.0,
+        "confirm_matrix_shape": null,
+        "context_type": "pass_through",
+        "eval_stack_shape": null,
+        "fee_penalty_per_confirm": 0.0011249999515712261,
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma",
+          "ma.zlema"
+        ],
+        "proxy_matrix_shape": null,
+        "ret_15m_shape": null
+      },
+      "request_hash": "3784d2634338fa7089fc98f678df469751907a455e636eeba1dca70202091e1f",
+      "risk_mode": "tp_sl_grid",
+      "timers": {
+        "build_exact_context": 0.004130166009417735,
+        "build_proxy_context": 4.582994733937085e-06,
+        "combo_iteration": 0.15503504700609483,
+        "proxy_filter": 0.0002680360048543662
+      }
+    }
+  ],
+  "schema": "backtest_service_artifact_runtime_v1_iteration_3_combo_planning_contexts",
+  "setup_prepare_pools": [
+    {
+      "arity": 1,
+      "cpu_time_delta_s": 0.15072799999999992,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "outer_wall_s": 0.15283716600970365,
+      "pass": true,
+      "peak_rss_delta_mb": 47.09375,
+      "request_hash": "7ed083bcdbd37e7538560fcf18d3e5a8958faf980f7d43d545506f0d2dc55ac3",
+      "row_counts": {
+        "ma.dema": 6
+      },
+      "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.009008500011987053,
+          "artifact_array_open": 0.009008500011987053,
+          "artifact_context_resolve": 0.06462545800604858,
+          "artifact_manifest_load": 0.06462545800604858,
+          "prepare_pools_core": 0.07789616700029,
+          "prepare_pools_total": 0.15253249999659602,
+          "request_slice_prepare": 0.0009449170029256493,
+          "row_prefilter": 0.07471162499859929,
+          "segment_build": 0.002857250001397915,
+          "signal_row_selection": 0.00032158399699255824,
+          "time_range_slice": 0.0009449170029256493
+        },
+        "wall_time_s": 0.15253249999659602
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 2,
+      "cpu_time_delta_s": 0.0808319999999999,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "outer_wall_s": 0.07438966698828153,
+      "pass": true,
+      "peak_rss_delta_mb": 18.046875,
+      "request_hash": "06d61e59371f9d9c5e636f3e9cfdd558dd301b1b6ec2ed9e5dbf2d989c7e1629",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.hma": 6
+      },
+      "row_metadata_order_hash": "3f4a93691e5b634f078f87800b8f66aedf230afd28c3e7b80c9bccbef789ee15",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.003386667012819089,
+          "artifact_array_open": 0.003386667012819089,
+          "artifact_context_resolve": 0.06645658299385104,
+          "artifact_manifest_load": 0.06645658299385104,
+          "prepare_pools_core": 0.0031738749967189506,
+          "prepare_pools_total": 0.07409370799723547,
+          "request_slice_prepare": 0.0010324169998057187,
+          "row_prefilter": 0.0012533749977592379,
+          "segment_build": 0.0012935419945279136,
+          "signal_row_selection": 0.000622042003669776,
+          "time_range_slice": 0.0010324169998057187
+        },
+        "wall_time_s": 0.07409370799723547
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 3,
+      "cpu_time_delta_s": 0.09981000000000007,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "outer_wall_s": 0.08960554200166371,
+      "pass": true,
+      "peak_rss_delta_mb": 21.171875,
+      "request_hash": "2c0860d5f4b63b4dab67c055cb1c22f5d23481e1a2d317c7c0f41fc5c58a9249",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6
+      },
+      "row_metadata_order_hash": "0b58cb9eafe983c9a33f82c100ef8a56c2d37cf88d524201f4d40f94ffce3be3",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.0045451250043697655,
+          "artifact_array_open": 0.0045451250043697655,
+          "artifact_context_resolve": 0.07882058298855554,
+          "artifact_manifest_load": 0.07882058298855554,
+          "prepare_pools_core": 0.004884000009042211,
+          "prepare_pools_total": 0.08933920800336637,
+          "request_slice_prepare": 0.0010148330038646236,
+          "row_prefilter": 0.001881332995253615,
+          "segment_build": 0.0020889580046059564,
+          "signal_row_selection": 0.0009090829989872873,
+          "time_range_slice": 0.0010148330038646236
+        },
+        "wall_time_s": 0.08933920800336637
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 4,
+      "cpu_time_delta_s": 0.09141199999999994,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "outer_wall_s": 0.07754962499893736,
+      "pass": true,
+      "peak_rss_delta_mb": 27.703125,
+      "request_hash": "fea101b329dff13a4779b8541a08cfc75a8ddb1c54b380e424a334ee17283a69",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6
+      },
+      "row_metadata_order_hash": "7a03c41aad5cda91add9c2aede498bd037e892f2a19f5865b47a5f9f0e1b4f37",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.005353415996069089,
+          "artifact_array_open": 0.005353415996069089,
+          "artifact_context_resolve": 0.0647663330018986,
+          "artifact_manifest_load": 0.0647663330018986,
+          "prepare_pools_core": 0.006300167005974799,
+          "prepare_pools_total": 0.07729445800941903,
+          "request_slice_prepare": 0.0007865830120863393,
+          "row_prefilter": 0.00241837500652764,
+          "segment_build": 0.0029128750029485673,
+          "signal_row_selection": 0.0009643749945098534,
+          "time_range_slice": 0.0007865830120863393
+        },
+        "wall_time_s": 0.07729445800941903
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 5,
+      "cpu_time_delta_s": 0.09565699999999999,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "outer_wall_s": 0.07984254200709984,
+      "pass": true,
+      "peak_rss_delta_mb": 34.265625,
+      "request_hash": "cd7be770417e985ad51a0c3e28f4fee5a3f288e6f420261382d0e8198877f54f",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "row_metadata_order_hash": "2951fa4b16cc3c6908e233a69d2472f2338d1ca3cebc7308e5dcf3fe978440f8",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.006664333006483503,
+          "artifact_array_open": 0.006664333006483503,
+          "artifact_context_resolve": 0.06457562500145286,
+          "artifact_manifest_load": 0.06457562500145286,
+          "prepare_pools_core": 0.007264125000801869,
+          "prepare_pools_total": 0.07945366599597037,
+          "request_slice_prepare": 0.0007818750018486753,
+          "row_prefilter": 0.0029420420032693073,
+          "segment_build": 0.003132957994239405,
+          "signal_row_selection": 0.0011844170076074079,
+          "time_range_slice": 0.0007818750018486753
+        },
+        "wall_time_s": 0.07945366599597037
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 6,
+      "cpu_time_delta_s": 0.10387899999999994,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "outer_wall_s": 0.08936879101383965,
+      "pass": true,
+      "peak_rss_delta_mb": 36.609375,
+      "request_hash": "cbbc8cdb01bd660e8fa21372c87d4c4de467c1e72e4a09a84913d00476f1f80d",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "row_metadata_order_hash": "ef9077f45b1e839dd76321c2df8c6ced81e28df29ecec14b7c9268761e9ea4d1",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.012145875007263385,
+          "artifact_array_open": 0.012145875007263385,
+          "artifact_context_resolve": 0.06660195899894461,
+          "artifact_manifest_load": 0.06660195899894461,
+          "prepare_pools_core": 0.00922858300327789,
+          "prepare_pools_total": 0.08903250000730623,
+          "request_slice_prepare": 0.0009338749950984493,
+          "row_prefilter": 0.0036168329970678315,
+          "segment_build": 0.003878874995280057,
+          "signal_row_selection": 0.0017280830070376396,
+          "time_range_slice": 0.0009338749950984493
+        },
+        "wall_time_s": 0.08903250000730623
+      },
+      "trade_T_length": 218913
+    },
+    {
+      "arity": 7,
+      "cpu_time_delta_s": 0.11094300000000012,
+      "eval_T_length": 218912,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "outer_wall_s": 0.08716725000704173,
+      "pass": true,
+      "peak_rss_delta_mb": 47.984375,
+      "request_hash": "1dffba82d24b7b9395bb1f1b420d71dd0eab060e6c28639b7f9e1d06bb36920c",
+      "row_counts": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6,
+        "ma.zlema": 6
+      },
+      "row_metadata_order_hash": "e178d2f4fa29902742383fb739a49dac1d8377de6118df17f2e0b269dc497ab3",
+      "time_slice_start_15m": 83819,
+      "time_slice_stop_15m": 302732,
+      "timing": {
+        "stage_name": "prepare_pools_total",
+        "subsegments": {
+          "artifact_array_mmap_load": 0.00941683299606666,
+          "artifact_array_open": 0.00941683299606666,
+          "artifact_context_resolve": 0.06526695800130256,
+          "artifact_manifest_load": 0.06526695800130256,
+          "prepare_pools_core": 0.011236708000069484,
+          "prepare_pools_total": 0.08681437499762978,
+          "request_slice_prepare": 0.0007516670011682436,
+          "row_prefilter": 0.004438291012775153,
+          "segment_build": 0.005027999999583699,
+          "signal_row_selection": 0.0017655830015428364,
+          "time_range_slice": 0.0007516670011682436
+        },
+        "wall_time_s": 0.08681437499762978
+      },
+      "trade_T_length": 218913
+    }
+  ],
+  "summary": {
+    "max_cartesian_combinations_single_run": 279936,
+    "max_combo_chunks_single_run": 69,
+    "max_cpu_time_delta_s": 0.15997700000000004,
+    "max_outer_wall_s": 0.15946979199361522,
+    "pass_count": 28,
+    "run_count": 28,
+    "stage_timing_summary_s": {
+      "build_exact_context": {
+        "max_s": 0.004130166009417735,
+        "median_s": 0.0010433544957777485,
+        "min_s": 5.4580013966187835e-06
+      },
+      "build_proxy_context": {
+        "max_s": 1.1500000255182385e-05,
+        "median_s": 2.3954999051056802e-06,
+        "min_s": 1.9169965526089072e-06
+      },
+      "combo_iteration": {
+        "max_s": 0.15708729287143797,
+        "median_s": 0.0004891460048384033,
+        "min_s": 7.70699989516288e-06
+      },
+      "proxy_filter": {
+        "max_s": 0.0003060390008613467,
+        "median_s": 4.5835040509700775e-06,
+        "min_s": 2.70901364274323e-06
+      }
+    },
+    "total_cartesian_combinations": 1343688,
+    "total_combo_chunks_processed": 348
+  }
+}
