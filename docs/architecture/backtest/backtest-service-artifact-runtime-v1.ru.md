@@ -348,6 +348,19 @@ Postgres-only JSONB допустим для малых payloads, но v1 дол�
 - пропущенный `top_n` использует config default;
 - пропущенный `risk` должен отклоняться, если product явно не выберет `risk.mode = "none"` как default.
 
+Важно: публичный `top_n` и canonical benchmark `top_k` — разные величины.
+
+- `top_n` — продуктовый/API контракт: сколько summary rows нужно сохранить и
+  вернуть для job. v1 default/max: `100`.
+- `benchmark_top_k` — размер heap/top results в каноническом benchmark. Текущий
+  notebook target вызывает `run_benchmark_matrix(..., top_k=5)`, поэтому все
+  canonical timer targets для `heap_update` и `top_result_proxy_fill`
+  относятся к `5` финальным top rows, а не к публичному `top_n = 100`.
+- если service benchmark сравнивается с canonical notebook target, runner должен
+  явно использовать `benchmark_top_k = 5` и записывать рядом `request.top_n`.
+- production budget для `top_n = 100` измеряется отдельно как service-specific
+  overhead и не должен смешиваться с notebook-compatible timer comparison.
+
 Ответ:
 
 - `201 Created` для нового job;
@@ -751,23 +764,51 @@ Self-check является частью benchmark evidence и должен fail
   `total_return_pct = (exp(best_log) - 1) * 100`;
 - если TP и SL hit на одном bar, SL wins the tie: TP требует
   `t_tp < t_sl`, SL допускает `t_sl <= t_tp`;
-- persisted summary должен включать тот же full metric set, что и no-risk
+- final persisted summary должен включать тот же full metric set, что и no-risk
   (`total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
   `profit_factor`, `trade_count`, `sharpe_trades`, `win_rate_pct`,
   `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`) плюс
-  `best_tp_pct` и `best_sl_pct` для выбранной best cell.
+  `best_tp_pct` и `best_sl_pct` для выбранной best cell;
+- текущий notebook benchmark hot path для TP/SL выбирает best cell по return и
+  сохраняет `trade_count`, `best_tp_pct`, `best_sl_pct`; full metric set для
+  selected best cell в service может считаться отдельным
+  `tp_sl_full_metrics_second_pass`, чтобы не раздувать `exact_scoring` boundary.
 
 ### Измеряемая стадия бенчмарка: `heap_update`
 
 Notebook использует Python `heapq`, чтобы держать top K.
 
+Для canonical acceptance эта stage должна воспроизводить именно notebook
+boundary:
+
+- full benchmark run использует `benchmark_top_k = 5`;
+- sample warmup использует `top_k = 1`;
+- `request.top_n = 100` из публичного fixture не применяется к canonical
+  comparison этой stage;
+- если service дополнительно прогоняет product mode с `top_n = 100`, этот
+  результат записывается как отдельный service-specific budget, а не как
+  замена canonical `heap_update`.
+
 Эта stage:
 
 - ranks по selected metric, default `total_return_pct desc`;
 - строит deterministic heap key из score и original row ids;
-- держит только top N в памяти;
-- добавляет compact per-indicator metadata;
-- производит deterministic ordering для persisted top-N rows.
+- держит только `top_k` rows в heap;
+- добавляет compact per-indicator metadata, достаточную для notebook-compatible
+  `top_results`;
+- для no-risk heap item содержит full summary metrics, `_local_indices` и
+  `_proxy_pending`, как в notebook;
+- для TP/SL heap item содержит `total_return_pct`, `best_tp_pct`,
+  `best_sl_pct`, `trade_count` и deterministic ordinal tie-breaker, как в
+  notebook benchmark.
+
+Запрещено включать в `heap_update`:
+
+- генерацию public `variant_key`;
+- расчет `variant_hash` / `indicator_variant_hash`;
+- сборку API DTO / persisted row objects;
+- validation под legacy SHA-only storage schema;
+- запись в БД или object storage.
 
 ### Измеряемая стадия бенчмарка: `top_result_proxy_fill`
 
@@ -777,6 +818,73 @@ Notebook использует Python `heapq`, чтобы держать top K.
 combo prefilter. Она пересчитывает `confirm_count` и `proxy_score` для top rows
 через `proxy_for_indicator_rows`. Она не должна маппиться на UI/API endpoint
 `show trades`.
+
+Notebook-compatible boundary:
+
+- вход stage — уже заполненный heap размера `top_k`;
+- stage сортирует heap descending по heap key;
+- для каждого final top row, где `_proxy_pending = true`, строит `eval_rows`
+  из `indicator_pools[indicator_id]["eval_T"][local_index]`;
+- вызывает `proxy_for_indicator_rows(...)` ровно для final top rows, а не для
+  всех evaluated candidates;
+- мутирует compact summary item полями `confirm_count` и `proxy_score`;
+- удаляет notebook-internal `_local_indices` и `_proxy_pending`;
+- возвращает `top_results` длиной не больше `benchmark_top_k`.
+
+Запрещено включать в `top_result_proxy_fill`:
+
+- lazy trades recompute;
+- повторный exact scoring;
+- расчет public/storage identity;
+- сборку persisted rows;
+- batch-fill proxy metadata для `request.top_n = 100`, если benchmark
+  сравнивается с canonical `top_k = 5`.
+
+Если production runtime хочет сохранять `top_n = 100`, это отдельный режим:
+сначала должна пройти canonical parity на `top_k = 5`, затем измеряется
+service-specific `top_n = 100` overhead.
+
+### Service-only стадия: `top_result_assembly`
+
+Эта stage существует только в production service и не имеет notebook baseline.
+
+Она принимает notebook-compatible top rows после `heap_update` /
+`top_result_proxy_fill` и строит persisted/API shape:
+
+- canonical variant params;
+- readable public `variant_key`;
+- stable `variant_hash`;
+- optional `indicator_variant_hash`;
+- DTO/read-model rows для `GET /backtests/jobs/{job_id}/top`;
+- mapping public identity to storage identity.
+
+`top_result_assembly` измеряется с CPU/RSS evidence и regression baseline после
+первой реализации, но не участвует в 90% comparison с notebook timers.
+
+### Service-only стадия: `tp_sl_full_metrics_second_pass`
+
+Текущий notebook target для TP/SL exact scoring оптимизирован под поиск best
+TP/SL cell. Он не доказывает, что весь no-risk-like metric set для выбранной cell
+посчитан бесплатно.
+
+Production service должен вернуть full summary metrics и для risk-on variants,
+поэтому после выбора top rows и best cell может потребоваться второй bounded
+проход по сделкам:
+
+- вход: final top rows, selected `best_tp_idx` / `best_sl_idx`, indicator row
+  combination и pinned execution context;
+- расчет: восстановить trade/equity stats для selected cell теми же execution,
+  direction, sizing, fees, slippage и `close_on_end` settings;
+- выход: `max_drawdown_pct`, `return_over_max_drawdown`, `profit_factor`,
+  `sharpe_trades`, `win_rate_pct`, `avg_trade_ret_pct`,
+  `avg_trade_exec_bars`, `exposure_pct` плюс уже выбранные
+  `total_return_pct`, `trade_count`, `best_tp_pct`, `best_sl_pct`;
+- cardinality: только persisted/in-memory top rows, а не все evaluated combos.
+
+Эта stage service-only: она измеряется отдельно и не ухудшает canonical
+`exact_scoring` / `tp_sl_exact_scoring` comparison. Если позже notebook будет
+расширен и начнет считать эти метрики внутри TP/SL hot path, canonical baseline
+нужно перезаписать отдельной benchmark iteration.
 
 ### Runtime total без warmup
 
@@ -797,8 +905,18 @@ combo prefilter. Она пересчитывает `confirm_count` и `proxy_sco
 | `tp_sl_exact_scoring` | risk-on only | Alias/subsegment of `exact_scoring` for risk-on. |
 | `heap_update` | yes | Top-N heap maintenance. |
 | `top_result_proxy_fill` | no-risk yes | Заполнение top-row proxy metadata. |
-| `total_without_warmup` | yes | User-facing measured runtime после warmup. |
+| `top_result_assembly` | service only | Public/storage identity, DTO/read-model assembly; не часть notebook baseline. |
+| `tp_sl_full_metrics_second_pass` | service only | Full metric set для выбранной best TP/SL cell; не часть текущего notebook baseline. |
+| `total_without_warmup` | yes | Notebook-compatible measured runtime после warmup. |
+| `service_total_without_warmup` | service only | Полный service runtime после warmup, включая service-only overhead. |
 | `persist_top_n_io` | service only | DB write overhead; не часть notebook baseline. |
+
+`total_without_warmup` для 90% comparison должен совпадать по boundary с
+notebook runtime и исключать `top_result_assembly`,
+`tp_sl_full_metrics_second_pass`, `persist_top_n_io`,
+`lazy_trades_compute` и другие service-only stages. Для user-facing SLA сервис
+дополнительно записывает `service_total_without_warmup`, где эти расходы уже
+видны отдельно и в сумме.
 
 ### Lazy trades
 
@@ -834,6 +952,8 @@ Persisted job state может оставаться coarse (`stage_a`, `stage_b`
 | `exact_scoring` / `tp_sl_exact_scoring` with `risk.mode = "tp_sl_grid"` | `stage_b` | TP/SL scoring на hit-times. |
 | `heap_update` | `finalizing` | Ranking и top-N assembly. |
 | `top_result_proxy_fill` | `finalizing` | Top-row proxy metadata, не lazy trades. |
+| `top_result_assembly` | `finalizing` | Service-only public/storage identity и DTO/read-model assembly. |
+| `tp_sl_full_metrics_second_pass` | `finalizing` | Service-only TP/SL metrics recompute для selected best cells. |
 | `persist_top_n_io` | `finalizing` | Service-only DB write overhead. |
 | `succeeded`, `failed`, `cancelled` | terminal state | Terminal state приоритетнее stage. |
 
@@ -885,12 +1005,22 @@ apps/api routes
 JSON evidence является источником истины для numeric target values. Summary нужен
 только для удобства review и не должен вручную редактироваться отдельно.
 
+Особенность текущего canonical evidence: JSON request сохраняет публичный
+`top_n = 100`, но benchmark entry point вызывает
+`run_benchmark_matrix(..., top_k=5)`. Поэтому comparison по `heap_update`,
+`top_result_proxy_fill`, `total_without_warmup` и result hashes должен учитывать
+фактический `top_results_count = 5`. Реализация, которая внутри measured
+notebook-compatible stages строит 100 rows, сравнивается с неправильной
+нагрузкой и не может быть принята как доказательство parity.
+
 Идентичность канонического benchmark:
 
 - host: `macstudio`;
 - period: `[2020-01-11T20:08:00Z, 2026-04-11T20:08:00Z)`;
 - rows per indicator: `6`;
 - warmup rows per indicator: `2`;
+- public request `top_n`: `100`;
+- canonical benchmark `top_k`: `5` для measured runs, `1` для sample warmup;
 - canonical production acceptance arities: `1..7`;
 - target public request arities: `1..10` для no-risk и TP/SL; arity 8..10
   разрешены только в пределах cost guardrails и не входят в обязательный 90%
@@ -900,6 +1030,7 @@ JSON evidence является источником истины для numeric 
 - TP/SL grid: `2.0..25.0` inclusive, step `0.5`;
 - TP/SL cells per combo: `2209`;
 - runs: `28` (`7 arities x 2 risk modes x 2 direction modes`);
+- фактический `top_results_count`: `5` в каждом canonical measured run;
 - request hash:
   `22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1`;
 - artifact manifest hash:
@@ -915,11 +1046,14 @@ JSON evidence является источником истины для numeric 
 - использованный notebook baseline;
 - notebook baseline output path или captured metrics;
 - request fixture;
+- public `request.top_n`, `benchmark_top_k`, фактический
+  `top_results_count` и heap capacity, использованный runner-ом;
 - canonical `request_hash` и result-affecting config hash;
 - service warmup metrics;
 - canonical notebook timer metrics без warmup;
 - service-only overhead metrics (`artifact_context_resolve`, `artifact_array_open`,
-  `request_slice_prepare`, `prepare_pools_total`);
+  `request_slice_prepare`, `prepare_pools_total`, `top_result_assembly`,
+  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`);
 - speed ratio vs baseline;
 - absolute latency budget result;
 - peak RSS / memory delta;
@@ -933,7 +1067,10 @@ JSON evidence является источником истины для numeric 
   segments;
 - canonical benchmark использует sample warmup на `min(2, rows_per_indicator)` rows
   per indicator для того же arity/risk/direction/backend;
-- user-facing runtime benchmark измеряется после warmup;
+- notebook-compatible runtime benchmark (`total_without_warmup`) измеряется после
+  warmup;
+- user-facing service runtime (`service_total_without_warmup`) измеряется после
+  warmup отдельно и включает service-only overhead;
 - warmup и warm runtime оба должны оставаться в accepted 90% envelope для
   соответствующего segment.
 
@@ -943,37 +1080,53 @@ JSON evidence является источником истины для numeric 
 2. `numba_warmup`
 3. `sample_warmup`
 4. `total_without_warmup`
-5. `load_hit_times` для `risk.mode = "tp_sl_grid"`
-6. `tp_sl_grid_validation` для `risk.mode = "tp_sl_grid"`
-7. `artifact_context_resolve`
-8. `artifact_array_open`
-9. `request_slice_prepare`
-10. `prepare_pools_core`
-11. `prepare_pools_total`
-12. `build_exact_context`
-13. `build_proxy_context`
-14. `combo_iteration`
-15. `proxy_filter`
-16. `self_check`
-17. `exact_scoring`
-18. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
-19. `heap_update`
-20. `top_result_proxy_fill`
-21. `persist_top_n_io`
-22. `lazy_trades_compute`
-23. `lazy_trades_cache_hit`
+5. `service_total_without_warmup`
+6. `load_hit_times` для `risk.mode = "tp_sl_grid"`
+7. `tp_sl_grid_validation` для `risk.mode = "tp_sl_grid"`
+8. `artifact_context_resolve`
+9. `artifact_array_open`
+10. `request_slice_prepare`
+11. `prepare_pools_core`
+12. `prepare_pools_total`
+13. `build_exact_context`
+14. `build_proxy_context`
+15. `combo_iteration`
+16. `proxy_filter`
+17. `self_check`
+18. `exact_scoring`
+19. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
+20. `heap_update`
+21. `top_result_proxy_fill`
+22. `top_result_assembly`
+23. `tp_sl_full_metrics_second_pass` для `risk.mode = "tp_sl_grid"`, когда full
+    metric set считается после выбора best cell
+24. `persist_top_n_io`
+25. `lazy_trades_compute`
+26. `lazy_trades_cache_hit`
 
 Сравнение acceptance:
 
 - notebook-compatible stages сравниваются с target values по tuple
   `{arity, risk_mode, direction_mode, backend}`;
+- в benchmark evidence `backend` может быть display/logical name
+  (`event_segments_1_no_risk`, `event_segments_7_no_risk`), а runtime registry
+  может использовать общий implementation id (`event_segments_n_no_risk`) для
+  arity 1 и 3..10; acceptance runner обязан записывать оба поля и сравнивать
+  правильный tuple `{arity, risk_mode, direction_mode, exact_engine,
+  implementation}`;
 - для Iteration 2 canonical notebook prepare_pools сравнивается только с
   `prepare_pools_core`;
 - `artifact_context_resolve`, `artifact_array_open`, `request_slice_prepare`,
-  `prepare_pools_total`, `persist_top_n_io`, `lazy_trades_compute` и
-  `lazy_trades_cache_hit` являются service overhead/telemetry stages; они
-  измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook
-  prepare_pools;
+  `prepare_pools_total`, `top_result_assembly`,
+  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`,
+  `persist_top_n_io`,
+  `lazy_trades_compute` и `lazy_trades_cache_hit` являются service
+  overhead/telemetry stages; они
+  измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook timer
+  targets;
+- `heap_update` и `top_result_proxy_fill` сравниваются с canonical notebook target
+  только при том же `benchmark_top_k = 5`; product run с `top_n = 100`
+  требует отдельного service-specific budget record;
 - для arity 1..7 target source:
   `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
 - arity 8..10 не блокируют v1 completion, если arity 1..7 проходят 90%
@@ -1128,6 +1281,13 @@ request.
 - benchmark records записываются до того, как iteration помечается complete;
 - более поздняя stage может прототипироваться локально, но она не должна считаться
   accepted, пока все предыдущие stage gates не пройдены.
+- implementation prompts должны явно разделять notebook-compatible measured
+  stages и service-only stages;
+- код, который собирает API DTOs, storage identity, persisted rows, cache keys или
+  DB writes, не должен попадать в timings notebook-compatible stages;
+- когда публичный request parameter отличается от canonical benchmark parameter
+  (`top_n` vs `benchmark_top_k`), benchmark record обязан записывать оба значения
+  и фактическую cardinality обработанных rows.
 
 Текущий статус accepted iterations:
 
@@ -1135,6 +1295,7 @@ request.
 |---:|---|---|
 | 1 | `pass` | [`2026-04-26_iteration_1_request_normalization_artifact_context`](benchmark_iterations/2026-04-26_iteration_1_request_normalization_artifact_context/) |
 | 2 | `pass` | [`2026-04-26_iteration_2_prepare_pools`](benchmark_iterations/2026-04-26_iteration_2_prepare_pools/) |
+| 3 | `pass` | [`2026-04-27_iteration_3_combo_planning_contexts`](benchmark_iterations/2026-04-27_iteration_3_combo_planning_contexts/) |
 
 ### Итерация 0: документы и benchmark harness
 
@@ -1233,27 +1394,53 @@ Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
 - active и inactive proxy-filter fixture evidence;
 - stage record записан до exact scoring.
 
-### Итерация 4: no-risk exact scoring и top-N
+Accepted evidence:
+[`2026-04-27_iteration_3_combo_planning_contexts`](benchmark_iterations/2026-04-27_iteration_3_combo_planning_contexts/).
+
+### Итерация 4: no-risk exact scoring и notebook-compatible top-K
 
 - реализовать `event_segments_2_no_risk`;
 - реализовать `event_segments_n_no_risk` для arity 1..10;
 - реализовать `streaming_2_no_risk` fallback/parity comparator;
 - реализовать no-risk self-check против generic slow reference;
 - реализовать full no-risk summary metric set;
-- реализовать `heap_update` и `top_result_proxy_fill`;
-- реализовать persisted top-N summary для no-risk;
-- безопасно map public `variant_key` to storage `variant_hash`.
+- реализовать notebook-compatible `heap_update` с `benchmark_top_k = 5`
+  для measured runs и `top_k = 1` для sample warmup;
+- реализовать notebook-compatible `top_result_proxy_fill` буквально по текущему
+  notebook: сортировка heap, proxy recompute только для final top rows через
+  `proxy_for_indicator_rows`, удаление внутренних `_local_indices` /
+  `_proxy_pending`;
+- вернуть in-memory `top_results` shape, достаточный для result hash/parity
+  против notebook.
+
+Не входит в Iteration 4 acceptance:
+
+- persisted top-N rows;
+- public `variant_key`;
+- `variant_hash` / `indicator_variant_hash`;
+- API DTO/read-model assembly;
+- product `top_n = 100` performance gate.
+
+Эти задачи принадлежат `top_result_assembly` / `persist_top_n_io` и закрываются
+в Iteration 7. Если они прототипируются раньше, их timings должны быть
+service-only и не должны попадать в `heap_update`, `top_result_proxy_fill` или
+`total_without_warmup` notebook comparison.
 
 Гейт бенчмарка:
 
 - `service_warmup`;
 - `self_check`;
 - `exact_scoring` для no-risk;
-- `heap_update`;
-- `top_result_proxy_fill`;
+- `heap_update` при `benchmark_top_k = 5`;
+- `top_result_proxy_fill` при `benchmark_top_k = 5`;
 - arity 1..7 target comparison против current canonical evidence;
+- evidence fields: `request.top_n = 100`, `benchmark_top_k = 5`,
+  `top_results_count = 5`, heap capacity, exact backend display name и
+  implementation id;
+- result hash/parity для notebook-compatible top results;
 - service-level correctness smoke для arity 8..10 на малых row pools;
-- persisted top-N summary hash/parity evidence.
+- evidence, что public/storage identity work не попадает внутрь measured
+  notebook-compatible stages.
 
 ### Итерация 5: загрузка и validation TP/SL grid
 
@@ -1275,12 +1462,24 @@ Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
 
 - реализовать `event_segments_n_tp_sl_15m_grid` для arity 1..10;
 - реализовать TP/SL self-check против slow direct reference;
-- реализовать TP/SL full persisted summary metric set:
+- реализовать TP/SL full summary metric set:
   `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
   `profit_factor`, `trade_count`, `sharpe_trades`, `win_rate_pct`,
   `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`,
   `best_tp_pct`, `best_sl_pct`;
-- persist risk-on top-N summary.
+- реализовать notebook-compatible `heap_update` для risk-on top rows с
+  `benchmark_top_k = 5`;
+- реализовать service-only `tp_sl_full_metrics_second_pass`, если full metric set
+  считается после выбора best TP/SL cell.
+
+Не входит в Iteration 6 acceptance:
+
+- persisted risk-on top-N rows;
+- public/storage identity assembly;
+- API read-model shape.
+
+Эти задачи закрываются в Iteration 7 как service-only
+`top_result_assembly` / `persist_top_n_io`.
 
 Гейт бенчмарка:
 
@@ -1288,13 +1487,19 @@ Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
 - `combo_iteration`;
 - `self_check`;
 - `exact_scoring` / `tp_sl_exact_scoring` для TP/SL grid vs canonical target;
-- `heap_update`;
+- `heap_update` при `benchmark_top_k = 5`;
+- `tp_sl_full_metrics_second_pass` CPU/RSS/latency evidence как service-only
+  budget, если этот step уже реализован;
 - arity 1..7 target comparison против current canonical evidence;
 - service-level correctness smoke для arity 8..10 на малых row pools;
 - full metric-set correctness evidence для selected best TP/SL cell.
 
 ### Итерация 7: job orchestration и persistence
 
+- реализовать `top_result_assembly` для no-risk и TP/SL top rows:
+  public `variant_key`, stable `variant_hash`, optional
+  `indicator_variant_hash`, canonical variant params и API/read-model DTOs;
+- безопасно map public `variant_key` to storage `variant_hash`;
 - реализовать job create/status/top/list/cancel contracts;
 - реализовать idempotency и request guardrails;
 - persist canonical request snapshot, artifact metadata и top-N rows;
@@ -1303,8 +1508,10 @@ Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
 
 Гейт бенчмарка:
 
+- `top_result_assembly`;
 - `persist_top_n_io`;
 - end-to-end job benchmark для no-risk и TP/SL с current canonical fixtures;
+- persisted top-N summary hash/parity evidence;
 - API contract tests для create/status/list/top/cancel/defaults/preflight;
 - idempotency replay/conflict evidence;
 - authz/ownership failure evidence.
@@ -1407,7 +1614,8 @@ indicator после отбора в benchmark остается 6 signal rows, �
 для выбранной cell и восстановить equity/trade stats. Решения:
 
 - предпочтительно: hot path ранжирует combos по return, а полный metric set
-  пересчитывается только для persisted top-N variants по их selected best cell;
+  пересчитывается только для final top rows по их selected best cell; после
+  Iteration 7 эти rows становятся persisted top-N variants;
 - если пользователь ранжирует по метрике не `total_return_pct`, нужен отдельный
   compiled path или bounded shortlist, иначе придется считать много trade stats;
 - Iteration 6 должна записать CPU/RSS cost именно этого second-pass metrics step.
