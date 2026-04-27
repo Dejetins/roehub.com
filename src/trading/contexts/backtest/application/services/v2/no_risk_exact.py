@@ -729,10 +729,20 @@ def proxy_for_indicator_rows(
     return confirms, float(proxy)
 
 
-@nb.njit(parallel=True, cache=True)
+@nb.njit(parallel=True, cache=True, fastmath=True)
 def proxy_for_indicator_rows_batch(
     local_rows_by_candidate: np.ndarray,
-    eval_stack: np.ndarray,
+    eval_t0: np.ndarray,
+    eval_t1: np.ndarray,
+    eval_t2: np.ndarray,
+    eval_t3: np.ndarray,
+    eval_t4: np.ndarray,
+    eval_t5: np.ndarray,
+    eval_t6: np.ndarray,
+    eval_t7: np.ndarray,
+    eval_t8: np.ndarray,
+    eval_t9: np.ndarray,
+    arity: np.int32,
     ret_15m: np.ndarray,
     min_confirm: np.int32,
     fee_penalty_per_confirm: np.float32,
@@ -740,20 +750,60 @@ def proxy_for_indicator_rows_batch(
     out_proxy: np.ndarray,
 ) -> None:
     n_candidates = local_rows_by_candidate.shape[0]
-    arity = local_rows_by_candidate.shape[1]
     n_intervals = ret_15m.shape[0]
     for candidate_pos in nb.prange(n_candidates):
+        row0 = local_rows_by_candidate[candidate_pos, 0]
+        row1 = np.int32(0)
+        row2 = np.int32(0)
+        row3 = np.int32(0)
+        row4 = np.int32(0)
+        row5 = np.int32(0)
+        row6 = np.int32(0)
+        row7 = np.int32(0)
+        row8 = np.int32(0)
+        row9 = np.int32(0)
+        if arity > 1:
+            row1 = local_rows_by_candidate[candidate_pos, 1]
+        if arity > 2:
+            row2 = local_rows_by_candidate[candidate_pos, 2]
+        if arity > 3:
+            row3 = local_rows_by_candidate[candidate_pos, 3]
+        if arity > 4:
+            row4 = local_rows_by_candidate[candidate_pos, 4]
+        if arity > 5:
+            row5 = local_rows_by_candidate[candidate_pos, 5]
+        if arity > 6:
+            row6 = local_rows_by_candidate[candidate_pos, 6]
+        if arity > 7:
+            row7 = local_rows_by_candidate[candidate_pos, 7]
+        if arity > 8:
+            row8 = local_rows_by_candidate[candidate_pos, 8]
+        if arity > 9:
+            row9 = local_rows_by_candidate[candidate_pos, 9]
         confirms = np.int32(0)
         proxy = np.float32(0.0)
         for interval_idx in range(n_intervals):
-            direction = eval_stack[0, local_rows_by_candidate[candidate_pos, 0], interval_idx]
+            direction = eval_t0[row0, interval_idx]
             if direction == 0:
                 continue
-            for indicator_pos in range(1, arity):
-                local_row = local_rows_by_candidate[candidate_pos, indicator_pos]
-                if eval_stack[indicator_pos, local_row, interval_idx] != direction:
-                    direction = np.int8(0)
-                    break
+            if arity > 1 and eval_t1[row1, interval_idx] != direction:
+                continue
+            if arity > 2 and eval_t2[row2, interval_idx] != direction:
+                continue
+            if arity > 3 and eval_t3[row3, interval_idx] != direction:
+                continue
+            if arity > 4 and eval_t4[row4, interval_idx] != direction:
+                continue
+            if arity > 5 and eval_t5[row5, interval_idx] != direction:
+                continue
+            if arity > 6 and eval_t6[row6, interval_idx] != direction:
+                continue
+            if arity > 7 and eval_t7[row7, interval_idx] != direction:
+                continue
+            if arity > 8 and eval_t8[row8, interval_idx] != direction:
+                continue
+            if arity > 9 and eval_t9[row9, interval_idx] != direction:
+                continue
             if direction == 1:
                 confirms += 1
                 proxy += ret_15m[interval_idx]
@@ -2171,12 +2221,25 @@ def _proxy_fill_missing_candidates(
             dtype=np.int32,
         )
     )
-    eval_stack = _proxy_fill_eval_stack(prepared_result=prepared_result)
+    eval_arrays = [pool.eval_T for pool in prepared_result.indicator_pools]
+    arity = len(eval_arrays)
+    while len(eval_arrays) < 10:
+        eval_arrays.append(eval_arrays[0])
     confirm_out = np.empty(len(missing_positions), dtype=np.int32)
     proxy_out = np.empty(len(missing_positions), dtype=np.float32)
     proxy_for_indicator_rows_batch(
         local_rows,
-        eval_stack,
+        eval_arrays[0],
+        eval_arrays[1],
+        eval_arrays[2],
+        eval_arrays[3],
+        eval_arrays[4],
+        eval_arrays[5],
+        eval_arrays[6],
+        eval_arrays[7],
+        eval_arrays[8],
+        eval_arrays[9],
+        np.int32(arity),
         prepared_result.signal_returns_15m,
         np.int32(proxy_context.combo_min_confirm),
         np.float32(proxy_context.fee_penalty_per_confirm),
@@ -2190,18 +2253,6 @@ def _proxy_fill_missing_candidates(
         },
         len(missing_positions),
     )
-
-
-def _proxy_fill_eval_stack(*, prepared_result: BacktestPreparePoolsResult) -> np.ndarray:
-    pools = tuple(prepared_result.indicator_pools)
-    arity = len(pools)
-    max_rows = max(int(pool.eval_T.shape[0]) for pool in pools)
-    eval_t_length = int(prepared_result.eval_T_length)
-    eval_stack = np.zeros((arity, max_rows, eval_t_length), dtype=np.int8)
-    for indicator_pos, pool in enumerate(pools):
-        row_count = int(pool.eval_T.shape[0])
-        eval_stack[indicator_pos, :row_count, :] = pool.eval_T[:, :eval_t_length]
-    return np.ascontiguousarray(eval_stack)
 
 
 def _variant_params(
