@@ -10,6 +10,13 @@ from .combo_planning import (
     BacktestProxyFilterResult,
     BacktestSelectedBackend,
 )
+from .no_risk_exact import (
+    NO_RISK_METRIC_NAMES,
+    BacktestNoRiskExactConfig,
+    BacktestNoRiskExactResult,
+    BacktestNoRiskExactTelemetry,
+    BacktestNoRiskPriceContext,
+)
 from .prepare_pools import (
     BacktestPreparePoolsConfig,
     BacktestPreparePoolsResult,
@@ -51,6 +58,11 @@ __all__ = [
     "BacktestSelectedBackend",
     "BacktestValidationIssue",
     "JsonMapping",
+    "NO_RISK_METRIC_NAMES",
+    "BacktestNoRiskExactConfig",
+    "BacktestNoRiskExactResult",
+    "BacktestNoRiskExactTelemetry",
+    "BacktestNoRiskPriceContext",
     "PreparedExecutionMapping",
     "PreparedIndicatorPool",
     "PreparedIndicatorRowMetadata",
