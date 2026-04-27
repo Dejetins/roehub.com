@@ -175,6 +175,9 @@ class BacktestNoRiskExactScoringService:
                 filter_result=filter_result,
                 chunk_scores=chunk_scores,
                 combo_global_start=combo_global_start,
+                ranking_metric=ranking_metric,
+                ranking_direction=ranking_direction,
+                top_n=top_n,
             )
             heap_candidates_seen += len(new_candidates)
             top_candidates = heapq.nsmallest(
@@ -1985,11 +1988,22 @@ def _top_candidates_from_chunk(
     filter_result: BacktestProxyFilterResult,
     chunk_scores: BacktestNoRiskChunkScores,
     combo_global_start: int,
+    ranking_metric: str,
+    ranking_direction: str,
+    top_n: int,
 ) -> list[_TopCandidate]:
     indicator_ids = tuple(prepared_result.indicator_ids)
     pools_by_id = {pool.indicator_id: pool for pool in prepared_result.indicator_pools}
+    selected_score_indexes = _selected_top_score_indexes_from_chunk(
+        prepared_result=prepared_result,
+        filter_result=filter_result,
+        chunk_scores=chunk_scores,
+        ranking_metric=ranking_metric,
+        ranking_direction=ranking_direction,
+        top_n=top_n,
+    )
     candidates: list[_TopCandidate] = []
-    for score_index in range(chunk_scores.size):
+    for score_index in selected_score_indexes:
         local_rows = tuple(
             int(filter_result.selected_rows_by_indicator[indicator_id][score_index])
             for indicator_id in indicator_ids
@@ -2015,6 +2029,47 @@ def _top_candidates_from_chunk(
             )
         )
     return candidates
+
+
+def _selected_top_score_indexes_from_chunk(
+    *,
+    prepared_result: BacktestPreparePoolsResult,
+    filter_result: BacktestProxyFilterResult,
+    chunk_scores: BacktestNoRiskChunkScores,
+    ranking_metric: str,
+    ranking_direction: str,
+    top_n: int,
+) -> np.ndarray:
+    size = chunk_scores.size
+    if size <= 0:
+        return np.empty(0, dtype=np.int32)
+
+    metric_values = np.asarray(
+        getattr(chunk_scores, ranking_metric),
+        dtype=np.float64,
+    )
+    metric_key = np.where(np.isnan(metric_values), np.inf, metric_values)
+    if ranking_direction == "desc":
+        metric_key = -metric_key
+
+    pools_by_id = {pool.indicator_id: pool for pool in prepared_result.indicator_pools}
+    row_id_keys: list[np.ndarray] = []
+    for indicator_id in prepared_result.indicator_ids:
+        local_rows = np.asarray(
+            filter_result.selected_rows_by_indicator[indicator_id],
+            dtype=np.int32,
+        )
+        row_id_keys.append(
+            np.asarray(pools_by_id[indicator_id].row_ids[local_rows], dtype=np.int32)
+        )
+    variant_key = np.asarray(filter_result.selected_indexes, dtype=np.int64)
+
+    order = np.lexsort(
+        tuple([variant_key, *reversed(row_id_keys), metric_key])
+    )
+    if size > top_n:
+        order = order[:top_n]
+    return np.ascontiguousarray(order.astype(np.int32))
 
 
 def _candidate_sort_key(
