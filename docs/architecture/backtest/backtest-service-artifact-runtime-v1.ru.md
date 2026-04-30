@@ -794,13 +794,30 @@ boundary:
 - ranks по selected metric, default `total_return_pct desc`;
 - строит deterministic heap key из score и original row ids;
 - держит только `top_k` rows в heap;
-- добавляет compact per-indicator metadata, достаточную для notebook-compatible
-  `top_results`;
+- добавляет compact per-indicator metadata только для rows, которые реально
+  удержаны в heap и нужны для notebook-compatible `top_results`;
 - для no-risk heap item содержит full summary metrics, `_local_indices` и
   `_proxy_pending`, как в notebook;
 - для TP/SL heap item содержит `total_return_pct`, `best_tp_pct`,
   `best_sl_pct`, `trade_count` и deterministic ordinal tie-breaker, как в
   notebook benchmark.
+
+Notebook-compatible в этой stage означает одинаковые ranking, tie-break,
+cardinality и final `top_results`, а не обязательное повторение лишних Python
+allocations для rejected candidates. Service implementation должна быть
+low-allocation:
+
+- canonical benchmark path `total_return_pct desc` должен идти через прямое
+  чтение `scores.total_return_pct[index]`, без generic string dispatch в tight
+  loop;
+- сначала рассчитываются только `rank_score`, original row ids и heap key;
+- full `item` dict, full summary metrics и per-indicator metadata materialization
+  выполняются только если heap еще не заполнен или candidate заменяет текущий
+  worst heap item;
+- generic ranking по другим метрикам может существовать, но benchmark evidence
+  для default `total_return_pct desc` не должен платить за polymorphic dispatch;
+- metadata conversion из domain objects в mapping не должна выполняться для
+  candidates, которые не попали в final heap.
 
 Запрещено включать в `heap_update`:
 
@@ -827,9 +844,17 @@ Notebook-compatible boundary:
   из `indicator_pools[indicator_id]["eval_T"][local_index]`;
 - вызывает `proxy_for_indicator_rows(...)` ровно для final top rows, а не для
   всех evaluated candidates;
+- `proxy_for_indicator_rows(...)` должен повторять текущий notebook dispatch:
+  для `len(eval_rows) == 2` используется compiled scalar fast path
+  `proxy_for_two_rows(...)`, а generic consensus copy/mask path используется для
+  arity 1 и arity 3..10;
 - мутирует compact summary item полями `confirm_count` и `proxy_score`;
 - удаляет notebook-internal `_local_indices` и `_proxy_pending`;
 - возвращает `top_results` длиной не больше `benchmark_top_k`.
+
+Benchmark по `top_result_proxy_fill` должен сравниваться per tuple
+`{arity, direction_mode}`. Median pass не достаточен: отдельный fail arity 2
+означает, что notebook arity-2 fast path не перенесен корректно.
 
 Запрещено включать в `top_result_proxy_fill`:
 
@@ -908,7 +933,8 @@ Production service должен вернуть full summary metrics и для ri
 | `top_result_assembly` | service only | Public/storage identity, DTO/read-model assembly; не часть notebook baseline. |
 | `tp_sl_full_metrics_second_pass` | service only | Full metric set для выбранной best TP/SL cell; не часть текущего notebook baseline. |
 | `total_without_warmup` | yes | Notebook-compatible measured runtime после warmup. |
-| `service_total_without_warmup` | service only | Полный service runtime после warmup, включая service-only overhead. |
+| `service_total_without_warmup` | service only | Полный service runtime после warmup до доступности terminal result, включая service-only overhead. |
+| `post_job_cleanup` | service only | Освобождение per-job heavy references после доступности terminal result. |
 | `persist_top_n_io` | service only | DB write overhead; не часть notebook baseline. |
 
 `total_without_warmup` для 90% comparison должен совпадать по boundary с
@@ -917,6 +943,12 @@ notebook runtime и исключать `top_result_assembly`,
 `lazy_trades_compute` и другие service-only stages. Для user-facing SLA сервис
 дополнительно записывает `service_total_without_warmup`, где эти расходы уже
 видны отдельно и в сумме.
+
+`post_job_cleanup` начинается после того, как summary result стал доступен
+пользователю или persistence layer. Эта stage не входит в notebook-compatible
+comparison и не должна маскироваться внутри `total_without_warmup`. Она обязана
+освободить per-job heavy objects до того, как worker slot считается свободным для
+следующего heavy job.
 
 ### Lazy trades
 
@@ -955,6 +987,7 @@ Persisted job state может оставаться coarse (`stage_a`, `stage_b`
 | `top_result_assembly` | `finalizing` | Service-only public/storage identity и DTO/read-model assembly. |
 | `tp_sl_full_metrics_second_pass` | `finalizing` | Service-only TP/SL metrics recompute для selected best cells. |
 | `persist_top_n_io` | `finalizing` | Service-only DB write overhead. |
+| `post_job_cleanup` | `finalizing` | Service-only освобождение heavy per-job references перед освобождением worker slot. |
 | `succeeded`, `failed`, `cancelled` | terminal state | Terminal state приоритетнее stage. |
 
 Контракт:
@@ -1013,6 +1046,17 @@ JSON evidence является источником истины для numeric 
 notebook-compatible stages строит 100 rows, сравнивается с неправильной
 нагрузкой и не может быть принята как доказательство parity.
 
+Известный непринятый benchmark record:
+
+- [`2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk`](benchmark_iterations/2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk/)
+  является failure record, а не accepted baseline;
+- этот record подтверждает, что `exact_scoring` может пройти `14 / 14`, но
+  `heap_update` fail `13 / 14`, `top_result_proxy_fill` fail для arity 2, а
+  `total_without_warmup` был сравнен с `service_total_without_warmup`, то есть с
+  неверной boundary;
+- следующие Iteration 4 prompts и benchmark runner должны использовать этот
+  record как чеклист против регрессий, а не как target values.
+
 Идентичность канонического benchmark:
 
 - host: `macstudio`;
@@ -1053,7 +1097,8 @@ notebook-compatible stages строит 100 rows, сравнивается с н
 - canonical notebook timer metrics без warmup;
 - service-only overhead metrics (`artifact_context_resolve`, `artifact_array_open`,
   `request_slice_prepare`, `prepare_pools_total`, `top_result_assembly`,
-  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`);
+  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`,
+  `post_job_cleanup`);
 - speed ratio vs baseline;
 - absolute latency budget result;
 - peak RSS / memory delta;
@@ -1103,11 +1148,24 @@ notebook-compatible stages строит 100 rows, сравнивается с н
 24. `persist_top_n_io`
 25. `lazy_trades_compute`
 26. `lazy_trades_cache_hit`
+27. `post_job_cleanup`
 
 Сравнение acceptance:
 
 - notebook-compatible stages сравниваются с target values по tuple
   `{arity, risk_mode, direction_mode, backend}`;
+- benchmark runner обязан записывать два разных поля:
+  - `total_without_warmup`: сумма только notebook-compatible stages;
+  - `service_total_without_warmup`: user-facing service runtime до доступности
+    terminal result, включая service-only overhead;
+- для Iteration 4 no-risk `total_without_warmup` считается как
+  `prepare_pools_core + build_exact_context + build_proxy_context +
+  combo_iteration + proxy_filter + self_check + exact_scoring + heap_update +
+  top_result_proxy_fill`;
+- `artifact_context_resolve`, `artifact_array_open`, `request_slice_prepare`,
+  `prepare_pools_total`, `top_result_assembly`, `persist_top_n_io`,
+  `post_job_cleanup` и любые DTO/storage/cache assembly steps не должны
+  попадать в `total_without_warmup`;
 - в benchmark evidence `backend` может быть display/logical name
   (`event_segments_1_no_risk`, `event_segments_7_no_risk`), а runtime registry
   может использовать общий implementation id (`event_segments_n_no_risk`) для
@@ -1120,7 +1178,7 @@ notebook-compatible stages строит 100 rows, сравнивается с н
   `prepare_pools_total`, `top_result_assembly`,
   `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`,
   `persist_top_n_io`,
-  `lazy_trades_compute` и `lazy_trades_cache_hit` являются service
+  `lazy_trades_compute`, `lazy_trades_cache_hit` и `post_job_cleanup` являются service
   overhead/telemetry stages; они
   измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook timer
   targets;
@@ -1223,6 +1281,9 @@ reference-only. Service implementation является first compiled parity po
 - `backtest_stage_peak_rss_bytes{stage,risk_mode}`
 - `backtest_lazy_trades_requests_total{cache_status}`
 - `backtest_lazy_trades_duration_seconds{cache_status}`
+- `backtest_job_cleanup_duration_seconds{risk_mode}`
+- `backtest_job_retained_rss_bytes{risk_mode}`
+- `backtest_worker_recycles_total{reason}`
 - `backtest_artifact_runtime_load_duration_seconds{family}`
 - `backtest_artifact_runtime_manifest_hash_info`
 - `backtest_request_cost_estimate{risk_mode,cost_class}`
@@ -1254,6 +1315,7 @@ Security и доступ:
 | Job queue wait | `backtest.job_queue_timeout_seconds` | `300` | Максимальное ожидание job в очереди до terminal failure. | terminal job failure |
 | Job wall time | `backtest.job_wall_timeout_seconds` | `900` | Максимальное wall-clock время исполнения job. Requests, которые по estimate не помещаются в этот budget, должны отсеиваться preflight. | terminal job failure |
 | Lazy trades wall time | `backtest.lazy_trades_timeout_seconds` | `30` | Максимальное время ленивого пересчета сделок по одному `variant_key`. | `503` retryable |
+| Worker retained RSS recycle | `backtest.worker_recycle_retained_rss_mb` | `256` | Если после `post_job_cleanup` worker удерживает больше configured RSS delta относительно baseline, worker должен быть recycled до следующего heavy job. | worker recycle |
 
 Default tier intentionally близок к canonical benchmark workload. Для платных или
 админских tiers можно расширять `max_top_n`, `max_indicator_rows`,
@@ -1273,6 +1335,41 @@ request.
 - lazy trades cache failure не должен ломать trades response, если recompute успешен;
 - benchmark failure блокирует текущую iteration от статуса complete.
 
+### Жизненный цикл памяти и cleanup
+
+Backtest job должен исполняться как bounded memory scope. Summary result может
+оставаться в памяти только в compact форме, достаточной для response/persistence;
+все heavy per-job objects должны освобождаться после доступности terminal result.
+
+Обязательные правила:
+
+- artifact `.npy` handles могут удерживаться только bounded artifact runtime cache;
+  per-job slices, contiguous copies, score arrays, segment stacks, hit-time
+  subsets, combo buffers, heaps больше final top rows и self-check reference data
+  не должны жить дольше job;
+- application result DTO не должен содержать references на prepared pools,
+  proxy/exact contexts, score arrays, hit-times arrays или full evaluated
+  candidates;
+- worker обязан иметь `try/finally` cleanup boundary вокруг scoring path:
+  удалить strong references на heavy objects, очистить per-job containers и
+  зафиксировать `post_job_cleanup` telemetry;
+- `gc.collect()` допустим как fallback cleanup step после удаления references,
+  но основная гарантия должна строиться на отсутствии retained references;
+- если Python/macOS allocator не возвращает RSS операционной системе, service
+  должен использовать process worker recycle по
+  `backtest.worker_recycle_retained_rss_mb` до следующего heavy job;
+- benchmark evidence должен записывать `rss_before`, `rss_peak`,
+  `rss_after_cleanup`, `retained_rss_delta`, cleanup duration и факт recycle.
+
+Acceptance по memory cleanup для каждой compute iteration:
+
+- один run проверяет, что returned result содержит только compact top rows и
+  scalar telemetry;
+- repeated-run smoke выполняет один и тот же heavy request минимум 3 раза подряд
+  в одном worker lifecycle и доказывает отсутствие монотонного роста retained RSS;
+- если retained RSS превышает configured recycle threshold, iteration может быть
+  принята только при доказанном worker recycle до следующего heavy job.
+
 ## План внедрения
 
 Правило для всех итераций:
@@ -1288,6 +1385,10 @@ request.
 - когда публичный request parameter отличается от canonical benchmark parameter
   (`top_n` vs `benchmark_top_k`), benchmark record обязан записывать оба значения
   и фактическую cardinality обработанных rows.
+- после доступности terminal result каждая compute iteration должна иметь
+  `post_job_cleanup` evidence: heavy per-job references освобождены, retained RSS
+  не растет монотонно на repeated runs или worker recycle сработал до следующего
+  heavy job.
 
 Текущий статус accepted iterations:
 
@@ -1399,19 +1500,173 @@ Accepted evidence:
 
 ### Итерация 4: no-risk exact scoring и notebook-compatible top-K
 
+Цель iteration: перенести no-risk compiled exact scoring и top-K output contract
+из canonical notebook без service-only assembly внутри measured stages.
+
+Известная неуспешная попытка:
+
+- [`2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk`](benchmark_iterations/2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk/)
+  не принимается как успешное evidence;
+- подтверждено как корректное: semantic metrics parity `14 / 14`, proxy
+  metadata parity `14 / 14`, `exact_scoring` latency `14 / 14`;
+- подтвержденные разрывы: object-heavy `heap_update`, отсутствующий arity-2
+  `proxy_for_two_rows` fast path в `top_result_proxy_fill`, strict hash drift
+  arity 1/2 и неверная benchmark boundary для `total_without_warmup`.
+
+#### Итерация 4.1: no-risk execution context и DTO boundary
+
+Реализация:
+
+- создать минимальные internal DTOs/config для no-risk scoring result,
+  telemetry и price/execution context;
+- result object хранит только compact `top_results`, scalar telemetry и
+  self-check summary;
+- result object не хранит references на prepared pools, segment stacks, score
+  arrays, combo chunks или hit-time arrays;
+- `request.top_n` сохраняется в telemetry как public input, но не управляет
+  canonical heap capacity.
+
+Измерение:
+
+- smoke benchmark записывает `request.top_n`, `benchmark_top_k`,
+  `top_results_count`, heap capacity и отсутствие heavy references в result;
+- `post_job_cleanup` фиксирует, что после удаления локальных heavy references
+  worker не удерживает per-job arrays через result DTO.
+
+#### Итерация 4.2: exact scoring kernels и self-check
+
+Реализация:
+
 - реализовать `event_segments_2_no_risk`;
 - реализовать `event_segments_n_no_risk` для arity 1..10;
-- реализовать `streaming_2_no_risk` fallback/parity comparator;
+- реализовать `streaming_2_no_risk` как fallback/parity comparator, а не default
+  production path;
 - реализовать no-risk self-check против generic slow reference;
-- реализовать full no-risk summary metric set;
-- реализовать notebook-compatible `heap_update` с `benchmark_top_k = 5`
-  для measured runs и `top_k = 1` для sample warmup;
-- реализовать notebook-compatible `top_result_proxy_fill` буквально по текущему
-  notebook: сортировка heap, proxy recompute только для final top rows через
-  `proxy_for_indicator_rows`, удаление внутренних `_local_indices` /
-  `_proxy_pending`;
-- вернуть in-memory `top_results` shape, достаточный для result hash/parity
-  против notebook.
+- реализовать full no-risk summary metric set:
+  `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+  `profit_factor`, `trade_count`, `sharpe_trades`, `win_rate_pct`,
+  `avg_trade_ret_pct`, `avg_trade_exec_bars`, `exposure_pct`.
+
+Измерение:
+
+- `service_warmup` / `sample_warmup` отдельно от measured runtime;
+- `self_check` отдельно от `exact_scoring`;
+- `exact_scoring` сравнивается per tuple `{arity, direction_mode, backend}` с
+  canonical target для arity 1..7;
+- arity 8..10 покрываются service-level correctness smoke на малых row pools, но
+  не блокируют v1 acceptance, если arity 1..7 проходят 90% target.
+
+#### Итерация 4.3: low-allocation `heap_update`
+
+Реализация:
+
+- canonical measured heap capacity: `benchmark_top_k = 5`;
+- sample warmup heap capacity: `top_k = 1`;
+- public `request.top_n = 100` не участвует в measured heap work;
+- default benchmark ranking `total_return_pct desc` идет через прямое чтение
+  score array, без generic ranking dispatch в hot loop;
+- для каждого candidate сначала строится только rank score и deterministic
+  heap key `(rank_score, original_row_ids)`;
+- full summary `item`, `_local_indices`, `_proxy_pending` и per-indicator
+  metadata materialize только если candidate реально входит в heap или заменяет
+  worst heap row;
+- metadata conversion в mapping не выполняется для rejected candidates.
+
+Измерение:
+
+- `heap_update` timer включает только candidate top-K maintenance и materialized
+  compact items для retained heap rows;
+- `heap_update` не включает public `variant_key`, `variant_hash`, API DTO,
+  persisted row construction или DB/object storage writes;
+- acceptance требует `target_heap_update / service_heap_update >= 0.9` для всех
+  arity 1..7 x direction modes.
+
+#### Итерация 4.4: notebook-compatible `top_result_proxy_fill`
+
+Реализация:
+
+- вход stage — heap размера `benchmark_top_k`;
+- stage сортирует heap descending по heap key;
+- proxy recompute выполняется только для final top rows с
+  `_proxy_pending = true`;
+- `proxy_for_indicator_rows(...)` повторяет current notebook dispatch:
+  `len(eval_rows) == 2` вызывает compiled `proxy_for_two_rows(...)`, остальные
+  arity используют generic consensus path;
+- stage удаляет `_local_indices` и `_proxy_pending`;
+- stage возвращает `top_results` длиной не больше `benchmark_top_k`.
+
+Измерение:
+
+- `top_result_proxy_fill` сравнивается per tuple `{arity, direction_mode}`;
+- arity-2 pass обязателен отдельно, потому что именно он имеет special fast path
+  в notebook;
+- stage не включает lazy trades, exact scoring, identity/hash assembly,
+  persisted rows или product `top_n = 100` proxy fill.
+
+#### Итерация 4.5: canonical result shape и hash/parity
+
+Реализация:
+
+- output shape должен совпадать с notebook-compatible top results;
+- все floats, ints, ordering, metric names и metadata shape должны проходить
+  tolerance parity;
+- strict result hash должен использовать canonical serialization/float
+  normalization, совместимую с notebook evidence;
+- float representation drift может быть зафиксирован как non-semantic finding
+  только временно и не должен скрывать metric или top-row identity mismatch.
+
+Измерение:
+
+- semantic metric parity для всех top rows;
+- proxy metadata parity для всех top rows;
+- strict result hash parity или явно documented waiver с причиной;
+- top row identity/order parity по deterministic heap key.
+
+#### Итерация 4.6: benchmark runner accounting
+
+Реализация:
+
+- runner записывает `request.top_n = 100`, `benchmark_top_k = 5`,
+  `sample_warmup_top_k = 1`, `top_results_count = 5` и heap capacity;
+- runner строит `total_without_warmup` только из notebook-compatible measured
+  stages:
+  `prepare_pools_core + build_exact_context + build_proxy_context +
+  combo_iteration + proxy_filter + self_check + exact_scoring + heap_update +
+  top_result_proxy_fill`;
+- runner отдельно записывает `service_total_without_warmup`, куда входят
+  service-only overhead stages до доступности terminal result.
+
+Измерение:
+
+- canonical target сравнивается только с `total_without_warmup`;
+- `service_total_without_warmup`, `artifact_context_resolve`,
+  `artifact_array_open`, `request_slice_prepare`, `prepare_pools_total`,
+  `top_result_assembly`, `persist_top_n_io` и `post_job_cleanup` записываются
+  как service telemetry / service-specific budget, но не участвуют в 90%
+  notebook timer comparison;
+- benchmark summary должен явно показывать оба ratio, чтобы следующие agents не
+  сравнивали разные процессы.
+
+#### Итерация 4.7: memory cleanup после no-risk run
+
+Реализация:
+
+- scoring service использует bounded job scope и `try/finally` cleanup boundary;
+- после доступности terminal result освобождаются strong references на prepared
+  pools, combo planning context, score arrays, segment stacks, self-check
+  reference objects, combo buffers и temporary heaps больше final top rows;
+- artifact mmap/cache handles могут оставаться только в bounded artifact runtime
+  cache, а не в per-job result;
+- если retained RSS после cleanup превышает configured threshold, worker должен
+  recycle до следующего heavy job.
+
+Измерение:
+
+- `post_job_cleanup` duration;
+- `rss_before`, `rss_peak`, `rss_after_cleanup`, `retained_rss_delta`;
+- repeated-run smoke минимум 3 раза подряд на одном worker lifecycle;
+- условие pass: нет монотонного retained RSS growth или доказан worker recycle перед
+  следующим heavy job.
 
 Не входит в Iteration 4 acceptance:
 
@@ -1433,6 +1688,9 @@ service-only и не должны попадать в `heap_update`, `top_result
 - `exact_scoring` для no-risk;
 - `heap_update` при `benchmark_top_k = 5`;
 - `top_result_proxy_fill` при `benchmark_top_k = 5`;
+- `total_without_warmup` по notebook-compatible formula из Итерации 4.6;
+- `service_total_without_warmup` только как service-specific telemetry;
+- `post_job_cleanup` memory evidence;
 - arity 1..7 target comparison против current canonical evidence;
 - evidence fields: `request.top_n = 100`, `benchmark_top_k = 5`,
   `top_results_count = 5`, heap capacity, exact backend display name и
@@ -1448,7 +1706,9 @@ service-only и не должны попадать в `heap_update`, `top_result
 - реализовать `load_hit_times` и `tp_sl_grid_validation`;
 - реализовать hit-times manifest hashing;
 - реализовать requested subset materialization для long/short TP/SL arrays;
-- реализовать deterministic 422 для grid-not-covered failure.
+- реализовать deterministic 422 для grid-not-covered failure;
+- гарантировать, что requested hit-time subset живет только в bounded job scope и
+  освобождается через `post_job_cleanup`, если scoring дальше падает.
 
 Гейт бенчмарка:
 
@@ -1456,7 +1716,9 @@ service-only и не должны попадать в `heap_update`, `top_result
 - `tp_sl_grid_validation`;
 - request grid coverage success и failure evidence;
 - target grid `2.0..25.0` step `0.5` evidence;
-- stage record записан до TP/SL exact scoring.
+- stage record записан до TP/SL exact scoring;
+- cleanup evidence для failed validation / failed load path без retained heavy
+  arrays.
 
 ### Итерация 6: TP/SL exact scoring и full metrics
 
@@ -1469,6 +1731,9 @@ service-only и не должны попадать в `heap_update`, `top_result
   `best_tp_pct`, `best_sl_pct`;
 - реализовать notebook-compatible `heap_update` для risk-on top rows с
   `benchmark_top_k = 5`;
+- применить те же low-allocation правила `heap_update`, что в Итерации 4.3:
+  сначала heap key и admission check, затем materialization только для retained
+  heap rows;
 - реализовать service-only `tp_sl_full_metrics_second_pass`, если full metric set
   считается после выбора best TP/SL cell.
 
@@ -1488,11 +1753,19 @@ service-only и не должны попадать в `heap_update`, `top_result
 - `self_check`;
 - `exact_scoring` / `tp_sl_exact_scoring` для TP/SL grid vs canonical target;
 - `heap_update` при `benchmark_top_k = 5`;
+- risk-on `total_without_warmup` сравнивается только как notebook-compatible sum:
+  `load_hit_times + tp_sl_grid_validation + prepare_pools_core +
+  build_exact_context + build_proxy_context + combo_iteration + proxy_filter +
+  self_check + exact_scoring + heap_update`;
 - `tp_sl_full_metrics_second_pass` CPU/RSS/latency evidence как service-only
   budget, если этот step уже реализован;
+- `service_total_without_warmup` и `post_job_cleanup` записываются отдельно и не
+  сравниваются с canonical notebook target;
 - arity 1..7 target comparison против current canonical evidence;
 - service-level correctness smoke для arity 8..10 на малых row pools;
-- full metric-set correctness evidence для selected best TP/SL cell.
+- full metric-set correctness evidence для selected best TP/SL cell;
+- repeated-run memory cleanup smoke для hit-time subsets, TP/SL diff buffers,
+  score arrays и selected top rows.
 
 ### Итерация 7: job orchestration и persistence
 
@@ -1504,7 +1777,10 @@ service-only и не должны попадать в `heap_update`, `top_result
 - реализовать idempotency и request guardrails;
 - persist canonical request snapshot, artifact metadata и top-N rows;
 - expose progress через canonical pipeline stage names;
-- реализовать ownership/authz checks.
+- реализовать ownership/authz checks;
+- реализовать production `post_job_cleanup` в worker orchestration: cleanup должен
+  выполняться после terminal persistence / доступности result и до освобождения
+  worker slot для следующего heavy job.
 
 Гейт бенчмарка:
 
@@ -1514,7 +1790,10 @@ service-only и не должны попадать в `heap_update`, `top_result
 - persisted top-N summary hash/parity evidence;
 - API contract tests для create/status/list/top/cancel/defaults/preflight;
 - idempotency replay/conflict evidence;
-- authz/ownership failure evidence.
+- authz/ownership failure evidence;
+- repeated end-to-end cleanup evidence: после чтения результатов job worker не
+  удерживает heavy compute objects, а превышение retained RSS threshold приводит
+  к worker recycle.
 
 ### Итерация 8: завершение execution/sizing
 

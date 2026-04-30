@@ -18,16 +18,17 @@ is_loaded() {
 }
 
 start_service() {
-  if is_loaded; then
-    launchctl kickstart -k "$service_target"
-  else
-    launchctl bootstrap "gui/${uid_value}" "$plist_path"
+  launchctl enable "$service_target" || true
+  if ! is_loaded; then
+    launchctl bootstrap "gui/${uid_value}" "$plist_path" || is_loaded
   fi
+  launchctl kickstart "$service_target"
 }
 
 stop_service() {
+  launchctl disable "$service_target" || true
   if ! is_loaded; then
-    exit 0
+    return 0
   fi
   launchctl bootout "$service_target" || launchctl bootout "gui/${uid_value}" "$plist_path"
 }
@@ -40,11 +41,8 @@ case "$action" in
     stop_service
     ;;
   restart)
-    if is_loaded; then
-      launchctl kickstart -k "$service_target"
-    else
-      start_service
-    fi
+    stop_service
+    start_service
     ;;
   status)
     launchctl print "$service_target" >/dev/null

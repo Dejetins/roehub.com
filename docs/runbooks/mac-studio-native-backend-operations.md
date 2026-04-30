@@ -109,6 +109,13 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
 ```
 
+Monit launchd wrapper semantics:
+
+- `start` runs `launchctl enable`, then `bootstrap` when needed, then `kickstart`;
+- `stop` runs `launchctl disable`, then `bootout`;
+- `restart` runs the same `stop` and `start` sequence, so a stopped service is re-enabled
+  explicitly instead of depending on prior launchd state.
+
 Keycloak quick checks:
 
 ```bash
