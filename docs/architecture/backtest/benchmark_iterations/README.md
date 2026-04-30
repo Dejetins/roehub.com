@@ -71,6 +71,20 @@ overhead должен иметь отдельные absolute budgets или regr
 against previous accepted service baseline. Нельзя проваливать
 notebook-compatible gate из-за overhead, которого нет в notebook timer.
 
+Локальная validation-команда для проверки accounting rules перед Mac Studio
+benchmark:
+
+```bash
+uv run python scripts/backtest/validate_benchmark_accounting.py \
+  --out docs/architecture/backtest/benchmark_iterations/<iteration>/local_accounting_validation.json
+```
+
+Она проверяет, что `request.top_n = 100`, `benchmark_top_k = 5`,
+`sample_warmup_top_k = 1`, `top_results_count = 5` и heap capacity записаны как
+benchmark metadata, что notebook `prepare_pools` нормализован в
+`prepare_pools_core`, а `service_total_without_warmup` и другие service-only
+поля не попадают в canonical stage comparison.
+
 ## Имя файла
 
 Формат для одиночной Markdown-записи:
