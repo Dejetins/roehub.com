@@ -1,0 +1,1029 @@
+{
+  "acceptance": {
+    "ratio_definition": "canonical_stage_seconds / service_stage_seconds",
+    "ratio_threshold": 0.9,
+    "requires_artifact_manifest_hash_match": true,
+    "stage_boundaries_compared": [
+      "self_check",
+      "exact_scoring"
+    ]
+  },
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+  "artifact_manifest_hash_matches_canonical": false,
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "canonical_artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-01T01:56:38.906069+03:00",
+  "git_commit": "00db858992846aaa1a8e7eb435a7457369cf4032",
+  "git_status_short": "runtime-copy-no-git",
+  "host": "MacStudioDaniil",
+  "pass": false,
+  "python": "3.12.13",
+  "request": {
+    "benchmark_top_k": 5,
+    "rows_per_indicator": 6,
+    "self_check_n": 2,
+    "top_n": 100,
+    "warmup_rows_per_indicator": 2
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.003169291000631347,
+        "self_check": 0.1191427499998099
+      },
+      "cartesian_combinations": 6,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "filtered_pool_sizes": {
+        "ma.dema": 6
+      },
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 2.472305928664402,
+        "self_check": 1.3012591887468328
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 39.56504723020801,
+        "avg_trade_ret_pct": -0.1697039524773401,
+        "exposure_pct": 36.06411894150412,
+        "max_drawdown_pct": 100.0,
+        "profit_factor": 0.3776615202372158,
+        "return_over_max_drawdown": -1.0,
+        "sharpe_trades": -21.77914453641565,
+        "total_return_pct": -100.0,
+        "trade_count": 41393.0,
+        "win_rate_pct": 20.31261324378518
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_1_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 0.0,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.00047708300007798243,
+        "build_proxy_context": 9.583000064594671e-06,
+        "combo_iteration": 2.120899807778187e-05,
+        "exact_scoring": 0.0012819170005968772,
+        "prepare_pools_core": 0.10181033299886622,
+        "proxy_filter": 5.45799957762938e-06,
+        "sample_warmup": 3.6938240409999707,
+        "self_check": 0.09155958400151576
+      },
+      "warmup_cartesian_combinations": 2
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "backend_implementation_id": "event_segments_2_no_risk",
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.003228833000321174,
+        "self_check": 0.14123391599969182
+      },
+      "cartesian_combinations": 36,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.hma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.3017734708497655,
+        "self_check": 2.790347723252879
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 38.82295623451693,
+        "avg_trade_ret_pct": -0.170000327172736,
+        "exposure_pct": 10.353077862017832,
+        "max_drawdown_pct": 99.99999991849621,
+        "profit_factor": 0.3776615202522575,
+        "return_over_max_drawdown": -0.9999999999750585,
+        "sharpe_trades": -9.095491552287202,
+        "total_return_pct": -99.99999991600207,
+        "trade_count": 12110.0,
+        "win_rate_pct": 23.5177539223782
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_2_no_risk",
+        "backend_logical_name": "event_segments_2_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 0.0,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 9.375000445288606e-06,
+        "build_proxy_context": 6.457999916165136e-06,
+        "combo_iteration": 3.662499875645153e-05,
+        "exact_scoring": 0.00248033400021086,
+        "prepare_pools_core": 0.0482151670003077,
+        "proxy_filter": 5.08399898535572e-06,
+        "sample_warmup": 3.694205958998282,
+        "self_check": 0.05061516699970525
+      },
+      "warmup_cartesian_combinations": 4
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.04864620900025329,
+        "self_check": 0.14245095799924457
+      },
+      "cartesian_combinations": 216,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.1925136420490858,
+        "self_check": 5.223915728424481
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 33.63502772643253,
+        "avg_trade_ret_pct": -0.17608509139958264,
+        "exposure_pct": 8.014118974535593,
+        "max_drawdown_pct": 99.999999569,
+        "profit_factor": 0.326376707439895,
+        "return_over_max_drawdown": -0.9999999999794457,
+        "sharpe_trades": -10.519160305388125,
+        "total_return_pct": -99.99999956694457,
+        "trade_count": 10820.0,
+        "win_rate_pct": 20.841035120147872
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_3_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 1.4210854715202004e-14,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0012017089993605623,
+        "build_proxy_context": 5.582998710451648e-06,
+        "combo_iteration": 9.516700083622709e-05,
+        "exact_scoring": 0.04079300000012154,
+        "prepare_pools_core": 0.07388874999924155,
+        "proxy_filter": 4.583000190905295e-06,
+        "sample_warmup": 0.02460350000001199,
+        "self_check": 0.027269000000160304
+      },
+      "warmup_cartesian_combinations": 8
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.3522160000002259,
+        "self_check": 0.14830691600036516
+      },
+      "cartesian_combinations": 1296,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.046547768537029,
+        "self_check": 5.071138151022802
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 33.61789234268385,
+        "avg_trade_ret_pct": -0.17618837609353433,
+        "exposure_pct": 7.811636020429308,
+        "max_drawdown_pct": 99.99999931407532,
+        "profit_factor": 0.3332350507643746,
+        "return_over_max_drawdown": -0.9999999999672885,
+        "sharpe_trades": -10.354165099990622,
+        "total_return_pct": -99.99999931080417,
+        "trade_count": 10552.0,
+        "win_rate_pct": 20.90598938589841
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_4_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 0.0,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0015677499995945254,
+        "build_proxy_context": 4.792000254383311e-06,
+        "combo_iteration": 0.0005267079977784306,
+        "exact_scoring": 0.3365503329987405,
+        "prepare_pools_core": 0.09883212500062655,
+        "proxy_filter": 4.7909998102113605e-06,
+        "sample_warmup": 0.03289720800057694,
+        "self_check": 0.02924529200026882
+      },
+      "warmup_cartesian_combinations": 16
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 2.090652749999208,
+        "self_check": 0.15213170799961517
+      },
+      "cartesian_combinations": 7776,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0363685663059858,
+        "self_check": 30.67454776753338
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 15.882352941176471,
+        "avg_trade_ret_pct": -0.6982543345495625,
+        "exposure_pct": 0.005945665862827323,
+        "max_drawdown_pct": 12.340286984658798,
+        "profit_factor": 0.1560809818467361,
+        "return_over_max_drawdown": -0.9214680806640313,
+        "sharpe_trades": -0.72521306247709,
+        "total_return_pct": -11.37118056259687,
+        "trade_count": 17.0,
+        "win_rate_pct": 35.294117647058826
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_5_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 9.237055564881302e-14,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0011092090007878141,
+        "build_proxy_context": 4.791998435393907e-06,
+        "combo_iteration": 0.003461042000708403,
+        "exact_scoring": 2.017286917000092,
+        "prepare_pools_core": 0.1224282500006666,
+        "proxy_filter": 9.459001375944354e-06,
+        "sample_warmup": 0.023707958000159124,
+        "self_check": 0.00495954200050619
+      },
+      "warmup_cartesian_combinations": 32
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 15.736087919001875,
+        "self_check": 0.15105662499991013
+      },
+      "cartesian_combinations": 46656,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0142504775885126,
+        "self_check": 27.621363643124845
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 15.882352941176471,
+        "avg_trade_ret_pct": -0.6982543345495625,
+        "exposure_pct": 0.005945665862827323,
+        "max_drawdown_pct": 12.340286984658798,
+        "profit_factor": 0.1560809818467361,
+        "return_over_max_drawdown": -0.9214680806640313,
+        "sharpe_trades": -0.72521306247709,
+        "total_return_pct": -11.37118056259687,
+        "trade_count": 17.0,
+        "win_rate_pct": 35.294117647058826
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_6_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 9.237055564881302e-14,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0014614579995395616,
+        "build_proxy_context": 5.249999958323315e-06,
+        "combo_iteration": 0.024028376001297147,
+        "exact_scoring": 15.514991875001215,
+        "prepare_pools_core": 0.1461121659995115,
+        "proxy_filter": 6.199899689818267e-05,
+        "sample_warmup": 0.035410332999163074,
+        "self_check": 0.005468833000122686
+      },
+      "warmup_cartesian_combinations": 64
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 139.58567983499415,
+        "self_check": 0.1564213749998089
+      },
+      "cartesian_combinations": 279936,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6,
+        "ma.zlema": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0212606460687557,
+        "self_check": 18.151858888583355
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 15.882352941176471,
+        "avg_trade_ret_pct": -0.6982543345495625,
+        "exposure_pct": 0.005945665862827323,
+        "max_drawdown_pct": 12.340286984658798,
+        "profit_factor": 0.1560809818467361,
+        "return_over_max_drawdown": -0.9214680806640313,
+        "sharpe_trades": -0.72521306247709,
+        "total_return_pct": -11.37118056259687,
+        "trade_count": 17.0,
+        "win_rate_pct": 35.294117647058826
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_7_no_risk",
+        "direction_mode": "long_only",
+        "enabled": true,
+        "max_abs_diff": 9.237055564881302e-14,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0021373330000642454,
+        "build_proxy_context": 5.832998795085587e-06,
+        "combo_iteration": 0.16369366699109378,
+        "exact_scoring": 136.67977941999015,
+        "prepare_pools_core": 0.1770653339990531,
+        "proxy_filter": 0.000289787009023712,
+        "sample_warmup": 0.08832633299971349,
+        "self_check": 0.00861737500054005
+      },
+      "warmup_cartesian_combinations": 128
+    },
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.00229975000002014,
+        "self_check": 0.15305625000019063
+      },
+      "cartesian_combinations": 6,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "filtered_pool_sizes": {
+        "ma.dema": 6
+      },
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.1875549307739819,
+        "self_check": 1.003492634629868
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 39.66656197528478,
+        "avg_trade_ret_pct": -0.17380278431304091,
+        "exposure_pct": 72.31068174105833,
+        "max_drawdown_pct": 100.0,
+        "profit_factor": 0.3032019911551515,
+        "return_over_max_drawdown": -1.0,
+        "sharpe_trades": -31.85804522619394,
+        "total_return_pct": -100.0,
+        "trade_count": 82783.0,
+        "win_rate_pct": 19.79271106386577
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_1_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 0.0,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.00033970799995586276,
+        "build_proxy_context": 5.500000042957254e-06,
+        "combo_iteration": 1.2250000509084202e-05,
+        "exact_scoring": 0.0019365419993846444,
+        "prepare_pools_core": 0.10181033299886622,
+        "proxy_filter": 4.333000106271356e-06,
+        "sample_warmup": 0.08288270799857855,
+        "self_check": 0.15252354099902732
+      },
+      "warmup_cartesian_combinations": 2
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "backend_implementation_id": "event_segments_2_no_risk",
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.0010126669994861004,
+        "self_check": 0.1411889169994538
+      },
+      "cartesian_combinations": 36,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.hma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 0.9164755587902569,
+        "self_check": 4.047929556433629
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 14402.13596491228,
+        "avg_trade_ret_pct": 2.7053982684502103,
+        "exposure_pct": 72.31002111151801,
+        "max_drawdown_pct": 70.7278079444566,
+        "profit_factor": 1.1493899880362974,
+        "return_over_max_drawdown": 1.9270371658178151,
+        "sharpe_trades": 0.2959761135920523,
+        "total_return_pct": 136.2951145657924,
+        "trade_count": 228.0,
+        "win_rate_pct": 25.0
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_2_no_risk",
+        "backend_logical_name": "event_segments_2_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 3.410605131648481e-13,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 7.124999683583155e-06,
+        "build_proxy_context": 4.458001058083028e-06,
+        "combo_iteration": 2.4291999579872936e-05,
+        "exact_scoring": 0.0011049579989048652,
+        "prepare_pools_core": 0.0482151670003077,
+        "proxy_filter": 4.8749989218777046e-06,
+        "sample_warmup": 0.018388083999525406,
+        "self_check": 0.03487929200127837
+      },
+      "warmup_cartesian_combinations": 4
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.035367040999517485,
+        "self_check": 0.15325662499981263
+      },
+      "cartesian_combinations": 216,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0376422501857216,
+        "self_check": 4.642510489556471
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 22187.074324324327,
+        "avg_trade_ret_pct": 4.262124726130536,
+        "exposure_pct": 72.31002111151801,
+        "max_drawdown_pct": 47.82147869693331,
+        "profit_factor": 1.562781814476188,
+        "return_over_max_drawdown": 6.56199380669173,
+        "sharpe_trades": 0.31034637283262845,
+        "total_return_pct": 313.80424703611686,
+        "trade_count": 148.0,
+        "win_rate_pct": 21.62162162162162
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_3_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 8.526512829121202e-13,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0011224160007259343,
+        "build_proxy_context": 3.958999513997696e-06,
+        "combo_iteration": 9.691800005384721e-05,
+        "exact_scoring": 0.03408404100082407,
+        "prepare_pools_core": 0.07388874999924155,
+        "proxy_filter": 4.041001375298947e-06,
+        "sample_warmup": 0.025229041999409674,
+        "self_check": 0.033011584000632865
+      },
+      "warmup_cartesian_combinations": 8
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 0.290841250000085,
+        "self_check": 0.1636790419997851
+      },
+      "cartesian_combinations": 1296,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0114002583004928,
+        "self_check": 5.0456189757429275
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 24504.79104477612,
+        "avg_trade_ret_pct": 4.664013383030513,
+        "exposure_pct": 72.30903016720754,
+        "max_drawdown_pct": 44.99084852914939,
+        "profit_factor": 1.62441750284011,
+        "return_over_max_drawdown": 7.33592230537761,
+        "sharpe_trades": 0.3126600621579677,
+        "total_return_pct": 330.04936926285245,
+        "trade_count": 134.0,
+        "win_rate_pct": 22.388059701492537
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_4_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 1.0231815394945443e-12,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0011450000001786975,
+        "build_proxy_context": 3.833998562186025e-06,
+        "combo_iteration": 0.0005170840013306588,
+        "exact_scoring": 0.28756295800121734,
+        "prepare_pools_core": 0.09883212500062655,
+        "proxy_filter": 4.166000508121215e-06,
+        "sample_warmup": 0.033501833999252995,
+        "self_check": 0.032439833999887924
+      },
+      "warmup_cartesian_combinations": 16
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 1.9616369169998507,
+        "self_check": 0.16311820800001442
+      },
+      "cartesian_combinations": 7776,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 0.9883988390896159,
+        "self_check": 12.729106774975403
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 273272.10000000003,
+        "avg_trade_ret_pct": 6.421800723389459,
+        "exposure_pct": 60.17720726789387,
+        "max_drawdown_pct": 17.514304145634963,
+        "profit_factor": 2.548633059831874,
+        "return_over_max_drawdown": 3.0560345139538647,
+        "sharpe_trades": 0.2841567403934607,
+        "total_return_pct": 53.5243179569457,
+        "trade_count": 10.0,
+        "win_rate_pct": 40.0
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_5_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 2.1316282072803006e-14,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.001426834000085364,
+        "build_proxy_context": 3.2079988159239292e-06,
+        "combo_iteration": 0.003545790999851306,
+        "exact_scoring": 1.9846612920009647,
+        "prepare_pools_core": 0.1224282500006666,
+        "proxy_filter": 8.331999197253026e-06,
+        "sample_warmup": 0.02329762500085053,
+        "self_check": 0.012814583998988383
+      },
+      "warmup_cartesian_combinations": 32
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 15.186988872997972,
+        "self_check": 0.16411845800030278
+      },
+      "cartesian_combinations": 46656,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.00454372744505,
+        "self_check": 14.547305956630671
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 273272.10000000003,
+        "avg_trade_ret_pct": 6.230429747965487,
+        "exposure_pct": 60.17720726789387,
+        "max_drawdown_pct": 19.107061026913154,
+        "profit_factor": 2.3486635804222407,
+        "return_over_max_drawdown": 2.6461338717555534,
+        "sharpe_trades": 0.2749617308231028,
+        "total_return_pct": 50.559841373015345,
+        "trade_count": 10.0,
+        "win_rate_pct": 40.0
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_6_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 1.5631940186722204e-13,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0018029579987342004,
+        "build_proxy_context": 4.417001036927104e-06,
+        "combo_iteration": 0.02416970800004492,
+        "exact_scoring": 15.118295458998546,
+        "prepare_pools_core": 0.1461121659995115,
+        "proxy_filter": 0.00012133099698985461,
+        "sample_warmup": 0.03329204200053937,
+        "self_check": 0.011281708000751678
+      },
+      "warmup_cartesian_combinations": 64
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "backend_implementation_id": "event_segments_n_no_risk",
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "exact_scoring": 136.11266678799893,
+        "self_check": 0.167379333000099
+      },
+      "cartesian_combinations": 279936,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "filtered_pool_sizes": {
+        "ma.dema": 6,
+        "ma.ema": 6,
+        "ma.hma": 6,
+        "ma.rma": 6,
+        "ma.sma": 6,
+        "ma.wma": 6,
+        "ma.zlema": 6
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "exact_scoring": true,
+        "overall": true,
+        "self_check": true
+      },
+      "ratios": {
+        "exact_scoring": 1.0163591505315386,
+        "self_check": 13.225948105409593
+      },
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 273272.10000000003,
+        "avg_trade_ret_pct": 6.230429747965487,
+        "exposure_pct": 60.17720726789387,
+        "max_drawdown_pct": 19.107061026913154,
+        "profit_factor": 2.3486635804222407,
+        "return_over_max_drawdown": 2.6461338717555534,
+        "sharpe_trades": 0.2749617308231028,
+        "total_return_pct": 50.559841373015345,
+        "trade_count": 10.0,
+        "win_rate_pct": 40.0
+      },
+      "self_check": {
+        "backend_implementation_id": "event_segments_n_no_risk",
+        "backend_logical_name": "event_segments_7_no_risk",
+        "direction_mode": "long_short_reversal",
+        "enabled": true,
+        "max_abs_diff": 0.0,
+        "mismatches": 0,
+        "return_tolerance": 0.0001,
+        "sample_size": 2,
+        "status": "passed",
+        "trade_count_equal": true
+      },
+      "timers": {
+        "build_exact_context": 0.0026165420003962936,
+        "build_proxy_context": 5.500000042957254e-06,
+        "combo_iteration": 0.1625920409878745,
+        "exact_scoring": 133.92181958199944,
+        "prepare_pools_core": 0.1770653339990531,
+        "proxy_filter": 0.0002976159958052449,
+        "sample_warmup": 0.0793658750008035,
+        "self_check": 0.012655374999667401
+      },
+      "warmup_cartesian_combinations": 128
+    }
+  ],
+  "schema": "backtest_iteration_4_2_exact_scoring_self_check_v1",
+  "scope": {
+    "implemented_stages": [
+      "self_check",
+      "exact_scoring"
+    ],
+    "not_implemented_stages": [
+      "heap_update",
+      "top_result_proxy_fill",
+      "result_hash_normalization",
+      "persistence",
+      "public_api_identity"
+    ],
+    "risk_mode": "none",
+    "stage_scope": "exact_only"
+  },
+  "stage_pass": true
+}
