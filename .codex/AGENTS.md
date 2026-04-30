@@ -732,19 +732,28 @@ In Speed Mode:
   - list hardening follow-ups.
 
 ### 11.4 Contract impact classification (mandatory for non-trivial tasks)
-For every non-trivial task, the agent SHOULD explicitly classify impact as:
+For every non-trivial task, the agent SHOULD explicitly classify each relevant dimension as:
 
-- public API contract: yes/no
-- port contract: yes/no
-- DTO schema: yes/no
-- persisted schema: yes/no
-- config schema: yes/no
-- request hash / cache key / persistence identity semantics: yes/no
+- `none`: no meaningful contract impact
+- `compatible-change`: a contract surface changes but existing consumers should keep working
+- `breaking-change`: existing consumers, persisted data, rollout assumptions, or externally relied-upon behavior may break
+- `unknown`: evidence is insufficient; state the assumption and unresolved risk
+
+Required dimensions:
+
+- public API contract
+- port contract
+- DTO schema
+- persisted schema
+- config schema
+- request hash / cache key / persistence identity semantics
 
 If relevant, the agent SHOULD also classify:
-- benchmark / rollout gate impact: yes/no
-- performance risk on verified hot path: yes/no
-- browser-visible behavior impact: yes/no
+- benchmark / rollout gate impact
+- performance risk on verified hot path
+- browser-visible behavior impact
+
+For trivial tasks where a dimension is clearly unaffected, a concise yes/no statement is acceptable.
 
 For the step-by-step analysis workflow behind this classification, the agent SHOULD use the global `contract-impact-analysis` skill.
 
@@ -890,7 +899,7 @@ For small, single-file, or purely mechanical tasks, a concise final response is 
 1. **Intent** — what and why
 2. **Scope** — areas touched
 3. **Design** — boundaries/contracts and rationale
-4. **Contract impact** — explicit yes/no classification
+4. **Contract impact** — explicit `none` / `compatible-change` / `breaking-change` / `unknown` classification when non-trivial
 5. **Tests** — added/updated and how to run
 6. **Docs** — updated or intentionally deferred
 7. **Performance** — hot path touched, evidence, or risk

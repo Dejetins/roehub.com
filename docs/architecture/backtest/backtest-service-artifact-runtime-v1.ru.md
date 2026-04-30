@@ -934,7 +934,6 @@ Production service должен вернуть full summary metrics и для ri
 | `tp_sl_full_metrics_second_pass` | service only | Full metric set для выбранной best TP/SL cell; не часть текущего notebook baseline. |
 | `total_without_warmup` | yes | Notebook-compatible measured runtime после warmup. |
 | `service_total_without_warmup` | service only | Полный service runtime после warmup до доступности terminal result, включая service-only overhead. |
-| `post_job_cleanup` | service only | Освобождение per-job heavy references после доступности terminal result. |
 | `persist_top_n_io` | service only | DB write overhead; не часть notebook baseline. |
 
 `total_without_warmup` для 90% comparison должен совпадать по boundary с
@@ -944,10 +943,11 @@ notebook runtime и исключать `top_result_assembly`,
 дополнительно записывает `service_total_without_warmup`, где эти расходы уже
 видны отдельно и в сумме.
 
-`post_job_cleanup` начинается после того, как summary result стал доступен
-пользователю или persistence layer. Эта stage не входит в notebook-compatible
-comparison и не должна маскироваться внутри `total_without_warmup`. Она обязана
-освободить per-job heavy objects до того, как worker slot считается свободным для
+Memory cleanup начинается после того, как summary result стал доступен
+пользователю или persistence layer. Cleanup не является canonical benchmark
+stage, не меняет порядок notebook stages и не сравнивается по правилу `>= 90%`
+до появления собственного accepted service baseline. При этом worker обязан
+освободить per-job heavy objects до того, как slot считается свободным для
 следующего heavy job.
 
 ### Lazy trades
@@ -987,7 +987,6 @@ Persisted job state может оставаться coarse (`stage_a`, `stage_b`
 | `top_result_assembly` | `finalizing` | Service-only public/storage identity и DTO/read-model assembly. |
 | `tp_sl_full_metrics_second_pass` | `finalizing` | Service-only TP/SL metrics recompute для selected best cells. |
 | `persist_top_n_io` | `finalizing` | Service-only DB write overhead. |
-| `post_job_cleanup` | `finalizing` | Service-only освобождение heavy per-job references перед освобождением worker slot. |
 | `succeeded`, `failed`, `cancelled` | terminal state | Terminal state приоритетнее stage. |
 
 Контракт:
@@ -1097,8 +1096,9 @@ notebook-compatible stages строит 100 rows, сравнивается с н
 - canonical notebook timer metrics без warmup;
 - service-only overhead metrics (`artifact_context_resolve`, `artifact_array_open`,
   `request_slice_prepare`, `prepare_pools_total`, `top_result_assembly`,
-  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`,
-  `post_job_cleanup`);
+  `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`);
+- memory cleanup evidence как отдельная service hygiene check, а не как
+  canonical benchmark stage;
 - speed ratio vs baseline;
 - absolute latency budget result;
 - peak RSS / memory delta;
@@ -1119,36 +1119,45 @@ notebook-compatible stages строит 100 rows, сравнивается с н
 - warmup и warm runtime оба должны оставаться в accepted 90% envelope для
   соответствующего segment.
 
-Обязательные benchmark segments:
+Canonical notebook-compatible benchmark stages сохраняют порядок и состав,
+экспонируемый текущим `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`.
+Runner может писать дополнительные service-only telemetry fields, но не должен
+добавлять их в этот ordered stage list.
 
 1. `service_warmup`
 2. `numba_warmup`
 3. `sample_warmup`
 4. `total_without_warmup`
-5. `service_total_without_warmup`
-6. `load_hit_times` для `risk.mode = "tp_sl_grid"`
-7. `tp_sl_grid_validation` для `risk.mode = "tp_sl_grid"`
-8. `artifact_context_resolve`
-9. `artifact_array_open`
-10. `request_slice_prepare`
-11. `prepare_pools_core`
-12. `prepare_pools_total`
-13. `build_exact_context`
-14. `build_proxy_context`
-15. `combo_iteration`
-16. `proxy_filter`
-17. `self_check`
-18. `exact_scoring`
-19. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
-20. `heap_update`
-21. `top_result_proxy_fill`
-22. `top_result_assembly`
-23. `tp_sl_full_metrics_second_pass` для `risk.mode = "tp_sl_grid"`, когда full
-    metric set считается после выбора best cell
-24. `persist_top_n_io`
-25. `lazy_trades_compute`
-26. `lazy_trades_cache_hit`
-27. `post_job_cleanup`
+5. `load_hit_times` для `risk.mode = "tp_sl_grid"`
+6. `tp_sl_grid_validation` для `risk.mode = "tp_sl_grid"`
+7. `prepare_pools_core` как service alias для notebook `prepare_pools`
+8. `build_exact_context`
+9. `build_proxy_context`
+10. `combo_iteration`
+11. `proxy_filter`
+12. `self_check`
+13. `exact_scoring`
+14. `tp_sl_exact_scoring` для `risk.mode = "tp_sl_grid"`
+15. `heap_update`
+16. `top_result_proxy_fill`
+
+Canonical JSON также может содержать `total` как historical/no-risk alias для
+`total_without_warmup`. Это не отдельная stage и не добавляет новый comparison
+gate.
+
+Service-only telemetry fields не являются canonical stages и не имеют notebook
+target values:
+
+- `artifact_context_resolve`;
+- `artifact_array_open`;
+- `request_slice_prepare`;
+- `prepare_pools_total`;
+- `service_total_without_warmup`;
+- `top_result_assembly`;
+- `tp_sl_full_metrics_second_pass`;
+- `persist_top_n_io`;
+- `lazy_trades_compute`;
+- `lazy_trades_cache_hit`.
 
 Сравнение acceptance:
 
@@ -1164,8 +1173,8 @@ notebook-compatible stages строит 100 rows, сравнивается с н
   top_result_proxy_fill`;
 - `artifact_context_resolve`, `artifact_array_open`, `request_slice_prepare`,
   `prepare_pools_total`, `top_result_assembly`, `persist_top_n_io`,
-  `post_job_cleanup` и любые DTO/storage/cache assembly steps не должны
-  попадать в `total_without_warmup`;
+  memory cleanup и любые DTO/storage/cache assembly steps не должны попадать в
+  `total_without_warmup`;
 - в benchmark evidence `backend` может быть display/logical name
   (`event_segments_1_no_risk`, `event_segments_7_no_risk`), а runtime registry
   может использовать общий implementation id (`event_segments_n_no_risk`) для
@@ -1178,7 +1187,7 @@ notebook-compatible stages строит 100 rows, сравнивается с н
   `prepare_pools_total`, `top_result_assembly`,
   `tp_sl_full_metrics_second_pass`, `service_total_without_warmup`,
   `persist_top_n_io`,
-  `lazy_trades_compute`, `lazy_trades_cache_hit` и `post_job_cleanup` являются service
+  `lazy_trades_compute` и `lazy_trades_cache_hit` являются service
   overhead/telemetry stages; они
   измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook timer
   targets;
@@ -1193,6 +1202,9 @@ notebook-compatible stages строит 100 rows, сравнивается с н
 - `persist_top_n_io`, `lazy_trades_compute` и
   `lazy_trades_cache_hit` используют service-specific absolute budgets плюс regression
   comparison после появления собственного baseline;
+- memory cleanup evidence использует service-specific retained RSS / recycle
+  checks; это не canonical stage и не участвует в `>= 90%` comparison до
+  появления собственного accepted service baseline;
 - implementation может записывать lower-level subsegments, но pass/fail должен включать
   каждый canonical timer, экспонируемый notebook;
 - latency target проходит, когда service wall time не хуже canonical target,
@@ -1315,7 +1327,7 @@ Security и доступ:
 | Job queue wait | `backtest.job_queue_timeout_seconds` | `300` | Максимальное ожидание job в очереди до terminal failure. | terminal job failure |
 | Job wall time | `backtest.job_wall_timeout_seconds` | `900` | Максимальное wall-clock время исполнения job. Requests, которые по estimate не помещаются в этот budget, должны отсеиваться preflight. | terminal job failure |
 | Lazy trades wall time | `backtest.lazy_trades_timeout_seconds` | `30` | Максимальное время ленивого пересчета сделок по одному `variant_key`. | `503` retryable |
-| Worker retained RSS recycle | `backtest.worker_recycle_retained_rss_mb` | `256` | Если после `post_job_cleanup` worker удерживает больше configured RSS delta относительно baseline, worker должен быть recycled до следующего heavy job. | worker recycle |
+| Worker retained RSS recycle | `backtest.worker_recycle_retained_rss_mb` | `256` | Если после cleanup boundary worker удерживает больше configured RSS delta относительно baseline, worker должен быть recycled до следующего heavy job. | worker recycle |
 
 Default tier intentionally близок к canonical benchmark workload. Для платных или
 админских tiers можно расширять `max_top_n`, `max_indicator_rows`,
@@ -1352,7 +1364,7 @@ Backtest job должен исполняться как bounded memory scope. Su
   candidates;
 - worker обязан иметь `try/finally` cleanup boundary вокруг scoring path:
   удалить strong references на heavy objects, очистить per-job containers и
-  зафиксировать `post_job_cleanup` telemetry;
+  зафиксировать cleanup telemetry;
 - `gc.collect()` допустим как fallback cleanup step после удаления references,
   но основная гарантия должна строиться на отсутствии retained references;
 - если Python/macOS allocator не возвращает RSS операционной системе, service
@@ -1386,7 +1398,7 @@ Acceptance по memory cleanup для каждой compute iteration:
   (`top_n` vs `benchmark_top_k`), benchmark record обязан записывать оба значения
   и фактическую cardinality обработанных rows.
 - после доступности terminal result каждая compute iteration должна иметь
-  `post_job_cleanup` evidence: heavy per-job references освобождены, retained RSS
+  memory cleanup evidence: heavy per-job references освобождены, retained RSS
   не растет монотонно на repeated runs или worker recycle сработал до следующего
   heavy job.
 
@@ -1530,7 +1542,7 @@ Accepted evidence:
 
 - smoke benchmark записывает `request.top_n`, `benchmark_top_k`,
   `top_results_count`, heap capacity и отсутствие heavy references в result;
-- `post_job_cleanup` фиксирует, что после удаления локальных heavy references
+- memory cleanup evidence фиксирует, что после удаления локальных heavy references
   worker не удерживает per-job arrays через result DTO.
 
 #### Итерация 4.2: exact scoring kernels и self-check
@@ -1641,7 +1653,7 @@ Accepted evidence:
 - canonical target сравнивается только с `total_without_warmup`;
 - `service_total_without_warmup`, `artifact_context_resolve`,
   `artifact_array_open`, `request_slice_prepare`, `prepare_pools_total`,
-  `top_result_assembly`, `persist_top_n_io` и `post_job_cleanup` записываются
+  `top_result_assembly` и `persist_top_n_io` записываются
   как service telemetry / service-specific budget, но не участвуют в 90%
   notebook timer comparison;
 - benchmark summary должен явно показывать оба ratio, чтобы следующие agents не
@@ -1660,9 +1672,9 @@ Accepted evidence:
 - если retained RSS после cleanup превышает configured threshold, worker должен
   recycle до следующего heavy job.
 
-Измерение:
+Проверка:
 
-- `post_job_cleanup` duration;
+- cleanup duration как service hygiene metric, а не canonical benchmark stage;
 - `rss_before`, `rss_peak`, `rss_after_cleanup`, `retained_rss_delta`;
 - repeated-run smoke минимум 3 раза подряд на одном worker lifecycle;
 - условие pass: нет монотонного retained RSS growth или доказан worker recycle перед
@@ -1690,7 +1702,7 @@ service-only и не должны попадать в `heap_update`, `top_result
 - `top_result_proxy_fill` при `benchmark_top_k = 5`;
 - `total_without_warmup` по notebook-compatible formula из Итерации 4.6;
 - `service_total_without_warmup` только как service-specific telemetry;
-- `post_job_cleanup` memory evidence;
+- memory cleanup smoke evidence без добавления нового canonical benchmark stage;
 - arity 1..7 target comparison против current canonical evidence;
 - evidence fields: `request.top_n = 100`, `benchmark_top_k = 5`,
   `top_results_count = 5`, heap capacity, exact backend display name и
@@ -1708,7 +1720,7 @@ service-only и не должны попадать в `heap_update`, `top_result
 - реализовать requested subset materialization для long/short TP/SL arrays;
 - реализовать deterministic 422 для grid-not-covered failure;
 - гарантировать, что requested hit-time subset живет только в bounded job scope и
-  освобождается через `post_job_cleanup`, если scoring дальше падает.
+  освобождается через cleanup boundary, если scoring дальше падает.
 
 Гейт бенчмарка:
 
@@ -1759,7 +1771,7 @@ service-only и не должны попадать в `heap_update`, `top_result
   self_check + exact_scoring + heap_update`;
 - `tp_sl_full_metrics_second_pass` CPU/RSS/latency evidence как service-only
   budget, если этот step уже реализован;
-- `service_total_without_warmup` и `post_job_cleanup` записываются отдельно и не
+- `service_total_without_warmup` и memory cleanup evidence записываются отдельно и не
   сравниваются с canonical notebook target;
 - arity 1..7 target comparison против current canonical evidence;
 - service-level correctness smoke для arity 8..10 на малых row pools;
@@ -1778,7 +1790,7 @@ service-only и не должны попадать в `heap_update`, `top_result
 - persist canonical request snapshot, artifact metadata и top-N rows;
 - expose progress через canonical pipeline stage names;
 - реализовать ownership/authz checks;
-- реализовать production `post_job_cleanup` в worker orchestration: cleanup должен
+- реализовать production cleanup boundary в worker orchestration: cleanup должен
   выполняться после terminal persistence / доступности result и до освобождения
   worker slot для следующего heavy job.
 

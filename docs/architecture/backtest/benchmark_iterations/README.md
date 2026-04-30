@@ -167,6 +167,9 @@ heap_update
 top_result_proxy_fill
 ```
 
+Canonical JSON may include `total` for no-risk rows as a historical alias of
+`total_without_warmup`. Do not treat it as a separate benchmark stage.
+
 | Stage | Required | Notebook wall s | Service wall s | Speed ratio | Notebook peak RSS | Service peak RSS | Memory ratio | CPU evidence | Pass |
 |---|---|---:|---:|---:|---:|---:|---:|---|---|
 | total_without_warmup | yes | | | | | | | | |
@@ -195,9 +198,30 @@ comparison against the previous service run.
 | artifact_array_open | | | | | |
 | request_slice_prepare | | | | | |
 | prepare_pools_total | | | | | |
+| service_total_without_warmup | | | | | |
+| top_result_assembly | | | | | |
+| tp_sl_full_metrics_second_pass | | | | | |
 | persist_top_n_io | | | | | |
 | lazy_trades_compute | | | | | |
 | lazy_trades_cache_hit | | | | | |
+
+## Memory Cleanup Evidence
+
+Cleanup evidence is a service hygiene check, not a canonical notebook stage. It
+does not change the ordered stage list above and must not be compared with
+canonical notebook timers until a separate accepted service baseline exists.
+
+| Check | Value |
+|---|---|
+| cleanup_duration_s | |
+| rss_before_mb | |
+| rss_peak_mb | |
+| rss_after_cleanup_mb | |
+| retained_rss_delta_mb | |
+| repeated_run_count | |
+| monotonic_retained_rss_growth | |
+| worker_recycled | |
+| pass | |
 
 ## Contract Coverage
 
