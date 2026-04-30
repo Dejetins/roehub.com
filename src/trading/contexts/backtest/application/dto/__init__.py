@@ -10,6 +10,16 @@ from .combo_planning import (
     BacktestProxyFilterResult,
     BacktestSelectedBackend,
 )
+from .no_risk_exact import (
+    BacktestNoRiskExactConfig,
+    BacktestNoRiskExactResult,
+    BacktestNoRiskExactTelemetry,
+    BacktestNoRiskExecutionContext,
+    BacktestNoRiskMemoryCleanupEvidence,
+    BacktestNoRiskSelfCheckSummary,
+    BacktestNoRiskTopResult,
+    CompactScalar,
+)
 from .prepare_pools import (
     BacktestPreparePoolsConfig,
     BacktestPreparePoolsResult,
@@ -41,6 +51,13 @@ __all__ = [
     "BacktestCostEstimate",
     "BacktestExecutionDefaults",
     "BacktestExactContext",
+    "BacktestNoRiskExactConfig",
+    "BacktestNoRiskExactResult",
+    "BacktestNoRiskExactTelemetry",
+    "BacktestNoRiskExecutionContext",
+    "BacktestNoRiskMemoryCleanupEvidence",
+    "BacktestNoRiskSelfCheckSummary",
+    "BacktestNoRiskTopResult",
     "BacktestPreparePoolsConfig",
     "BacktestPreparePoolsResult",
     "BacktestPreflightResult",
@@ -50,6 +67,7 @@ __all__ = [
     "BacktestRuntimeGuardrails",
     "BacktestSelectedBackend",
     "BacktestValidationIssue",
+    "CompactScalar",
     "JsonMapping",
     "PreparedExecutionMapping",
     "PreparedIndicatorPool",
