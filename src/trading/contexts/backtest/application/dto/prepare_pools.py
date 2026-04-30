@@ -157,6 +157,8 @@ class BacktestPreparePoolsResult:
     eval_T_length: int
     row_metadata_order_hash: str
     timing: PreparePoolsTiming
+    execution_open_1m: np.ndarray | None = None
+    execution_close_1m: np.ndarray | None = None
 
 
 __all__ = [

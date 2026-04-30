@@ -16,12 +16,33 @@ class BacktestNoRiskExactConfig:
     benchmark_top_k: int = 5
     default_request_top_n: int = 100
     run_self_check: bool = False
+    self_check_sample_size: int = 2
+    self_check_return_tolerance: float = 1e-4
+    default_fee_rate: float = 0.00075
+    default_slippage_rate: float = 0.0001
+    default_initial_cash_quote: float = 10000.0
+    default_fixed_quote: float = 100.0
+    default_safe_profit_percent: float = 30.0
 
     def __post_init__(self) -> None:
         if self.benchmark_top_k <= 0:
             raise ValueError("benchmark_top_k must be > 0")
         if self.default_request_top_n <= 0:
             raise ValueError("default_request_top_n must be > 0")
+        if self.self_check_sample_size < 0:
+            raise ValueError("self_check_sample_size must be >= 0")
+        if self.self_check_return_tolerance < 0.0:
+            raise ValueError("self_check_return_tolerance must be >= 0")
+        if self.default_fee_rate < 0.0:
+            raise ValueError("default_fee_rate must be >= 0")
+        if self.default_slippage_rate < 0.0:
+            raise ValueError("default_slippage_rate must be >= 0")
+        if self.default_initial_cash_quote <= 0.0:
+            raise ValueError("default_initial_cash_quote must be > 0")
+        if self.default_fixed_quote <= 0.0:
+            raise ValueError("default_fixed_quote must be > 0")
+        if self.default_safe_profit_percent < 0.0:
+            raise ValueError("default_safe_profit_percent must be >= 0")
 
     @property
     def heap_capacity(self) -> int:
@@ -111,6 +132,11 @@ class BacktestNoRiskSelfCheckSummary:
     sample_size: int = 0
     mismatches: int = 0
     max_abs_diff: float | None = None
+    backend_logical_name: str | None = None
+    backend_implementation_id: str | None = None
+    direction_mode: str | None = None
+    trade_count_equal: bool | None = None
+    return_tolerance: float | None = None
 
     def __post_init__(self) -> None:
         if self.sample_size < 0:
@@ -119,6 +145,8 @@ class BacktestNoRiskSelfCheckSummary:
             raise ValueError("mismatches must be >= 0")
         if self.max_abs_diff is not None and self.max_abs_diff < 0.0:
             raise ValueError("max_abs_diff must be >= 0")
+        if self.return_tolerance is not None and self.return_tolerance < 0.0:
+            raise ValueError("return_tolerance must be >= 0")
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -127,6 +155,11 @@ class BacktestNoRiskSelfCheckSummary:
             "sample_size": self.sample_size,
             "mismatches": self.mismatches,
             "max_abs_diff": self.max_abs_diff,
+            "backend_logical_name": self.backend_logical_name,
+            "backend_implementation_id": self.backend_implementation_id,
+            "direction_mode": self.direction_mode,
+            "trade_count_equal": self.trade_count_equal,
+            "return_tolerance": self.return_tolerance,
         }
 
 
@@ -147,6 +180,10 @@ class BacktestNoRiskExactTelemetry:
     backend_id: str
     arity: int
     status: str
+    backend_logical_name: str | None = None
+    backend_implementation_id: str | None = None
+    metric_names: tuple[str, ...] = ()
+    sample_metrics: Mapping[str, float] | None = None
 
     def __post_init__(self) -> None:
         if self.request_top_n <= 0:
@@ -166,6 +203,15 @@ class BacktestNoRiskExactTelemetry:
             "stage_timings",
             MappingProxyType({str(key): float(value) for key, value in self.stage_timings.items()}),
         )
+        object.__setattr__(self, "metric_names", tuple(str(name) for name in self.metric_names))
+        if self.sample_metrics is not None:
+            object.__setattr__(
+                self,
+                "sample_metrics",
+                MappingProxyType(
+                    {str(key): float(value) for key, value in self.sample_metrics.items()}
+                ),
+            )
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -180,6 +226,12 @@ class BacktestNoRiskExactTelemetry:
             "backend_id": self.backend_id,
             "arity": self.arity,
             "status": self.status,
+            "backend_logical_name": self.backend_logical_name,
+            "backend_implementation_id": self.backend_implementation_id,
+            "metric_names": list(self.metric_names),
+            "sample_metrics": None
+            if self.sample_metrics is None
+            else dict(self.sample_metrics),
         }
 
 

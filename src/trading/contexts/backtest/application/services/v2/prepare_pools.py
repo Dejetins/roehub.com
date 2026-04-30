@@ -329,6 +329,12 @@ class BacktestPreparePoolsService:
                 wall_time_s=subsegments[PREPARE_POOLS_CORE_STAGE_NAME],
                 subsegments=subsegments,
             ),
+            execution_open_1m=np.ascontiguousarray(
+                np.asarray(runtime_arrays.price_arrays_1m.ohlcv[:, 0], dtype=np.float32)
+            ),
+            execution_close_1m=np.ascontiguousarray(
+                np.asarray(runtime_arrays.price_arrays_1m.ohlcv[:, 3], dtype=np.float32)
+            ),
         )
         return result
 
