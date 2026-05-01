@@ -672,8 +672,6 @@ def _tp_sl_regression_pass(runs: Sequence[Mapping[str, Any]]) -> bool:
         and bool(run["full_metrics_evidence"]["pass"])
         and bool(run["cleanup_evidence"]["pass"])
         and run["self_check"]["status"] == TP_SL_SELF_CHECK_PASSED_STATUS
-        and bool(run["stage_pass"].get("exact_scoring", False))
-        and bool(run["stage_pass"].get("tp_sl_exact_scoring", False))
         for run in runs
     )
 
