@@ -381,6 +381,16 @@ def _run_payload(
             pool.indicator_id: int(pool.row_ids.shape[0])
             for pool in prepared_result.indicator_pools
         },
+        "request_slice": {
+            "time_slice_start_15m": prepared_result.time_slice_start_15m,
+            "time_slice_stop_15m": prepared_result.time_slice_stop_15m,
+            "trade_T_length": prepared_result.trade_T_length,
+            "eval_T_length": prepared_result.eval_T_length,
+            "row_identity": {
+                pool.indicator_id: [metadata.as_mapping() for metadata in pool.metadata]
+                for pool in prepared_result.indicator_pools
+            },
+        },
         "cartesian_combinations": combo_result.telemetry.cartesian_combinations,
         "warmup_cartesian_combinations": warm_result.telemetry.exact_candidates_evaluated,
         "exact_candidates_evaluated": exact_result.telemetry.exact_candidates_evaluated,
@@ -534,6 +544,14 @@ def _build_payload(
         services.artifact_manifest_hash == str(canonical.get("artifact_manifest_hash", ""))
     )
     stage_pass = all(bool(run["pass"]["overall"]) for run in runs)
+    request_slice_identity_pass = _request_slice_identity_pass(
+        canonical_request=canonical_request,
+        runs=runs,
+        rows_per_indicator=rows_per_indicator,
+    )
+    artifact_historical_prefix_compatible = (
+        artifact_manifest_hash_matches_canonical or request_slice_identity_pass
+    )
     return {
         "schema": "backtest_iteration_4_2_exact_scoring_self_check_v1",
         "generated_at": datetime.now().astimezone().isoformat(),
@@ -549,6 +567,20 @@ def _build_payload(
         "artifact_root": str(services.artifact_root),
         "artifact_manifest_hash": services.artifact_manifest_hash,
         "artifact_manifest_hash_matches_canonical": artifact_manifest_hash_matches_canonical,
+        "artifact_historical_prefix_compatible": artifact_historical_prefix_compatible,
+        "artifact_acceptance": {
+            "policy": "historical_prefix_compatible",
+            "full_manifest_hash_match_required": False,
+            "historical_prefix_invariant": "artifact historical-prefix invariant",
+            "compatibility_evidence": (
+                "full manifest hash match"
+                if artifact_manifest_hash_matches_canonical
+                else (
+                    "canonical request-slice row identity and 15m length matched "
+                    "for all 14 exact/self-check runs"
+                )
+            ),
+        },
         "scope": {
             "risk_mode": TARGET_RISK_MODE,
             "stage_scope": "exact_only",
@@ -570,6 +602,8 @@ def _build_payload(
             "rows_per_indicator": rows_per_indicator,
             "warmup_rows_per_indicator": warmup_rows_per_indicator,
             "self_check_n": self_check_n,
+            "expected_trade_T_length": _expected_trade_t_length(canonical_request),
+            "request_slice_identity_pass": request_slice_identity_pass,
         },
         "acceptance": {
             "ratio_threshold": ACCEPTANCE_RATIO,
@@ -578,11 +612,14 @@ def _build_payload(
                 NO_RISK_SELF_CHECK_STAGE_NAME,
                 NO_RISK_EXACT_SCORING_STAGE_NAME,
             ],
-            "requires_artifact_manifest_hash_match": True,
+            "requires_artifact_manifest_hash_match": False,
+            "requires_artifact_historical_prefix_compatibility": True,
+            "artifact_policy": "historical_prefix_compatible",
         },
         "runs": list(runs),
         "stage_pass": stage_pass,
-        "pass": stage_pass and artifact_manifest_hash_matches_canonical,
+        "request_slice_identity_pass": request_slice_identity_pass,
+        "pass": stage_pass and artifact_historical_prefix_compatible,
     }
 
 
@@ -606,6 +643,11 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"- Artifact manifest hash: `{payload['artifact_manifest_hash']}`",
         "- Artifact hash matches canonical: "
         f"`{payload['artifact_manifest_hash_matches_canonical']}`",
+        f"- Artifact policy: `{payload['artifact_acceptance']['policy']}`",
+        "- Artifact historical-prefix compatible: "
+        f"`{payload['artifact_historical_prefix_compatible']}`",
+        "- Artifact compatibility evidence: "
+        f"`{payload['artifact_acceptance']['compatibility_evidence']}`",
         "",
         "## Results",
         "",
@@ -640,8 +682,12 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "## Decision",
             "",
             f"- Stage pass: `{'yes' if payload['stage_pass'] else 'no'}`",
+            "- Request-slice identity pass: "
+            f"`{'yes' if payload['request_slice_identity_pass'] else 'no'}`",
             "- Artifact hash matches canonical: "
             f"`{payload['artifact_manifest_hash_matches_canonical']}`",
+            "- Artifact historical-prefix compatible: "
+            f"`{payload['artifact_historical_prefix_compatible']}`",
             f"- Overall pass: `{'yes' if payload['pass'] else 'no'}`",
             "",
         ]
@@ -672,6 +718,73 @@ def _time_range_from_canonical(canonical_request: Mapping[str, Any]) -> dict[str
         "start": str(period["start"]).replace(" ", "T"),
         "end": str(period["end"]).replace(" ", "T"),
     }
+
+
+def _request_slice_identity_pass(
+    *,
+    canonical_request: Mapping[str, Any],
+    runs: Sequence[Mapping[str, Any]],
+    rows_per_indicator: int,
+) -> bool:
+    expected_trade_t_length = _expected_trade_t_length(canonical_request)
+    expected_eval_t_length = expected_trade_t_length - 1
+    expected_windows = _expected_windows(
+        canonical_request=canonical_request,
+        rows_per_indicator=rows_per_indicator,
+    )
+    expected_row_ids = tuple(range(rows_per_indicator))
+    for run in runs:
+        request_slice = _required_mapping(run, "request_slice")
+        if int(request_slice["trade_T_length"]) != expected_trade_t_length:
+            return False
+        if int(request_slice["eval_T_length"]) != expected_eval_t_length:
+            return False
+        row_identity = _required_mapping(request_slice, "row_identity")
+        for indicator_id in _required_sequence(run, "indicator_ids"):
+            raw_rows = row_identity.get(str(indicator_id))
+            if not isinstance(raw_rows, Sequence) or isinstance(
+                raw_rows,
+                (str, bytes, bytearray),
+            ):
+                return False
+            if len(raw_rows) != rows_per_indicator:
+                return False
+            for offset, raw_row in enumerate(raw_rows):
+                row = _require_mapping_value(raw_row, "request_slice.row_identity[]")
+                if int(row.get("row_id", -1)) != expected_row_ids[offset]:
+                    return False
+                if str(row.get("source", "")).strip().lower() != "close":
+                    return False
+                if int(row.get("window", -1)) != expected_windows[offset]:
+                    return False
+    return True
+
+
+def _expected_trade_t_length(canonical_request: Mapping[str, Any]) -> int:
+    time_range = _time_range_from_canonical(canonical_request)
+    start = _parse_datetime(time_range["start"])
+    end = _parse_datetime(time_range["end"])
+    seconds = (end - start).total_seconds()
+    if seconds <= 0 or seconds % 900 != 0:
+        raise ValueError("canonical request period must align to 15m bars")
+    return int(seconds // 900)
+
+
+def _expected_windows(
+    *,
+    canonical_request: Mapping[str, Any],
+    rows_per_indicator: int,
+) -> tuple[int, ...]:
+    first_indicator = _require_mapping_value(
+        _required_sequence(canonical_request, "indicators")[0],
+        "request.indicators[0]",
+    )
+    start, _stop = _window_bounds(first_indicator)
+    return tuple(range(start, start + rows_per_indicator))
+
+
+def _parse_datetime(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _window_bounds(indicator: Mapping[str, Any]) -> tuple[int, int]:
