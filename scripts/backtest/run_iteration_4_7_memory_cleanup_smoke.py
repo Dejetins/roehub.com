@@ -286,8 +286,10 @@ def _build_payload(
     warmup_runs: int,
     self_check_n: int,
 ) -> dict[str, Any]:
-    retained_after_cleanup = [int(run["rss_after_cleanup"]) for run in runs]
-    monotonic_retained_rss_growth = _strictly_increasing(retained_after_cleanup)
+    retained_rss_deltas = [int(run["retained_rss_delta"]) for run in runs]
+    rss_after_cleanup_values = [int(run["rss_after_cleanup"]) for run in runs]
+    monotonic_retained_rss_growth = _strictly_increasing(retained_rss_deltas)
+    monotonic_rss_after_cleanup_growth = _strictly_increasing(rss_after_cleanup_values)
     worker_recycled = False
     compact_results = all(bool(run["result_compact"]) for run in runs)
     pass_payload = {
@@ -351,8 +353,17 @@ def _build_payload(
             "max_cleanup_duration_s": max(
                 float(run["cleanup_duration_s"] or 0.0) for run in runs
             ),
+            "retained_rss_delta_series": retained_rss_deltas,
+            "retained_rss_delta_series_mb": [
+                _bytes_to_mib(value) for value in retained_rss_deltas
+            ],
+            "rss_after_cleanup_series": rss_after_cleanup_values,
+            "rss_after_cleanup_series_mb": [
+                _bytes_to_mib(value) for value in rss_after_cleanup_values
+            ],
             "repeated_run_count": len(runs),
             "monotonic_retained_rss_growth": monotonic_retained_rss_growth,
+            "monotonic_rss_after_cleanup_growth": monotonic_rss_after_cleanup_growth,
             "worker_recycled": worker_recycled,
             "worker_recycle_applicable": False,
             "pass": pass_payload["overall"],
@@ -364,8 +375,8 @@ def _build_payload(
                 "notebook stage"
             ),
             "pass_definition": (
-                "compact result DTOs and no monotonic retained RSS growth across "
-                "at least three same-process runs, or proven worker recycle"
+                "compact result DTOs and no monotonic retained_rss_delta growth "
+                "across at least three same-process runs, or proven worker recycle"
             ),
         },
         "runs": runs,
@@ -433,8 +444,14 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"| rss_peak_mb | {float(evidence['rss_peak_mb']):.3f} |",
         f"| rss_after_cleanup_mb | {float(evidence['rss_after_cleanup_mb']):.3f} |",
         f"| retained_rss_delta_mb | {float(evidence['retained_rss_delta_mb']):.3f} |",
+        "| retained_rss_delta_series_mb | "
+        f"`{_format_float_series(evidence['retained_rss_delta_series_mb'])}` |",
+        "| rss_after_cleanup_series_mb | "
+        f"`{_format_float_series(evidence['rss_after_cleanup_series_mb'])}` |",
         f"| repeated_run_count | {int(evidence['repeated_run_count'])} |",
         f"| monotonic_retained_rss_growth | `{evidence['monotonic_retained_rss_growth']}` |",
+        "| monotonic_rss_after_cleanup_growth | "
+        f"`{evidence['monotonic_rss_after_cleanup_growth']}` |",
         f"| worker_recycled | `{evidence['worker_recycled']}` |",
         f"| pass | `{evidence['pass']}` |",
         "",
@@ -464,8 +481,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "",
             f"- Overall pass: `{'yes' if payload['pass'] else 'no'}`",
             "- macOS RSS note: allocator caches may keep RSS above the starting value; "
-            "this evidence checks retained RSS trend and compact DTOs rather than "
-            "expecting immediate OS return.",
+            "this evidence checks the per-run `retained_rss_delta` trend and compact "
+            "DTOs rather than expecting immediate OS return.",
             "",
         ]
     )
@@ -504,6 +521,12 @@ def _strictly_increasing(values: list[int]) -> bool:
 
 def _bytes_to_mib(value: int | float) -> float:
     return float(value) / float(BYTES_PER_MIB)
+
+
+def _format_float_series(values: object) -> str:
+    if not isinstance(values, list):
+        return str(values)
+    return ", ".join(f"{float(value):.3f}" for value in values)
 
 
 def _contains_ndarray(value: object) -> bool:
