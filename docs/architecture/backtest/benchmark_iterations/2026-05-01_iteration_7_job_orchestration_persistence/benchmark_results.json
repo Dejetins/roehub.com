@@ -1,0 +1,169 @@
+{
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+  "artifact_policy": "historical_prefix_compatible",
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-02T00:17:04.507777+03:00",
+  "git_commit": "3a3fa3535e9ad0121294b5692ab19368f8f74d03",
+  "git_status_short": "runtime-copy-no-git",
+  "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
+  "host": "MacStudioDaniil",
+  "pass": true,
+  "pass_breakdown": {
+    "cleanup": true,
+    "persist_top_n_io": true,
+    "summary_only": true,
+    "top_result_assembly": true
+  },
+  "python": "3.12.13",
+  "request": {
+    "arity": 1,
+    "benchmark_top_k": 5,
+    "direction_mode": "long_short_reversal",
+    "rows_per_indicator": 6,
+    "sample_warmup_top_k": 1,
+    "self_check_n": 1,
+    "top_n": 100
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "cleanup_evidence": {
+        "checked_reference_names": [
+          "prepared_result",
+          "combo_planning_result",
+          "prepared_pools",
+          "exact_context",
+          "proxy_context",
+          "execution_open_1m",
+          "execution_close_1m",
+          "selected_batches_iter",
+          "metric_buffers",
+          "heap"
+        ],
+        "cleanup_duration_s": 1.9169965526089072e-06,
+        "result_contains_heavy_references": false,
+        "result_is_compact": true,
+        "retained_heavy_reference_names": []
+      },
+      "direction_mode": "long_short_reversal",
+      "pass": true,
+      "persisted_top_n_summary_hash": "fc524c81a09a31ef2d61c36a66ef5adee0bc07dee3c2dcc3085f06b225e10eef",
+      "persistence": {
+        "bytes": 12615,
+        "rows": 5,
+        "summary_hash": "fc524c81a09a31ef2d61c36a66ef5adee0bc07dee3c2dcc3085f06b225e10eef",
+        "summary_only": true,
+        "wall_s": 9.929199586622417e-05
+      },
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "process_maxrss_raw": 490684416
+      },
+      "timers": {
+        "artifact_array_mmap_load": 0.02837070799432695,
+        "artifact_array_open": 0.02837070799432695,
+        "artifact_context_resolve": 0.06699500000104308,
+        "artifact_manifest_load": 0.06699500000104308,
+        "build_exact_context": 0.0004461250064196065,
+        "build_proxy_context": 8.666000212542713e-06,
+        "combo_iteration": 1.8999999156221747e-05,
+        "exact_scoring": 0.0019572500023059547,
+        "heap_update": 2.6292007532902062e-05,
+        "no_risk_exact_boundary": 2.3625005269423127e-05,
+        "persist_top_n_io": 9.929199586622417e-05,
+        "prepare_pools_core": 0.11083245900226757,
+        "prepare_pools_total": 0.21950125000148546,
+        "proxy_filter": 5.9589947341009974e-06,
+        "request_slice_prepare": 0.0010171250032726675,
+        "row_prefilter": 0.09342808299697936,
+        "segment_build": 0.010519125004066154,
+        "self_check": 0.08226441599254031,
+        "service_total_without_warmup": 0.09344104099727701,
+        "signal_row_selection": 0.0068774160026805475,
+        "time_range_slice": 0.0010171250032726675,
+        "top_result_assembly": 0.000938915996812284,
+        "top_result_proxy_fill": 0.007548416993813589
+      },
+      "top_results_count": 5,
+      "top_results_summary_hash": "dcfcde6d51857edfe09b3389b6ef070693948acc16b2dc98df4eda02d490f8fd"
+    },
+    {
+      "arity": 1,
+      "cleanup_evidence": {
+        "hit_times": {
+          "retained_hit_times_grid_arrays": false,
+          "retained_hit_times_table_arrays": false,
+          "retained_materialized_subset": true,
+          "status": "success"
+        },
+        "tp_sl_exact": {
+          "checked_reference_names": [
+            "prepared_result",
+            "combo_planning_result",
+            "hit_times_subset",
+            "tp_sl_diff_buffers",
+            "score_arrays",
+            "selected_top_rows",
+            "heap"
+          ],
+          "cleanup_duration_s": 0.0001915829925565049,
+          "result_contains_heavy_references": false,
+          "result_is_compact": true,
+          "retained_heavy_reference_names": []
+        }
+      },
+      "direction_mode": "long_short_reversal",
+      "pass": true,
+      "persisted_top_n_summary_hash": "154669517f1d221907be5b76ec6055245c29a3db418fb9b37f2f7ba301bd0934",
+      "persistence": {
+        "bytes": 14233,
+        "rows": 5,
+        "summary_hash": "154669517f1d221907be5b76ec6055245c29a3db418fb9b37f2f7ba301bd0934",
+        "summary_only": true,
+        "wall_s": 0.00010929199925158173
+      },
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "process_maxrss_raw": 782204928
+      },
+      "timers": {
+        "artifact_array_mmap_load": 0.0021374589996412396,
+        "artifact_array_open": 0.0021374589996412396,
+        "artifact_context_resolve": 0.06689816700236406,
+        "artifact_manifest_load": 0.06689816700236406,
+        "build_exact_context": 0.00034574999881442636,
+        "build_proxy_context": 9.41699545364827e-06,
+        "combo_iteration": 1.5416982932947576e-05,
+        "exact_scoring": 0.007926082995254546,
+        "heap_update": 0.0018965419876622036,
+        "load_hit_times": 0.04426083399448544,
+        "persist_top_n_io": 0.00010929199925158173,
+        "prepare_pools_core": 0.025443958002142608,
+        "prepare_pools_total": 0.10649462499713991,
+        "proxy_filter": 6.166999810375273e-06,
+        "request_slice_prepare": 0.0008789580024313182,
+        "row_prefilter": 0.009461125009693205,
+        "segment_build": 0.009530916999210604,
+        "self_check": 0.9536625420005294,
+        "service_total_without_warmup": 2.1313350010022987,
+        "signal_row_selection": 0.0064470000070286915,
+        "time_range_slice": 0.0008789580024313182,
+        "top_result_assembly": 0.0009204999951180071,
+        "tp_sl_exact_boundary": 0.002190457991673611,
+        "tp_sl_exact_scoring": 0.007926082995254546,
+        "tp_sl_full_metrics_second_pass": 1.1639113340061158,
+        "tp_sl_grid_validation": 0.0016457500023534521
+      },
+      "top_results_count": 5,
+      "top_results_summary_hash": "7f22b48c41fd2df0e08e0ed518e3ed201c3a75c4cca07f17faf2ee2eef42e9ee"
+    }
+  ],
+  "schema": "backtest_iteration_7_job_orchestration_persistence_v1",
+  "service_only_stages": [
+    "top_result_assembly",
+    "persist_top_n_io",
+    "service_total_without_warmup"
+  ]
+}
