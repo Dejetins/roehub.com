@@ -1,0 +1,2309 @@
+{
+  "acceptance": {
+    "artifact_policy": "historical_prefix_compatible",
+    "proxy_score_tolerance": 1e-05,
+    "requires_artifact_historical_prefix_compatibility": true,
+    "requires_artifact_manifest_hash_match": false,
+    "requires_measured_stage_boundary_clean": true,
+    "requires_proxy_metadata_parity": true,
+    "requires_semantic_metric_parity": true,
+    "requires_shape_match": true,
+    "requires_strict_result_hash_or_waiver": true,
+    "requires_top_result_identity_match": true,
+    "semantic_float_tolerance": 1e-09,
+    "semantic_relative_tolerance": 1e-12
+  },
+  "artifact_acceptance": {
+    "compatibility_evidence": "canonical request-slice top identity, semantic metrics, and proxy metadata matched for all 14 result-shape runs",
+    "full_manifest_hash_match_required": false,
+    "historical_prefix_invariant": "artifact historical-prefix invariant",
+    "policy": "historical_prefix_compatible"
+  },
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_historical_prefix_compatible": true,
+  "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+  "artifact_manifest_hash_matches_canonical": false,
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "canonical_artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-01T16:00:04.916705+03:00",
+  "git_commit": "2d42a2f70f8f62ff7137491446fe12fafd3b8ee8",
+  "git_status_short": "runtime-copy-no-git",
+  "host": "MacStudioDaniil",
+  "measured_stage_boundary_clean": true,
+  "pass": true,
+  "pass_count": {
+    "measured_stage_timings_unchanged": "14 / 14",
+    "proxy metadata parity": "14 / 14",
+    "semantic metric parity": "14 / 14",
+    "shape": "14 / 14",
+    "strict result hash": "14 / 14",
+    "strict_hash_or_waiver": "14 / 14",
+    "top_identity": "14 / 14"
+  },
+  "proxy_metadata_parity_pass": true,
+  "python": "3.12.13",
+  "request": {
+    "benchmark_top_k": 5,
+    "heap_capacity_values": [
+      5
+    ],
+    "rows_per_indicator": 6,
+    "sample_warmup_top_k": 1,
+    "self_check_n": 2,
+    "top_n": 100,
+    "top_results_count_values": [
+      5
+    ],
+    "warmup_rows_per_indicator": 2
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "e0434a0b895f7ae354aa0ed7df633379ec69efa9e053b69c4bea1aaaec50dcb3",
+        "service": "e0434a0b895f7ae354aa0ed7df633379ec69efa9e053b69c4bea1aaaec50dcb3",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 1.8958999135065824e-05,
+        "result_serialization_normalization": 0.00019695900118676946,
+        "sample_warmup": 3.810665999997582,
+        "top_result_proxy_fill": 0.007572333997813985
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "2fad97724afb919ec9477e195f58a5f31182d44cd36b0f3d9e1590782b81d485",
+        "service": "2fad97724afb919ec9477e195f58a5f31182d44cd36b0f3d9e1590782b81d485",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 5.40409964742139e-05,
+        "result_serialization_normalization": 0.0002020839965553023,
+        "sample_warmup": 3.7905978329945356,
+        "top_result_proxy_fill": 0.0025782500015338883
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            109385,
+            -125.96622467041016
+          ],
+          [
+            109601,
+            -126.387451171875
+          ],
+          [
+            109619,
+            -126.73922729492188
+          ],
+          [
+            109692,
+            -127.1106948852539
+          ],
+          [
+            109690,
+            -126.56442260742188
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            109385,
+            -125.96622467041016
+          ],
+          [
+            109601,
+            -126.387451171875
+          ],
+          [
+            109619,
+            -126.73922729492188
+          ],
+          [
+            109692,
+            -127.1106948852539
+          ],
+          [
+            109690,
+            -126.56442260742188
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "9d8ea2ca3b811abeda33c25c99ba70c57ad0d551d6c8a84799368fb752ecec8d",
+        "service": "9d8ea2ca3b811abeda33c25c99ba70c57ad0d551d6c8a84799368fb752ecec8d",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.0002374579999013804,
+        "result_serialization_normalization": 0.00025266699958592653,
+        "sample_warmup": 0.024157166997611057,
+        "top_result_proxy_fill": 0.009803458000533283
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            79228,
+            -92.30244445800781
+          ],
+          [
+            81249,
+            -94.72787475585938
+          ],
+          [
+            83504,
+            -97.41728210449219
+          ],
+          [
+            85988,
+            -100.3876953125
+          ],
+          [
+            88676,
+            -103.42484283447266
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            79228,
+            -92.30244445800781
+          ],
+          [
+            81249,
+            -94.72787475585938
+          ],
+          [
+            83504,
+            -97.41728210449219
+          ],
+          [
+            85988,
+            -100.3876953125
+          ],
+          [
+            88676,
+            -103.42484283447266
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "b8a28bb93737fb3b50ab5c16225f0977b01f5d09155848835400347eeaff785f",
+        "service": "b8a28bb93737fb3b50ab5c16225f0977b01f5d09155848835400347eeaff785f",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.0014133329968899488,
+        "result_serialization_normalization": 0.0003037089991266839,
+        "sample_warmup": 0.036447250000492204,
+        "top_result_proxy_fill": 0.012122000000090338
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            76820,
+            -89.38124084472656
+          ],
+          [
+            77503,
+            -90.26830291748047
+          ],
+          [
+            77939,
+            -90.69127655029297
+          ],
+          [
+            78131,
+            -90.8143539428711
+          ],
+          [
+            77912,
+            -90.73274230957031
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            76820,
+            -89.38124084472656
+          ],
+          [
+            77503,
+            -90.26830291748047
+          ],
+          [
+            77939,
+            -90.69127655029297
+          ],
+          [
+            78131,
+            -90.8143539428711
+          ],
+          [
+            77912,
+            -90.73274230957031
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "48f398d98236b4d1b42326e9cae04b792f0918597a7ddc83201a7d7318958e8e",
+        "service": "48f398d98236b4d1b42326e9cae04b792f0918597a7ddc83201a7d7318958e8e",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.01146650099690305,
+        "result_serialization_normalization": 0.0003504170017549768,
+        "sample_warmup": 0.022747458002413623,
+        "top_result_proxy_fill": 0.013091332999465521
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47772,
+            -56.019954681396484
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47772,
+            -56.019954681396484
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "a03ed0afb60ceb608e76b2598009606a46aa57dae0afd500d8b8059ed42d91b9",
+        "service": "a03ed0afb60ceb608e76b2598009606a46aa57dae0afd500d8b8059ed42d91b9",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.07445229399309028,
+        "result_serialization_normalization": 0.0004074159951414913,
+        "sample_warmup": 0.03449837499647401,
+        "top_result_proxy_fill": 0.014581125004042406
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            40173,
+            -47.37158966064453
+          ],
+          [
+            41398,
+            -48.5816764831543
+          ],
+          [
+            42780,
+            -50.142860412597656
+          ],
+          [
+            44439,
+            -52.1949348449707
+          ],
+          [
+            46159,
+            -54.10445785522461
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            40173,
+            -47.37158966064453
+          ],
+          [
+            41398,
+            -48.5816764831543
+          ],
+          [
+            42780,
+            -50.142860412597656
+          ],
+          [
+            44439,
+            -52.1949348449707
+          ],
+          [
+            46159,
+            -54.10445785522461
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "489322dd5b8a2c71c656beebc1f46ca45f68942f9c605ece6b43af49e9bb65b4",
+        "service": "489322dd5b8a2c71c656beebc1f46ca45f68942f9c605ece6b43af49e9bb65b4",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.4935412089835154,
+        "result_serialization_normalization": 0.0004738749994430691,
+        "sample_warmup": 0.08711025000229711,
+        "top_result_proxy_fill": 0.016363124996132683
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            34506,
+            -41.24724578857422
+          ],
+          [
+            31602,
+            -37.56538009643555
+          ],
+          [
+            32783,
+            -38.961402893066406
+          ],
+          [
+            28717,
+            -34.084712982177734
+          ],
+          [
+            32317,
+            -37.9571533203125
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            34506,
+            -41.24724578857422
+          ],
+          [
+            31602,
+            -37.56538009643555
+          ],
+          [
+            32783,
+            -38.961402893066406
+          ],
+          [
+            28717,
+            -34.084712982177734
+          ],
+          [
+            32317,
+            -37.9571533203125
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "268ad29fa2e1a3d8da0b91442d538fe95ed7d150f151306f71013c6e8bdc0249",
+        "service": "268ad29fa2e1a3d8da0b91442d538fe95ed7d150f151306f71013c6e8bdc0249",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 2.779100032057613e-05,
+        "result_serialization_normalization": 0.0001800419995561242,
+        "sample_warmup": 0.08367720800015377,
+        "top_result_proxy_fill": 0.007689750003919471
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "856f7aa6a5a42ac32edce2c9cf126b8871a43ec6416c3d5e2496f5cff828e0ad",
+        "service": "856f7aa6a5a42ac32edce2c9cf126b8871a43ec6416c3d5e2496f5cff828e0ad",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 5.787499685538933e-05,
+        "result_serialization_normalization": 0.0002430420063319616,
+        "sample_warmup": 0.019351249997271225,
+        "top_result_proxy_fill": 0.002962665996165015
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            109217,
+            -122.54962921142578
+          ],
+          [
+            109180,
+            -122.68852233886719
+          ],
+          [
+            109301,
+            -122.56288146972656
+          ],
+          [
+            109288,
+            -122.88823699951172
+          ],
+          [
+            109214,
+            -123.07896423339844
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            109217,
+            -122.54962921142578
+          ],
+          [
+            109180,
+            -122.68852233886719
+          ],
+          [
+            109301,
+            -122.56288146972656
+          ],
+          [
+            109288,
+            -122.88823699951172
+          ],
+          [
+            109214,
+            -123.07896423339844
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "973ae53048345c7a86a5539b63c661379c86278732ffff4df1d91bb4e0ca613e",
+        "service": "973ae53048345c7a86a5539b63c661379c86278732ffff4df1d91bb4e0ca613e",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.00020170799689367414,
+        "result_serialization_normalization": 0.0002613750039017759,
+        "sample_warmup": 0.025649875002272893,
+        "top_result_proxy_fill": 0.011211958000785671
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            74037,
+            -83.59858703613281
+          ],
+          [
+            75810,
+            -85.56597900390625
+          ],
+          [
+            77819,
+            -87.91912078857422
+          ],
+          [
+            80232,
+            -90.6368637084961
+          ],
+          [
+            83176,
+            -93.95013427734375
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            74037,
+            -83.59858703613281
+          ],
+          [
+            75810,
+            -85.56597900390625
+          ],
+          [
+            77819,
+            -87.91912078857422
+          ],
+          [
+            80232,
+            -90.6368637084961
+          ],
+          [
+            83176,
+            -93.95013427734375
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "b9d61cb0bae9ac87f15fad6b06cb84c2ad445b7ae3f3ad40e0f26c97028e1d92",
+        "service": "b9d61cb0bae9ac87f15fad6b06cb84c2ad445b7ae3f3ad40e0f26c97028e1d92",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.001215000003867317,
+        "result_serialization_normalization": 0.0003212079973309301,
+        "sample_warmup": 0.036165125005936716,
+        "top_result_proxy_fill": 0.013821792003000155
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            70114,
+            -79.01168060302734
+          ],
+          [
+            70838,
+            -79.75386047363281
+          ],
+          [
+            71524,
+            -80.65699005126953
+          ],
+          [
+            72068,
+            -81.25873565673828
+          ],
+          [
+            72614,
+            -81.9129409790039
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            70114,
+            -79.01168060302734
+          ],
+          [
+            70838,
+            -79.75386047363281
+          ],
+          [
+            71524,
+            -80.65699005126953
+          ],
+          [
+            72068,
+            -81.25873565673828
+          ],
+          [
+            72614,
+            -81.9129409790039
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "1640b5685d457229d5feedd45f09c5fca7cf905066a45625bf76c9f934a4be03",
+        "service": "1640b5685d457229d5feedd45f09c5fca7cf905066a45625bf76c9f934a4be03",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.007893207999586593,
+        "result_serialization_normalization": 0.0003571660054149106,
+        "sample_warmup": 0.026678999995056074,
+        "top_result_proxy_fill": 0.012228875006258022
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            17131,
+            -19.21197509765625
+          ],
+          [
+            14569,
+            -16.491043090820312
+          ],
+          [
+            17295,
+            -19.389728546142578
+          ],
+          [
+            14698,
+            -16.639692306518555
+          ],
+          [
+            17437,
+            -19.64826774597168
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            17131,
+            -19.21197509765625
+          ],
+          [
+            14569,
+            -16.491043090820312
+          ],
+          [
+            17295,
+            -19.389728546142578
+          ],
+          [
+            14698,
+            -16.639692306518555
+          ],
+          [
+            17437,
+            -19.64826774597168
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "6c64c6945a1ab995d77bb2e1dd6a0c66c52d407d5eec439b5bc5cda2a5fd7e4e",
+        "service": "6c64c6945a1ab995d77bb2e1dd6a0c66c52d407d5eec439b5bc5cda2a5fd7e4e",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.05420175199833466,
+        "result_serialization_normalization": 0.00041570799658074975,
+        "sample_warmup": 0.036863875000562984,
+        "top_result_proxy_fill": 0.013180541995097883
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            15075,
+            -16.709529876708984
+          ],
+          [
+            15423,
+            -17.079225540161133
+          ],
+          [
+            15829,
+            -17.513822555541992
+          ],
+          [
+            16299,
+            -18.175764083862305
+          ],
+          [
+            16831,
+            -18.877201080322266
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            15075,
+            -16.709529876708984
+          ],
+          [
+            15423,
+            -17.079225540161133
+          ],
+          [
+            15829,
+            -17.513822555541992
+          ],
+          [
+            16299,
+            -18.175764083862305
+          ],
+          [
+            16831,
+            -18.877201080322266
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "hash_waiver": {
+        "eligible": false,
+        "reason": "strict result hash matched; waiver not used",
+        "waived_fields": []
+      },
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "measured_stage_timings_unchanged": true,
+        "overall": true,
+        "proxy_metadata": true,
+        "semantic_metrics": true,
+        "shape": true,
+        "strict_hash_or_waiver": true,
+        "strict_result_hash": true,
+        "top_identity": true
+      },
+      "request_top_n": 100,
+      "result_hash": {
+        "algorithm": "canonical_json_hash(top_results)",
+        "canonical": "5fbb8fb598e4c34e8d73de296e26e641210152de9518055775228dce0303c6c8",
+        "service": "5fbb8fb598e4c34e8d73de296e26e641210152de9518055775228dce0303c6c8",
+        "strict result hash": true
+      },
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.36055629298789427,
+        "result_serialization_normalization": 0.0004708339984063059,
+        "sample_warmup": 0.08374579099472612,
+        "top_result_proxy_fill": 0.014250082997023128
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            14046,
+            -15.82341194152832
+          ],
+          [
+            12547,
+            -14.245820045471191
+          ],
+          [
+            13444,
+            -14.94339370727539
+          ],
+          [
+            10927,
+            -11.998102188110352
+          ],
+          [
+            14354,
+            -16.18408966064453
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            14046,
+            -15.82341194152832
+          ],
+          [
+            12547,
+            -14.245820045471191
+          ],
+          [
+            13444,
+            -14.94339370727539
+          ],
+          [
+            10927,
+            -11.998102188110352
+          ],
+          [
+            14354,
+            -16.18408966064453
+          ]
+        ]
+      },
+      "top_results_count": 5
+    }
+  ],
+  "schema": "backtest_iteration_4_5_result_shape_hash_parity_v1",
+  "scope": {
+    "implemented_stages": [
+      "result_hash_normalization"
+    ],
+    "not_implemented_stages": [
+      "exact_scoring",
+      "heap_update",
+      "top_result_proxy_fill",
+      "persistence",
+      "public_api_identity",
+      "lazy_trades"
+    ],
+    "risk_mode": "none",
+    "stage_scope": "result_shape_hash_only"
+  },
+  "semantic_metric_parity_pass": true,
+  "shape_pass": true,
+  "strict_hash_or_waiver_pass": true,
+  "strict_result_hash_pass": true,
+  "top_identity_pass": true
+}
