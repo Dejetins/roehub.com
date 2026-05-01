@@ -5,6 +5,11 @@ from typing import Any
 from pydantic import BaseModel
 
 from trading.contexts.backtest.application.dto import (
+    BacktestJobCreateResult,
+    BacktestJobListResult,
+    BacktestJobReadModel,
+    BacktestJobTopResult,
+    BacktestJobTopVariantReadModel,
     BacktestPreflightResult,
     BacktestRuntimeDefaults,
 )
@@ -44,6 +49,60 @@ class BacktestPreflightResponse(BaseModel):
     errors: list[dict[str, str]]
 
 
+class BacktestJobProgressResponse(BaseModel):
+    pipeline_stage: str
+    percent: int
+    processed_units: int
+    total_units: int
+    updated_at: str | None
+
+
+class BacktestJobResponse(BaseModel):
+    """
+    API response model for public `/backtests/jobs` job reads.
+    """
+
+    job_id: str
+    state: str
+    request_hash: str
+    result_config_hash: str
+    artifact_metadata: dict[str, Any]
+    progress: BacktestJobProgressResponse
+    request: dict[str, Any]
+    requested_top_n: int | None
+    ranking: dict[str, Any]
+    created_at: str
+    started_at: str | None
+    finished_at: str | None
+    updated_at: str
+    terminal_summary: dict[str, Any]
+    links: dict[str, Any]
+    idempotent_replay: bool | None = None
+
+
+class BacktestJobsListResponse(BaseModel):
+    items: list[BacktestJobResponse]
+    next_cursor: str | None
+
+
+class BacktestTopVariantResponse(BaseModel):
+    rank: int
+    variant_key: str
+    variant_hash: str
+    indicator_variant_hash: str | None
+    summary_metrics: dict[str, Any]
+    best_tp_pct: float | None
+    best_sl_pct: float | None
+    canonical_variant_params: dict[str, Any]
+    readable_params: dict[str, Any]
+    links: dict[str, Any]
+    actions: dict[str, Any]
+
+
+class BacktestTopVariantsResponse(BaseModel):
+    items: list[BacktestTopVariantResponse]
+
+
 def build_backtest_runtime_defaults_response(
     *,
     defaults: BacktestRuntimeDefaults,
@@ -58,9 +117,46 @@ def build_backtest_preflight_response(
     return BacktestPreflightResponse.model_validate(result.as_mapping())
 
 
+def build_backtest_job_response(
+    *,
+    result: BacktestJobCreateResult | BacktestJobReadModel,
+) -> BacktestJobResponse:
+    return BacktestJobResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_jobs_list_response(
+    *,
+    result: BacktestJobListResult,
+) -> BacktestJobsListResponse:
+    return BacktestJobsListResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_top_variants_response(
+    *,
+    result: BacktestJobTopResult,
+) -> BacktestTopVariantsResponse:
+    return BacktestTopVariantsResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_top_variant_response(
+    *,
+    result: BacktestJobTopVariantReadModel,
+) -> BacktestTopVariantResponse:
+    return BacktestTopVariantResponse.model_validate(result.as_mapping())
+
+
 __all__ = [
+    "BacktestJobProgressResponse",
+    "BacktestJobResponse",
+    "BacktestJobsListResponse",
     "BacktestPreflightResponse",
     "BacktestRuntimeDefaultsResponse",
+    "BacktestTopVariantResponse",
+    "BacktestTopVariantsResponse",
+    "build_backtest_job_response",
+    "build_backtest_jobs_list_response",
     "build_backtest_preflight_response",
     "build_backtest_runtime_defaults_response",
+    "build_backtest_top_variant_response",
+    "build_backtest_top_variants_response",
 ]

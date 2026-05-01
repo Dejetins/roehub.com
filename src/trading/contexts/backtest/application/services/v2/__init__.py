@@ -23,6 +23,12 @@ from .combo_planning import (
     proxy_prefilter_combos_chunk_n,
     proxy_prefilter_combos_chunk_two,
 )
+from .job_orchestration import (
+    PERSIST_TOP_N_IO_STAGE_NAME,
+    SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME,
+    BacktestJobExecutionResult,
+    BacktestRuntimeJobOrchestrationService,
+)
 from .no_risk_exact import (
     CANONICAL_EXECUTION_TIMEFRAME_V1,
     NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
@@ -92,6 +98,11 @@ from .prepare_pools import (
     row_metadata_order_hash,
     time_range_slice,
     topk_fraction_idx,
+)
+from .top_result_assembly import (
+    TOP_RESULT_ASSEMBLY_STAGE_NAME,
+    BacktestTopResultAssemblyResult,
+    BacktestTopResultAssemblyService,
 )
 from .tp_sl_exact import (
     TP_SL_EXACT_BOUNDARY_STAGE_NAME,
@@ -163,6 +174,8 @@ __all__ = [
     "NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME",
     "NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME",
     "PROXY_FILTER_STAGE_NAME",
+    "PERSIST_TOP_N_IO_STAGE_NAME",
+    "SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME",
     "STREAMING_2_NO_RISK_BACKEND",
     "TARGET_TP_SL_GRID_START_PCT",
     "TARGET_TP_SL_GRID_STEP_PCT",
@@ -177,6 +190,7 @@ __all__ = [
     "TP_SL_SELF_CHECK_PASSED_STATUS",
     "TP_SL_SELF_CHECK_STAGE_NAME",
     "TP_SL_GRID_VALIDATION_STAGE_NAME",
+    "TOP_RESULT_ASSEMBLY_STAGE_NAME",
     "BacktestBackendRegistry",
     "BacktestComboPlanningRejected",
     "BacktestComboPlanningService",
@@ -192,11 +206,15 @@ __all__ = [
     "BacktestPreflightService",
     "BacktestRuntimeConfig",
     "BacktestRuntimeDefaultsService",
+    "BacktestJobExecutionResult",
+    "BacktestRuntimeJobOrchestrationService",
     "BacktestTpSlExactRejected",
     "BacktestTpSlExactScoringService",
     "BacktestTpSlSelfCheckFailed",
     "BacktestTpSlHitTimesRejected",
     "BacktestTpSlHitTimesService",
+    "BacktestTopResultAssemblyResult",
+    "BacktestTopResultAssemblyService",
     "PREPARE_POOLS_CORE_STAGE_NAME",
     "PREPARE_POOLS_TOTAL_STAGE_NAME",
     "REQUEST_SLICE_PREPARE_SEGMENT",

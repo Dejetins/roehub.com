@@ -147,6 +147,97 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
+    def find_by_idempotency_key(
+        self,
+        *,
+        user_id: UserId,
+        idempotency_key_hash: str,
+        created_after: datetime,
+    ) -> BacktestJob | None:
+        """
+        Find durable owner job snapshot for one v1 idempotency key hash inside its TTL.
+
+        Args:
+            user_id: Job owner identifier.
+            idempotency_key_hash: SHA-256 hash of the public `Idempotency-Key` value.
+            created_after: Lower bound for TTL-compatible replay lookup.
+        Returns:
+            BacktestJob | None: Existing job snapshot or `None`.
+        Assumptions:
+            New v1 rows persist idempotency metadata under
+            `request_json.idempotency.key_hash`.
+        Raises:
+            ValueError: If storage read fails.
+        Side Effects:
+            Reads at most one row from `backtest_jobs`.
+        """
+        ...
+
+    def claim_for_inline_execution(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        lease_expires_at: datetime,
+    ) -> BacktestJob | None:
+        """
+        Claim one just-created queued job for sync-inline execution.
+
+        Args:
+            job_id: Job identifier.
+            user_id: Owner identifier.
+            now: Claim timestamp.
+            locked_by: Inline worker owner literal.
+            lease_expires_at: Lease expiry timestamp.
+        Returns:
+            BacktestJob | None: Running snapshot or `None` if state/owner changed.
+        Assumptions:
+            Sync-inline v1 still persists the running lifecycle state before compute.
+        Raises:
+            ValueError: If storage write/read fails.
+        Side Effects:
+            Updates one row from `queued` to `running`.
+        """
+        ...
+
+    def finish_with_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        next_state: BacktestJobState,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+        last_error: str | None = None,
+        last_error_json: BacktestJobErrorPayload | None = None,
+    ) -> BacktestJob | None:
+        """
+        Finish a running inline job and persist summary-only top rows atomically.
+
+        Args:
+            job_id: Job identifier.
+            user_id: Owner identifier.
+            now: Terminal timestamp.
+            locked_by: Expected inline worker owner literal.
+            next_state: Terminal state.
+            top_variants: Summary-only rows for succeeded jobs.
+            last_error: Failure text when `next_state='failed'`.
+            last_error_json: Failure payload when `next_state='failed'`.
+        Returns:
+            BacktestJob | None: Terminal job snapshot or `None` when lease/owner changed.
+        Assumptions:
+            Storage `BacktestJobTopVariant.variant_key` remains SHA-only; public readable
+            key is carried inside `payload_json.public_variant_key`.
+        Raises:
+            ValueError: If storage write/read fails.
+        Side Effects:
+            Updates one job row and inserts zero or more top rows.
+        """
+        ...
+
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
         """
         Load job snapshot by id with optional owner filter.
@@ -162,6 +253,46 @@ class BacktestJobRepository(Protocol):
             ValueError: If row mapping fails.
         Side Effects:
             Reads one row from `backtest_jobs` table.
+        """
+        ...
+
+    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+        """
+        List persisted summary-only top rows for one job ordered by rank.
+
+        Args:
+            job_id: Parent job identifier.
+        Returns:
+            tuple[BacktestJobTopVariant, ...]: Rows sorted by `rank ASC`.
+        Assumptions:
+            Ownership has already been checked by the use-case layer.
+        Raises:
+            ValueError: If row mapping fails.
+        Side Effects:
+            Reads rows from `backtest_job_top_variants`.
+        """
+        ...
+
+    def get_top_variant_by_public_key(
+        self,
+        *,
+        job_id: UUID,
+        public_variant_key: str,
+    ) -> BacktestJobTopVariant | None:
+        """
+        Resolve one public readable variant key to a persisted top row inside one job.
+
+        Args:
+            job_id: Parent job identifier.
+            public_variant_key: Public route key, not the raw storage SHA.
+        Returns:
+            BacktestJobTopVariant | None: Row or `None`.
+        Assumptions:
+            Direct public lookup by raw storage SHA is intentionally not supported.
+        Raises:
+            ValueError: If row mapping fails.
+        Side Effects:
+            Reads at most one top row.
         """
         ...
 
@@ -222,6 +353,23 @@ class BacktestJobRepository(Protocol):
             ValueError: If storage read fails.
         Side Effects:
             Reads aggregate count from `backtest_jobs` table.
+        """
+        ...
+
+    def count_active_global(self) -> int:
+        """
+        Count all active jobs (`queued + running`) for service-wide guardrails.
+
+        Args:
+            None.
+        Returns:
+            int: Active global job count.
+        Assumptions:
+            Active state set is fixed by Backtest jobs storage contract.
+        Raises:
+            ValueError: If storage read fails.
+        Side Effects:
+            Reads aggregate count from `backtest_jobs`.
         """
         ...
 

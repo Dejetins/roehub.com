@@ -1,8 +1,17 @@
 from .backtests import (
+    BacktestJobProgressResponse,
+    BacktestJobResponse,
+    BacktestJobsListResponse,
     BacktestPreflightResponse,
     BacktestRuntimeDefaultsResponse,
+    BacktestTopVariantResponse,
+    BacktestTopVariantsResponse,
+    build_backtest_job_response,
+    build_backtest_jobs_list_response,
     build_backtest_preflight_response,
     build_backtest_runtime_defaults_response,
+    build_backtest_top_variant_response,
+    build_backtest_top_variants_response,
 )
 from .indicators import (
     ComputeAxisResponse,
@@ -49,7 +58,12 @@ from .market_data_reference import (
 
 __all__ = [
     "BacktestPreflightResponse",
+    "BacktestJobProgressResponse",
+    "BacktestJobResponse",
+    "BacktestJobsListResponse",
     "BacktestRuntimeDefaultsResponse",
+    "BacktestTopVariantResponse",
+    "BacktestTopVariantsResponse",
     "ComputeAxisResponse",
     "ComputeMetaResponse",
     "DefaultSpecResponse",
@@ -83,7 +97,11 @@ __all__ = [
     "build_time_range",
     "build_timeframe",
     "build_backtest_preflight_response",
+    "build_backtest_job_response",
+    "build_backtest_jobs_list_response",
     "build_backtest_runtime_defaults_response",
+    "build_backtest_top_variant_response",
+    "build_backtest_top_variants_response",
     "MarketDataMarketItemResponse",
     "MarketDataMarketsResponse",
     "MarketDataInstrumentItemResponse",
