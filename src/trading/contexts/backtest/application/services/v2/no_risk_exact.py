@@ -4,7 +4,7 @@ import heapq
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, NamedTuple
 
 import numba as nb
 import numpy as np
@@ -34,6 +34,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
 NO_RISK_EXACT_BOUNDARY_STAGE_NAME = "no_risk_exact_boundary"
 NO_RISK_EXACT_SCORING_STAGE_NAME = "exact_scoring"
 NO_RISK_HEAP_UPDATE_STAGE_NAME = "heap_update"
+NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME = "top_result_assembly"
 NO_RISK_SELF_CHECK_STAGE_NAME = "self_check"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
@@ -127,16 +128,14 @@ class _TopKContext:
     metadata_by_pos: tuple[tuple[Any, ...], ...]
 
 
-@dataclass(frozen=True, slots=True)
-class _NoRiskHeapEntry:
+class _NoRiskHeapEntry(NamedTuple):
     score: float
     original_rows: tuple[int, ...]
-    indicator_rows: Mapping[str, int]
-    metrics: Mapping[str, float]
-    metadata_by_indicator: Mapping[str, Mapping[str, Any]]
+    local_indices: tuple[int, ...]
+    metric_values: tuple[float, ...]
+    metadata_by_pos: tuple[Any, ...]
     confirm_count: int
     proxy_score: float
-    local_indices: tuple[int, ...]
     proxy_pending: bool
 
 
@@ -263,7 +262,11 @@ class BacktestNoRiskExactScoringService:
             )
             scored_count += scored
 
-        top_results = _top_results_from_heap(heap)
+        top_result_start = time.perf_counter()
+        top_results = _top_results_from_heap(heap, top_k_context=top_k_context)
+        stage_timings[NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME] = (
+            time.perf_counter() - top_result_start
+        )
         telemetry = BacktestNoRiskExactTelemetry(
             stage_timings=stage_timings,
             request_top_n=request_top_n,
@@ -2183,6 +2186,28 @@ def _metrics_at(*, buffers: _MetricBuffers, index: int) -> Mapping[str, float]:
     }
 
 
+def _metric_values_at(*, buffers: _MetricBuffers, index: int) -> tuple[float, ...]:
+    return (
+        float(buffers.total_return_pct[index]),
+        float(buffers.max_drawdown_pct[index]),
+        float(buffers.return_over_max_drawdown[index]),
+        float(buffers.profit_factor[index]),
+        float(buffers.trade_count[index]),
+        float(buffers.sharpe_trades[index]),
+        float(buffers.win_rate_pct[index]),
+        float(buffers.avg_trade_ret_pct[index]),
+        float(buffers.avg_trade_exec_bars[index]),
+        float(buffers.exposure_pct[index]),
+    )
+
+
+def _metrics_from_values(metric_values: tuple[float, ...]) -> dict[str, float]:
+    return {
+        metric_name: metric_values[pos]
+        for pos, metric_name in enumerate(NO_RISK_METRIC_NAMES)
+    }
+
+
 def _top_k_context_from_prepared(
     prepared_result: BacktestPreparePoolsResult,
 ) -> _TopKContext:
@@ -2424,22 +2449,17 @@ def _materialize_heap_entry(
         confirm_count = int(confirm[result_index])
         proxy_score = float(proxy[result_index])
 
-    metadata_by_indicator = {
-        indicator_id: top_k_context.metadata_by_pos[pos][local_indices[pos]].as_mapping()
-        for pos, indicator_id in enumerate(top_k_context.indicator_ids)
-    }
     return _NoRiskHeapEntry(
         score=score,
         original_rows=original_rows,
-        indicator_rows={
-            indicator_id: original_rows[pos]
-            for pos, indicator_id in enumerate(top_k_context.indicator_ids)
-        },
-        metrics=_metrics_at(buffers=buffers, index=result_index),
-        metadata_by_indicator=metadata_by_indicator,
+        local_indices=local_indices,
+        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metadata_by_pos=tuple(
+            top_k_context.metadata_by_pos[pos][local_indices[pos]]
+            for pos in range(len(local_indices))
+        ),
         confirm_count=confirm_count,
         proxy_score=proxy_score,
-        local_indices=local_indices,
         proxy_pending=proxy_pending,
     )
 
@@ -2465,32 +2485,33 @@ def _materialize_heap_entry_arity1(
         confirm_count = int(confirm[result_index])
         proxy_score = float(proxy[result_index])
 
-    indicator_id = top_k_context.indicator_ids[0]
     return _NoRiskHeapEntry(
         score=score,
         original_rows=(original_row,),
-        indicator_rows={indicator_id: original_row},
-        metrics=_metrics_at(buffers=buffers, index=result_index),
-        metadata_by_indicator={
-            indicator_id: top_k_context.metadata_by_pos[0][local_index].as_mapping()
-        },
+        local_indices=(local_index,),
+        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metadata_by_pos=(top_k_context.metadata_by_pos[0][local_index],),
         confirm_count=confirm_count,
         proxy_score=proxy_score,
-        local_indices=(local_index,),
         proxy_pending=proxy_pending,
     )
 
 
 def _top_results_from_heap(
     heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+    *,
+    top_k_context: _TopKContext,
 ) -> tuple[BacktestNoRiskTopResult, ...]:
     return tuple(
         BacktestNoRiskTopResult(
             rank=rank,
             score=entry.score,
-            indicator_rows=entry.indicator_rows,
-            metrics=entry.metrics,
-            metadata=_top_result_metadata(entry),
+            indicator_rows={
+                indicator_id: entry.original_rows[pos]
+                for pos, indicator_id in enumerate(top_k_context.indicator_ids)
+            },
+            metrics=_metrics_from_values(entry.metric_values),
+            metadata=_top_result_metadata(entry, top_k_context=top_k_context),
         )
         for rank, (_, entry) in enumerate(
             sorted(heap, key=lambda pair: pair[0], reverse=True),
@@ -2499,13 +2520,18 @@ def _top_results_from_heap(
     )
 
 
-def _top_result_metadata(entry: _NoRiskHeapEntry) -> dict[str, Any]:
+def _top_result_metadata(
+    entry: _NoRiskHeapEntry,
+    *,
+    top_k_context: _TopKContext,
+) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "confirm_count": entry.confirm_count,
         "proxy_score": entry.proxy_score,
         "_proxy_pending": entry.proxy_pending,
     }
-    for pos, (indicator_id, row_metadata) in enumerate(entry.metadata_by_indicator.items()):
+    for pos, indicator_id in enumerate(top_k_context.indicator_ids):
+        row_metadata = entry.metadata_by_pos[pos].as_mapping()
         metadata[f"{indicator_id}.local_index"] = entry.local_indices[pos]
         for key, value in row_metadata.items():
             metadata[f"{indicator_id}.{key}"] = value
@@ -2586,6 +2612,7 @@ __all__ = [
     "NO_RISK_SELF_CHECK_NOT_RUN_STATUS",
     "NO_RISK_SELF_CHECK_PASSED_STATUS",
     "NO_RISK_SELF_CHECK_STAGE_NAME",
+    "NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME",
     "BacktestNoRiskExactRejected",
     "BacktestNoRiskExactScoringService",
     "BacktestNoRiskSelfCheckFailed",

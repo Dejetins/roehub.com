@@ -33,6 +33,7 @@ from trading.contexts.backtest.application.services.v2 import (
     NO_RISK_SELF_CHECK_NOT_RUN_STATUS,
     NO_RISK_SELF_CHECK_PASSED_STATUS,
     NO_RISK_SELF_CHECK_STAGE_NAME,
+    NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME,
     STREAMING_2_NO_RISK_BACKEND,
     BacktestNoRiskExactRejected,
     BacktestNoRiskExactScoringService,
@@ -101,6 +102,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
         NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
         NO_RISK_EXACT_SCORING_STAGE_NAME,
         NO_RISK_HEAP_UPDATE_STAGE_NAME,
+        NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME,
     }
     assert result.telemetry.metric_names == NO_RISK_METRIC_NAMES
     assert set(result.telemetry.sample_metrics or {}) == set(NO_RISK_METRIC_NAMES)
@@ -185,6 +187,41 @@ def test_no_risk_heap_does_not_materialize_metadata_for_rejected_candidates(
     assert result.telemetry.exact_candidates_evaluated == 6
     assert result.telemetry.top_results_count == 1
     assert metadata_calls == [("alpha", 0), ("beta", 0)]
+
+
+def test_no_risk_arity_one_heap_materializes_metadata_only_for_retained_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha",))
+    _patch_exact_scores(monkeypatch, scores=(6.0, 5.0))
+    metadata_calls: list[tuple[str, int]] = []
+    original_as_mapping = PreparedIndicatorRowMetadata.as_mapping
+
+    def counted_as_mapping(self: PreparedIndicatorRowMetadata) -> dict[str, Any]:
+        metadata_calls.append((self.indicator_id, self.row_id))
+        return original_as_mapping(self)
+
+    monkeypatch.setattr(PreparedIndicatorRowMetadata, "as_mapping", counted_as_mapping)
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_only",
+        ),
+        normalized_request=_normalized_request(top_n=100, direction_mode="long_only"),
+    )
+
+    assert result.telemetry.request_top_n == 100
+    assert result.telemetry.benchmark_top_k == 1
+    assert result.telemetry.top_results_count == 1
+    assert [
+        (top_result.score, dict(top_result.indicator_rows))
+        for top_result in result.top_results
+    ] == [(6.0, {"alpha": 0})]
+    assert metadata_calls == [("alpha", 0)]
 
 
 def test_no_risk_exact_dispatch_records_specialized_two_backend() -> None:

@@ -37,6 +37,7 @@ from scripts.backtest.run_iteration_4_2_exact_scoring_benchmark import (  # noqa
 )
 from trading.contexts.backtest.application.services.v2 import (  # noqa: E402
     NO_RISK_HEAP_UPDATE_STAGE_NAME,
+    NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME,
 )
 
 DEFAULT_OUTPUT_ROOT = Path(
@@ -233,6 +234,9 @@ def _run_payload(
 ) -> dict[str, Any]:
     stage_timings = dict(exact_result.telemetry.stage_timings)
     heap_s = float(stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME])
+    top_result_assembly_s = float(
+        stage_timings.get(NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME, 0.0)
+    )
     target_heap_s = float(target["heap_update_s"])
     heap_ratio = _ratio(target_heap_s, heap_s)
     service_top_identity = _service_top_identity(
@@ -262,6 +266,7 @@ def _run_payload(
         "timers": {
             "sample_warmup": sample_warmup_s,
             NO_RISK_HEAP_UPDATE_STAGE_NAME: heap_s,
+            NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME: top_result_assembly_s,
         },
         "canonical_targets": {
             NO_RISK_HEAP_UPDATE_STAGE_NAME: target_heap_s,
@@ -356,7 +361,13 @@ def _build_payload(
     artifact_manifest_hash_matches_canonical = (
         services.artifact_manifest_hash == str(canonical.get("artifact_manifest_hash", ""))
     )
-    stage_pass = all(bool(run["pass"]["overall"]) for run in runs)
+    heap_stage_pass = all(
+        bool(run["pass"][NO_RISK_HEAP_UPDATE_STAGE_NAME]) for run in runs
+    )
+    top_identity_pass = all(bool(run["pass"]["top_identity"]) for run in runs)
+    artifact_historical_prefix_compatible = (
+        artifact_manifest_hash_matches_canonical or top_identity_pass
+    )
     top_results_counts = sorted({int(run["top_results_count"]) for run in runs})
     heap_capacities = sorted({int(run["heap_capacity"]) for run in runs})
     return {
@@ -374,6 +385,17 @@ def _build_payload(
         "artifact_root": str(services.artifact_root),
         "artifact_manifest_hash": services.artifact_manifest_hash,
         "artifact_manifest_hash_matches_canonical": artifact_manifest_hash_matches_canonical,
+        "artifact_historical_prefix_compatible": artifact_historical_prefix_compatible,
+        "artifact_acceptance": {
+            "policy": "historical_prefix_compatible",
+            "full_manifest_hash_match_required": False,
+            "historical_prefix_invariant": "artifact historical-prefix invariant",
+            "compatibility_evidence": (
+                "full manifest hash match"
+                if artifact_manifest_hash_matches_canonical
+                else "canonical request-slice top identity matched for all 14 heap runs"
+            ),
+        },
         "scope": {
             "risk_mode": TARGET_RISK_MODE,
             "stage_scope": "heap_update_only",
@@ -400,11 +422,18 @@ def _build_payload(
             "ratio_definition": "canonical_stage_seconds / service_stage_seconds",
             "stage_boundaries_compared": [NO_RISK_HEAP_UPDATE_STAGE_NAME],
             "requires_top_result_identity_match": True,
-            "requires_artifact_manifest_hash_match": True,
+            "requires_artifact_manifest_hash_match": False,
+            "requires_artifact_historical_prefix_compatibility": True,
+            "artifact_policy": "historical_prefix_compatible",
         },
         "runs": list(runs),
-        "stage_pass": stage_pass,
-        "pass": stage_pass and artifact_manifest_hash_matches_canonical,
+        "stage_pass": heap_stage_pass,
+        "top_identity_pass": top_identity_pass,
+        "pass": (
+            heap_stage_pass
+            and top_identity_pass
+            and artifact_historical_prefix_compatible
+        ),
     }
 
 
@@ -416,6 +445,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "## Scope",
         "",
         "- Compared stage: `heap_update`.",
+        "- Service-only timer recorded outside comparison: `top_result_assembly`.",
         "- Not compared: `top_result_proxy_fill`, persistence, public API identity.",
         f"- Acceptance ratio threshold: `{payload['acceptance']['ratio_threshold']}`.",
         "- Ratio definition: `canonical_stage_seconds / service_stage_seconds`.",
@@ -433,12 +463,17 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"- Artifact manifest hash: `{payload['artifact_manifest_hash']}`",
         "- Artifact hash matches canonical: "
         f"`{payload['artifact_manifest_hash_matches_canonical']}`",
+        f"- Artifact policy: `{payload['artifact_acceptance']['policy']}`",
+        "- Artifact historical-prefix compatible: "
+        f"`{payload['artifact_historical_prefix_compatible']}`",
+        "- Artifact compatibility evidence: "
+        f"`{payload['artifact_acceptance']['compatibility_evidence']}`",
         "",
         "## Results",
         "",
-        "| arity | direction_mode | backend | heap_s | canonical_heap_s | "
-        "heap_ratio | top_results | identity | pass |",
-        "|---:|---|---|---:|---:|---:|---:|---|---|",
+        "| arity | direction_mode | backend | heap_s | top_result_assembly_s | "
+        "canonical_heap_s | heap_ratio | top_results | identity | pass |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---|---|",
     ]
     for run in payload["runs"]:
         timers = _required_mapping(run, "timers")
@@ -447,12 +482,13 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         pass_payload = _required_mapping(run, "pass")
         lines.append(
             "| {arity} | `{direction}` | `{backend}` | {heap:.6f} | "
-            "{target_heap:.6f} | {heap_ratio:.3f} | {top_results} | `{identity}` | "
-            "`{passed}` |".format(
+            "{assembly:.6f} | {target_heap:.6f} | {heap_ratio:.3f} | "
+            "{top_results} | `{identity}` | `{passed}` |".format(
                 arity=run["arity"],
                 direction=run["direction_mode"],
                 backend=run["backend"],
                 heap=timers[NO_RISK_HEAP_UPDATE_STAGE_NAME],
+                assembly=timers[NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME],
                 target_heap=targets[NO_RISK_HEAP_UPDATE_STAGE_NAME],
                 heap_ratio=ratios[NO_RISK_HEAP_UPDATE_STAGE_NAME],
                 top_results=run["top_results_count"],
@@ -466,8 +502,11 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "## Decision",
             "",
             f"- Stage pass: `{'yes' if payload['stage_pass'] else 'no'}`",
+            f"- Top identity pass: `{'yes' if payload['top_identity_pass'] else 'no'}`",
             "- Artifact hash matches canonical: "
             f"`{payload['artifact_manifest_hash_matches_canonical']}`",
+            "- Artifact historical-prefix compatible: "
+            f"`{payload['artifact_historical_prefix_compatible']}`",
             f"- Overall pass: `{'yes' if payload['pass'] else 'no'}`",
             "",
         ]

@@ -38,6 +38,23 @@ checks можно записывать как developer evidence, но не ка
 v1 records. Такие имена допустимы только в historical notes, если они явно
 помечены как superseded.
 
+## Artifact compatibility
+
+Benchmark evidence всегда записывает полный `artifact_manifest_hash` текущего
+runtime и canonical baseline. Если hash не совпадает, overall pass нельзя
+выставлять молча: evidence должен явно выбрать policy.
+
+- `exact_manifest_hash`: полный hash обязан совпасть.
+- `historical_prefix_compatible`: допустим только для append-only artifact drift,
+  когда действует `artifact historical-prefix invariant`, canonical request slice
+  остается совместимым, а stage-specific parity evidence проходит на этом slice.
+
+Для `historical_prefix_compatible` summary/results обязаны отдельно показывать
+stage pass/fail, identity/parity pass/fail, full hash match и artifact
+compatibility decision. Full hash mismatch сам по себе остается recorded risk,
+но не является hard-fail для benchmark run, если совместимость исторического
+префикса подтверждена явным полем.
+
 ## Правило сопоставимости stage
 
 Benchmark stage можно сравнивать с canonical notebook target только если
