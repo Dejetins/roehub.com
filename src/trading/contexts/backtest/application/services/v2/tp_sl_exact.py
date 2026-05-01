@@ -1433,7 +1433,17 @@ def _update_heap_total_return_desc(
         for indicator_id in top_k_context.indicator_ids
     )
     row_ids_by_pos = top_k_context.row_ids_by_pos
-    for result_index in range(buffers.size):
+    selected_indices, selected_count = _tp_sl_select_top_k_indices(
+        buffers.total_return_pct,
+        buffers.best_tp_idx,
+        buffers.best_sl_idx,
+        hit_times.tp_values,
+        hit_times.sl_values,
+        np.int64(candidate_ordinal_start),
+        np.int32(top_k),
+    )
+    for selected_pos in range(selected_count):
+        result_index = int(selected_indices[selected_pos])
         local_values = []
         original_values = []
         for pos, selected_rows in enumerate(selected_rows_by_pos):
@@ -1487,6 +1497,152 @@ def _update_heap_total_return_desc(
                     ),
                 ),
             )
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_top_key_greater(
+    score: float,
+    tp_pct: float,
+    sl_pct: float,
+    neg_ordinal: np.int64,
+    other_score: float,
+    other_tp_pct: float,
+    other_sl_pct: float,
+    other_neg_ordinal: np.int64,
+) -> bool:
+    if score > other_score:
+        return True
+    if score < other_score:
+        return False
+    if tp_pct > other_tp_pct:
+        return True
+    if tp_pct < other_tp_pct:
+        return False
+    if sl_pct > other_sl_pct:
+        return True
+    if sl_pct < other_sl_pct:
+        return False
+    return bool(neg_ordinal > other_neg_ordinal)
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_top_key_less(
+    score: float,
+    tp_pct: float,
+    sl_pct: float,
+    neg_ordinal: np.int64,
+    other_score: float,
+    other_tp_pct: float,
+    other_sl_pct: float,
+    other_neg_ordinal: np.int64,
+) -> bool:
+    if score < other_score:
+        return True
+    if score > other_score:
+        return False
+    if tp_pct < other_tp_pct:
+        return True
+    if tp_pct > other_tp_pct:
+        return False
+    if sl_pct < other_sl_pct:
+        return True
+    if sl_pct > other_sl_pct:
+        return False
+    return bool(neg_ordinal < other_neg_ordinal)
+
+
+@nb.njit(cache=True)
+def _tp_sl_select_top_k_indices(
+    scores: np.ndarray,
+    best_tp_idx: np.ndarray,
+    best_sl_idx: np.ndarray,
+    tp_values: np.ndarray,
+    sl_values: np.ndarray,
+    candidate_ordinal_start: np.int64,
+    top_k: np.int32,
+) -> tuple[np.ndarray, np.int32]:
+    selected_indices = np.empty(top_k, dtype=np.int32)
+    selected_scores = np.empty(top_k, dtype=np.float64)
+    selected_tp_pct = np.empty(top_k, dtype=np.float64)
+    selected_sl_pct = np.empty(top_k, dtype=np.float64)
+    selected_neg_ord = np.empty(top_k, dtype=np.int64)
+    count = np.int32(0)
+    for result_index in range(scores.shape[0]):
+        score = float(scores[result_index])
+        tp_pct = float(tp_values[best_tp_idx[result_index]]) * 100.0
+        sl_pct = float(sl_values[best_sl_idx[result_index]]) * 100.0
+        neg_ordinal = -(candidate_ordinal_start + np.int64(result_index))
+        if count < top_k:
+            selected_indices[count] = np.int32(result_index)
+            selected_scores[count] = score
+            selected_tp_pct[count] = tp_pct
+            selected_sl_pct[count] = sl_pct
+            selected_neg_ord[count] = neg_ordinal
+            count += np.int32(1)
+            continue
+
+        worst = np.int32(0)
+        for selected_pos in range(np.int32(1), count):
+            if _tp_sl_top_key_less(
+                selected_scores[selected_pos],
+                selected_tp_pct[selected_pos],
+                selected_sl_pct[selected_pos],
+                selected_neg_ord[selected_pos],
+                selected_scores[worst],
+                selected_tp_pct[worst],
+                selected_sl_pct[worst],
+                selected_neg_ord[worst],
+            ):
+                worst = selected_pos
+
+        if _tp_sl_top_key_greater(
+            score,
+            tp_pct,
+            sl_pct,
+            neg_ordinal,
+            selected_scores[worst],
+            selected_tp_pct[worst],
+            selected_sl_pct[worst],
+            selected_neg_ord[worst],
+        ):
+            selected_indices[worst] = np.int32(result_index)
+            selected_scores[worst] = score
+            selected_tp_pct[worst] = tp_pct
+            selected_sl_pct[worst] = sl_pct
+            selected_neg_ord[worst] = neg_ordinal
+
+    for left in range(count):
+        best = left
+        for right in range(left + 1, count):
+            if _tp_sl_top_key_greater(
+                selected_scores[right],
+                selected_tp_pct[right],
+                selected_sl_pct[right],
+                selected_neg_ord[right],
+                selected_scores[best],
+                selected_tp_pct[best],
+                selected_sl_pct[best],
+                selected_neg_ord[best],
+            ):
+                best = right
+        if best != left:
+            tmp_idx = selected_indices[left]
+            tmp_score = selected_scores[left]
+            tmp_tp = selected_tp_pct[left]
+            tmp_sl = selected_sl_pct[left]
+            tmp_ord = selected_neg_ord[left]
+            selected_indices[left] = selected_indices[best]
+            selected_scores[left] = selected_scores[best]
+            selected_tp_pct[left] = selected_tp_pct[best]
+            selected_sl_pct[left] = selected_sl_pct[best]
+            selected_neg_ord[left] = selected_neg_ord[best]
+            selected_indices[best] = tmp_idx
+            selected_scores[best] = tmp_score
+            selected_tp_pct[best] = tmp_tp
+            selected_sl_pct[best] = tmp_sl
+            selected_neg_ord[best] = tmp_ord
+
+    return selected_indices, count
 
 
 def _materialize_heap_entry(

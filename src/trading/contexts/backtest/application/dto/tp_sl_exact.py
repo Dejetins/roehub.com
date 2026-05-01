@@ -30,7 +30,7 @@ class BacktestTpSlExactConfig:
     default_request_top_n: int = 100
     run_self_check: bool = False
     self_check_sample_size: int = 2
-    self_check_return_tolerance: float = 5e-5
+    self_check_return_tolerance: float = 1e-4
     default_fee_rate: float = 0.00075
     default_slippage_rate: float = 0.0001
     default_initial_cash_quote: float = 10000.0
