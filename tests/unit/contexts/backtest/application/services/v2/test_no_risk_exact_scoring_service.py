@@ -28,6 +28,7 @@ from trading.contexts.backtest.application.services.v2 import (
     NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
     NO_RISK_EXACT_SCORED_STATUS,
     NO_RISK_EXACT_SCORING_STAGE_NAME,
+    NO_RISK_HEAP_UPDATE_STAGE_NAME,
     NO_RISK_METRIC_NAMES,
     NO_RISK_SELF_CHECK_NOT_RUN_STATUS,
     NO_RISK_SELF_CHECK_PASSED_STATUS,
@@ -66,7 +67,15 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
         normalized_request=_normalized_request(top_n=100),
     )
 
-    assert result.top_results == ()
+    assert len(result.top_results) == 5
+    assert result.top_results[0].rank == 1
+    assert result.top_results[0].score == pytest.approx(2.970297029702987)
+    assert dict(result.top_results[0].indicator_rows) == {
+        "alpha": 1,
+        "beta": 2,
+        "gamma": 1,
+    }
+    assert result.top_results[0].metadata["_proxy_pending"] is True
     assert result.execution_context.as_mapping() == {
         "timeframe": "15m",
         "execution_timeframe": "1m",
@@ -79,7 +88,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert result.telemetry.request_top_n == 100
     assert result.telemetry.benchmark_top_k == 5
     assert result.telemetry.heap_capacity == 5
-    assert result.telemetry.top_results_count == 0
+    assert result.telemetry.top_results_count == 5
     assert result.telemetry.exact_candidates_evaluated == 12
     assert result.telemetry.risk_mode == "none"
     assert result.telemetry.direction_mode == "long_short_reversal"
@@ -91,6 +100,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert set(result.telemetry.stage_timings) == {
         NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
         NO_RISK_EXACT_SCORING_STAGE_NAME,
+        NO_RISK_HEAP_UPDATE_STAGE_NAME,
     }
     assert result.telemetry.metric_names == NO_RISK_METRIC_NAMES
     assert set(result.telemetry.sample_metrics or {}) == set(NO_RISK_METRIC_NAMES)
@@ -100,11 +110,81 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     mapping = result.as_mapping()
     assert mapping["telemetry"]["request_top_n"] == 100
     assert mapping["telemetry"]["benchmark_top_k"] == 5
-    assert mapping["telemetry"]["top_results_count"] == 0
+    assert mapping["telemetry"]["top_results_count"] == 5
+    assert len(mapping["top_results"]) == 5
     assert mapping["telemetry"]["backend_logical_name"] == "event_segments_3_no_risk"
     assert mapping["telemetry"]["backend_implementation_id"] == EVENT_SEGMENTS_N_NO_RISK_BACKEND
     assert set(mapping["telemetry"]["sample_metrics"]) == set(NO_RISK_METRIC_NAMES)
     assert mapping["memory_cleanup_evidence"]["result_is_compact"] is True
+
+
+def test_no_risk_heap_capacity_uses_benchmark_top_k_not_request_top_n() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta", "gamma"))
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1, default_request_top_n=100),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    assert result.telemetry.request_top_n == 100
+    assert result.telemetry.benchmark_top_k == 1
+    assert result.telemetry.heap_capacity == 1
+    assert result.telemetry.exact_candidates_evaluated == 12
+    assert result.telemetry.top_results_count == 1
+    assert len(result.top_results) == 1
+
+
+def test_no_risk_heap_orders_by_score_then_original_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    _patch_exact_scores(monkeypatch, scores=(1.0, 5.0, 5.0, 2.0, 3.0, 4.0))
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=3),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    assert [
+        (top_result.score, dict(top_result.indicator_rows))
+        for top_result in result.top_results
+    ] == [
+        (5.0, {"alpha": 0, "beta": 2}),
+        (5.0, {"alpha": 0, "beta": 1}),
+        (4.0, {"alpha": 1, "beta": 2}),
+    ]
+
+
+def test_no_risk_heap_does_not_materialize_metadata_for_rejected_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    _patch_exact_scores(monkeypatch, scores=(6.0, 5.0, 4.0, 3.0, 2.0, 1.0))
+    metadata_calls: list[tuple[str, int]] = []
+    original_as_mapping = PreparedIndicatorRowMetadata.as_mapping
+
+    def counted_as_mapping(self: PreparedIndicatorRowMetadata) -> dict[str, Any]:
+        metadata_calls.append((self.indicator_id, self.row_id))
+        return original_as_mapping(self)
+
+    monkeypatch.setattr(PreparedIndicatorRowMetadata, "as_mapping", counted_as_mapping)
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    assert result.telemetry.exact_candidates_evaluated == 6
+    assert result.telemetry.top_results_count == 1
+    assert metadata_calls == [("alpha", 0), ("beta", 0)]
 
 
 def test_no_risk_exact_dispatch_records_specialized_two_backend() -> None:
@@ -505,6 +585,28 @@ def _normalized_request(
             "close_on_end": True,
         },
     }
+
+
+def _patch_exact_scores(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    scores: Sequence[float],
+) -> None:
+    def fixed_evaluate(**kwargs: Any) -> None:
+        buffers = kwargs["buffers"]
+        assert buffers.size == len(scores)
+        buffers.total_return_pct[:] = np.asarray(scores, dtype=np.float64)
+        buffers.max_drawdown_pct[:] = 0.0
+        buffers.return_over_max_drawdown[:] = 0.0
+        buffers.profit_factor[:] = 0.0
+        buffers.trade_count[:] = 0
+        buffers.sharpe_trades[:] = 0.0
+        buffers.win_rate_pct[:] = 0.0
+        buffers.avg_trade_ret_pct[:] = 0.0
+        buffers.avg_trade_exec_bars[:] = 0.0
+        buffers.exposure_pct[:] = 0.0
+
+    monkeypatch.setattr(no_risk_exact_module, "evaluate_no_risk_exact_chunk", fixed_evaluate)
 
 
 def _backend_role(backend_id: str) -> str:

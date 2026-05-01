@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import math
 import time
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestNoRiskExecutionContext,
     BacktestNoRiskMemoryCleanupEvidence,
     BacktestNoRiskSelfCheckSummary,
+    BacktestNoRiskTopResult,
     BacktestPreparePoolsResult,
 )
 from trading.contexts.backtest.application.services.v2.combo_planning import (
@@ -31,6 +33,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
 
 NO_RISK_EXACT_BOUNDARY_STAGE_NAME = "no_risk_exact_boundary"
 NO_RISK_EXACT_SCORING_STAGE_NAME = "exact_scoring"
+NO_RISK_HEAP_UPDATE_STAGE_NAME = "heap_update"
 NO_RISK_SELF_CHECK_STAGE_NAME = "self_check"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
@@ -101,9 +104,46 @@ class _MetricBuffers:
 
 
 @dataclass(frozen=True, slots=True)
+class _SelectedCandidateBatch:
+    rows_by_indicator: Mapping[str, np.ndarray]
+    confirm: np.ndarray | None
+    proxy: np.ndarray | None
+
+
+@dataclass(frozen=True, slots=True)
+class _RankingSpec:
+    metric_name: str
+    direction: str
+
+    @property
+    def is_default_total_return_desc(self) -> bool:
+        return self.metric_name == "total_return_pct" and self.direction == "desc"
+
+
+@dataclass(frozen=True, slots=True)
+class _TopKContext:
+    indicator_ids: tuple[str, ...]
+    row_ids_by_pos: tuple[np.ndarray, ...]
+    metadata_by_pos: tuple[tuple[Any, ...], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _NoRiskHeapEntry:
+    score: float
+    original_rows: tuple[int, ...]
+    indicator_rows: Mapping[str, int]
+    metrics: Mapping[str, float]
+    metadata_by_indicator: Mapping[str, Mapping[str, Any]]
+    confirm_count: int
+    proxy_score: float
+    local_indices: tuple[int, ...]
+    proxy_pending: bool
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestNoRiskExactScoringService:
     """
-    Internal service for Iteration 4.2 no-risk exact scoring.
+    Internal service for no-risk exact scoring and notebook-compatible top-K heap work.
     """
 
     config: BacktestNoRiskExactConfig = BacktestNoRiskExactConfig()
@@ -116,10 +156,8 @@ class BacktestNoRiskExactScoringService:
         normalized_request: Mapping[str, Any],
     ) -> BacktestNoRiskExactResult:
         """
-        Validate the no-risk boundary, run optional self-check, and score candidates.
-
-        Iteration 4.2 intentionally computes exact metrics without implementing
-        heap maintenance, top-result proxy fill, public identity, or persistence.
+        Validate the no-risk boundary, run optional self-check, score candidates,
+        and keep the canonical benchmark top-K heap.
         """
 
         boundary_start = time.perf_counter()
@@ -153,6 +191,8 @@ class BacktestNoRiskExactScoringService:
             normalized_request,
             default_request_top_n=self.config.default_request_top_n,
         )
+        ranking = _ranking_from_normalized(normalized_request)
+        top_k_context = _top_k_context_from_prepared(prepared_result)
         backend_logical_name = _backend_logical_name(backend_id=backend.backend_id, arity=arity)
         stage_timings = {
             NO_RISK_EXACT_BOUNDARY_STAGE_NAME: time.perf_counter() - boundary_start,
@@ -165,15 +205,17 @@ class BacktestNoRiskExactScoringService:
             backend_implementation_id=backend.backend_id,
             direction_mode=backend.direction_mode,
         )
-        selected_rows_iter = _iter_selected_candidate_rows(
+        selected_batches_iter = _iter_selected_candidate_batches(
             prepared_result=prepared_result,
             combo_planning_result=combo_planning_result,
         )
-        first_selected_rows = _next_selected_candidate_rows(selected_rows_iter)
+        first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
         if self.config.run_self_check:
             check_start = time.perf_counter()
             self_check_summary = self._run_self_check(
-                selected_rows_by_indicator=first_selected_rows,
+                selected_rows_by_indicator=None
+                if first_selected_batch is None
+                else first_selected_batch.rows_by_indicator,
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
                 execution_settings=execution_settings,
@@ -184,11 +226,13 @@ class BacktestNoRiskExactScoringService:
             stage_timings[NO_RISK_SELF_CHECK_STAGE_NAME] = time.perf_counter() - check_start
 
         stage_timings[NO_RISK_EXACT_SCORING_STAGE_NAME] = 0.0
+        stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] = 0.0
+        heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] = []
         scored_count = 0
         sample_metrics: Mapping[str, float] | None = None
-        if first_selected_rows is not None:
+        if first_selected_batch is not None:
             scored, sample_metrics = self._score_selected_rows(
-                selected_rows_by_indicator=first_selected_rows,
+                selected_batch=first_selected_batch,
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
                 execution_settings=execution_settings,
@@ -196,11 +240,15 @@ class BacktestNoRiskExactScoringService:
                 execution_close_1m=execution_close_1m,
                 stage_timings=stage_timings,
                 sample_metrics=sample_metrics,
+                heap=heap,
+                top_k_context=top_k_context,
+                top_k=self.config.heap_capacity,
+                ranking=ranking,
             )
             scored_count += scored
-        for selected_rows in selected_rows_iter:
+        for selected_batch in selected_batches_iter:
             scored, sample_metrics = self._score_selected_rows(
-                selected_rows_by_indicator=selected_rows,
+                selected_batch=selected_batch,
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
                 execution_settings=execution_settings,
@@ -208,10 +256,14 @@ class BacktestNoRiskExactScoringService:
                 execution_close_1m=execution_close_1m,
                 stage_timings=stage_timings,
                 sample_metrics=sample_metrics,
+                heap=heap,
+                top_k_context=top_k_context,
+                top_k=self.config.heap_capacity,
+                ranking=ranking,
             )
             scored_count += scored
 
-        top_results: tuple[Any, ...] = ()
+        top_results = _top_results_from_heap(heap)
         telemetry = BacktestNoRiskExactTelemetry(
             stage_timings=stage_timings,
             request_top_n=request_top_n,
@@ -252,7 +304,7 @@ class BacktestNoRiskExactScoringService:
     def _score_selected_rows(
         self,
         *,
-        selected_rows_by_indicator: Mapping[str, np.ndarray],
+        selected_batch: _SelectedCandidateBatch,
         prepared_result: BacktestPreparePoolsResult,
         combo_planning_result: BacktestComboPlanningResult,
         execution_settings: _ExecutionSettings,
@@ -260,7 +312,12 @@ class BacktestNoRiskExactScoringService:
         execution_close_1m: np.ndarray,
         stage_timings: dict[str, float],
         sample_metrics: Mapping[str, float] | None,
+        heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+        top_k_context: _TopKContext,
+        top_k: int,
+        ranking: _RankingSpec,
     ) -> tuple[int, Mapping[str, float] | None]:
+        selected_rows_by_indicator = selected_batch.rows_by_indicator
         selected_size = _selected_size(selected_rows_by_indicator)
         if selected_size <= 0:
             return 0, sample_metrics
@@ -280,6 +337,29 @@ class BacktestNoRiskExactScoringService:
         )
         if sample_metrics is None:
             sample_metrics = _metrics_at(buffers=buffers, index=0)
+        heap_start = time.perf_counter()
+        if ranking.is_default_total_return_desc:
+            _update_heap_total_return_desc(
+                heap=heap,
+                top_k_context=top_k_context,
+                selected_rows_by_indicator=selected_rows_by_indicator,
+                buffers=buffers,
+                confirm=selected_batch.confirm,
+                proxy=selected_batch.proxy,
+                top_k=top_k,
+            )
+        else:
+            _update_heap_generic_ranking(
+                heap=heap,
+                top_k_context=top_k_context,
+                selected_rows_by_indicator=selected_rows_by_indicator,
+                buffers=buffers,
+                confirm=selected_batch.confirm,
+                proxy=selected_batch.proxy,
+                top_k=top_k,
+                ranking=ranking,
+            )
+        stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] += time.perf_counter() - heap_start
         return buffers.size, sample_metrics
 
     def _run_self_check(
@@ -2033,11 +2113,11 @@ def _backend_logical_name(*, backend_id: str, arity: int) -> str:
     return backend_id
 
 
-def _iter_selected_candidate_rows(
+def _iter_selected_candidate_batches(
     *,
     prepared_result: BacktestPreparePoolsResult,
     combo_planning_result: BacktestComboPlanningResult,
-) -> Iterator[Mapping[str, np.ndarray]]:
+) -> Iterator[_SelectedCandidateBatch]:
     local_row_pools = build_local_row_pools(prepared_result=prepared_result)
     filter_service = BacktestComboPlanningService()
     for combo_chunk in iter_combo_chunks(
@@ -2050,15 +2130,19 @@ def _iter_selected_candidate_rows(
             proxy_context=combo_planning_result.proxy_context,
         )
         if filter_result.selected_candidate_count > 0:
-            yield filter_result.selected_rows_by_indicator
+            yield _SelectedCandidateBatch(
+                rows_by_indicator=filter_result.selected_rows_by_indicator,
+                confirm=filter_result.confirm,
+                proxy=filter_result.proxy,
+            )
 
 
-def _next_selected_candidate_rows(
-    selected_rows_iter: Iterator[Mapping[str, np.ndarray]],
-) -> Mapping[str, np.ndarray] | None:
-    for selected_rows in selected_rows_iter:
-        if _selected_size(selected_rows) > 0:
-            return selected_rows
+def _next_selected_candidate_batch(
+    selected_batches_iter: Iterator[_SelectedCandidateBatch],
+) -> _SelectedCandidateBatch | None:
+    for selected_batch in selected_batches_iter:
+        if _selected_size(selected_batch.rows_by_indicator) > 0:
+            return selected_batch
     return None
 
 
@@ -2099,6 +2183,341 @@ def _metrics_at(*, buffers: _MetricBuffers, index: int) -> Mapping[str, float]:
     }
 
 
+def _top_k_context_from_prepared(
+    prepared_result: BacktestPreparePoolsResult,
+) -> _TopKContext:
+    pools_by_id = _pool_by_id(prepared_result)
+    indicator_ids = tuple(prepared_result.indicator_ids)
+    return _TopKContext(
+        indicator_ids=indicator_ids,
+        row_ids_by_pos=tuple(pools_by_id[indicator_id].row_ids for indicator_id in indicator_ids),
+        metadata_by_pos=tuple(
+            pools_by_id[indicator_id].metadata for indicator_id in indicator_ids
+        ),
+    )
+
+
+def _update_heap_total_return_desc(
+    *,
+    heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+    top_k_context: _TopKContext,
+    selected_rows_by_indicator: Mapping[str, np.ndarray],
+    buffers: _MetricBuffers,
+    confirm: np.ndarray | None,
+    proxy: np.ndarray | None,
+    top_k: int,
+) -> None:
+    _update_heap_from_score_values(
+        heap=heap,
+        top_k_context=top_k_context,
+        selected_rows_by_indicator=selected_rows_by_indicator,
+        buffers=buffers,
+        score_values=buffers.total_return_pct,
+        score_multiplier=1.0,
+        confirm=confirm,
+        proxy=proxy,
+        top_k=top_k,
+    )
+
+
+def _update_heap_generic_ranking(
+    *,
+    heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+    top_k_context: _TopKContext,
+    selected_rows_by_indicator: Mapping[str, np.ndarray],
+    buffers: _MetricBuffers,
+    confirm: np.ndarray | None,
+    proxy: np.ndarray | None,
+    top_k: int,
+    ranking: _RankingSpec,
+) -> None:
+    score_multiplier = 1.0 if ranking.direction == "desc" else -1.0
+    _update_heap_from_score_values(
+        heap=heap,
+        top_k_context=top_k_context,
+        selected_rows_by_indicator=selected_rows_by_indicator,
+        buffers=buffers,
+        score_values=_score_array_for_metric(buffers=buffers, metric_name=ranking.metric_name),
+        score_multiplier=score_multiplier,
+        confirm=confirm,
+        proxy=proxy,
+        top_k=top_k,
+    )
+
+
+def _update_heap_from_score_values(
+    *,
+    heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+    top_k_context: _TopKContext,
+    selected_rows_by_indicator: Mapping[str, np.ndarray],
+    buffers: _MetricBuffers,
+    score_values: np.ndarray,
+    score_multiplier: float,
+    confirm: np.ndarray | None,
+    proxy: np.ndarray | None,
+    top_k: int,
+) -> None:
+    selected_rows_by_pos = tuple(
+        selected_rows_by_indicator[indicator_id]
+        for indicator_id in top_k_context.indicator_ids
+    )
+    row_ids_by_pos = top_k_context.row_ids_by_pos
+    arity = len(selected_rows_by_pos)
+    if arity == 1:
+        selected_0 = selected_rows_by_pos[0]
+        row_ids_0 = row_ids_by_pos[0]
+        for result_index in range(buffers.size):
+            local_0 = int(selected_0[result_index])
+            local_indices = (local_0,)
+            original_rows = (int(row_ids_0[local_0]),)
+            score = float(score_values[result_index])
+            heap_key = (score * score_multiplier, original_rows)
+            if len(heap) < top_k:
+                heapq.heappush(
+                    heap,
+                    (
+                        heap_key,
+                        _materialize_heap_entry(
+                            top_k_context=top_k_context,
+                            local_indices=local_indices,
+                            original_rows=original_rows,
+                            score=score,
+                            buffers=buffers,
+                            result_index=result_index,
+                            confirm=confirm,
+                            proxy=proxy,
+                        ),
+                    ),
+                )
+            elif heap_key > heap[0][0]:
+                heapq.heapreplace(
+                    heap,
+                    (
+                        heap_key,
+                        _materialize_heap_entry(
+                            top_k_context=top_k_context,
+                            local_indices=local_indices,
+                            original_rows=original_rows,
+                            score=score,
+                            buffers=buffers,
+                            result_index=result_index,
+                            confirm=confirm,
+                            proxy=proxy,
+                        ),
+                    ),
+                )
+        return
+
+    if arity == 2:
+        selected_0 = selected_rows_by_pos[0]
+        selected_1 = selected_rows_by_pos[1]
+        row_ids_0 = row_ids_by_pos[0]
+        row_ids_1 = row_ids_by_pos[1]
+        for result_index in range(buffers.size):
+            local_0 = int(selected_0[result_index])
+            local_1 = int(selected_1[result_index])
+            local_indices = (local_0, local_1)
+            original_rows = (int(row_ids_0[local_0]), int(row_ids_1[local_1]))
+            score = float(score_values[result_index])
+            heap_key = (score * score_multiplier, original_rows)
+            if len(heap) < top_k:
+                heapq.heappush(
+                    heap,
+                    (
+                        heap_key,
+                        _materialize_heap_entry(
+                            top_k_context=top_k_context,
+                            local_indices=local_indices,
+                            original_rows=original_rows,
+                            score=score,
+                            buffers=buffers,
+                            result_index=result_index,
+                            confirm=confirm,
+                            proxy=proxy,
+                        ),
+                    ),
+                )
+            elif heap_key > heap[0][0]:
+                heapq.heapreplace(
+                    heap,
+                    (
+                        heap_key,
+                        _materialize_heap_entry(
+                            top_k_context=top_k_context,
+                            local_indices=local_indices,
+                            original_rows=original_rows,
+                            score=score,
+                            buffers=buffers,
+                            result_index=result_index,
+                            confirm=confirm,
+                            proxy=proxy,
+                        ),
+                    ),
+                )
+        return
+
+    for result_index in range(buffers.size):
+        local_values = []
+        original_values = []
+        for pos, selected_rows in enumerate(selected_rows_by_pos):
+            local_row = int(selected_rows[result_index])
+            local_values.append(local_row)
+            original_values.append(int(row_ids_by_pos[pos][local_row]))
+        local_indices = tuple(local_values)
+        original_rows = tuple(original_values)
+        score = float(score_values[result_index])
+        heap_key = (score * score_multiplier, original_rows)
+        if len(heap) < top_k:
+            heapq.heappush(
+                heap,
+                (
+                    heap_key,
+                    _materialize_heap_entry(
+                        top_k_context=top_k_context,
+                        local_indices=local_indices,
+                        original_rows=original_rows,
+                        score=score,
+                        buffers=buffers,
+                        result_index=result_index,
+                        confirm=confirm,
+                        proxy=proxy,
+                    ),
+                ),
+            )
+        elif heap_key > heap[0][0]:
+            heapq.heapreplace(
+                heap,
+                (
+                    heap_key,
+                    _materialize_heap_entry(
+                        top_k_context=top_k_context,
+                        local_indices=local_indices,
+                        original_rows=original_rows,
+                        score=score,
+                        buffers=buffers,
+                        result_index=result_index,
+                        confirm=confirm,
+                        proxy=proxy,
+                    ),
+                ),
+            )
+
+
+def _materialize_heap_entry(
+    *,
+    top_k_context: _TopKContext,
+    local_indices: tuple[int, ...],
+    original_rows: tuple[int, ...],
+    score: float,
+    buffers: _MetricBuffers,
+    result_index: int,
+    confirm: np.ndarray | None,
+    proxy: np.ndarray | None,
+) -> _NoRiskHeapEntry:
+    proxy_pending = confirm is None or proxy is None
+    if proxy_pending:
+        confirm_count = 0
+        proxy_score = 0.0
+    else:
+        assert confirm is not None
+        assert proxy is not None
+        confirm_count = int(confirm[result_index])
+        proxy_score = float(proxy[result_index])
+
+    metadata_by_indicator = {
+        indicator_id: top_k_context.metadata_by_pos[pos][local_indices[pos]].as_mapping()
+        for pos, indicator_id in enumerate(top_k_context.indicator_ids)
+    }
+    return _NoRiskHeapEntry(
+        score=score,
+        original_rows=original_rows,
+        indicator_rows={
+            indicator_id: original_rows[pos]
+            for pos, indicator_id in enumerate(top_k_context.indicator_ids)
+        },
+        metrics=_metrics_at(buffers=buffers, index=result_index),
+        metadata_by_indicator=metadata_by_indicator,
+        confirm_count=confirm_count,
+        proxy_score=proxy_score,
+        local_indices=local_indices,
+        proxy_pending=proxy_pending,
+    )
+
+
+def _top_results_from_heap(
+    heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
+) -> tuple[BacktestNoRiskTopResult, ...]:
+    return tuple(
+        BacktestNoRiskTopResult(
+            rank=rank,
+            score=entry.score,
+            indicator_rows=entry.indicator_rows,
+            metrics=entry.metrics,
+            metadata=_top_result_metadata(entry),
+        )
+        for rank, (_, entry) in enumerate(
+            sorted(heap, key=lambda pair: pair[0], reverse=True),
+            start=1,
+        )
+    )
+
+
+def _top_result_metadata(entry: _NoRiskHeapEntry) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "confirm_count": entry.confirm_count,
+        "proxy_score": entry.proxy_score,
+        "_proxy_pending": entry.proxy_pending,
+    }
+    for pos, (indicator_id, row_metadata) in enumerate(entry.metadata_by_indicator.items()):
+        metadata[f"{indicator_id}.local_index"] = entry.local_indices[pos]
+        for key, value in row_metadata.items():
+            metadata[f"{indicator_id}.{key}"] = value
+    return metadata
+
+
+def _ranking_from_normalized(normalized_request: Mapping[str, Any]) -> _RankingSpec:
+    ranking = normalized_request.get("ranking")
+    if ranking is None:
+        return _RankingSpec(metric_name="total_return_pct", direction="desc")
+    if not isinstance(ranking, Mapping):
+        raise BacktestNoRiskExactRejected("normalized_request.ranking must be a mapping")
+    raw_metric = ranking.get("primary_metric", ranking.get("metric", "total_return_pct"))
+    metric_name = str(raw_metric)
+    if metric_name not in NO_RISK_METRIC_NAMES:
+        raise BacktestNoRiskExactRejected(
+            f"unsupported no-risk ranking metric {metric_name!r}; expected one of "
+            f"{NO_RISK_METRIC_NAMES!r}"
+        )
+    direction = str(ranking.get("direction", "desc"))
+    if direction not in ("asc", "desc"):
+        raise BacktestNoRiskExactRejected("ranking.direction must be 'asc' or 'desc'")
+    return _RankingSpec(metric_name=metric_name, direction=direction)
+
+
+def _score_array_for_metric(*, buffers: _MetricBuffers, metric_name: str) -> np.ndarray:
+    if metric_name == "total_return_pct":
+        return buffers.total_return_pct
+    if metric_name == "max_drawdown_pct":
+        return buffers.max_drawdown_pct
+    if metric_name == "return_over_max_drawdown":
+        return buffers.return_over_max_drawdown
+    if metric_name == "profit_factor":
+        return buffers.profit_factor
+    if metric_name == "trade_count":
+        return buffers.trade_count
+    if metric_name == "sharpe_trades":
+        return buffers.sharpe_trades
+    if metric_name == "win_rate_pct":
+        return buffers.win_rate_pct
+    if metric_name == "avg_trade_ret_pct":
+        return buffers.avg_trade_ret_pct
+    if metric_name == "avg_trade_exec_bars":
+        return buffers.avg_trade_exec_bars
+    if metric_name == "exposure_pct":
+        return buffers.exposure_pct
+    raise BacktestNoRiskExactRejected(f"unsupported no-risk ranking metric {metric_name!r}")
+
+
 def _pool_by_id(prepared_result: BacktestPreparePoolsResult):
     return {pool.indicator_id: pool for pool in prepared_result.indicator_pools}
 
@@ -2125,6 +2544,7 @@ __all__ = [
     "NO_RISK_EXACT_BOUNDARY_STATUS",
     "NO_RISK_EXACT_SCORED_STATUS",
     "NO_RISK_EXACT_SCORING_STAGE_NAME",
+    "NO_RISK_HEAP_UPDATE_STAGE_NAME",
     "NO_RISK_METRIC_NAMES",
     "NO_RISK_SELF_CHECK_NOT_RUN_STATUS",
     "NO_RISK_SELF_CHECK_PASSED_STATUS",
