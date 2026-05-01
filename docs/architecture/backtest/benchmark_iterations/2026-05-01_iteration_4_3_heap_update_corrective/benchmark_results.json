@@ -1,0 +1,1478 @@
+{
+  "acceptance": {
+    "artifact_policy": "historical_prefix_compatible",
+    "ratio_definition": "canonical_stage_seconds / service_stage_seconds",
+    "ratio_threshold": 0.9,
+    "requires_artifact_historical_prefix_compatibility": true,
+    "requires_artifact_manifest_hash_match": false,
+    "requires_top_result_identity_match": true,
+    "stage_boundaries_compared": [
+      "heap_update"
+    ]
+  },
+  "artifact_acceptance": {
+    "compatibility_evidence": "canonical request-slice top identity matched for all 14 heap runs",
+    "full_manifest_hash_match_required": false,
+    "historical_prefix_invariant": "artifact historical-prefix invariant",
+    "policy": "historical_prefix_compatible"
+  },
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_historical_prefix_compatible": true,
+  "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+  "artifact_manifest_hash_matches_canonical": false,
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "canonical_artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-01T14:33:01.018225+03:00",
+  "git_commit": "8a3cd7cad0e1856de64b9ae1b58a6e54953135bd",
+  "git_status_short": "runtime-copy-no-git",
+  "host": "MacStudioDaniil",
+  "pass": true,
+  "python": "3.12.13",
+  "request": {
+    "benchmark_top_k": 5,
+    "heap_capacity_values": [
+      5
+    ],
+    "rows_per_indicator": 6,
+    "sample_warmup_top_k": 1,
+    "self_check_n": 2,
+    "top_n": 100,
+    "top_results_count_values": [
+      5
+    ],
+    "warmup_rows_per_indicator": 2
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "heap_update": 2.3374999727820978e-05
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.115272672233364
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 2.0958999812137336e-05,
+        "sample_warmup": 0.055891290998260956,
+        "top_result_assembly": 4.7041998186614364e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "heap_update": 8.308399992529303e-05
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.501527039767729
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 5.533300281967968e-05,
+        "sample_warmup": 0.01949912500276696,
+        "top_result_assembly": 4.033299774164334e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.000434833000326762
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.817483839086652
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.00023924999550217763,
+        "sample_warmup": 0.023920667001220863,
+        "top_result_assembly": 4.7084002289921045e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.00274233300024207
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.8761141947723086
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.001461708998249378,
+        "sample_warmup": 0.03236250000190921,
+        "top_result_assembly": 6.0917001974303275e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.019045416000153637
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.649465457390731
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.011546417001227383,
+        "sample_warmup": 0.023834040999645367,
+        "top_result_assembly": 6.920799933141097e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.1232555839997076
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.629170616293037
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.07565541801886866,
+        "sample_warmup": 0.03367945799982408,
+        "top_result_assembly": 7.733300299150869e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.8047931249984686
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.641638275209114
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.4902377930338844,
+        "sample_warmup": 0.08066633400449064,
+        "top_result_assembly": 8.86249981704168e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "heap_update": 3.645899960247334e-05
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.8616730952993086
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 1.9583996618166566e-05,
+        "sample_warmup": 0.08454758299922105,
+        "top_result_assembly": 4.7541005187667906e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "heap_update": 7.862500024202745e-05
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 1.3232745361679408
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 5.9416997828520834e-05,
+        "sample_warmup": 0.018571749998955056,
+        "top_result_assembly": 4.5082997530698776e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.00047612500020477455
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 2.3816133065399
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.00019991700537502766,
+        "sample_warmup": 0.02507145799609134,
+        "top_result_assembly": 5.154200334800407e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.002959291000479425
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 2.4322113473706386
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.0012167079985374585,
+        "sample_warmup": 0.03367370799969649,
+        "top_result_assembly": 5.775000317953527e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.018598666999423585
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 2.358528193893456
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.007885708997491747,
+        "sample_warmup": 0.025788875005673617,
+        "top_result_assembly": 8.183399768313393e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.12232574700010446
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 2.280794296214733
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.05363295901042875,
+        "sample_warmup": 0.0351556659952621,
+        "top_result_assembly": 7.9166995419655e-05
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "heap_update": 0.7841608709995853
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "heap_update": true,
+        "overall": true,
+        "top_identity": true
+      },
+      "ratios": {
+        "heap_update": 2.1838270194107823
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "heap_update": 0.3590764579930692,
+        "sample_warmup": 0.0835991250060033,
+        "top_result_assembly": 0.0001234579976880923
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ]
+      },
+      "top_results_count": 5
+    }
+  ],
+  "schema": "backtest_iteration_4_3_heap_update_v1",
+  "scope": {
+    "implemented_stages": [
+      "heap_update"
+    ],
+    "not_implemented_stages": [
+      "top_result_proxy_fill",
+      "result_hash_normalization",
+      "persistence",
+      "public_api_identity"
+    ],
+    "risk_mode": "none",
+    "stage_scope": "heap_update_only"
+  },
+  "stage_pass": true,
+  "top_identity_pass": true
+}
