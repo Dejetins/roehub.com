@@ -43,6 +43,17 @@ from .runtime_preflight import (
     BacktestValidationIssue,
     JsonMapping,
 )
+from .tp_sl_hit_times import (
+    BacktestTpSlGridEvidence,
+    BacktestTpSlGridResolution,
+    BacktestTpSlHitTimesCleanupEvidence,
+    BacktestTpSlHitTimesGridArrays,
+    BacktestTpSlHitTimesResult,
+    BacktestTpSlHitTimesSubset,
+    BacktestTpSlHitTimesTableArrays,
+    BacktestTpSlHitTimesTiming,
+    BacktestTpSlRequestedGrid,
+)
 
 __all__ = [
     "BacktestArtifactMetadata",
@@ -69,6 +80,15 @@ __all__ = [
     "BacktestRuntimeDefaults",
     "BacktestRuntimeGuardrails",
     "BacktestSelectedBackend",
+    "BacktestTpSlGridEvidence",
+    "BacktestTpSlGridResolution",
+    "BacktestTpSlHitTimesCleanupEvidence",
+    "BacktestTpSlHitTimesGridArrays",
+    "BacktestTpSlHitTimesResult",
+    "BacktestTpSlHitTimesSubset",
+    "BacktestTpSlHitTimesTableArrays",
+    "BacktestTpSlHitTimesTiming",
+    "BacktestTpSlRequestedGrid",
     "BacktestValidationIssue",
     "CompactScalar",
     "JsonMapping",

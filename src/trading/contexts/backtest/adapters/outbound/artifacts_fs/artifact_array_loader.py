@@ -10,6 +10,8 @@ import numpy as np
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
+    BacktestTpSlHitTimesGridArrays,
+    BacktestTpSlHitTimesTableArrays,
 )
 from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
@@ -17,6 +19,7 @@ from trading.contexts.backtest.application.ports.artifact_arrays import (
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
+    ArtifactHitTimesManifestDocumentV2,
     ArtifactMappingArraysV2,
     ArtifactMappingTimeframeManifestV2,
     ArtifactPriceArraysV2,
@@ -205,6 +208,87 @@ class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
             time_slice=time_slice,
         )
 
+    def load_hit_times_grid_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+    ) -> BacktestTpSlHitTimesGridArrays:
+        manifest = self.artifact_loader.load_hit_times_manifest(
+            context.coordinates,
+            context.artifact_slot,
+        )
+        manifest_hash = _verified_hit_times_manifest_hash(context=context, manifest=manifest)
+        paths = self.artifact_loader.resolve_hit_times_paths(
+            context.coordinates,
+            context.artifact_slot,
+        )
+        if manifest.path != paths.manifest:
+            raise ValueError(
+                "hit-times manifest path does not match resolved hit_times/15m path; "
+                f"got {manifest.path!r}, expected {paths.manifest!r}"
+            )
+        return BacktestTpSlHitTimesGridArrays(
+            manifest=manifest,
+            manifest_hash=manifest_hash,
+            tp_values=_load_npy_mmap(
+                paths.tp_values,
+                metadata=manifest.tp_values,
+                expected_dtype=np.dtype(np.float32),
+                expected_ndim=1,
+            ),
+            sl_values=_load_npy_mmap(
+                paths.sl_values,
+                metadata=manifest.sl_values,
+                expected_dtype=np.dtype(np.float32),
+                expected_ndim=1,
+            ),
+        )
+
+    def load_hit_times_table_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        manifest: ArtifactHitTimesManifestDocumentV2,
+    ) -> BacktestTpSlHitTimesTableArrays:
+        manifest_hash = _verified_hit_times_manifest_hash(context=context, manifest=manifest)
+        paths = self.artifact_loader.resolve_hit_times_paths(
+            context.coordinates,
+            context.artifact_slot,
+        )
+        if manifest.path != paths.manifest:
+            raise ValueError(
+                "hit-times manifest path does not match resolved hit_times/15m path; "
+                f"got {manifest.path!r}, expected {paths.manifest!r}"
+            )
+        return BacktestTpSlHitTimesTableArrays(
+            manifest=manifest,
+            manifest_hash=manifest_hash,
+            long_tp=_load_npy_mmap(
+                paths.long_tp,
+                metadata=manifest.long_tp.array,
+                expected_dtype=np.dtype(np.uint32),
+                expected_ndim=2,
+            ),
+            long_sl=_load_npy_mmap(
+                paths.long_sl,
+                metadata=manifest.long_sl.array,
+                expected_dtype=np.dtype(np.uint32),
+                expected_ndim=2,
+            ),
+            short_tp=_load_npy_mmap(
+                paths.short_tp,
+                metadata=manifest.short_tp.array,
+                expected_dtype=np.dtype(np.uint32),
+                expected_ndim=2,
+            ),
+            short_sl=_load_npy_mmap(
+                paths.short_sl,
+                metadata=manifest.short_sl.array,
+                expected_dtype=np.dtype(np.uint32),
+                expected_ndim=2,
+            ),
+        )
+
 
 def copy_signal_rows_i8(
     matrix: np.ndarray,
@@ -277,6 +361,21 @@ def _load_npy_mmap(
             f"expected {metadata.shape!r}"
         )
     return array
+
+
+def _verified_hit_times_manifest_hash(
+    *,
+    context: ArtifactSlotPinnedRuntimeContextV2,
+    manifest: ArtifactHitTimesManifestDocumentV2,
+) -> str:
+    expected_hash = context.slot_manifest.hit_times.manifest_sha256
+    actual_hash = _file_sha256_hex(manifest.path)
+    if actual_hash != expected_hash:
+        raise ValueError(
+            "hit_times/15m manifest hash does not match root manifest reference; "
+            f"got {actual_hash!r}, expected {expected_hash!r}"
+        )
+    return actual_hash
 
 
 def _file_sha256_hex(path: Path) -> str:
