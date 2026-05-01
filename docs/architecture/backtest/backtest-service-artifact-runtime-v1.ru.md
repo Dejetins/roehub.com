@@ -1402,13 +1402,18 @@ Acceptance по memory cleanup для каждой compute iteration:
   не растет монотонно на repeated runs или worker recycle сработал до следующего
   heavy job.
 
-Текущий статус accepted iterations:
+Текущий статус принятых итераций:
 
-| Iteration | Status | Accepted evidence |
+| Итерация | Статус | Принятые benchmark records |
 |---:|---|---|
+| 0 | `pass` | [`2026-04-26_iteration_0_docs_benchmark_harness`](benchmark_iterations/2026-04-26_iteration_0_docs_benchmark_harness/) |
 | 1 | `pass` | [`2026-04-26_iteration_1_request_normalization_artifact_context`](benchmark_iterations/2026-04-26_iteration_1_request_normalization_artifact_context/) |
 | 2 | `pass` | [`2026-04-26_iteration_2_prepare_pools`](benchmark_iterations/2026-04-26_iteration_2_prepare_pools/) |
 | 3 | `pass` | [`2026-04-27_iteration_3_combo_planning_contexts`](benchmark_iterations/2026-04-27_iteration_3_combo_planning_contexts/) |
+| 4 | `pass` | [`4.1 no-risk boundary`](benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/), [`4.2 exact/self-check`](benchmark_iterations/2026-05-01_iteration_4_2_exact_scoring_self_check/), [`4.3 heap corrective`](benchmark_iterations/2026-05-01_iteration_4_3_heap_update_corrective/), [`4.4 proxy fill`](benchmark_iterations/2026-05-01_iteration_4_4_top_result_proxy_fill/), [`4.5 shape/hash parity`](benchmark_iterations/2026-05-01_iteration_4_5_result_shape_hash_parity/), [`4.6 accounting`](benchmark_iterations/2026-05-01_iteration_4_6_benchmark_runner_accounting/), [`4.7 memory cleanup`](benchmark_iterations/2026-05-01_iteration_4_7_memory_cleanup/) |
+
+Итерация 5 и последующие итерации пока не имеют принятого benchmark record в
+`docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
 
 ### Итерация 0: документы и benchmark harness
 
@@ -1453,7 +1458,7 @@ Acceptance по memory cleanup для каждой compute iteration:
 - parity check, что request hash совпадает с canonical fixture hash, где применимо;
 - failure evidence для invalid indicator/source/window и request-too-expensive.
 
-Accepted evidence:
+Принятый benchmark record:
 [`2026-04-26_iteration_1_request_normalization_artifact_context`](benchmark_iterations/2026-04-26_iteration_1_request_normalization_artifact_context/).
 
 ### Итерация 2: artifact arrays и `prepare_pools`
@@ -1481,11 +1486,10 @@ Accepted evidence:
 - row metadata/order hash равен notebook fixture;
 - stage record записан до перехода к combo planning.
 
-Accepted evidence:
+Принятый benchmark record:
 [`2026-04-26_iteration_2_prepare_pools`](benchmark_iterations/2026-04-26_iteration_2_prepare_pools/).
-Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
-`prepare_pools_total` failure remains preserved in the evidence as
-`stage_boundary_mismatch`.
+В Итерации 2 принятая stage — `prepare_pools_core`; исторический strict-total
+fail по `prepare_pools_total` сохранен в evidence как `stage_boundary_mismatch`.
 
 ### Итерация 3: combo planning contexts
 
@@ -1507,7 +1511,7 @@ Iteration 2 accepted stage is `prepare_pools_core`; historical strict-total
 - active и inactive proxy-filter fixture evidence;
 - stage record записан до exact scoring.
 
-Accepted evidence:
+Принятый benchmark record:
 [`2026-04-27_iteration_3_combo_planning_contexts`](benchmark_iterations/2026-04-27_iteration_3_combo_planning_contexts/).
 
 ### Итерация 4: no-risk exact scoring и notebook-compatible top-K
@@ -1712,7 +1716,35 @@ service-only и не должны попадать в `heap_update`, `top_result
 - evidence, что public/storage identity work не попадает внутрь measured
   notebook-compatible stages.
 
+Принятые benchmark records:
+
+- [`4.1 no-risk boundary`](benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/)
+  принят как service hygiene smoke для compact DTO/result boundary и отсутствия
+  retained heavy references.
+- [`4.2 exact/self-check`](benchmark_iterations/2026-05-01_iteration_4_2_exact_scoring_self_check/)
+  принят для no-risk `self_check` и `exact_scoring`: `14 / 14` canonical
+  no-risk rows прошли с artifact policy `historical_prefix_compatible`.
+- [`4.3 heap corrective`](benchmark_iterations/2026-05-01_iteration_4_3_heap_update_corrective/)
+  принят для low-allocation `heap_update`: `14 / 14` rows прошли и top identity
+  совпал. Более ранний failed 4.3 evidence удален из active benchmark tree
+  после этого corrective pass.
+- [`4.4 proxy fill`](benchmark_iterations/2026-05-01_iteration_4_4_top_result_proxy_fill/)
+  принят для notebook-compatible `top_result_proxy_fill`: `14 / 14` rows прошли
+  с top identity и proxy metadata parity.
+- [`4.5 shape/hash parity`](benchmark_iterations/2026-05-01_iteration_4_5_result_shape_hash_parity/)
+  принят для canonical result shape, ordering, semantic metric parity, proxy
+  metadata parity и strict result hash: `14 / 14`.
+- [`4.6 benchmark runner accounting`](benchmark_iterations/2026-05-01_iteration_4_6_benchmark_runner_accounting/)
+  принят для local и Mac Studio validation canonical stage aliases,
+  accounting `total_without_warmup` и отделения
+  `service_total_without_warmup`.
+- [`4.7 memory cleanup`](benchmark_iterations/2026-05-01_iteration_4_7_memory_cleanup/)
+  принят как service hygiene evidence для compact results и non-monotonic
+  retained RSS growth на repeated no-risk runs.
+
 ### Итерация 5: загрузка и validation TP/SL grid
+
+Текущий статус: `pending`; принятый benchmark record еще не создан.
 
 - валидировать request TP/SL subset against artifact grid;
 - реализовать `load_hit_times` и `tp_sl_grid_validation`;
