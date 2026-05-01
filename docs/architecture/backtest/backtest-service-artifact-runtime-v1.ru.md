@@ -1412,8 +1412,12 @@ Acceptance по memory cleanup для каждой compute iteration:
 | 3 | `pass` | [`2026-04-27_iteration_3_combo_planning_contexts`](benchmark_iterations/2026-04-27_iteration_3_combo_planning_contexts/) |
 | 4 | `pass` | [`4.1 no-risk boundary`](benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/), [`4.2 exact/self-check`](benchmark_iterations/2026-05-01_iteration_4_2_exact_scoring_self_check/), [`4.3 heap corrective`](benchmark_iterations/2026-05-01_iteration_4_3_heap_update_corrective/), [`4.4 proxy fill`](benchmark_iterations/2026-05-01_iteration_4_4_top_result_proxy_fill/), [`4.5 shape/hash parity`](benchmark_iterations/2026-05-01_iteration_4_5_result_shape_hash_parity/), [`4.6 accounting`](benchmark_iterations/2026-05-01_iteration_4_6_benchmark_runner_accounting/), [`4.7 memory cleanup`](benchmark_iterations/2026-05-01_iteration_4_7_memory_cleanup/) |
 | 5 | `pass` | [`5 TP/SL hit-times loading/grid validation`](benchmark_iterations/2026-05-01_iteration_5_tp_sl_hit_times_loading_validation/) |
+| 6 | `pass` | [`6 TP/SL exact scoring/full metrics`](benchmark_iterations/2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics/) |
 
-Итерация 6 и последующие итерации пока не имеют принятого benchmark record в
+Итерация 6 принята с явным manual stage override: пользователь допустил
+нарушения `0.9` ratio для микросекундных стадий как неразличимые на уровне
+service latency. Raw ratios сохранены в benchmark evidence. Последующие итерации
+пока не имеют принятого benchmark record в
 `docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
 
 ### Итерация 0: документы и benchmark harness
@@ -1773,6 +1777,11 @@ service-only и не должны попадать в `heap_update`, `top_result
   arrays.
 
 ### Итерация 6: TP/SL exact scoring и full metrics
+
+Текущий статус: `pass` с manual stage override в
+[`2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics`](benchmark_iterations/2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics/).
+Raw benchmark ratios сохранены в evidence; override принят пользователем для
+микросекундных stage-ratio misses.
 
 - реализовать `event_segments_n_tp_sl_15m_grid` для arity 1..10;
 - реализовать TP/SL self-check против slow direct reference;

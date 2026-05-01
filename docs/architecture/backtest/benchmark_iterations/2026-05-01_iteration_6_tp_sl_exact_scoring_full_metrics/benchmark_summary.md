@@ -21,7 +21,17 @@
 - Artifact policy: `historical_prefix_compatible`
 - Artifact historical-prefix compatible: `True`
 
-## Failed Rows
+## Manual Acceptance Override
+
+- Manual override: `yes`
+- Applied at: `2026-05-01T22:58:16+03:00`
+- Requested by: `user`
+- Decision: `accepted_with_manual_stage_override`
+- Reason: the user accepted Iteration 6 despite stage-ratio misses below `0.9`
+  where the observed delta is microsecond-level and not service-visible.
+- Raw ratios and raw failed stage rows are retained below for traceability.
+
+## Rows Accepted By Manual Override
 
 | arity | direction_mode | stage | canonical_s | service_s | ratio | reason |
 |---:|---|---|---:|---:|---:|---|
@@ -50,20 +60,20 @@
 
 | arity | direction_mode | exact_s | canonical_exact_s | exact_ratio | heap_s | canonical_heap_s | heap_ratio | full_metrics_s | pass |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | `long_only` | 0.003510 | 0.003561 | 1.015 | 0.000041 | 0.000019 | 0.477 | 0.628887 | `no` |
-| 2 | `long_only` | 0.015603 | 0.020015 | 1.283 | 0.000044 | 0.000034 | 0.777 | 0.087631 | `no` |
-| 3 | `long_only` | 0.054965 | 0.056349 | 1.025 | 0.000038 | 0.000144 | 3.833 | 0.088397 | `no` |
-| 4 | `long_only` | 0.425468 | 0.428111 | 1.006 | 0.000047 | 0.000753 | 16.155 | 0.090403 | `no` |
-| 5 | `long_only` | 2.298283 | 2.299528 | 1.001 | 0.000128 | 0.004514 | 35.141 | 0.092244 | `no` |
-| 6 | `long_only` | 17.191681 | 16.822684 | 0.979 | 0.000826 | 0.027209 | 32.926 | 0.093465 | `no` |
-| 7 | `long_only` | 148.093383 | 146.899213 | 0.992 | 0.004469 | 0.165521 | 37.034 | 0.094398 | `no` |
-| 1 | `long_short_reversal` | 0.008512 | 0.008307 | 0.976 | 0.000036 | 0.000018 | 0.487 | 1.159840 | `no` |
-| 2 | `long_short_reversal` | 0.009499 | 0.007455 | 0.785 | 0.000025 | 0.000032 | 1.263 | 0.111054 | `no` |
-| 3 | `long_short_reversal` | 0.037265 | 0.038231 | 1.026 | 0.000032 | 0.000143 | 4.526 | 0.107678 | `no` |
-| 4 | `long_short_reversal` | 0.312823 | 0.308558 | 0.986 | 0.000039 | 0.000770 | 19.741 | 0.109801 | `no` |
-| 5 | `long_short_reversal` | 2.092360 | 2.087266 | 0.998 | 0.000135 | 0.004668 | 34.486 | 0.097981 | `no` |
-| 6 | `long_short_reversal` | 16.154290 | 15.795686 | 0.978 | 0.000873 | 0.027475 | 31.456 | 0.142896 | `no` |
-| 7 | `long_short_reversal` | 143.468516 | 140.994417 | 0.983 | 0.005166 | 0.165107 | 31.962 | 0.128072 | `no` |
+| 1 | `long_only` | 0.003510 | 0.003561 | 1.015 | 0.000041 | 0.000019 | 0.477 | 0.628887 | `yes (manual)` |
+| 2 | `long_only` | 0.015603 | 0.020015 | 1.283 | 0.000044 | 0.000034 | 0.777 | 0.087631 | `yes (manual)` |
+| 3 | `long_only` | 0.054965 | 0.056349 | 1.025 | 0.000038 | 0.000144 | 3.833 | 0.088397 | `yes (manual)` |
+| 4 | `long_only` | 0.425468 | 0.428111 | 1.006 | 0.000047 | 0.000753 | 16.155 | 0.090403 | `yes (manual)` |
+| 5 | `long_only` | 2.298283 | 2.299528 | 1.001 | 0.000128 | 0.004514 | 35.141 | 0.092244 | `yes (manual)` |
+| 6 | `long_only` | 17.191681 | 16.822684 | 0.979 | 0.000826 | 0.027209 | 32.926 | 0.093465 | `yes (manual)` |
+| 7 | `long_only` | 148.093383 | 146.899213 | 0.992 | 0.004469 | 0.165521 | 37.034 | 0.094398 | `yes (manual)` |
+| 1 | `long_short_reversal` | 0.008512 | 0.008307 | 0.976 | 0.000036 | 0.000018 | 0.487 | 1.159840 | `yes (manual)` |
+| 2 | `long_short_reversal` | 0.009499 | 0.007455 | 0.785 | 0.000025 | 0.000032 | 1.263 | 0.111054 | `yes (manual)` |
+| 3 | `long_short_reversal` | 0.037265 | 0.038231 | 1.026 | 0.000032 | 0.000143 | 4.526 | 0.107678 | `yes (manual)` |
+| 4 | `long_short_reversal` | 0.312823 | 0.308558 | 0.986 | 0.000039 | 0.000770 | 19.741 | 0.109801 | `yes (manual)` |
+| 5 | `long_short_reversal` | 2.092360 | 2.087266 | 0.998 | 0.000135 | 0.004668 | 34.486 | 0.097981 | `yes (manual)` |
+| 6 | `long_short_reversal` | 16.154290 | 15.795686 | 0.978 | 0.000873 | 0.027475 | 31.456 | 0.142896 | `yes (manual)` |
+| 7 | `long_short_reversal` | 143.468516 | 140.994417 | 0.983 | 0.005166 | 0.165107 | 31.962 | 0.128072 | `yes (manual)` |
 
 ## Smoke 8..10
 
@@ -78,9 +88,9 @@
 
 ## Decision
 
-- Stage pass: `no`
+- Stage pass: `yes (manual override)`
 - Top-result parity pass: `yes`
 - Full metrics pass: `yes`
 - Cleanup pass: `yes`
 - Smoke pass: `yes`
-- Overall pass: `no`
+- Overall pass: `yes (manual override)`

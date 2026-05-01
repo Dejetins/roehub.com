@@ -28,7 +28,13 @@
       "self_check",
       "exact_scoring",
       "heap_update"
-    ]
+    ],
+    "manual_stage_override": {
+      "applied": true,
+      "applied_at": "2026-05-01T22:58:16+03:00",
+      "requested_by": "user",
+      "reason": "Microsecond-level stage ratio misses are accepted manually; raw benchmark ratios remain authoritative measurement data."
+    }
   },
   "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
   "artifact_historical_prefix_compatible": true,
@@ -45,13 +51,34 @@
   "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
   "hit_times_manifest_hash_matches_canonical": false,
   "host": "MacStudioDaniil",
-  "pass": false,
+  "pass": true,
   "pass_breakdown": {
     "cleanup": true,
     "full_metrics": true,
     "smoke": true,
-    "stage": false,
+    "stage": true,
     "top_result_parity": true
+  },
+  "raw_pass_before_manual_override": {
+    "pass": false,
+    "pass_breakdown": {
+      "cleanup": true,
+      "full_metrics": true,
+      "smoke": true,
+      "stage": false,
+      "top_result_parity": true
+    }
+  },
+  "manual_acceptance_override": {
+    "applied": true,
+    "applied_at": "2026-05-01T22:58:16+03:00",
+    "requested_by": "user",
+    "decision": "accepted_with_manual_stage_override",
+    "reason": "User manually accepted Iteration 6 despite ratio misses below 0.9 where the observed delta is microsecond-level and not service-visible. Raw ratios and raw per-run stage pass fields are retained for traceability.",
+    "raw_stage_pass": false,
+    "raw_overall_pass": false,
+    "ratio_threshold": 0.9,
+    "raw_failed_stage_rows_retained_in_runs": true
   },
   "python": "3.12.13",
   "request": {
