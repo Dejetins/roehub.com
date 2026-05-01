@@ -2277,10 +2277,10 @@ def _update_heap_from_score_values(
                     heap,
                     (
                         heap_key,
-                        _materialize_heap_entry(
+                        _materialize_heap_entry_arity1(
                             top_k_context=top_k_context,
-                            local_indices=local_indices,
-                            original_rows=original_rows,
+                            local_index=local_0,
+                            original_row=original_rows[0],
                             score=score,
                             buffers=buffers,
                             result_index=result_index,
@@ -2294,10 +2294,10 @@ def _update_heap_from_score_values(
                     heap,
                     (
                         heap_key,
-                        _materialize_heap_entry(
+                        _materialize_heap_entry_arity1(
                             top_k_context=top_k_context,
-                            local_indices=local_indices,
-                            original_rows=original_rows,
+                            local_index=local_0,
+                            original_row=original_rows[0],
                             score=score,
                             buffers=buffers,
                             result_index=result_index,
@@ -2440,6 +2440,43 @@ def _materialize_heap_entry(
         confirm_count=confirm_count,
         proxy_score=proxy_score,
         local_indices=local_indices,
+        proxy_pending=proxy_pending,
+    )
+
+
+def _materialize_heap_entry_arity1(
+    *,
+    top_k_context: _TopKContext,
+    local_index: int,
+    original_row: int,
+    score: float,
+    buffers: _MetricBuffers,
+    result_index: int,
+    confirm: np.ndarray | None,
+    proxy: np.ndarray | None,
+) -> _NoRiskHeapEntry:
+    proxy_pending = confirm is None or proxy is None
+    if proxy_pending:
+        confirm_count = 0
+        proxy_score = 0.0
+    else:
+        assert confirm is not None
+        assert proxy is not None
+        confirm_count = int(confirm[result_index])
+        proxy_score = float(proxy[result_index])
+
+    indicator_id = top_k_context.indicator_ids[0]
+    return _NoRiskHeapEntry(
+        score=score,
+        original_rows=(original_row,),
+        indicator_rows={indicator_id: original_row},
+        metrics=_metrics_at(buffers=buffers, index=result_index),
+        metadata_by_indicator={
+            indicator_id: top_k_context.metadata_by_pos[0][local_index].as_mapping()
+        },
+        confirm_count=confirm_count,
+        proxy_score=proxy_score,
+        local_indices=(local_index,),
         proxy_pending=proxy_pending,
     )
 
