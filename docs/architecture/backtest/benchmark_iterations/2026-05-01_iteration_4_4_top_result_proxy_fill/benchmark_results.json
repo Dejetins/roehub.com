@@ -1,0 +1,2141 @@
+{
+  "acceptance": {
+    "artifact_policy": "historical_prefix_compatible",
+    "proxy_score_tolerance": 1e-05,
+    "ratio_definition": "canonical_stage_seconds / service_stage_seconds",
+    "ratio_threshold": 0.9,
+    "requires_artifact_historical_prefix_compatibility": true,
+    "requires_artifact_manifest_hash_match": false,
+    "requires_proxy_metadata_match": true,
+    "requires_top_result_identity_match": true,
+    "stage_boundaries_compared": [
+      "top_result_proxy_fill"
+    ]
+  },
+  "artifact_acceptance": {
+    "compatibility_evidence": "canonical request-slice top identity and proxy metadata matched for all 14 proxy-fill runs",
+    "full_manifest_hash_match_required": false,
+    "historical_prefix_invariant": "artifact historical-prefix invariant",
+    "policy": "historical_prefix_compatible"
+  },
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_historical_prefix_compatible": true,
+  "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+  "artifact_manifest_hash_matches_canonical": false,
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "canonical_artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-01T15:32:27.216605+03:00",
+  "git_commit": "4f390bd59fc4121b2c5edebd1accfc7f62c83491",
+  "git_status_short": "runtime-copy-no-git",
+  "host": "MacStudioDaniil",
+  "pass": true,
+  "proxy_metadata_pass": true,
+  "python": "3.12.13",
+  "request": {
+    "benchmark_top_k": 5,
+    "heap_capacity_values": [
+      5
+    ],
+    "rows_per_indicator": 6,
+    "sample_warmup_top_k": 1,
+    "self_check_n": 2,
+    "top_n": 100,
+    "top_results_count_values": [
+      5
+    ],
+    "warmup_rows_per_indicator": 2
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.007520833999478782
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9646218007474775
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 3.746235375001561,
+        "top_result_proxy_fill": 0.007796666002832353
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.0025859580000542337
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 1.0050525499982461
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 3.7887363339978037,
+        "top_result_proxy_fill": 0.002572958001110237
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            109385,
+            -125.96622467041016
+          ],
+          [
+            109601,
+            -126.387451171875
+          ],
+          [
+            109619,
+            -126.73922729492188
+          ],
+          [
+            109692,
+            -127.1106948852539
+          ],
+          [
+            109690,
+            -126.56442260742188
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            109385,
+            -125.96622467041016
+          ],
+          [
+            109601,
+            -126.387451171875
+          ],
+          [
+            109619,
+            -126.73922729492188
+          ],
+          [
+            109692,
+            -127.1106948852539
+          ],
+          [
+            109690,
+            -126.56442260742188
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.010922667000158981
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 1.0564741990580457
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.02604550000251038,
+        "top_result_proxy_fill": 0.010338792002585251
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            79228,
+            -92.30244445800781
+          ],
+          [
+            81249,
+            -94.72787475585938
+          ],
+          [
+            83504,
+            -97.41728210449219
+          ],
+          [
+            85988,
+            -100.3876953125
+          ],
+          [
+            88676,
+            -103.42484283447266
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            79228,
+            -92.30244445800781
+          ],
+          [
+            81249,
+            -94.72787475585938
+          ],
+          [
+            83504,
+            -97.41728210449219
+          ],
+          [
+            85988,
+            -100.3876953125
+          ],
+          [
+            88676,
+            -103.42484283447266
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.011894457999915176
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 1296,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9766634537773827
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.03671500000200467,
+        "top_result_proxy_fill": 0.012178666002000682
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            76820,
+            -89.38124084472656
+          ],
+          [
+            77503,
+            -90.26830291748047
+          ],
+          [
+            77939,
+            -90.69127655029297
+          ],
+          [
+            78131,
+            -90.8143539428711
+          ],
+          [
+            77912,
+            -90.73274230957031
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            76820,
+            -89.38124084472656
+          ],
+          [
+            77503,
+            -90.26830291748047
+          ],
+          [
+            77939,
+            -90.69127655029297
+          ],
+          [
+            78131,
+            -90.8143539428711
+          ],
+          [
+            77912,
+            -90.73274230957031
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.012689499999396503
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 7776,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9802815812655684
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.024128165998263285,
+        "top_result_proxy_fill": 0.012944750000315253
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            4,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            3,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47772,
+            -56.019954681396484
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47066,
+            -55.15078353881836
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47499,
+            -55.75096130371094
+          ],
+          [
+            47772,
+            -56.019954681396484
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.014285707999988517
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 46656,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9767810451224211
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.0379167499995674,
+        "top_result_proxy_fill": 0.014625291994889267
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            40173,
+            -47.37158966064453
+          ],
+          [
+            41398,
+            -48.5816764831543
+          ],
+          [
+            42780,
+            -50.142860412597656
+          ],
+          [
+            44439,
+            -52.1949348449707
+          ],
+          [
+            46159,
+            -54.10445785522461
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            40173,
+            -47.37158966064453
+          ],
+          [
+            41398,
+            -48.5816764831543
+          ],
+          [
+            42780,
+            -50.142860412597656
+          ],
+          [
+            44439,
+            -52.1949348449707
+          ],
+          [
+            46159,
+            -54.10445785522461
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.016414333000284387
+      },
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 279936,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9917401576781694
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.08564737500273623,
+        "top_result_proxy_fill": 0.01655104199744528
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            5
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            4
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            3
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            2
+          ],
+          [
+            5,
+            5,
+            5,
+            5,
+            3,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            34506,
+            -41.24724578857422
+          ],
+          [
+            31602,
+            -37.56538009643555
+          ],
+          [
+            32783,
+            -38.961402893066406
+          ],
+          [
+            28717,
+            -34.084712982177734
+          ],
+          [
+            32317,
+            -37.9571533203125
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            34506,
+            -41.24724578857422
+          ],
+          [
+            31602,
+            -37.56538009643555
+          ],
+          [
+            32783,
+            -38.961402893066406
+          ],
+          [
+            28717,
+            -34.084712982177734
+          ],
+          [
+            32317,
+            -37.9571533203125
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 1,
+      "backend": "event_segments_1_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_1_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.007748416999675101
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 6,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 1.016441380111331
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.08414712499507004,
+        "top_result_proxy_fill": 0.007623082994541619
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ],
+        "service": [
+          [
+            5
+          ],
+          [
+            4
+          ],
+          [
+            3
+          ],
+          [
+            2
+          ],
+          [
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            218906,
+            -248.6004638671875
+          ],
+          [
+            218902,
+            -248.9503631591797
+          ],
+          [
+            218907,
+            -249.62747192382812
+          ],
+          [
+            218906,
+            -250.18968200683594
+          ],
+          [
+            218907,
+            -249.1140594482422
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 2,
+      "backend": "event_segments_2_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_2_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.0028272920008021174
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 36,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9595154793446604
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.019051375005801674,
+        "top_result_proxy_fill": 0.0029465830011758953
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            2,
+            2
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            109217,
+            -122.54962921142578
+          ],
+          [
+            109180,
+            -122.68852233886719
+          ],
+          [
+            109301,
+            -122.56288146972656
+          ],
+          [
+            109288,
+            -122.88823699951172
+          ],
+          [
+            109214,
+            -123.07896423339844
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            109217,
+            -122.54962921142578
+          ],
+          [
+            109180,
+            -122.68852233886719
+          ],
+          [
+            109301,
+            -122.56288146972656
+          ],
+          [
+            109288,
+            -122.88823699951172
+          ],
+          [
+            109214,
+            -123.07896423339844
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 3,
+      "backend": "event_segments_3_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_3_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.010717500000282598
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 216,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9056245049063402
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.029741374994046055,
+        "top_result_proxy_fill": 0.011834375000034925
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5
+          ],
+          [
+            1,
+            2,
+            4
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            74037,
+            -83.59858703613281
+          ],
+          [
+            75810,
+            -85.56597900390625
+          ],
+          [
+            77819,
+            -87.91912078857422
+          ],
+          [
+            80232,
+            -90.6368637084961
+          ],
+          [
+            83176,
+            -93.95013427734375
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            74037,
+            -83.59858703613281
+          ],
+          [
+            75810,
+            -85.56597900390625
+          ],
+          [
+            77819,
+            -87.91912078857422
+          ],
+          [
+            80232,
+            -90.6368637084961
+          ],
+          [
+            83176,
+            -93.95013427734375
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 4,
+      "backend": "event_segments_4_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_4_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.013926625000749482
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 1296,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9815200460007945
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.03701033299876144,
+        "top_result_proxy_fill": 0.014188834000378847
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            70114,
+            -79.01168060302734
+          ],
+          [
+            70838,
+            -79.75386047363281
+          ],
+          [
+            71524,
+            -80.65699005126953
+          ],
+          [
+            72068,
+            -81.25873565673828
+          ],
+          [
+            72614,
+            -81.9129409790039
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            70114,
+            -79.01168060302734
+          ],
+          [
+            70838,
+            -79.75386047363281
+          ],
+          [
+            71524,
+            -80.65699005126953
+          ],
+          [
+            72068,
+            -81.25873565673828
+          ],
+          [
+            72614,
+            -81.9129409790039
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 5,
+      "backend": "event_segments_5_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_5_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.01221179200001643
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 7776,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9619371402368156
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.026730292003776412,
+        "top_result_proxy_fill": 0.012695000004896428
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            4,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            3,
+            5
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            17131,
+            -19.21197509765625
+          ],
+          [
+            14569,
+            -16.491043090820312
+          ],
+          [
+            17295,
+            -19.389728546142578
+          ],
+          [
+            14698,
+            -16.639692306518555
+          ],
+          [
+            17437,
+            -19.64826774597168
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            17131,
+            -19.21197509765625
+          ],
+          [
+            14569,
+            -16.491043090820312
+          ],
+          [
+            17295,
+            -19.389728546142578
+          ],
+          [
+            14698,
+            -16.639692306518555
+          ],
+          [
+            17437,
+            -19.64826774597168
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 6,
+      "backend": "event_segments_6_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_6_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.013265665999824705
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 1.0040239165933496
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.0375742079995689,
+        "top_result_proxy_fill": 0.01321250000182772
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            1
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            15075,
+            -16.709529876708984
+          ],
+          [
+            15423,
+            -17.079225540161133
+          ],
+          [
+            15829,
+            -17.513822555541992
+          ],
+          [
+            16299,
+            -18.175764083862305
+          ],
+          [
+            16831,
+            -18.877201080322266
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            15075,
+            -16.709529876708984
+          ],
+          [
+            15423,
+            -17.079225540161133
+          ],
+          [
+            15829,
+            -17.513822555541992
+          ],
+          [
+            16299,
+            -18.175764083862305
+          ],
+          [
+            16831,
+            -18.877201080322266
+          ]
+        ]
+      },
+      "top_results_count": 5
+    },
+    {
+      "arity": 7,
+      "backend": "event_segments_7_no_risk",
+      "benchmark_top_k": 5,
+      "canonical_backend": "event_segments_7_no_risk",
+      "canonical_targets": {
+        "top_result_proxy_fill": 0.01429183300024306
+      },
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 279936,
+      "heap_capacity": 5,
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "pass": {
+        "overall": true,
+        "proxy_metadata": true,
+        "top_identity": true,
+        "top_result_proxy_fill": true
+      },
+      "ratios": {
+        "top_result_proxy_fill": 0.9933420560978078
+      },
+      "request_top_n": 100,
+      "risk_mode": "none",
+      "sample_warmup_top_results_count": 1,
+      "timers": {
+        "sample_warmup": 0.0840926250020857,
+        "top_result_proxy_fill": 0.014387625000381377
+      },
+      "top_result_identity": {
+        "canonical": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ],
+        "service": [
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            3
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            2
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            1
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            5,
+            0
+          ],
+          [
+            1,
+            2,
+            5,
+            5,
+            5,
+            4,
+            3
+          ]
+        ]
+      },
+      "top_result_proxy_metadata": {
+        "canonical": [
+          [
+            14046,
+            -15.82341194152832
+          ],
+          [
+            12547,
+            -14.245820045471191
+          ],
+          [
+            13444,
+            -14.94339370727539
+          ],
+          [
+            10927,
+            -11.998102188110352
+          ],
+          [
+            14354,
+            -16.18408966064453
+          ]
+        ],
+        "proxy_score_tolerance": 1e-05,
+        "service": [
+          [
+            14046,
+            -15.82341194152832
+          ],
+          [
+            12547,
+            -14.245820045471191
+          ],
+          [
+            13444,
+            -14.94339370727539
+          ],
+          [
+            10927,
+            -11.998102188110352
+          ],
+          [
+            14354,
+            -16.18408966064453
+          ]
+        ]
+      },
+      "top_results_count": 5
+    }
+  ],
+  "schema": "backtest_iteration_4_4_top_result_proxy_fill_v1",
+  "scope": {
+    "implemented_stages": [
+      "top_result_proxy_fill"
+    ],
+    "not_implemented_stages": [
+      "exact_scoring",
+      "heap_update",
+      "result_hash_normalization",
+      "persistence",
+      "public_api_identity",
+      "lazy_trades"
+    ],
+    "risk_mode": "none",
+    "stage_scope": "top_result_proxy_fill_only"
+  },
+  "stage_pass": true,
+  "top_identity_pass": true
+}
