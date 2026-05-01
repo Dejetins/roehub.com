@@ -3,8 +3,8 @@
 ## Failed Row
 
 - Row: `arity=1 long_only`
-- Previous evidence path:
-  `docs/architecture/backtest/benchmark_iterations/2026-05-01_iteration_4_3_heap_update/`
+- Previous failed evidence was removed from the active benchmark tree after the
+  corrective pass record became the only accepted Iteration 4.3 evidence.
 - Previous service `heap_update`: `0.000036625s`
 - Canonical target: `0.000023375s`
 - Previous ratio: `0.638`
