@@ -114,6 +114,8 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert set(result.telemetry.sample_metrics or {}) == set(NO_RISK_METRIC_NAMES)
     assert result.self_check.status == NO_RISK_SELF_CHECK_NOT_RUN_STATUS
     assert result.memory_cleanup_evidence.result_is_compact is True
+    assert result.memory_cleanup_evidence.cleanup_duration_s is not None
+    assert result.memory_cleanup_evidence.cleanup_duration_s >= 0.0
 
     mapping = result.as_mapping()
     assert mapping["telemetry"]["request_top_n"] == 100
@@ -124,6 +126,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert mapping["telemetry"]["backend_implementation_id"] == EVENT_SEGMENTS_N_NO_RISK_BACKEND
     assert set(mapping["telemetry"]["sample_metrics"]) == set(NO_RISK_METRIC_NAMES)
     assert mapping["memory_cleanup_evidence"]["result_is_compact"] is True
+    assert mapping["memory_cleanup_evidence"]["cleanup_duration_s"] >= 0.0
 
 
 def test_no_risk_heap_capacity_uses_benchmark_top_k_not_request_top_n() -> None:
@@ -228,6 +231,43 @@ def test_no_risk_arity_one_heap_materializes_metadata_only_for_retained_row(
         for top_result in result.top_results
     ] == [(6.0, {"alpha": 0})]
     assert metadata_calls == [("alpha", 0)]
+
+
+def test_no_risk_arity_one_heap_entry_does_not_retain_metric_buffers() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha",))
+    buffers = no_risk_exact_module._allocate_metric_buffers(1)
+    buffers.total_return_pct[:] = 12.5
+    buffers.max_drawdown_pct[:] = 1.5
+    buffers.return_over_max_drawdown[:] = 8.0
+    buffers.profit_factor[:] = 2.0
+    buffers.trade_count[:] = 3
+    buffers.sharpe_trades[:] = 0.75
+    buffers.win_rate_pct[:] = 66.0
+    buffers.avg_trade_ret_pct[:] = 4.0
+    buffers.avg_trade_exec_bars[:] = 5.0
+    buffers.exposure_pct[:] = 42.0
+    total_return_ref = weakref.ref(buffers.total_return_pct)
+
+    entry = no_risk_exact_module._materialize_heap_entry_arity1(
+        top_k_context=no_risk_exact_module._top_k_context_from_prepared(prepared),
+        local_index=0,
+        original_row=0,
+        score=12.5,
+        buffers=buffers,
+        result_index=0,
+        confirm=None,
+        proxy=None,
+    )
+
+    assert entry.metric_buffers is None
+    assert entry.metric_index == -1
+    assert entry.metric_values == pytest.approx(
+        (12.5, 1.5, 8.0, 2.0, 3.0, 0.75, 66.0, 4.0, 5.0, 42.0)
+    )
+
+    del buffers
+    gc.collect()
+    assert total_return_ref() is None
 
 
 def test_top_result_proxy_fill_recomputes_only_final_pending_rows(

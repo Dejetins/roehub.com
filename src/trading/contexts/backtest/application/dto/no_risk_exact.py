@@ -272,8 +272,11 @@ class BacktestNoRiskMemoryCleanupEvidence:
     checked_reference_names: tuple[str, ...]
     retained_heavy_reference_names: tuple[str, ...]
     result_contains_heavy_references: bool
+    cleanup_duration_s: float | None = None
 
     def __post_init__(self) -> None:
+        if self.cleanup_duration_s is not None and self.cleanup_duration_s < 0.0:
+            raise ValueError("cleanup_duration_s must be >= 0")
         object.__setattr__(
             self,
             "checked_reference_names",
@@ -298,6 +301,7 @@ class BacktestNoRiskMemoryCleanupEvidence:
             "retained_heavy_reference_names": list(self.retained_heavy_reference_names),
             "result_contains_heavy_references": self.result_contains_heavy_references,
             "result_is_compact": self.result_is_compact,
+            "cleanup_duration_s": self.cleanup_duration_s,
         }
 
 

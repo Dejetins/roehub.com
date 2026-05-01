@@ -200,6 +200,7 @@ class BacktestNoRiskExactScoringService:
         stage_timings = {
             NO_RISK_EXACT_BOUNDARY_STAGE_NAME: time.perf_counter() - boundary_start,
         }
+        execution_context = _execution_context_from_prepared(prepared_result)
 
         self_check_summary = BacktestNoRiskSelfCheckSummary(
             enabled=self.config.run_self_check,
@@ -208,93 +209,125 @@ class BacktestNoRiskExactScoringService:
             backend_implementation_id=backend.backend_id,
             direction_mode=backend.direction_mode,
         )
-        selected_batches_iter = _iter_selected_candidate_batches(
-            prepared_result=prepared_result,
-            combo_planning_result=combo_planning_result,
-        )
-        first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
-        if self.config.run_self_check:
-            check_start = time.perf_counter()
-            self_check_summary = self._run_self_check(
-                selected_rows_by_indicator=None
-                if first_selected_batch is None
-                else first_selected_batch.rows_by_indicator,
+
+        top_results: tuple[BacktestNoRiskTopResult, ...] | None = None
+        telemetry: BacktestNoRiskExactTelemetry | None = None
+        cleanup_duration_s = 0.0
+        selected_batches_iter: Iterator[_SelectedCandidateBatch] | None = None
+        first_selected_batch: _SelectedCandidateBatch | None = None
+        selected_batch: _SelectedCandidateBatch | None = None
+        heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] | None = None
+        try:
+            selected_batches_iter = _iter_selected_candidate_batches(
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
-                execution_settings=execution_settings,
-                execution_open_1m=execution_open_1m,
-                execution_close_1m=execution_close_1m,
+            )
+            first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
+            if self.config.run_self_check:
+                check_start = time.perf_counter()
+                self_check_summary = self._run_self_check(
+                    selected_rows_by_indicator=None
+                    if first_selected_batch is None
+                    else first_selected_batch.rows_by_indicator,
+                    prepared_result=prepared_result,
+                    combo_planning_result=combo_planning_result,
+                    execution_settings=execution_settings,
+                    execution_open_1m=execution_open_1m,
+                    execution_close_1m=execution_close_1m,
+                    backend_logical_name=backend_logical_name,
+                )
+                stage_timings[NO_RISK_SELF_CHECK_STAGE_NAME] = (
+                    time.perf_counter() - check_start
+                )
+
+            stage_timings[NO_RISK_EXACT_SCORING_STAGE_NAME] = 0.0
+            stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] = 0.0
+            heap = []
+            scored_count = 0
+            sample_metrics: Mapping[str, float] | None = None
+            if first_selected_batch is not None:
+                scored, sample_metrics = self._score_selected_rows(
+                    selected_batch=first_selected_batch,
+                    prepared_result=prepared_result,
+                    combo_planning_result=combo_planning_result,
+                    execution_settings=execution_settings,
+                    execution_open_1m=execution_open_1m,
+                    execution_close_1m=execution_close_1m,
+                    stage_timings=stage_timings,
+                    sample_metrics=sample_metrics,
+                    heap=heap,
+                    top_k_context=top_k_context,
+                    top_k=self.config.heap_capacity,
+                    ranking=ranking,
+                )
+                scored_count += scored
+            assert selected_batches_iter is not None
+            for selected_batch in selected_batches_iter:
+                scored, sample_metrics = self._score_selected_rows(
+                    selected_batch=selected_batch,
+                    prepared_result=prepared_result,
+                    combo_planning_result=combo_planning_result,
+                    execution_settings=execution_settings,
+                    execution_open_1m=execution_open_1m,
+                    execution_close_1m=execution_close_1m,
+                    stage_timings=stage_timings,
+                    sample_metrics=sample_metrics,
+                    heap=heap,
+                    top_k_context=top_k_context,
+                    top_k=self.config.heap_capacity,
+                    ranking=ranking,
+                )
+                scored_count += scored
+
+            top_result_start = time.perf_counter()
+            top_results = _top_results_from_heap(
+                heap,
+                prepared_result=prepared_result,
+                combo_planning_result=combo_planning_result,
+                top_k_context=top_k_context,
+            )
+            stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
+                time.perf_counter() - top_result_start
+            )
+            telemetry = BacktestNoRiskExactTelemetry(
+                stage_timings=stage_timings,
+                request_top_n=request_top_n,
+                benchmark_top_k=self.config.benchmark_top_k,
+                heap_capacity=self.config.heap_capacity,
+                top_results_count=len(top_results),
+                exact_candidates_evaluated=scored_count,
+                risk_mode=risk_mode,
+                direction_mode=backend.direction_mode,
+                backend_id=backend.backend_id,
+                arity=arity,
+                status=NO_RISK_EXACT_SCORED_STATUS,
                 backend_logical_name=backend_logical_name,
-            )
-            stage_timings[NO_RISK_SELF_CHECK_STAGE_NAME] = time.perf_counter() - check_start
-
-        stage_timings[NO_RISK_EXACT_SCORING_STAGE_NAME] = 0.0
-        stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] = 0.0
-        heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] = []
-        scored_count = 0
-        sample_metrics: Mapping[str, float] | None = None
-        if first_selected_batch is not None:
-            scored, sample_metrics = self._score_selected_rows(
-                selected_batch=first_selected_batch,
-                prepared_result=prepared_result,
-                combo_planning_result=combo_planning_result,
-                execution_settings=execution_settings,
-                execution_open_1m=execution_open_1m,
-                execution_close_1m=execution_close_1m,
-                stage_timings=stage_timings,
+                backend_implementation_id=backend.backend_id,
+                metric_names=NO_RISK_METRIC_NAMES,
                 sample_metrics=sample_metrics,
-                heap=heap,
-                top_k_context=top_k_context,
-                top_k=self.config.heap_capacity,
-                ranking=ranking,
             )
-            scored_count += scored
-        for selected_batch in selected_batches_iter:
-            scored, sample_metrics = self._score_selected_rows(
-                selected_batch=selected_batch,
-                prepared_result=prepared_result,
-                combo_planning_result=combo_planning_result,
-                execution_settings=execution_settings,
-                execution_open_1m=execution_open_1m,
-                execution_close_1m=execution_close_1m,
-                stage_timings=stage_timings,
-                sample_metrics=sample_metrics,
-                heap=heap,
-                top_k_context=top_k_context,
-                top_k=self.config.heap_capacity,
-                ranking=ranking,
-            )
-            scored_count += scored
+        finally:
+            cleanup_start = time.perf_counter()
+            if heap is not None:
+                heap.clear()
+            selected_batch = None
+            first_selected_batch = None
+            selected_batches_iter = None
+            del selected_batch
+            del first_selected_batch
+            del selected_batches_iter
+            del top_k_context
+            del execution_open_1m
+            del execution_close_1m
+            del prepared_result
+            del combo_planning_result
+            del normalized_request
+            cleanup_duration_s = time.perf_counter() - cleanup_start
 
-        top_result_start = time.perf_counter()
-        top_results = _top_results_from_heap(
-            heap,
-            prepared_result=prepared_result,
-            combo_planning_result=combo_planning_result,
-            top_k_context=top_k_context,
-        )
-        stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
-            time.perf_counter() - top_result_start
-        )
-        telemetry = BacktestNoRiskExactTelemetry(
-            stage_timings=stage_timings,
-            request_top_n=request_top_n,
-            benchmark_top_k=self.config.benchmark_top_k,
-            heap_capacity=self.config.heap_capacity,
-            top_results_count=len(top_results),
-            exact_candidates_evaluated=scored_count,
-            risk_mode=risk_mode,
-            direction_mode=backend.direction_mode,
-            backend_id=backend.backend_id,
-            arity=arity,
-            status=NO_RISK_EXACT_SCORED_STATUS,
-            backend_logical_name=backend_logical_name,
-            backend_implementation_id=backend.backend_id,
-            metric_names=NO_RISK_METRIC_NAMES,
-            sample_metrics=sample_metrics,
-        )
+        if top_results is None or telemetry is None:
+            raise RuntimeError("no-risk exact scoring did not produce a compact result")
         return BacktestNoRiskExactResult(
-            execution_context=_execution_context_from_prepared(prepared_result),
+            execution_context=execution_context,
             top_results=top_results,
             telemetry=telemetry,
             self_check=self_check_summary,
@@ -307,9 +340,13 @@ class BacktestNoRiskExactScoringService:
                     "proxy_context",
                     "execution_open_1m",
                     "execution_close_1m",
+                    "selected_batches_iter",
+                    "metric_buffers",
+                    "heap",
                 ),
                 retained_heavy_reference_names=(),
                 result_contains_heavy_references=False,
+                cleanup_duration_s=cleanup_duration_s,
             ),
         )
 
@@ -2556,9 +2593,9 @@ def _materialize_heap_entry_arity1(
         score=score,
         original_rows=(original_row,),
         local_indices=(local_index,),
-        metric_values=(),
-        metric_buffers=buffers,
-        metric_index=result_index,
+        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metric_buffers=None,
+        metric_index=-1,
         metadata_by_pos=(top_k_context.metadata_by_pos[0][local_index],),
         confirm_count=confirm_count,
         proxy_score=proxy_score,
