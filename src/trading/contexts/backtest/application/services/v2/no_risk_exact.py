@@ -133,6 +133,8 @@ class _NoRiskHeapEntry(NamedTuple):
     original_rows: tuple[int, ...]
     local_indices: tuple[int, ...]
     metric_values: tuple[float, ...]
+    metric_buffers: _MetricBuffers | None
+    metric_index: int
     metadata_by_pos: tuple[Any, ...]
     confirm_count: int
     proxy_score: float
@@ -2454,6 +2456,8 @@ def _materialize_heap_entry(
         original_rows=original_rows,
         local_indices=local_indices,
         metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metric_buffers=None,
+        metric_index=-1,
         metadata_by_pos=tuple(
             top_k_context.metadata_by_pos[pos][local_indices[pos]]
             for pos in range(len(local_indices))
@@ -2489,7 +2493,9 @@ def _materialize_heap_entry_arity1(
         score=score,
         original_rows=(original_row,),
         local_indices=(local_index,),
-        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metric_values=(),
+        metric_buffers=buffers,
+        metric_index=result_index,
         metadata_by_pos=(top_k_context.metadata_by_pos[0][local_index],),
         confirm_count=confirm_count,
         proxy_score=proxy_score,
@@ -2510,7 +2516,7 @@ def _top_results_from_heap(
                 indicator_id: entry.original_rows[pos]
                 for pos, indicator_id in enumerate(top_k_context.indicator_ids)
             },
-            metrics=_metrics_from_values(entry.metric_values),
+            metrics=_metrics_from_values(_metric_values_from_heap_entry(entry)),
             metadata=_top_result_metadata(entry, top_k_context=top_k_context),
         )
         for rank, (_, entry) in enumerate(
@@ -2518,6 +2524,14 @@ def _top_results_from_heap(
             start=1,
         )
     )
+
+
+def _metric_values_from_heap_entry(entry: _NoRiskHeapEntry) -> tuple[float, ...]:
+    if entry.metric_values:
+        return entry.metric_values
+    if entry.metric_buffers is None:
+        raise RuntimeError("deferred no-risk heap metrics require metric buffers")
+    return _metric_values_at(buffers=entry.metric_buffers, index=entry.metric_index)
 
 
 def _top_result_metadata(
