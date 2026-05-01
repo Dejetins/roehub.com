@@ -3,7 +3,7 @@
 ## Version
 
 - Host: `MacStudioDaniil`
-- Git commit: `064f5de1b1f070ed1098f031df87a46c18ae6641`
+- Git commit: `92258b304819d5b8f2c4aebf2a1be4bdab517da3`
 - Artifact manifest hash: `595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af`
 - Hit-times manifest hash: `09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc`
 - Artifact policy: `historical_prefix_compatible`
