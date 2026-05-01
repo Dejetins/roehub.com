@@ -32,14 +32,21 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     iter_combo_chunks,
     make_combo_idx_matrix,
 )
-from trading.contexts.backtest.application.services.v2.no_risk_exact import (
-    BARS_PER_YEAR_EXEC_1M,
+from trading.contexts.backtest.application.services.v2.execution_sizing import (
     DIRECTION_MODE_LONG_ONLY,
     DIRECTION_MODE_LONG_ONLY_CODE,
     DIRECTION_MODE_LONG_SHORT_REVERSAL,
     DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE,
-    _execution_settings_from_normalized,
-    _ExecutionSettings,
+    SIZING_MODE_ALL_IN_CODE,
+    execution_quote_amount,
+    execution_quote_amount_py,
+    execution_settings_from_normalized,
+)
+from trading.contexts.backtest.application.services.v2.execution_sizing import (
+    ExecutionSettings as _ExecutionSettings,
+)
+from trading.contexts.backtest.application.services.v2.no_risk_exact import (
+    BARS_PER_YEAR_EXEC_1M,
     _pool_by_id,
     _request_top_n_from_normalized,
     _risk_mode_from_normalized,
@@ -58,6 +65,8 @@ TP_SL_EXACT_SCORED_STATUS = "scored"
 TP_SL_SELF_CHECK_NOT_RUN_STATUS = "not_run"
 TP_SL_SELF_CHECK_PASSED_STATUS = "passed"
 NEG_LARGE = -1.0e300
+TP_SL_BEST_CELL_TIE_EPS = 1.0e-12
+TP_SL_SELF_CHECK_BEST_CELL_TIE_TOLERANCE_PCT = 1.0e-9
 
 
 class BacktestTpSlExactRejected(ValueError):
@@ -70,6 +79,20 @@ class BacktestTpSlSelfCheckFailed(AssertionError):
     """
     Raised when fast TP/SL exact scoring diverges from the bounded slow reference.
     """
+
+
+def _execution_settings_from_normalized(
+    normalized_request: Mapping[str, Any],
+    *,
+    expected_direction_mode: str,
+    config: BacktestTpSlExactConfig,
+) -> _ExecutionSettings:
+    return execution_settings_from_normalized(
+        normalized_request,
+        expected_direction_mode=expected_direction_mode,
+        config=config,
+        rejection_cls=BacktestTpSlExactRejected,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +109,14 @@ class _TpSlRuntimeContext:
     log_fac_sl_short: np.ndarray
     log_fee_two_sides: float
     close_on_end: np.int8
+    initial_cash_quote: float
+    sizing_mode_code: np.int8
+    quote_amount: float
+    equity_pct: float
+    min_quote: float
+    max_quote: float
+    safe_profit_percent: float
+    use_profit_lock: np.int8
 
 
 @dataclass(frozen=True, slots=True)
@@ -458,35 +489,76 @@ def evaluate_tp_sl_exact_chunk(
         dtype=np.int32,
     )
     best_ret = np.empty(buffers.size, dtype=np.float32)
-    event_segments_n_tp_sl_15m_grid(
-        combo_idx_by_indicator,
-        exact_context.starts,
-        exact_context.ends,
-        exact_context.values,
-        exact_context.counts,
-        segment_pos_workspace,
-        runtime.run_abs_start_15m,
-        runtime.t_exec_abs_15m,
-        runtime.price_open_15m,
-        runtime.log_open_15m,
-        runtime.last_close_15m,
-        runtime.log_last_close_15m,
-        hit_times.long_tp,
-        hit_times.long_sl,
-        hit_times.short_tp,
-        hit_times.short_sl,
-        runtime.log_fac_tp_long,
-        runtime.log_fac_sl_long,
-        runtime.log_fac_tp_short,
-        runtime.log_fac_sl_short,
-        runtime.log_fee_two_sides,
-        runtime.close_on_end,
-        _direction_mode_code(combo_planning_result.backend.direction_mode),
-        buffers.best_tp_idx,
-        buffers.best_sl_idx,
-        best_ret,
-        buffers.trade_count,
-    )
+    if (
+        runtime.sizing_mode_code == SIZING_MODE_ALL_IN_CODE
+        and runtime.use_profit_lock == 0
+        and runtime.close_on_end == 1
+    ):
+        event_segments_n_tp_sl_15m_grid(
+            combo_idx_by_indicator,
+            exact_context.starts,
+            exact_context.ends,
+            exact_context.values,
+            exact_context.counts,
+            segment_pos_workspace,
+            runtime.run_abs_start_15m,
+            runtime.t_exec_abs_15m,
+            runtime.price_open_15m,
+            runtime.log_open_15m,
+            runtime.last_close_15m,
+            runtime.log_last_close_15m,
+            hit_times.long_tp,
+            hit_times.long_sl,
+            hit_times.short_tp,
+            hit_times.short_sl,
+            runtime.log_fac_tp_long,
+            runtime.log_fac_sl_long,
+            runtime.log_fac_tp_short,
+            runtime.log_fac_sl_short,
+            runtime.log_fee_two_sides,
+            runtime.close_on_end,
+            _direction_mode_code(combo_planning_result.backend.direction_mode),
+            buffers.best_tp_idx,
+            buffers.best_sl_idx,
+            best_ret,
+            buffers.trade_count,
+        )
+    else:
+        event_segments_n_tp_sl_15m_grid_execution_sizing(
+            combo_idx_by_indicator,
+            exact_context.starts,
+            exact_context.ends,
+            exact_context.values,
+            exact_context.counts,
+            segment_pos_workspace,
+            runtime.run_abs_start_15m,
+            runtime.t_exec_abs_15m,
+            runtime.price_open_15m,
+            runtime.last_close_15m,
+            hit_times.long_tp,
+            hit_times.long_sl,
+            hit_times.short_tp,
+            hit_times.short_sl,
+            runtime.log_fac_tp_long,
+            runtime.log_fac_sl_long,
+            runtime.log_fac_tp_short,
+            runtime.log_fac_sl_short,
+            runtime.log_fee_two_sides,
+            runtime.close_on_end,
+            runtime.initial_cash_quote,
+            runtime.sizing_mode_code,
+            runtime.quote_amount,
+            runtime.equity_pct,
+            runtime.min_quote,
+            runtime.max_quote,
+            runtime.safe_profit_percent,
+            runtime.use_profit_lock,
+            _direction_mode_code(combo_planning_result.backend.direction_mode),
+            buffers.best_tp_idx,
+            buffers.best_sl_idx,
+            best_ret,
+            buffers.trade_count,
+        )
     buffers.total_return_pct[:] = best_ret.astype(np.float64) * 100.0
 
 
@@ -587,7 +659,10 @@ def run_tp_sl_fast_vs_reference_self_check(
         same_cell = int(reference["best_tp_idx"]) == fast_tp and int(
             reference["best_sl_idx"]
         ) == fast_sl
-        if not same_cell:
+        if (
+            not same_cell
+            and abs_diff > TP_SL_SELF_CHECK_BEST_CELL_TIE_TOLERANCE_PCT
+        ):
             best_cell_equal = False
             mismatches += 1
             if first_mismatch is None:
@@ -1080,6 +1155,403 @@ def event_segments_n_tp_sl_15m_grid(
             out_best_ret[k] = np.float32(math.exp(best_log) - 1.0)
 
 
+@nb.njit(cache=True, parallel=True, fastmath=False)
+def event_segments_n_tp_sl_15m_grid_execution_sizing(
+    combo_idx_by_indicator: np.ndarray,
+    segment_starts: np.ndarray,
+    segment_ends: np.ndarray,
+    segment_values: np.ndarray,
+    segment_counts: np.ndarray,
+    segment_pos_workspace: np.ndarray,
+    run_abs_start: np.int32,
+    t_exec_abs: np.int32,
+    price_open: np.ndarray,
+    last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    initial_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+    direction_mode: np.int8,
+    out_best_tp_idx: np.ndarray,
+    out_best_sl_idx: np.ndarray,
+    out_best_ret: np.ndarray,
+    out_trade_count: np.ndarray,
+) -> None:
+    arity = combo_idx_by_indicator.shape[0]
+    combo_count = combo_idx_by_indicator.shape[1]
+    n_tp = hit_long_tp.shape[0]
+    n_sl = hit_long_sl.shape[0]
+
+    for k in nb.prange(combo_count):
+        best_return = -1.0e300
+        best_tp = np.int32(0)
+        best_sl = np.int32(0)
+        best_trade_count = np.int32(0)
+
+        for tp_i in range(n_tp):
+            for sl_i in range(n_sl):
+                for indicator_pos in range(arity):
+                    segment_pos_workspace[k, indicator_pos] = np.int32(0)
+
+                available_quote = initial_cash_quote
+                safe_quote = 0.0
+                equity = initial_cash_quote
+                current_dir = np.int8(0)
+                current_entry_abs = np.int32(0)
+                closed_trade_count = np.int32(0)
+
+                while True:
+                    active = True
+                    segment_start = np.int32(0)
+                    segment_end = np.int32(2147483647)
+                    for indicator_pos in range(arity):
+                        row_idx = combo_idx_by_indicator[indicator_pos, k]
+                        segment_idx = segment_pos_workspace[k, indicator_pos]
+                        if segment_idx >= segment_counts[indicator_pos, row_idx]:
+                            active = False
+                            break
+                        start_value = segment_starts[indicator_pos, row_idx, segment_idx]
+                        end_value = segment_ends[indicator_pos, row_idx, segment_idx]
+                        if start_value > segment_start:
+                            segment_start = start_value
+                        if end_value < segment_end:
+                            segment_end = end_value
+                    if not active:
+                        break
+
+                    if segment_start < segment_end:
+                        first_row_idx = combo_idx_by_indicator[0, k]
+                        first_segment_idx = segment_pos_workspace[k, 0]
+                        raw_dir = segment_values[0, first_row_idx, first_segment_idx]
+                        if raw_dir != 0:
+                            for indicator_pos in range(1, arity):
+                                row_idx = combo_idx_by_indicator[indicator_pos, k]
+                                segment_idx = segment_pos_workspace[k, indicator_pos]
+                                if (
+                                    segment_values[indicator_pos, row_idx, segment_idx]
+                                    != raw_dir
+                                ):
+                                    raw_dir = np.int8(0)
+                                    break
+                        dirn = _tp_sl_apply_direction_mode(raw_dir, direction_mode)
+                        if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                            entry_abs = np.int32(run_abs_start + segment_start + 1)
+                            if entry_abs >= t_exec_abs:
+                                break
+                            if dirn == 0:
+                                (
+                                    available_quote,
+                                    safe_quote,
+                                    equity,
+                                    closed_trade_count,
+                                ) = _tp_sl_apply_trade_to_account_for_cell(
+                                    current_dir,
+                                    current_entry_abs,
+                                    entry_abs,
+                                    np.int32(tp_i),
+                                    np.int32(sl_i),
+                                    price_open,
+                                    last_close,
+                                    hit_long_tp,
+                                    hit_long_sl,
+                                    hit_short_tp,
+                                    hit_short_sl,
+                                    log_fac_tp_long,
+                                    log_fac_sl_long,
+                                    log_fac_tp_short,
+                                    log_fac_sl_short,
+                                    log_fee_two_sides,
+                                    close_on_end,
+                                    t_exec_abs,
+                                    available_quote,
+                                    safe_quote,
+                                    equity,
+                                    sizing_mode_code,
+                                    configured_quote_amount,
+                                    equity_pct,
+                                    min_quote,
+                                    max_quote,
+                                    safe_profit_percent,
+                                    use_profit_lock,
+                                    closed_trade_count,
+                                )
+                                current_dir = np.int8(0)
+                                current_entry_abs = np.int32(0)
+                            elif current_dir == 0:
+                                current_dir = dirn
+                                current_entry_abs = entry_abs
+                            elif dirn != current_dir:
+                                (
+                                    available_quote,
+                                    safe_quote,
+                                    equity,
+                                    closed_trade_count,
+                                ) = _tp_sl_apply_trade_to_account_for_cell(
+                                    current_dir,
+                                    current_entry_abs,
+                                    entry_abs,
+                                    np.int32(tp_i),
+                                    np.int32(sl_i),
+                                    price_open,
+                                    last_close,
+                                    hit_long_tp,
+                                    hit_long_sl,
+                                    hit_short_tp,
+                                    hit_short_sl,
+                                    log_fac_tp_long,
+                                    log_fac_sl_long,
+                                    log_fac_tp_short,
+                                    log_fac_sl_short,
+                                    log_fee_two_sides,
+                                    close_on_end,
+                                    t_exec_abs,
+                                    available_quote,
+                                    safe_quote,
+                                    equity,
+                                    sizing_mode_code,
+                                    configured_quote_amount,
+                                    equity_pct,
+                                    min_quote,
+                                    max_quote,
+                                    safe_profit_percent,
+                                    use_profit_lock,
+                                    closed_trade_count,
+                                )
+                                current_dir = dirn
+                                current_entry_abs = entry_abs
+
+                    for indicator_pos in range(arity):
+                        row_idx = combo_idx_by_indicator[indicator_pos, k]
+                        segment_idx = segment_pos_workspace[k, indicator_pos]
+                        if segment_ends[indicator_pos, row_idx, segment_idx] == segment_end:
+                            segment_pos_workspace[k, indicator_pos] = np.int32(
+                                segment_idx + 1
+                            )
+
+                if current_dir != 0:
+                    (
+                        available_quote,
+                        safe_quote,
+                        equity,
+                        closed_trade_count,
+                    ) = _tp_sl_apply_trade_to_account_for_cell(
+                        current_dir,
+                        current_entry_abs,
+                        t_exec_abs,
+                        np.int32(tp_i),
+                        np.int32(sl_i),
+                        price_open,
+                        last_close,
+                        hit_long_tp,
+                        hit_long_sl,
+                        hit_short_tp,
+                        hit_short_sl,
+                        log_fac_tp_long,
+                        log_fac_sl_long,
+                        log_fac_tp_short,
+                        log_fac_sl_short,
+                        log_fee_two_sides,
+                        close_on_end,
+                        t_exec_abs,
+                        available_quote,
+                        safe_quote,
+                        equity,
+                        sizing_mode_code,
+                        configured_quote_amount,
+                        equity_pct,
+                        min_quote,
+                        max_quote,
+                        safe_profit_percent,
+                        use_profit_lock,
+                        closed_trade_count,
+                    )
+
+                total_return = (equity / initial_cash_quote) - 1.0
+                if total_return > best_return + TP_SL_BEST_CELL_TIE_EPS:
+                    best_return = total_return
+                    best_tp = np.int32(tp_i)
+                    best_sl = np.int32(sl_i)
+                    best_trade_count = closed_trade_count
+
+        out_best_tp_idx[k] = best_tp
+        out_best_sl_idx[k] = best_sl
+        out_trade_count[k] = best_trade_count
+        out_best_ret[k] = np.float32(best_return)
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_apply_trade_to_account_for_cell(
+    dirn: np.int8,
+    entry_abs: np.int32,
+    sig_exit_abs: np.int32,
+    tp_i: np.int32,
+    sl_i: np.int32,
+    price_open: np.ndarray,
+    last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    t_exec_abs: np.int32,
+    available_quote: float,
+    safe_quote: float,
+    equity: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+    closed_trade_count: np.int32,
+) -> tuple[float, float, float, np.int32]:
+    log_value, closed = _tp_sl_trade_log_contrib_and_closed(
+        dirn,
+        entry_abs,
+        sig_exit_abs,
+        tp_i,
+        sl_i,
+        price_open,
+        last_close,
+        hit_long_tp,
+        hit_long_sl,
+        hit_short_tp,
+        hit_short_sl,
+        log_fac_tp_long,
+        log_fac_sl_long,
+        log_fac_tp_short,
+        log_fac_sl_short,
+        log_fee_two_sides,
+        close_on_end,
+        t_exec_abs,
+    )
+    if closed == 0:
+        return available_quote, safe_quote, equity, closed_trade_count
+    quote_amount = execution_quote_amount(
+        available_quote,
+        equity,
+        sizing_mode_code,
+        configured_quote_amount,
+        equity_pct,
+        min_quote,
+        max_quote,
+    )
+    if quote_amount <= 0.0:
+        return available_quote, safe_quote, equity, closed_trade_count
+    trade_return = -1.0 if log_value <= -1.0e200 else math.exp(log_value) - 1.0
+    net_pnl_quote = quote_amount * trade_return
+    available_quote += net_pnl_quote
+    if use_profit_lock == 1 and net_pnl_quote > 0.0:
+        locked_profit_quote = net_pnl_quote * (safe_profit_percent / 100.0)
+        available_quote -= locked_profit_quote
+        safe_quote += locked_profit_quote
+    equity = available_quote + safe_quote
+    closed_trade_count += np.int32(1)
+    return available_quote, safe_quote, equity, closed_trade_count
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_trade_log_contrib_and_closed(
+    dirn: np.int8,
+    entry_abs: np.int32,
+    sig_exit_abs: np.int32,
+    tp_i: np.int32,
+    sl_i: np.int32,
+    price_open: np.ndarray,
+    last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    t_exec_abs: np.int32,
+) -> tuple[float, np.int8]:
+    entry_open = float(price_open[entry_abs])
+    if entry_open <= 0.0:
+        return 0.0, np.int8(0)
+    start = np.int32(entry_abs + 1)
+    if dirn == 1:
+        hit_tp_value = (
+            np.int32(hit_long_tp[tp_i, start])
+            if start < t_exec_abs
+            else np.int32(2147483647)
+        )
+        hit_sl_value = (
+            np.int32(hit_long_sl[sl_i, start])
+            if start < t_exec_abs
+            else np.int32(2147483647)
+        )
+        log_tp = float(log_fac_tp_long[tp_i])
+        log_sl = float(log_fac_sl_long[sl_i])
+    else:
+        hit_tp_value = (
+            np.int32(hit_short_tp[tp_i, start])
+            if start < t_exec_abs
+            else np.int32(2147483647)
+        )
+        hit_sl_value = (
+            np.int32(hit_short_sl[sl_i, start])
+            if start < t_exec_abs
+            else np.int32(2147483647)
+        )
+        log_tp = float(log_fac_tp_short[tp_i])
+        log_sl = float(log_fac_sl_short[sl_i])
+
+    stop_abs = sig_exit_abs if sig_exit_abs < t_exec_abs else t_exec_abs
+    if start < t_exec_abs:
+        if hit_tp_value < stop_abs and hit_tp_value < hit_sl_value:
+            return log_tp, np.int8(1)
+        if hit_sl_value < stop_abs and hit_sl_value <= hit_tp_value:
+            return log_sl, np.int8(1)
+
+    if sig_exit_abs < t_exec_abs:
+        exit_open = float(price_open[sig_exit_abs])
+        if exit_open <= 0.0:
+            return NEG_LARGE, np.int8(1)
+        if dirn == 1:
+            return log_fee_two_sides + math.log(exit_open / entry_open), np.int8(1)
+        ratio = exit_open / entry_open
+        if ratio >= 2.0:
+            return NEG_LARGE, np.int8(1)
+        return log_fee_two_sides + math.log(2.0 - ratio), np.int8(1)
+
+    if close_on_end == 1 and t_exec_abs > 0:
+        if last_close <= 0.0:
+            return NEG_LARGE, np.int8(1)
+        if dirn == 1:
+            return log_fee_two_sides + math.log(last_close / entry_open), np.int8(1)
+        ratio = last_close / entry_open
+        if ratio >= 2.0:
+            return NEG_LARGE, np.int8(1)
+        return log_fee_two_sides + math.log(2.0 - ratio), np.int8(1)
+    return 0.0, np.int8(0)
+
+
 @nb.njit(cache=True, inline="always")
 def _tp_sl_apply_direction_mode(raw_dir: np.int8 | int, direction_mode: np.int8 | int) -> np.int8:
     if direction_mode == 1:
@@ -1118,6 +1590,14 @@ def evaluate_tp_sl_reference_rows_slow(
         runtime.log_fac_sl_short,
         runtime.log_fee_two_sides,
         runtime.close_on_end,
+        runtime.initial_cash_quote,
+        runtime.sizing_mode_code,
+        runtime.quote_amount,
+        runtime.equity_pct,
+        runtime.min_quote,
+        runtime.max_quote,
+        runtime.safe_profit_percent,
+        runtime.use_profit_lock,
         runtime.t_exec_abs_15m,
     )
     return {
@@ -1220,65 +1700,27 @@ def _tp_sl_trade_log_contrib_reference_kernel(
     close_on_end: np.int8,
     t_exec_abs: np.int32,
 ) -> float:
-    entry_open = float(price_open[entry_abs])
-    if entry_open <= 0.0:
-        return 0.0
-    start = np.int32(entry_abs + 1)
-    if dirn == 1:
-        hit_tp_value = (
-            np.int32(hit_long_tp[tp_i, start])
-            if start < t_exec_abs
-            else np.int32(2147483647)
-        )
-        hit_sl_value = (
-            np.int32(hit_long_sl[sl_i, start])
-            if start < t_exec_abs
-            else np.int32(2147483647)
-        )
-        log_tp = float(log_fac_tp_long[tp_i])
-        log_sl = float(log_fac_sl_long[sl_i])
-    else:
-        hit_tp_value = (
-            np.int32(hit_short_tp[tp_i, start])
-            if start < t_exec_abs
-            else np.int32(2147483647)
-        )
-        hit_sl_value = (
-            np.int32(hit_short_sl[sl_i, start])
-            if start < t_exec_abs
-            else np.int32(2147483647)
-        )
-        log_tp = float(log_fac_tp_short[tp_i])
-        log_sl = float(log_fac_sl_short[sl_i])
-
-    stop_abs = sig_exit_abs if sig_exit_abs < t_exec_abs else t_exec_abs
-    if start < t_exec_abs:
-        if hit_tp_value < stop_abs and hit_tp_value < hit_sl_value:
-            return log_tp
-        if hit_sl_value < stop_abs and hit_sl_value <= hit_tp_value:
-            return log_sl
-
-    if sig_exit_abs < t_exec_abs:
-        exit_open = float(price_open[sig_exit_abs])
-        if exit_open <= 0.0:
-            return NEG_LARGE
-        if dirn == 1:
-            return log_fee_two_sides + math.log(exit_open / entry_open)
-        ratio = exit_open / entry_open
-        if ratio >= 2.0:
-            return NEG_LARGE
-        return log_fee_two_sides + math.log(2.0 - ratio)
-
-    if close_on_end == 1 and t_exec_abs > 0:
-        if last_close <= 0.0:
-            return NEG_LARGE
-        if dirn == 1:
-            return log_fee_two_sides + math.log(last_close / entry_open)
-        ratio = last_close / entry_open
-        if ratio >= 2.0:
-            return NEG_LARGE
-        return log_fee_two_sides + math.log(2.0 - ratio)
-    return 0.0
+    log_value, _closed = _tp_sl_trade_log_contrib_and_closed(
+        dirn,
+        entry_abs,
+        sig_exit_abs,
+        tp_i,
+        sl_i,
+        price_open,
+        last_close,
+        hit_long_tp,
+        hit_long_sl,
+        hit_short_tp,
+        hit_short_sl,
+        log_fac_tp_long,
+        log_fac_sl_long,
+        log_fac_tp_short,
+        log_fac_sl_short,
+        log_fee_two_sides,
+        close_on_end,
+        t_exec_abs,
+    )
+    return log_value
 
 
 @nb.njit(cache=True, fastmath=False)
@@ -1298,6 +1740,14 @@ def evaluate_tp_sl_reference_trade_list_direct(
     log_fac_sl_short: np.ndarray,
     log_fee_two_sides: float,
     close_on_end: np.int8,
+    initial_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
     t_exec_abs: np.int32,
 ) -> tuple[np.int32, np.int32, float, np.int32]:
     n_trades = np.int32(entry_abs.shape[0])
@@ -1308,11 +1758,20 @@ def evaluate_tp_sl_reference_trade_list_direct(
     best_log = -1.0e300
     best_tp = np.int32(0)
     best_sl = np.int32(0)
+    best_trade_count = np.int32(0)
     for tp_i in range(n_tp):
         for sl_i in range(n_sl):
-            total_log = 0.0
+            available_quote = initial_cash_quote
+            safe_quote = 0.0
+            equity = initial_cash_quote
+            closed_trade_count = np.int32(0)
             for trade_idx in range(n_trades):
-                total_log += _tp_sl_trade_log_contrib_reference_kernel(
+                (
+                    available_quote,
+                    safe_quote,
+                    equity,
+                    closed_trade_count,
+                ) = _tp_sl_apply_trade_to_account_for_cell(
                     dir_arr[trade_idx],
                     entry_abs[trade_idx],
                     sig_exit_abs[trade_idx],
@@ -1331,16 +1790,26 @@ def evaluate_tp_sl_reference_trade_list_direct(
                     log_fee_two_sides,
                     close_on_end,
                     t_exec_abs,
+                    available_quote,
+                    safe_quote,
+                    equity,
+                    sizing_mode_code,
+                    configured_quote_amount,
+                    equity_pct,
+                    min_quote,
+                    max_quote,
+                    safe_profit_percent,
+                    use_profit_lock,
+                    closed_trade_count,
                 )
-            if total_log > best_log:
-                best_log = total_log
+            total_return = (equity / initial_cash_quote) - 1.0
+            if total_return > best_log:
+                best_log = total_return
                 best_tp = np.int32(tp_i)
                 best_sl = np.int32(sl_i)
-    if best_log <= -1.0e200:
-        best_ret = -1.0
-    else:
-        best_ret = math.exp(best_log) - 1.0
-    return best_tp, best_sl, best_ret, n_trades
+                best_trade_count = closed_trade_count
+    best_ret = best_log
+    return best_tp, best_sl, best_ret, best_trade_count
 
 
 def _iter_selected_candidate_batches(
@@ -1762,6 +2231,7 @@ def _full_metrics_for_heap_entry(
         trade_returns=trade_returns,
         bars_held=bars_held,
         t_exec_abs=int(runtime.t_exec_abs_15m),
+        runtime=runtime,
     )
 
 
@@ -1778,28 +2248,29 @@ def _selected_cell_trade_returns(
     trade_returns: list[float] = []
     bars_held: list[float] = []
     for trade_idx in range(int(entry_abs.shape[0])):
-        log_value = float(
-            _tp_sl_trade_log_contrib_reference_kernel(
-                np.int8(dir_arr[trade_idx]),
-                np.int32(entry_abs[trade_idx]),
-                np.int32(sig_exit_abs[trade_idx]),
-                np.int32(best_tp_idx),
-                np.int32(best_sl_idx),
-                runtime.price_open_15m,
-                runtime.last_close_15m,
-                hit_times.long_tp,
-                hit_times.long_sl,
-                hit_times.short_tp,
-                hit_times.short_sl,
-                runtime.log_fac_tp_long,
-                runtime.log_fac_sl_long,
-                runtime.log_fac_tp_short,
-                runtime.log_fac_sl_short,
-                runtime.log_fee_two_sides,
-                runtime.close_on_end,
-                runtime.t_exec_abs_15m,
-            )
+        log_value_raw, closed = _tp_sl_trade_log_contrib_and_closed(
+            np.int8(dir_arr[trade_idx]),
+            np.int32(entry_abs[trade_idx]),
+            np.int32(sig_exit_abs[trade_idx]),
+            np.int32(best_tp_idx),
+            np.int32(best_sl_idx),
+            runtime.price_open_15m,
+            runtime.last_close_15m,
+            hit_times.long_tp,
+            hit_times.long_sl,
+            hit_times.short_tp,
+            hit_times.short_sl,
+            runtime.log_fac_tp_long,
+            runtime.log_fac_sl_long,
+            runtime.log_fac_tp_short,
+            runtime.log_fac_sl_short,
+            runtime.log_fee_two_sides,
+            runtime.close_on_end,
+            runtime.t_exec_abs_15m,
         )
+        if int(closed) == 0:
+            continue
+        log_value = float(log_value_raw)
         if log_value <= -1.0e200:
             trade_return = -1.0
         else:
@@ -1854,9 +2325,12 @@ def _summary_metrics_from_trade_returns(
     trade_returns: list[float],
     bars_held: list[float],
     t_exec_abs: int,
+    runtime: _TpSlRuntimeContext,
 ) -> dict[str, float]:
-    equity = 1.0
-    peak_equity = 1.0
+    available_quote = runtime.initial_cash_quote
+    safe_quote = 0.0
+    equity = runtime.initial_cash_quote
+    peak_equity = equity
     max_drawdown_pct = 0.0
     gross_profit = 0.0
     gross_loss = 0.0
@@ -1865,11 +2339,26 @@ def _summary_metrics_from_trade_returns(
     sum_trade_return_squared = 0.0
     total_trade_return_pct = 0.0
     total_bars = 0.0
+    trade_count = 0
     for idx, trade_return in enumerate(trade_returns):
-        pnl = equity * trade_return
-        equity += pnl
-        if equity < 0.0:
-            equity = 0.0
+        quote_amount = execution_quote_amount_py(
+            available_quote=available_quote,
+            equity=equity,
+            sizing_mode_code=runtime.sizing_mode_code,
+            quote_amount=runtime.quote_amount,
+            equity_pct=runtime.equity_pct,
+            min_quote=runtime.min_quote,
+            max_quote=runtime.max_quote,
+        )
+        if quote_amount <= 0.0:
+            continue
+        pnl = quote_amount * trade_return
+        available_quote += pnl
+        if runtime.use_profit_lock == 1 and pnl > 0.0:
+            locked_profit_quote = pnl * (runtime.safe_profit_percent / 100.0)
+            available_quote -= locked_profit_quote
+            safe_quote += locked_profit_quote
+        equity = available_quote + safe_quote
         if equity > peak_equity:
             peak_equity = equity
         elif peak_equity > 0.0:
@@ -1885,8 +2374,8 @@ def _summary_metrics_from_trade_returns(
         sum_trade_return_squared += trade_return * trade_return
         total_trade_return_pct += trade_return * 100.0
         total_bars += bars_held[idx]
-    trade_count = len(trade_returns)
-    total_return_pct = (equity - 1.0) * 100.0
+        trade_count += 1
+    total_return_pct = ((equity / runtime.initial_cash_quote) - 1.0) * 100.0
     if gross_loss > 0.0:
         profit_factor = gross_profit / gross_loss
     elif gross_profit > 0.0:
@@ -2021,6 +2510,14 @@ def _tp_sl_runtime_context_from_prepared(
         ),
         log_fee_two_sides=float(math.log(fee_two_sides)),
         close_on_end=execution_settings.close_on_end,
+        initial_cash_quote=execution_settings.initial_cash_quote,
+        sizing_mode_code=execution_settings.sizing_mode_code,
+        quote_amount=execution_settings.quote_amount,
+        equity_pct=execution_settings.equity_pct,
+        min_quote=execution_settings.min_quote,
+        max_quote=execution_settings.max_quote,
+        safe_profit_percent=execution_settings.safe_profit_percent,
+        use_profit_lock=execution_settings.use_profit_lock,
     )
 
 

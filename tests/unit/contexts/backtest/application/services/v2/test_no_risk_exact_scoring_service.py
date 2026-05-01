@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import math
 import weakref
 from pathlib import Path
 from typing import Any, Mapping, Sequence, cast
@@ -522,6 +523,120 @@ def test_no_risk_direction_modes_change_long_only_reversal_semantics() -> None:
 
 
 @pytest.mark.parametrize(
+    "sizing",
+    [
+        {"mode": "all_in"},
+        {"mode": "fixed_quote", "quote_amount": 100.0},
+        {"mode": "fixed_equity_pct", "equity_pct": 25.0},
+        {
+            "mode": "fixed_equity_pct_min_quote",
+            "equity_pct": 5.0,
+            "min_quote": 100.0,
+        },
+        {
+            "mode": "fixed_equity_pct_max_quote",
+            "equity_pct": 50.0,
+            "max_quote": 100.0,
+        },
+    ],
+)
+@pytest.mark.parametrize("profit_lock_enabled", [False, True])
+def test_no_risk_execution_sizing_modes_pass_compiled_self_check(
+    sizing: Mapping[str, float | str],
+    profit_lock_enabled: bool,
+) -> None:
+    prepared = _execution_sizing_prepared_result()
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_2_NO_RISK_BACKEND,
+        ),
+        normalized_request=_normalized_request(
+            sizing=sizing,
+            profit_lock_enabled=profit_lock_enabled,
+            direction_mode="long_short_reversal",
+            initial_cash_quote=1000.0,
+            close_on_end=True,
+        ),
+    )
+
+    assert result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+    assert result.top_results[0].metrics["trade_count"] == 3.0
+    assert math.isfinite(result.top_results[0].metrics["total_return_pct"])
+
+
+def test_no_risk_fixed_equity_pct_uses_current_equity_after_wins() -> None:
+    prepared = _execution_sizing_prepared_result()
+    fixed_first_quote = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 500.0},
+    )
+    equity_pct = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_equity_pct", "equity_pct": 50.0},
+    )
+
+    assert equity_pct > fixed_first_quote
+
+
+def test_no_risk_min_max_and_available_quote_clamps_are_deterministic() -> None:
+    prepared = _execution_sizing_prepared_result()
+
+    min_quote = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={
+            "mode": "fixed_equity_pct_min_quote",
+            "equity_pct": 5.0,
+            "min_quote": 500.0,
+        },
+    )
+    fixed_500 = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 500.0},
+    )
+    max_quote = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={
+            "mode": "fixed_equity_pct_max_quote",
+            "equity_pct": 90.0,
+            "max_quote": 100.0,
+        },
+    )
+    fixed_100 = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 100.0},
+    )
+    capped_to_available = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 10_000.0},
+    )
+    all_in = _score_no_risk_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "all_in"},
+    )
+
+    assert min_quote == pytest.approx(fixed_500)
+    assert max_quote == pytest.approx(fixed_100)
+    assert capped_to_available == pytest.approx(all_in)
+
+
+def test_no_risk_close_on_end_false_leaves_final_position_open() -> None:
+    prepared = _execution_sizing_prepared_result()
+    close_true = _execute_no_risk_execution_sizing(prepared=prepared, close_on_end=True)
+    close_false = _execute_no_risk_execution_sizing(prepared=prepared, close_on_end=False)
+
+    assert close_true.top_results[0].metrics["trade_count"] == 3.0
+    assert close_false.top_results[0].metrics["trade_count"] == 2.0
+    assert close_true.top_results[0].metrics["total_return_pct"] > (
+        close_false.top_results[0].metrics["total_return_pct"]
+    )
+
+
+@pytest.mark.parametrize(
     "indicator_ids",
     [
         ("alpha",),
@@ -721,6 +836,45 @@ def _direction_semantics_prepared_result() -> BacktestPreparePoolsResult:
     )
 
 
+def _execution_sizing_prepared_result() -> BacktestPreparePoolsResult:
+    pools = (
+        _pool(
+            indicator_id="alpha",
+            trade_rows=[[1, -1, 1, -1]],
+            eval_rows=[[1, -1, 1]],
+        ),
+        _pool(
+            indicator_id="beta",
+            trade_rows=[[1, -1, 1, -1]],
+            eval_rows=[[1, -1, 1]],
+        ),
+    )
+    return BacktestPreparePoolsResult(
+        timeframe="15m",
+        indicator_ids=("alpha", "beta"),
+        indicator_pools=pools,
+        signal_returns_15m=np.asarray([10.0, -10.0, 21.0], dtype=np.float32),
+        execution_mapping=PreparedExecutionMapping(
+            signal_entry_exec_idx_15m=np.asarray([1, 2, 3, 4], dtype=np.int32),
+            run_bar_open_1m_idx_15m=np.asarray([0, 1, 2, 3], dtype=np.uint32),
+            run_bar_close_1m_idx_15m=np.asarray([0, 1, 2, 3], dtype=np.uint32),
+            t_exec_limit_1m=4,
+        ),
+        time_slice_start_15m=0,
+        time_slice_stop_15m=4,
+        trade_T_length=4,
+        eval_T_length=3,
+        row_metadata_order_hash="c" * 64,
+        timing=PreparePoolsTiming(
+            stage_name="prepare_pools_core",
+            wall_time_s=0.0,
+            subsegments={"prepare_pools_core": 0.0},
+        ),
+        execution_open_1m=np.asarray([100.0, 100.0, 110.0, 99.0], dtype=np.float32),
+        execution_close_1m=np.asarray([100.0, 100.0, 110.0, 120.0], dtype=np.float32),
+    )
+
+
 def _pool(
     *,
     indicator_id: str,
@@ -828,9 +982,14 @@ def _normalized_request(
     direction_mode: str = "long_short_reversal",
     fee_rate: float = 0.0,
     slippage_rate: float = 0.0,
+    initial_cash_quote: float = 10000.0,
     top_n: int = 100,
     sizing_mode: str = "all_in",
+    sizing: Mapping[str, float | str] | None = None,
+    profit_lock_enabled: bool = False,
+    close_on_end: bool = True,
 ) -> dict[str, Any]:
+    sizing_payload = dict(sizing or {"mode": sizing_mode, "quote_amount": 100.0})
     return {
         "top_n": top_n,
         "risk": {"mode": risk_mode},
@@ -838,12 +997,46 @@ def _normalized_request(
             "direction_mode": direction_mode,
             "fee_rate": fee_rate,
             "slippage_rate": slippage_rate,
-            "initial_cash_quote": 10000.0,
-            "sizing": {"mode": sizing_mode, "fixed_quote": 100.0},
-            "profit_lock": {"enabled": False, "safe_profit_percent": 30.0},
-            "close_on_end": True,
+            "initial_cash_quote": initial_cash_quote,
+            "sizing": sizing_payload,
+            "profit_lock": {
+                "enabled": profit_lock_enabled,
+                "safe_profit_percent": 30.0,
+            },
+            "close_on_end": close_on_end,
         },
     }
+
+
+def _execute_no_risk_execution_sizing(
+    *,
+    prepared: BacktestPreparePoolsResult,
+    sizing: Mapping[str, float | str] | None = None,
+    profit_lock_enabled: bool = False,
+    close_on_end: bool = True,
+) -> Any:
+    return BacktestNoRiskExactScoringService().execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_2_NO_RISK_BACKEND,
+        ),
+        normalized_request=_normalized_request(
+            sizing=sizing or {"mode": "fixed_equity_pct", "equity_pct": 50.0},
+            profit_lock_enabled=profit_lock_enabled,
+            initial_cash_quote=1000.0,
+            close_on_end=close_on_end,
+        ),
+    )
+
+
+def _score_no_risk_execution_sizing(
+    *,
+    prepared: BacktestPreparePoolsResult,
+    sizing: Mapping[str, float | str],
+) -> float:
+    result = _execute_no_risk_execution_sizing(prepared=prepared, sizing=sizing)
+    return float(result.top_results[0].metrics["total_return_pct"])
 
 
 def _patch_exact_scores(

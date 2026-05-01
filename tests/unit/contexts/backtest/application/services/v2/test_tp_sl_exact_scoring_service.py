@@ -165,6 +165,121 @@ def test_tp_sl_exact_preserves_direction_mode_semantics() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "sizing",
+    [
+        {"mode": "all_in"},
+        {"mode": "fixed_quote", "quote_amount": 100.0},
+        {"mode": "fixed_equity_pct", "equity_pct": 25.0},
+        {
+            "mode": "fixed_equity_pct_min_quote",
+            "equity_pct": 5.0,
+            "min_quote": 100.0,
+        },
+        {
+            "mode": "fixed_equity_pct_max_quote",
+            "equity_pct": 50.0,
+            "max_quote": 100.0,
+        },
+    ],
+)
+@pytest.mark.parametrize("profit_lock_enabled", [False, True])
+def test_tp_sl_execution_sizing_modes_pass_compiled_self_check(
+    sizing: Mapping[str, float | str],
+    profit_lock_enabled: bool,
+) -> None:
+    prepared = _tp_sl_execution_sizing_prepared_result()
+
+    result = BacktestTpSlExactScoringService(
+        config=BacktestTpSlExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_short_reversal",
+        ),
+        hit_times_result=_no_hit_times_result(),
+        normalized_request=_normalized_request(
+            sizing=sizing,
+            profit_lock_enabled=profit_lock_enabled,
+            direction_mode="long_short_reversal",
+            initial_cash_quote=1000.0,
+            close_on_end=True,
+        ),
+    )
+
+    assert result.self_check.status == TP_SL_SELF_CHECK_PASSED_STATUS
+    assert result.top_results[0].metrics["trade_count"] == 3.0
+    assert np.isfinite(result.top_results[0].metrics["total_return_pct"])
+
+
+def test_tp_sl_fixed_equity_pct_uses_current_equity_after_wins() -> None:
+    prepared = _tp_sl_execution_sizing_prepared_result()
+    fixed_first_quote = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 500.0},
+    )
+    equity_pct = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_equity_pct", "equity_pct": 50.0},
+    )
+
+    assert equity_pct > fixed_first_quote
+
+
+def test_tp_sl_min_max_and_available_quote_clamps_are_deterministic() -> None:
+    prepared = _tp_sl_execution_sizing_prepared_result()
+
+    min_quote = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={
+            "mode": "fixed_equity_pct_min_quote",
+            "equity_pct": 5.0,
+            "min_quote": 500.0,
+        },
+    )
+    fixed_500 = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 500.0},
+    )
+    max_quote = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={
+            "mode": "fixed_equity_pct_max_quote",
+            "equity_pct": 90.0,
+            "max_quote": 100.0,
+        },
+    )
+    fixed_100 = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 100.0},
+    )
+    capped_to_available = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "fixed_quote", "quote_amount": 10_000.0},
+    )
+    all_in = _score_tp_sl_execution_sizing(
+        prepared=prepared,
+        sizing={"mode": "all_in"},
+    )
+
+    assert min_quote == pytest.approx(fixed_500)
+    assert max_quote == pytest.approx(fixed_100)
+    assert capped_to_available == pytest.approx(all_in)
+
+
+def test_tp_sl_close_on_end_false_leaves_final_position_open() -> None:
+    prepared = _tp_sl_execution_sizing_prepared_result()
+    close_true = _execute_tp_sl_execution_sizing(prepared=prepared, close_on_end=True)
+    close_false = _execute_tp_sl_execution_sizing(prepared=prepared, close_on_end=False)
+
+    assert close_true.top_results[0].metrics["trade_count"] == 3.0
+    assert close_false.top_results[0].metrics["trade_count"] == 2.0
+    assert close_true.top_results[0].metrics["total_return_pct"] > (
+        close_false.top_results[0].metrics["total_return_pct"]
+    )
+
+
 def test_tp_sl_self_check_passes_and_reports_summary() -> None:
     prepared = _prepared_result(
         indicator_ids=("alpha", "beta"),
@@ -231,6 +346,7 @@ def test_tp_sl_self_check_fails_fast_on_best_cell_drift(
     def drifted_evaluate(**kwargs: Any) -> None:
         original_evaluate(**kwargs)
         kwargs["buffers"].best_tp_idx[0] = 1
+        kwargs["buffers"].total_return_pct[0] += 1.0
 
     monkeypatch.setattr(tp_sl_exact_module, "evaluate_tp_sl_exact_chunk", drifted_evaluate)
 
@@ -398,6 +514,15 @@ def _prepared_result(
     )
 
 
+def _tp_sl_execution_sizing_prepared_result() -> BacktestPreparePoolsResult:
+    return _prepared_result(
+        indicator_ids=("alpha",),
+        trade_rows_by_id={"alpha": [[1, -1, 1, -1]]},
+        open_1m=[100.0, 100.0, 110.0, 99.0],
+        close_1m=[100.0, 100.0, 110.0, 120.0],
+    )
+
+
 def _pool(
     *,
     indicator_id: str,
@@ -543,12 +668,28 @@ def _hit_times_result(
     )
 
 
+def _no_hit_times_result() -> BacktestTpSlHitTimesResult:
+    return _hit_times_result(
+        tp_values=(0.50,),
+        sl_values=(0.50,),
+        long_tp=[[4, 4, 4, 4]],
+        long_sl=[[4, 4, 4, 4]],
+        short_tp=[[4, 4, 4, 4]],
+        short_sl=[[4, 4, 4, 4]],
+    )
+
+
 def _normalized_request(
     *,
     direction_mode: str = "long_short_reversal",
     fee_rate: float = 0.0,
+    initial_cash_quote: float = 10000.0,
     top_n: int = 100,
+    sizing: Mapping[str, float | str] | None = None,
+    profit_lock_enabled: bool = False,
+    close_on_end: bool = True,
 ) -> dict[str, Any]:
+    sizing_payload = dict(sizing or {"mode": "all_in", "quote_amount": 100.0})
     return {
         "top_n": top_n,
         "risk": {
@@ -560,12 +701,47 @@ def _normalized_request(
             "direction_mode": direction_mode,
             "fee_rate": fee_rate,
             "slippage_rate": 0.0,
-            "initial_cash_quote": 10000.0,
-            "sizing": {"mode": "all_in", "fixed_quote": 100.0},
-            "profit_lock": {"enabled": False, "safe_profit_percent": 30.0},
-            "close_on_end": True,
+            "initial_cash_quote": initial_cash_quote,
+            "sizing": sizing_payload,
+            "profit_lock": {
+                "enabled": profit_lock_enabled,
+                "safe_profit_percent": 30.0,
+            },
+            "close_on_end": close_on_end,
         },
     }
+
+
+def _execute_tp_sl_execution_sizing(
+    *,
+    prepared: BacktestPreparePoolsResult,
+    sizing: Mapping[str, float | str] | None = None,
+    profit_lock_enabled: bool = False,
+    close_on_end: bool = True,
+) -> Any:
+    return BacktestTpSlExactScoringService().execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_short_reversal",
+        ),
+        hit_times_result=_no_hit_times_result(),
+        normalized_request=_normalized_request(
+            sizing=sizing or {"mode": "fixed_equity_pct", "equity_pct": 50.0},
+            profit_lock_enabled=profit_lock_enabled,
+            initial_cash_quote=1000.0,
+            close_on_end=close_on_end,
+        ),
+    )
+
+
+def _score_tp_sl_execution_sizing(
+    *,
+    prepared: BacktestPreparePoolsResult,
+    sizing: Mapping[str, float | str],
+) -> float:
+    result = _execute_tp_sl_execution_sizing(prepared=prepared, sizing=sizing)
+    return float(result.top_results[0].metrics["total_return_pct"])
 
 
 def _patch_tp_sl_scores(

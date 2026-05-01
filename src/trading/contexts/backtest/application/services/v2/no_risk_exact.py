@@ -31,6 +31,15 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     iter_combo_chunks,
     make_combo_idx_matrix,
 )
+from trading.contexts.backtest.application.services.v2.execution_sizing import (
+    DIRECTION_MODE_LONG_ONLY,
+    DIRECTION_MODE_LONG_SHORT_REVERSAL,
+    execution_quote_amount,
+    execution_settings_from_normalized,
+)
+from trading.contexts.backtest.application.services.v2.execution_sizing import (
+    ExecutionSettings as _ExecutionSettings,
+)
 
 NO_RISK_EXACT_BOUNDARY_STAGE_NAME = "no_risk_exact_boundary"
 NO_RISK_EXACT_SCORING_STAGE_NAME = "exact_scoring"
@@ -43,10 +52,6 @@ NO_RISK_EXACT_SCORED_STATUS = "scored"
 NO_RISK_SELF_CHECK_NOT_RUN_STATUS = "not_run"
 NO_RISK_SELF_CHECK_PASSED_STATUS = "passed"
 CANONICAL_EXECUTION_TIMEFRAME_V1 = "1m"
-DIRECTION_MODE_LONG_ONLY = "long_only"
-DIRECTION_MODE_LONG_SHORT_REVERSAL = "long_short_reversal"
-DIRECTION_MODE_LONG_ONLY_CODE = np.int8(1)
-DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE = np.int8(2)
 BARS_PER_YEAR_EXEC_1M = 365.0 * 24.0 * 60.0
 NO_RISK_METRIC_NAMES = (
     "total_return_pct",
@@ -72,20 +77,6 @@ class BacktestNoRiskSelfCheckFailed(AssertionError):
     """
     Raised when fast exact scoring diverges from the bounded slow reference.
     """
-
-
-@dataclass(frozen=True, slots=True)
-class _ExecutionSettings:
-    direction_mode: str
-    direction_mode_code: np.int8
-    fee_rate: float
-    slippage_rate: float
-    initial_cash_quote: float
-    fixed_quote: float
-    use_fixed_quote: np.int8
-    safe_profit_percent: float
-    use_profit_lock: np.int8
-    close_on_end: np.int8
 
 
 @dataclass(frozen=True, slots=True)
@@ -580,11 +571,14 @@ def evaluate_no_risk_exact_chunk(
             execution_close_1m,
             np.int32(prepared_result.execution_mapping.t_exec_limit_1m),
             execution_settings.initial_cash_quote,
-            execution_settings.fixed_quote,
+            execution_settings.sizing_mode_code,
+            execution_settings.quote_amount,
+            execution_settings.equity_pct,
+            execution_settings.min_quote,
+            execution_settings.max_quote,
             execution_settings.fee_rate,
             execution_settings.slippage_rate,
             execution_settings.safe_profit_percent,
-            execution_settings.use_fixed_quote,
             execution_settings.use_profit_lock,
             BARS_PER_YEAR_EXEC_1M,
             execution_settings.close_on_end,
@@ -615,11 +609,14 @@ def evaluate_no_risk_exact_chunk(
             execution_close_1m,
             np.int32(prepared_result.execution_mapping.t_exec_limit_1m),
             execution_settings.initial_cash_quote,
-            execution_settings.fixed_quote,
+            execution_settings.sizing_mode_code,
+            execution_settings.quote_amount,
+            execution_settings.equity_pct,
+            execution_settings.min_quote,
+            execution_settings.max_quote,
             execution_settings.fee_rate,
             execution_settings.slippage_rate,
             execution_settings.safe_profit_percent,
-            execution_settings.use_fixed_quote,
             execution_settings.use_profit_lock,
             BARS_PER_YEAR_EXEC_1M,
             execution_settings.close_on_end,
@@ -671,11 +668,14 @@ def evaluate_no_risk_exact_chunk(
             execution_close_1m,
             np.int32(prepared_result.execution_mapping.t_exec_limit_1m),
             execution_settings.initial_cash_quote,
-            execution_settings.fixed_quote,
+            execution_settings.sizing_mode_code,
+            execution_settings.quote_amount,
+            execution_settings.equity_pct,
+            execution_settings.min_quote,
+            execution_settings.max_quote,
             execution_settings.fee_rate,
             execution_settings.slippage_rate,
             execution_settings.safe_profit_percent,
-            execution_settings.use_fixed_quote,
             execution_settings.use_profit_lock,
             BARS_PER_YEAR_EXEC_1M,
             execution_settings.close_on_end,
@@ -815,11 +815,14 @@ def _apply_no_risk_trade_to_state(
     total_trade_exec_bars: float,
     exposure_bars: float,
     init_cash_quote: float,
-    fixed_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
     fee_rate: float,
     slippage_rate: float,
     safe_profit_percent: float,
-    use_fixed_quote: np.int8,
     use_profit_lock: np.int8,
 ) -> tuple[
     float,
@@ -855,9 +858,15 @@ def _apply_no_risk_trade_to_state(
             exposure_bars,
         )
 
-    quote_amount = available_quote
-    if use_fixed_quote == 1 and fixed_quote < quote_amount:
-        quote_amount = fixed_quote
+    quote_amount = execution_quote_amount(
+        available_quote,
+        equity,
+        sizing_mode_code,
+        configured_quote_amount,
+        equity_pct,
+        min_quote,
+        max_quote,
+    )
     if quote_amount <= 0.0:
         return (
             available_quote,
@@ -1034,11 +1043,14 @@ def event_segments_2_no_risk(
     exec_close_1m: np.ndarray,
     t_exec: np.int32,
     init_cash_quote: float,
-    fixed_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
     fee_rate: float,
     slippage_rate: float,
     safe_profit_percent: float,
-    use_fixed_quote: np.int8,
     use_profit_lock: np.int8,
     bars_per_year_exec: float,
     close_on_end: np.int8,
@@ -1133,11 +1145,14 @@ def event_segments_2_no_risk(
                             total_trade_exec_bars,
                             exposure_bars,
                             init_cash_quote,
-                            fixed_quote,
+                            sizing_mode_code,
+                            configured_quote_amount,
+                            equity_pct,
+                            min_quote,
+                            max_quote,
                             fee_rate,
                             slippage_rate,
                             safe_profit_percent,
-                            use_fixed_quote,
                             use_profit_lock,
                         )
                         current_dir = np.int8(0)
@@ -1182,11 +1197,14 @@ def event_segments_2_no_risk(
                             total_trade_exec_bars,
                             exposure_bars,
                             init_cash_quote,
-                            fixed_quote,
+                            sizing_mode_code,
+                            configured_quote_amount,
+                            equity_pct,
+                            min_quote,
+                            max_quote,
                             fee_rate,
                             slippage_rate,
                             safe_profit_percent,
-                            use_fixed_quote,
                             use_profit_lock,
                         )
                         current_dir = dirn
@@ -1234,11 +1252,14 @@ def event_segments_2_no_risk(
                 total_trade_exec_bars,
                 exposure_bars,
                 init_cash_quote,
-                fixed_quote,
+                sizing_mode_code,
+                configured_quote_amount,
+                equity_pct,
+                min_quote,
+                max_quote,
                 fee_rate,
                 slippage_rate,
                 safe_profit_percent,
-                use_fixed_quote,
                 use_profit_lock,
             )
         _write_final_metrics(
@@ -1281,11 +1302,14 @@ def streaming_2_no_risk(
     exec_close_1m: np.ndarray,
     t_exec: np.int32,
     init_cash_quote: float,
-    fixed_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
     fee_rate: float,
     slippage_rate: float,
     safe_profit_percent: float,
-    use_fixed_quote: np.int8,
     use_profit_lock: np.int8,
     bars_per_year_exec: float,
     close_on_end: np.int8,
@@ -1369,11 +1393,14 @@ def streaming_2_no_risk(
                     total_trade_exec_bars,
                     exposure_bars,
                     init_cash_quote,
-                    fixed_quote,
+                    sizing_mode_code,
+                    configured_quote_amount,
+                    equity_pct,
+                    min_quote,
+                    max_quote,
                     fee_rate,
                     slippage_rate,
                     safe_profit_percent,
-                    use_fixed_quote,
                     use_profit_lock,
                 )
                 current_dir = np.int8(0)
@@ -1418,11 +1445,14 @@ def streaming_2_no_risk(
                     total_trade_exec_bars,
                     exposure_bars,
                     init_cash_quote,
-                    fixed_quote,
+                    sizing_mode_code,
+                    configured_quote_amount,
+                    equity_pct,
+                    min_quote,
+                    max_quote,
                     fee_rate,
                     slippage_rate,
                     safe_profit_percent,
-                    use_fixed_quote,
                     use_profit_lock,
                 )
                 current_dir = dirn
@@ -1466,11 +1496,14 @@ def streaming_2_no_risk(
                 total_trade_exec_bars,
                 exposure_bars,
                 init_cash_quote,
-                fixed_quote,
+                sizing_mode_code,
+                configured_quote_amount,
+                equity_pct,
+                min_quote,
+                max_quote,
                 fee_rate,
                 slippage_rate,
                 safe_profit_percent,
-                use_fixed_quote,
                 use_profit_lock,
             )
         _write_final_metrics(
@@ -1515,11 +1548,14 @@ def event_segments_n_no_risk(
     exec_close_1m: np.ndarray,
     t_exec: np.int32,
     init_cash_quote: float,
-    fixed_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
     fee_rate: float,
     slippage_rate: float,
     safe_profit_percent: float,
-    use_fixed_quote: np.int8,
     use_profit_lock: np.int8,
     bars_per_year_exec: float,
     close_on_end: np.int8,
@@ -1630,11 +1666,14 @@ def event_segments_n_no_risk(
                             total_trade_exec_bars,
                             exposure_bars,
                             init_cash_quote,
-                            fixed_quote,
+                            sizing_mode_code,
+                            configured_quote_amount,
+                            equity_pct,
+                            min_quote,
+                            max_quote,
                             fee_rate,
                             slippage_rate,
                             safe_profit_percent,
-                            use_fixed_quote,
                             use_profit_lock,
                         )
                         current_dir = np.int8(0)
@@ -1679,11 +1718,14 @@ def event_segments_n_no_risk(
                             total_trade_exec_bars,
                             exposure_bars,
                             init_cash_quote,
-                            fixed_quote,
+                            sizing_mode_code,
+                            configured_quote_amount,
+                            equity_pct,
+                            min_quote,
+                            max_quote,
                             fee_rate,
                             slippage_rate,
                             safe_profit_percent,
-                            use_fixed_quote,
                             use_profit_lock,
                         )
                         current_dir = dirn
@@ -1732,11 +1774,14 @@ def event_segments_n_no_risk(
                 total_trade_exec_bars,
                 exposure_bars,
                 init_cash_quote,
-                fixed_quote,
+                sizing_mode_code,
+                configured_quote_amount,
+                equity_pct,
+                min_quote,
+                max_quote,
                 fee_rate,
                 slippage_rate,
                 safe_profit_percent,
-                use_fixed_quote,
                 use_profit_lock,
             )
         _write_final_metrics(
@@ -1908,12 +1953,15 @@ def _score_trade_list_no_risk_reference(
             continue
         if available_quote <= 0.0:
             continue
-        quote_amount = available_quote
-        if (
-            execution_settings.use_fixed_quote == 1
-            and execution_settings.fixed_quote < quote_amount
-        ):
-            quote_amount = execution_settings.fixed_quote
+        quote_amount = execution_quote_amount(
+            available_quote,
+            equity,
+            execution_settings.sizing_mode_code,
+            execution_settings.quote_amount,
+            execution_settings.equity_pct,
+            execution_settings.min_quote,
+            execution_settings.max_quote,
+        )
         if quote_amount <= 0.0:
             continue
         trade_direction = int(dir_arr[trade_index])
@@ -2082,98 +2130,11 @@ def _execution_settings_from_normalized(
     expected_direction_mode: str,
     config: BacktestNoRiskExactConfig,
 ) -> _ExecutionSettings:
-    execution = normalized_request.get("execution")
-    if not isinstance(execution, Mapping):
-        raise BacktestNoRiskExactRejected("normalized_request.execution must be a mapping")
-    direction_mode = str(execution.get("direction_mode", expected_direction_mode))
-    if direction_mode != expected_direction_mode:
-        raise BacktestNoRiskExactRejected(
-            f"execution direction_mode {direction_mode!r} does not match "
-            f"backend direction_mode {expected_direction_mode!r}"
-        )
-    sizing = execution.get("sizing", {"mode": "all_in"})
-    if not isinstance(sizing, Mapping):
-        raise BacktestNoRiskExactRejected("normalized_request.execution.sizing must be a mapping")
-    sizing_mode = str(sizing.get("mode", "all_in"))
-    if sizing_mode not in ("all_in", "fixed_quote"):
-        raise BacktestNoRiskExactRejected(
-            f"unsupported no-risk exact sizing mode {sizing_mode!r}; "
-            "Iteration 4.2 supports all_in and fixed_quote"
-        )
-    profit_lock = execution.get("profit_lock", {"enabled": False})
-    if not isinstance(profit_lock, Mapping):
-        raise BacktestNoRiskExactRejected(
-            "normalized_request.execution.profit_lock must be a mapping"
-        )
-    return _ExecutionSettings(
-        direction_mode=direction_mode,
-        direction_mode_code=_direction_mode_code(direction_mode),
-        fee_rate=_float_from_mapping(
-            execution,
-            "fee_rate",
-            default=config.default_fee_rate,
-            minimum=0.0,
-        ),
-        slippage_rate=_float_from_mapping(
-            execution,
-            "slippage_rate",
-            default=config.default_slippage_rate,
-            minimum=0.0,
-        ),
-        initial_cash_quote=_float_from_mapping(
-            execution,
-            "initial_cash_quote",
-            default=config.default_initial_cash_quote,
-            minimum=0.0,
-            minimum_inclusive=False,
-        ),
-        fixed_quote=_float_from_mapping(
-            sizing,
-            "fixed_quote",
-            default=config.default_fixed_quote,
-            minimum=0.0,
-            minimum_inclusive=False,
-        ),
-        use_fixed_quote=np.int8(1 if sizing_mode == "fixed_quote" else 0),
-        safe_profit_percent=_float_from_mapping(
-            profit_lock,
-            "safe_profit_percent",
-            default=config.default_safe_profit_percent,
-            minimum=0.0,
-        ),
-        use_profit_lock=np.int8(1 if bool(profit_lock.get("enabled", False)) else 0),
-        close_on_end=np.int8(1 if bool(execution.get("close_on_end", True)) else 0),
-    )
-
-
-def _float_from_mapping(
-    mapping: Mapping[str, Any],
-    key: str,
-    *,
-    default: float,
-    minimum: float,
-    minimum_inclusive: bool = True,
-) -> float:
-    raw_value = mapping.get(key, default)
-    if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
-        raise BacktestNoRiskExactRejected(f"{key} must be numeric")
-    value = float(raw_value)
-    if minimum_inclusive:
-        if value < minimum:
-            raise BacktestNoRiskExactRejected(f"{key} must be >= {minimum}")
-    elif value <= minimum:
-        raise BacktestNoRiskExactRejected(f"{key} must be > {minimum}")
-    return value
-
-
-def _direction_mode_code(direction_mode: str) -> np.int8:
-    if direction_mode == DIRECTION_MODE_LONG_ONLY:
-        return DIRECTION_MODE_LONG_ONLY_CODE
-    if direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
-        return DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE
-    raise BacktestNoRiskExactRejected(
-        f"Unsupported direction_mode={direction_mode!r}; expected "
-        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
+    return execution_settings_from_normalized(
+        normalized_request,
+        expected_direction_mode=expected_direction_mode,
+        config=config,
+        rejection_cls=BacktestNoRiskExactRejected,
     )
 
 
