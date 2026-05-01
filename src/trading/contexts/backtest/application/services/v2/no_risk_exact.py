@@ -24,6 +24,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     COMBO_CHUNK_SIZE,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+    NEG_INF,
     STREAMING_2_NO_RISK_BACKEND,
     BacktestComboPlanningService,
     build_local_row_pools,
@@ -35,6 +36,7 @@ NO_RISK_EXACT_BOUNDARY_STAGE_NAME = "no_risk_exact_boundary"
 NO_RISK_EXACT_SCORING_STAGE_NAME = "exact_scoring"
 NO_RISK_HEAP_UPDATE_STAGE_NAME = "heap_update"
 NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME = "top_result_assembly"
+NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME = "top_result_proxy_fill"
 NO_RISK_SELF_CHECK_STAGE_NAME = "self_check"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
@@ -265,8 +267,13 @@ class BacktestNoRiskExactScoringService:
             scored_count += scored
 
         top_result_start = time.perf_counter()
-        top_results = _top_results_from_heap(heap, top_k_context=top_k_context)
-        stage_timings[NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME] = (
+        top_results = _top_results_from_heap(
+            heap,
+            prepared_result=prepared_result,
+            combo_planning_result=combo_planning_result,
+            top_k_context=top_k_context,
+        )
+        stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
             time.perf_counter() - top_result_start
         )
         telemetry = BacktestNoRiskExactTelemetry(
@@ -659,6 +666,62 @@ def _consensus_dir2(left_value: np.int8, right_value: np.int8) -> np.int8:
     if left_value == -1 and right_value == -1:
         return np.int8(-1)
     return np.int8(0)
+
+
+@nb.njit(cache=True, inline="always")
+def proxy_for_two_rows(
+    left_eval_row: np.ndarray,
+    right_eval_row: np.ndarray,
+    ret_15m: np.ndarray,
+    min_confirm: np.int32,
+    fee_penalty_per_confirm: np.float32,
+) -> tuple[np.int32, np.float32]:
+    confirms = np.int32(0)
+    proxy = np.float32(0.0)
+    for interval_idx in range(ret_15m.shape[0]):
+        dirn = _consensus_dir2(left_eval_row[interval_idx], right_eval_row[interval_idx])
+        if dirn == 1:
+            confirms += 1
+            proxy += ret_15m[interval_idx]
+        elif dirn == -1:
+            confirms += 1
+            proxy -= ret_15m[interval_idx]
+    if confirms >= min_confirm:
+        return confirms, proxy - fee_penalty_per_confirm * np.float32(confirms)
+    return confirms, NEG_INF
+
+
+def proxy_for_indicator_rows(
+    *,
+    eval_rows: tuple[np.ndarray, ...],
+    ret_15m: np.ndarray,
+    min_confirm: int,
+    fee_penalty_per_confirm: np.float32,
+) -> tuple[int, float]:
+    if len(eval_rows) == 2:
+        confirms, proxy = proxy_for_two_rows(
+            eval_rows[0],
+            eval_rows[1],
+            np.asarray(ret_15m, dtype=np.float32),
+            np.int32(min_confirm),
+            fee_penalty_per_confirm,
+        )
+        return int(confirms), float(proxy)
+
+    consensus = np.asarray(eval_rows[0], dtype=np.int8).copy()
+    for eval_row in eval_rows[1:]:
+        consensus[consensus != eval_row] = np.int8(0)
+    confirms = int(np.count_nonzero(consensus))
+    if confirms < int(min_confirm):
+        return confirms, float(NEG_INF)
+
+    returns = np.asarray(ret_15m, dtype=np.float32)
+    proxy = np.float32(0.0)
+    if confirms:
+        proxy += np.sum(returns[consensus == 1], dtype=np.float32)
+        proxy -= np.sum(returns[consensus == -1], dtype=np.float32)
+    proxy -= fee_penalty_per_confirm * np.float32(confirms)
+    return confirms, float(proxy)
 
 
 @nb.njit(cache=True, inline="always")
@@ -2506,8 +2569,18 @@ def _materialize_heap_entry_arity1(
 def _top_results_from_heap(
     heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]],
     *,
+    prepared_result: BacktestPreparePoolsResult,
+    combo_planning_result: BacktestComboPlanningResult,
     top_k_context: _TopKContext,
 ) -> tuple[BacktestNoRiskTopResult, ...]:
+    pools_by_id = _pool_by_id(prepared_result)
+    eval_rows_by_pos = tuple(
+        np.ascontiguousarray(pools_by_id[indicator_id].eval_T)
+        for indicator_id in top_k_context.indicator_ids
+    )
+    proxy_context = combo_planning_result.proxy_context
+    ret_15m = np.asarray(prepared_result.signal_returns_15m, dtype=np.float32)
+
     return tuple(
         BacktestNoRiskTopResult(
             rank=rank,
@@ -2517,7 +2590,17 @@ def _top_results_from_heap(
                 for pos, indicator_id in enumerate(top_k_context.indicator_ids)
             },
             metrics=_metrics_from_values(_metric_values_from_heap_entry(entry)),
-            metadata=_top_result_metadata(entry, top_k_context=top_k_context),
+            metadata=_top_result_metadata(
+                entry,
+                top_k_context=top_k_context,
+                proxy_fill=_proxy_fill_for_heap_entry(
+                    entry=entry,
+                    eval_rows_by_pos=eval_rows_by_pos,
+                    ret_15m=ret_15m,
+                    min_confirm=proxy_context.combo_min_confirm,
+                    fee_penalty_per_confirm=proxy_context.fee_penalty_per_confirm,
+                ),
+            ),
         )
         for rank, (_, entry) in enumerate(
             sorted(heap, key=lambda pair: pair[0], reverse=True),
@@ -2538,18 +2621,41 @@ def _top_result_metadata(
     entry: _NoRiskHeapEntry,
     *,
     top_k_context: _TopKContext,
+    proxy_fill: tuple[int, float],
 ) -> dict[str, Any]:
+    confirm_count, proxy_score = proxy_fill
     metadata: dict[str, Any] = {
-        "confirm_count": entry.confirm_count,
-        "proxy_score": entry.proxy_score,
-        "_proxy_pending": entry.proxy_pending,
+        "confirm_count": confirm_count,
+        "proxy_score": proxy_score,
     }
     for pos, indicator_id in enumerate(top_k_context.indicator_ids):
         row_metadata = entry.metadata_by_pos[pos].as_mapping()
-        metadata[f"{indicator_id}.local_index"] = entry.local_indices[pos]
         for key, value in row_metadata.items():
             metadata[f"{indicator_id}.{key}"] = value
     return metadata
+
+
+def _proxy_fill_for_heap_entry(
+    *,
+    entry: _NoRiskHeapEntry,
+    eval_rows_by_pos: tuple[np.ndarray, ...],
+    ret_15m: np.ndarray,
+    min_confirm: int,
+    fee_penalty_per_confirm: np.float32,
+) -> tuple[int, float]:
+    if not entry.proxy_pending:
+        return entry.confirm_count, entry.proxy_score
+
+    eval_rows = tuple(
+        eval_rows_by_pos[pos][entry.local_indices[pos]]
+        for pos in range(len(entry.local_indices))
+    )
+    return proxy_for_indicator_rows(
+        eval_rows=eval_rows,
+        ret_15m=ret_15m,
+        min_confirm=min_confirm,
+        fee_penalty_per_confirm=fee_penalty_per_confirm,
+    )
 
 
 def _ranking_from_normalized(normalized_request: Mapping[str, Any]) -> _RankingSpec:
@@ -2627,6 +2733,7 @@ __all__ = [
     "NO_RISK_SELF_CHECK_PASSED_STATUS",
     "NO_RISK_SELF_CHECK_STAGE_NAME",
     "NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME",
+    "NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME",
     "BacktestNoRiskExactRejected",
     "BacktestNoRiskExactScoringService",
     "BacktestNoRiskSelfCheckFailed",
@@ -2635,6 +2742,8 @@ __all__ = [
     "evaluate_no_risk_reference_rows_slow",
     "event_segments_2_no_risk",
     "event_segments_n_no_risk",
+    "proxy_for_indicator_rows",
+    "proxy_for_two_rows",
     "run_fast_vs_reference_self_check",
     "streaming_2_no_risk",
 ]

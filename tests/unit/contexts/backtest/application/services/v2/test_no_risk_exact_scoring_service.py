@@ -33,7 +33,7 @@ from trading.contexts.backtest.application.services.v2 import (
     NO_RISK_SELF_CHECK_NOT_RUN_STATUS,
     NO_RISK_SELF_CHECK_PASSED_STATUS,
     NO_RISK_SELF_CHECK_STAGE_NAME,
-    NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME,
+    NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME,
     STREAMING_2_NO_RISK_BACKEND,
     BacktestNoRiskExactRejected,
     BacktestNoRiskExactScoringService,
@@ -76,7 +76,9 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
         "beta": 2,
         "gamma": 1,
     }
-    assert result.top_results[0].metadata["_proxy_pending"] is True
+    assert result.top_results[0].metadata["confirm_count"] == 2
+    assert result.top_results[0].metadata["proxy_score"] == pytest.approx(1.0)
+    assert "_proxy_pending" not in result.top_results[0].metadata
     assert result.execution_context.as_mapping() == {
         "timeframe": "15m",
         "execution_timeframe": "1m",
@@ -102,7 +104,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
         NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
         NO_RISK_EXACT_SCORING_STAGE_NAME,
         NO_RISK_HEAP_UPDATE_STAGE_NAME,
-        NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME,
+        NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME,
     }
     assert result.telemetry.metric_names == NO_RISK_METRIC_NAMES
     assert set(result.telemetry.sample_metrics or {}) == set(NO_RISK_METRIC_NAMES)
@@ -222,6 +224,102 @@ def test_no_risk_arity_one_heap_materializes_metadata_only_for_retained_row(
         for top_result in result.top_results
     ] == [(6.0, {"alpha": 0})]
     assert metadata_calls == [("alpha", 0)]
+
+
+def test_top_result_proxy_fill_recomputes_only_final_pending_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    _patch_exact_scores(monkeypatch, scores=(6.0, 5.0, 4.0, 3.0, 2.0, 1.0))
+    proxy_calls: list[tuple[tuple[int, ...], ...]] = []
+
+    def counted_proxy_fill(**kwargs: Any) -> tuple[int, float]:
+        eval_rows = cast(tuple[np.ndarray, ...], kwargs["eval_rows"])
+        proxy_calls.append(tuple(tuple(int(value) for value in row) for row in eval_rows))
+        return 77, 12.5
+
+    monkeypatch.setattr(
+        no_risk_exact_module,
+        "proxy_for_indicator_rows",
+        counted_proxy_fill,
+    )
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    assert result.telemetry.top_results_count == 1
+    assert proxy_calls == [((1, 1, 0), (1, 0, 0))]
+    assert result.top_results[0].metadata["confirm_count"] == 77
+    assert result.top_results[0].metadata["proxy_score"] == pytest.approx(12.5)
+
+
+def test_proxy_for_indicator_rows_dispatches_arity_two_fast_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[np.ndarray, np.ndarray]] = []
+
+    def fast_path(
+        left_eval_row: np.ndarray,
+        right_eval_row: np.ndarray,
+        ret_15m: np.ndarray,
+        min_confirm: np.int32,
+        fee_penalty_per_confirm: np.float32,
+    ) -> tuple[np.int32, np.float32]:
+        calls.append((left_eval_row, right_eval_row))
+        assert ret_15m.dtype == np.float32
+        assert int(min_confirm) == 2
+        assert float(fee_penalty_per_confirm) == pytest.approx(0.25)
+        return np.int32(9), np.float32(3.5)
+
+    monkeypatch.setattr(no_risk_exact_module, "proxy_for_two_rows", fast_path)
+
+    confirm_count, proxy_score = no_risk_exact_module.proxy_for_indicator_rows(
+        eval_rows=(
+            np.asarray([1, -1, 0], dtype=np.int8),
+            np.asarray([1, -1, 1], dtype=np.int8),
+        ),
+        ret_15m=np.asarray([1.0, 2.0, 3.0], dtype=np.float64),
+        min_confirm=2,
+        fee_penalty_per_confirm=np.float32(0.25),
+    )
+
+    assert confirm_count == 9
+    assert proxy_score == pytest.approx(3.5)
+    assert len(calls) == 1
+
+
+def test_proxy_for_two_rows_matches_notebook_scalar_path() -> None:
+    confirm_count, proxy_score = no_risk_exact_module.proxy_for_two_rows(
+        np.asarray([1, 1, -1, 0], dtype=np.int8),
+        np.asarray([1, 0, -1, -1], dtype=np.int8),
+        np.asarray([1.0, 2.0, -3.0, 4.0], dtype=np.float32),
+        np.int32(1),
+        np.float32(0.5),
+    )
+
+    assert int(confirm_count) == 2
+    assert float(proxy_score) == pytest.approx(3.0)
+
+
+def test_top_result_metadata_removes_proxy_fill_internal_fields() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    metadata = result.top_results[0].metadata
+    assert "_local_indices" not in metadata
+    assert "_proxy_pending" not in metadata
+    assert all(not key.endswith(".local_index") for key in metadata)
 
 
 def test_no_risk_exact_dispatch_records_specialized_two_backend() -> None:
