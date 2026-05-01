@@ -19,6 +19,9 @@ from .no_risk_exact import (
     BacktestNoRiskSelfCheckSummary,
     BacktestNoRiskTopResult,
     CompactScalar,
+    canonical_no_risk_json_hash,
+    canonical_no_risk_top_results_hash,
+    canonical_no_risk_top_results_payload,
 )
 from .prepare_pools import (
     BacktestPreparePoolsConfig,
@@ -74,4 +77,7 @@ __all__ = [
     "PreparedIndicatorRowMetadata",
     "PreparedSignalSegments",
     "PreparePoolsTiming",
+    "canonical_no_risk_json_hash",
+    "canonical_no_risk_top_results_hash",
+    "canonical_no_risk_top_results_payload",
 ]

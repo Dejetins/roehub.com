@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 CompactScalar = str | int | float | bool | None
+NO_RISK_CANONICAL_INTEGER_FIELDS = frozenset({"confirm_count", "trade_count"})
+NO_RISK_CANONICAL_PROXY_FIELDS = ("confirm_count", "proxy_score")
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +125,28 @@ class BacktestNoRiskTopResult:
             "metrics": dict(self.metrics),
             "metadata": dict(self.metadata),
         }
+
+    def as_canonical_mapping(self) -> dict[str, Any]:
+        """
+        Return the notebook-compatible top result row used for result hashing.
+        """
+
+        payload: dict[str, Any] = {}
+        for key, value in self.metrics.items():
+            payload[key] = _canonical_no_risk_field_value(key=key, value=value)
+        for key in NO_RISK_CANONICAL_PROXY_FIELDS:
+            if key in self.metadata:
+                payload[key] = _canonical_no_risk_field_value(
+                    key=key,
+                    value=self.metadata[key],
+                )
+        for indicator_id in self.indicator_rows:
+            payload[indicator_id] = _canonical_indicator_metadata(
+                indicator_id=indicator_id,
+                row_id=self.indicator_rows[indicator_id],
+                metadata=self.metadata,
+            )
+        return _canonical_mapping(payload)
 
 
 @dataclass(frozen=True, slots=True)
@@ -300,6 +328,98 @@ class BacktestNoRiskExactResult:
             "memory_cleanup_evidence": self.memory_cleanup_evidence.as_mapping(),
         }
 
+    def canonical_top_results_payload(self) -> list[dict[str, Any]]:
+        return canonical_no_risk_top_results_payload(self.top_results)
+
+    def canonical_top_results_hash(self) -> str:
+        return canonical_no_risk_top_results_hash(self.top_results)
+
+
+def canonical_no_risk_top_results_payload(
+    top_results: Sequence[BacktestNoRiskTopResult | Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for top_result in top_results:
+        if isinstance(top_result, BacktestNoRiskTopResult):
+            payload.append(top_result.as_canonical_mapping())
+            continue
+        normalized = _normalize_canonical_json_value(top_result)
+        if not isinstance(normalized, dict):
+            raise TypeError("canonical top result row must normalize to a mapping")
+        payload.append(normalized)
+    return payload
+
+
+def canonical_no_risk_top_results_hash(
+    top_results: Sequence[BacktestNoRiskTopResult | Mapping[str, Any]],
+) -> str:
+    return canonical_no_risk_json_hash(canonical_no_risk_top_results_payload(top_results))
+
+
+def canonical_no_risk_json_hash(payload: Any) -> str:
+    encoded = json.dumps(
+        _normalize_canonical_json_value(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_no_risk_field_value(*, key: str, value: object) -> CompactScalar:
+    if key in NO_RISK_CANONICAL_INTEGER_FIELDS:
+        return int(value)  # type: ignore[arg-type]
+    return _normalize_canonical_scalar(value)
+
+
+def _canonical_indicator_metadata(
+    *,
+    indicator_id: str,
+    row_id: int,
+    metadata: Mapping[str, CompactScalar],
+) -> dict[str, Any]:
+    prefix = f"{indicator_id}."
+    indicator_metadata = {
+        key[len(prefix) :]: value
+        for key, value in metadata.items()
+        if key.startswith(prefix)
+    }
+    indicator_metadata.setdefault("indicator_id", indicator_id)
+    indicator_metadata.setdefault("row_id", row_id)
+    return _canonical_mapping(indicator_metadata)
+
+
+def _canonical_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = _normalize_canonical_json_value(value)
+    if not isinstance(normalized, dict):
+        raise TypeError("canonical mapping did not normalize to a dict")
+    return normalized
+
+
+def _normalize_canonical_json_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, Mapping):
+        return {
+            str(key): _normalize_canonical_json_value(value[key])
+            for key in sorted(value)
+        }
+    if isinstance(value, (tuple, list)):
+        return [_normalize_canonical_json_value(item) for item in value]
+    return _normalize_canonical_scalar(value)
+
+
+def _normalize_canonical_scalar(value: object) -> CompactScalar:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    item = getattr(value, "item", None)
+    if callable(item):
+        scalar = item()
+        if scalar is not value:
+            return _normalize_canonical_scalar(scalar)
+    return str(value)
+
 
 def _compact_scalar(value: object) -> CompactScalar:
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -316,4 +436,7 @@ __all__ = [
     "BacktestNoRiskSelfCheckSummary",
     "BacktestNoRiskTopResult",
     "CompactScalar",
+    "canonical_no_risk_json_hash",
+    "canonical_no_risk_top_results_hash",
+    "canonical_no_risk_top_results_payload",
 ]

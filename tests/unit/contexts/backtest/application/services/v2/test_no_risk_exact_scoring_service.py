@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import gc
+import json
 import weakref
+from pathlib import Path
 from typing import Any, Mapping, Sequence, cast
 
 import numpy as np
@@ -21,6 +23,8 @@ from trading.contexts.backtest.application.dto import (
     PreparedIndicatorPool,
     PreparedIndicatorRowMetadata,
     PreparePoolsTiming,
+    canonical_no_risk_top_results_hash,
+    canonical_no_risk_top_results_payload,
 )
 from trading.contexts.backtest.application.services.v2 import (
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
@@ -320,6 +324,86 @@ def test_top_result_metadata_removes_proxy_fill_internal_fields() -> None:
     assert "_local_indices" not in metadata
     assert "_proxy_pending" not in metadata
     assert all(not key.endswith(".local_index") for key in metadata)
+
+
+def test_no_risk_canonical_top_result_payload_matches_notebook_shape() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=100),
+    )
+
+    payload = result.canonical_top_results_payload()
+
+    assert result.canonical_top_results_hash() == canonical_no_risk_top_results_hash(
+        result.top_results
+    )
+    assert len(payload) == 1
+    row = payload[0]
+    assert set(row) == {
+        *NO_RISK_METRIC_NAMES,
+        "confirm_count",
+        "proxy_score",
+        "alpha",
+        "beta",
+    }
+    assert "rank" not in row
+    assert "score" not in row
+    assert "indicator_rows" not in row
+    assert "metrics" not in row
+    assert "metadata" not in row
+    assert "_local_indices" not in row
+    assert "_proxy_pending" not in row
+    assert isinstance(row["trade_count"], int)
+    assert isinstance(row["confirm_count"], int)
+    assert row["alpha"] == {
+        "indicator_id": "alpha",
+        "row_id": result.top_results[0].indicator_rows["alpha"],
+        "source": "close",
+        "window": 5 + result.top_results[0].indicator_rows["alpha"],
+    }
+    assert row["beta"] == {
+        "indicator_id": "beta",
+        "row_id": result.top_results[0].indicator_rows["beta"],
+        "source": "close",
+        "window": 5 + result.top_results[0].indicator_rows["beta"],
+    }
+    assert all(not key.startswith("alpha.") for key in row)
+    assert all(not key.startswith("beta.") for key in row)
+
+
+def test_no_risk_canonical_hash_matches_arity_one_two_evidence_fixture() -> None:
+    fixture_path = Path(
+        "docs/architecture/backtest/benchmark_iterations/"
+        "2026-04-26_engine_test_btcusdt_15m/benchmark_results.json"
+    )
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+    checked: list[tuple[int, str]] = []
+
+    for run in payload["runs"]:
+        if run.get("risk_mode") != "none":
+            continue
+        arity = len(run["indicator_ids"])
+        if arity not in (1, 2):
+            continue
+        checked.append((arity, run["direction_mode"]))
+        canonical_payload = canonical_no_risk_top_results_payload(run["top_results"])
+        assert canonical_no_risk_top_results_hash(canonical_payload) == run["result_hash"]
+        for row in canonical_payload:
+            assert "trade_count" in row
+            assert isinstance(row["trade_count"], int)
+            assert "_local_indices" not in row
+            assert "_proxy_pending" not in row
+
+    assert sorted(checked) == [
+        (1, "long_only"),
+        (1, "long_short_reversal"),
+        (2, "long_only"),
+        (2, "long_short_reversal"),
+    ]
 
 
 def test_no_risk_exact_dispatch_records_specialized_two_backend() -> None:
