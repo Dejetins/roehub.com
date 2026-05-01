@@ -18,8 +18,15 @@ from starlette.responses import JSONResponse
 from trading.platform.errors import RoehubError
 
 _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
+    "auth.required": 401,
     "backtest.artifacts_unavailable": 503,
+    "backtest.forbidden": 403,
+    "backtest.idempotency_key_conflict": 409,
     "backtest.invalid_request": 422,
+    "backtest.job_not_cancellable": 409,
+    "backtest.not_found": 404,
+    "backtest.queue_saturated": 503,
+    "backtest.rate_limited": 429,
     "backtest.request_too_expensive": 422,
     "backtest.tp_sl_grid_not_covered": 422,
     "validation_error": 422,

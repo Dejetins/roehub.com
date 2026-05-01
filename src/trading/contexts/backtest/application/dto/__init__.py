@@ -1,5 +1,15 @@
 """DTO package for the reset backtest scope."""
 
+from .backtest_jobs import (
+    BacktestJobCreateResult,
+    BacktestJobListResult,
+    BacktestJobProgressReadModel,
+    BacktestJobReadModel,
+    BacktestJobTopResult,
+    BacktestJobTopVariantReadModel,
+    build_backtest_job_read_model,
+    build_top_variant_read_model,
+)
 from .combo_planning import (
     BacktestComboChunk,
     BacktestComboPlanningConfig,
@@ -68,6 +78,12 @@ from .tp_sl_hit_times import (
 
 __all__ = [
     "BacktestArtifactMetadata",
+    "BacktestJobCreateResult",
+    "BacktestJobListResult",
+    "BacktestJobProgressReadModel",
+    "BacktestJobReadModel",
+    "BacktestJobTopResult",
+    "BacktestJobTopVariantReadModel",
     "BacktestComboChunk",
     "BacktestComboPlanningConfig",
     "BacktestComboPlanningResult",
@@ -116,6 +132,8 @@ __all__ = [
     "PreparedSignalSegments",
     "PreparePoolsTiming",
     "TP_SL_EXACT_METRIC_NAMES",
+    "build_backtest_job_read_model",
+    "build_top_variant_read_model",
     "canonical_no_risk_json_hash",
     "canonical_no_risk_top_results_hash",
     "canonical_no_risk_top_results_payload",

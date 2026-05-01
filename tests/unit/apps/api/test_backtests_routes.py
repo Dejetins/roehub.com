@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
@@ -10,12 +12,27 @@ from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaults
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
+    BacktestNoRiskTopResult,
 )
-from trading.contexts.backtest.application.ports import BacktestArtifactContextUnavailable
+from trading.contexts.backtest.application.ports import (
+    BacktestArtifactContextUnavailable,
+    BacktestJobListPage,
+    BacktestJobListQuery,
+)
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestJobExecutionResult,
     BacktestPreflightService,
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
+    BacktestTopResultAssemblyService,
+)
+from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
+from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
+    BacktestJobErrorPayload,
+    BacktestJobStageAShortlist,
+    BacktestJobState,
+    BacktestJobTopVariant,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -93,6 +110,106 @@ def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() ->
     assert response.json()["error"]["details"]["retryable"] is True
 
 
+def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+
+    response = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+        json=_valid_request(),
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["state"] == "succeeded"
+    assert payload["progress"]["pipeline_stage"] == "succeeded"
+    assert payload["terminal_summary"]["top_variants_count"] == 1
+    top_response = client.get(
+        f"/backtests/jobs/{payload['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+    )
+    assert top_response.status_code == 200
+    top_row = top_response.json()["items"][0]
+    assert top_row["variant_key"].startswith("job_")
+    assert len(top_row["variant_hash"]) == 64
+    assert top_row["variant_key"] != top_row["variant_hash"]
+    assert top_row["links"]["lazy_trades"].endswith("/trades")
+    raw_hash_response = client.get(
+        f"/backtests/jobs/{payload['job_id']}/variants/{top_row['variant_hash']}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+    )
+    assert raw_hash_response.status_code == 404
+    assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
+
+
+def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000000206",
+        "Idempotency-Key": "stable-key",
+    }
+
+    first = client.post("/backtests/jobs", headers=headers, json=_valid_request())
+    replay = client.post("/backtests/jobs", headers=headers, json=_valid_request())
+    changed_request = _valid_request()
+    changed_request["top_n"] = 50
+    conflict = client.post("/backtests/jobs", headers=headers, json=changed_request)
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert replay.json()["job_id"] == first.json()["job_id"]
+    assert replay.json()["idempotent_replay"] is True
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "backtest.idempotency_key_conflict"
+
+
+def test_get_backtest_job_foreign_owner_returns_forbidden_code() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000207"},
+        json=_valid_request(),
+    )
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000208"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "backtest.forbidden"
+
+
+def test_post_backtest_job_cancel_terminal_job_is_idempotent() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000209"},
+        json=_valid_request(),
+    )
+
+    response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/cancel",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000209"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "succeeded"
+
+
+def test_backtest_jobs_auth_failure_uses_auth_required_code() -> None:
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
+
+    response = client.get("/backtests/jobs")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "auth.required"
+
+
 class _HeaderCurrentUserDependency:
     def __call__(self, request: Request) -> CurrentUserPrincipal:
         raw_user_id = request.headers.get("x-user-id")
@@ -134,6 +251,7 @@ class _UnavailableArtifactResolver:
 def _build_client(
     *,
     resolver: _FakeArtifactResolver | _UnavailableArtifactResolver | None = None,
+    jobs_use_case: BacktestJobsUseCase | None = None,
 ) -> TestClient:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -157,9 +275,233 @@ def _build_client(
                 runtime_config=runtime_config,
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
+            jobs_use_case=jobs_use_case,
         )
     )
     return TestClient(app)
+
+
+def _build_jobs_use_case(*, repository: "_FakeJobRepository") -> BacktestJobsUseCase:
+    defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path="configs/prod/indicators.yaml"
+    )
+    runtime_config = BacktestRuntimeConfig(
+        hit_times_tp_levels_pct=tuple(i / 2 for i in range(1, 101)),
+        hit_times_sl_levels_pct=tuple(i / 2 for i in range(1, 51)),
+        artifact_config_hash="a" * 64,
+    )
+    return BacktestJobsUseCase(
+        job_repository=repository,
+        preflight_service=BacktestPreflightService(
+            defaults_provider=defaults_provider,
+            artifact_context_resolver=_FakeArtifactResolver(),
+            runtime_config=runtime_config,
+        ),
+        runtime_config=runtime_config,
+        executor=_FakeExecutor(),
+    )
+
+
+class _FakeExecutor:
+    def execute(
+        self,
+        *,
+        job_id: UUID,
+        preflight: Any,
+        updated_at: datetime,
+    ) -> BacktestJobExecutionResult:
+        top_result = BacktestNoRiskTopResult(
+            rank=1,
+            score=12.5,
+            indicator_rows={"ma.dema": 7},
+            metrics={"total_return_pct": 12.5, "trade_count": 2.0},
+            metadata={
+                "ma.dema.source": "close",
+                "ma.dema.window": 5,
+                "confirm_count": 1,
+                "proxy_score": 0.25,
+            },
+        )
+        assembly = BacktestTopResultAssemblyService().assemble(
+            job_id=job_id,
+            normalized_request=preflight.normalized_request,
+            top_results=(top_result,),
+            updated_at=updated_at,
+        )
+        return BacktestJobExecutionResult(
+            top_variants=assembly.top_variants,
+            stage_timings=assembly.stage_timings,
+            summary_hash=assembly.summary_hash,
+            cleanup_evidence={"result_contains_heavy_references": False},
+        )
+
+
+@dataclass
+class _FakeJobRepository:
+    jobs: dict[UUID, BacktestJob] | None = None
+    top_rows: dict[UUID, tuple[BacktestJobTopVariant, ...]] | None = None
+
+    def __post_init__(self) -> None:
+        if self.jobs is None:
+            self.jobs = {}
+        if self.top_rows is None:
+            self.top_rows = {}
+
+    def create(self, *, job: BacktestJob) -> BacktestJob:
+        assert self.jobs is not None
+        self.jobs[job.job_id] = job
+        return job
+
+    def create_with_top_variants(
+        self,
+        *,
+        job: BacktestJob,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
+    ) -> BacktestJob:
+        _ = stage_a_shortlist
+        stored = self.create(job=job)
+        assert self.top_rows is not None
+        self.top_rows[job.job_id] = top_variants
+        return stored
+
+    def find_by_idempotency_key(
+        self,
+        *,
+        user_id: UserId,
+        idempotency_key_hash: str,
+        created_after: datetime,
+    ) -> BacktestJob | None:
+        assert self.jobs is not None
+        for job in sorted(self.jobs.values(), key=lambda item: item.created_at):
+            idempotency = dict(job.request_json).get("idempotency")
+            if (
+                job.user_id == user_id
+                and job.created_at >= created_after
+                and isinstance(idempotency, dict)
+                and idempotency.get("key_hash") == idempotency_key_hash
+            ):
+                return job
+        return None
+
+    def claim_for_inline_execution(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        lease_expires_at: datetime,
+    ) -> BacktestJob | None:
+        assert self.jobs is not None
+        job = self.jobs.get(job_id)
+        if job is None or job.user_id != user_id or job.state != "queued":
+            return None
+        claimed = job.claim(
+            changed_at=now,
+            locked_by=locked_by,
+            lease_expires_at=lease_expires_at,
+        )
+        self.jobs[job_id] = claimed
+        return claimed
+
+    def finish_with_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        next_state: BacktestJobState,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+        last_error: str | None = None,
+        last_error_json: BacktestJobErrorPayload | None = None,
+    ) -> BacktestJob | None:
+        _ = locked_by
+        assert self.jobs is not None
+        assert self.top_rows is not None
+        job = self.jobs.get(job_id)
+        if job is None or job.user_id != user_id or job.state != "running":
+            return None
+        finished = job.finish(
+            next_state=next_state,
+            changed_at=now,
+            last_error=last_error,
+            last_error_json=last_error_json,
+        )
+        self.jobs[job_id] = finished
+        if next_state == "succeeded":
+            self.top_rows[job_id] = top_variants
+        return finished
+
+    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+        assert self.jobs is not None
+        job = self.jobs.get(job_id)
+        if job is None:
+            return None
+        if user_id is not None and job.user_id != user_id:
+            return None
+        return job
+
+    def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
+        assert self.jobs is not None
+        items = [
+            job
+            for job in self.jobs.values()
+            if job.user_id == query.user_id
+            and (query.state is None or job.state == query.state)
+        ]
+        items.sort(key=lambda item: (item.created_at, str(item.job_id)), reverse=True)
+        return BacktestJobListPage(items=tuple(items[: query.limit]), next_cursor=None)
+
+    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+        assert self.top_rows is not None
+        return self.top_rows.get(job_id, ())
+
+    def get_top_variant_by_public_key(
+        self,
+        *,
+        job_id: UUID,
+        public_variant_key: str,
+    ) -> BacktestJobTopVariant | None:
+        for row in self.list_top_variants(job_id=job_id):
+            if row.payload_json.get("public_variant_key") == public_variant_key:
+                return row
+        return None
+
+    def cancel(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        cancel_requested_at: datetime,
+    ) -> BacktestJob | None:
+        assert self.jobs is not None
+        job = self.jobs.get(job_id)
+        if job is None or job.user_id != user_id:
+            return None
+        cancelled = job.request_cancel(changed_at=cancel_requested_at)
+        self.jobs[job_id] = cancelled
+        return cancelled
+
+    def count_active_for_user(self, *, user_id: UserId) -> int:
+        assert self.jobs is not None
+        return sum(1 for job in self.jobs.values() if job.user_id == user_id and job.is_active())
+
+    def count_active_global(self) -> int:
+        assert self.jobs is not None
+        return sum(1 for job in self.jobs.values() if job.is_active())
+
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        _ = market_id, symbol, artifact_slot, artifact_manifest_hash
+        return 0
 
 
 def _valid_request() -> dict[str, Any]:

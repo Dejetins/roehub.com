@@ -74,6 +74,22 @@ _BACKTEST_JOB_SELECT_COLUMNS = """
     last_error_json
 """
 
+_BACKTEST_TOP_VARIANT_SELECT_COLUMNS = """
+    job_id,
+    rank,
+    variant_key,
+    indicator_variant_key,
+    variant_index,
+    total_return_pct,
+    payload_json,
+    summary_metrics_json,
+    best_tp_pct,
+    best_sl_pct,
+    report_table_md,
+    trades_json,
+    updated_at
+"""
+
 
 class PostgresBacktestJobRepository(BacktestJobRepository):
     """
@@ -497,6 +513,290 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             return None
         return _map_job_row(row=row)
 
+    def find_by_idempotency_key(
+        self,
+        *,
+        user_id: UserId,
+        idempotency_key_hash: str,
+        created_after: datetime,
+    ) -> BacktestJob | None:
+        """
+        Find a durable v1 idempotent job snapshot for one owner/key hash.
+        """
+        query = f"""
+        SELECT
+            {_BACKTEST_JOB_SELECT_COLUMNS}
+        FROM {self._jobs_table}
+        WHERE user_id = %(user_id)s
+          AND created_at >= %(created_after)s
+          AND request_json -> 'idempotency' ->> 'key_hash' = %(idempotency_key_hash)s
+        ORDER BY created_at ASC, job_id ASC
+        LIMIT 1
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "user_id": str(user_id),
+                "idempotency_key_hash": idempotency_key_hash,
+                "created_after": created_after,
+            },
+        )
+        if row is None:
+            return None
+        return _map_job_row(row=row)
+
+    def claim_for_inline_execution(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        lease_expires_at: datetime,
+    ) -> BacktestJob | None:
+        """
+        Mark one owned queued job as running for sync-inline execution.
+        """
+        normalized_owner = locked_by.strip()
+        if not normalized_owner:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.claim_for_inline_execution requires locked_by"
+            )
+        query = f"""
+        UPDATE {self._jobs_table}
+        SET
+            state = 'running',
+            stage = 'stage_a',
+            started_at = %(now)s,
+            updated_at = %(now)s,
+            locked_by = %(locked_by)s,
+            locked_at = %(now)s,
+            lease_expires_at = %(lease_expires_at)s,
+            heartbeat_at = %(now)s,
+            attempt = attempt + 1
+        WHERE job_id = %(job_id)s
+          AND user_id = %(user_id)s
+          AND state = 'queued'
+        RETURNING
+            {_BACKTEST_JOB_SELECT_COLUMNS}
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "job_id": str(job_id),
+                "user_id": str(user_id),
+                "now": now,
+                "locked_by": normalized_owner,
+                "lease_expires_at": lease_expires_at,
+            },
+        )
+        if row is None:
+            return None
+        return _map_job_row(row=row)
+
+    def finish_with_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        next_state: BacktestJobState,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+        last_error: str | None = None,
+        last_error_json: BacktestJobErrorPayload | None = None,
+    ) -> BacktestJob | None:
+        """
+        Finish one running inline job and write summary-only top rows atomically.
+        """
+        normalized_owner = locked_by.strip()
+        normalized_state = next_state.strip().lower()
+        if normalized_state not in {"succeeded", "failed", "cancelled"}:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.finish_with_top_variants "
+                "requires terminal state"
+            )
+        if normalized_state != "succeeded" and top_variants:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.finish_with_top_variants accepts top rows "
+                "only for succeeded state"
+            )
+        normalized_last_error: str | None = None
+        normalized_error_json: Mapping[str, Any] | None = None
+        if normalized_state == "failed":
+            if last_error is None or not last_error.strip():
+                raise BacktestStorageError(
+                    "PostgresBacktestJobRepository.finish_with_top_variants failed state "
+                    "requires last_error"
+                )
+            if last_error_json is None:
+                raise BacktestStorageError(
+                    "PostgresBacktestJobRepository.finish_with_top_variants failed state "
+                    "requires last_error_json"
+                )
+            normalized_last_error = last_error.strip()
+            normalized_error_json = last_error_json.to_mapping()
+        rows_json = json.dumps(
+            _serialize_top_rows(job_id=job_id, rows=top_variants),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        query = f"""
+        WITH updated_job AS (
+            UPDATE {self._jobs_table}
+            SET
+                state = %(next_state)s,
+                stage = CASE
+                    WHEN %(next_state)s = 'succeeded' THEN 'finalizing'
+                    ELSE stage
+                END,
+                processed_units = CASE
+                    WHEN %(next_state)s = 'succeeded' THEN 1
+                    ELSE processed_units
+                END,
+                total_units = CASE
+                    WHEN %(next_state)s = 'succeeded' THEN 1
+                    ELSE total_units
+                END,
+                progress_updated_at = %(now)s,
+                updated_at = %(now)s,
+                finished_at = %(now)s,
+                locked_by = NULL,
+                locked_at = NULL,
+                lease_expires_at = NULL,
+                heartbeat_at = NULL,
+                last_error = CASE
+                    WHEN %(next_state)s = 'failed' THEN %(last_error)s
+                    ELSE NULL
+                END,
+                last_error_json = CASE
+                    WHEN %(next_state)s = 'failed' THEN %(last_error_json)s::jsonb
+                    ELSE NULL
+                END
+            WHERE job_id = %(job_id)s
+              AND user_id = %(user_id)s
+              AND state = 'running'
+              AND locked_by = %(locked_by)s
+              AND lease_expires_at > %(now)s
+            RETURNING
+                {_BACKTEST_JOB_SELECT_COLUMNS}
+        ),
+        deleted_rows AS (
+            DELETE FROM {self._top_variants_table}
+            WHERE job_id = %(job_id)s
+              AND EXISTS (SELECT 1 FROM updated_job)
+        ),
+        source_rows AS (
+            SELECT item
+            FROM jsonb_array_elements(%(rows_json)s::jsonb) AS item
+        ),
+        inserted_rows AS (
+            INSERT INTO {self._top_variants_table}
+            (
+                job_id,
+                rank,
+                variant_key,
+                indicator_variant_key,
+                variant_index,
+                total_return_pct,
+                payload_json,
+                summary_metrics_json,
+                best_tp_pct,
+                best_sl_pct,
+                report_table_md,
+                trades_json,
+                updated_at
+            )
+            SELECT
+                %(job_id)s::uuid AS job_id,
+                (item ->> 'rank')::INTEGER AS rank,
+                item ->> 'variant_key' AS variant_key,
+                item ->> 'indicator_variant_key' AS indicator_variant_key,
+                (item ->> 'variant_index')::INTEGER AS variant_index,
+                (item ->> 'total_return_pct')::DOUBLE PRECISION AS total_return_pct,
+                item -> 'payload_json' AS payload_json,
+                item -> 'summary_metrics_json' AS summary_metrics_json,
+                (item ->> 'best_tp_pct')::DOUBLE PRECISION AS best_tp_pct,
+                (item ->> 'best_sl_pct')::DOUBLE PRECISION AS best_sl_pct,
+                NULL::TEXT AS report_table_md,
+                NULL::JSONB AS trades_json,
+                %(now)s AS updated_at
+            FROM source_rows
+            WHERE EXISTS (SELECT 1 FROM updated_job)
+            ORDER BY
+                (item ->> 'rank')::INTEGER ASC,
+                (item ->> 'variant_key') ASC
+        )
+        SELECT
+            {_BACKTEST_JOB_SELECT_COLUMNS}
+        FROM updated_job
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "job_id": str(job_id),
+                "user_id": str(user_id),
+                "now": now,
+                "locked_by": normalized_owner,
+                "next_state": normalized_state,
+                "last_error": normalized_last_error,
+                "last_error_json": _json_dumps(payload=normalized_error_json)
+                if normalized_error_json is not None
+                else None,
+                "rows_json": rows_json,
+            },
+        )
+        if row is None:
+            return None
+        return _map_job_row(row=row)
+
+    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+        """
+        List persisted top rows ordered by public rank.
+        """
+        query = f"""
+        SELECT
+            {_BACKTEST_TOP_VARIANT_SELECT_COLUMNS}
+        FROM {self._top_variants_table}
+        WHERE job_id = %(job_id)s
+        ORDER BY rank ASC, variant_key ASC
+        """
+        rows = self._gateway.fetch_all(
+            query=query,
+            parameters={"job_id": str(job_id)},
+        )
+        return tuple(_map_top_variant_row(row=row) for row in rows)
+
+    def get_top_variant_by_public_key(
+        self,
+        *,
+        job_id: UUID,
+        public_variant_key: str,
+    ) -> BacktestJobTopVariant | None:
+        """
+        Resolve readable public key from payload JSON, never by raw storage SHA.
+        """
+        query = f"""
+        SELECT
+            {_BACKTEST_TOP_VARIANT_SELECT_COLUMNS}
+        FROM {self._top_variants_table}
+        WHERE job_id = %(job_id)s
+          AND payload_json ->> 'public_variant_key' = %(public_variant_key)s
+        ORDER BY rank ASC
+        LIMIT 1
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "job_id": str(job_id),
+                "public_variant_key": public_variant_key,
+            },
+        )
+        if row is None:
+            return None
+        return _map_top_variant_row(row=row)
+
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
         """
         List owner jobs by deterministic keyset ordering and optional state filter.
@@ -650,6 +950,28 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         except Exception as error:  # noqa: BLE001
             raise BacktestStorageError(
                 "PostgresBacktestJobRepository.count_active_for_user invalid count row"
+            ) from error
+
+    def count_active_global(self) -> int:
+        """
+        Count all active jobs (`queued + running`) for service-wide guardrails.
+        """
+        sql = f"""
+        SELECT
+            COUNT(*) AS active_total
+        FROM {self._jobs_table}
+        WHERE state IN ('queued', 'running')
+        """
+        row = self._gateway.fetch_one(query=sql, parameters={})
+        if row is None:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_active_global returned no row"
+            )
+        try:
+            return int(row["active_total"])
+        except Exception as error:  # noqa: BLE001
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_active_global invalid count row"
             ) from error
 
     def count_active_for_artifact_manifest(
@@ -1141,6 +1463,67 @@ def _serialize_top_rows(
             }
         )
     return serialized_rows
+
+
+def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
+    """
+    Map SQL top-variant row into summary-only domain snapshot.
+    """
+    try:
+        payload = _parse_json_object(
+            value=row.get("payload_json"),
+            field_name="payload_json",
+            required=True,
+        )
+        summary_metrics = _parse_json_object(
+            value=row.get("summary_metrics_json"),
+            field_name="summary_metrics_json",
+            required=False,
+        )
+        if payload is None:
+            raise BacktestStorageError(
+                "backtest_job_top_variants.payload_json must be JSON object"
+            )
+        trades_json = row.get("trades_json")
+        if trades_json is not None:
+            raise BacktestStorageError(
+                "backtest_job_top_variants.trades_json must stay null in summary-only contract"
+            )
+        updated_at = _normalize_storage_datetime_utc(
+            value=row.get("updated_at"),
+            field_name="updated_at",
+        )
+        if updated_at is None:
+            raise BacktestStorageError(
+                "backtest_job_top_variants.updated_at must be non-null"
+            )
+        return BacktestJobTopVariant(
+            job_id=UUID(str(row["job_id"])),
+            rank=int(row["rank"]),
+            variant_key=str(row["variant_key"]),
+            indicator_variant_key=str(row["indicator_variant_key"]),
+            variant_index=int(row["variant_index"]),
+            total_return_pct=float(row["total_return_pct"]),
+            payload_json=payload,
+            summary_metrics_json=summary_metrics or {},
+            best_tp_pct=None
+            if row.get("best_tp_pct") is None
+            else float(row["best_tp_pct"]),
+            best_sl_pct=None
+            if row.get("best_sl_pct") is None
+            else float(row["best_sl_pct"]),
+            report_table_md=None
+            if row.get("report_table_md") is None
+            else str(row["report_table_md"]),
+            trades_json=None,
+            updated_at=updated_at,
+        )
+    except BacktestStorageError:
+        raise
+    except Exception as error:  # noqa: BLE001
+        raise BacktestStorageError(
+            "PostgresBacktestJobRepository failed to map top-variant row"
+        ) from error
 
 
 def _parse_artifact_pin(*, row: Mapping[str, Any]) -> BacktestJobArtifactPin | None:

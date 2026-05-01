@@ -10,8 +10,10 @@ config keys, metric names, timer names, backend ids, file paths и значен�
 ## Статус
 
 Каноническая целевая архитектура для планирования реализации. Runtime-сервис
-еще не реализован; notebook и benchmark evidence ниже определяют production-
-прототип, которому сервис обязан соответствовать.
+реализуется итерационно; Iteration 7 принята для public jobs API,
+summary-only top-N persistence и service-only job orchestration evidence.
+Notebook и benchmark evidence ниже определяют production-прототип, которому
+сервис обязан соответствовать.
 
 Этот документ проектируется поверх:
 
@@ -1413,11 +1415,12 @@ Acceptance по memory cleanup для каждой compute iteration:
 | 4 | `pass` | [`4.1 no-risk boundary`](benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/), [`4.2 exact/self-check`](benchmark_iterations/2026-05-01_iteration_4_2_exact_scoring_self_check/), [`4.3 heap corrective`](benchmark_iterations/2026-05-01_iteration_4_3_heap_update_corrective/), [`4.4 proxy fill`](benchmark_iterations/2026-05-01_iteration_4_4_top_result_proxy_fill/), [`4.5 shape/hash parity`](benchmark_iterations/2026-05-01_iteration_4_5_result_shape_hash_parity/), [`4.6 accounting`](benchmark_iterations/2026-05-01_iteration_4_6_benchmark_runner_accounting/), [`4.7 memory cleanup`](benchmark_iterations/2026-05-01_iteration_4_7_memory_cleanup/) |
 | 5 | `pass` | [`5 TP/SL hit-times loading/grid validation`](benchmark_iterations/2026-05-01_iteration_5_tp_sl_hit_times_loading_validation/) |
 | 6 | `pass` | [`6 TP/SL exact scoring/full metrics`](benchmark_iterations/2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics/) |
+| 7 | `pass` | [`7 job orchestration/persistence`](benchmark_iterations/2026-05-01_iteration_7_job_orchestration_persistence/) |
 
 Итерация 6 принята с явным manual stage override: пользователь допустил
 нарушения `0.9` ratio для микросекундных стадий как неразличимые на уровне
 service latency. Raw ratios сохранены в benchmark evidence. Последующие итерации
-пока не имеют принятого benchmark record в
+начиная с Iteration 8 пока не имеют принятого benchmark record в
 `docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
 
 ### Итерация 0: документы и benchmark harness
@@ -1829,6 +1832,12 @@ Raw benchmark ratios сохранены в evidence; override принят по�
   score arrays и selected top rows.
 
 ### Итерация 7: job orchestration и persistence
+
+Текущий статус: `pass`;
+[`benchmark record`](benchmark_iterations/2026-05-01_iteration_7_job_orchestration_persistence/)
+принят на Mac Studio для public/storage variant identity mapping,
+summary-only top-N rows, `top_result_assembly`, `persist_top_n_io` и
+`service_total_without_warmup`.
 
 - реализовать `top_result_assembly` для no-risk и TP/SL top rows:
   public `variant_key`, stable `variant_hash`, optional
