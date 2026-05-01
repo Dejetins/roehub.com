@@ -544,11 +544,12 @@ def _build_payload(
         services.artifact_manifest_hash == str(canonical.get("artifact_manifest_hash", ""))
     )
     stage_pass = all(bool(run["pass"]["overall"]) for run in runs)
-    request_slice_identity_pass = _request_slice_identity_pass(
+    request_slice_identity = _request_slice_identity_evidence(
         canonical_request=canonical_request,
         runs=runs,
         rows_per_indicator=rows_per_indicator,
     )
+    request_slice_identity_pass = bool(request_slice_identity["pass"])
     artifact_historical_prefix_compatible = (
         artifact_manifest_hash_matches_canonical or request_slice_identity_pass
     )
@@ -602,8 +603,8 @@ def _build_payload(
             "rows_per_indicator": rows_per_indicator,
             "warmup_rows_per_indicator": warmup_rows_per_indicator,
             "self_check_n": self_check_n,
-            "expected_trade_T_length": _expected_trade_t_length(canonical_request),
             "request_slice_identity_pass": request_slice_identity_pass,
+            "request_slice_identity": request_slice_identity,
         },
         "acceptance": {
             "ratio_threshold": ACCEPTANCE_RATIO,
@@ -624,6 +625,8 @@ def _build_payload(
 
 
 def _render_summary(*, payload: Mapping[str, Any]) -> str:
+    request = _required_mapping(payload, "request")
+    request_slice_identity = _required_mapping(request, "request_slice_identity")
     lines = [
         "# Iteration 4.2 exact scoring self-check benchmark",
         "",
@@ -648,6 +651,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"`{payload['artifact_historical_prefix_compatible']}`",
         "- Artifact compatibility evidence: "
         f"`{payload['artifact_acceptance']['compatibility_evidence']}`",
+        "- Observed trade_T length values: "
+        f"`{request_slice_identity['observed_trade_T_length_values']}`",
+        "- Observed eval_T length values: "
+        f"`{request_slice_identity['observed_eval_T_length_values']}`",
         "",
         "## Results",
         "",
@@ -720,71 +727,111 @@ def _time_range_from_canonical(canonical_request: Mapping[str, Any]) -> dict[str
     }
 
 
-def _request_slice_identity_pass(
+def _request_slice_identity_evidence(
     *,
     canonical_request: Mapping[str, Any],
     runs: Sequence[Mapping[str, Any]],
     rows_per_indicator: int,
-) -> bool:
-    expected_trade_t_length = _expected_trade_t_length(canonical_request)
-    expected_eval_t_length = expected_trade_t_length - 1
-    expected_windows = _expected_windows(
+) -> dict[str, Any]:
+    expected_rows_by_indicator = _expected_rows_by_indicator(
         canonical_request=canonical_request,
         rows_per_indicator=rows_per_indicator,
     )
-    expected_row_ids = tuple(range(rows_per_indicator))
+    observed_trade_t_lengths: set[int] = set()
+    observed_eval_t_lengths: set[int] = set()
+    observed_starts: set[int] = set()
+    observed_stops: set[int] = set()
+    row_identity_pass = True
+    slice_shape_pass = True
+
     for run in runs:
         request_slice = _required_mapping(run, "request_slice")
-        if int(request_slice["trade_T_length"]) != expected_trade_t_length:
-            return False
-        if int(request_slice["eval_T_length"]) != expected_eval_t_length:
-            return False
+        trade_t_length = int(request_slice["trade_T_length"])
+        eval_t_length = int(request_slice["eval_T_length"])
+        start_15m = int(request_slice["time_slice_start_15m"])
+        stop_15m = int(request_slice["time_slice_stop_15m"])
+        observed_trade_t_lengths.add(trade_t_length)
+        observed_eval_t_lengths.add(eval_t_length)
+        observed_starts.add(start_15m)
+        observed_stops.add(stop_15m)
+        if trade_t_length <= 0 or eval_t_length != trade_t_length - 1:
+            slice_shape_pass = False
+        if stop_15m - start_15m != trade_t_length:
+            slice_shape_pass = False
+
         row_identity = _required_mapping(request_slice, "row_identity")
-        for indicator_id in _required_sequence(run, "indicator_ids"):
-            raw_rows = row_identity.get(str(indicator_id))
+        indicator_ids = tuple(str(value) for value in _required_sequence(run, "indicator_ids"))
+        if set(row_identity) != set(indicator_ids):
+            row_identity_pass = False
+            continue
+        for indicator_id in indicator_ids:
+            expected_rows = expected_rows_by_indicator.get(indicator_id)
+            if expected_rows is None:
+                row_identity_pass = False
+                continue
+            raw_rows = row_identity.get(indicator_id)
             if not isinstance(raw_rows, Sequence) or isinstance(
                 raw_rows,
                 (str, bytes, bytearray),
             ):
-                return False
+                row_identity_pass = False
+                continue
             if len(raw_rows) != rows_per_indicator:
-                return False
+                row_identity_pass = False
+                continue
             for offset, raw_row in enumerate(raw_rows):
                 row = _require_mapping_value(raw_row, "request_slice.row_identity[]")
-                if int(row.get("row_id", -1)) != expected_row_ids[offset]:
-                    return False
-                if str(row.get("source", "")).strip().lower() != "close":
-                    return False
-                if int(row.get("window", -1)) != expected_windows[offset]:
-                    return False
-    return True
+                expected_row = expected_rows[offset]
+                if str(row.get("indicator_id", "")) != indicator_id:
+                    row_identity_pass = False
+                if int(row.get("row_id", -1)) != expected_row["row_id"]:
+                    row_identity_pass = False
+                if str(row.get("source", "")).strip().lower() != expected_row["source"]:
+                    row_identity_pass = False
+                if int(row.get("window", -1)) != expected_row["window"]:
+                    row_identity_pass = False
+
+    consistent_slice_values = (
+        len(observed_trade_t_lengths) == 1
+        and len(observed_eval_t_lengths) == 1
+        and len(observed_starts) == 1
+        and len(observed_stops) == 1
+    )
+    return {
+        "pass": bool(row_identity_pass and slice_shape_pass and consistent_slice_values),
+        "row_identity_pass": row_identity_pass,
+        "slice_shape_pass": slice_shape_pass,
+        "consistent_slice_values": consistent_slice_values,
+        "observed_trade_T_length_values": sorted(observed_trade_t_lengths),
+        "observed_eval_T_length_values": sorted(observed_eval_t_lengths),
+        "observed_time_slice_start_15m_values": sorted(observed_starts),
+        "observed_time_slice_stop_15m_values": sorted(observed_stops),
+    }
 
 
-def _expected_trade_t_length(canonical_request: Mapping[str, Any]) -> int:
-    time_range = _time_range_from_canonical(canonical_request)
-    start = _parse_datetime(time_range["start"])
-    end = _parse_datetime(time_range["end"])
-    seconds = (end - start).total_seconds()
-    if seconds <= 0 or seconds % 900 != 0:
-        raise ValueError("canonical request period must align to 15m bars")
-    return int(seconds // 900)
-
-
-def _expected_windows(
+def _expected_rows_by_indicator(
     *,
     canonical_request: Mapping[str, Any],
     rows_per_indicator: int,
-) -> tuple[int, ...]:
-    first_indicator = _require_mapping_value(
-        _required_sequence(canonical_request, "indicators")[0],
-        "request.indicators[0]",
-    )
-    start, _stop = _window_bounds(first_indicator)
-    return tuple(range(start, start + rows_per_indicator))
-
-
-def _parse_datetime(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+) -> dict[str, tuple[dict[str, int | str], ...]]:
+    expected: dict[str, tuple[dict[str, int | str], ...]] = {}
+    for raw_indicator in _required_sequence(canonical_request, "indicators"):
+        indicator = _require_mapping_value(raw_indicator, "request.indicators[]")
+        indicator_id = str(indicator["indicator_id"])
+        sources = _required_sequence(indicator, "sources")
+        if len(sources) != 1:
+            raise ValueError("canonical indicator.sources must have exactly one item")
+        source = str(sources[0]).strip().lower()
+        start, _stop = _window_bounds(indicator)
+        expected[indicator_id] = tuple(
+            {
+                "row_id": offset,
+                "source": source,
+                "window": start + offset,
+            }
+            for offset in range(rows_per_indicator)
+        )
+    return expected
 
 
 def _window_bounds(indicator: Mapping[str, Any]) -> tuple[int, int]:
