@@ -1278,10 +1278,11 @@ target values:
 
 Текущие canonical `sizing_smoke` evidence имеют compiled parity для `all_in` и
 `fixed_quote`; equity-percent sizing modes в notebook evidence являются
-reference-only. Service implementation является first compiled parity point для
+reference-only. Iteration 8 service implementation является first compiled
+parity point для
 `fixed_equity_pct`, `fixed_equity_pct_min_quote` и
-`fixed_equity_pct_max_quote` и должна записать service-level parity evidence для
-этих modes до того, как v1 можно считать functionally complete.
+`fixed_equity_pct_max_quote`; service-level parity evidence записана в
+[`2026-05-02_iteration_8_execution_sizing_completion`](benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/).
 
 ## Операционные аспекты
 
@@ -1416,11 +1417,12 @@ Acceptance по memory cleanup для каждой compute iteration:
 | 5 | `pass` | [`5 TP/SL hit-times loading/grid validation`](benchmark_iterations/2026-05-01_iteration_5_tp_sl_hit_times_loading_validation/) |
 | 6 | `pass` | [`6 TP/SL exact scoring/full metrics`](benchmark_iterations/2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics/) |
 | 7 | `pass` | [`7 job orchestration/persistence`](benchmark_iterations/2026-05-01_iteration_7_job_orchestration_persistence/) |
+| 8 | `pass` | [`8 execution/sizing completion`](benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/) |
 
 Итерация 6 принята с явным manual stage override: пользователь допустил
 нарушения `0.9` ratio для микросекундных стадий как неразличимые на уровне
 service latency. Raw ratios сохранены в benchmark evidence. Последующие итерации
-начиная с Iteration 8 пока не имеют принятого benchmark record в
+начиная с Iteration 9 пока не имеют принятого benchmark record в
 `docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
 
 ### Итерация 0: документы и benchmark harness
@@ -1873,6 +1875,9 @@ summary-only top-N rows, `top_result_assembly`, `persist_top_n_io` и
 - реализовать `profit_lock` parity для каждого sizing mode;
 - реализовать `close_on_end = false`;
 - verify, что no-risk и TP/SL semantics остаются stable across execution settings.
+
+Статус: `pass`, accepted Mac Studio evidence:
+[`2026-05-02_iteration_8_execution_sizing_completion`](benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/).
 
 Гейт бенчмарка и корректности:
 

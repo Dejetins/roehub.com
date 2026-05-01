@@ -78,6 +78,56 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
 
 
 @pytest.mark.parametrize(
+    ("sizing", "expected"),
+    [
+        ({"mode": "all_in"}, {"mode": "all_in"}),
+        (
+            {"mode": "fixed_quote", "quote_amount": 250.0},
+            {"mode": "fixed_quote", "quote_amount": 250.0},
+        ),
+        (
+            {"mode": "fixed_equity_pct", "equity_pct": 15.0},
+            {"mode": "fixed_equity_pct", "equity_pct": 15.0},
+        ),
+        (
+            {
+                "mode": "fixed_equity_pct_min_quote",
+                "equity_pct": 5.0,
+                "min_quote": 50.0,
+            },
+            {
+                "mode": "fixed_equity_pct_min_quote",
+                "equity_pct": 5.0,
+                "min_quote": 50.0,
+            },
+        ),
+        (
+            {
+                "mode": "fixed_equity_pct_max_quote",
+                "equity_pct": 50.0,
+                "max_quote": 500.0,
+            },
+            {
+                "mode": "fixed_equity_pct_max_quote",
+                "equity_pct": 50.0,
+                "max_quote": 500.0,
+            },
+        ),
+    ],
+)
+def test_preflight_normalizes_public_sizing_fields(
+    sizing: dict[str, float | str],
+    expected: dict[str, float | str],
+) -> None:
+    request = _valid_request()
+    request["execution"]["sizing"] = sizing
+
+    result = _service().execute(request)
+
+    assert result.normalized_request["execution"]["sizing"] == expected
+
+
+@pytest.mark.parametrize(
     ("mutation", "path", "issue_code"),
     [
         (lambda request: request.update({"timeframe": "1m"}), "timeframe", "unsupported_timeframe"),
