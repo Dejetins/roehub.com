@@ -1,0 +1,159 @@
+{
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_manifest_hash": "6c41e8eb57d8865c2243d15d7d390054bcbbcd601d56c490290168185ef1e554",
+  "artifact_policy": "historical_prefix_compatible",
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "cache_root": "/opt/roehub/state/backtest/trades_cache",
+  "cache_ttl_seconds": 172800,
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-05-02T08:10:44.416321Z",
+  "git_commit": "bb50e10fc56c0e7a7a2c5c46400162ab5ae229dd",
+  "git_status_short": "",
+  "hit_times_manifest_hash": "ee5dc838b491a563783becd85cc5107d07b8f2d4c90c3c1903dc31383752da26",
+  "host": "MacStudioDaniil",
+  "numba": "0.60.0",
+  "pass": true,
+  "python": "3.12.13",
+  "request": {
+    "arity": 1,
+    "benchmark_top_k": 5,
+    "direction_mode": "long_short_reversal",
+    "rows_per_indicator": 6,
+    "top_n": 100
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "artifact_manifest_hash": "6c41e8eb57d8865c2243d15d7d390054bcbbcd601d56c490290168185ef1e554",
+      "artifact_policy": "historical_prefix_compatible",
+      "cache": {
+        "compute_status": "miss",
+        "hit_status": "hit"
+      },
+      "cache_key": "d2d6ccc875f476b45e963d7b1f9e747527c3b23a3b4eed788ac2b01d4ae92e84",
+      "cache_root": "/opt/roehub/state/backtest/trades_cache",
+      "cache_ttl_seconds": 172800,
+      "close_on_end": true,
+      "direction_mode": "long_short_reversal",
+      "engine_params_hash": "8701d60fcceaa440ea1f0b3ca42bb9d90d2da662cbd50c11e6c0949a5a39dbff",
+      "hit_times_manifest_hash": null,
+      "lazy_trades_cache_hit": 0.5630945000011707,
+      "lazy_trades_compute": 4.034277917002328,
+      "pass": true,
+      "request_hash": "6ebcc86e83aef4a761edb93c60412e11f11e9740218abd6f19852c6dda009560",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "cache_hit": {
+          "process_cpu_time_s": 0.5630480000000002,
+          "rss_after": 1212678144,
+          "rss_before": 1136508928
+        },
+        "compute": {
+          "process_cpu_time_s": 4.072095,
+          "rss_after": 1136508928,
+          "rss_before": 556531712
+        }
+      },
+      "sizing_mode": "all_in",
+      "summary_parity": {
+        "checks": {
+          "total_return_pct": {
+            "abs_diff": 0.0,
+            "actual": -100.0,
+            "expected": -100.0,
+            "pass": true
+          },
+          "trade_count": {
+            "abs_diff": 0.0,
+            "actual": 60108.0,
+            "expected": 60108.0,
+            "pass": true
+          }
+        },
+        "pass": true
+      },
+      "timing": {
+        "lazy_trades_cache_hit": 0.5630945000011707,
+        "lazy_trades_compute": 4.034277917002328
+      },
+      "trade_count": 60108,
+      "variant_hash": "8f2a641908745dd7241336e3dd08ee8b5d4779e2fdb8c4128973164873347bb8",
+      "variant_key": "job_fffcb9d534a8__dema_close_w10__risk_none__vh_8f2a6419"
+    },
+    {
+      "arity": 1,
+      "artifact_manifest_hash": "6c41e8eb57d8865c2243d15d7d390054bcbbcd601d56c490290168185ef1e554",
+      "artifact_policy": "historical_prefix_compatible",
+      "cache": {
+        "compute_status": "miss",
+        "hit_status": "hit"
+      },
+      "cache_key": "efa90dd3d8cd6da68c00c5d91976b2323e817a9bf77197a64f03bf5780189421",
+      "cache_root": "/opt/roehub/state/backtest/trades_cache",
+      "cache_ttl_seconds": 172800,
+      "close_on_end": true,
+      "direction_mode": "long_short_reversal",
+      "engine_params_hash": "82b76177320720d18359f2587bb2ccc6e7249a90ddfb44c8a7194c391bedc39a",
+      "hit_times_manifest_hash": "ee5dc838b491a563783becd85cc5107d07b8f2d4c90c3c1903dc31383752da26",
+      "lazy_trades_cache_hit": 0.7513308750058059,
+      "lazy_trades_compute": 5.862833708000835,
+      "pass": true,
+      "request_hash": "dfaa73b9a4fa6b719a880d6f1dcd4563d6d00120a284a5b094c5791d140ca20f",
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "cache_hit": {
+          "process_cpu_time_s": 0.7513150000000053,
+          "rss_after": 2849275904,
+          "rss_before": 2692235264
+        },
+        "compute": {
+          "process_cpu_time_s": 5.926755,
+          "rss_after": 2692235264,
+          "rss_before": 1916977152
+        }
+      },
+      "sizing_mode": "all_in",
+      "summary_parity": {
+        "checks": {
+          "best_sl_pct": {
+            "abs_diff": 0.0,
+            "actual": 11.0,
+            "expected": 11.0,
+            "pass": true
+          },
+          "best_tp_pct": {
+            "abs_diff": 0.0,
+            "actual": 7.500000476837158,
+            "expected": 7.500000476837158,
+            "pass": true
+          },
+          "total_return_pct": {
+            "abs_diff": 0.0,
+            "actual": -100.0,
+            "expected": -100.0,
+            "pass": true
+          },
+          "trade_count": {
+            "abs_diff": 0.0,
+            "actual": 82783.0,
+            "expected": 82783.0,
+            "pass": true
+          }
+        },
+        "pass": true
+      },
+      "timing": {
+        "lazy_trades_cache_hit": 0.7513308750058059,
+        "lazy_trades_compute": 5.862833708000835
+      },
+      "trade_count": 82783,
+      "variant_hash": "53826f615006949eca675ae2f69f4b59d7c57bed7d769c0939959e7c9955c30e",
+      "variant_key": "job_4a029574c013__dema_close_w5__risk_tp_sl_grid__tp_7_5__sl_11__vh_53826f61"
+    }
+  ],
+  "service_only_stages": [
+    "lazy_trades_compute",
+    "lazy_trades_cache_hit"
+  ],
+  "total_without_warmup_excludes_lazy_trades": true
+}
