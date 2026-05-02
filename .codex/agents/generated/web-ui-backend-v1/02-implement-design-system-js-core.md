@@ -51,6 +51,9 @@ style_references:
     - matrix-green
     - high-contrast
   invariant_financial_colors: true
+  default_locale: en
+  secondary_locale: ru
+  language_switch_required: true
 
 hard_requirements:
   default_theme_terminal_orange: true
@@ -60,6 +63,8 @@ hard_requirements:
   js_core_required: true
   no_overlap_poller_required: true
   api_client_error_mapping_required: true
+  locale_js_required: true
+  i18n_component_contract_required: true
   browser_qa_required: true
 
 task_toggles:
@@ -93,6 +98,7 @@ package_contract:
     - "CSS token names"
     - "theme.js data-theme API"
     - "api.js/poller.js/sse.js/dom.js public JS helpers"
+    - "locale.js language switcher/helper API"
     - "shared macro/component names"
   handoff:
     - "stable UI kit, theme contract, and JS core for page packages"
@@ -136,12 +142,17 @@ required_literals:
   - "poller.js"
   - "sse.js"
   - "dom.js"
+  - "locale.js"
+  - "en"
+  - "ru"
+  - "data-locale"
 
 non_goals:
   - "Do not implement page-specific business workflows."
   - "Do not implement backend account preferences yet."
   - "Do not add Node/Vite/React toolchain."
   - "Do not recolor financial semantics by theme."
+  - "Do not hardcode user-visible component labels in only one language."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -154,7 +165,7 @@ final_report_format:
   - "Runtime evidence: Playwright/browser, tests, inference, assumptions clearly separated"
   - "Risks: edge cases, migration/rollback, pre-existing/environmental/flaky failures"
   - "Handoff: stable exports, route includes, helpers, endpoint contracts for next agents"
-  - "Publish/deploy: terminal state publish-ci-deploy or exact reason it was skipped"
+  - "Publish/deploy: publish-ci-deploy terminal state; if successful, include main merge, local sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact reason it was skipped"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/web"
@@ -198,7 +209,9 @@ Done means:
 - CSS tokens and themes exist with `terminal-orange` default;
 - shared Jinja macros/components exist and can render placeholders;
 - `theme.js`, `api.js`, `poller.js`, `sse.js`, `dom.js`, `notifications.js`, `formatters.js`, `validators.js` exist as scoped JS core;
+- `locale.js` exists as scoped JS core for language switcher state, cookie/localStorage sync, fallback `en`, and dynamic strings;
 - theme switch updates `data-theme` without reload and preserves financial colors;
+- shared components expose i18n hooks/keys for labels, empty states, errors and button text;
 - `poller.js` prevents overlapping requests and hidden-tab repeated polling;
 - browser evidence exists.
 
@@ -207,6 +220,7 @@ Done means:
 - Stage 1 shell should be in place or this task must integrate with the current base shell.
 - Current `site.css`, `strategy_ui.js`, `backtest_ui.js` are replacement targets, not visual sources.
 - Design manifest fixes `terminal-orange` as default and requires theme switching.
+- Design manifest fixes `en` as default locale, `ru` as secondary locale, and requires language switching.
 
 ## Requirements (Must)
 
@@ -214,6 +228,7 @@ Done means:
 - Never hardcode page color literals outside token/theme layer except narrowly justified non-color values.
 - Keep `financial` tokens invariant across themes.
 - Implement JS core with deterministic 401/403/409/422/timeout handling.
+- Implement `locale.js` with `en`/`ru` support, safe fallback, and no localized route/API paths.
 - Provide CSRF extension point for state-changing calls.
 - Add tests/smokes for asset references and theme hooks.
 - Run Playwright evidence.
@@ -247,7 +262,7 @@ Use front matter `context_sources`; avoid broad repo reads.
 1. Inspect current shell asset hooks.
 2. Add CSS token/theme/component files.
 3. Add shared Jinja macros/components.
-4. Add JS core modules, including the shared `dom.js` helpers from the target asset structure.
+4. Add JS core modules, including the shared `dom.js` and `locale.js` helpers from the target asset structure.
 5. Wire shell placeholders to use the new assets.
 6. Add focused tests.
 7. Run browser QA and quality gates.
@@ -259,6 +274,8 @@ Use front matter `context_sources`; avoid broad repo reads.
 - New templates do not depend on old `site.css`.
 - Default theme is `terminal-orange`.
 - Theme switch updates `data-theme` immediately.
+- Default locale is `en`; language switcher can select `ru`; root `data-locale` and `<html lang>` stay aligned.
+- Shared components render `en` and `ru` labels without missing keys.
 - Financial values keep fixed semantic colors across all themes.
 - `api.js` handles 401, 403, 409, 422, timeout deterministically.
 - `poller.js` has no-overlap behavior and hidden-tab pause.
@@ -346,6 +363,32 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" snapshot
 "$PWCLI" screenshot --filename output/playwright/ui-kit-dashboard-placeholder.png
 ```
+
+# i18n / language contract
+
+The Web UI v1 is multilingual. Every prompt in this pack must preserve this contract:
+
+- default locale is `en`; secondary locale is `ru`;
+- any new user-visible copy introduced by this stage must have both `en` and `ru` strings through the shared locale catalog/helper;
+- do not localize routes, `/api/*` paths, DTO fields, enum values, market symbols, strategy ids, `job_id`, `variant_key`, config keys, or metric identifiers;
+- rendered pages must keep `<html lang>` and root `data-locale` aligned with the selected locale;
+- the language switcher must remain available from shell/account controls and must not compete with primary navigation;
+- browser QA for any stage that adds or changes visible copy must include default `en` evidence and either `ru` locale-switch evidence or an explicit blocker;
+- final report must state i18n impact: locale keys/catalogs touched, fallback behavior, and whether language-switch evidence was collected.
+
+# publish-ci-deploy terminal delivery contract
+
+When all stage DoD, gates, browser evidence, and performance evidence required by this prompt pass, and `publish_after_success` is true, run `publish-ci-deploy` to the natural terminal state. A successful terminal state for this prompt means more than PR creation, green CI, or deploy workflow completion. It must include, when the agent has authority and no external blocker remains:
+
+- branch/PR merged into `main`, or exact blocker why merge is outside current authority;
+- local checkout synchronized with `origin/main`;
+- Mac Studio repository checkout synchronized with `origin/main` using `git pull --ff-only` from the actual repo checkout, normally `/Users/daniildegtyarev/Projects/roehub.com`;
+- deployed runtime updated through the repository deploy/runbook path, keeping the repo checkout and runtime bundle as separate surfaces when they differ;
+- impacted services restarted only when touched-path impact requires it; if impact is unclear, use the standard prod reload path from `publish-ci-deploy`;
+- post-restart smoke verification completed;
+- final report names exact commands, host/paths used, commit SHA on `main`, restarted services, smoke result, or exact blocker.
+
+Do not report successful publish/deploy while merge to `main`, Mac Studio git pull, required service restart/reload, or smoke verification remains pending.
 
 # Final output: report format (strict)
 

@@ -60,6 +60,9 @@ style_references:
     - matrix-green
     - high-contrast
   invariant_financial_colors: true
+  default_locale: en
+  secondary_locale: ru
+  language_switch_required: true
 
 hard_requirements:
   split_backtests_page: true
@@ -162,7 +165,7 @@ final_report_format:
   - "Runtime evidence: Playwright/browser, tests, inference, assumptions clearly separated"
   - "Risks: edge cases, migration/rollback, pre-existing/environmental/flaky failures"
   - "Handoff: stable exports, route includes, helpers, endpoint contracts for next agents"
-  - "Publish/deploy: terminal state publish-ci-deploy or exact reason it was skipped"
+  - "Publish/deploy: publish-ci-deploy terminal state; if successful, include main merge, local sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact reason it was skipped"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/web/test_app_routes.py"
@@ -355,6 +358,32 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" snapshot
 "$PWCLI" screenshot --filename output/playwright/backtests-run-desktop.png
 ```
+
+# i18n / language contract
+
+The Web UI v1 is multilingual. Every prompt in this pack must preserve this contract:
+
+- default locale is `en`; secondary locale is `ru`;
+- any new user-visible copy introduced by this stage must have both `en` and `ru` strings through the shared locale catalog/helper;
+- do not localize routes, `/api/*` paths, DTO fields, enum values, market symbols, strategy ids, `job_id`, `variant_key`, config keys, or metric identifiers;
+- rendered pages must keep `<html lang>` and root `data-locale` aligned with the selected locale;
+- the language switcher must remain available from shell/account controls and must not compete with primary navigation;
+- browser QA for any stage that adds or changes visible copy must include default `en` evidence and either `ru` locale-switch evidence or an explicit blocker;
+- final report must state i18n impact: locale keys/catalogs touched, fallback behavior, and whether language-switch evidence was collected.
+
+# publish-ci-deploy terminal delivery contract
+
+When all stage DoD, gates, browser evidence, and performance evidence required by this prompt pass, and `publish_after_success` is true, run `publish-ci-deploy` to the natural terminal state. A successful terminal state for this prompt means more than PR creation, green CI, or deploy workflow completion. It must include, when the agent has authority and no external blocker remains:
+
+- branch/PR merged into `main`, or exact blocker why merge is outside current authority;
+- local checkout synchronized with `origin/main`;
+- Mac Studio repository checkout synchronized with `origin/main` using `git pull --ff-only` from the actual repo checkout, normally `/Users/daniildegtyarev/Projects/roehub.com`;
+- deployed runtime updated through the repository deploy/runbook path, keeping the repo checkout and runtime bundle as separate surfaces when they differ;
+- impacted services restarted only when touched-path impact requires it; if impact is unclear, use the standard prod reload path from `publish-ci-deploy`;
+- post-restart smoke verification completed;
+- final report names exact commands, host/paths used, commit SHA on `main`, restarted services, smoke result, or exact blocker.
+
+Do not report successful publish/deploy while merge to `main`, Mac Studio git pull, required service restart/reload, or smoke verification remains pending.
 
 # Final output: report format (strict)
 

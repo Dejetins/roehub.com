@@ -14,6 +14,7 @@
 Построить новый сайт и защищенный UI приложения поверх существующих backend-контекстов Roehub:
 
 - сначала базовый каркас: skeleton, вкладки шапки, точки входа авторизации/регистрации;
+- весь UI мультиязычный: основной язык `en`, дополнительный `ru`, переключение языка доступно из shell/settings;
 - затем отдельный план реализации для каждой страницы;
 - для каждой страницы явно указать backend API, состав UI, пользовательский функционал, затрагиваемые файлы, критерии приемки и Playwright CLI-проверки;
 - backend-логика остается в backend API/application services, не в `apps/web`;
@@ -48,6 +49,7 @@
 
 - замена маршрутов, шаблонов и ассетов `apps/web`;
 - UI-kit на design-токенах и переключатель темы;
+- i18n foundation: `en` default, `ru` secondary, language switcher, locale preference/fallback;
 - каркас с auth/register/header;
 - лендинг, dashboard, settings, monitoring стратегий, библиотека/детали стратегий, история/configurator/results backtest-задач;
 - backend API read-model-расширения под same-origin `/api/*`;
@@ -66,6 +68,7 @@
 - breaking changes публичного API, если этап явно не содержит migration notes;
 - прямой запуск job AI-ассистентом без подтверждения пользователя;
 - темы, меняющие семантику финансовых цветов для доходности и процентных изменений.
+- локализация URL-маршрутов, `/api/*` paths, DTO fields, enum values, `job_id`, `variant_key`, market symbols и других технических identifiers.
 
 ## Целевая архитектура
 
@@ -142,6 +145,11 @@ apps/web/templates/
     error_state.html
   macros/
     ui.html
+apps/web/locales/
+  en.json
+  ru.json
+apps/web/main/
+  i18n.py
 ```
 
 Ассеты:
@@ -161,6 +169,7 @@ apps/web/dist/
       poller.js
       sse.js
       dom.js
+      locale.js
       formatters.js
       notifications.js
       validators.js
@@ -170,6 +179,44 @@ apps/web/dist/
     pages/
   vendor/
 ```
+
+## Мультиязычность и locale contract
+
+Web UI v1 реализуется как мультиязычный продуктовый интерфейс.
+
+Инварианты:
+
+- supported locales: `en`, `ru`;
+- default locale: `en`;
+- `ru` является полным вторым языком для пользовательского UI-copy;
+- routes, `/api/*`, DTO fields, enum values, strategy ids, market symbols, `job_id`, `variant_key`, config keys и metric identifiers не локализуются;
+- `<html lang>` и root `data-locale` всегда соответствуют выбранному locale;
+- каждый stage, добавляющий user-visible copy, обязан добавить `en` и `ru` строки в общий catalog/helper;
+- отсутствующий перевод является introduced failure для stage, который добавил строку;
+- длинные русские строки проверяются на desktop/mobile, чтобы не ломать header, buttons, table headers и status badges.
+
+Resolution order:
+
+1. authenticated `identity_user_preferences.locale`, когда backend preference доступен;
+2. locale cookie, установленная language switcher-ом и доступная SSR до render;
+3. browser `localStorage` как client-side fallback/hydration source;
+4. `Accept-Language`, если пользователь еще не выбирал язык;
+5. hard fallback `en`.
+
+Target files:
+
+- `apps/web/main/i18n.py` - planned SSR helper для locale resolution, translation lookup, missing-key fallback и `<html lang>`;
+- `apps/web/locales/en.json`, `apps/web/locales/ru.json` - planned catalogs с одинаковыми ключами;
+- `apps/web/dist/js/core/locale.js` - planned client helper для language switcher, cookie/localStorage sync и dynamic strings;
+- `identity_user_preferences.locale` - planned persisted account preference на settings stage.
+
+Browser-visible contract:
+
+- language switcher доступен в shell рядом с account/auth controls, но не конкурирует с primary nav;
+- переключение языка не меняет route path и не добавляет localized URL aliases;
+- anonymous pages используют cookie/localStorage/Accept-Language fallback;
+- authenticated pages используют backend preference, если она уже реализована;
+- full reload после переключения допустим для SSR v1; controlled fragment refresh допустим только если он не ломает state и auth.
 
 Backend-добавления:
 
@@ -371,7 +418,7 @@ Idempotency:
 
 | Таблица | Назначение | Ключи и индексы | Rollback/default |
 |---|---|---|---|
-| `identity_user_preferences` | UI theme, density, locale-like preferences | unique `owner_user_id`; index `updated_at` | при rollback UI использует `terminal-orange` и `localStorage`; таблицу можно оставить unused. |
+| `identity_user_preferences` | UI theme, density, `locale` (`en`/`ru`) и другие account preferences | unique `owner_user_id`; check/validation `locale in ('en', 'ru')`; index `updated_at` | при rollback UI использует `terminal-orange`, locale cookie/localStorage и fallback `en`; таблицу можно оставить unused. |
 | `identity_integrations` | non-secret integration toggles/config refs | `owner_user_id`, `provider`, `enabled` | disable-on-read fallback; secrets отдельно. |
 | `identity_audit_events` | account/settings/security/live-control audit | `owner_user_id`, `created_at`, `event_type` | append-only; rollback к read-only ignored events. |
 | `identity_user_profile_overrides` | optional display/profile overrides | unique `owner_user_id` | fallback на `current-user` claims. |
@@ -761,6 +808,13 @@ python -m tools.docs.generate_docs_index --check
 - Заменить inline JS для login/logout на внешний `apps/web/dist/js/pages/auth.js` или чистые серверные redirects там, где это возможно.
 - Self-host HTMX в `apps/web/dist/vendor/htmx.min.js`.
 - Добавить route-level template contexts для активного состояния nav, title страницы и user badge.
+- Добавить i18n foundation в shell:
+  - default locale `en`;
+  - secondary locale `ru`;
+  - `<html lang>` и `data-locale`;
+  - compact language switcher `EN/RU` рядом с auth/account controls;
+  - locale cookie для SSR;
+  - route/template context для `locale` и translation helper.
 - Добавить `/register` как web entrypoint, запускающий Keycloak-backed registration/get-started flow.
 - Не реализовывать локальную регистрацию username/password в Roehub web.
 
@@ -780,6 +834,8 @@ Backend/API:
 - переместить/пересоздать текущие `login.html`, `logout.html` в `apps/web/templates/pages/` или согласованные auth fragments;
 - переместить/пересоздать текущий `partials/user_badge.html` как shell component/fragment без сохранения `/_partial/user_badge` как public route;
 - добавить placeholder-шаблоны `apps/web/templates/pages/*.html`;
+- добавить `apps/web/main/i18n.py`;
+- добавить `apps/web/locales/en.json`, `apps/web/locales/ru.json`;
 - добавить `apps/web/dist/css/tokens.css`, `themes.css`, `base.css`, `layout.css`;
 - добавить `apps/web/dist/js/pages/auth.js`;
 - обновить `tests/unit/apps/web/test_app_routes.py`;
@@ -795,6 +851,10 @@ Backend/API:
 - register CTA присутствует и ведет в выбранный Keycloak-backed entrypoint;
 - `/strategies/new` остается поддержанным entrypoint для создания стратегии или явно редиректит на новый create workflow;
 - в базовом каркасе не остается внешнего CDN-скрипта.
+- shell copy по умолчанию на английском, русская версия доступна через language switcher;
+- переключение языка обновляет cookie/`<html lang>`/`data-locale` и не меняет route path;
+- технические identifiers и `/api/*` paths не локализуются;
+- locale catalogs `en`/`ru` имеют одинаковый набор ключей для строк Stage 1.
 
 Playwright CLI:
 
@@ -835,6 +895,13 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
   - затем использует `terminal-orange`;
   - применяет `data-theme` без перезагрузки страницы;
   - никогда не переписывает финансовые семантические классы.
+- Реализовать `apps/web/dist/js/core/locale.js`:
+  - читает/пишет locale cookie и `localStorage`;
+  - поддерживает только `en` и `ru`;
+  - fallback всегда `en`;
+  - обновляет language switcher state;
+  - не локализует routes/API identifiers;
+  - предоставляет hook для dynamic strings и validation messages.
 - Реализовать shared macros/components:
   - панель;
   - metric card;
@@ -845,6 +912,7 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
   - command bar;
   - modal shell;
   - переключатель темы.
+  - переключатель языка.
 - Реализовать JS core:
   - `api.js` с `credentials: "include"`, timeout, abort, 401 redirect, mapping для 403/409/422;
   - CSRF/Origin integration point для state-changing requests, даже если конкретная server strategy включается на hardening stage;
@@ -877,6 +945,8 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
 - `poller.js` не допускает overlapping requests;
 - hidden tab приостанавливает repeated polling в течение 5s;
 - компоненты имеют accessible labels/focus states.
+- language switcher доступен с клавиатуры, имеет accessible label и не ломает header на `en`/`ru`;
+- shared components используют i18n keys/helper для пользовательских labels, empty/error states и button text.
 
 Playwright CLI:
 
@@ -933,7 +1003,8 @@ Backend/API:
 - CTA-маршруты корректны;
 - на mobile нет горизонтального overflow;
 - декоративные blobs/gradients не заменяют продуктовую диаграмму;
-- переключатель темы работает, если он видим в каркасе.
+- переключатель темы работает, если он видим в каркасе;
+- default copy рендерится на `en`, переключатель языка показывает `ru` без локализации route.
 
 Playwright CLI:
 
@@ -1004,7 +1075,7 @@ Playwright CLI:
 
 ## Этап 5 - настройки / аккаунт
 
-Цель: реализовать `personal_settings.png`: профиль, exchange keys, limits, integrations, notifications, security, sessions, audit и настройки темы.
+Цель: реализовать `personal_settings.png`: профиль, exchange keys, limits, integrations, notifications, security, sessions, audit, настройки темы и языка.
 
 Маршрут страницы:
 
@@ -1040,7 +1111,7 @@ Backend/API-добавления:
 - дубликат активного exchange key остается детерминированным `409` с code `exchange_key_already_exists`;
 - каждая destructive/settings mutation пишет audit event;
 - sessions и audit используют cursor pagination, без load-all;
-- account preferences включают выбранную UI-тему, но не могут переопределять семантику финансовых цветов.
+- account preferences включают выбранную UI-тему и `locale` (`en`/`ru`), но не могут переопределять семантику финансовых цветов или локализовать технические identifiers.
 
 Вероятно потребуется хранение:
 
@@ -1073,6 +1144,8 @@ Backend/API-добавления:
 - delete key подтверждается и идемпотентен с точки зрения UX;
 - notification/integration toggles сохраняются без полного reload страницы;
 - theme preference сохраняется и корректно восстанавливается после reload;
+- language preference сохраняется, восстанавливается после reload и обновляет `<html lang>`/`data-locale`;
+- settings copy и controls имеют `en` и `ru` версии без layout overflow;
 - sessions и audit пагинируются;
 - mobile layout складывается без горизонтального overflow.
 
@@ -1089,7 +1162,7 @@ Playwright CLI:
 - public API contract: `compatible-change`;
 - DTO schema: `compatible-change`;
 - persisted schema: `compatible-change` через additive tables;
-- config schema: `none`, если не вводятся integration credentials.
+- config schema: `compatible-change`, если locale defaults становятся настраиваемыми; иначе `none`.
 
 ## Этап 6 - библиотека и детали стратегий
 
@@ -1628,6 +1701,7 @@ uv run python tools/load/web_capacity_smoke.py \
 | Request hash / cache key / persistence identity | `none` или `compatible-change` | Backtest canonical request hash не должен меняться. Lazy cache keys могут добавлять metadata только при сохранении существующей semantics. |
 | Browser-visible behavior | `breaking-change` | Намеренная замена текущего UI. |
 | Поведение тем | `compatible-change` | Переключение тем является additive; палитра по умолчанию остается `terminal-orange`; семантика финансовых цветов остается инвариантом. |
+| Поведение языка/locale | `compatible-change` | Мультиязычность additive: default `en`, secondary `ru`, route/API identifiers не локализуются, account preference/cookie/localStorage fallback совместимы. |
 | Runtime workflow | `compatible-change` или `unknown` | Backtest create должен стать bounded async path; фактический переход с `sync_inline` требует evidence и rollout notes. |
 | Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без Mac Studio evidence, если меняются compute paths. |
 | Performance risk | `unknown` до измерений | Dashboard/monitoring/results/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
@@ -1638,7 +1712,6 @@ uv run python tools/load/web_capacity_smoke.py \
 
 - Registration: будет ли `/register` вызывать отдельный Keycloak registration action или существующий login/get-started flow, зависит от Keycloak realm/client configuration.
 - Icons: добавить ли self-hosted Lucide delivery path или оставить text-only controls для v1.
-- UI language: финальное разделение copy между русскими защищенными страницами приложения и англоязычным публичным лендингом.
 - AI assistant: provider, storage, redaction и rate limits требуют отдельного design decision перед Этап 10.
 - Backtest runtime: final queue/worker trigger shape должен быть подтвержден до публичного results/configurator rollout.
 - Capacity thresholds: жесткие p95/RSS/error thresholds можно зафиксировать только после первого capacity report на текущем host.
@@ -1658,6 +1731,7 @@ uv run python tools/load/web_capacity_smoke.py \
 - focused Python gates;
 - явную contract impact classification;
 - theme acceptance, если затрагиваются browser-visible values.
+- i18n acceptance, если добавляется user-visible copy: `en`/`ru` keys, language switch evidence, `<html lang>`, отсутствие локализации routes/API identifiers.
 
 Агенты не должны preload unrelated docs. Для page stream читать:
 

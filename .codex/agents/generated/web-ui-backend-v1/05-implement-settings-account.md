@@ -61,6 +61,9 @@ style_references:
     - matrix-green
     - high-contrast
   invariant_financial_colors: true
+  default_locale: en
+  secondary_locale: ru
+  language_switch_required: true
 
 hard_requirements:
   secrets_write_only: true
@@ -70,6 +73,8 @@ hard_requirements:
   identity_migrations_channel_required: true
   csrf_strategy_gate_required_for_mutations: true
   theme_preference_preserves_financial_colors: true
+  locale_preference_required: true
+  language_switch_settings_required: true
   browser_qa_required: true
 
 task_toggles:
@@ -106,6 +111,7 @@ package_contract:
     - "apps/api/main.py route include"
     - "exchange-key route contract"
     - "theme preference default resolution"
+    - "locale preference default resolution"
   handoff:
     - "owner-scoped account/preferences/audit endpoints and settings UI"
 
@@ -115,7 +121,7 @@ skill_routing:
     timing: "before implementation only if needed"
     reason: "identity/account tables are persisted contracts"
   - skill: contract-impact-analysis
-    use_when: "adding account endpoints, DTOs, persisted schema, audit event schema, config/defaults, or theme preferences"
+    use_when: "adding account endpoints, DTOs, persisted schema, audit event schema, config/defaults, theme preferences, or locale preferences"
     timing: "before implementation and final report"
     reason: "settings crosses public API, secrets, persistence, config, browser defaults"
   - skill: backend-quality-gates
@@ -123,7 +129,7 @@ skill_routing:
     timing: "during verification"
     reason: "stage has backend and migration surfaces"
   - skill: browser-qa-evidence
-    use_when: "verifying settings workflows, secret masking, duplicate 409, theme persistence, mobile layout"
+    use_when: "verifying settings workflows, secret masking, duplicate 409, theme persistence, language persistence, mobile layout"
     timing: "after backend tests"
     reason: "settings is browser-visible and security-sensitive"
   - skill: playwright
@@ -149,12 +155,17 @@ required_literals:
   - "identity_user_preferences"
   - "identity_audit_events"
   - "terminal-orange"
+  - "locale"
+  - "en"
+  - "ru"
+  - "data-locale"
 
 non_goals:
   - "Do not change exchange secret storage policy except additive UI/account needs."
   - "Do not expose api_secret/passphrase/plain api_key."
   - "Do not implement local 2FA."
   - "Do not add arbitrary webhook integrations without validation."
+  - "Do not localize routes, `/api/*`, DTO fields, exchange ids, session ids, or audit event type identifiers."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -167,7 +178,7 @@ final_report_format:
   - "Runtime evidence: Playwright/browser, tests, inference, assumptions clearly separated"
   - "Risks: edge cases, migration/rollback, pre-existing/environmental/flaky failures"
   - "Handoff: stable exports, route includes, helpers, endpoint contracts for next agents"
-  - "Publish/deploy: terminal state publish-ci-deploy or exact reason it was skipped"
+  - "Publish/deploy: publish-ci-deploy terminal state; if successful, include main merge, local sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact reason it was skipped"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/web/test_app_routes.py"
@@ -215,6 +226,7 @@ Done means:
 - account/profile/limits/integrations/notifications/preferences/sessions/audit endpoints exist as scoped UI API where required;
 - exchange keys UI uses existing secret-safe exchange-key endpoints;
 - theme preference persists and never changes financial color semantics;
+- locale preference persists for `en`/`ru` and updates language switch/default rendering;
 - destructive/settings mutations write audit events;
 - sessions/audit are cursor-paginated;
 - browser/security evidence exists.
@@ -224,6 +236,7 @@ Done means:
 - Current backend already has auth/current-user and exchange keys.
 - Missing account preferences, integrations, audit, sessions UI read-models.
 - Identity SQL migrations live under `migrations/postgres`.
+- Shell i18n exists before this stage; settings persists authenticated account locale preference.
 
 ## Requirements (Must)
 
@@ -232,6 +245,7 @@ Done means:
 - Add owner-scoped persisted tables only through correct identity migration channel.
 - Add authorization/owner-scope tests.
 - Add secret leak checks in tests or browser evidence.
+- Add locale preference validation: allowed `en`/`ru`, deterministic error for unsupported locale, reload restores selected language.
 - Use `publish-ci-deploy` only after complete success.
 
 ## Requirements (Should)
@@ -264,7 +278,7 @@ Use front matter `context_sources`.
 3. Implement identity use cases/ports/adapters and migrations.
 4. Add API routes/wiring.
 5. Implement settings page/fragments/JS/CSS.
-6. Add tests for authz, validation, duplicates, audit, defaults, secret leak.
+6. Add tests for authz, validation, duplicates, audit, defaults, theme/locale preference, secret leak.
 7. Run browser QA and quality gates.
 8. Use `publish-ci-deploy` only after all gates pass.
 
@@ -276,6 +290,7 @@ Use front matter `context_sources`.
 - Delete is confirmed and UX-idempotent.
 - Toggles/preferences save without full reload where implemented.
 - Theme preference survives reload and preserves financial colors.
+- Language preference survives reload, updates `<html lang>`/`data-locale`, and settings copy works in `en` and `ru`.
 - Sessions/audit paginate.
 - Mobile layout has no horizontal overflow.
 
@@ -328,7 +343,7 @@ For every browser-visible change, collect and report runtime evidence:
 - Public API contract: `compatible-change`.
 - DTO schema: `compatible-change`.
 - Persisted schema: `compatible-change` through additive identity tables.
-- Config schema: `none` unless new integration credentials are introduced.
+- Config schema: `compatible-change` if locale defaults become configurable; otherwise `none` unless new integration credentials are introduced.
 
 # Files to indicate (expected touched areas)
 
@@ -360,6 +375,32 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" snapshot
 "$PWCLI" screenshot --filename output/playwright/settings-desktop.png
 ```
+
+# i18n / language contract
+
+The Web UI v1 is multilingual. Every prompt in this pack must preserve this contract:
+
+- default locale is `en`; secondary locale is `ru`;
+- any new user-visible copy introduced by this stage must have both `en` and `ru` strings through the shared locale catalog/helper;
+- do not localize routes, `/api/*` paths, DTO fields, enum values, market symbols, strategy ids, `job_id`, `variant_key`, config keys, or metric identifiers;
+- rendered pages must keep `<html lang>` and root `data-locale` aligned with the selected locale;
+- the language switcher must remain available from shell/account controls and must not compete with primary navigation;
+- browser QA for any stage that adds or changes visible copy must include default `en` evidence and either `ru` locale-switch evidence or an explicit blocker;
+- final report must state i18n impact: locale keys/catalogs touched, fallback behavior, and whether language-switch evidence was collected.
+
+# publish-ci-deploy terminal delivery contract
+
+When all stage DoD, gates, browser evidence, and performance evidence required by this prompt pass, and `publish_after_success` is true, run `publish-ci-deploy` to the natural terminal state. A successful terminal state for this prompt means more than PR creation, green CI, or deploy workflow completion. It must include, when the agent has authority and no external blocker remains:
+
+- branch/PR merged into `main`, or exact blocker why merge is outside current authority;
+- local checkout synchronized with `origin/main`;
+- Mac Studio repository checkout synchronized with `origin/main` using `git pull --ff-only` from the actual repo checkout, normally `/Users/daniildegtyarev/Projects/roehub.com`;
+- deployed runtime updated through the repository deploy/runbook path, keeping the repo checkout and runtime bundle as separate surfaces when they differ;
+- impacted services restarted only when touched-path impact requires it; if impact is unclear, use the standard prod reload path from `publish-ci-deploy`;
+- post-restart smoke verification completed;
+- final report names exact commands, host/paths used, commit SHA on `main`, restarted services, smoke result, or exact blocker.
+
+Do not report successful publish/deploy while merge to `main`, Mac Studio git pull, required service restart/reload, or smoke verification remains pending.
 
 # Final output: report format (strict)
 

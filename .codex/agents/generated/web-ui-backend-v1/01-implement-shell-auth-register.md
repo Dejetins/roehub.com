@@ -62,6 +62,9 @@ style_references:
     - matrix-green
     - high-contrast
   invariant_financial_colors: true
+  default_locale: en
+  secondary_locale: ru
+  language_switch_required: true
 
 hard_requirements:
   replace_shell: true
@@ -73,6 +76,9 @@ hard_requirements:
   self_host_htmx_required: true
   user_badge_partial_route_deleted: true
   favicon_no_incidental_404_preserved: true
+  multilingual_shell_required: true
+  default_locale_en_required: true
+  russian_secondary_locale_required: true
   support_strategies_new_entrypoint: true
   browser_qa_required: true
 
@@ -95,6 +101,9 @@ package_contract:
     - "apps/web/templates/pages/* placeholders only"
     - "apps/web/templates/components/user_badge.html"
     - "apps/web/templates/fragments/shell/user_badge.html"
+    - "apps/web/main/i18n.py"
+    - "apps/web/locales/en.json"
+    - "apps/web/locales/ru.json"
     - "apps/web/dist/css/shell.css"
     - "apps/web/dist/js/pages/auth.js"
     - "apps/web/dist/vendor/htmx.min.js"
@@ -159,6 +168,13 @@ required_literals:
   - "/_partial/user_badge"
   - "no public /_partial/user_badge"
   - "GET /favicon.ico"
+  - "en"
+  - "ru"
+  - "<html lang"
+  - "data-locale"
+  - "apps/web/main/i18n.py"
+  - "apps/web/locales/en.json"
+  - "apps/web/locales/ru.json"
   - "terminal-orange"
 
 non_goals:
@@ -167,6 +183,7 @@ non_goals:
   - "Do not migrate to React/Next/SPA."
   - "Do not change backend auth semantics unless Keycloak registration entrypoint is explicitly required."
   - "Do not preserve `/_partial/user_badge` as a public route; render badge through shell context/component/fragment."
+  - "Do not localize route paths, `/api/*`, DTO fields, IDs, symbols, or technical labels."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -179,7 +196,7 @@ final_report_format:
   - "Runtime evidence: Playwright/browser, tests, inference, assumptions clearly separated"
   - "Risks: edge cases, migration/rollback, pre-existing/environmental/flaky failures"
   - "Handoff: stable exports, route includes, helpers, endpoint contracts for next agents"
-  - "Publish/deploy: terminal state publish-ci-deploy or exact reason it was skipped"
+  - "Publish/deploy: publish-ci-deploy terminal state; if successful, include main merge, local sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact reason it was skipped"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test_security.py"
@@ -199,6 +216,9 @@ expected_primary_touches:
   - "apps/web/templates/pages/*.html"
   - "apps/web/templates/components/user_badge.html"
   - "apps/web/templates/fragments/shell/user_badge.html"
+  - "apps/web/main/i18n.py"
+  - "apps/web/locales/en.json"
+  - "apps/web/locales/ru.json"
   - "apps/web/dist/css/tokens.css"
   - "apps/web/dist/css/themes.css"
   - "apps/web/dist/css/base.css"
@@ -220,6 +240,7 @@ safety_notes:
   - "Self-host HTMX at `apps/web/dist/vendor/htmx.min.js`; do not keep CDN script tags."
   - "`GET /favicon.ico` must remain non-noisy (`204` or a versioned static asset), not an incidental 404."
   - "`/_partial/user_badge` is a legacy partial route to remove from the public route map after shell badge replacement."
+  - "Language switcher belongs near auth/account controls and must not compete with primary nav."
   - "If registration requires a Keycloak realm/client choice that is not discoverable, stop and ask."
 ---
 
@@ -237,6 +258,7 @@ Done means:
 - HTMX is self-hosted at `apps/web/dist/vendor/htmx.min.js` and no external CDN remains in the shell;
 - public `/_partial/user_badge` route is removed or not registered; user badge renders through shell context/component/fragment;
 - `GET /favicon.ico` still avoids incidental browser 404 noise;
+- shell is multilingual with default `en`, secondary `ru`, `<html lang>`, `data-locale`, locale cookie and language switcher;
 - `/strategies/new` remains a supported create entrypoint or controlled redirect;
 - Playwright evidence exists.
 
@@ -247,6 +269,7 @@ Done means:
 - Current login/logout templates use inline JavaScript.
 - Current `/_partial/user_badge` is a legacy HTMX partial route, not a stable public route.
 - New design uses terminal-orange default palette and dark shell.
+- New product UI defaults to English copy and must provide Russian copy through shared locale catalogs.
 
 ## Requirements (Must)
 
@@ -255,6 +278,7 @@ Done means:
 - Keep web stateless: no domain use-case imports in `apps/web`.
 - Add/adjust tests for route map, protected redirects, `next` sanitization, asset references.
 - Add/adjust security tests covering no CDN/inline-auth-script regressions and route-map cleanup where practical.
+- Add/adjust tests for locale fallback, locale cookie sanitization, `<html lang>` and matching `en`/`ru` catalog keys.
 - Run browser QA through Playwright CLI.
 - If all checks pass and the task is 100% complete, use `publish-ci-deploy`. If any gate fails, do not publish.
 
@@ -262,7 +286,7 @@ Done means:
 
 - Prefer server-side redirects over JS where practical.
 - Keep templates organized under `pages/`, `components/`, `macros/` as the plan defines.
-- Keep text in Russian where appropriate, technical route/API identifiers unchanged.
+- Keep user-facing product copy available in English and Russian; technical route/API identifiers stay unchanged.
 
 ## Requirements (Nice-to-have)
 
@@ -294,11 +318,12 @@ Use front matter `context_sources`. Do not preload all conditional bundles.
 1. Inspect current route/template/test shape.
 2. Implement route map and protected placeholder pages.
 3. Replace shared shell/header and auth/register entrypoints.
-4. Remove external CDN/inline auth script dependency.
-5. Add focused tests.
-6. Run local web server and Playwright CLI evidence.
-7. Run quality gates.
-8. If and only if all DoD criteria pass, run `publish-ci-deploy`.
+4. Add SSR i18n helper, `en`/`ru` catalogs, `<html lang>`, `data-locale`, and compact language switcher.
+5. Remove external CDN/inline auth script dependency.
+6. Add focused tests.
+7. Run local web server and Playwright CLI evidence.
+8. Run quality gates.
+9. If and only if all DoD criteria pass, run `publish-ci-deploy`.
 
 # Acceptance criteria (Definition of Done)
 
@@ -312,6 +337,7 @@ Use front matter `context_sources`. Do not preload all conditional bundles.
 - HTMX is served from `apps/web/dist/vendor/htmx.min.js` if HTMX is still used.
 - `/_partial/user_badge` is absent as public route or explicitly returns non-public/not-found semantics after shell replacement.
 - `GET /favicon.ico` returns `204` or a valid static/versioned asset response, not an incidental 404.
+- Default locale is `en`; `ru` can be selected from shell; routes remain unchanged; `<html lang>`/`data-locale` match selected locale.
 - Playwright snapshot and desktop screenshot exist for `/` and protected redirect behavior.
 
 # Implementation constraints
@@ -363,6 +389,7 @@ For every browser-visible change, collect and report runtime evidence:
 - Public API contract is `compatible-change` only if auth registration endpoint is added.
 - Browser-visible behavior is intentionally `breaking-change`.
 - Config schema changes are `compatible-change` and must be documented.
+- Locale/browser-visible behavior is `compatible-change`: default `en`, supported `ru`, routes/API unchanged.
 
 ## Browser-visible behavior
 
@@ -400,6 +427,32 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" open http://127.0.0.1:8010/settings
 "$PWCLI" snapshot
 ```
+
+# i18n / language contract
+
+The Web UI v1 is multilingual. Every prompt in this pack must preserve this contract:
+
+- default locale is `en`; secondary locale is `ru`;
+- any new user-visible copy introduced by this stage must have both `en` and `ru` strings through the shared locale catalog/helper;
+- do not localize routes, `/api/*` paths, DTO fields, enum values, market symbols, strategy ids, `job_id`, `variant_key`, config keys, or metric identifiers;
+- rendered pages must keep `<html lang>` and root `data-locale` aligned with the selected locale;
+- the language switcher must remain available from shell/account controls and must not compete with primary navigation;
+- browser QA for any stage that adds or changes visible copy must include default `en` evidence and either `ru` locale-switch evidence or an explicit blocker;
+- final report must state i18n impact: locale keys/catalogs touched, fallback behavior, and whether language-switch evidence was collected.
+
+# publish-ci-deploy terminal delivery contract
+
+When all stage DoD, gates, browser evidence, and performance evidence required by this prompt pass, and `publish_after_success` is true, run `publish-ci-deploy` to the natural terminal state. A successful terminal state for this prompt means more than PR creation, green CI, or deploy workflow completion. It must include, when the agent has authority and no external blocker remains:
+
+- branch/PR merged into `main`, or exact blocker why merge is outside current authority;
+- local checkout synchronized with `origin/main`;
+- Mac Studio repository checkout synchronized with `origin/main` using `git pull --ff-only` from the actual repo checkout, normally `/Users/daniildegtyarev/Projects/roehub.com`;
+- deployed runtime updated through the repository deploy/runbook path, keeping the repo checkout and runtime bundle as separate surfaces when they differ;
+- impacted services restarted only when touched-path impact requires it; if impact is unclear, use the standard prod reload path from `publish-ci-deploy`;
+- post-restart smoke verification completed;
+- final report names exact commands, host/paths used, commit SHA on `main`, restarted services, smoke result, or exact blocker.
+
+Do not report successful publish/deploy while merge to `main`, Mac Studio git pull, required service restart/reload, or smoke verification remains pending.
 
 # Final output: report format (strict)
 
