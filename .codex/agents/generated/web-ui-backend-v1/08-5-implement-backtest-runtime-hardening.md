@@ -28,9 +28,12 @@ context_sources:
       why: "job repository queue/claim/lease contract"
     - path: apps/api/routes/backtests.py
       why: "public job create/cancel routes"
-    - path: tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py
-      why: "use-case behavior tests"
   conditional_bundles:
+    tests:
+      read_when: "when adding job runtime/use-case/API tests"
+      paths:
+        - tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py
+        - tests/unit/apps/api/test_backtests_routes.py
     worker_runtime:
       read_when: "when implementing worker trigger/adapter or queue claim loop"
       paths:
@@ -47,6 +50,21 @@ context_sources:
     - path: docs/runbooks/mac-studio-native-backend-operations.md
       read_when: "deployment/runtime verification or Mac Studio service impact is ambiguous"
 
+style_references:
+  design_manifest:
+    path: docs/architecture/apps/web/web-ui-design-manifest-v1.md
+    purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
+  external_reference_root:
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui
+    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+  default_palette: terminal-orange
+  theme_variants:
+    - terminal-orange
+    - graphite
+    - matrix-green
+    - high-contrast
+  invariant_financial_colors: true
+
 hard_requirements:
   api_create_bounded: true
   no_long_compute_in_api_request_path: true
@@ -61,6 +79,30 @@ task_toggles:
   implement_job_state_tests: true
   implement_public_api_breaking_change: false
   publish_after_success: true
+
+package_contract:
+  depends_on:
+    - "08-backtests-history-configurator accepted or job UI contract stable"
+  owns:
+    - "apps/api/wiring/modules/backtest.py"
+    - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
+    - "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py"
+    - "src/trading/contexts/backtest/** worker trigger/queue/adapter additions"
+    - "apps/worker/** backtest worker additions"
+    - "tests/unit/apps/api/test_backtests_routes.py job runtime assertions"
+    - "tests/unit/contexts/backtest/** job runtime tests"
+  forbidden:
+    - "browser results/configurator UI"
+    - "AI configurator"
+    - "scoring algorithm changes"
+    - "canonical request hash changes"
+  integration_points:
+    - "job state transitions"
+    - "worker trigger port/adapter"
+    - "idempotent enqueue"
+    - "Mac Studio benchmark evidence if compute path changes"
+  handoff:
+    - "bounded async job create path and worker/queue contract for Stage 9/12"
 
 skill_routing:
   - skill: architecture-design
@@ -110,12 +152,17 @@ non_goals:
   - "Do not claim benchmark acceptance from local tests alone if compute path changes."
 
 final_report_format:
-  - "Summary: что сделано"
-  - "Files changed: пути и назначение"
-  - "Contracts: classification and API/schema/UI impact"
-  - "Verification: команды, Playwright/performance evidence, результаты"
-  - "Publish/deploy: terminal state publish-ci-deploy или причина пропуска"
-  - "Risks / follow-up: остаточные риски"
+  - "Intent: что реализовано и почему это нужно пользователю"
+  - "Scope: bounded capability, routes, modules, files, owns/forbidden compliance"
+  - "Design: use cases, DTO, ports/adapters, migrations, JS modules, template fragments"
+  - "Contract impact: public API, port, DTO, persisted schema, config, cache/request identity, browser-visible behavior, performance risk"
+  - "Tests: exact commands, cwd, results, focused/lint/type/migration gates"
+  - "Docs: updated docs or explicit reason no docs changed"
+  - "Performance: touched hot paths, payload/latency/RSS/load checks, or explicit none"
+  - "Runtime evidence: Playwright/browser, tests, inference, assumptions clearly separated"
+  - "Risks: edge cases, migration/rollback, pre-existing/environmental/flaky failures"
+  - "Handoff: stable exports, route includes, helpers, endpoint contracts for next agents"
+  - "Publish/deploy: terminal state publish-ci-deploy or exact reason it was skipped"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/ports tests/unit/contexts/backtest/adapters/outbound/persistence/postgres"
@@ -193,6 +240,7 @@ Read `.codex/AGENTS.md`, Stage 8.5, backtest runtime doc, then task entrypoints.
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
 Do not eager-load all `context_sources`, `conditional_bundles`, or `consult_if_needed` files at startup.
+If `.codex/agents/.context/promt_manager_state.yaml` or a latest executor final report for this pack exists, read only its completed/open_items/risks/handoff summary before task entrypoints; skip this step if absent.
 
 # Reading manifest
 
@@ -218,6 +266,48 @@ Use front matter `context_sources`.
 - Any compute-path change has Mac Studio benchmark evidence or a documented blocker.
 
 # Implementation constraints
+
+## Agent package boundaries
+
+- Treat `package_contract.owns` as the write allow-list for this prompt.
+- Do not edit `package_contract.forbidden` areas. If an implementation truly needs one, stop and report the required integration point instead of broadening scope silently.
+- Keep shared integration edits small and explicit: route includes, DTO exports, CSS tokens, JS core APIs, migration chain, edge config.
+- In final report, state whether the diff stayed inside `owns`; list any integration-point edits separately.
+
+## API endpoint specification checklist
+
+Before coding any new endpoint or browser-visible API addition, write the local contract in the implementation notes/tests with:
+
+- `method/path`: browser-visible `/api/...` path and actual backend router path without duplicate `/api` prefix;
+- `owner scope`: current user/account resolution and authorization check;
+- `request DTO`: required/optional fields, defaults, validation, idempotency key, size limits;
+- `response DTO`: shape, nullable fields, enums, links, timestamps, pagination;
+- `status codes`: expected `200/201/204/400/401/403/404/409/422/429/500/503` semantics where applicable;
+- `error payload`: compatible `RoehubError` envelope, field errors, retryability/correlation id when available;
+- `pagination`: cursor/keyset/page semantics, max limit, stable ordering, or explicit `none`;
+- `cache identity`: request hash/cache key/persistence identity impact or explicit `none`;
+- `compatibility`: `none`, `compatible-change`, `breaking-change`, or `unknown` with migration/deprecation notes.
+
+## Browser runtime evidence checklist
+
+For every browser-visible change, collect and report runtime evidence:
+
+- desktop screenshot, normally around `1440x1000`;
+- mobile screenshot, normally around `390x844`;
+- `snapshot` after the key state;
+- console errors absent;
+- failed same-origin network requests absent except expected auth redirects;
+- auth state/protected route behavior verified when the page is protected;
+- theme switcher changes base/accent/state but not financial colors;
+- primary workflow has no overlapping requests;
+- chart/canvas/SVG pages include a nonblank check;
+- final report separates observed browser evidence, automated test evidence, inference, and assumptions.
+
+## Gate failure classification
+
+- Classify every failing gate as `introduced`, `required-path pre-existing`, `unrelated pre-existing`, `environmental`, or `flaky`.
+- Do not run `publish-ci-deploy` with unresolved `introduced` failures or missing required browser/performance evidence.
+- If a failure is pre-existing or environmental, include exact command, failure summary, and why it does or does not block this stage.
 
 ## API / contracts
 
@@ -249,4 +339,16 @@ Add the strongest feasible load/benchmark command and record exact command/outpu
 
 # Final output: report format (strict)
 
-Report in Russian: `Intent`, `Scope`, `Design`, `Contract impact`, `Tests`, `Performance evidence`, `Runtime evidence`, `Risks`, `Handoff`, `Publish/deploy`.
+Report in Russian with these exact sections:
+
+- `Intent`: что реализовано и почему это нужно пользователю.
+- `Scope`: bounded capability, routes, modules, files, and `owns`/`forbidden` compliance.
+- `Design`: use cases, DTO, ports/adapters, migrations, JS modules, template fragments.
+- `Contract impact`: classify public API, port, DTO, persisted schema, config, request hash/cache identity, browser-visible behavior, performance risk.
+- `Tests`: exact commands, cwd, result, focused gates, lint/type gates, migration gates.
+- `Docs`: docs changed, docs index result, or explicit reason docs were not changed.
+- `Performance`: hot path impact, payload/latency/RSS/load checks, or explicit `none`.
+- `Runtime evidence`: Playwright/browser evidence, automated test evidence, inference, assumptions.
+- `Risks`: edge cases, migration/rollback risks, pre-existing/environmental/flaky failures.
+- `Handoff`: stable exports, route includes, shared helpers, endpoint contracts for next agents.
+- `Publish/deploy`: whether `publish-ci-deploy` ran, terminal state, or exact reason it was skipped.
