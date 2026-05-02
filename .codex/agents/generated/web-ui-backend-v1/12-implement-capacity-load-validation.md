@@ -76,6 +76,7 @@ task_toggles:
 package_contract:
   depends_on:
     - "main page packages implemented or target scenario explicitly skipped"
+    - "11-security-performance-delivery-hardening accepted or coordinated final hardening window"
     - "08.5-backtest-runtime-hardening accepted before create-burst scenario"
   owns:
     - "tools/load/web_capacity_smoke.py"
@@ -173,6 +174,7 @@ safety_notes:
   - "No secrets, cookies, tokens, env dumps in capacity report."
   - "Read-mostly by default; destructive create bursts only controlled and isolated."
   - "If scenario is yellow/red, record mitigation before public rollout."
+  - "Do not run early against incomplete page packages; skip each unavailable scenario with an explicit accepted-stage blocker."
 ---
 
 # Task
@@ -193,6 +195,7 @@ Done means:
 - Plan targets current backend host capacity, including 1 vCPU / 2 GB class constraints.
 - Existing API has Prometheus HTTP metrics.
 - This is measurement/evidence work, not feature implementation.
+- This stage runs after the main page packages are implemented; unavailable scenarios must be skipped with explicit blocker notes, not silently approximated.
 
 ## Requirements (Must)
 
@@ -201,6 +204,7 @@ Done means:
 - Prefer Python + already available `httpx` if adding harness.
 - Record exact commands.
 - Never record secrets/cookies/tokens.
+- Do not validate against unfinished placeholder pages as if they were final flows.
 - Use `publish-ci-deploy` only after harness/report/docs/tests pass.
 
 ## Requirements (Should)
@@ -232,7 +236,7 @@ Use front matter `context_sources`.
 2. Implement or reuse harness.
 3. Add safe scenario set and auth/session handling without secret logging.
 4. Run local smoke.
-5. Run current-host capacity assessment if environment is available.
+5. Run current-host capacity assessment if environment is available and target page packages are accepted.
 6. Classify results and record mitigations.
 7. Run gates.
 8. Use `publish-ci-deploy` only after complete success.

@@ -67,6 +67,9 @@ hard_requirements:
   freeze_route_map: true
   freeze_endpoint_map: true
   preserve_api_prefix_notation: true
+  favicon_no_incidental_404_invariant: true
+  user_badge_partial_route_not_public_contract: true
+  physical_delete_only_after_route_replacement: true
   update_docs_index_if_docs_change: true
 
 task_toggles:
@@ -124,6 +127,11 @@ required_literals:
   - "site.css"
   - "strategy_ui.js"
   - "backtest_ui.js"
+  - "GET /favicon.ico"
+  - "ANY /api/{upstream_path:path}"
+  - "MOUNT /assets/*"
+  - "GET /_partial/user_badge"
+  - "protected_page.html"
 
 non_goals:
   - "Не реализовывать новый UI, backend endpoints или миграции."
@@ -161,6 +169,9 @@ safety_notes:
   - "Этот этап должен дать stable handoff для следующих агентов, а не начать реализацию."
   - "Не stage unrelated local changes."
   - "Если найдено противоречие между `.codex/AGENTS.md` и планом, остановись и зафиксируй conflict."
+  - "`GET /favicon.ico` должен оставаться без incidental browser 404: `204` совместим, позже можно заменить на static/versioned asset."
+  - "`GET /_partial/user_badge` не переносится как public contract; Stage 1 должен заменить его shell component/fragment."
+  - "Физическое удаление legacy files допускается только в owning stage, который уже заменил соответствующий route/page/asset."
 ---
 
 # Task
@@ -170,8 +181,11 @@ safety_notes:
 Done means:
 
 - текущие `apps/web` routes, templates и assets классифицированы как `replace`, `move` или `delete`;
+- `GET /favicon.ico`, `ANY /api/{upstream_path:path}`, `MOUNT /assets/*` и `GET /_partial/user_badge` имеют явный target decision;
+- `apps/web/templates/protected_page.html` классифицирован как `delete`, но без физического удаления на Stage 0;
 - route map и endpoint map из плана сверены с текущим кодом;
 - `/api/...` нотация подтверждена как browser-visible contract, без добавления `/api` prefix в backend routers;
+- `/_partial/user_badge` зафиксирован как non-public legacy partial route, который заменяется shell component/fragment;
 - список handoff-инвариантов готов для этапов 1-2;
 - docs index проходит.
 
@@ -188,6 +202,8 @@ Done means:
 - Добавь или уточни в плане только то, что нужно для безопасной передачи этапов агентам.
 - Не меняй runtime behavior.
 - Не удаляй старые templates/assets физически.
+- Не превращай `/_partial/user_badge` в стабильный публичный контракт.
+- Не допускай возврата browser 404 noise для `GET /favicon.ico`.
 - Классифицируй contract impact: public API, browser-visible behavior, persisted schema, config.
 - Если все проверки прошли и этап завершен на 100%, запусти delivery chain через `publish-ci-deploy`. Если нет, не публикуй и отчитай blocker.
 
