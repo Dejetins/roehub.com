@@ -3,6 +3,7 @@ from .artifacts_fs import (
     BacktestArtifactPathBuilderV2,
     FilesystemBacktestArtifactContextResolver,
 )
+from .cache_fs import DEFAULT_LAZY_TRADES_CACHE_ROOT, LocalFileBacktestLazyTradesCache
 from .config import (
     BacktestArtifactHitTimesGridRuntimeConfig,
     BacktestArtifactLookbackPolicyRuntimeConfig,
@@ -36,7 +37,9 @@ __all__ = [
     "BacktestArtifactValidationPlanRuntimeConfig",
     "BacktestArtifactsRuntimeConfig",
     "BacktestPostgresGateway",
+    "DEFAULT_LAZY_TRADES_CACHE_ROOT",
     "FilesystemBacktestArtifactContextResolver",
+    "LocalFileBacktestLazyTradesCache",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PsycopgBacktestPostgresGateway",

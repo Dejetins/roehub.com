@@ -29,6 +29,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "backtest.rate_limited": 429,
     "backtest.request_too_expensive": 422,
     "backtest.tp_sl_grid_not_covered": 422,
+    "backtest.variant_conflict": 409,
     "validation_error": 422,
     "not_found": 404,
     "forbidden": 403,

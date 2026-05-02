@@ -7,6 +7,7 @@ from .backtest_jobs import (
     BacktestJobReadModel,
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
+    BacktestLazyTradesDetailReadModel,
     build_backtest_job_read_model,
     build_top_variant_read_model,
 )
@@ -80,6 +81,7 @@ __all__ = [
     "BacktestArtifactMetadata",
     "BacktestJobCreateResult",
     "BacktestJobListResult",
+    "BacktestLazyTradesDetailReadModel",
     "BacktestJobProgressReadModel",
     "BacktestJobReadModel",
     "BacktestJobTopResult",

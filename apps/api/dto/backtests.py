@@ -10,6 +10,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobReadModel,
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
+    BacktestLazyTradesDetailReadModel,
     BacktestPreflightResult,
     BacktestRuntimeDefaults,
 )
@@ -103,6 +104,22 @@ class BacktestTopVariantsResponse(BaseModel):
     items: list[BacktestTopVariantResponse]
 
 
+class BacktestLazyTradesDetailResponse(BaseModel):
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    request_hash: str
+    engine_params_hash: str
+    artifact_manifest_hash: str
+    summary_metrics: dict[str, Any]
+    canonical_variant_params: dict[str, Any]
+    readable_params: dict[str, Any]
+    trades: list[dict[str, Any]]
+    chart_overlay: dict[str, Any]
+    cache: dict[str, Any]
+    timing: dict[str, Any]
+
+
 def build_backtest_runtime_defaults_response(
     *,
     defaults: BacktestRuntimeDefaults,
@@ -145,7 +162,15 @@ def build_backtest_top_variant_response(
     return BacktestTopVariantResponse.model_validate(result.as_mapping())
 
 
+def build_backtest_lazy_trades_detail_response(
+    *,
+    result: BacktestLazyTradesDetailReadModel,
+) -> BacktestLazyTradesDetailResponse:
+    return BacktestLazyTradesDetailResponse.model_validate(result.as_mapping())
+
+
 __all__ = [
+    "BacktestLazyTradesDetailResponse",
     "BacktestJobProgressResponse",
     "BacktestJobResponse",
     "BacktestJobsListResponse",
@@ -154,6 +179,7 @@ __all__ = [
     "BacktestTopVariantResponse",
     "BacktestTopVariantsResponse",
     "build_backtest_job_response",
+    "build_backtest_lazy_trades_detail_response",
     "build_backtest_jobs_list_response",
     "build_backtest_preflight_response",
     "build_backtest_runtime_defaults_response",

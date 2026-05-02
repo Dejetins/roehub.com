@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Mapping
 
 from fastapi import APIRouter
 
 from apps.api.routes import build_backtests_router as build_backtests_api_router
 from trading.contexts.backtest.adapters.outbound import (
+    DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
     FilesystemBacktestArtifactContextResolver,
+    LocalFileBacktestLazyTradesCache,
     PostgresBacktestJobRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
@@ -20,6 +23,7 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestComboPlanningService,
+    BacktestLazyTradesDetailService,
     BacktestNoRiskExactScoringService,
     BacktestPreflightService,
     BacktestPreparePoolsService,
@@ -117,16 +121,18 @@ def _build_jobs_use_case(
     job_repository = PostgresBacktestJobRepository(
         gateway=PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     )
+    prepare_pools = BacktestPreparePoolsService(
+        artifact_array_loader=artifact_array_loader,
+        defaults_provider=defaults_provider,
+    )
+    tp_sl_hit_times = BacktestTpSlHitTimesService(
+        artifact_array_loader=artifact_array_loader
+    )
     executor = BacktestRuntimeJobOrchestrationService(
-        prepare_pools=BacktestPreparePoolsService(
-            artifact_array_loader=artifact_array_loader,
-            defaults_provider=defaults_provider,
-        ),
+        prepare_pools=prepare_pools,
         combo_planning=BacktestComboPlanningService(),
         no_risk_exact=BacktestNoRiskExactScoringService(),
-        tp_sl_hit_times=BacktestTpSlHitTimesService(
-            artifact_array_loader=artifact_array_loader
-        ),
+        tp_sl_hit_times=tp_sl_hit_times,
         tp_sl_exact=BacktestTpSlExactScoringService(),
         artifact_array_loader=artifact_array_loader,
     )
@@ -135,6 +141,18 @@ def _build_jobs_use_case(
         preflight_service=preflight_service,
         runtime_config=runtime_config,
         executor=executor,
+        lazy_trades_service=BacktestLazyTradesDetailService(
+            prepare_pools=prepare_pools,
+            tp_sl_hit_times=tp_sl_hit_times,
+            cache=LocalFileBacktestLazyTradesCache(
+                root=Path(
+                    environ.get(
+                        "ROEHUB_BACKTEST_TRADES_CACHE_ROOT",
+                        str(DEFAULT_LAZY_TRADES_CACHE_ROOT),
+                    )
+                )
+            ),
+        ),
     )
 
 

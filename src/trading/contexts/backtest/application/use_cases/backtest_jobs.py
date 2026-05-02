@@ -14,6 +14,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobReadModel,
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
+    BacktestLazyTradesDetailReadModel,
     BacktestPreflightResult,
     build_backtest_job_read_model,
     build_top_variant_read_model,
@@ -23,6 +24,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobRepository,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestLazyTradesDetailService,
     BacktestPreflightRejected,
     BacktestPreflightService,
     BacktestRuntimeConfig,
@@ -68,6 +70,7 @@ class BacktestJobsUseCase:
     preflight_service: BacktestPreflightService
     runtime_config: BacktestRuntimeConfig
     executor: BacktestJobExecutor | None = None
+    lazy_trades_service: BacktestLazyTradesDetailService | None = None
     idempotency_ttl_seconds: int = 86_400
 
     def create(
@@ -254,6 +257,36 @@ class BacktestJobsUseCase:
                 details={"job_id": str(job_id), "variant_key": variant_key},
             )
         return build_top_variant_read_model(job_id=str(job_id), row=row)
+
+    def trades(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestLazyTradesDetailReadModel:
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        row = self.job_repository.get_top_variant_by_public_key(
+            job_id=job_id,
+            public_variant_key=variant_key,
+        )
+        if row is None:
+            raise _error(
+                code=BACKTEST_ERROR_NOT_FOUND,
+                message="Backtest variant was not found",
+                details={"job_id": str(job_id), "variant_key": variant_key},
+            )
+        if self.lazy_trades_service is None:
+            raise _error(
+                code=BACKTEST_ERROR_QUEUE_SATURATED,
+                message="Backtest lazy trades service is not configured",
+                details={"reason": "lazy_trades_service_unavailable"},
+            )
+        return self.lazy_trades_service.execute(
+            job=job,
+            row=row,
+            public_variant_key=variant_key,
+        )
 
     def cancel(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
