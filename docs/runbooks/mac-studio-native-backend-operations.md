@@ -135,12 +135,15 @@ Keycloak auth operations (realm/client/OTP/local setup):
 В production baseline сюда входит `infra/scripts/monit/roehub-keycloak.monitrc`.
 `reload_launchd_services.sh` сначала выгружает текущие static services и legacy
 `backtest-job-runner` plists, затем bootstrap-ит только static services для profile.
+`backtest-artifact-publisher` временно исключён из automatic reload/deploy path:
+его единственная operational control point — Monit wrapper, который явно делает
+`launchctl enable/bootstrap/kickstart` на `start` и `launchctl disable/bootout` на `stop`.
 
 GitHub Actions workflow `deploy-backend` должен использовать этот же install/reload path:
 сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
-`bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest и
-`backtest-job-runner` больше не входят в production baseline; trusted backtest scope сейчас
-ограничен `backtest-artifact-publisher` и artifact precompute/publish.
+`bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest,
+`backtest-job-runner` и automatic `backtest-artifact-publisher` launchd bootstrap больше не
+входят в production reload baseline.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
 
 Schema bootstrap (identity SQL + Alembic):

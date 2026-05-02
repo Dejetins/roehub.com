@@ -17,7 +17,6 @@ prod_services=(
   com.roehub.api.plist
   com.roehub.market-data-ws-worker.plist
   com.roehub.market-data-scheduler.plist
-  com.roehub.backtest-artifact-publisher.plist
 )
 
 test_services=(
