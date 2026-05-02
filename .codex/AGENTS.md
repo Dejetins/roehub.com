@@ -123,8 +123,8 @@ Expected global skill pack:
 
 Current intended routing:
 
-- architecture review, refactor analysis, docs-sync → `architecture-review`
-- new architecture, target-state design, bounded-context design, service integration design, ADR drafting, integration plus rollout design, phased migration design → `architecture-design`
+- architecture review, review-first refactor analysis, plan assessment, docs/code drift, docs-sync → `architecture-review`
+- new architecture, target-state design, bounded-context design, dependency direction, ports/adapters, service boundaries, module structure, data flow, integration contracts, service integration design, ADR drafting, platform evolution, boundary reshaping, integration plus rollout design, or phased migration design → `architecture-design`
 - bug fixes, regressions, failing tests, stack traces, or "worked before" reports → `root-cause-debugging`
 - branch / PR / diff review focused on production risk, scope drift, tests, contracts, data safety, trust boundaries, or release blockers → `production-risk-review`
 - contract or compatibility impact → `contract-impact-analysis`
