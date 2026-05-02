@@ -92,7 +92,7 @@ package_contract:
   integration_points:
     - "CSS token names"
     - "theme.js data-theme API"
-    - "api.js/poller.js/sse.js public JS helpers"
+    - "api.js/poller.js/sse.js/dom.js public JS helpers"
     - "shared macro/component names"
   handoff:
     - "stable UI kit, theme contract, and JS core for page packages"
@@ -135,6 +135,7 @@ required_literals:
   - "api.js"
   - "poller.js"
   - "sse.js"
+  - "dom.js"
 
 non_goals:
   - "Do not implement page-specific business workflows."
@@ -196,7 +197,7 @@ Done means:
 
 - CSS tokens and themes exist with `terminal-orange` default;
 - shared Jinja macros/components exist and can render placeholders;
-- `theme.js`, `api.js`, `poller.js`, `sse.js`, `notifications.js`, `formatters.js`, `validators.js` exist as scoped JS core;
+- `theme.js`, `api.js`, `poller.js`, `sse.js`, `dom.js`, `notifications.js`, `formatters.js`, `validators.js` exist as scoped JS core;
 - theme switch updates `data-theme` without reload and preserves financial colors;
 - `poller.js` prevents overlapping requests and hidden-tab repeated polling;
 - browser evidence exists.
@@ -246,7 +247,7 @@ Use front matter `context_sources`; avoid broad repo reads.
 1. Inspect current shell asset hooks.
 2. Add CSS token/theme/component files.
 3. Add shared Jinja macros/components.
-4. Add JS core modules.
+4. Add JS core modules, including the shared `dom.js` helpers from the target asset structure.
 5. Wire shell placeholders to use the new assets.
 6. Add focused tests.
 7. Run browser QA and quality gates.

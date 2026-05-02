@@ -634,6 +634,83 @@ flowchart TD
 - `apps/web/dist/backtest_ui.js`;
 - `tests/unit/apps/web/test_app_routes.py`.
 
+Текущая route map и целевые решения:
+
+| Текущий route/static surface | Текущий шаблон/поведение | Решение | Handoff для этапов |
+|---|---|---:|---|
+| `GET /` | `landing.html`, public landing | `replace` | Этап 1 сохраняет public entrypoint, этап 3 заменяет содержимое на `apps/web/templates/pages/landing.html`. |
+| `GET /favicon.ico` | `204`, чтобы убрать browser 404 noise | `replace` | Инвариант "favicon не дает incidental 404" сохраняется; позже можно заменить на static/versioned asset. |
+| `GET /login` | `login.html`, inline JS redirect на `/api/auth/login` | `replace` | Этап 1 сохраняет OIDC entrypoint, но убирает inline script в внешний `auth.js` или server redirect. |
+| `GET /logout` | `logout.html`, inline JS `POST /api/auth/logout` | `replace` | Этап 1 сохраняет logout entrypoint, но убирает inline script. |
+| `ANY /api/{upstream_path:path}` | local/dev same-origin proxy, снимает `/api` перед upstream | `move` | `/api/... browser-visible` contract сохраняется для browser/dev parity; backend routers остаются без второго `/api` prefix. |
+| `MOUNT /assets/*` | flat `apps/web/dist/*` | `move` | Browser-visible `/assets/*` сохраняется; внутренняя раскладка переезжает в `css/`, `js/`, `vendor/`. |
+| `GET /strategies` | protected `strategies_list.html` | `replace` | Этап 1 регистрирует route, этап 6 заменяет страницу на `pages/strategies.html` и fragments. |
+| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 1 сохраняет entrypoint; этап 6 делает create workflow или явный redirect на новый create UI. |
+| `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 1 регистрирует route, этап 6 заменяет details UI на `pages/strategy_detail.html`. |
+| `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 делит current monolith на history/run pages; этап 9 владеет results route `/backtests/{job_id}`. |
+| `GET /_partial/user_badge` | HTMX partial route для текущего header badge | `delete` | Не является stable public route; этап 1 переносит badge в shell component/fragment или server-rendered context. |
+
+Текущие шаблоны и ассеты:
+
+| Current file | Target decision | Целевое владение |
+|---|---:|---|
+| `apps/web/templates/base.html` | `replace` | Этап 1: terminal shell, self-hosted HTMX, no legacy light skin. |
+| `apps/web/templates/landing.html` | `replace` | Этап 3: `apps/web/templates/pages/landing.html`. |
+| `apps/web/templates/login.html` | `replace` | Этап 1: `apps/web/templates/pages/login.html` или согласованный auth fragment без inline JS. |
+| `apps/web/templates/logout.html` | `replace` | Этап 1: `apps/web/templates/pages/logout.html` или server redirect flow без inline JS. |
+| `apps/web/templates/protected_page.html` | `delete` | Stage placeholders/pages заменяют этот generic skeleton; legacy skin не сохраняется. |
+| `apps/web/templates/strategies_list.html` | `replace` | Этап 6: `pages/strategies.html` + `fragments/strategies/*`. |
+| `apps/web/templates/strategy_builder.html` | `replace` | Этап 6: create workflow для `/strategies/new` или redirect, без зависимости от старого layout. |
+| `apps/web/templates/strategy_details.html` | `replace` | Этап 6: `pages/strategy_detail.html` + strategy fragments. |
+| `apps/web/templates/backtests.html` | `replace` | Этап 8/9: `pages/backtests_history.html`, `pages/backtests_run.html`, `pages/backtests_result.html` + fragments. |
+| `apps/web/templates/partials/user_badge.html` | `move` | Этап 1: shell component/fragment; route `/_partial/user_badge` не переносится как public contract. |
+| `apps/web/dist/site.css` | `replace` | Этап 2: `css/tokens.css`, `themes.css`, `base.css`, `layout.css`, `components.css`, `pages/*`; default palette `terminal-orange`. |
+| `apps/web/dist/strategy_ui.js` | `replace` | Этап 2/6: `js/core/*`, `js/pages/strategies*`, strategy-specific helpers. |
+| `apps/web/dist/backtest_ui.js` | `replace` | Этап 2/8/9: `js/core/*`, `js/pages/backtests*`, chart/poller helpers. |
+
+Endpoint map freeze:
+
+| Browser-visible method/path | Actual backend router path | Статус для следующих этапов |
+|---|---|---|
+| `GET /api/auth/login` | `GET /auth/login` | Existing auth entrypoint; этап 1 переиспользует. |
+| `GET /api/auth/callback` | `GET /auth/callback` | Existing OIDC callback; этап 1 не реализует локальную callback-логику в web. |
+| `POST /api/auth/logout` | `POST /auth/logout` | Existing auth entrypoint; этап 1 переиспользует. |
+| `GET /api/auth/current-user` | `GET /auth/current-user` | Existing auth gate; protected web routes продолжают server-side проверку через него. |
+| `GET /api/exchange-keys` | `GET /exchange-keys` | Existing settings/account API; этап 5 переиспользует. |
+| `POST /api/exchange-keys` | `POST /exchange-keys` | Existing settings/account API; этап 5 переиспользует. |
+| `DELETE /api/exchange-keys/{key_id}` | `DELETE /exchange-keys/{key_id}` | Existing settings/account API; этап 5 переиспользует. |
+| `GET /api/strategies` | `GET /strategies` | Existing strategy list; этап 6 переиспользует. |
+| `GET /api/strategies/{strategy_id}` | `GET /strategies/{strategy_id}` | Existing strategy details; этап 6 переиспользует. |
+| `POST /api/strategies` | `POST /strategies` | Existing strategy create; этап 6 переиспользует. |
+| `POST /api/strategies/clone` | `POST /strategies/clone` | Existing clone action; этап 6 переиспользует. |
+| `POST /api/strategies/{strategy_id}/run` | `POST /strategies/{strategy_id}/run` | Existing run-control action; этап 7 переиспользует для monitoring/live control. |
+| `POST /api/strategies/{strategy_id}/stop` | `POST /strategies/{strategy_id}/stop` | Existing run-control action; этап 7 переиспользует для monitoring/live control. |
+| `DELETE /api/strategies/{strategy_id}` | `DELETE /strategies/{strategy_id}` | Existing delete action; этап 6 переиспользует с UX confirmation. |
+| `GET /api/market-data/markets` | `GET /market-data/markets` | Existing reference data; stages 6/8 reuse. |
+| `GET /api/market-data/instruments` | `GET /market-data/instruments` | Existing reference data; stages 6/8 reuse. |
+| `GET /api/indicators` | `GET /indicators` | Existing indicator reference data; stages 6/8 reuse. |
+| `GET /api/backtests/runtime-defaults` | `GET /backtests/runtime-defaults` | Existing backtest defaults; этап 8 переиспользует. |
+| `POST /api/backtests/preflight` | `POST /backtests/preflight` | Existing preflight; этап 8 переиспользует. |
+| `POST /api/backtests/jobs` | `POST /backtests/jobs` | Existing async job create; этап 8 считает authoritative. |
+| `GET /api/backtests/jobs` | `GET /backtests/jobs` | Existing history/list; этап 8 переиспользует с cursor/limit contract. |
+| `GET /api/backtests/jobs/{job_id}` | `GET /backtests/jobs/{job_id}` | Existing job read; stages 8/9 reuse. |
+| `GET /api/backtests/jobs/{job_id}/top` | `GET /backtests/jobs/{job_id}/top` | Existing top variants summary; stages 8/9 reuse. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | `GET /backtests/jobs/{job_id}/variants/{variant_key}` | Existing variant details; этап 9 переиспользует. |
+| `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | `POST /backtests/jobs/{job_id}/variants/{variant_key}/trades` | Existing lazy trades detail; этап 9 переиспользует, не хранит full trades в top rows. |
+| `POST /api/backtests/jobs/{job_id}/cancel` | `POST /backtests/jobs/{job_id}/cancel` | Existing cancel action; этап 8 переиспользует. |
+| New `/api/ui/*` | New `/ui/*` | Additive endpoints only in owning stages; no duplicate backend `/api` prefix. |
+| New `/api/stream/*` | New `/stream/*` | Additive SSE endpoints only in owning stages; edge/proxy contract unchanged. |
+
+Handoff-инварианты для этапов 1-2:
+
+- Целевая структура `apps/web/templates/pages|fragments|components|macros` и `apps/web/dist/css|js|vendor` выше является source of truth; старые top-level файлы являются только current inventory.
+- Stage 1 может держать compatibility route paths, но не должен использовать старый `site.css`, `strategy_ui.js` или `backtest_ui.js` как визуальную или JS-основу.
+- Stage 2 задает tokens/themes/core JS; default theme остается `terminal-orange`, а financial color semantics не меняются темами.
+- Browser-visible API notation остается `/api/...`; actual backend router paths остаются без `/api`.
+- Production edge split не меняется: HTML/assets обслуживает web, `/api/*` обслуживает backend через prefix stripping.
+- `_partial/user_badge` не является публичным API; user badge переносится в shell context/component без обязательного HTMX route.
+- Физически удалять старые templates/assets можно только в этапе, который уже заменил соответствующий route/page и обновил route tests.
+
 Критерии приемки:
 
 - у каждого текущего web-маршрута есть целевое решение;
@@ -650,9 +727,14 @@ python -m tools.docs.generate_docs_index --check
 
 Влияние на контракты:
 
-- public API contract: `none`;
-- browser-visible behavior: `breaking-change` для текущего вида/компоновки UI, намеренно принято этим планом;
-- persisted schema: `none`.
+- public API contract: `none` для этапа 0; следующие `/api/ui/*` и `/api/stream/*` остаются additive `compatible-change` в owning stages;
+- port contract: `none`;
+- DTO schema: `none`;
+- persisted schema: `none`;
+- config schema: `none`;
+- request hash/cache identity: `none`;
+- browser-visible behavior: `breaking-change` для текущего вида/компоновки UI, намеренно принято этим планом; `/api/... browser-visible` path contract сохраняется;
+- performance risk: `none` для этапа 0, потому что runtime behavior не меняется.
 
 ## Этап 1 - каркас приложения, вкладки шапки, auth/register
 
@@ -695,7 +777,8 @@ Backend/API:
 
 - изменить `apps/web/main/app.py`;
 - изменить `apps/web/templates/base.html`;
-- переместить/пересоздать `apps/web/templates/login.html`, `logout.html`, `partials/user_badge.html`;
+- переместить/пересоздать текущие `login.html`, `logout.html` в `apps/web/templates/pages/` или согласованные auth fragments;
+- переместить/пересоздать текущий `partials/user_badge.html` как shell component/fragment без сохранения `/_partial/user_badge` как public route;
 - добавить placeholder-шаблоны `apps/web/templates/pages/*.html`;
 - добавить `apps/web/dist/css/tokens.css`, `themes.css`, `base.css`, `layout.css`;
 - добавить `apps/web/dist/js/pages/auth.js`;

@@ -70,6 +70,9 @@ hard_requirements:
   no_local_username_password_registration: true
   no_external_cdn_script: true
   no_inline_auth_scripts: true
+  self_host_htmx_required: true
+  user_badge_partial_route_deleted: true
+  favicon_no_incidental_404_preserved: true
   support_strategies_new_entrypoint: true
   browser_qa_required: true
 
@@ -87,12 +90,16 @@ package_contract:
   owns:
     - "apps/web/main/app.py shell/auth routes"
     - "apps/web/templates/base.html"
-    - "apps/web/templates/login.html"
-    - "apps/web/templates/logout.html"
+    - "apps/web/templates/pages/login.html"
+    - "apps/web/templates/pages/logout.html"
     - "apps/web/templates/pages/* placeholders only"
+    - "apps/web/templates/components/user_badge.html"
+    - "apps/web/templates/fragments/shell/user_badge.html"
     - "apps/web/dist/css/shell.css"
-    - "apps/web/dist/js/core/auth.js"
+    - "apps/web/dist/js/pages/auth.js"
+    - "apps/web/dist/vendor/htmx.min.js"
     - "tests/unit/apps/web/test_app_routes.py"
+    - "tests/unit/apps/web/test_security.py"
   forbidden:
     - "page-specific business templates after placeholders"
     - "apps/api/routes/backtests.py"
@@ -147,6 +154,11 @@ required_literals:
   - "/backtests/new"
   - "/backtests/{job_id}"
   - "/api/auth/current-user"
+  - "apps/web/dist/vendor/htmx.min.js"
+  - "apps/web/dist/js/pages/auth.js"
+  - "/_partial/user_badge"
+  - "no public /_partial/user_badge"
+  - "GET /favicon.ico"
   - "terminal-orange"
 
 non_goals:
@@ -154,6 +166,7 @@ non_goals:
   - "Do not create local username/password registration."
   - "Do not migrate to React/Next/SPA."
   - "Do not change backend auth semantics unless Keycloak registration entrypoint is explicitly required."
+  - "Do not preserve `/_partial/user_badge` as a public route; render badge through shell context/component/fragment."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -181,14 +194,16 @@ quality_gates:
 expected_primary_touches:
   - "apps/web/main/app.py"
   - "apps/web/templates/base.html"
-  - "apps/web/templates/login.html"
-  - "apps/web/templates/logout.html"
+  - "apps/web/templates/pages/login.html"
+  - "apps/web/templates/pages/logout.html"
   - "apps/web/templates/pages/*.html"
-  - "apps/web/templates/partials/user_badge.html"
+  - "apps/web/templates/components/user_badge.html"
+  - "apps/web/templates/fragments/shell/user_badge.html"
   - "apps/web/dist/css/tokens.css"
   - "apps/web/dist/css/themes.css"
   - "apps/web/dist/css/base.css"
   - "apps/web/dist/css/layout.css"
+  - "apps/web/dist/vendor/htmx.min.js"
   - "apps/web/dist/js/pages/auth.js"
   - "tests/unit/apps/web/test_app_routes.py"
   - "tests/unit/apps/web/test_security.py"
@@ -202,6 +217,9 @@ safety_notes:
   - "Server-side auth state comes only from `/api/auth/current-user`."
   - "Sanitize external `next=https://...` to safe local path."
   - "Do not add second `/api` prefix inside backend routes."
+  - "Self-host HTMX at `apps/web/dist/vendor/htmx.min.js`; do not keep CDN script tags."
+  - "`GET /favicon.ico` must remain non-noisy (`204` or a versioned static asset), not an incidental 404."
+  - "`/_partial/user_badge` is a legacy partial route to remove from the public route map after shell badge replacement."
   - "If registration requires a Keycloak realm/client choice that is not discoverable, stop and ask."
 ---
 
@@ -216,7 +234,9 @@ Done means:
 - protected placeholder routes exist for dashboard/settings/strategies/monitoring/backtests;
 - protected routes redirect anonymous users to `/login?next=<safe-local-path>`;
 - auth/logout no longer require inline scripts;
-- HTMX is self-hosted or no external CDN remains in the shell;
+- HTMX is self-hosted at `apps/web/dist/vendor/htmx.min.js` and no external CDN remains in the shell;
+- public `/_partial/user_badge` route is removed or not registered; user badge renders through shell context/component/fragment;
+- `GET /favicon.ico` still avoids incidental browser 404 noise;
 - `/strategies/new` remains a supported create entrypoint or controlled redirect;
 - Playwright evidence exists.
 
@@ -225,6 +245,7 @@ Done means:
 - Current `apps/web` is FastAPI SSR/Jinja2 with `/assets` and local `/api/*` proxy.
 - Current `base.html` uses HTMX from CDN.
 - Current login/logout templates use inline JavaScript.
+- Current `/_partial/user_badge` is a legacy HTMX partial route, not a stable public route.
 - New design uses terminal-orange default palette and dark shell.
 
 ## Requirements (Must)
@@ -233,6 +254,7 @@ Done means:
 - Preserve production same-origin split: browser `/api/*`, backend routes without `/api` prefix.
 - Keep web stateless: no domain use-case imports in `apps/web`.
 - Add/adjust tests for route map, protected redirects, `next` sanitization, asset references.
+- Add/adjust security tests covering no CDN/inline-auth-script regressions and route-map cleanup where practical.
 - Run browser QA through Playwright CLI.
 - If all checks pass and the task is 100% complete, use `publish-ci-deploy`. If any gate fails, do not publish.
 
@@ -287,6 +309,9 @@ Use front matter `context_sources`. Do not preload all conditional bundles.
 - Login/logout do not require inline scripts.
 - Register CTA leads to selected Keycloak-backed entrypoint or a documented compatible auth extension.
 - No external CDN script remains in base shell.
+- HTMX is served from `apps/web/dist/vendor/htmx.min.js` if HTMX is still used.
+- `/_partial/user_badge` is absent as public route or explicitly returns non-public/not-found semantics after shell replacement.
+- `GET /favicon.ico` returns `204` or a valid static/versioned asset response, not an incidental 404.
 - Playwright snapshot and desktop screenshot exist for `/` and protected redirect behavior.
 
 # Implementation constraints

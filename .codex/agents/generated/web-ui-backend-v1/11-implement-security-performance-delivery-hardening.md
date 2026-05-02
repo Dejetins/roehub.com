@@ -83,7 +83,7 @@ task_toggles:
 package_contract:
   depends_on:
     - "all implemented page packages accepted or explicitly skipped"
-    - "12-capacity-load-validation can run before or after if coordinated"
+    - "12-capacity-load-validation is accepted or explicitly scheduled as the immediately-following capacity gate"
   owns:
     - "apps/web/main/app.py security/cache/asset hooks only"
     - "apps/web/main/security.py"
@@ -200,6 +200,7 @@ safety_notes:
   - "Do not create CSP that silently breaks auth/logout/register; verify in browser."
   - "SSE routes need buffering disabled at edge when used."
   - "Full gates are mandatory before publish."
+  - "Capacity validation belongs after main page packages; if it is not yet accepted, leave an explicit handoff to Stage 12 instead of treating capacity as complete."
 ---
 
 # Task
@@ -221,6 +222,7 @@ Done means:
 
 - Prior page packages should already be implemented.
 - This stage is not for new product features; it is for release hardening.
+- Stage 12 capacity/load validation should run after main page packages and be coordinated with this final hardening window.
 
 ## Requirements (Must)
 

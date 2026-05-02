@@ -1,37 +1,78 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru" data-theme="{{ current_theme|default('terminal-orange') }}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>{{ page_title }} | Roehub</title>
-    <link rel="stylesheet" href="/assets/site.css">
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/assets/css/tokens.css">
+    <link rel="stylesheet" href="/assets/css/themes.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/shell.css">
+    <script src="/assets/vendor/htmx.min.js" defer></script>
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="/">Roehub</a>
-      <nav class="site-nav">
-        <a class="{% if page_path == '/' %}active{% endif %}" href="/">Home</a>
-        <a class="{% if page_path == '/strategies' %}active{% endif %}" href="/strategies">
-          Strategies
-        </a>
-        <a class="{% if page_path == '/backtests' %}active{% endif %}" href="/backtests">
-          Backtests
-        </a>
-        <a class="{% if page_path == '/login' %}active{% endif %}" href="/login">Login</a>
-        <a class="{% if page_path == '/logout' %}active{% endif %}" href="/logout">Logout</a>
+    <a class="rh-skip-link" href="#main-content">К содержимому</a>
+
+    <header class="rh-shell-header">
+      <a class="rh-brand" href="/" aria-label="Roehub home">
+        <span class="rh-brand__mark" aria-hidden="true">RH</span>
+        <span class="rh-brand__name">Roehub</span>
+      </a>
+
+      <nav class="rh-primary-nav" aria-label="Основная навигация">
+        {% for item in nav_items %}
+          <a
+            class="rh-nav-tab{% if item.active %} rh-nav-tab--active{% endif %}"
+            href="{{ item.href }}"
+            data-nav-key="{{ item.key }}"
+            data-active="{{ 'true' if item.active else 'false' }}"
+            {% if item.active %}aria-current="page"{% endif %}
+          >{{ item.label }}</a>
+        {% endfor %}
       </nav>
-      <div class="header-badge">
-        {% include "partials/user_badge.html" %}
+
+      <div class="rh-header-tools" aria-label="Shell controls">
+        <nav class="rh-theme-tabs" aria-label="Тема">
+          {% for theme in theme_options %}
+            <a
+              class="rh-theme-tab{% if theme.active %} rh-theme-tab--active{% endif %}"
+              href="{{ theme.href }}"
+              data-theme-option="{{ theme.key }}"
+              data-active="{{ 'true' if theme.active else 'false' }}"
+              {% if theme.active %}aria-current="true"{% endif %}
+            >{{ theme.label }}</a>
+          {% endfor %}
+        </nav>
+
+        <nav class="rh-auth-actions" aria-label="Auth">
+          {% for action in auth_actions %}
+            <a
+              class="rh-auth-link{% if action.active %} rh-auth-link--active{% endif %}"
+              href="{{ action.href }}"
+              data-auth-action="{{ action.key }}"
+              {% if action.active %}aria-current="page"{% endif %}
+            >{{ action.label }}</a>
+          {% endfor %}
+        </nav>
+
+        {% include "fragments/shell/user_badge.html" %}
       </div>
     </header>
 
-    <main class="content">
+    <main id="main-content" class="rh-main" tabindex="-1">
       {% if error_message %}
-        <div class="error-banner" role="alert">{{ error_message }}</div>
+        <div class="rh-error-banner" role="alert">{{ error_message }}</div>
       {% endif %}
       {% block content %}{% endblock %}
     </main>
+
+    <footer class="rh-shell-footer">
+      <span>Roehub Web</span>
+      <span>v1</span>
+    </footer>
+
     {% block scripts %}{% endblock %}
   </body>
 </html>

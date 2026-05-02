@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="rh-auth-page" aria-labelledby="logout-title">
+    <div class="rh-kicker">Session</div>
+    <h1 id="logout-title">Выход</h1>
+    <p>Запрос завершит Roehub session cookie через same-origin API.</p>
+    <form
+      class="rh-command-row"
+      action="{{ logout_url }}"
+      method="post"
+      data-auth-logout-form
+      data-redirect-path="{{ post_logout_redirect_path }}"
+    >
+      <button class="rh-button rh-button--primary" type="submit">Завершить сессию</button>
+      <a class="rh-button" href="{{ post_logout_redirect_path }}">Назад</a>
+    </form>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/assets/js/pages/auth.js" defer></script>
+{% endblock %}

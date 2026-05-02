@@ -61,6 +61,7 @@ hard_requirements:
   one_summary_request_target: true
   compact_payload_target_kb_compressed: 50
   degraded_panel_behavior_required: true
+  no_fake_dashboard_kpis: true
   no_large_payloads: true
   no_overlap_polling: true
   browser_qa_required: true
@@ -146,6 +147,7 @@ non_goals:
   - "Do not implement monitoring SSE in dashboard."
   - "Do not materialize large strategy/backtest details."
   - "Do not add persistence unless explicitly required by read-model design."
+  - "Do not invent dashboard KPIs/metrics that are not backed by accepted strategy/backtest/account read models."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -190,6 +192,7 @@ safety_notes:
   - "`/api/ui/dashboard/summary` is browser path; backend router path is `/ui/dashboard/summary`."
   - "Dashboard must not import private domain internals without mapper/ACL."
   - "One failed source should degrade a panel, not the whole page, unless auth fails."
+  - "Exact dashboard KPIs depend on read models accepted after Stages 5-9; render unavailable panels as degraded/empty rather than fake values."
 ---
 
 # Task
@@ -210,6 +213,7 @@ Done means:
 - Existing backend has auth, strategies and backtest jobs APIs.
 - There is no current dashboard read-model.
 - Stage 2 JS core should provide `api.js` and `poller.js`.
+- Exact dashboard KPIs are intentionally not frozen yet; use only accepted read models and explicit degraded/unavailable states.
 
 ## Requirements (Must)
 
@@ -217,6 +221,7 @@ Done means:
 - Keep browser path `/api/ui/dashboard/summary`.
 - Keep payload bounded; target < 50 KB compressed.
 - Use ports/query services/ACL for cross-context assembly.
+- Use only real accepted read-model fields; never fabricate KPI values to fill the UI.
 - Add focused API and web tests.
 - Verify browser behavior and theme financial colors.
 - Use `publish-ci-deploy` only after full success.
@@ -258,6 +263,7 @@ Use front matter `context_sources`.
 - One summary request can render dashboard.
 - Auth-required behavior matches other protected routes.
 - Source failure degrades one panel, not the whole page.
+- Missing/unaccepted KPI sources render as degraded/unavailable, not as fake zero/default business values.
 - Polling pauses on hidden tab and does not overlap.
 - Financial deltas keep fixed semantic colors in all themes.
 - Browser screenshot/snapshot and console/network evidence exist.
