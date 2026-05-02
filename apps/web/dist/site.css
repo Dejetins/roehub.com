@@ -184,6 +184,7 @@ body {
 
 .table-scroll {
   overflow-x: auto;
+  min-width: 0;
 }
 
 .data-table {
@@ -360,6 +361,8 @@ body {
 
 .json-pre {
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
   background: #f3f7ff;
   border: 1px solid #d5deef;
   border-radius: 0.65rem;
@@ -599,6 +602,129 @@ body {
   pointer-events: none;
 }
 
+.backtest-page {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.backtest-page > * {
+  min-width: 0;
+}
+
+.backtest-request-form {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.backtest-fieldset {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.backtest-fieldset legend {
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0 0.35rem;
+}
+
+.backtest-indicator-rows {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.backtest-indicator-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(150px, 1.3fr) repeat(3, minmax(88px, 0.8fr)) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: end;
+}
+
+.backtest-indicator-row label {
+  grid-row: 1;
+  margin: 0;
+}
+
+.backtest-indicator-row select,
+.backtest-indicator-row input,
+.backtest-indicator-row button {
+  grid-row: 2;
+}
+
+.backtest-tp-sl-grid {
+  margin-top: 0.75rem;
+}
+
+.backtest-binary-controls {
+  margin-top: 0.8rem;
+}
+
+.backtest-result-panel,
+.backtest-jobs-panel,
+.backtest-selected-job,
+.backtest-trades-panel {
+  margin-bottom: 0;
+}
+
+.backtest-preflight-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+  gap: 0.9rem;
+}
+
+.backtest-job-summary,
+.backtest-trades-panel .key-value-grid {
+  margin-top: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.backtest-top-table,
+.backtest-trades-table {
+  min-width: 860px;
+}
+
+.backtest-row-selected {
+  background: #eef4ff;
+}
+
+.backtest-code-line {
+  display: grid;
+  gap: 0.15rem;
+  max-width: 18rem;
+}
+
+.backtest-code-line code {
+  white-space: normal;
+  word-break: break-all;
+}
+
+.backtest-chart-shell {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.8rem 0;
+}
+
+.backtest-chart {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 20 / 7;
+  border: 1px solid #d9e1f0;
+  border-radius: 0.5rem;
+  background: #f8fbff;
+}
+
+.backtest-pagination {
+  justify-content: flex-end;
+}
+
 .hidden {
   display: none;
 }
@@ -626,6 +752,21 @@ body {
   .filters-grid--time-range,
   .filters-grid--advanced {
     grid-template-columns: 1fr;
+  }
+
+  .backtest-preflight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .backtest-indicator-row {
+    grid-template-columns: 1fr;
+  }
+
+  .backtest-indicator-row label,
+  .backtest-indicator-row select,
+  .backtest-indicator-row input,
+  .backtest-indicator-row button {
+    grid-row: auto;
   }
 
   .panel-heading {

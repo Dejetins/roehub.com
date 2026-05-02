@@ -1419,12 +1419,13 @@ Acceptance по memory cleanup для каждой compute iteration:
 | 7 | `pass` | [`7 job orchestration/persistence`](benchmark_iterations/2026-05-01_iteration_7_job_orchestration_persistence/) |
 | 8 | `pass` | [`8 execution/sizing completion`](benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/) |
 | 9 | `pass` | [`9 lazy trades detail`](benchmark_iterations/2026-05-02_iteration_9_lazy_trades_detail/) |
+| 10 | `pass` | Browser QA evidence: [`10 UI integration`](benchmark_iterations/2026-05-02_iteration_10_ui_integration/browser_qa_summary.md) |
 
 Итерация 6 принята с явным manual stage override: пользователь допустил
 нарушения `0.9` ratio для микросекундных стадий как неразличимые на уровне
-service latency. Raw ratios сохранены в benchmark evidence. Последующие итерации
-начиная с Iteration 10 пока не имеют принятого benchmark record в
-`docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
+service latency. Raw ratios сохранены в benchmark evidence. Iteration 10
+закрыта через browser-visible QA, а не через compute benchmark: это UI
+integration gate поверх уже принятого public API/lazy trades runtime.
 
 ### Итерация 0: документы и benchmark harness
 
@@ -1916,6 +1917,9 @@ summary-only top-N rows, `top_result_assembly`, `persist_top_n_io` и
 - показывать job progress/top N;
 - реализовать `show trades`;
 - render trades на candle chart.
+
+Статус: `pass`, локальная browser QA evidence:
+[`2026-05-02_iteration_10_ui_integration`](benchmark_iterations/2026-05-02_iteration_10_ui_integration/browser_qa_summary.md).
 
 Проверка:
 

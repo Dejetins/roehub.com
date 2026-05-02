@@ -113,6 +113,7 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
 @pytest.mark.parametrize(
     ("path", "expected_location"),
     [
+        ("/backtests", "/login?next=%2Fbacktests"),
         ("/strategies", "/login?next=%2Fstrategies"),
         ("/strategies/new", "/login?next=%2Fstrategies%2Fnew"),
         (
@@ -175,6 +176,17 @@ def test_login_page_sanitizes_external_next_parameter() -> None:
     assert "Continue with Keycloak" in response.text
     assert "window.location.assign(oidcLoginUrl);" in response.text
     assert "https://evil.example/path" not in response.text
+
+
+def test_favicon_route_avoids_browser_404_noise() -> None:
+    """
+    Verify browsers can request favicon without creating an incidental 404.
+    """
+    client = _build_test_client()
+
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 204
 
 
 @pytest.mark.parametrize(
@@ -240,6 +252,36 @@ def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:
     assert "/strategies/new" in response.text
     assert "/api/strategies" in response.text
     assert "/api/strategies/clone" in response.text
+
+
+def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
+    """
+    Verify `/backtests` renders protected UI hooks and public Backtest API paths.
+    """
+    client = _build_test_client()
+
+    response = client.get("/backtests")
+
+    assert response.status_code == 200
+    assert "Backtests" in response.text
+    assert 'href="/backtests"' in response.text
+    assert "data-backtest-page" in response.text
+    assert "/assets/backtest_ui.js" in response.text
+    assert 'data-api-defaults-path="/api/backtests/runtime-defaults"' in response.text
+    assert 'data-api-preflight-path="/api/backtests/preflight"' in response.text
+    assert 'data-api-jobs-path="/api/backtests/jobs"' in response.text
+    assert 'data-api-job-path-template="/api/backtests/jobs/{job_id}"' in response.text
+    assert 'data-api-top-path-template="/api/backtests/jobs/{job_id}/top"' in response.text
+    assert (
+        'data-api-variant-path-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"'
+        in response.text
+    )
+    assert (
+        'data-api-trades-path-template='
+        '"/api/backtests/jobs/{job_id}/variants/{variant_key}/trades"'
+        in response.text
+    )
+    assert 'data-api-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' in response.text
 
 
 def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:

@@ -129,6 +129,13 @@ def _register_routes(
             ),
         )
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def get_favicon() -> Response:
+        """
+        Return an empty favicon response so browser QA has no incidental 404 noise.
+        """
+        return Response(status_code=204)
+
     @app.get("/login", response_class=HTMLResponse)
     def get_login_page(request: Request, next: str | None = None) -> Response:
         """
@@ -269,6 +276,30 @@ def _register_routes(
             page_path="/strategies",
             page_title="Strategies",
             template_name="strategies_list.html",
+        )
+
+    @app.get("/backtests", response_class=HTMLResponse)
+    def get_backtests_page(request: Request) -> Response:
+        """
+        Render protected backtests page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML backtests page or login redirect response.
+        Assumptions:
+            Browser-side code consumes the public Backtest API through `/api/*`.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/backtests",
+            page_title="Backtests",
+            template_name="backtests.html",
         )
 
     @app.get("/strategies/new", response_class=HTMLResponse)
