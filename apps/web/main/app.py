@@ -20,6 +20,14 @@ from apps.web.main.api_client import (
     HttpxCurrentUserApiClient,
     WebCurrentUser,
 )
+from apps.web.main.i18n import (
+    LOCALE_COOKIE_NAME,
+    SUPPORTED_LOCALES,
+    build_translator,
+    normalize_locale,
+    resolve_locale,
+    translate,
+)
 from apps.web.main.security import sanitize_next_path
 from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_settings
 
@@ -45,30 +53,39 @@ _HOP_BY_HOP_HEADERS = {
 class _NavItem:
     key: str
     href: str
-    label: str
+    label_key: str
 
 
 @dataclass(frozen=True)
 class _ThemeOption:
     key: str
-    label: str
+    label_key: str
+
+
+@dataclass(frozen=True)
+class _LocaleOption:
+    key: str
+    label_key: str
 
 
 _PRIMARY_NAV_ITEMS = (
-    _NavItem(key="/", href="/", label="Главная"),
-    _NavItem(key="/dashboard", href="/dashboard", label="Панель"),
-    _NavItem(key="/strategies", href="/strategies", label="Стратегии"),
-    _NavItem(key="/backtests", href="/backtests", label="Backtests"),
-    _NavItem(key="/monitoring", href="/monitoring", label="Мониторинг"),
-    _NavItem(key="/settings", href="/settings", label="Настройки"),
+    _NavItem(key="/", href="/", label_key="nav.home"),
+    _NavItem(key="/dashboard", href="/dashboard", label_key="nav.dashboard"),
+    _NavItem(key="/strategies", href="/strategies", label_key="nav.strategies"),
+    _NavItem(key="/backtests", href="/backtests", label_key="nav.backtests"),
+    _NavItem(key="/monitoring", href="/monitoring", label_key="nav.monitoring"),
+    _NavItem(key="/settings", href="/settings", label_key="nav.settings"),
 )
 _THEME_OPTIONS = (
-    _ThemeOption(key="terminal-orange", label="Orange"),
-    _ThemeOption(key="graphite", label="Graphite"),
-    _ThemeOption(key="matrix-green", label="Matrix"),
-    _ThemeOption(key="high-contrast", label="Contrast"),
+    _ThemeOption(key="terminal-orange", label_key="theme.terminal_orange"),
+    _ThemeOption(key="graphite", label_key="theme.graphite"),
+    _ThemeOption(key="matrix-green", label_key="theme.matrix_green"),
+    _ThemeOption(key="high-contrast", label_key="theme.high_contrast"),
 )
 _THEME_KEYS = {theme.key for theme in _THEME_OPTIONS}
+_LOCALE_OPTIONS = tuple(
+    _LocaleOption(key=locale, label_key=f"locale.{locale}") for locale in SUPPORTED_LOCALES
+)
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -101,7 +118,7 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/",
-            page_title="Roehub",
+            page_title_key="page.landing.title",
             template_name="pages/landing.html",
         )
 
@@ -115,12 +132,17 @@ def _register_routes(
         context = _build_template_context(
             request=request,
             page_path="/login",
-            page_title="Вход",
+            page_title_key="page.login.title",
             current_user=None,
             error_message=None,
         )
         context["oidc_login_url"] = _build_oidc_login_url(next_path=safe_next_path)
-        return templates.TemplateResponse(request, "pages/login.html", context=context)
+        return _render_template_response(
+            request=request,
+            templates=templates,
+            template_name="pages/login.html",
+            context=context,
+        )
 
     @app.get("/register", response_class=HTMLResponse)
     def get_register_page(request: Request, next: str | None = None) -> Response:
@@ -128,12 +150,17 @@ def _register_routes(
         context = _build_template_context(
             request=request,
             page_path="/register",
-            page_title="Регистрация",
+            page_title_key="page.register.title",
             current_user=None,
             error_message=None,
         )
         context["oidc_register_url"] = _build_oidc_login_url(next_path=safe_next_path)
-        return templates.TemplateResponse(request, "pages/register.html", context=context)
+        return _render_template_response(
+            request=request,
+            templates=templates,
+            template_name="pages/register.html",
+            context=context,
+        )
 
     @app.get("/logout", response_class=HTMLResponse)
     def get_logout_page(request: Request, next: str | None = None) -> Response:
@@ -141,13 +168,18 @@ def _register_routes(
         context = _build_template_context(
             request=request,
             page_path="/logout",
-            page_title="Выход",
+            page_title_key="page.logout.title",
             current_user=None,
             error_message=None,
         )
         context["post_logout_redirect_path"] = post_logout_redirect_path
         context["logout_url"] = "/api/auth/logout"
-        return templates.TemplateResponse(request, "pages/logout.html", context=context)
+        return _render_template_response(
+            request=request,
+            templates=templates,
+            template_name="pages/logout.html",
+            context=context,
+        )
 
     @app.api_route(
         "/api/{upstream_path:path}",
@@ -194,8 +226,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/dashboard",
-            page_title="Панель",
-            page_description="Protected dashboard placeholder for Stage 2.",
+            page_title_key="page.dashboard.title",
+            page_description_key="page.dashboard.description",
         )
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -204,8 +236,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/settings",
-            page_title="Настройки",
-            page_description="Protected settings placeholder for account preferences.",
+            page_title_key="page.settings.title",
+            page_description_key="page.settings.description",
         )
 
     @app.get("/strategies", response_class=HTMLResponse)
@@ -214,8 +246,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/strategies",
-            page_title="Стратегии",
-            page_description="Protected strategies placeholder for the Stage 6 package.",
+            page_title_key="page.strategies.title",
+            page_description_key="page.strategies.description",
         )
 
     @app.get("/strategies/new", response_class=HTMLResponse)
@@ -224,8 +256,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/strategies",
-            page_title="Новая стратегия",
-            page_description="Protected create-strategy entrypoint placeholder.",
+            page_title_key="page.strategy_new.title",
+            page_description_key="page.strategy_new.description",
             template_context={"placeholder_id": "strategies-new"},
         )
 
@@ -235,8 +267,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/strategies",
-            page_title="Стратегия",
-            page_description="Protected strategy detail placeholder.",
+            page_title_key="page.strategy_detail.title",
+            page_description_key="page.strategy_detail.description",
             template_context={"placeholder_id": "strategy-detail", "entity_id": strategy_id},
         )
 
@@ -246,8 +278,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/monitoring",
-            page_title="Мониторинг",
-            page_description="Protected monitoring placeholder for runtime state.",
+            page_title_key="page.monitoring.title",
+            page_description_key="page.monitoring.description",
         )
 
     @app.get("/backtests", response_class=HTMLResponse)
@@ -256,8 +288,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/backtests",
-            page_title="Backtests",
-            page_description="Protected backtests history placeholder.",
+            page_title_key="page.backtests.title",
+            page_description_key="page.backtests.description",
         )
 
     @app.get("/backtests/new", response_class=HTMLResponse)
@@ -266,8 +298,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/backtests",
-            page_title="Новый backtest",
-            page_description="Protected backtest configurator placeholder.",
+            page_title_key="page.backtest_new.title",
+            page_description_key="page.backtest_new.description",
             template_context={"placeholder_id": "backtests-new"},
         )
 
@@ -277,8 +309,8 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/backtests",
-            page_title="Backtest result",
-            page_description="Protected backtest result placeholder.",
+            page_title_key="page.backtest_result.title",
+            page_description_key="page.backtest_result.description",
             template_context={"placeholder_id": "backtest-result", "entity_id": job_id},
         )
 
@@ -304,20 +336,25 @@ def _render_public_page(
     request: Request,
     templates: Jinja2Templates,
     page_path: str,
-    page_title: str,
+    page_title_key: str,
     template_name: str,
     template_context: Mapping[str, Any] | None = None,
 ) -> Response:
     context = _build_template_context(
         request=request,
         page_path=page_path,
-        page_title=page_title,
+        page_title_key=page_title_key,
         current_user=None,
         error_message=None,
     )
     if template_context is not None:
         context.update(template_context)
-    return templates.TemplateResponse(request, template_name, context=context)
+    return _render_template_response(
+        request=request,
+        templates=templates,
+        template_name=template_name,
+        context=context,
+    )
 
 
 def _render_protected_page(
@@ -325,8 +362,8 @@ def _render_protected_page(
     request: Request,
     templates: Jinja2Templates,
     page_path: str,
-    page_title: str,
-    page_description: str,
+    page_title_key: str,
+    page_description_key: str,
     template_context: Mapping[str, Any] | None = None,
 ) -> Response:
     api_client = _resolve_current_user_api_client(request=request)
@@ -335,29 +372,58 @@ def _render_protected_page(
     if api_result.status_code == 401:
         return _build_login_redirect_response(current_path=_build_current_path(request=request))
 
+    current_locale, should_set_locale_cookie = _resolve_locale_state(request=request)
     current_user = api_result.user if api_result.status_code == 200 else None
-    error_message = _build_api_error_message(api_result=api_result)
+    error_message = _build_api_error_message(api_result=api_result, locale=current_locale)
     status_code = 200 if current_user is not None else 502
 
     context = _build_template_context(
         request=request,
         page_path=page_path,
-        page_title=page_title,
+        page_title_key=page_title_key,
         current_user=current_user,
         error_message=error_message,
+        locale=current_locale,
+        should_set_locale_cookie=should_set_locale_cookie,
     )
-    context["page_description"] = page_description
+    context["page_description"] = translate(locale=current_locale, key=page_description_key)
     context["placeholder_id"] = page_path.strip("/").replace("/", "-") or "home"
     if template_context is not None:
         context.update(template_context)
 
-    response = templates.TemplateResponse(
+    response = _render_template_response(
         request,
-        "pages/placeholder.html",
+        templates=templates,
+        template_name="pages/placeholder.html",
         context=context,
         status_code=status_code,
     )
     response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _render_template_response(
+    request: Request,
+    *,
+    templates: Jinja2Templates,
+    template_name: str,
+    context: dict[str, Any],
+    status_code: int = 200,
+) -> Response:
+    response = templates.TemplateResponse(
+        request,
+        template_name,
+        context=context,
+        status_code=status_code,
+    )
+    if context.get("should_set_locale_cookie") is True:
+        response.set_cookie(
+            LOCALE_COOKIE_NAME,
+            str(context["current_locale"]),
+            max_age=31_536_000,
+            httponly=False,
+            samesite="lax",
+        )
     return response
 
 
@@ -380,11 +446,15 @@ def _build_current_path(*, request: Request) -> str:
     return f"{request.url.path}?{query}"
 
 
-def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:
+def _build_api_error_message(
+    *,
+    api_result: CurrentUserApiResult,
+    locale: str,
+) -> str | None:
     if api_result.status_code in (200, 401):
         return None
     if api_result.error_message is None:
-        return "Identity API request failed"
+        return translate(locale=locale, key="error.identity_api")
     return api_result.error_message
 
 
@@ -392,30 +462,61 @@ def _build_template_context(
     *,
     request: Request,
     page_path: str,
-    page_title: str,
+    page_title_key: str,
     current_user: WebCurrentUser | None,
     error_message: str | None,
+    locale: str | None = None,
+    should_set_locale_cookie: bool | None = None,
 ) -> dict[str, Any]:
     current_theme = _resolve_theme(request=request)
+    if locale is None or should_set_locale_cookie is None:
+        current_locale, should_set_cookie = _resolve_locale_state(request=request)
+    else:
+        current_locale = locale
+        should_set_cookie = should_set_locale_cookie
+    t = build_translator(locale=current_locale)
     return {
         "request": request,
         "page_path": page_path,
-        "page_title": page_title,
+        "page_title": t(page_title_key),
         "current_user": current_user,
         "error_message": error_message,
         "current_theme": current_theme,
-        "nav_items": _build_nav_items(page_path=page_path),
-        "auth_actions": _build_auth_actions(page_path=page_path, current_user=current_user),
-        "theme_options": _build_theme_options(request=request, current_theme=current_theme),
+        "current_locale": current_locale,
+        "should_set_locale_cookie": should_set_cookie,
+        "t": t,
+        "nav_items": _build_nav_items(page_path=page_path, locale=current_locale),
+        "auth_actions": _build_auth_actions(
+            page_path=page_path,
+            current_user=current_user,
+            locale=current_locale,
+        ),
+        "theme_options": _build_theme_options(
+            request=request,
+            current_theme=current_theme,
+            locale=current_locale,
+        ),
+        "locale_options": _build_locale_options(request=request, current_locale=current_locale),
     }
 
 
-def _build_nav_items(*, page_path: str) -> list[dict[str, str | bool]]:
+def _resolve_locale_state(*, request: Request) -> tuple[str, bool]:
+    raw_query_locale = request.query_params.get("locale")
+    resolved_locale = resolve_locale(
+        query_locale=raw_query_locale,
+        cookie_locale=request.cookies.get(LOCALE_COOKIE_NAME),
+        accept_language=request.headers.get("accept-language"),
+    )
+    should_set_cookie = normalize_locale(raw_query_locale) is not None
+    return resolved_locale, should_set_cookie
+
+
+def _build_nav_items(*, page_path: str, locale: str) -> list[dict[str, str | bool]]:
     return [
         {
             "key": item.key,
             "href": item.href,
-            "label": item.label,
+            "label": translate(locale=locale, key=item.label_key),
             "active": item.key == page_path,
         }
         for item in _PRIMARY_NAV_ITEMS
@@ -426,13 +527,14 @@ def _build_auth_actions(
     *,
     page_path: str,
     current_user: WebCurrentUser | None,
+    locale: str,
 ) -> list[dict[str, str | bool]]:
     if current_user is not None:
         return [
             {
                 "key": "/logout",
                 "href": "/logout",
-                "label": "Выйти",
+                "label": translate(locale=locale, key="auth.logout"),
                 "active": page_path == "/logout",
             }
         ]
@@ -440,13 +542,13 @@ def _build_auth_actions(
         {
             "key": "/login",
             "href": "/login",
-            "label": "Войти",
+            "label": translate(locale=locale, key="auth.login"),
             "active": page_path == "/login",
         },
         {
             "key": "/register",
             "href": "/register",
-            "label": "Регистрация",
+            "label": translate(locale=locale, key="auth.register"),
             "active": page_path == "/register",
         },
     ]
@@ -463,17 +565,43 @@ def _build_theme_options(
     *,
     request: Request,
     current_theme: str,
+    locale: str,
 ) -> list[dict[str, str | bool]]:
-    query_params = dict(request.query_params)
     theme_options: list[dict[str, str | bool]] = []
     for theme in _THEME_OPTIONS:
-        query_params["theme"] = theme.key
         theme_options.append(
             {
                 "key": theme.key,
-                "label": theme.label,
-                "href": f"{request.url.path}?{urlencode(query_params)}",
+                "label": translate(locale=locale, key=theme.label_key),
+                "href": _build_control_href(request=request, updates={"theme": theme.key}),
                 "active": theme.key == current_theme,
             }
         )
     return theme_options
+
+
+def _build_locale_options(
+    *,
+    request: Request,
+    current_locale: str,
+) -> list[dict[str, str | bool]]:
+    return [
+        {
+            "key": locale.key,
+            "label": translate(locale=current_locale, key=locale.label_key),
+            "href": _build_control_href(request=request, updates={"locale": locale.key}),
+            "active": locale.key == current_locale,
+        }
+        for locale in _LOCALE_OPTIONS
+    ]
+
+
+def _build_control_href(*, request: Request, updates: Mapping[str, str]) -> str:
+    query_params = dict(request.query_params)
+    if "next" in query_params:
+        query_params["next"] = sanitize_next_path(raw_next=query_params["next"])
+    query_params.update(updates)
+    query = urlencode(query_params)
+    if not query:
+        return request.url.path
+    return f"{request.url.path}?{query}"

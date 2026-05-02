@@ -12,11 +12,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    linear-gradient(var(--rh-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--rh-grid-line) 1px, transparent 1px),
-    var(--rh-bg);
-  background-size: 32px 32px;
+  background: var(--rh-bg);
   color: var(--rh-text);
   letter-spacing: 0;
 }

@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="ru" data-theme="{{ current_theme|default('terminal-orange') }}">
+<html
+  lang="{{ current_locale|default('en') }}"
+  data-locale="{{ current_locale|default('en') }}"
+  data-theme="{{ current_theme|default('terminal-orange') }}"
+>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,15 +17,15 @@
     <script src="/assets/vendor/htmx.min.js" defer></script>
   </head>
   <body>
-    <a class="rh-skip-link" href="#main-content">К содержимому</a>
+    <a class="rh-skip-link" href="#main-content">{{ t("shell.skip_to_content") }}</a>
 
     <header class="rh-shell-header">
-      <a class="rh-brand" href="/" aria-label="Roehub home">
-        <span class="rh-brand__mark" aria-hidden="true">RH</span>
-        <span class="rh-brand__name">Roehub</span>
+      <a class="rh-brand" href="/" aria-label="{{ t('shell.brand_aria') }}">
+        <span class="rh-brand__terminal" aria-hidden="true">&gt;_</span>
+        <span class="rh-brand__name">ROEHUB</span>
       </a>
 
-      <nav class="rh-primary-nav" aria-label="Основная навигация">
+      <nav class="rh-primary-nav" aria-label="{{ t('shell.nav_aria') }}">
         {% for item in nav_items %}
           <a
             class="rh-nav-tab{% if item.active %} rh-nav-tab--active{% endif %}"
@@ -33,20 +37,43 @@
         {% endfor %}
       </nav>
 
-      <div class="rh-header-tools" aria-label="Shell controls">
-        <nav class="rh-theme-tabs" aria-label="Тема">
+      <div class="rh-header-tools" aria-label="{{ t('shell.controls_aria') }}">
+        <nav class="rh-locale-switcher" aria-label="{{ t('shell.language_aria') }}">
+          {% for locale in locale_options %}
+            <a
+              class="rh-locale-switcher__option{% if locale.active %} rh-locale-switcher__option--active{% endif %}"
+              href="{{ locale.href }}"
+              data-locale-option="{{ locale.key }}"
+              data-active="{{ 'true' if locale.active else 'false' }}"
+              hreflang="{{ locale.key }}"
+              {% if locale.active %}aria-current="true"{% endif %}
+            >{{ locale.label }}</a>
+          {% endfor %}
+        </nav>
+
+        <details class="rh-theme-menu">
+          <summary class="rh-theme-menu__summary" aria-label="{{ t('theme.aria') }}">
+            <span class="rh-theme-menu__swatch" aria-hidden="true"></span>
+            <span>{{ t("theme.current") }}</span>
+          </summary>
+          <div class="rh-theme-menu__list" role="menu">
           {% for theme in theme_options %}
             <a
-              class="rh-theme-tab{% if theme.active %} rh-theme-tab--active{% endif %}"
+              class="rh-theme-menu__item{% if theme.active %} rh-theme-menu__item--active{% endif %}"
               href="{{ theme.href }}"
               data-theme-option="{{ theme.key }}"
               data-active="{{ 'true' if theme.active else 'false' }}"
               {% if theme.active %}aria-current="true"{% endif %}
-            >{{ theme.label }}</a>
+              role="menuitem"
+            >
+              <span class="rh-theme-menu__dot" aria-hidden="true"></span>
+              <span>{{ theme.label }}</span>
+            </a>
           {% endfor %}
-        </nav>
+          </div>
+        </details>
 
-        <nav class="rh-auth-actions" aria-label="Auth">
+        <nav class="rh-auth-actions" aria-label="{{ t('shell.auth_aria') }}">
           {% for action in auth_actions %}
             <a
               class="rh-auth-link{% if action.active %} rh-auth-link--active{% endif %}"
@@ -68,9 +95,9 @@
       {% block content %}{% endblock %}
     </main>
 
-    <footer class="rh-shell-footer">
-      <span>Roehub Web</span>
-      <span>v1</span>
+    <footer class="rh-shell-footer" aria-label="{{ t('shell.status_aria') }}">
+      <span>{{ t("shell.status") }}</span>
+      <span>{{ current_locale|upper }}</span>
     </footer>
 
     {% block scripts %}{% endblock %}

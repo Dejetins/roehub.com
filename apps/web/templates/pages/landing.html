@@ -2,34 +2,33 @@
 
 {% block content %}
   <section class="rh-landing" aria-labelledby="landing-title">
-    <div class="rh-kicker">Roehub / Web UI v1</div>
-    <h1 id="landing-title">Терминал управления стратегиями и backtests.</h1>
-    <p>
-      Быстрый вход к защищенным рабочим разделам, настройкам и runtime-наблюдению через
-      единый shell.
-    </p>
-    <div class="rh-command-row" aria-label="Быстрые действия">
-      <a class="rh-button rh-button--primary" href="/login">Войти</a>
-      <a class="rh-button" href="/register">Регистрация</a>
-      <a class="rh-button rh-button--ghost" href="/dashboard">Открыть панель</a>
+    <div class="rh-kicker">{{ t("landing.subtitle") }}</div>
+    <h1 id="landing-title">{{ t("landing.title") }}</h1>
+    <p>{{ t("landing.description") }}</p>
+    <div class="rh-command-row" aria-label="{{ t('landing.actions') }}">
+      <a class="rh-button rh-button--primary" href="/login">{{ t("landing.login_cta") }}</a>
+      <a class="rh-button" href="/register">{{ t("landing.register_cta") }}</a>
+      <a class="rh-button rh-button--ghost" href="/dashboard">
+        {{ t("landing.dashboard_cta") }}
+      </a>
     </div>
   </section>
 
-  <section class="rh-shell-grid" aria-label="Разделы">
+  <section class="rh-shell-grid" aria-label="{{ t('landing.routes') }}">
     <a class="rh-panel rh-route-card" href="/strategies">
       <span class="rh-route-card__eyebrow">/strategies</span>
-      <strong>Стратегии</strong>
-      <span>Конструктор и список появятся в отдельном Stage 6 пакете.</span>
+      <strong>{{ t("landing.strategies.title") }}</strong>
+      <span>{{ t("landing.strategies.body") }}</span>
     </a>
     <a class="rh-panel rh-route-card" href="/backtests">
       <span class="rh-route-card__eyebrow">/backtests</span>
-      <strong>Backtests</strong>
-      <span>History, configurator и results остаются за Stage 8/9.</span>
+      <strong>{{ t("landing.backtests.title") }}</strong>
+      <span>{{ t("landing.backtests.body") }}</span>
     </a>
     <a class="rh-panel rh-route-card" href="/monitoring">
       <span class="rh-route-card__eyebrow">/monitoring</span>
-      <strong>Мониторинг</strong>
-      <span>Runtime snapshot будет подключен без изменения shell contract.</span>
+      <strong>{{ t("landing.monitoring.title") }}</strong>
+      <span>{{ t("landing.monitoring.body") }}</span>
     </a>
   </section>
 {% endblock %}

@@ -2,14 +2,14 @@
 
 {% block content %}
   <section class="rh-auth-page" aria-labelledby="login-title">
-    <div class="rh-kicker">Keycloak</div>
-    <h1 id="login-title">Вход в Roehub</h1>
-    <p>Сессия Roehub создается после OIDC-перехода через Keycloak.</p>
+    <div class="rh-kicker">{{ t("login.kicker") }}</div>
+    <h1 id="login-title">{{ t("login.title") }}</h1>
+    <p>{{ t("login.description") }}</p>
     <div class="rh-command-row">
       <a id="keycloak-login-link" class="rh-button rh-button--primary" href="{{ oidc_login_url }}">
-        Продолжить вход
+        {{ t("login.continue") }}
       </a>
-      <a class="rh-button" href="/register">Регистрация</a>
+      <a class="rh-button" href="/register">{{ t("auth.register") }}</a>
     </div>
   </section>
 {% endblock %}

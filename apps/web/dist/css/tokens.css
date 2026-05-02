@@ -2,28 +2,30 @@
 :root[data-theme="terminal-orange"] {
   color-scheme: dark;
 
-  --rh-bg: #050807;
-  --rh-bg-elevated: #07100f;
-  --rh-surface: #081210;
-  --rh-surface-2: #0b1714;
-  --rh-surface-3: #111b18;
+  --rh-bg: #020607;
+  --rh-bg-elevated: #050a0c;
+  --rh-surface: #071012;
+  --rh-surface-2: #0a1416;
+  --rh-surface-3: #10191b;
 
-  --rh-line: rgba(255, 122, 0, 0.48);
-  --rh-line-strong: #ff7a00;
-  --rh-line-muted: rgba(255, 122, 0, 0.24);
-  --rh-grid-line: rgba(127, 92, 51, 0.22);
+  --rh-line: rgba(255, 106, 0, 0.62);
+  --rh-line-strong: #ff6a00;
+  --rh-line-muted: rgba(255, 106, 0, 0.28);
+  --rh-divider: rgba(255, 106, 0, 0.18);
+  --rh-chart-grid-line: rgba(111, 84, 53, 0.18);
 
-  --rh-text: #e7e3dc;
-  --rh-text-strong: #fff4e5;
-  --rh-muted: #9d9890;
-  --rh-muted-2: #6d6961;
+  --rh-text: #d8d2c9;
+  --rh-text-strong: #fff1df;
+  --rh-muted: #918a82;
+  --rh-muted-2: #5f5a53;
 
-  --rh-accent: #ff8a00;
-  --rh-accent-2: #ffb000;
-  --rh-warning: #ff9f0a;
-  --rh-info: #24b8ff;
-  --rh-focus: #ffd166;
-  --rh-shadow-panel: 0 0 0 1px rgba(255, 122, 0, 0.24);
+  --rh-accent: #ff7a00;
+  --rh-accent-2: #ff9d00;
+  --rh-warning: #ff9d00;
+  --rh-info: #00a6c8;
+  --rh-focus: #ffb000;
+  --rh-shadow-panel: none;
+  --rh-shadow-glow: 0 0 18px rgba(255, 106, 0, 0.08);
 
   --rh-financial-positive: #57d33b;
   --rh-financial-negative: #ff3b30;
@@ -51,7 +53,8 @@
   --rh-radius-2: 4px;
   --rh-radius-3: 6px;
 
-  --rh-header-height: 48px;
-  --rh-footer-height: 34px;
+  --rh-header-height: 44px;
+  --rh-commandbar-height: 36px;
+  --rh-footer-height: 30px;
   --rh-page-max: 1920px;
 }

@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
+from apps.web.main.i18n import LOCALE_COOKIE_NAME, assert_catalog_keys_match
 
 
 def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
@@ -121,6 +122,8 @@ def test_public_shell_routes_render(path: str) -> None:
 
     assert response.status_code == 200
     assert "Roehub" in response.text
+    assert 'lang="en"' in response.text
+    assert 'data-locale="en"' in response.text
     assert "/assets/vendor/htmx.min.js" in response.text
     assert "https://unpkg.com" not in response.text
     assert "terminal-orange" in response.text
@@ -167,6 +170,69 @@ def test_protected_redirect_preserves_safe_local_query_in_next_parameter() -> No
     assert response.status_code == 307
     expected_location = f"/login?next={quote('/settings?theme=graphite', safe='')}"
     assert response.headers["location"] == expected_location
+
+
+def test_default_locale_is_english_with_language_switcher() -> None:
+    client = _build_test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'lang="en"' in response.text
+    assert 'data-locale="en"' in response.text
+    assert "Strategy and backtest operations terminal." in response.text
+    assert 'data-locale-option="en"' in response.text
+    assert 'data-locale-option="ru"' in response.text
+
+
+def test_locale_query_selects_russian_and_sets_cookie_without_localized_routes() -> None:
+    client = _build_test_client()
+
+    response = client.get("/?locale=ru")
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert "Терминал управления стратегиями" in response.text
+    assert f"{LOCALE_COOKIE_NAME}=ru" in response.headers["set-cookie"]
+    assert 'href="/dashboard"' in response.text
+    assert 'href="/strategies"' in response.text
+
+
+def test_locale_cookie_selects_russian() -> None:
+    client = _build_test_client()
+
+    response = client.get("/", headers={"cookie": f"{LOCALE_COOKIE_NAME}=ru"})
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert "Регистрация" in response.text
+
+
+def test_invalid_locale_cookie_falls_back_to_english() -> None:
+    client = _build_test_client()
+
+    response = client.get("/", headers={"cookie": f"{LOCALE_COOKIE_NAME}=javascript"})
+
+    assert response.status_code == 200
+    assert 'lang="en"' in response.text
+    assert 'data-locale="en"' in response.text
+    assert "Strategy and backtest operations terminal." in response.text
+
+
+def test_accept_language_is_used_when_cookie_is_absent() -> None:
+    client = _build_test_client()
+
+    response = client.get("/", headers={"accept-language": "ru-RU,ru;q=0.9,en;q=0.1"})
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+
+
+def test_locale_catalogs_have_matching_keys() -> None:
+    assert_catalog_keys_match()
 
 
 @pytest.mark.parametrize(

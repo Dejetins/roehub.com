@@ -9,24 +9,24 @@
   >
     <div class="rh-page-heading">
       <div>
-        <div class="rh-kicker">Protected route</div>
+        <div class="rh-kicker">{{ t("placeholder.kicker") }}</div>
         <h1 id="page-title">{{ page_title }}</h1>
       </div>
-      <span class="rh-status-badge">Stage 1</span>
+      <span class="rh-status-badge">{{ t("placeholder.stage") }}</span>
     </div>
     <p>{{ page_description }}</p>
 
-    <section class="rh-panel rh-panel--dense" aria-label="Shell contract">
+    <section class="rh-panel rh-panel--dense" aria-label="{{ t('placeholder.shell_contract') }}">
       <div class="rh-data-row">
-        <span>route</span>
+        <span>{{ t("placeholder.route") }}</span>
         <code>{{ request.url.path }}</code>
       </div>
       <div class="rh-data-row">
-        <span>auth state</span>
-        <code>current-user</code>
+        <span>{{ t("placeholder.auth_state") }}</span>
+        <code>{{ t("placeholder.current_user") }}</code>
       </div>
       <div class="rh-data-row">
-        <span>api</span>
+        <span>{{ t("placeholder.api") }}</span>
         <code>/api/auth/current-user</code>
       </div>
     </section>

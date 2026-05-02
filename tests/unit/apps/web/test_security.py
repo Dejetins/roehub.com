@@ -6,6 +6,7 @@ from pathlib import Path
 from apps.web.main.security import sanitize_next_path
 
 _TEMPLATE_ROOT = Path("apps/web/templates")
+_CSS_ROOT = Path("apps/web/dist/css")
 
 
 def test_sanitize_next_path_allows_relative_route() -> None:
@@ -31,6 +32,25 @@ def test_base_shell_does_not_reference_external_cdn_scripts() -> None:
     assert "https://unpkg.com" not in base_template
     assert "https://cdn" not in base_template
     assert 'src="/assets/vendor/htmx.min.js"' in base_template
+
+
+def test_base_shell_avoids_decorative_monogram_and_guest_badge() -> None:
+    base_template = (_TEMPLATE_ROOT / "base.html").read_text(encoding="utf-8")
+    user_badge = (_TEMPLATE_ROOT / "components/user_badge.html").read_text(encoding="utf-8")
+
+    assert "rh-brand__mark" not in base_template
+    assert ">RH<" not in base_template
+    assert "GUEST" not in base_template
+    assert "GUEST" not in user_badge
+
+
+def test_global_page_background_does_not_use_orange_grid() -> None:
+    base_css = (_CSS_ROOT / "base.css").read_text(encoding="utf-8")
+
+    body_block_match = re.search(r"body\s*\{(?P<body>.*?)\}", base_css, re.DOTALL)
+    assert body_block_match is not None
+    assert "linear-gradient" not in body_block_match.group("body")
+    assert "--rh-grid-line" not in base_css
 
 
 def test_auth_templates_do_not_embed_inline_scripts() -> None:
