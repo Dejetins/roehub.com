@@ -1,34 +1,20 @@
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
+from typing import cast
+from urllib.parse import quote
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
 
-# WEB-EPIC-07 mapping:
-# - Scope 2: smoke tests for login gate redirects and SSR pages that expose
-#   required data-hooks, assets entrypoints, and /api/* literals without network I/O.
-
 
 def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
-    """
-    Build web TestClient with deterministic internal API client override.
-
-    Args:
-        api_result: Optional fixed result returned by mocked current-user API adapter.
-    Returns:
-        TestClient: Configured client with fake API adapter in app state.
-    Assumptions:
-        Internal API adapter exposes `fetch_current_user(cookie_header=...)`.
-    Raises:
-        None.
-    Side Effects:
-        Creates isolated FastAPI app instance for each test.
-    """
     app = create_app(
         environ={
             "WEB_API_BASE_URL": "http://web.local",
@@ -50,20 +36,6 @@ def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> Tes
 
 
 def test_create_app_fails_fast_when_required_web_api_urls_are_missing() -> None:
-    """
-    Verify web app startup fails fast when required web API URLs are not configured.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Runtime config validation executes during app factory call.
-    Raises:
-        AssertionError: If startup unexpectedly succeeds without required env vars.
-    Side Effects:
-        None.
-    """
     with pytest.raises(ValueError, match="WEB_API_BASE_URL"):
         create_app(environ={})
 
@@ -71,10 +43,33 @@ def test_create_app_fails_fast_when_required_web_api_urls_are_missing() -> None:
         create_app(environ={"WEB_API_BASE_URL": "http://web.local"})
 
 
+def test_stage_1_route_map_is_registered_without_user_badge_partial() -> None:
+    client = _build_test_client()
+
+    app = cast(FastAPI, client.app)
+    route_paths = {getattr(route, "path", None) for route in app.routes}
+
+    assert {
+        "/",
+        "/login",
+        "/logout",
+        "/register",
+        "/dashboard",
+        "/settings",
+        "/strategies",
+        "/strategies/new",
+        "/strategies/{strategy_id}",
+        "/monitoring",
+        "/backtests",
+        "/backtests/new",
+        "/backtests/{job_id}",
+        "/api/{upstream_path:path}",
+        "/favicon.ico",
+    }.issubset(route_paths)
+    assert "/_partial/user_badge" not in route_paths
+
+
 def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
-    """
-    Verify `/api/*` requests are proxied by web app directly to API upstream.
-    """
     captured: dict[str, str | None] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -111,36 +106,47 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
 
 
 @pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/login",
+        "/logout",
+        "/register",
+    ],
+)
+def test_public_shell_routes_render(path: str) -> None:
+    client = _build_test_client()
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert "Roehub" in response.text
+    assert "/assets/vendor/htmx.min.js" in response.text
+    assert "https://unpkg.com" not in response.text
+    assert "terminal-orange" in response.text
+
+
+@pytest.mark.parametrize(
     ("path", "expected_location"),
     [
-        ("/backtests", "/login?next=%2Fbacktests"),
+        ("/dashboard", "/login?next=%2Fdashboard"),
+        ("/settings", "/login?next=%2Fsettings"),
         ("/strategies", "/login?next=%2Fstrategies"),
         ("/strategies/new", "/login?next=%2Fstrategies%2Fnew"),
         (
             "/strategies/00000000-0000-0000-0000-000000000123",
             "/login?next=%2Fstrategies%2F00000000-0000-0000-0000-000000000123",
         ),
+        ("/monitoring", "/login?next=%2Fmonitoring"),
+        ("/backtests", "/login?next=%2Fbacktests"),
+        ("/backtests/new", "/login?next=%2Fbacktests%2Fnew"),
+        ("/backtests/job-123", "/login?next=%2Fbacktests%2Fjob-123"),
     ],
 )
 def test_protected_page_redirects_to_login_on_unauthorized_current_user(
     path: str,
     expected_location: str,
 ) -> None:
-    """
-    Verify login gate redirects protected page requests to `/login?next=...` on 401.
-
-    Args:
-        path: Protected route path requested by test client.
-        expected_location: Expected redirect location with guarded `next` query.
-    Returns:
-        None.
-    Assumptions:
-        Internal API client returns HTTP 401 for unauthenticated browser cookie state.
-    Raises:
-        AssertionError: If redirect status or target differs from contract.
-    Side Effects:
-        None.
-    """
     client = _build_test_client(
         api_result=CurrentUserApiResult(status_code=401, user=None, error_message=None)
     )
@@ -151,21 +157,49 @@ def test_protected_page_redirects_to_login_on_unauthorized_current_user(
     assert response.headers["location"] == expected_location
 
 
-def test_login_page_sanitizes_external_next_parameter() -> None:
-    """
-    Verify login page uses OIDC start URL with sanitized safe fallback next path.
+def test_protected_redirect_preserves_safe_local_query_in_next_parameter() -> None:
+    client = _build_test_client(
+        api_result=CurrentUserApiResult(status_code=401, user=None, error_message=None)
+    )
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Login page points browser to `/api/auth/login?next=...` for Keycloak flow.
-    Raises:
-        AssertionError: If external URL is preserved in rendered page.
-    Side Effects:
-        None.
-    """
+    response = client.get("/settings?theme=graphite", follow_redirects=False)
+
+    assert response.status_code == 307
+    expected_location = f"/login?next={quote('/settings?theme=graphite', safe='')}"
+    assert response.headers["location"] == expected_location
+
+
+@pytest.mark.parametrize(
+    ("path", "active_nav_key", "placeholder_id"),
+    [
+        ("/dashboard", "/dashboard", "dashboard"),
+        ("/settings", "/settings", "settings"),
+        ("/strategies", "/strategies", "strategies"),
+        ("/strategies/new", "/strategies", "strategies-new"),
+        ("/strategies/abc", "/strategies", "strategy-detail"),
+        ("/monitoring", "/monitoring", "monitoring"),
+        ("/backtests", "/backtests", "backtests"),
+        ("/backtests/new", "/backtests", "backtests-new"),
+        ("/backtests/job-123", "/backtests", "backtest-result"),
+    ],
+)
+def test_authorized_protected_routes_render_placeholders_with_active_nav(
+    path: str,
+    active_nav_key: str,
+    placeholder_id: str,
+) -> None:
+    client = _build_test_client()
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert f'data-placeholder-page="{placeholder_id}"' in response.text
+    assert "/api/auth/current-user" in response.text
+    assert _nav_item_is_active(html=response.text, nav_key=active_nav_key)
+
+
+def test_login_page_sanitizes_external_next_parameter() -> None:
     client = _build_test_client()
 
     response = client.get("/login?next=https://evil.example/path")
@@ -173,20 +207,20 @@ def test_login_page_sanitizes_external_next_parameter() -> None:
     assert response.status_code == 200
     assert "/api/auth/login?next=%2F" in response.text
     assert 'id="keycloak-login-link"' in response.text
-    assert "Continue with Keycloak" in response.text
-    assert "window.location.assign(oidcLoginUrl);" in response.text
+    assert "window.location.assign" not in response.text
     assert "https://evil.example/path" not in response.text
 
 
-def test_favicon_route_avoids_browser_404_noise() -> None:
-    """
-    Verify browsers can request favicon without creating an incidental 404.
-    """
+def test_register_page_uses_keycloak_backed_entrypoint_without_local_password_form() -> None:
     client = _build_test_client()
 
-    response = client.get("/favicon.ico")
+    response = client.get("/register?next=/settings")
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert 'id="keycloak-register-link"' in response.text
+    assert "/api/auth/login?next=%2Fsettings" in response.text
+    assert "<form" not in response.text
+    assert 'type="password"' not in response.text
 
 
 @pytest.mark.parametrize(
@@ -197,145 +231,59 @@ def test_favicon_route_avoids_browser_404_noise() -> None:
         ("/logout?next=https://evil.example/path", "/login"),
     ],
 )
-def test_logout_page_contains_api_logout_call_and_sanitized_redirect(
+def test_logout_page_uses_external_auth_script_and_sanitized_redirect(
     path: str,
     expected_redirect: str,
 ) -> None:
-    """
-    Verify logout page clears session via API call and redirects to safe target.
-
-    Args:
-        path: Requested logout path with optional redirect query.
-        expected_redirect: Expected post-logout redirect path.
-    Returns:
-        None.
-    Assumptions:
-        Logout flow is browser-driven JavaScript call to `/api/auth/logout`.
-    Raises:
-        AssertionError: If expected API path or redirect target is missing in HTML.
-    Side Effects:
-        None.
-    """
     client = _build_test_client()
 
     response = client.get(path)
 
     assert response.status_code == 200
-    assert "/api/auth/logout" in response.text
-    assert "window.location.assign(postLogoutRedirectPath);" in response.text
-    assert f'const postLogoutRedirectPath = "{expected_redirect}";' in response.text
+    assert 'action="/api/auth/logout"' in response.text
+    assert 'src="/assets/js/pages/auth.js"' in response.text
+    assert f'data-redirect-path="{expected_redirect}"' in response.text
+    assert "fetch('/api/auth/logout'" not in response.text
     assert "https://evil.example/path" not in response.text
 
 
-def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:
-    """
-    Verify `/strategies` renders list-page hooks and API paths for Strategy UI module.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Authorized user receives HTML page that bootstraps browser-side API calls.
-    Raises:
-        AssertionError: If required hooks or API path literals are missing from SSR output.
-    Side Effects:
-        None.
-    """
+@pytest.mark.parametrize(
+    "asset_path",
+    [
+        "/assets/vendor/htmx.min.js",
+        "/assets/js/pages/auth.js",
+        "/assets/css/tokens.css",
+        "/assets/css/themes.css",
+        "/assets/css/base.css",
+        "/assets/css/layout.css",
+        "/assets/css/shell.css",
+    ],
+)
+def test_shell_assets_are_self_hosted(asset_path: str) -> None:
     client = _build_test_client()
 
-    response = client.get("/strategies")
+    response = client.get(asset_path)
 
     assert response.status_code == 200
-    assert 'data-strategy-page="list"' in response.text
-    assert "/assets/strategy_ui.js" in response.text
-    assert "/strategies/new" in response.text
-    assert "/api/strategies" in response.text
-    assert "/api/strategies/clone" in response.text
+    assert response.content
 
 
-def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
-    """
-    Verify `/backtests` renders protected UI hooks and public Backtest API paths.
-    """
+def test_user_badge_partial_route_is_not_public() -> None:
     client = _build_test_client()
 
-    response = client.get("/backtests")
+    response = client.get("/_partial/user_badge")
 
-    assert response.status_code == 200
-    assert "Backtests" in response.text
-    assert 'href="/backtests"' in response.text
-    assert "data-backtest-page" in response.text
-    assert "/assets/backtest_ui.js" in response.text
-    assert 'data-api-defaults-path="/api/backtests/runtime-defaults"' in response.text
-    assert 'data-api-preflight-path="/api/backtests/preflight"' in response.text
-    assert 'data-api-jobs-path="/api/backtests/jobs"' in response.text
-    assert 'data-api-job-path-template="/api/backtests/jobs/{job_id}"' in response.text
-    assert 'data-api-top-path-template="/api/backtests/jobs/{job_id}/top"' in response.text
-    assert (
-        'data-api-variant-path-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"'
-        in response.text
-    )
-    assert (
-        'data-api-trades-path-template='
-        '"/api/backtests/jobs/{job_id}/variants/{variant_key}/trades"'
-        in response.text
-    )
-    assert 'data-api-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' in response.text
+    assert response.status_code == 404
 
 
-def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:
-    """
-    Verify `/strategies/new` keeps builder hooks and exposes prefill-query integration hooks.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Builder page supports optional `prefill` query parameter without changing base hooks.
-    Raises:
-        AssertionError: If required endpoint literals or prefill hooks are absent from SSR output.
-    Side Effects:
-        None.
-    """
+def test_favicon_route_avoids_browser_404_noise() -> None:
     client = _build_test_client()
 
-    response = client.get("/strategies/new?prefill=sample-prefill-id")
+    response = client.get("/favicon.ico")
 
-    assert response.status_code == 200
-    assert 'data-strategy-page="builder"' in response.text
-    assert "/api/strategies" in response.text
-    assert "/api/market-data/markets" in response.text
-    assert "/api/market-data/instruments" in response.text
-    assert "/api/indicators" in response.text
-    assert 'data-prefill-query-param="prefill"' in response.text
-    assert 'data-prefill-storage="sessionStorage"' in response.text
-    assert "<textarea" not in response.text
+    assert response.status_code == 204
 
 
-def test_strategy_details_page_renders_required_strategy_id_and_hooks() -> None:
-    """
-    Verify `/strategies/{strategy_id}` renders details hooks with route strategy identifier.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Page receives strategy id from route and performs browser-side API loading.
-    Raises:
-        AssertionError: If strategy-id hook or required API literals are missing.
-    Side Effects:
-        None.
-    """
-    client = _build_test_client()
-    strategy_id = "00000000-0000-0000-0000-000000000123"
-
-    response = client.get(f"/strategies/{strategy_id}")
-
-    assert response.status_code == 200
-    assert 'data-strategy-page="details"' in response.text
-    assert f'data-strategy-id="{strategy_id}"' in response.text
-    assert "/api/strategies/{strategy_id}" in response.text
-    assert "/api/strategies/clone" in response.text
+def _nav_item_is_active(*, html: str, nav_key: str) -> bool:
+    pattern = rf'data-nav-key="{re.escape(nav_key)}"[\s\S]*?data-active="true"'
+    return re.search(pattern, html) is not None

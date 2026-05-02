@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="rh-auth-page" aria-labelledby="register-title">
+    <div class="rh-kicker">Keycloak</div>
+    <h1 id="register-title">Регистрация</h1>
+    <p>
+      Roehub не хранит локальные пароли. Создание аккаунта продолжается в Keycloak-backed
+      входе.
+    </p>
+    <div class="rh-command-row">
+      <a
+        id="keycloak-register-link"
+        class="rh-button rh-button--primary"
+        href="{{ oidc_register_url }}"
+      >
+        Продолжить регистрацию
+      </a>
+      <a class="rh-button" href="/login">У меня уже есть доступ</a>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="rh-page-shell"
+    aria-labelledby="page-title"
+    data-placeholder-page="{{ placeholder_id }}"
+    {% if entity_id %}data-entity-id="{{ entity_id }}"{% endif %}
+  >
+    <div class="rh-page-heading">
+      <div>
+        <div class="rh-kicker">Protected route</div>
+        <h1 id="page-title">{{ page_title }}</h1>
+      </div>
+      <span class="rh-status-badge">Stage 1</span>
+    </div>
+    <p>{{ page_description }}</p>
+
+    <section class="rh-panel rh-panel--dense" aria-label="Shell contract">
+      <div class="rh-data-row">
+        <span>route</span>
+        <code>{{ request.url.path }}</code>
+      </div>
+      <div class="rh-data-row">
+        <span>auth state</span>
+        <code>current-user</code>
+      </div>
+      <div class="rh-data-row">
+        <span>api</span>
+        <code>/api/auth/current-user</code>
+      </div>
+    </section>
+  </section>
+{% endblock %}

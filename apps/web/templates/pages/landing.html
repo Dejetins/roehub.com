@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="rh-landing" aria-labelledby="landing-title">
+    <div class="rh-kicker">Roehub / Web UI v1</div>
+    <h1 id="landing-title">Терминал управления стратегиями и backtests.</h1>
+    <p>
+      Быстрый вход к защищенным рабочим разделам, настройкам и runtime-наблюдению через
+      единый shell.
+    </p>
+    <div class="rh-command-row" aria-label="Быстрые действия">
+      <a class="rh-button rh-button--primary" href="/login">Войти</a>
+      <a class="rh-button" href="/register">Регистрация</a>
+      <a class="rh-button rh-button--ghost" href="/dashboard">Открыть панель</a>
+    </div>
+  </section>
+
+  <section class="rh-shell-grid" aria-label="Разделы">
+    <a class="rh-panel rh-route-card" href="/strategies">
+      <span class="rh-route-card__eyebrow">/strategies</span>
+      <strong>Стратегии</strong>
+      <span>Конструктор и список появятся в отдельном Stage 6 пакете.</span>
+    </a>
+    <a class="rh-panel rh-route-card" href="/backtests">
+      <span class="rh-route-card__eyebrow">/backtests</span>
+      <strong>Backtests</strong>
+      <span>History, configurator и results остаются за Stage 8/9.</span>
+    </a>
+    <a class="rh-panel rh-route-card" href="/monitoring">
+      <span class="rh-route-card__eyebrow">/monitoring</span>
+      <strong>Мониторинг</strong>
+      <span>Runtime snapshot будет подключен без изменения shell contract.</span>
+    </a>
+  </section>
+{% endblock %}
