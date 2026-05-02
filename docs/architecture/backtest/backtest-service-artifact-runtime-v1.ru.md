@@ -1418,11 +1418,12 @@ Acceptance по memory cleanup для каждой compute iteration:
 | 6 | `pass` | [`6 TP/SL exact scoring/full metrics`](benchmark_iterations/2026-05-01_iteration_6_tp_sl_exact_scoring_full_metrics/) |
 | 7 | `pass` | [`7 job orchestration/persistence`](benchmark_iterations/2026-05-01_iteration_7_job_orchestration_persistence/) |
 | 8 | `pass` | [`8 execution/sizing completion`](benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/) |
+| 9 | `pass` | [`9 lazy trades detail`](benchmark_iterations/2026-05-02_iteration_9_lazy_trades_detail/) |
 
 Итерация 6 принята с явным manual stage override: пользователь допустил
 нарушения `0.9` ratio для микросекундных стадий как неразличимые на уровне
 service latency. Raw ratios сохранены в benchmark evidence. Последующие итерации
-начиная с Iteration 9 пока не имеют принятого benchmark record в
+начиная с Iteration 10 пока не имеют принятого benchmark record в
 `docs/architecture/backtest/benchmark_iterations/` и не считаются завершенными.
 
 ### Итерация 0: документы и benchmark harness
@@ -1894,6 +1895,9 @@ summary-only top-N rows, `top_result_assembly`, `persist_top_n_io` и
 - реализовать lazy trades recompute;
 - реализовать 48h cache;
 - возвращать chart-ready payload.
+
+Статус: `pass`, accepted Mac Studio evidence:
+[`2026-05-02_iteration_9_lazy_trades_detail`](benchmark_iterations/2026-05-02_iteration_9_lazy_trades_detail/).
 
 Гейт бенчмарка:
 

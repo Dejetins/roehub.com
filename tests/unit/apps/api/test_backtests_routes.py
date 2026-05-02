@@ -12,6 +12,7 @@ from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaults
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
+    BacktestLazyTradesDetailReadModel,
     BacktestNoRiskTopResult,
 )
 from trading.contexts.backtest.application.ports import (
@@ -141,6 +142,72 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     )
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
+
+
+def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+        json=_valid_request(),
+    )
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+    ).json()["items"][0]
+
+    response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+    )
+    raw_hash_response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_hash']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["variant_key"] == top["variant_key"]
+    assert payload["variant_hash"] == top["variant_hash"]
+    assert payload["cache"]["status"] == "miss"
+    assert payload["trades"][0]["exit_reason"] == "signal"
+    assert raw_hash_response.status_code == 404
+    assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
+    assert lazy_service.requests == ((top["variant_key"], top["variant_hash"]),)
+
+
+def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
+        json=_valid_request(),
+    )
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
+    ).json()["items"][0]
+
+    response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000217"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "backtest.forbidden"
 
 
 def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
@@ -281,7 +348,11 @@ def _build_client(
     return TestClient(app)
 
 
-def _build_jobs_use_case(*, repository: "_FakeJobRepository") -> BacktestJobsUseCase:
+def _build_jobs_use_case(
+    *,
+    repository: "_FakeJobRepository",
+    lazy_trades_service: Any | None = None,
+) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
     )
@@ -299,6 +370,7 @@ def _build_jobs_use_case(*, repository: "_FakeJobRepository") -> BacktestJobsUse
         ),
         runtime_config=runtime_config,
         executor=_FakeExecutor(),
+        lazy_trades_service=lazy_trades_service,
     )
 
 
@@ -333,6 +405,55 @@ class _FakeExecutor:
             stage_timings=assembly.stage_timings,
             summary_hash=assembly.summary_hash,
             cleanup_evidence={"result_contains_heavy_references": False},
+        )
+
+
+@dataclass
+class _FakeLazyTradesService:
+    requests: tuple[tuple[str, str], ...] = ()
+
+    def execute(
+        self,
+        *,
+        job: BacktestJob,
+        row: BacktestJobTopVariant,
+        public_variant_key: str,
+    ) -> BacktestLazyTradesDetailReadModel:
+        variant_hash = str(row.payload_json["variant_hash"])
+        self.requests = (*self.requests, (public_variant_key, variant_hash))
+        return BacktestLazyTradesDetailReadModel(
+            job_id=str(job.job_id),
+            variant_key=public_variant_key,
+            variant_hash=variant_hash,
+            request_hash=job.request_hash,
+            engine_params_hash=job.engine_params_hash,
+            artifact_manifest_hash=str(job.request_json["artifact_metadata"]["artifact_manifest_hash"]),
+            summary_metrics=dict(row.summary_metrics_json),
+            canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
+            readable_params=dict(row.payload_json["readable_params"]),
+            trades=(
+                {
+                    "trade_index": 0,
+                    "entry_timestamp": "2026-01-01T00:00:00Z",
+                    "exit_timestamp": "2026-01-01T00:15:00Z",
+                    "entry_bar_index": 1,
+                    "exit_bar_index": 2,
+                    "side": "long",
+                    "direction": "long",
+                    "entry_price": 100.0,
+                    "exit_price": 101.0,
+                    "quantity": 1.0,
+                    "notional_quote": 100.0,
+                    "return_pct": 1.0,
+                    "net_pnl_quote": 1.0,
+                    "fee_quote": 0.0,
+                    "slippage_quote": 0.0,
+                    "exit_reason": "signal",
+                },
+            ),
+            chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
+            cache={"status": "miss"},
+            timing={"lazy_trades_compute": 0.001},
         )
 
 

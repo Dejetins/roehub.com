@@ -8,12 +8,14 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Requ
 from apps.api.dto import (
     BacktestJobResponse,
     BacktestJobsListResponse,
+    BacktestLazyTradesDetailResponse,
     BacktestPreflightResponse,
     BacktestRuntimeDefaultsResponse,
     BacktestTopVariantResponse,
     BacktestTopVariantsResponse,
     build_backtest_job_response,
     build_backtest_jobs_list_response,
+    build_backtest_lazy_trades_detail_response,
     build_backtest_preflight_response,
     build_backtest_runtime_defaults_response,
     build_backtest_top_variant_response,
@@ -180,6 +182,23 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         return build_backtest_top_variant_response(result=result)
+
+    @router.post(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades",
+        response_model=BacktestLazyTradesDetailResponse,
+    )
+    def post_backtest_job_variant_trades(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestLazyTradesDetailResponse:
+        result = use_case.trades(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return build_backtest_lazy_trades_detail_response(result=result)
 
     @router.post("/backtests/jobs/{job_id}/cancel", response_model=BacktestJobResponse)
     def post_backtest_job_cancel(

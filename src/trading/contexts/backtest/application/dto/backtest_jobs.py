@@ -125,6 +125,61 @@ class BacktestJobTopVariantReadModel:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestLazyTradesDetailReadModel:
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    request_hash: str
+    engine_params_hash: str
+    artifact_manifest_hash: str
+    summary_metrics: Mapping[str, Any]
+    canonical_variant_params: Mapping[str, Any]
+    readable_params: Mapping[str, Any]
+    trades: tuple[Mapping[str, Any], ...]
+    chart_overlay: Mapping[str, Any]
+    cache: Mapping[str, Any]
+    timing: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "summary_metrics",
+            MappingProxyType(dict(self.summary_metrics)),
+        )
+        object.__setattr__(
+            self,
+            "canonical_variant_params",
+            MappingProxyType(dict(self.canonical_variant_params)),
+        )
+        object.__setattr__(self, "readable_params", MappingProxyType(dict(self.readable_params)))
+        object.__setattr__(
+            self,
+            "trades",
+            tuple(MappingProxyType(dict(item)) for item in self.trades),
+        )
+        object.__setattr__(self, "chart_overlay", MappingProxyType(dict(self.chart_overlay)))
+        object.__setattr__(self, "cache", MappingProxyType(dict(self.cache)))
+        object.__setattr__(self, "timing", MappingProxyType(dict(self.timing)))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "job_id": self.job_id,
+            "variant_key": self.variant_key,
+            "variant_hash": self.variant_hash,
+            "request_hash": self.request_hash,
+            "engine_params_hash": self.engine_params_hash,
+            "artifact_manifest_hash": self.artifact_manifest_hash,
+            "summary_metrics": dict(self.summary_metrics),
+            "canonical_variant_params": dict(self.canonical_variant_params),
+            "readable_params": dict(self.readable_params),
+            "trades": [dict(item) for item in self.trades],
+            "chart_overlay": dict(self.chart_overlay),
+            "cache": dict(self.cache),
+            "timing": dict(self.timing),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJobCreateResult:
     job: BacktestJobReadModel
     idempotent_replay: bool
@@ -323,6 +378,7 @@ def _format_datetime(value: datetime | None) -> str | None:
 __all__ = [
     "BacktestJobCreateResult",
     "BacktestJobListResult",
+    "BacktestLazyTradesDetailReadModel",
     "BacktestJobProgressReadModel",
     "BacktestJobReadModel",
     "BacktestJobTopResult",
