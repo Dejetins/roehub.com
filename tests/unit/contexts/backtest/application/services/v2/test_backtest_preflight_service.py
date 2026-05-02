@@ -41,7 +41,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
     ]
     assert "total_return_pct" in response["ranking_metrics"]
     assert response["top_n_default"] == 100
-    assert response["guardrails"]["max_candidate_combinations"] == 300000
+    assert response["guardrails"]["max_candidate_combinations"] == 300_000_000_000
     assert "ma.dema" in response["supported_indicator_ids"]
 
 

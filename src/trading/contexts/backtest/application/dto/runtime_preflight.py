@@ -43,7 +43,7 @@ class BacktestRuntimeGuardrails:
     max_top_n: int = 100
     max_indicator_arity: int = 10
     max_indicator_rows: int = 1000
-    max_candidate_combinations: int = 300000
+    max_candidate_combinations: int = 300_000_000_000
     max_tp_sl_cells: int = 2209
     lazy_trades_rate_limit: str = "30/10min"
     job_queue_timeout_seconds: int = 300
