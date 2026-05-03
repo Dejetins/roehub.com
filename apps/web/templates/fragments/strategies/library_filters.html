@@ -1,0 +1,36 @@
+<section class="rh-strategy-toolbar" aria-label="{{ t('strategies.filters.aria') }}">
+  <label class="rh-field rh-field--compact" for="strategy-filter-symbol">
+    <span data-i18n="strategies.filters.symbol">{{ t("strategies.filters.symbol") }}</span>
+    <input
+      id="strategy-filter-symbol"
+      type="search"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="BTCUSDT"
+    >
+  </label>
+
+  <label class="rh-field rh-field--compact" for="strategy-filter-market-type">
+    <span data-i18n="strategies.filters.market_type">
+      {{ t("strategies.filters.market_type") }}
+    </span>
+    <select id="strategy-filter-market-type">
+      <option value="" data-i18n="strategies.filters.all">
+        {{ t("strategies.filters.all") }}
+      </option>
+    </select>
+  </label>
+
+  <label class="rh-field rh-field--compact" for="strategy-filter-timeframe">
+    <span data-i18n="strategies.filters.timeframe">{{ t("strategies.filters.timeframe") }}</span>
+    <select id="strategy-filter-timeframe">
+      <option value="" data-i18n="strategies.filters.all">
+        {{ t("strategies.filters.all") }}
+      </option>
+    </select>
+  </label>
+
+  <button id="strategy-filter-reset" class="rh-button rh-button--ghost" type="button">
+    <span data-i18n="strategies.filters.reset">{{ t("strategies.filters.reset") }}</span>
+  </button>
+</section>

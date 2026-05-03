@@ -107,6 +107,13 @@ from .prepare_pools import (
     time_range_slice,
     topk_fraction_idx,
 )
+from .result_views import (
+    DEFAULT_RESULT_CHART_POINTS,
+    DEFAULT_RESULT_TRADES_PAGE_SIZE,
+    MAX_RESULT_CHART_POINTS,
+    MAX_RESULT_TRADES_PAGE_SIZE,
+    BacktestResultViewService,
+)
 from .top_result_assembly import (
     TOP_RESULT_ASSEMBLY_STAGE_NAME,
     BacktestTopResultAssemblyResult,
@@ -166,6 +173,8 @@ __all__ = [
     "DEFAULT_TP_SL_GRID_MATCH_ATOL",
     "DEFAULT_BACKTEST_TOP_N_V1",
     "DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS",
+    "DEFAULT_RESULT_CHART_POINTS",
+    "DEFAULT_RESULT_TRADES_PAGE_SIZE",
     "EVENT_SEGMENTS_2_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND",
@@ -173,6 +182,8 @@ __all__ = [
     "LAZY_TRADES_CACHE_HIT_STAGE_NAME",
     "LAZY_TRADES_COMPUTE_STAGE_NAME",
     "LOAD_HIT_TIMES_STAGE_NAME",
+    "MAX_RESULT_CHART_POINTS",
+    "MAX_RESULT_TRADES_PAGE_SIZE",
     "NEG_INF",
     "NO_RISK_EXACT_BOUNDARY_STAGE_NAME",
     "NO_RISK_EXACT_BOUNDARY_STATUS",
@@ -218,6 +229,7 @@ __all__ = [
     "BacktestPreflightService",
     "BacktestRuntimeConfig",
     "BacktestRuntimeDefaultsService",
+    "BacktestResultViewService",
     "BacktestJobExecutionResult",
     "BacktestLazyTradesDetailConfig",
     "BacktestLazyTradesDetailService",

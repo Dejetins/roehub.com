@@ -1,4 +1,9 @@
-from .backtest_jobs import BacktestJobExecutor, BacktestJobsUseCase
+from .backtest_job_worker import (
+    BacktestJobExecutor,
+    BacktestJobWorkerRunResult,
+    BacktestJobWorkerUseCase,
+)
+from .backtest_jobs import BacktestJobsUseCase
 from .errors import (
     backtest_conflict,
     backtest_forbidden,
@@ -13,6 +18,8 @@ from .errors import (
 
 __all__ = [
     "BacktestJobExecutor",
+    "BacktestJobWorkerRunResult",
+    "BacktestJobWorkerUseCase",
     "BacktestJobsUseCase",
     "backtest_conflict",
     "backtest_forbidden",

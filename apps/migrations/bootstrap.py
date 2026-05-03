@@ -17,6 +17,7 @@ _IDENTITY_CORE_SQL_FILES: tuple[str, ...] = (
 _IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE = "0003_identity_exchange_keys_v1.sql"
 _IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE = "0004_identity_exchange_keys_v2.sql"
 _IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE = "0005_identity_keycloak_cutover_v1.sql"
+_IDENTITY_ACCOUNT_SETTINGS_V1_SQL_FILE = "0006_identity_account_settings_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,7 +206,7 @@ def run_dev_db_bootstrap(
     Returns:
         None.
     Assumptions:
-        Identity SQL files `0001..0005` are present in `migrations_dir`.
+        Identity SQL files `0001..0006` are present in `migrations_dir`.
     Raises:
         ValueError: If DSN or migrations directory values are invalid.
         RuntimeError: If identity bootstrap or Alembic upgrade fails.
@@ -221,7 +222,7 @@ def run_dev_db_bootstrap(
 
 def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """
-    Apply identity baseline SQL with v2 pre-check and Keycloak cutover `0005`.
+    Apply identity baseline SQL with v2 pre-check and account settings `0006`.
 
     Args:
         identity_dsn: DSN for identity Postgres schema.
@@ -244,6 +245,7 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
       - migrations/postgres/0003_identity_exchange_keys_v1.sql
       - migrations/postgres/0004_identity_exchange_keys_v2.sql
       - migrations/postgres/0005_identity_keycloak_cutover_v1.sql
+      - migrations/postgres/0006_identity_account_settings_v1.sql
       - apps/migrations/bootstrap.py
     """
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -262,6 +264,10 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
     keycloak_cutover_v1_path = _collect_sql_paths(
         migrations_dir=migrations_dir,
         filenames=(_IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE,),
+    )[0]
+    account_settings_v1_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_IDENTITY_ACCOUNT_SETTINGS_V1_SQL_FILE,),
     )[0]
 
     with psycopg.connect(
@@ -298,6 +304,9 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
 
         print(f"Applying identity baseline SQL: {keycloak_cutover_v1_path.name}")
         _execute_sql_script(connection=connection, sql_path=keycloak_cutover_v1_path)
+
+        print(f"Applying identity baseline SQL: {account_settings_v1_path.name}")
+        _execute_sql_script(connection=connection, sql_path=account_settings_v1_path)
 
 
 def run_alembic_upgrade_head(

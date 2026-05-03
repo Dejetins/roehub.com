@@ -1,0 +1,36 @@
+<section class="rh-settings-panel rh-settings-panel--profile" aria-labelledby="settings-profile-title">
+  <div class="rh-settings-panel__header">
+    <h2 id="settings-profile-title" data-i18n="settings.profile.title">{{ t("settings.profile.title") }}</h2>
+    <span class="rh-status-badge rh-status-badge--neutral" data-profile-plan>--</span>
+  </div>
+
+  <dl class="rh-settings-facts">
+    <div>
+      <dt data-i18n="settings.profile.user_id">{{ t("settings.profile.user_id") }}</dt>
+      <dd data-profile-user-id>--</dd>
+    </div>
+    <div>
+      <dt data-i18n="settings.profile.timezone">{{ t("settings.profile.timezone") }}</dt>
+      <dd data-profile-timezone>UTC</dd>
+    </div>
+  </dl>
+
+  <form class="rh-settings-form" data-settings-form="profile">
+    <label>
+      <span data-i18n="settings.profile.display_name">{{ t("settings.profile.display_name") }}</span>
+      <input
+        name="display_name"
+        maxlength="80"
+        autocomplete="nickname"
+        placeholder="{{ t('settings.profile.display_name_placeholder') }}"
+      >
+    </label>
+    <label>
+      <span data-i18n="settings.profile.timezone">{{ t("settings.profile.timezone") }}</span>
+      <input name="timezone" maxlength="64" value="UTC" autocomplete="off">
+    </label>
+    <button class="rh-button rh-button--primary" type="submit" data-i18n="settings.action.save_profile">
+      {{ t("settings.action.save_profile") }}
+    </button>
+  </form>
+</section>

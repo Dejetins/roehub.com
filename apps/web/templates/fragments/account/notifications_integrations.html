@@ -1,0 +1,49 @@
+<section class="rh-settings-panel" aria-labelledby="settings-notifications-title">
+  <div class="rh-settings-panel__header">
+    <h2 id="settings-notifications-title" data-i18n="settings.notifications.title">{{ t("settings.notifications.title") }}</h2>
+    <span class="rh-status-badge rh-status-badge--neutral" data-notifications-updated>--</span>
+  </div>
+
+  <form class="rh-settings-form rh-settings-toggle-list" data-settings-form="notifications">
+    <label>
+      <input type="checkbox" name="email_notifications_enabled">
+      <span data-i18n="settings.notifications.email">{{ t("settings.notifications.email") }}</span>
+    </label>
+    <label>
+      <input type="checkbox" name="trade_alerts_enabled">
+      <span data-i18n="settings.notifications.trade_alerts">{{ t("settings.notifications.trade_alerts") }}</span>
+    </label>
+    <label>
+      <input type="checkbox" name="product_updates_enabled">
+      <span data-i18n="settings.notifications.product_updates">{{ t("settings.notifications.product_updates") }}</span>
+    </label>
+    <button class="rh-button rh-button--primary" type="submit" data-i18n="settings.action.save_notifications">
+      {{ t("settings.action.save_notifications") }}
+    </button>
+  </form>
+</section>
+
+<section class="rh-settings-panel" aria-labelledby="settings-integrations-title">
+  <div class="rh-settings-panel__header">
+    <h2 id="settings-integrations-title" data-i18n="settings.integrations.title">{{ t("settings.integrations.title") }}</h2>
+    <span class="rh-status-badge rh-status-badge--neutral" data-integrations-status>--</span>
+  </div>
+
+  <form class="rh-settings-form rh-settings-toggle-list" data-settings-form="integrations">
+    <label>
+      <input type="checkbox" name="telegram" data-integration-provider="telegram">
+      <span data-i18n="settings.integrations.telegram">{{ t("settings.integrations.telegram") }}</span>
+    </label>
+    <label>
+      <input type="checkbox" name="email_digest" data-integration-provider="email_digest">
+      <span data-i18n="settings.integrations.email_digest">{{ t("settings.integrations.email_digest") }}</span>
+    </label>
+    <label>
+      <input type="checkbox" name="webhook_alerts" data-integration-provider="webhook_alerts">
+      <span data-i18n="settings.integrations.webhook_alerts">{{ t("settings.integrations.webhook_alerts") }}</span>
+    </label>
+    <button class="rh-button rh-button--primary" type="submit" data-i18n="settings.action.save_integrations">
+      {{ t("settings.action.save_integrations") }}
+    </button>
+  </form>
+</section>

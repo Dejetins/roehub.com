@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
-from apps.api.routes import build_backtests_router
+from apps.api.routes.backtests import build_backtests_router
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
@@ -21,7 +21,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
 )
 from trading.contexts.backtest.application.services.v2 import (
-    BacktestJobExecutionResult,
     BacktestPreflightService,
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
@@ -30,6 +29,7 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobStageAShortlist,
     BacktestJobState,
@@ -97,6 +97,26 @@ def test_post_backtest_preflight_invalid_indicator_returns_backtest_422() -> Non
     )
 
 
+def test_post_backtest_job_invalid_request_rejects_before_repository_create() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    request = _valid_request()
+    request["indicators"][0]["indicator_id"] = "ma.nope"
+
+    response = client.post(
+        "/backtests/jobs",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000218",
+            "Idempotency-Key": "invalid-request-key",
+        },
+        json=request,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.invalid_request"
+    assert repository.jobs == {}
+
+
 def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() -> None:
     client = _build_client(resolver=_UnavailableArtifactResolver())
 
@@ -111,9 +131,12 @@ def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() ->
     assert response.json()["error"]["details"]["retryable"] is True
 
 
-def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> None:
+def test_post_backtest_job_creates_queued_job_without_inline_top_rows() -> None:
     repository = _FakeJobRepository()
-    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    trigger = _FakeExecutionTrigger()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(repository=repository, execution_trigger=trigger)
+    )
 
     response = client.post(
         "/backtests/jobs",
@@ -123,22 +146,42 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["state"] == "succeeded"
-    assert payload["progress"]["pipeline_stage"] == "succeeded"
-    assert payload["terminal_summary"]["top_variants_count"] == 1
+    assert payload["state"] == "queued"
+    assert payload["progress"]["pipeline_stage"] == "queued"
+    assert payload["terminal_summary"] == {}
+    assert len(trigger.job_ids) == 1
+    assert repository.jobs is not None
+    stored = repository.jobs[UUID(payload["job_id"])]
+    assert stored.execution_mode == "background_auto"
     top_response = client.get(
         f"/backtests/jobs/{payload['job_id']}/top",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
     )
     assert top_response.status_code == 200
+    assert top_response.json()["items"] == []
+
+
+def test_get_top_exposes_public_variant_key_for_worker_finished_job() -> None:
+    repository = _FakeJobRepository()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000205")
+    job, row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+
+    top_response = client.get(
+        f"/backtests/jobs/{job.job_id}/top",
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert top_response.status_code == 200
     top_row = top_response.json()["items"][0]
+    assert top_row["variant_key"] == row.payload_json["public_variant_key"]
     assert top_row["variant_key"].startswith("job_")
     assert len(top_row["variant_hash"]) == 64
     assert top_row["variant_key"] != top_row["variant_hash"]
     assert top_row["links"]["lazy_trades"].endswith("/trades")
     raw_hash_response = client.get(
-        f"/backtests/jobs/{payload['job_id']}/variants/{top_row['variant_hash']}",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+        f"/backtests/jobs/{job.job_id}/variants/{top_row['variant_hash']}",
+        headers={"x-user-id": str(user_id)},
     )
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
@@ -147,29 +190,26 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
 def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> None:
     repository = _FakeJobRepository()
     lazy_service = _FakeLazyTradesService()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000215")
+    job, _row = _seed_succeeded_job(repository=repository, user_id=user_id)
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(
             repository=repository,
             lazy_trades_service=lazy_service,
         )
     )
-    created = client.post(
-        "/backtests/jobs",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
-        json=_valid_request(),
-    )
     top = client.get(
-        f"/backtests/jobs/{created.json()['job_id']}/top",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+        f"/backtests/jobs/{job.job_id}/top",
+        headers={"x-user-id": str(user_id)},
     ).json()["items"][0]
 
     response = client.post(
-        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+        f"/backtests/jobs/{job.job_id}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": str(user_id)},
     )
     raw_hash_response = client.post(
-        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_hash']}/trades",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
+        f"/backtests/jobs/{job.job_id}/variants/{top['variant_hash']}/trades",
+        headers={"x-user-id": str(user_id)},
     )
 
     assert response.status_code == 200
@@ -183,27 +223,171 @@ def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> No
     assert lazy_service.requests == ((top["variant_key"], top["variant_hash"]),)
 
 
+def test_get_backtest_result_summary_is_bounded_and_uses_public_variant_key() -> None:
+    """
+    Contract: GET /api/backtests/jobs/{job_id}/summary maps to backend
+    GET /backtests/jobs/{job_id}/summary, owner-scopes the current user, returns
+    job + summary-only top rows, has no pagination, has no cache identity impact,
+    and is a compatible additive public API response.
+    """
+    repository = _FakeJobRepository()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000218")
+    job, row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+
+    response = client.get(
+        f"/backtests/jobs/{job.job_id}/summary",
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["job_id"] == str(job.job_id)
+    assert payload["job"]["terminal_summary"]["top_variants_count"] == 1
+    assert payload["selected_variant_key"] == row.payload_json["public_variant_key"]
+    assert payload["variants"][0]["variant_key"] == row.payload_json["public_variant_key"]
+    assert payload["variants"][0]["variant_hash"] == row.variant_key
+    assert "trades" not in payload["variants"][0]
+
+
+def test_get_backtest_result_unknown_variant_returns_404() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000219")
+    job, _row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+
+    response = client.get(
+        f"/backtests/jobs/{job.job_id}/variants/not-public/equity",
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "backtest.not_found"
+    assert lazy_service.requests == ()
+
+
+def test_get_backtest_result_trades_uses_server_pagination() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService(trade_count=125)
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000220")
+    job, row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    variant_key = str(row.payload_json["public_variant_key"])
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+
+    response = client.get(
+        f"/backtests/jobs/{job.job_id}/variants/{variant_key}/trades",
+        params={"page": 2, "page_size": 50},
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["items"]) == 50
+    assert payload["items"][0]["trade_index"] == 50
+    assert payload["items"][-1]["trade_index"] == 99
+    assert payload["pagination"] == {
+        "page": 2,
+        "page_size": 50,
+        "max_page_size": 100,
+        "total": 125,
+        "total_pages": 3,
+        "has_previous": True,
+        "has_next": True,
+    }
+    assert payload["links"]["csv"].endswith("/trades.csv")
+    assert lazy_service.requests == ((variant_key, row.variant_key),)
+
+
+def test_get_backtest_result_equity_downsamples_to_requested_bounds() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService(trade_count=1600)
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000221")
+    job, row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    variant_key = str(row.payload_json["public_variant_key"])
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+
+    response = client.get(
+        f"/backtests/jobs/{job.job_id}/variants/{variant_key}/equity",
+        params={"points": 100},
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["series"] == "equity"
+    assert payload["total_points"] == 1600
+    assert payload["point_limit"] == 100
+    assert payload["downsampled"] is True
+    assert len(payload["points"]) <= 100
+    assert payload["points"][0]["trade_index"] == 0
+    assert payload["points"][-1]["trade_index"] == 1599
+
+
+def test_get_backtest_result_csv_is_separate_and_owner_scoped() -> None:
+    repository = _FakeJobRepository()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000222")
+    job, row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    variant_key = str(row.payload_json["public_variant_key"])
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(trade_count=3),
+        )
+    )
+
+    owner_response = client.get(
+        f"/backtests/jobs/{job.job_id}/variants/{variant_key}/trades.csv",
+        headers={"x-user-id": str(user_id)},
+    )
+    foreign_response = client.get(
+        f"/backtests/jobs/{job.job_id}/variants/{variant_key}/trades.csv",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000223"},
+    )
+
+    assert owner_response.status_code == 200
+    assert owner_response.headers["content-type"].startswith("text/csv")
+    assert "attachment;" in owner_response.headers["content-disposition"]
+    assert "trade_index,side,entry_timestamp,exit_timestamp" in owner_response.text
+    assert "\n0,long,2026-01-01T00:00:00Z" in owner_response.text
+    assert foreign_response.status_code == 403
+    assert foreign_response.json()["error"]["code"] == "backtest.forbidden"
+
+
 def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
     repository = _FakeJobRepository()
+    owner_id = UserId.from_string("00000000-0000-0000-0000-000000000216")
+    foreign_id = UserId.from_string("00000000-0000-0000-0000-000000000217")
+    job, _row = _seed_succeeded_job(repository=repository, user_id=owner_id)
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(
             repository=repository,
             lazy_trades_service=_FakeLazyTradesService(),
         )
     )
-    created = client.post(
-        "/backtests/jobs",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
-        json=_valid_request(),
-    )
     top = client.get(
-        f"/backtests/jobs/{created.json()['job_id']}/top",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
+        f"/backtests/jobs/{job.job_id}/top",
+        headers={"x-user-id": str(owner_id)},
     ).json()["items"][0]
 
     response = client.post(
-        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000217"},
+        f"/backtests/jobs/{job.job_id}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": str(foreign_id)},
     )
 
     assert response.status_code == 403
@@ -212,7 +396,10 @@ def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
 
 def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     repository = _FakeJobRepository()
-    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    trigger = _FakeExecutionTrigger()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(repository=repository, execution_trigger=trigger)
+    )
     headers = {
         "x-user-id": "00000000-0000-0000-0000-000000000206",
         "Idempotency-Key": "stable-key",
@@ -225,9 +412,11 @@ def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     conflict = client.post("/backtests/jobs", headers=headers, json=changed_request)
 
     assert first.status_code == 201
+    assert first.json()["state"] == "queued"
     assert replay.status_code == 200
     assert replay.json()["job_id"] == first.json()["job_id"]
     assert replay.json()["idempotent_replay"] is True
+    assert trigger.job_ids == (UUID(first.json()["job_id"]),)
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "backtest.idempotency_key_conflict"
 
@@ -252,20 +441,36 @@ def test_get_backtest_job_foreign_owner_returns_forbidden_code() -> None:
 
 def test_post_backtest_job_cancel_terminal_job_is_idempotent() -> None:
     repository = _FakeJobRepository()
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000209")
+    job, _row = _seed_succeeded_job(repository=repository, user_id=user_id)
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+
+    response = client.post(
+        f"/backtests/jobs/{job.job_id}/cancel",
+        headers={"x-user-id": str(user_id)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "succeeded"
+
+
+def test_post_backtest_job_cancel_queued_job_is_deterministic() -> None:
+    repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
     created = client.post(
         "/backtests/jobs",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000209"},
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000210"},
         json=_valid_request(),
     )
 
     response = client.post(
         f"/backtests/jobs/{created.json()['job_id']}/cancel",
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000209"},
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000210"},
     )
 
     assert response.status_code == 200
-    assert response.json()["state"] == "succeeded"
+    assert response.json()["state"] == "cancelled"
+    assert response.json()["progress"]["pipeline_stage"] == "cancelled"
 
 
 def test_backtest_jobs_auth_failure_uses_auth_required_code() -> None:
@@ -351,6 +556,7 @@ def _build_client(
 def _build_jobs_use_case(
     *,
     repository: "_FakeJobRepository",
+    execution_trigger: Any | None = None,
     lazy_trades_service: Any | None = None,
 ) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
@@ -369,48 +575,99 @@ def _build_jobs_use_case(
             runtime_config=runtime_config,
         ),
         runtime_config=runtime_config,
-        executor=_FakeExecutor(),
+        execution_trigger=execution_trigger,
         lazy_trades_service=lazy_trades_service,
     )
 
 
-class _FakeExecutor:
-    def execute(
-        self,
-        *,
-        job_id: UUID,
-        preflight: Any,
-        updated_at: datetime,
-    ) -> BacktestJobExecutionResult:
-        top_result = BacktestNoRiskTopResult(
-            rank=1,
-            score=12.5,
-            indicator_rows={"ma.dema": 7},
-            metrics={"total_return_pct": 12.5, "trade_count": 2.0},
-            metadata={
-                "ma.dema.source": "close",
-                "ma.dema.window": 5,
-                "confirm_count": 1,
-                "proxy_score": 0.25,
-            },
-        )
-        assembly = BacktestTopResultAssemblyService().assemble(
-            job_id=job_id,
-            normalized_request=preflight.normalized_request,
-            top_results=(top_result,),
-            updated_at=updated_at,
-        )
-        return BacktestJobExecutionResult(
-            top_variants=assembly.top_variants,
-            stage_timings=assembly.stage_timings,
-            summary_hash=assembly.summary_hash,
-            cleanup_evidence={"result_contains_heavy_references": False},
-        )
+@dataclass
+class _FakeExecutionTrigger:
+    job_ids: tuple[UUID, ...] = ()
+
+    def enqueue(self, *, job: BacktestJob) -> None:
+        self.job_ids = (*self.job_ids, job.job_id)
+
+
+def _seed_succeeded_job(
+    *,
+    repository: "_FakeJobRepository",
+    user_id: UserId,
+) -> tuple[BacktestJob, BacktestJobTopVariant]:
+    job_id = UUID("00000000-0000-0000-0000-00000000f001")
+    created_at = datetime.now(UTC) - timedelta(seconds=3)
+    request = _valid_request()
+    metadata = _artifact_metadata()
+    request["artifact_metadata"] = metadata.as_mapping()
+    queued = BacktestJob.create_queued(
+        job_id=job_id,
+        user_id=user_id,
+        mode="template",
+        created_at=created_at,
+        request_json=request,
+        request_hash="d" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="a" * 64,
+        backtest_runtime_config_hash="a" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_a",
+            artifact_slot_generation=metadata.artifact_slot_generation,
+            artifact_manifest_hash=metadata.artifact_manifest_hash,
+            artifact_asof_date=metadata.artifact_asof_date,
+        ),
+        execution_mode="background_auto",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="15m",
+        requested_top_n=100,
+        ranking_primary_metric="total_return_pct",
+    )
+    running = queued.claim(
+        changed_at=created_at + timedelta(seconds=1),
+        locked_by="test-worker",
+        lease_expires_at=created_at + timedelta(seconds=901),
+    )
+    succeeded = running.finish(
+        next_state="succeeded",
+        changed_at=created_at + timedelta(seconds=2),
+    )
+    top_result = BacktestNoRiskTopResult(
+        rank=1,
+        score=12.5,
+        indicator_rows={"ma.dema": 7},
+        metrics={"total_return_pct": 12.5, "trade_count": 2.0},
+        metadata={
+            "ma.dema.source": "close",
+            "ma.dema.window": 5,
+            "confirm_count": 1,
+            "proxy_score": 0.25,
+        },
+    )
+    row = BacktestTopResultAssemblyService().assemble(
+        job_id=job_id,
+        normalized_request=request,
+        top_results=(top_result,),
+        updated_at=succeeded.finished_at or succeeded.updated_at,
+    ).top_variants[0]
+    repository.create_with_top_variants(job=succeeded, top_variants=(row,))
+    return succeeded, row
+
+
+def _artifact_metadata() -> BacktestArtifactMetadata:
+    return BacktestArtifactMetadata(
+        artifact_slot="slot_a",
+        artifact_slot_generation=4,
+        artifact_manifest_hash="a" * 64,
+        artifact_asof_date="2026-03-25",
+        hit_times_manifest_hash="b" * 64,
+        published_at_utc="2026-03-25T02:00:00Z",
+    )
 
 
 @dataclass
 class _FakeLazyTradesService:
     requests: tuple[tuple[str, str], ...] = ()
+    trade_count: int = 1
 
     def execute(
         self,
@@ -427,34 +684,51 @@ class _FakeLazyTradesService:
             variant_hash=variant_hash,
             request_hash=job.request_hash,
             engine_params_hash=job.engine_params_hash,
-            artifact_manifest_hash=str(job.request_json["artifact_metadata"]["artifact_manifest_hash"]),
+            artifact_manifest_hash=str(
+                job.request_json["artifact_metadata"]["artifact_manifest_hash"]
+            ),
             summary_metrics=dict(row.summary_metrics_json),
             canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
             readable_params=dict(row.payload_json["readable_params"]),
-            trades=(
-                {
-                    "trade_index": 0,
-                    "entry_timestamp": "2026-01-01T00:00:00Z",
-                    "exit_timestamp": "2026-01-01T00:15:00Z",
-                    "entry_bar_index": 1,
-                    "exit_bar_index": 2,
-                    "side": "long",
-                    "direction": "long",
-                    "entry_price": 100.0,
-                    "exit_price": 101.0,
-                    "quantity": 1.0,
-                    "notional_quote": 100.0,
-                    "return_pct": 1.0,
-                    "net_pnl_quote": 1.0,
-                    "fee_quote": 0.0,
-                    "slippage_quote": 0.0,
-                    "exit_reason": "signal",
-                },
-            ),
+            trades=_fake_trade_rows(count=self.trade_count),
             chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
             cache={"status": "miss"},
             timing={"lazy_trades_compute": 0.001},
         )
+
+
+def _fake_trade_rows(*, count: int) -> tuple[dict[str, Any], ...]:
+    rows: list[dict[str, Any]] = []
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    for index in range(count):
+        entry = start + timedelta(minutes=15 * index)
+        exit_time = entry + timedelta(minutes=15)
+        signed_return = 1.0 if index % 2 == 0 else -0.5
+        rows.append(
+            {
+                "trade_index": index,
+                "entry_timestamp": entry.isoformat().replace("+00:00", "Z"),
+                "exit_timestamp": exit_time.isoformat().replace("+00:00", "Z"),
+                "entry_bar_index": index * 2 + 1,
+                "exit_bar_index": index * 2 + 2,
+                "side": "long" if index % 3 == 0 else "short",
+                "direction": "long" if index % 3 == 0 else "short",
+                "entry_price": 100.0 + index,
+                "exit_price": 101.0 + index,
+                "quantity": 1.0,
+                "notional_quote": 100.0,
+                "gross_pnl_quote": signed_return,
+                "net_pnl_quote": signed_return,
+                "return_pct": signed_return,
+                "fee_quote": 0.0,
+                "slippage_quote": 0.0,
+                "exit_reason": "signal",
+                "equity_after": 10_000.0 + index + signed_return,
+                "safe_quote_after": 0.0,
+                "timeframe": "15m",
+            }
+        )
+    return tuple(rows)
 
 
 @dataclass

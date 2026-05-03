@@ -20,7 +20,10 @@ from apps.api.wiring.modules import (
     build_indicators_compute,
     build_indicators_registry,
     build_market_data_reference_router,
-    build_strategy_router,
+    build_strategy_api_module,
+    build_ui_account_api_module,
+    build_ui_dashboard_module,
+    build_ui_strategy_monitoring_api_module,
     is_strategy_api_enabled,
 )
 from trading.platform.config import load_indicators_compute_numba_config
@@ -76,13 +79,32 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.include_router(build_operations_router())
     identity_module = build_identity_api_module(environ=effective_environ)
     app.include_router(identity_module.router)
+    ui_dashboard_module = build_ui_dashboard_module(
+        environ=effective_environ,
+        current_user_dependency=identity_module.current_user_dependency,
+    )
+    app.include_router(ui_dashboard_module.router)
+    ui_account_module = build_ui_account_api_module(
+        environ=effective_environ,
+        current_user_dependency=identity_module.current_user_dependency,
+        account_settings_repository=identity_module.account_settings_repository,
+        list_exchange_keys_use_case=identity_module.list_exchange_keys_use_case,
+        clock=identity_module.clock,
+    )
+    app.include_router(ui_account_module.router)
     if is_strategy_api_enabled(environ=effective_environ):
-        app.include_router(
-            build_strategy_router(
-                environ=effective_environ,
-                current_user_dependency=identity_module.current_user_dependency,
-            )
+        strategy_module = build_strategy_api_module(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
         )
+        app.include_router(strategy_module.router)
+        ui_strategy_monitoring_module = build_ui_strategy_monitoring_api_module(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
+            strategy_repository=strategy_module.strategy_repository,
+            run_repository=strategy_module.run_repository,
+        )
+        app.include_router(ui_strategy_monitoring_module.router)
     else:
         log.info("strategy API router disabled by strategy runtime config")
     app.include_router(

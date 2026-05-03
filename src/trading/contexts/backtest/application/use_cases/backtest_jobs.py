@@ -5,10 +5,11 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Mapping, Protocol, cast
+from typing import Any, Mapping, cast
 from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import (
+    BacktestJobCountersResult,
     BacktestJobCreateResult,
     BacktestJobListResult,
     BacktestJobReadModel,
@@ -16,10 +17,17 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobTopVariantReadModel,
     BacktestLazyTradesDetailReadModel,
     BacktestPreflightResult,
+    BacktestResultMonthlyStatsReadModel,
+    BacktestResultSeriesReadModel,
+    BacktestResultSummaryReadModel,
+    BacktestResultSymbolStatsReadModel,
+    BacktestResultTradesPageReadModel,
+    BacktestTradesCsvReadModel,
     build_backtest_job_read_model,
     build_top_variant_read_model,
 )
 from trading.contexts.backtest.application.ports import (
+    BacktestJobExecutionTrigger,
     BacktestJobListQuery,
     BacktestJobRepository,
 )
@@ -27,13 +35,13 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestLazyTradesDetailService,
     BacktestPreflightRejected,
     BacktestPreflightService,
+    BacktestResultViewService,
     BacktestRuntimeConfig,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJob,
     BacktestJobArtifactPin,
-    BacktestJobErrorPayload,
     BacktestJobState,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -53,24 +61,14 @@ BACKTEST_ERROR_RATE_LIMITED = "backtest.rate_limited"
 BACKTEST_ERROR_QUEUE_SATURATED = "backtest.queue_saturated"
 
 
-class BacktestJobExecutor(Protocol):
-    def execute(
-        self,
-        *,
-        job_id: UUID,
-        preflight: BacktestPreflightResult,
-        updated_at: datetime,
-    ) -> Any:
-        ...
-
-
 @dataclass(frozen=True, slots=True)
 class BacktestJobsUseCase:
     job_repository: BacktestJobRepository
     preflight_service: BacktestPreflightService
     runtime_config: BacktestRuntimeConfig
-    executor: BacktestJobExecutor | None = None
+    execution_trigger: BacktestJobExecutionTrigger | None = None
     lazy_trades_service: BacktestLazyTradesDetailService | None = None
+    result_view_service: BacktestResultViewService = BacktestResultViewService()
     idempotency_ttl_seconds: int = 86_400
 
     def create(
@@ -115,7 +113,7 @@ class BacktestJobsUseCase:
             engine_params_hash=preflight.result_config_hash,
             backtest_runtime_config_hash=preflight.result_config_hash,
             artifact_pin=_artifact_pin(preflight=preflight),
-            execution_mode="sync_inline",
+            execution_mode="background_auto",
             market_id=_market_id(preflight=preflight),
             symbol=_symbol(preflight=preflight),
             timeframe=str(preflight.normalized_request["timeframe"]),
@@ -124,75 +122,10 @@ class BacktestJobsUseCase:
             ranking_secondary_metric=None,
         )
         stored_job = self.job_repository.create(job=queued_job)
-        if self.executor is None:
-            return BacktestJobCreateResult(
-                job=build_backtest_job_read_model(job=stored_job),
-                idempotent_replay=False,
-            )
-
-        locked_by = f"sync_inline:{job_id.hex[:16]}"
-        running = self.job_repository.claim_for_inline_execution(
-            job_id=job_id,
-            user_id=user_id,
-            now=datetime.now(UTC),
-            locked_by=locked_by,
-            lease_expires_at=datetime.now(UTC)
-            + timedelta(seconds=self.runtime_config.guardrails.job_wall_timeout_seconds),
-        )
-        if running is None:
-            raise _error(
-                code=BACKTEST_ERROR_QUEUE_SATURATED,
-                message="Backtest job could not be claimed for execution",
-                details={"job_id": str(job_id)},
-            )
-
-        try:
-            execution_result = self.executor.execute(
-                job_id=job_id,
-                preflight=preflight,
-                updated_at=datetime.now(UTC),
-            )
-        except Exception as error:  # noqa: BLE001
-            self.job_repository.finish_with_top_variants(
-                job_id=job_id,
-                user_id=user_id,
-                now=datetime.now(UTC),
-                locked_by=locked_by,
-                next_state="failed",
-                top_variants=(),
-                last_error=str(error),
-                last_error_json=BacktestJobErrorPayload(
-                    code="unexpected_error",
-                    message="Backtest job execution failed",
-                    details={"reason": str(error)},
-                ),
-            )
-            raise _error(
-                code="unexpected_error",
-                message="Backtest job execution failed",
-                details={"job_id": str(job_id), "reason": str(error)},
-            ) from error
-
-        finished = self.job_repository.finish_with_top_variants(
-            job_id=job_id,
-            user_id=user_id,
-            now=datetime.now(UTC),
-            locked_by=locked_by,
-            next_state="succeeded",
-            top_variants=tuple(execution_result.top_variants),
-        )
-        if finished is None:
-            raise _error(
-                code=BACKTEST_ERROR_QUEUE_SATURATED,
-                message="Backtest job lease was lost before terminal persistence",
-                details={"job_id": str(job_id)},
-            )
-        top_rows = self.job_repository.list_top_variants(job_id=job_id)
+        if self.execution_trigger is not None:
+            self.execution_trigger.enqueue(job=stored_job)
         return BacktestJobCreateResult(
-            job=build_backtest_job_read_model(
-                job=finished,
-                top_variants_count=len(top_rows),
-            ),
+            job=build_backtest_job_read_model(job=stored_job),
             idempotent_replay=False,
         )
 
@@ -227,6 +160,19 @@ class BacktestJobsUseCase:
         )
         next_cursor = _encode_cursor(cursor=page.next_cursor)
         return BacktestJobListResult(items=items, next_cursor=next_cursor)
+
+    def counters(self, *, user_id: UserId) -> BacktestJobCountersResult:
+        guardrails = self.runtime_config.guardrails
+        max_active_jobs = (
+            guardrails.max_active_jobs_per_user + guardrails.max_queued_jobs_per_user
+        )
+        active_jobs = self.job_repository.count_active_for_user(user_id=user_id)
+        return BacktestJobCountersResult(
+            active_jobs=active_jobs,
+            max_active_jobs=max_active_jobs,
+            max_active_jobs_global=guardrails.max_active_jobs_global,
+            can_create=active_jobs < max_active_jobs,
+        )
 
     def top(self, *, user_id: UserId, job_id: UUID) -> BacktestJobTopResult:
         self._require_visible_job(user_id=user_id, job_id=job_id)
@@ -265,28 +211,128 @@ class BacktestJobsUseCase:
         job_id: UUID,
         variant_key: str,
     ) -> BacktestLazyTradesDetailReadModel:
-        job = self._require_visible_job(user_id=user_id, job_id=job_id)
-        row = self.job_repository.get_top_variant_by_public_key(
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
             job_id=job_id,
-            public_variant_key=variant_key,
+            variant_key=variant_key,
         )
-        if row is None:
-            raise _error(
-                code=BACKTEST_ERROR_NOT_FOUND,
-                message="Backtest variant was not found",
-                details={"job_id": str(job_id), "variant_key": variant_key},
+        return detail
+
+    def result_summary(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+    ) -> BacktestResultSummaryReadModel:
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        rows = tuple(
+            sorted(
+                self.job_repository.list_top_variants(job_id=job_id),
+                key=lambda item: item.rank,
             )
-        if self.lazy_trades_service is None:
-            raise _error(
-                code=BACKTEST_ERROR_QUEUE_SATURATED,
-                message="Backtest lazy trades service is not configured",
-                details={"reason": "lazy_trades_service_unavailable"},
-            )
-        return self.lazy_trades_service.execute(
-            job=job,
-            row=row,
-            public_variant_key=variant_key,
         )
+        variants = tuple(
+            build_top_variant_read_model(job_id=str(job_id), row=row) for row in rows
+        )
+        return self.result_view_service.summary(
+            job=build_backtest_job_read_model(
+                job=job,
+                top_variants_count=len(rows),
+            ),
+            variants=variants,
+        )
+
+    def equity(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+        points: int,
+    ) -> BacktestResultSeriesReadModel:
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.equity(detail=detail, points=points)
+
+    def drawdown(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+        points: int,
+    ) -> BacktestResultSeriesReadModel:
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.drawdown(detail=detail, points=points)
+
+    def monthly_stats(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestResultMonthlyStatsReadModel:
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.monthly_stats(detail=detail)
+
+    def symbol_stats(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestResultSymbolStatsReadModel:
+        job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.symbol_stats(job=job, detail=detail)
+
+    def trades_page(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+        page: int,
+        page_size: int,
+    ) -> BacktestResultTradesPageReadModel:
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.trades_page(
+            detail=detail,
+            page=page,
+            page_size=page_size,
+        )
+
+    def trades_csv(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestTradesCsvReadModel:
+        _job, detail = self._lazy_trades_detail(
+            user_id=user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return self.result_view_service.trades_csv(detail=detail)
 
     def cancel(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
@@ -356,6 +402,39 @@ class BacktestJobsUseCase:
                 details={"job_id": str(job_id)},
             )
         return job
+
+    def _lazy_trades_detail(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> tuple[BacktestJob, BacktestLazyTradesDetailReadModel]:
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        row = self.job_repository.get_top_variant_by_public_key(
+            job_id=job_id,
+            public_variant_key=variant_key,
+        )
+        if row is None:
+            raise _error(
+                code=BACKTEST_ERROR_NOT_FOUND,
+                message="Backtest variant was not found",
+                details={"job_id": str(job_id), "variant_key": variant_key},
+            )
+        if self.lazy_trades_service is None:
+            raise _error(
+                code=BACKTEST_ERROR_QUEUE_SATURATED,
+                message="Backtest lazy trades service is not configured",
+                details={"reason": "lazy_trades_service_unavailable"},
+            )
+        return (
+            job,
+            self.lazy_trades_service.execute(
+                job=job,
+                row=row,
+                public_variant_key=variant_key,
+            ),
+        )
 
 
 def _job_request_json(
@@ -487,6 +566,5 @@ __all__ = [
     "BACKTEST_ERROR_NOT_FOUND",
     "BACKTEST_ERROR_QUEUE_SATURATED",
     "BACKTEST_ERROR_RATE_LIMITED",
-    "BacktestJobExecutor",
     "BacktestJobsUseCase",
 ]

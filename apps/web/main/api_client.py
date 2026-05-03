@@ -6,6 +6,7 @@ from typing import Protocol
 import httpx
 
 _CURRENT_USER_PATH = "/api/auth/current-user"
+_ACCOUNT_PREFERENCES_PATH = "/api/ui/account/preferences"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,20 @@ class CurrentUserApiResult:
     error_message: str | None
 
 
+@dataclass(frozen=True)
+class WebAccountPreferences:
+    theme: str
+    locale: str
+    density: str
+
+
+@dataclass(frozen=True)
+class AccountPreferencesApiResult:
+    status_code: int
+    preferences: WebAccountPreferences | None
+    error_message: str | None
+
+
 class CurrentUserApiClient(Protocol):
     """
     CurrentUserApiClient defines contract for server-side current-user lookup.
@@ -67,6 +82,14 @@ class CurrentUserApiClient(Protocol):
             NotImplementedError: Always raised by the contract base.
         Side Effects:
             None.
+        """
+        ...
+
+
+class AccountPreferencesApiClient(Protocol):
+    def fetch_preferences(self, *, cookie_header: str | None) -> AccountPreferencesApiResult:
+        """
+        Fetch authenticated account UI preferences using opaque forwarded cookies.
         """
         ...
 
@@ -216,5 +239,84 @@ def _build_success_result(*, response: httpx.Response) -> CurrentUserApiResult:
     return CurrentUserApiResult(
         status_code=200,
         user=WebCurrentUser(user_id=user_id, paid_level=paid_level),
+        error_message=None,
+    )
+
+
+class HttpxAccountPreferencesApiClient(AccountPreferencesApiClient):
+    """
+    Httpx adapter for `/api/ui/account/preferences` used by protected SSR pages.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_base_url: str,
+        timeout_seconds: float = 5.0,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        normalized_api_base_url = api_base_url.strip().rstrip("/")
+        if not normalized_api_base_url:
+            raise ValueError("HttpxAccountPreferencesApiClient requires non-empty api_base_url")
+        if timeout_seconds <= 0:
+            raise ValueError("HttpxAccountPreferencesApiClient requires positive timeout_seconds")
+        self._api_base_url = normalized_api_base_url
+        self._timeout_seconds = timeout_seconds
+        self._transport = transport
+
+    def fetch_preferences(self, *, cookie_header: str | None) -> AccountPreferencesApiResult:
+        request_headers = _build_request_headers(cookie_header=cookie_header)
+        endpoint_url = f"{self._api_base_url}{_ACCOUNT_PREFERENCES_PATH}"
+        try:
+            with httpx.Client(
+                timeout=self._timeout_seconds,
+                transport=self._transport,
+            ) as http_client:
+                response = http_client.get(endpoint_url, headers=request_headers)
+        except httpx.HTTPError as error:
+            return AccountPreferencesApiResult(
+                status_code=503,
+                preferences=None,
+                error_message=f"Account preferences request failed: {error}",
+            )
+        if response.status_code == 401:
+            return AccountPreferencesApiResult(
+                status_code=401,
+                preferences=None,
+                error_message=None,
+            )
+        if response.status_code == 200:
+            return _build_preferences_success_result(response=response)
+        return AccountPreferencesApiResult(
+            status_code=response.status_code,
+            preferences=None,
+            error_message=f"Unexpected account preferences status: {response.status_code}",
+        )
+
+
+def _build_preferences_success_result(
+    *,
+    response: httpx.Response,
+) -> AccountPreferencesApiResult:
+    try:
+        payload = dict(response.json())
+    except (TypeError, ValueError):
+        return AccountPreferencesApiResult(
+            status_code=502,
+            preferences=None,
+            error_message="Account preferences response is not a valid JSON object",
+        )
+    theme = str(payload.get("theme", "")).strip()
+    locale = str(payload.get("locale", "")).strip()
+    density = str(payload.get("density", "")).strip()
+    if not theme or not locale or not density:
+        return AccountPreferencesApiResult(
+            status_code=502,
+            preferences=None,
+            error_message="Account preferences payload is missing required fields",
+        )
+    return AccountPreferencesApiResult(
+        status_code=200,
+        preferences=WebAccountPreferences(theme=theme, locale=locale, density=density),
         error_message=None,
     )

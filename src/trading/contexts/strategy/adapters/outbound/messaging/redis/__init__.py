@@ -7,6 +7,10 @@ from .redis_streams_realtime_output_publisher import (
     RedisStrategyRealtimeOutputPublisherConfig,
     RedisStrategyRealtimeOutputPublisherHooks,
 )
+from .redis_streams_realtime_output_reader import (
+    RedisStrategyRealtimeOutputReader,
+    RedisStrategyRealtimeOutputReaderConfig,
+)
 
 __all__ = [
     "RedisStrategyLiveCandleStream",
@@ -14,4 +18,6 @@ __all__ = [
     "RedisStrategyRealtimeOutputPublisher",
     "RedisStrategyRealtimeOutputPublisherConfig",
     "RedisStrategyRealtimeOutputPublisherHooks",
+    "RedisStrategyRealtimeOutputReader",
+    "RedisStrategyRealtimeOutputReaderConfig",
 ]

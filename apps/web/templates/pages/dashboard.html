@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/pages/dashboard.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="rh-dashboard"
+    aria-labelledby="page-title"
+    data-dashboard
+    data-dashboard-endpoint="/api/ui/dashboard/summary"
+    data-poll-interval-ms="12000"
+  >
+    <div class="rh-page-heading rh-dashboard__heading">
+      <div>
+        <div class="rh-kicker" data-i18n="dashboard.kicker">{{ t("dashboard.kicker") }}</div>
+        <h1 id="page-title" data-i18n="{{ page_title_key }}">{{ page_title }}</h1>
+      </div>
+      <span
+        class="rh-status-badge rh-status-badge--warning"
+        data-dashboard-status
+        data-i18n="dashboard.status.loading"
+      >{{ t("dashboard.status.loading") }}</span>
+    </div>
+    <p data-i18n="{{ page_description_key }}">{{ page_description }}</p>
+
+    <div class="rh-dashboard__meta" aria-label="{{ t('dashboard.meta_aria') }}">
+      <span data-i18n="dashboard.summary_endpoint">{{ t("dashboard.summary_endpoint") }}</span>
+      <code>/api/ui/dashboard/summary</code>
+      <span data-i18n="dashboard.generated_at">{{ t("dashboard.generated_at") }}</span>
+      <time data-dashboard-generated-at>--</time>
+    </div>
+
+    {% include "fragments/dashboard/loading_state.html" %}
+
+    <section class="rh-dashboard-grid" aria-label="{{ t('dashboard.cards_aria') }}">
+      <article class="rh-dashboard-card" data-dashboard-panel="account">
+        <div class="rh-dashboard-card__header">
+          <h2 data-i18n="dashboard.account.title">{{ t("dashboard.account.title") }}</h2>
+          <span class="rh-status-badge rh-status-badge--neutral" data-dashboard-source="account">--</span>
+        </div>
+        <dl class="rh-dashboard-facts">
+          <div>
+            <dt data-i18n="dashboard.account.plan">{{ t("dashboard.account.plan") }}</dt>
+            <dd data-dashboard-value="account.plan">--</dd>
+          </div>
+          <div>
+            <dt data-i18n="dashboard.account.user">{{ t("dashboard.account.user") }}</dt>
+            <dd data-dashboard-value="account.user_id">--</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="rh-dashboard-card" data-dashboard-panel="strategies">
+        <div class="rh-dashboard-card__header">
+          <h2 data-i18n="dashboard.strategies.title">{{ t("dashboard.strategies.title") }}</h2>
+          <span class="rh-status-badge rh-status-badge--neutral" data-dashboard-source="strategies">--</span>
+        </div>
+        <dl class="rh-dashboard-facts rh-dashboard-facts--compact">
+          <div>
+            <dt data-i18n="dashboard.strategies.total">{{ t("dashboard.strategies.total") }}</dt>
+            <dd data-dashboard-value="strategies.total">--</dd>
+          </div>
+          <div>
+            <dt data-i18n="dashboard.strategies.active">{{ t("dashboard.strategies.active") }}</dt>
+            <dd data-dashboard-value="strategies.active">--</dd>
+          </div>
+        </dl>
+        <div class="rh-dashboard-list" data-dashboard-list="strategies"></div>
+      </article>
+
+      <article class="rh-dashboard-card rh-dashboard-card--wide" data-dashboard-panel="backtests">
+        <div class="rh-dashboard-card__header">
+          <h2 data-i18n="dashboard.backtests.title">{{ t("dashboard.backtests.title") }}</h2>
+          <span class="rh-status-badge rh-status-badge--neutral" data-dashboard-source="backtests">--</span>
+        </div>
+        <dl class="rh-dashboard-facts rh-dashboard-facts--compact">
+          <div>
+            <dt data-i18n="dashboard.backtests.active">{{ t("dashboard.backtests.active") }}</dt>
+            <dd data-dashboard-value="backtests.active">--</dd>
+          </div>
+        </dl>
+        <div class="rh-dashboard-list" data-dashboard-list="backtests"></div>
+      </article>
+
+      <article class="rh-dashboard-card" data-dashboard-panel="alerts">
+        <div class="rh-dashboard-card__header">
+          <h2 data-i18n="dashboard.alerts.title">{{ t("dashboard.alerts.title") }}</h2>
+          <span class="rh-status-badge rh-status-badge--neutral" data-dashboard-source="alerts">--</span>
+        </div>
+        <div class="rh-dashboard-list" data-dashboard-list="alerts"></div>
+      </article>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/dashboard.js"></script>
+{% endblock %}

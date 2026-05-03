@@ -1,34 +1,164 @@
 {% extends "base.html" %}
 
-{% block content %}
-  <section class="rh-landing" aria-labelledby="landing-title">
-    <div class="rh-kicker">{{ t("landing.subtitle") }}</div>
-    <h1 id="landing-title">{{ t("landing.title") }}</h1>
-    <p>{{ t("landing.description") }}</p>
-    <div class="rh-command-row" aria-label="{{ t('landing.actions') }}">
-      <a class="rh-button rh-button--primary" href="/login">{{ t("landing.login_cta") }}</a>
-      <a class="rh-button" href="/register">{{ t("landing.register_cta") }}</a>
-      <a class="rh-button rh-button--ghost" href="/dashboard">
-        {{ t("landing.dashboard_cta") }}
-      </a>
-    </div>
-  </section>
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/pages/landing.css">
+{% endblock %}
 
-  <section class="rh-shell-grid" aria-label="{{ t('landing.routes') }}">
-    <a class="rh-panel rh-route-card" href="/strategies">
-      <span class="rh-route-card__eyebrow">/strategies</span>
-      <strong>{{ t("landing.strategies.title") }}</strong>
-      <span>{{ t("landing.strategies.body") }}</span>
-    </a>
-    <a class="rh-panel rh-route-card" href="/backtests">
-      <span class="rh-route-card__eyebrow">/backtests</span>
-      <strong>{{ t("landing.backtests.title") }}</strong>
-      <span>{{ t("landing.backtests.body") }}</span>
-    </a>
-    <a class="rh-panel rh-route-card" href="/monitoring">
-      <span class="rh-route-card__eyebrow">/monitoring</span>
-      <strong>{{ t("landing.monitoring.title") }}</strong>
-      <span>{{ t("landing.monitoring.body") }}</span>
-    </a>
-  </section>
+{% block content %}
+  <div class="rh-landing-page" data-landing-page>
+    <section class="rh-landing-hero" aria-labelledby="landing-title">
+      <div class="rh-landing-hero__copy">
+        <div class="rh-kicker" data-i18n="landing.kicker">{{ t("landing.kicker") }}</div>
+        <h1 id="landing-title" data-i18n="landing.title">{{ t("landing.title") }}</h1>
+        <p class="rh-landing-hero__lead" data-i18n="landing.lead">{{ t("landing.lead") }}</p>
+
+        <div class="rh-command-row rh-landing-hero__actions" aria-label="{{ t('landing.actions') }}" data-i18n-aria-label="landing.actions">
+          <a class="rh-button rh-button--primary" href="/register" data-i18n="landing.primary_cta">
+            {{ t("landing.primary_cta") }}
+          </a>
+          <a class="rh-button rh-button--ghost" href="#platform-map" data-i18n="landing.secondary_cta">
+            {{ t("landing.secondary_cta") }}
+          </a>
+        </div>
+
+        <dl class="rh-landing-hero__status" aria-label="{{ t('landing.status_aria') }}" data-i18n-aria-label="landing.status_aria">
+          <div>
+            <dt data-i18n="landing.status.infrastructure.label">{{ t("landing.status.infrastructure.label") }}</dt>
+            <dd data-i18n="landing.status.infrastructure.value">{{ t("landing.status.infrastructure.value") }}</dd>
+          </div>
+          <div>
+            <dt data-i18n="landing.status.security.label">{{ t("landing.status.security.label") }}</dt>
+            <dd data-i18n="landing.status.security.value">{{ t("landing.status.security.value") }}</dd>
+          </div>
+          <div>
+            <dt data-i18n="landing.status.automation.label">{{ t("landing.status.automation.label") }}</dt>
+            <dd data-i18n="landing.status.automation.value">{{ t("landing.status.automation.value") }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div
+        id="platform-map"
+        class="rh-platform-map"
+        role="img"
+        aria-label="{{ t('landing.diagram_aria') }}"
+        data-i18n-aria-label="landing.diagram_aria"
+      >
+        <div class="rh-platform-map__title" data-i18n="landing.diagram.title">
+          {{ t("landing.diagram.title") }}
+        </div>
+        <div class="rh-platform-map__nodes rh-platform-map__nodes--top">
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">&gt;_</span>
+            <strong data-i18n="landing.diagram.backtests.title">{{ t("landing.diagram.backtests.title") }}</strong>
+            <span data-i18n="landing.diagram.backtests.status">{{ t("landing.diagram.backtests.status") }}</span>
+          </div>
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">EX</span>
+            <strong data-i18n="landing.diagram.exchanges.title">{{ t("landing.diagram.exchanges.title") }}</strong>
+            <span data-i18n="landing.diagram.exchanges.status">{{ t("landing.diagram.exchanges.status") }}</span>
+          </div>
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">ST</span>
+            <strong data-i18n="landing.diagram.strategies.title">{{ t("landing.diagram.strategies.title") }}</strong>
+            <span data-i18n="landing.diagram.strategies.status">{{ t("landing.diagram.strategies.status") }}</span>
+          </div>
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">AL</span>
+            <strong data-i18n="landing.diagram.alerts.title">{{ t("landing.diagram.alerts.title") }}</strong>
+            <span data-i18n="landing.diagram.alerts.status">{{ t("landing.diagram.alerts.status") }}</span>
+          </div>
+        </div>
+
+        <div class="rh-platform-map__bus" aria-hidden="true"></div>
+
+        <div class="rh-platform-node rh-platform-node--engine">
+          <span class="rh-platform-node__icon" aria-hidden="true">AE</span>
+          <strong data-i18n="landing.diagram.engine.title">{{ t("landing.diagram.engine.title") }}</strong>
+          <span data-i18n="landing.diagram.engine.status">{{ t("landing.diagram.engine.status") }}</span>
+        </div>
+
+        <div class="rh-platform-map__bus rh-platform-map__bus--lower" aria-hidden="true"></div>
+
+        <div class="rh-platform-map__nodes rh-platform-map__nodes--bottom">
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">PT</span>
+            <strong data-i18n="landing.diagram.paper.title">{{ t("landing.diagram.paper.title") }}</strong>
+            <span data-i18n="landing.diagram.paper.status">{{ t("landing.diagram.paper.status") }}</span>
+          </div>
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">CT</span>
+            <strong data-i18n="landing.diagram.cloud.title">{{ t("landing.diagram.cloud.title") }}</strong>
+            <span data-i18n="landing.diagram.cloud.status">{{ t("landing.diagram.cloud.status") }}</span>
+          </div>
+          <div class="rh-platform-node">
+            <span class="rh-platform-node__icon" aria-hidden="true">AI</span>
+            <strong data-i18n="landing.diagram.ai.title">{{ t("landing.diagram.ai.title") }}</strong>
+            <span data-i18n="landing.diagram.ai.status">{{ t("landing.diagram.ai.status") }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="rh-capability-band" aria-labelledby="landing-capabilities-title">
+      <h2 id="landing-capabilities-title" data-i18n="landing.capabilities.title">
+        {{ t("landing.capabilities.title") }}
+      </h2>
+      <div class="rh-capability-band__grid">
+        <article>
+          <span aria-hidden="true">BT</span>
+          <h3 data-i18n="landing.capabilities.backtests.title">{{ t("landing.capabilities.backtests.title") }}</h3>
+          <p data-i18n="landing.capabilities.backtests.body">{{ t("landing.capabilities.backtests.body") }}</p>
+        </article>
+        <article>
+          <span aria-hidden="true">EX</span>
+          <h3 data-i18n="landing.capabilities.exchanges.title">{{ t("landing.capabilities.exchanges.title") }}</h3>
+          <p data-i18n="landing.capabilities.exchanges.body">{{ t("landing.capabilities.exchanges.body") }}</p>
+        </article>
+        <article>
+          <span aria-hidden="true">ST</span>
+          <h3 data-i18n="landing.capabilities.strategies.title">{{ t("landing.capabilities.strategies.title") }}</h3>
+          <p data-i18n="landing.capabilities.strategies.body">{{ t("landing.capabilities.strategies.body") }}</p>
+        </article>
+        <article>
+          <span aria-hidden="true">RT</span>
+          <h3 data-i18n="landing.capabilities.runtime.title">{{ t("landing.capabilities.runtime.title") }}</h3>
+          <p data-i18n="landing.capabilities.runtime.body">{{ t("landing.capabilities.runtime.body") }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="rh-work-band" aria-labelledby="landing-work-title">
+      <h2 id="landing-work-title" data-i18n="landing.work.title">{{ t("landing.work.title") }}</h2>
+      <div class="rh-work-band__grid">
+        <article>
+          <h3 data-i18n="landing.work.researchers.title">{{ t("landing.work.researchers.title") }}</h3>
+          <p data-i18n="landing.work.researchers.body">{{ t("landing.work.researchers.body") }}</p>
+        </article>
+        <article>
+          <h3 data-i18n="landing.work.developers.title">{{ t("landing.work.developers.title") }}</h3>
+          <p data-i18n="landing.work.developers.body">{{ t("landing.work.developers.body") }}</p>
+        </article>
+        <article>
+          <h3 data-i18n="landing.work.traders.title">{{ t("landing.work.traders.title") }}</h3>
+          <p data-i18n="landing.work.traders.body">{{ t("landing.work.traders.body") }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="rh-landing-cta" aria-labelledby="landing-cta-title">
+      <div aria-hidden="true">&gt;_</div>
+      <div>
+        <h2 id="landing-cta-title" data-i18n="landing.bottom_cta.title">{{ t("landing.bottom_cta.title") }}</h2>
+        <p data-i18n="landing.bottom_cta.body">{{ t("landing.bottom_cta.body") }}</p>
+      </div>
+      <a class="rh-button rh-button--primary" href="/register" data-i18n="landing.primary_cta">
+        {{ t("landing.primary_cta") }}
+      </a>
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/landing.js"></script>
 {% endblock %}

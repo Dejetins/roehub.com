@@ -11,7 +11,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
+from apps.web.main.api_client import (
+    AccountPreferencesApiResult,
+    CurrentUserApiResult,
+    WebAccountPreferences,
+    WebCurrentUser,
+)
 from apps.web.main.app import create_app
 from apps.web.main.i18n import LOCALE_COOKIE_NAME, assert_catalog_keys_match
 
@@ -19,7 +24,11 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 WEB_DIST_ROOT = REPO_ROOT / "apps" / "web" / "dist"
 
 
-def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
+def _build_test_client(
+    *,
+    api_result: CurrentUserApiResult | None = None,
+    preferences_result: AccountPreferencesApiResult | None = None,
+) -> TestClient:
     app = create_app(
         environ={
             "WEB_API_BASE_URL": "http://web.local",
@@ -36,6 +45,18 @@ def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> Tes
     )
     app.state.current_user_api_client = SimpleNamespace(
         fetch_current_user=lambda *, cookie_header: resolved_api_result
+    )
+    resolved_preferences_result = preferences_result or AccountPreferencesApiResult(
+        status_code=200,
+        preferences=WebAccountPreferences(
+            theme="terminal-orange",
+            locale="en",
+            density="compact",
+        ),
+        error_message=None,
+    )
+    app.state.account_preferences_api_client = SimpleNamespace(
+        fetch_preferences=lambda *, cookie_header: resolved_preferences_result
     )
     return TestClient(app)
 
@@ -136,6 +157,32 @@ def test_public_shell_routes_render(path: str) -> None:
     assert "terminal-orange" in response.text
 
 
+def test_stage_3_landing_route_renders_without_current_user_api_dependency() -> None:
+    def fail_current_user_call(*, cookie_header: str | None) -> CurrentUserApiResult:
+        raise AssertionError("landing must not call current-user API")
+
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+        }
+    )
+    app.state.current_user_api_client = SimpleNamespace(fetch_current_user=fail_current_user_call)
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'data-landing-page' in response.text
+    assert "ROEHUB" in response.text
+    assert 'href="/register"' in response.text
+    assert 'href="/login"' in response.text
+    assert 'id="platform-map"' in response.text
+    assert "/assets/css/pages/landing.css" in response.text
+    assert "/assets/js/pages/landing.js" in response.text
+    assert "/api/auth/current-user" not in response.text
+
+
 @pytest.mark.parametrize(
     ("path", "expected_location"),
     [
@@ -187,7 +234,8 @@ def test_default_locale_is_english_with_language_switcher() -> None:
     assert response.status_code == 200
     assert 'lang="en"' in response.text
     assert 'data-locale="en"' in response.text
-    assert "Strategy and backtest operations terminal." in response.text
+    assert "Built for systematic traders" in response.text
+    assert "Get started free" in response.text
     assert 'data-locale-option="en"' in response.text
     assert 'data-locale-option="ru"' in response.text
 
@@ -200,7 +248,8 @@ def test_locale_query_selects_russian_and_sets_cookie_without_localized_routes()
     assert response.status_code == 200
     assert 'lang="ru"' in response.text
     assert 'data-locale="ru"' in response.text
-    assert "Терминал управления стратегиями" in response.text
+    assert "Для системных трейдеров" in response.text
+    assert "Начать бесплатно" in response.text
     assert f"{LOCALE_COOKIE_NAME}=ru" in response.headers["set-cookie"]
     assert 'href="/dashboard"' in response.text
     assert 'href="/strategies"' in response.text
@@ -225,7 +274,7 @@ def test_invalid_locale_cookie_falls_back_to_english() -> None:
     assert response.status_code == 200
     assert 'lang="en"' in response.text
     assert 'data-locale="en"' in response.text
-    assert "Strategy and backtest operations terminal." in response.text
+    assert "Built for systematic traders" in response.text
 
 
 def test_accept_language_is_used_when_cookie_is_absent() -> None:
@@ -242,24 +291,129 @@ def test_locale_catalogs_have_matching_keys() -> None:
     assert_catalog_keys_match()
 
 
+def test_stage_7_monitoring_route_renders_live_page_with_api_and_stream_contracts() -> None:
+    client = _build_test_client()
+
+    response = client.get("/monitoring")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert "data-monitoring-page" in response.text
+    assert 'data-monitor-endpoint="/api/ui/strategies/monitor"' in response.text
+    assert 'data-stream-path="/api/stream/strategies"' in response.text
+    assert 'data-run-path-template="/api/strategies/{strategy_id}/run"' in response.text
+    assert 'data-stop-path-template="/api/strategies/{strategy_id}/stop"' in response.text
+    assert (
+        'data-snapshot-path-template="/api/ui/strategies/{strategy_id}/snapshot"'
+        in response.text
+    )
+    assert (
+        'data-positions-path-template="/api/ui/strategies/{strategy_id}/positions?limit=50"'
+        in response.text
+    )
+    assert (
+        'data-fills-path-template="/api/ui/strategies/{strategy_id}/fills?limit=50"'
+        in response.text
+    )
+    assert "/assets/css/pages/monitoring.css" in response.text
+    assert "/assets/js/pages/monitoring.js" in response.text
+    assert "data-ui-kit-placeholder" not in response.text
+    assert _nav_item_is_active(html=response.text, nav_key="/monitoring")
+
+
+def test_stage_7_monitoring_route_has_russian_locale_copy() -> None:
+    client = _build_test_client()
+
+    response = client.get("/monitoring?locale=ru")
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert "Мониторинг" in response.text
+    assert "Загрузка" in response.text
+    assert "/api/stream/strategies" in response.text
+
+
+def test_backtest_result_route_renders_result_page_hooks_without_initial_trades() -> None:
+    client = _build_test_client()
+
+    response = client.get("/backtests/job-123")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert 'data-backtest-result-page' in response.text
+    assert 'data-job-id="job-123"' in response.text
+    assert "/api/backtests/jobs/job-123/summary" in response.text
+    assert "/api/backtests/jobs/job-123/variants/{variant_key}/equity?points=1200" in response.text
+    assert "/api/backtests/jobs/job-123/variants/{variant_key}/trades.csv" in response.text
+    assert "/assets/css/pages/backtests.css" in response.text
+    assert "/assets/js/pages/backtests_result.js" in response.text
+    assert 'data-placeholder-page="backtest-result"' not in response.text
+    assert '"trades":' not in response.text
+    assert _nav_item_is_active(html=response.text, nav_key="/backtests")
+
+
+def test_authorized_dashboard_route_renders_stage_4_page_with_active_nav() -> None:
+    client = _build_test_client()
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert 'data-dashboard' in response.text
+    assert 'data-dashboard-endpoint="/api/ui/dashboard/summary"' in response.text
+    assert 'data-poll-interval-ms="12000"' in response.text
+    assert "/assets/css/pages/dashboard.css" in response.text
+    assert "/assets/js/pages/dashboard.js" in response.text
+    assert "/api/ui/dashboard/summary" in response.text
+    assert "data-ui-kit-placeholder" not in response.text
+    assert _nav_item_is_active(html=response.text, nav_key="/dashboard")
+
+
+def test_authorized_settings_route_renders_stage_5_account_page_with_preferences() -> None:
+    client = _build_test_client(
+        preferences_result=AccountPreferencesApiResult(
+            status_code=200,
+            preferences=WebAccountPreferences(
+                theme="graphite",
+                locale="ru",
+                density="comfortable",
+            ),
+            error_message=None,
+        )
+    )
+
+    response = client.get("/settings")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert 'data-theme="graphite"' in response.text
+    assert 'data-settings' in response.text
+    assert 'data-preferences-endpoint="/api/ui/account/preferences"' in response.text
+    assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in response.text
+    assert "/assets/css/pages/settings.css" in response.text
+    assert "/assets/js/pages/settings.js" in response.text
+    assert "data-ui-kit-placeholder" not in response.text
+    assert "route-secret" not in response.text
+    assert 'name="api_secret"' in response.text
+    assert 'name="api_secret" value=' not in response.text
+    assert _nav_item_is_active(html=response.text, nav_key="/settings")
+
+
 @pytest.mark.parametrize(
-    ("path", "active_nav_key", "placeholder_id"),
+    ("path", "page_type", "expected_text"),
     [
-        ("/dashboard", "/dashboard", "dashboard"),
-        ("/settings", "/settings", "settings"),
-        ("/strategies", "/strategies", "strategies"),
-        ("/strategies/new", "/strategies", "strategies-new"),
-        ("/strategies/abc", "/strategies", "strategy-detail"),
-        ("/monitoring", "/monitoring", "monitoring"),
-        ("/backtests", "/backtests", "backtests"),
-        ("/backtests/new", "/backtests", "backtests-new"),
-        ("/backtests/job-123", "/backtests", "backtest-result"),
+        ("/strategies", "list", "Strategy library"),
+        ("/strategies/new", "create", "New strategy"),
+        ("/strategies/abc", "detail", "Strategy detail"),
     ],
 )
-def test_authorized_protected_routes_render_placeholders_with_active_nav(
+def test_stage_6_strategy_routes_render_new_pages_without_old_strategy_asset(
     path: str,
-    active_nav_key: str,
-    placeholder_id: str,
+    page_type: str,
+    expected_text: str,
 ) -> None:
     client = _build_test_client()
 
@@ -267,18 +421,97 @@ def test_authorized_protected_routes_render_placeholders_with_active_nav(
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    assert f'data-placeholder-page="{placeholder_id}"' in response.text
-    assert "/api/auth/current-user" in response.text
-    assert "data-ui-kit-placeholder" in response.text
-    assert 'data-component="metric-card"' in response.text
-    assert 'data-component="data-table"' in response.text
-    assert _nav_item_is_active(html=response.text, nav_key=active_nav_key)
+    assert f'data-strategy-page="{page_type}"' in response.text
+    assert expected_text in response.text
+    assert 'src="/assets/js/pages/strategies.js"' in response.text
+    assert 'href="/assets/css/pages/strategies.css"' in response.text
+    assert "/assets/strategy_ui.js" not in response.text
+    assert "data-ui-kit-placeholder" not in response.text
+    assert _nav_item_is_active(html=response.text, nav_key="/strategies")
+
+
+def test_stage_6_strategy_create_route_has_russian_locale_copy() -> None:
+    client = _build_test_client()
+
+    response = client.get("/strategies/new?locale=ru")
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert "Новая стратегия" in response.text
+    assert "Блоки индикаторов" in response.text
+    assert 'data-api-create-path="/api/strategies"' in response.text
+
+
+def test_stage_6_strategy_pages_use_existing_strategy_api_paths() -> None:
+    client = _build_test_client()
+
+    list_response = client.get("/strategies")
+    create_response = client.get("/strategies/new")
+    detail_response = client.get("/strategies/strategy-123")
+
+    assert 'data-api-list-path="/api/strategies"' in list_response.text
+    assert 'data-api-clone-path="/api/strategies/clone"' in list_response.text
+    assert 'data-api-delete-path-template="/api/strategies/{strategy_id}"' in list_response.text
+    assert 'data-api-create-path="/api/strategies"' in create_response.text
+    assert 'data-api-get-path-template="/api/strategies/{strategy_id}"' in detail_response.text
+    assert 'data-api-clone-path="/api/strategies/clone"' in detail_response.text
+    assert 'data-api-delete-path-template="/api/strategies/{strategy_id}"' in detail_response.text
+
+
+def test_stage_8_backtests_routes_render_history_and_configurator_split() -> None:
+    client = _build_test_client()
+
+    history_response = client.get("/backtests")
+    run_response = client.get("/backtests/new")
+
+    assert history_response.status_code == 200
+    assert run_response.status_code == 200
+    assert history_response.headers["cache-control"] == "no-store"
+    assert run_response.headers["cache-control"] == "no-store"
+
+    assert "data-backtests-history-page" in history_response.text
+    assert 'data-api-jobs-path="/api/backtests/jobs"' in history_response.text
+    assert 'data-api-counters-path="/api/ui/backtests/counters"' in history_response.text
+    assert "/assets/js/pages/backtests_history.js" in history_response.text
+    assert "/assets/css/pages/backtests.css" in history_response.text
+    assert "/assets/backtest_ui.js" not in history_response.text
+    assert "/api/backtests/jobs/{job_id}/top" not in history_response.text
+    assert "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades" not in history_response.text
+
+    assert "data-backtests-run-page" in run_response.text
+    assert 'data-api-defaults-path="/api/backtests/runtime-defaults"' in run_response.text
+    assert 'data-api-preflight-path="/api/backtests/preflight"' in run_response.text
+    assert 'data-api-jobs-path="/api/backtests/jobs"' in run_response.text
+    assert 'data-api-markets-path="/api/market-data/markets"' in run_response.text
+    assert 'data-api-indicators-path="/api/indicators"' in run_response.text
+    assert "/assets/js/pages/backtests_run.js" in run_response.text
+    assert "/assets/css/pages/backtests.css" in run_response.text
+    assert "backtest_presets" in run_response.text
+    assert "/assets/backtest_ui.js" not in run_response.text
+    assert "/api/backtests/jobs/{job_id}/top" not in run_response.text
+    assert "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades" not in run_response.text
+    assert _nav_item_is_active(html=history_response.text, nav_key="/backtests")
+    assert _nav_item_is_active(html=run_response.text, nav_key="/backtests")
+
+
+def test_stage_8_backtest_configurator_has_russian_locale_copy() -> None:
+    client = _build_test_client()
+
+    response = client.get("/backtests/new?locale=ru")
+
+    assert response.status_code == 200
+    assert 'lang="ru"' in response.text
+    assert 'data-locale="ru"' in response.text
+    assert "Конфигуратор" in response.text
+    assert "Сборка валидированного request draft" in response.text
+    assert 'data-api-jobs-path="/api/backtests/jobs"' in response.text
 
 
 def test_stage_2_shell_exposes_theme_and_locale_client_hooks() -> None:
     client = _build_test_client()
 
-    response = client.get("/dashboard")
+    response = client.get("/monitoring")
 
     assert response.status_code == 200
     assert 'data-theme="terminal-orange"' in response.text
@@ -292,7 +525,7 @@ def test_stage_2_shell_exposes_theme_and_locale_client_hooks() -> None:
     assert 'data-locale-option="ru"' in response.text
     assert 'id="rh-locale-catalogs"' in response.text
     assert 'data-i18n="theme.current"' in response.text
-    assert 'data-i18n="ui.empty_title"' in response.text
+    assert 'data-i18n="page.monitoring.title"' in response.text
 
 
 def test_login_page_sanitizes_external_next_parameter() -> None:
@@ -354,6 +587,12 @@ def test_logout_page_uses_external_auth_script_and_sanitized_redirect(
         "/assets/css/layout.css",
         "/assets/css/components.css",
         "/assets/css/shell.css",
+        "/assets/css/pages/dashboard.css",
+        "/assets/css/pages/landing.css",
+        "/assets/css/pages/monitoring.css",
+        "/assets/css/pages/settings.css",
+        "/assets/css/pages/strategies.css",
+        "/assets/css/pages/backtests.css",
         "/assets/js/core/api.js",
         "/assets/js/core/poller.js",
         "/assets/js/core/sse.js",
@@ -364,6 +603,15 @@ def test_logout_page_uses_external_auth_script_and_sanitized_redirect(
         "/assets/js/core/formatters.js",
         "/assets/js/core/validators.js",
         "/assets/js/components/shell.js",
+        "/assets/js/charts/timeseries.js",
+        "/assets/js/pages/dashboard.js",
+        "/assets/js/pages/landing.js",
+        "/assets/js/pages/monitoring.js",
+        "/assets/js/pages/settings.js",
+        "/assets/js/pages/strategies.js",
+        "/assets/js/pages/backtests_history.js",
+        "/assets/js/pages/backtests_result.js",
+        "/assets/js/pages/backtests_run.js",
     ],
 )
 def test_shell_assets_are_self_hosted(asset_path: str) -> None:
@@ -398,6 +646,48 @@ def test_stage_2_js_core_contract_literals_are_present() -> None:
     assert '"ru"' in locale_js
     assert "roehub_locale" in locale_js
     assert "data-locale-option" in locale_js
+
+
+def test_stage_4_dashboard_js_uses_one_summary_request_and_safe_poller() -> None:
+    dashboard_js = (WEB_DIST_ROOT / "js" / "pages" / "dashboard.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'DEFAULT_ENDPOINT = "/api/ui/dashboard/summary"' in dashboard_js
+    assert "DEFAULT_POLL_INTERVAL_MS = 12000" in dashboard_js
+    assert "createPoller" in dashboard_js
+    assert "apiRequest(endpoint" in dashboard_js
+    assert "redirectOnUnauthorized: true" in dashboard_js
+    assert "innerHTML" not in dashboard_js
+
+
+def test_stage_7_monitoring_js_uses_sse_and_safe_polling_fallback() -> None:
+    monitoring_js = (WEB_DIST_ROOT / "js" / "pages" / "monitoring.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'DEFAULT_MONITOR_ENDPOINT = "/api/ui/strategies/monitor"' in monitoring_js
+    assert "createPoller" in monitoring_js
+    assert "createEventStream" in monitoring_js
+    assert "closeStream(state)" in monitoring_js
+    assert "redirectOnUnauthorized: true" in monitoring_js
+    assert "data-monitoring-mobile-tab" in monitoring_js
+    assert "drawTimeSeries" in monitoring_js
+    assert "innerHTML" not in monitoring_js
+
+
+def test_stage_5_settings_assets_keep_secret_values_write_only() -> None:
+    settings_js = (WEB_DIST_ROOT / "js" / "pages" / "settings.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "/api/exchange-keys" not in settings_js
+    assert "form.elements.api_secret.value = \"\"" in settings_js
+    assert "form.elements.passphrase.value = \"\"" in settings_js
+    assert "innerHTML" not in settings_js
+    assert "api_secret" not in (WEB_DIST_ROOT / "css" / "pages" / "settings.css").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_financial_theme_tokens_are_invariant_across_theme_overrides() -> None:

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/pages/backtests.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="rh-backtests-page rh-backtests-history"
+    aria-labelledby="page-title"
+    data-backtests-history-page
+    data-api-jobs-path="/api/backtests/jobs"
+    data-api-counters-path="/api/ui/backtests/counters"
+    data-page-size="25"
+  >
+    <div class="rh-page-heading rh-backtests-heading">
+      <div>
+        <div class="rh-kicker" data-i18n="backtests.history.kicker">{{ t("backtests.history.kicker") }}</div>
+        <h1 id="page-title" data-i18n="{{ page_title_key }}">{{ page_title }}</h1>
+        <p data-i18n="{{ page_description_key }}">{{ page_description }}</p>
+      </div>
+      <a class="rh-button rh-button--primary" href="/backtests/new" data-i18n="backtests.action.new">
+        {{ t("backtests.action.new") }}
+      </a>
+    </div>
+
+    <div class="rh-command-bar rh-backtests-toolbar" aria-label="{{ t('backtests.history.toolbar') }}">
+      <label class="rh-backtests-filter" for="backtests-state-filter">
+        <span data-i18n="backtests.filter.state">{{ t("backtests.filter.state") }}</span>
+        <select id="backtests-state-filter" data-backtests-state-filter>
+          <option value="" data-i18n="backtests.filter.all">{{ t("backtests.filter.all") }}</option>
+          <option value="queued">queued</option>
+          <option value="running">running</option>
+          <option value="succeeded">succeeded</option>
+          <option value="failed">failed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+      </label>
+      <button class="rh-button" type="button" data-backtests-refresh data-i18n="backtests.action.refresh">
+        {{ t("backtests.action.refresh") }}
+      </button>
+      <span class="rh-status-badge rh-status-badge--neutral" data-backtests-active-count>
+        {{ t("backtests.history.active_unknown") }}
+      </span>
+      <span class="rh-status-badge rh-status-badge--neutral" data-backtests-page-count>
+        {{ t("backtests.history.page_empty") }}
+      </span>
+    </div>
+
+    <div class="rh-error-state rh-backtests-error" data-backtests-error hidden role="alert"></div>
+
+    <section class="rh-panel rh-backtests-panel" aria-label="{{ t('backtests.history.table_aria') }}">
+      {% include "fragments/backtests/history_table.html" %}
+      <div class="rh-command-row rh-backtests-pagination">
+        <button class="rh-button rh-button--ghost" type="button" data-backtests-load-more disabled data-i18n="backtests.action.load_more">
+          {{ t("backtests.action.load_more") }}
+        </button>
+        <span class="rh-backtests-muted" data-backtests-cursor-state data-i18n="backtests.history.cursor_idle">
+          {{ t("backtests.history.cursor_idle") }}
+        </span>
+      </div>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/backtests_history.js"></script>
+{% endblock %}

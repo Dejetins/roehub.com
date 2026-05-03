@@ -1,0 +1,36 @@
+<aside
+  class="rh-monitoring-list-panel"
+  aria-labelledby="monitoring-list-title"
+  data-monitoring-panel="list"
+>
+  <div class="rh-monitoring-list-panel__header">
+    <div>
+      <h2 id="monitoring-list-title" data-i18n="monitoring.list.title">
+        {{ t("monitoring.list.title") }}
+      </h2>
+      <p data-i18n="monitoring.list.description">{{ t("monitoring.list.description") }}</p>
+    </div>
+    <span class="rh-status-badge rh-status-badge--neutral" data-monitoring-source="monitor">--</span>
+  </div>
+
+  <div class="rh-segmented" role="group" aria-label="{{ t('monitoring.filter_aria') }}">
+    <button
+      class="rh-segmented__button rh-segmented__button--active"
+      type="button"
+      data-monitoring-state-filter="all"
+      aria-pressed="true"
+      data-i18n="monitoring.filters.all"
+    >{{ t("monitoring.filters.all") }}</button>
+    <button
+      class="rh-segmented__button"
+      type="button"
+      data-monitoring-state-filter="active"
+      aria-pressed="false"
+      data-i18n="monitoring.filters.active"
+    >{{ t("monitoring.filters.active") }}</button>
+  </div>
+
+  <div class="rh-monitoring-strategy-list" data-monitoring-strategy-list>
+    <p data-i18n="monitoring.state.loading">{{ t("monitoring.state.loading") }}</p>
+  </div>
+</aside>

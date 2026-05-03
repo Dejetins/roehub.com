@@ -87,6 +87,14 @@ class StrategyRuntimeSettings:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class StrategyApiModule:
+    router: APIRouter
+    strategy_repository: StrategyRepository
+    run_repository: StrategyRunRepository
+    event_repository: StrategyEventRepository
+
+
 class IdentityPrincipalCurrentUserProvider(CurrentUserProvider):
     """
     IdentityPrincipalCurrentUserProvider — adapter from identity principal to Strategy CurrentUser.
@@ -240,6 +248,17 @@ def build_strategy_router(
     Side Effects:
         None.
     """
+    return build_strategy_api_module(
+        environ=environ,
+        current_user_dependency=current_user_dependency,
+    ).router
+
+
+def build_strategy_api_module(
+    *,
+    environ: Mapping[str, str],
+    current_user_dependency: RequireCurrentUserDependency,
+) -> StrategyApiModule:
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, event_repository = _build_repositories(settings=settings)
     clock = SystemStrategyClock()
@@ -278,15 +297,20 @@ def build_strategy_router(
         current_user_dependency=current_user_dependency,
     )
 
-    return build_strategies_router(
-        create_use_case=create_use_case,
-        clone_use_case=clone_use_case,
-        list_use_case=list_use_case,
-        get_use_case=get_use_case,
-        run_use_case=run_use_case,
-        stop_use_case=stop_use_case,
-        delete_use_case=delete_use_case,
-        current_user_provider_dependency=current_user_provider_dependency,
+    return StrategyApiModule(
+        router=build_strategies_router(
+            create_use_case=create_use_case,
+            clone_use_case=clone_use_case,
+            list_use_case=list_use_case,
+            get_use_case=get_use_case,
+            run_use_case=run_use_case,
+            stop_use_case=stop_use_case,
+            delete_use_case=delete_use_case,
+            current_user_provider_dependency=current_user_provider_dependency,
+        ),
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
     )
 
 

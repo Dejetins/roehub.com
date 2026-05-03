@@ -15,9 +15,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from apps.web.main.api_client import (
+    AccountPreferencesApiClient,
+    AccountPreferencesApiResult,
     CurrentUserApiClient,
     CurrentUserApiResult,
+    HttpxAccountPreferencesApiClient,
     HttpxCurrentUserApiClient,
+    WebAccountPreferences,
     WebCurrentUser,
 )
 from apps.web.main.i18n import (
@@ -98,6 +102,9 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app = FastAPI(title="Roehub Web", version="1.0.0")
     app.mount("/assets", StaticFiles(directory=str(_DIST_PATH)), name="assets")
     app.state.current_user_api_client = HttpxCurrentUserApiClient(
+        api_base_url=runtime_settings.api_base_url
+    )
+    app.state.account_preferences_api_client = HttpxAccountPreferencesApiClient(
         api_base_url=runtime_settings.api_base_url
     )
     app.state.api_proxy_transport = None
@@ -229,6 +236,7 @@ def _register_routes(
             page_path="/dashboard",
             page_title_key="page.dashboard.title",
             page_description_key="page.dashboard.description",
+            template_name="pages/dashboard.html",
         )
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -239,6 +247,8 @@ def _register_routes(
             page_path="/settings",
             page_title_key="page.settings.title",
             page_description_key="page.settings.description",
+            template_name="pages/settings.html",
+            load_account_preferences=True,
         )
 
     @app.get("/strategies", response_class=HTMLResponse)
@@ -249,6 +259,7 @@ def _register_routes(
             page_path="/strategies",
             page_title_key="page.strategies.title",
             page_description_key="page.strategies.description",
+            template_name="pages/strategies.html",
         )
 
     @app.get("/strategies/new", response_class=HTMLResponse)
@@ -259,7 +270,7 @@ def _register_routes(
             page_path="/strategies",
             page_title_key="page.strategy_new.title",
             page_description_key="page.strategy_new.description",
-            template_context={"placeholder_id": "strategies-new"},
+            template_name="pages/strategy_create.html",
         )
 
     @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
@@ -270,7 +281,8 @@ def _register_routes(
             page_path="/strategies",
             page_title_key="page.strategy_detail.title",
             page_description_key="page.strategy_detail.description",
-            template_context={"placeholder_id": "strategy-detail", "entity_id": strategy_id},
+            template_name="pages/strategy_detail.html",
+            template_context={"strategy_id": strategy_id},
         )
 
     @app.get("/monitoring", response_class=HTMLResponse)
@@ -281,6 +293,7 @@ def _register_routes(
             page_path="/monitoring",
             page_title_key="page.monitoring.title",
             page_description_key="page.monitoring.description",
+            template_name="pages/monitoring.html",
         )
 
     @app.get("/backtests", response_class=HTMLResponse)
@@ -291,6 +304,7 @@ def _register_routes(
             page_path="/backtests",
             page_title_key="page.backtests.title",
             page_description_key="page.backtests.description",
+            template_name="pages/backtests_history.html",
         )
 
     @app.get("/backtests/new", response_class=HTMLResponse)
@@ -301,7 +315,7 @@ def _register_routes(
             page_path="/backtests",
             page_title_key="page.backtest_new.title",
             page_description_key="page.backtest_new.description",
-            template_context={"placeholder_id": "backtests-new"},
+            template_name="pages/backtests_run.html",
         )
 
     @app.get("/backtests/{job_id}", response_class=HTMLResponse)
@@ -312,7 +326,8 @@ def _register_routes(
             page_path="/backtests",
             page_title_key="page.backtest_result.title",
             page_description_key="page.backtest_result.description",
-            template_context={"placeholder_id": "backtest-result", "entity_id": job_id},
+            template_name="pages/backtests_result.html",
+            template_context={"job_id": job_id},
         )
 
 
@@ -320,6 +335,13 @@ def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClien
     api_client = getattr(request.app.state, "current_user_api_client", None)
     if api_client is None:
         raise ValueError("current_user_api_client is not configured in application state")
+    return api_client
+
+
+def _resolve_account_preferences_api_client(*, request: Request) -> AccountPreferencesApiClient:
+    api_client = getattr(request.app.state, "account_preferences_api_client", None)
+    if api_client is None:
+        raise ValueError("account_preferences_api_client is not configured in application state")
     return api_client
 
 
@@ -365,6 +387,8 @@ def _render_protected_page(
     page_path: str,
     page_title_key: str,
     page_description_key: str,
+    template_name: str = "pages/placeholder.html",
+    load_account_preferences: bool = False,
     template_context: Mapping[str, Any] | None = None,
 ) -> Response:
     api_client = _resolve_current_user_api_client(request=request)
@@ -373,8 +397,18 @@ def _render_protected_page(
     if api_result.status_code == 401:
         return _build_login_redirect_response(current_path=_build_current_path(request=request))
 
-    current_locale, should_set_locale_cookie = _resolve_locale_state(request=request)
     current_user = api_result.user if api_result.status_code == 200 else None
+    preferences_result = _fetch_account_preferences(
+        request=request,
+        enabled=load_account_preferences and current_user is not None,
+    )
+    account_preferences = (
+        preferences_result.preferences if preferences_result is not None else None
+    )
+    current_locale, should_set_locale_cookie = _resolve_locale_state(
+        request=request,
+        account_locale=account_preferences.locale if account_preferences is not None else None,
+    )
     error_message = _build_api_error_message(api_result=api_result, locale=current_locale)
     status_code = 200 if current_user is not None else 502
 
@@ -386,6 +420,7 @@ def _render_protected_page(
         error_message=error_message,
         locale=current_locale,
         should_set_locale_cookie=should_set_locale_cookie,
+        account_preferences=account_preferences,
     )
     context["page_description"] = translate(locale=current_locale, key=page_description_key)
     context["page_description_key"] = page_description_key
@@ -396,7 +431,7 @@ def _render_protected_page(
     response = _render_template_response(
         request,
         templates=templates,
-        template_name="pages/placeholder.html",
+        template_name=template_name,
         context=context,
         status_code=status_code,
     )
@@ -460,6 +495,20 @@ def _build_api_error_message(
     return api_result.error_message
 
 
+def _fetch_account_preferences(
+    *,
+    request: Request,
+    enabled: bool,
+) -> AccountPreferencesApiResult | None:
+    if not enabled:
+        return None
+    api_client = _resolve_account_preferences_api_client(request=request)
+    result = api_client.fetch_preferences(cookie_header=request.headers.get("cookie"))
+    if result.status_code != 200:
+        return None
+    return result
+
+
 def _build_template_context(
     *,
     request: Request,
@@ -469,10 +518,17 @@ def _build_template_context(
     error_message: str | None,
     locale: str | None = None,
     should_set_locale_cookie: bool | None = None,
+    account_preferences: WebAccountPreferences | None = None,
 ) -> dict[str, Any]:
-    current_theme = _resolve_theme(request=request)
+    current_theme = _resolve_theme(
+        request=request,
+        account_theme=account_preferences.theme if account_preferences is not None else None,
+    )
     if locale is None or should_set_locale_cookie is None:
-        current_locale, should_set_cookie = _resolve_locale_state(request=request)
+        current_locale, should_set_cookie = _resolve_locale_state(
+            request=request,
+            account_locale=account_preferences.locale if account_preferences is not None else None,
+        )
     else:
         current_locale = locale
         should_set_cookie = should_set_locale_cookie
@@ -504,9 +560,13 @@ def _build_template_context(
     }
 
 
-def _resolve_locale_state(*, request: Request) -> tuple[str, bool]:
+def _resolve_locale_state(
+    *,
+    request: Request,
+    account_locale: str | None = None,
+) -> tuple[str, bool]:
     raw_query_locale = request.query_params.get("locale")
-    resolved_locale = resolve_locale(
+    resolved_locale = normalize_locale(account_locale) or resolve_locale(
         query_locale=raw_query_locale,
         cookie_locale=request.cookies.get(LOCALE_COOKIE_NAME),
         accept_language=request.headers.get("accept-language"),
@@ -562,7 +622,9 @@ def _build_auth_actions(
     ]
 
 
-def _resolve_theme(*, request: Request) -> str:
+def _resolve_theme(*, request: Request, account_theme: str | None = None) -> str:
+    if account_theme in _THEME_KEYS:
+        return account_theme
     requested_theme = request.query_params.get("theme")
     if requested_theme in _THEME_KEYS:
         return requested_theme

@@ -1,6 +1,7 @@
 """DTO package for the reset backtest scope."""
 
 from .backtest_jobs import (
+    BacktestJobCountersResult,
     BacktestJobCreateResult,
     BacktestJobListResult,
     BacktestJobProgressReadModel,
@@ -8,6 +9,12 @@ from .backtest_jobs import (
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
     BacktestLazyTradesDetailReadModel,
+    BacktestResultMonthlyStatsReadModel,
+    BacktestResultSeriesReadModel,
+    BacktestResultSummaryReadModel,
+    BacktestResultSymbolStatsReadModel,
+    BacktestResultTradesPageReadModel,
+    BacktestTradesCsvReadModel,
     build_backtest_job_read_model,
     build_top_variant_read_model,
 )
@@ -79,6 +86,7 @@ from .tp_sl_hit_times import (
 
 __all__ = [
     "BacktestArtifactMetadata",
+    "BacktestJobCountersResult",
     "BacktestJobCreateResult",
     "BacktestJobListResult",
     "BacktestLazyTradesDetailReadModel",
@@ -104,10 +112,16 @@ __all__ = [
     "BacktestPreparePoolsConfig",
     "BacktestPreparePoolsResult",
     "BacktestPreflightResult",
+    "BacktestResultMonthlyStatsReadModel",
+    "BacktestResultSeriesReadModel",
+    "BacktestResultSummaryReadModel",
+    "BacktestResultSymbolStatsReadModel",
+    "BacktestResultTradesPageReadModel",
     "BacktestProxyContext",
     "BacktestProxyFilterResult",
     "BacktestRuntimeDefaults",
     "BacktestRuntimeGuardrails",
+    "BacktestTradesCsvReadModel",
     "BacktestSelectedBackend",
     "BacktestTpSlGridEvidence",
     "BacktestTpSlGridResolution",

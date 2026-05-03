@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/pages/strategies.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="rh-strategies-page"
+    aria-labelledby="strategy-detail-title"
+    data-strategy-page="detail"
+    data-strategy-id="{{ strategy_id }}"
+    data-api-get-path-template="/api/strategies/{strategy_id}"
+    data-api-clone-path="/api/strategies/clone"
+    data-api-delete-path-template="/api/strategies/{strategy_id}"
+    data-list-path="/strategies"
+  >
+    <div class="rh-strategy-hero">
+      <div>
+        <div class="rh-kicker">/strategies/{{ strategy_id }}</div>
+        <h1 id="strategy-detail-title" data-i18n="strategies.detail.title">
+          {{ t("strategies.detail.title") }}
+        </h1>
+        <p data-i18n="strategies.detail.description">{{ t("strategies.detail.description") }}</p>
+      </div>
+      <div class="rh-command-row">
+        <a class="rh-button rh-button--ghost" href="/strategies">
+          <span aria-hidden="true">&#8592;</span>
+          <span data-i18n="strategies.actions.back_to_list">
+            {{ t("strategies.actions.back_to_list") }}
+          </span>
+        </a>
+        <button id="strategy-detail-clone" class="rh-button" type="button">
+          <span data-i18n="strategies.actions.clone">{{ t("strategies.actions.clone") }}</span>
+        </button>
+        <button id="strategy-detail-delete" class="rh-button rh-button--danger" type="button">
+          <span data-i18n="strategies.actions.delete">{{ t("strategies.actions.delete") }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="strategy-error-banner" class="rh-error-state rh-hidden" role="alert"></div>
+    <p id="strategy-detail-loading" class="rh-inline-help" data-i18n="strategies.state.loading">
+      {{ t("strategies.state.loading") }}
+    </p>
+
+    {% include "fragments/strategies/detail_shell.html" %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/strategies.js"></script>
+{% endblock %}

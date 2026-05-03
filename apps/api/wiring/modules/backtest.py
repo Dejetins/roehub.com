@@ -9,6 +9,7 @@ from apps.api.routes import build_backtests_router as build_backtests_api_router
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
+    DatabaseBacktestJobExecutionTrigger,
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestJobRepository,
@@ -22,15 +23,11 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest.application.services.v2 import (
-    BacktestComboPlanningService,
     BacktestLazyTradesDetailService,
-    BacktestNoRiskExactScoringService,
     BacktestPreflightService,
     BacktestPreparePoolsService,
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
-    BacktestRuntimeJobOrchestrationService,
-    BacktestTpSlExactScoringService,
     BacktestTpSlHitTimesService,
 )
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
@@ -38,6 +35,8 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+
+from .ui_backtests import build_ui_backtests_router
 
 
 def build_backtests_router(
@@ -91,12 +90,19 @@ def build_backtests_router(
         preflight_service=preflight_service,
         runtime_config=runtime_config,
     )
-    return build_backtests_api_router(
+    router = build_backtests_api_router(
         runtime_defaults_service=runtime_defaults_service,
         preflight_service=preflight_service,
         current_user_dependency=current_user_dependency,
         jobs_use_case=jobs_use_case,
     )
+    router.include_router(
+        build_ui_backtests_router(
+            current_user_dependency=current_user_dependency,
+            jobs_use_case=jobs_use_case,
+        )
+    )
+    return router
 
 
 def _with_local_dev_default(*, environ: Mapping[str, str]) -> Mapping[str, str]:
@@ -128,19 +134,11 @@ def _build_jobs_use_case(
     tp_sl_hit_times = BacktestTpSlHitTimesService(
         artifact_array_loader=artifact_array_loader
     )
-    executor = BacktestRuntimeJobOrchestrationService(
-        prepare_pools=prepare_pools,
-        combo_planning=BacktestComboPlanningService(),
-        no_risk_exact=BacktestNoRiskExactScoringService(),
-        tp_sl_hit_times=tp_sl_hit_times,
-        tp_sl_exact=BacktestTpSlExactScoringService(),
-        artifact_array_loader=artifact_array_loader,
-    )
     return BacktestJobsUseCase(
         job_repository=job_repository,
         preflight_service=preflight_service,
         runtime_config=runtime_config,
-        executor=executor,
+        execution_trigger=DatabaseBacktestJobExecutionTrigger(),
         lazy_trades_service=BacktestLazyTradesDetailService(
             prepare_pools=prepare_pools,
             tp_sl_hit_times=tp_sl_hit_times,

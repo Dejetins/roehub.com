@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/pages/monitoring.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="rh-monitoring"
+    aria-labelledby="monitoring-title"
+    data-monitoring-page
+    data-monitor-endpoint="/api/ui/strategies/monitor"
+    data-snapshot-path-template="/api/ui/strategies/{strategy_id}/snapshot"
+    data-positions-path-template="/api/ui/strategies/{strategy_id}/positions?limit=50"
+    data-fills-path-template="/api/ui/strategies/{strategy_id}/fills?limit=50"
+    data-equity-path-template="/api/ui/strategies/{strategy_id}/equity?range=1d&amp;points=600"
+    data-stream-path="/api/stream/strategies"
+    data-run-path-template="/api/strategies/{strategy_id}/run"
+    data-stop-path-template="/api/strategies/{strategy_id}/stop"
+    data-poll-interval-ms="10000"
+  >
+    <div class="rh-monitoring__heading rh-page-heading">
+      <div>
+        <div class="rh-kicker">/monitoring</div>
+        <h1 id="monitoring-title" data-i18n="{{ page_title_key }}">{{ page_title }}</h1>
+      </div>
+      <span
+        class="rh-status-badge rh-status-badge--warning"
+        data-monitoring-connection
+        data-i18n="monitoring.status.loading"
+      >{{ t("monitoring.status.loading") }}</span>
+    </div>
+    <p data-i18n="{{ page_description_key }}">{{ page_description }}</p>
+
+    <div class="rh-monitoring__meta" aria-label="{{ t('monitoring.meta_aria') }}">
+      <span data-i18n="monitoring.meta.snapshot">{{ t("monitoring.meta.snapshot") }}</span>
+      <code>/api/ui/strategies/monitor</code>
+      <span data-i18n="monitoring.meta.stream">{{ t("monitoring.meta.stream") }}</span>
+      <code>/api/stream/strategies</code>
+      <span data-i18n="monitoring.meta.generated">{{ t("monitoring.meta.generated") }}</span>
+      <time data-monitoring-generated-at>--</time>
+    </div>
+
+    <div id="monitoring-error-banner" class="rh-monitoring-error rh-hidden" role="alert"></div>
+
+    <div class="rh-monitoring-tabs" role="tablist" aria-label="{{ t('monitoring.tabs_aria') }}">
+      <button
+        class="rh-monitoring-tab rh-monitoring-tab--active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        data-monitoring-mobile-tab="detail"
+        data-i18n="monitoring.tabs.detail"
+      >{{ t("monitoring.tabs.detail") }}</button>
+      <button
+        class="rh-monitoring-tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        data-monitoring-mobile-tab="list"
+        data-i18n="monitoring.tabs.list"
+      >{{ t("monitoring.tabs.list") }}</button>
+    </div>
+
+    <div class="rh-monitoring-layout">
+      {% include "fragments/monitoring/detail_panel.html" %}
+      {% include "fragments/monitoring/strategy_list.html" %}
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/monitoring.js"></script>
+{% endblock %}
