@@ -9,26 +9,28 @@
   >
     <div class="rh-page-heading">
       <div>
-        <div class="rh-kicker">{{ t("placeholder.kicker") }}</div>
-        <h1 id="page-title">{{ page_title }}</h1>
+        <div class="rh-kicker" data-i18n="placeholder.kicker">{{ t("placeholder.kicker") }}</div>
+        <h1 id="page-title" data-i18n="{{ page_title_key }}">{{ page_title }}</h1>
       </div>
-      <span class="rh-status-badge">{{ t("placeholder.stage") }}</span>
+      <span class="rh-status-badge" data-i18n="placeholder.stage">{{ t("placeholder.stage") }}</span>
     </div>
-    <p>{{ page_description }}</p>
+    <p data-i18n="{{ page_description_key }}">{{ page_description }}</p>
 
     <section class="rh-panel rh-panel--dense" aria-label="{{ t('placeholder.shell_contract') }}">
       <div class="rh-data-row">
-        <span>{{ t("placeholder.route") }}</span>
+        <span data-i18n="placeholder.route">{{ t("placeholder.route") }}</span>
         <code>{{ request.url.path }}</code>
       </div>
       <div class="rh-data-row">
-        <span>{{ t("placeholder.auth_state") }}</span>
+        <span data-i18n="placeholder.auth_state">{{ t("placeholder.auth_state") }}</span>
         <code>{{ t("placeholder.current_user") }}</code>
       </div>
       <div class="rh-data-row">
-        <span>{{ t("placeholder.api") }}</span>
+        <span data-i18n="placeholder.api">{{ t("placeholder.api") }}</span>
         <code>/api/auth/current-user</code>
       </div>
     </section>
+
+    {% include "components/ui_kit_placeholder.html" %}
   </section>
 {% endblock %}

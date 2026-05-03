@@ -1,0 +1,29 @@
+{% import "macros/ui.html" as ui with context %}
+
+<section
+  class="rh-ui-kit-placeholder"
+  aria-label="{{ t('ui.placeholder_aria') }}"
+  data-ui-kit-placeholder
+  data-i18n-aria-label="ui.placeholder_aria"
+>
+  <div class="rh-metric-grid">
+    {{ ui.metric_card("ui.metric_return", "+3.84%", "positive", "ui.metric_return_help") }}
+    {{ ui.metric_card("ui.metric_drawdown", "-1.12%", "negative", "ui.metric_drawdown_help") }}
+    {{ ui.metric_card("ui.metric_flat", "0.00%", "neutral", "ui.metric_flat_help") }}
+  </div>
+
+  {{ ui.tabs([
+    {"key": "overview", "href": request.url.path, "label_key": "ui.tab_overview"},
+    {"key": "activity", "href": request.url.path, "label_key": "ui.tab_activity"},
+  ], "overview") }}
+
+  {% call ui.panel("ui.panel_title", "ui.panel_body", "ui.panel_aria", "rh-panel--dense") %}
+    {{ ui.data_table([
+      {"key": "symbol", "label_key": "ui.table_symbol"},
+      {"key": "state", "label_key": "ui.table_state"},
+      {"key": "value", "label_key": "ui.table_value"},
+    ], [], "ui.table_empty") }}
+  {% endcall %}
+
+  {{ ui.empty_state("ui.empty_title", "ui.empty_body", "ui.empty_action", "/strategies") }}
+</section>

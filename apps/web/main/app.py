@@ -24,6 +24,7 @@ from apps.web.main.i18n import (
     LOCALE_COOKIE_NAME,
     SUPPORTED_LOCALES,
     build_translator,
+    load_catalogs,
     normalize_locale,
     resolve_locale,
     translate,
@@ -387,6 +388,7 @@ def _render_protected_page(
         should_set_locale_cookie=should_set_locale_cookie,
     )
     context["page_description"] = translate(locale=current_locale, key=page_description_key)
+    context["page_description_key"] = page_description_key
     context["placeholder_id"] = page_path.strip("/").replace("/", "-") or "home"
     if template_context is not None:
         context.update(template_context)
@@ -478,6 +480,7 @@ def _build_template_context(
     return {
         "request": request,
         "page_path": page_path,
+        "page_title_key": page_title_key,
         "page_title": t(page_title_key),
         "current_user": current_user,
         "error_message": error_message,
@@ -497,6 +500,7 @@ def _build_template_context(
             locale=current_locale,
         ),
         "locale_options": _build_locale_options(request=request, current_locale=current_locale),
+        "client_i18n_catalogs": load_catalogs(),
     }
 
 
@@ -516,6 +520,7 @@ def _build_nav_items(*, page_path: str, locale: str) -> list[dict[str, str | boo
         {
             "key": item.key,
             "href": item.href,
+            "label_key": item.label_key,
             "label": translate(locale=locale, key=item.label_key),
             "active": item.key == page_path,
         }
@@ -534,6 +539,7 @@ def _build_auth_actions(
             {
                 "key": "/logout",
                 "href": "/logout",
+                "label_key": "auth.logout",
                 "label": translate(locale=locale, key="auth.logout"),
                 "active": page_path == "/logout",
             }
@@ -542,12 +548,14 @@ def _build_auth_actions(
         {
             "key": "/login",
             "href": "/login",
+            "label_key": "auth.login",
             "label": translate(locale=locale, key="auth.login"),
             "active": page_path == "/login",
         },
         {
             "key": "/register",
             "href": "/register",
+            "label_key": "auth.register",
             "label": translate(locale=locale, key="auth.register"),
             "active": page_path == "/register",
         },

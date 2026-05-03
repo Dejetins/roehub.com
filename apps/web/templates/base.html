@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/assets/css/themes.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/shell.css">
     <script src="/assets/vendor/htmx.min.js" defer></script>
   </head>
@@ -31,6 +32,7 @@
             class="rh-nav-tab{% if item.active %} rh-nav-tab--active{% endif %}"
             href="{{ item.href }}"
             data-nav-key="{{ item.key }}"
+            data-i18n="{{ item.label_key }}"
             data-active="{{ 'true' if item.active else 'false' }}"
             {% if item.active %}aria-current="page"{% endif %}
           >{{ item.label }}</a>
@@ -38,40 +40,8 @@
       </nav>
 
       <div class="rh-header-tools" aria-label="{{ t('shell.controls_aria') }}">
-        <nav class="rh-locale-switcher" aria-label="{{ t('shell.language_aria') }}">
-          {% for locale in locale_options %}
-            <a
-              class="rh-locale-switcher__option{% if locale.active %} rh-locale-switcher__option--active{% endif %}"
-              href="{{ locale.href }}"
-              data-locale-option="{{ locale.key }}"
-              data-active="{{ 'true' if locale.active else 'false' }}"
-              hreflang="{{ locale.key }}"
-              {% if locale.active %}aria-current="true"{% endif %}
-            >{{ locale.label }}</a>
-          {% endfor %}
-        </nav>
-
-        <details class="rh-theme-menu">
-          <summary class="rh-theme-menu__summary" aria-label="{{ t('theme.aria') }}">
-            <span class="rh-theme-menu__swatch" aria-hidden="true"></span>
-            <span>{{ t("theme.current") }}</span>
-          </summary>
-          <div class="rh-theme-menu__list" role="menu">
-          {% for theme in theme_options %}
-            <a
-              class="rh-theme-menu__item{% if theme.active %} rh-theme-menu__item--active{% endif %}"
-              href="{{ theme.href }}"
-              data-theme-option="{{ theme.key }}"
-              data-active="{{ 'true' if theme.active else 'false' }}"
-              {% if theme.active %}aria-current="true"{% endif %}
-              role="menuitem"
-            >
-              <span class="rh-theme-menu__dot" aria-hidden="true"></span>
-              <span>{{ theme.label }}</span>
-            </a>
-          {% endfor %}
-          </div>
-        </details>
+        {% include "components/locale_switcher.html" %}
+        {% include "components/theme_switcher.html" %}
 
         <nav class="rh-auth-actions" aria-label="{{ t('shell.auth_aria') }}">
           {% for action in auth_actions %}
@@ -79,6 +49,7 @@
               class="rh-auth-link{% if action.active %} rh-auth-link--active{% endif %}"
               href="{{ action.href }}"
               data-auth-action="{{ action.key }}"
+              data-i18n="{{ action.label_key }}"
               {% if action.active %}aria-current="page"{% endif %}
             >{{ action.label }}</a>
           {% endfor %}
@@ -96,10 +67,13 @@
     </main>
 
     <footer class="rh-shell-footer" aria-label="{{ t('shell.status_aria') }}">
-      <span>{{ t("shell.status") }}</span>
-      <span>{{ current_locale|upper }}</span>
+      <span data-i18n="shell.status">{{ t("shell.status") }}</span>
+      <span data-current-locale>{{ current_locale|upper }}</span>
     </footer>
 
+    <div class="rh-notification-region" data-notification-region aria-live="polite"></div>
+    <script id="rh-locale-catalogs" type="application/json">{{ client_i18n_catalogs|tojson }}</script>
+    <script type="module" src="/assets/js/components/shell.js"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 from urllib.parse import quote
@@ -13,6 +14,9 @@ from fastapi.testclient import TestClient
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
 from apps.web.main.i18n import LOCALE_COOKIE_NAME, assert_catalog_keys_match
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+WEB_DIST_ROOT = REPO_ROOT / "apps" / "web" / "dist"
 
 
 def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
@@ -125,6 +129,9 @@ def test_public_shell_routes_render(path: str) -> None:
     assert 'lang="en"' in response.text
     assert 'data-locale="en"' in response.text
     assert "/assets/vendor/htmx.min.js" in response.text
+    assert "/assets/css/components.css" in response.text
+    assert "/assets/js/components/shell.js" in response.text
+    assert "/assets/site.css" not in response.text
     assert "https://unpkg.com" not in response.text
     assert "terminal-orange" in response.text
 
@@ -262,7 +269,30 @@ def test_authorized_protected_routes_render_placeholders_with_active_nav(
     assert response.headers["cache-control"] == "no-store"
     assert f'data-placeholder-page="{placeholder_id}"' in response.text
     assert "/api/auth/current-user" in response.text
+    assert "data-ui-kit-placeholder" in response.text
+    assert 'data-component="metric-card"' in response.text
+    assert 'data-component="data-table"' in response.text
     assert _nav_item_is_active(html=response.text, nav_key=active_nav_key)
+
+
+def test_stage_2_shell_exposes_theme_and_locale_client_hooks() -> None:
+    client = _build_test_client()
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'data-theme="terminal-orange"' in response.text
+    assert 'data-theme-control' in response.text
+    assert 'data-theme-option="terminal-orange"' in response.text
+    assert 'data-theme-option="graphite"' in response.text
+    assert 'data-theme-option="matrix-green"' in response.text
+    assert 'data-theme-option="high-contrast"' in response.text
+    assert 'data-locale-control' in response.text
+    assert 'data-locale-option="en"' in response.text
+    assert 'data-locale-option="ru"' in response.text
+    assert 'id="rh-locale-catalogs"' in response.text
+    assert 'data-i18n="theme.current"' in response.text
+    assert 'data-i18n="ui.empty_title"' in response.text
 
 
 def test_login_page_sanitizes_external_next_parameter() -> None:
@@ -322,7 +352,18 @@ def test_logout_page_uses_external_auth_script_and_sanitized_redirect(
         "/assets/css/themes.css",
         "/assets/css/base.css",
         "/assets/css/layout.css",
+        "/assets/css/components.css",
         "/assets/css/shell.css",
+        "/assets/js/core/api.js",
+        "/assets/js/core/poller.js",
+        "/assets/js/core/sse.js",
+        "/assets/js/core/dom.js",
+        "/assets/js/core/locale.js",
+        "/assets/js/core/theme.js",
+        "/assets/js/core/notifications.js",
+        "/assets/js/core/formatters.js",
+        "/assets/js/core/validators.js",
+        "/assets/js/components/shell.js",
     ],
 )
 def test_shell_assets_are_self_hosted(asset_path: str) -> None:
@@ -332,6 +373,43 @@ def test_shell_assets_are_self_hosted(asset_path: str) -> None:
 
     assert response.status_code == 200
     assert response.content
+
+
+def test_stage_2_js_core_contract_literals_are_present() -> None:
+    api_js = (WEB_DIST_ROOT / "js" / "core" / "api.js").read_text(encoding="utf-8")
+    poller_js = (WEB_DIST_ROOT / "js" / "core" / "poller.js").read_text(encoding="utf-8")
+    locale_js = (WEB_DIST_ROOT / "js" / "core" / "locale.js").read_text(encoding="utf-8")
+
+    assert 'credentials: "include"' in api_js
+    assert "redirectToLogin" in api_js
+    assert "validation_error" in api_js
+    assert "conflict" in api_js
+    assert "forbidden" in api_js
+    assert "unauthorized" in api_js
+    assert "timeout" in api_js
+    assert "setCsrfTokenProvider" in api_js
+    assert "X-CSRF-Token" in api_js
+
+    assert "this.inFlight" in poller_js
+    assert "this.documentRef.hidden" in poller_js
+    assert "hiddenIntervalMs ?? 5000" in poller_js
+
+    assert 'DEFAULT_LOCALE = "en"' in locale_js
+    assert '"ru"' in locale_js
+    assert "roehub_locale" in locale_js
+    assert "data-locale-option" in locale_js
+
+
+def test_financial_theme_tokens_are_invariant_across_theme_overrides() -> None:
+    tokens_css = (WEB_DIST_ROOT / "css" / "tokens.css").read_text(encoding="utf-8")
+    themes_css = (WEB_DIST_ROOT / "css" / "themes.css").read_text(encoding="utf-8")
+
+    assert "--rh-financial-positive" in tokens_css
+    assert "--rh-financial-negative" in tokens_css
+    assert "--rh-financial-neutral" in tokens_css
+    assert "--rh-financial-positive" not in themes_css
+    assert "--rh-financial-negative" not in themes_css
+    assert "--rh-financial-neutral" not in themes_css
 
 
 def test_user_badge_partial_route_is_not_public() -> None:

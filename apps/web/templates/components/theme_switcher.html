@@ -1,0 +1,25 @@
+<details class="rh-theme-menu" data-theme-control>
+  <summary
+    class="rh-theme-menu__summary"
+    aria-label="{{ t('theme.aria') }}"
+    data-i18n-aria-label="theme.aria"
+  >
+    <span class="rh-theme-menu__swatch" aria-hidden="true"></span>
+    <span data-i18n="theme.current">{{ t("theme.current") }}</span>
+  </summary>
+  <div class="rh-theme-menu__list" role="menu">
+  {% for theme in theme_options %}
+    <a
+      class="rh-theme-menu__item{% if theme.active %} rh-theme-menu__item--active{% endif %}"
+      href="{{ theme.href }}"
+      data-theme-option="{{ theme.key }}"
+      data-active="{{ 'true' if theme.active else 'false' }}"
+      {% if theme.active %}aria-current="true"{% endif %}
+      role="menuitem"
+    >
+      <span class="rh-theme-menu__dot" aria-hidden="true"></span>
+      <span data-i18n="theme.{{ theme.key|replace('-', '_') }}">{{ theme.label }}</span>
+    </a>
+  {% endfor %}
+  </div>
+</details>
