@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from apps.api.routes.identity import build_identity_router
+from apps.api.routes import build_identity_router
 from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
 )

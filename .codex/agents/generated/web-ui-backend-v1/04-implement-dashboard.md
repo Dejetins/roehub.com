@@ -2,7 +2,7 @@
 prompt_name: web_ui_backend_v1_04_dashboard
 repo: roehub.com
 branch: main
-scope: "Этап 4: защищенный dashboard overview и компактный backend read-model."
+scope: "Этап 4: защищенный /dashboard как all-strategies terminal workstation по personal_dashboard.png."
 
 language:
   implementation: python_fastapi_jinja_css_js
@@ -26,6 +26,10 @@ context_sources:
     - path: apps/web/dist/js/core/api.js
       why: "shared API client/error handling"
   conditional_bundles:
+    canonical_reference:
+      read_when: "always before implementation; this stage is reference-fidelity gated"
+      paths:
+        - /Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png
     backend_sources:
       read_when: "building dashboard summary from existing data"
       paths:
@@ -47,7 +51,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; canonical for this stage is personal_dashboard.png"
+  canonical_reference:
+    route: /dashboard
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png
+    fidelity: "hard reference-shaped contract for the page body after global header"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -62,11 +70,13 @@ style_references:
 hard_requirements:
   protected_dashboard_required: true
   one_summary_request_target: true
-  compact_payload_target_kb_compressed: 50
+  compact_payload_target_kb_compressed: 80
   degraded_panel_behavior_required: true
   no_fake_dashboard_kpis: true
   no_large_payloads: true
   no_overlap_polling: true
+  reference_fidelity_required: true
+  reject_generic_cards: true
   browser_qa_required: true
 
 task_toggles:
@@ -92,8 +102,8 @@ package_contract:
     - "tests/unit/apps/web/test_app_routes.py dashboard assertions"
   forbidden:
     - "settings/account package files"
-    - "monitoring package files"
-    - "strategy library package files"
+    - "strategy live bridge package files"
+    - "selected-strategy dashboard package files"
     - "backtests package files"
     - "identity secret storage internals"
   integration_points:
@@ -143,11 +153,14 @@ required_literals:
   - "/dashboard"
   - "/api/ui/dashboard/summary"
   - "/ui/dashboard/summary"
+  - "personal_dashboard.png"
+  - "selected_strategy_snapshot"
+  - "equity_pnl_series"
   - "degraded"
   - "terminal-orange"
 
 non_goals:
-  - "Do not implement monitoring SSE in dashboard."
+  - "Do not build generic overview cards or a marketing dashboard."
   - "Do not materialize large strategy/backtest details."
   - "Do not add persistence unless explicitly required by read-model design."
   - "Do not invent dashboard KPIs/metrics that are not backed by accepted strategy/backtest/account read models."
@@ -195,17 +208,19 @@ safety_notes:
   - "`/api/ui/dashboard/summary` is browser path; backend router path is `/ui/dashboard/summary`."
   - "Dashboard must not import private domain internals without mapper/ACL."
   - "One failed source should degrade a panel, not the whole page, unless auth fails."
-  - "Exact dashboard KPIs depend on read models accepted after Stages 5-9; render unavailable panels as degraded/empty rather than fake values."
+  - "The page body after the global header must be reference-shaped against personal_dashboard.png; generic cards are an introduced failure."
 ---
 
 # Task
 
-Implement Stage 4 dashboard overview.
+Implement Stage 4 `/dashboard` all-strategies workstation.
 
 Done means:
 
 - protected `/dashboard` renders;
-- backend exposes compact dashboard summary read-model;
+- backend exposes bounded dashboard summary read-model;
+- the page body after the global header is reference-shaped against `personal_dashboard.png`;
+- the final report lists the panel inventory observed in the reference and the implemented page;
 - page uses one summary request where practical;
 - degraded panel behavior exists;
 - polling is 10-15s, no-overlap, hidden-tab aware;
@@ -216,15 +231,19 @@ Done means:
 - Existing backend has auth, strategies and backtest jobs APIs.
 - There is no current dashboard read-model.
 - Stage 2 JS core should provide `api.js` and `poller.js`.
-- Exact dashboard KPIs are intentionally not frozen yet; use only accepted read models and explicit degraded/unavailable states.
+- Exact data sources may be incomplete; preserve reference panel shapes with explicit degraded/unavailable states rather than replacing them with generic cards.
 
 ## Requirements (Must)
 
+- Open `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png` before coding.
+- List the reference panel inventory before implementation notes/final report.
 - Add `/ui/dashboard/summary` backend route and DTO.
 - Keep browser path `/api/ui/dashboard/summary`.
-- Keep payload bounded; target < 50 KB compressed.
+- Keep payload bounded; target < 80 KB compressed for default viewport.
 - Use ports/query services/ACL for cross-context assembly.
 - Use only real accepted read-model fields; never fabricate KPI values to fill the UI.
+- Implement these minimum DTO zones: `selected_strategy_snapshot`, `equity_pnl_series`, `metric_grid`, `open_positions`, `recent_executions`, `health_risk`, `alerts`, `symbol_allocation`, `strategy_list`, `footer_status`.
+- Preserve the reference panel inventory: command bar, selected strategy summary/actions, PnL/equity chart, metric grid, open positions, recent executions, health/risk, alerts/events, symbol allocation, right strategy list with filters/totals/mini sparklines, bottom status bar.
 - Add focused API and web tests.
 - Verify browser behavior and theme financial colors.
 - Use `publish-ci-deploy` only after full success.
@@ -241,7 +260,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, plan Stage 4, design manifest dashboard rules, then entrypoints. Expand only for the contexts used by summary data.
+Read `.codex/AGENTS.md`, plan Stage 4, design manifest dashboard rules, `personal_dashboard.png`, then entrypoints. Expand only for the contexts used by summary data.
 
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
@@ -254,22 +273,25 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Define dashboard summary DTO and failure/degraded semantics.
-2. Implement use case/query service and route/wiring.
-3. Implement protected dashboard page and JS polling.
-4. Add tests for auth, DTO, degraded source, payload bounds where practical.
-5. Run browser QA and quality gates.
-6. Use `publish-ci-deploy` only after complete success.
+1. Open `personal_dashboard.png` and record panel inventory.
+2. Define dashboard summary DTO and failure/degraded semantics for all required zones.
+3. Implement use case/query service and route/wiring.
+4. Implement protected dashboard page and JS polling as a terminal workstation, not generic cards.
+5. Add tests for auth, DTO, degraded source, payload bounds where practical.
+6. Run browser QA, including visual comparison against the reference shape.
+7. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
 - One summary request can render dashboard.
+- Implemented panel inventory matches `personal_dashboard.png`; any deviation is named and justified.
 - Auth-required behavior matches other protected routes.
 - Source failure degrades one panel, not the whole page.
 - Missing/unaccepted KPI sources render as degraded/unavailable, not as fake zero/default business values.
 - Polling pauses on hidden tab and does not overlap.
 - Financial deltas keep fixed semantic colors in all themes.
 - Browser screenshot/snapshot and console/network evidence exist.
+- Generic card-grid/overview layout is not acceptable.
 
 # Implementation constraints
 
@@ -300,6 +322,7 @@ For every browser-visible change, collect and report runtime evidence:
 
 - desktop screenshot, normally around `1440x1000`;
 - mobile screenshot, normally around `390x844`;
+- reference fidelity note comparing the desktop page body against `personal_dashboard.png`;
 - `snapshot` after the key state;
 - console errors absent;
 - failed same-origin network requests absent except expected auth redirects;

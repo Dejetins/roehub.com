@@ -180,152 +180,6 @@ class BacktestLazyTradesDetailReadModel:
 
 
 @dataclass(frozen=True, slots=True)
-class BacktestResultSummaryReadModel:
-    job: BacktestJobReadModel
-    variants: tuple[BacktestJobTopVariantReadModel, ...]
-    selected_variant_key: str | None
-    links: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "links", MappingProxyType(dict(self.links)))
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "job": self.job.as_mapping(),
-            "variants": [variant.as_mapping() for variant in self.variants],
-            "selected_variant_key": self.selected_variant_key,
-            "links": dict(self.links),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestResultSeriesReadModel:
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    series: str
-    requested_points: int
-    point_limit: int
-    total_points: int
-    downsampled: bool
-    points: tuple[Mapping[str, Any], ...]
-    summary: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "points",
-            tuple(MappingProxyType(dict(item)) for item in self.points),
-        )
-        object.__setattr__(self, "summary", MappingProxyType(dict(self.summary)))
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "variant_key": self.variant_key,
-            "variant_hash": self.variant_hash,
-            "series": self.series,
-            "requested_points": self.requested_points,
-            "point_limit": self.point_limit,
-            "total_points": self.total_points,
-            "downsampled": self.downsampled,
-            "points": [dict(item) for item in self.points],
-            "summary": dict(self.summary),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestResultMonthlyStatsReadModel:
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: tuple[Mapping[str, Any], ...]
-    totals: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "items",
-            tuple(MappingProxyType(dict(item)) for item in self.items),
-        )
-        object.__setattr__(self, "totals", MappingProxyType(dict(self.totals)))
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "variant_key": self.variant_key,
-            "variant_hash": self.variant_hash,
-            "items": [dict(item) for item in self.items],
-            "totals": dict(self.totals),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestResultSymbolStatsReadModel:
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: tuple[Mapping[str, Any], ...]
-    totals: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "items",
-            tuple(MappingProxyType(dict(item)) for item in self.items),
-        )
-        object.__setattr__(self, "totals", MappingProxyType(dict(self.totals)))
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "variant_key": self.variant_key,
-            "variant_hash": self.variant_hash,
-            "items": [dict(item) for item in self.items],
-            "totals": dict(self.totals),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestResultTradesPageReadModel:
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: tuple[Mapping[str, Any], ...]
-    pagination: Mapping[str, Any]
-    summary: Mapping[str, Any]
-    links: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "items",
-            tuple(MappingProxyType(dict(item)) for item in self.items),
-        )
-        object.__setattr__(self, "pagination", MappingProxyType(dict(self.pagination)))
-        object.__setattr__(self, "summary", MappingProxyType(dict(self.summary)))
-        object.__setattr__(self, "links", MappingProxyType(dict(self.links)))
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "variant_key": self.variant_key,
-            "variant_hash": self.variant_hash,
-            "items": [dict(item) for item in self.items],
-            "pagination": dict(self.pagination),
-            "summary": dict(self.summary),
-            "links": dict(self.links),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestTradesCsvReadModel:
-    filename: str
-    content: str
-    media_type: str = "text/csv; charset=utf-8"
-
-
-@dataclass(frozen=True, slots=True)
 class BacktestJobCreateResult:
     job: BacktestJobReadModel
     idempotent_replay: bool
@@ -345,22 +199,6 @@ class BacktestJobListResult:
         return {
             "items": [item.as_mapping() for item in self.items],
             "next_cursor": self.next_cursor,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestJobCountersResult:
-    active_jobs: int
-    max_active_jobs: int
-    max_active_jobs_global: int
-    can_create: bool
-
-    def as_mapping(self) -> dict[str, Any]:
-        return {
-            "active_jobs": self.active_jobs,
-            "max_active_jobs": self.max_active_jobs,
-            "max_active_jobs_global": self.max_active_jobs_global,
-            "can_create": self.can_create,
         }
 
 
@@ -545,12 +383,6 @@ __all__ = [
     "BacktestJobReadModel",
     "BacktestJobTopResult",
     "BacktestJobTopVariantReadModel",
-    "BacktestResultMonthlyStatsReadModel",
-    "BacktestResultSeriesReadModel",
-    "BacktestResultSummaryReadModel",
-    "BacktestResultSymbolStatsReadModel",
-    "BacktestResultTradesPageReadModel",
-    "BacktestTradesCsvReadModel",
     "build_backtest_job_read_model",
     "build_top_variant_read_model",
 ]

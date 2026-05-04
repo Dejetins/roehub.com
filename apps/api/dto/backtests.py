@@ -12,11 +12,6 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobTopVariantReadModel,
     BacktestLazyTradesDetailReadModel,
     BacktestPreflightResult,
-    BacktestResultMonthlyStatsReadModel,
-    BacktestResultSeriesReadModel,
-    BacktestResultSummaryReadModel,
-    BacktestResultSymbolStatsReadModel,
-    BacktestResultTradesPageReadModel,
     BacktestRuntimeDefaults,
 )
 
@@ -125,52 +120,6 @@ class BacktestLazyTradesDetailResponse(BaseModel):
     timing: dict[str, Any]
 
 
-class BacktestResultSummaryResponse(BaseModel):
-    job: BacktestJobResponse
-    variants: list[BacktestTopVariantResponse]
-    selected_variant_key: str | None
-    links: dict[str, Any]
-
-
-class BacktestResultSeriesResponse(BaseModel):
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    series: str
-    requested_points: int
-    point_limit: int
-    total_points: int
-    downsampled: bool
-    points: list[dict[str, Any]]
-    summary: dict[str, Any]
-
-
-class BacktestResultMonthlyStatsResponse(BaseModel):
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: list[dict[str, Any]]
-    totals: dict[str, Any]
-
-
-class BacktestResultSymbolStatsResponse(BaseModel):
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: list[dict[str, Any]]
-    totals: dict[str, Any]
-
-
-class BacktestResultTradesPageResponse(BaseModel):
-    job_id: str
-    variant_key: str
-    variant_hash: str
-    items: list[dict[str, Any]]
-    pagination: dict[str, Any]
-    summary: dict[str, Any]
-    links: dict[str, Any]
-
-
 def build_backtest_runtime_defaults_response(
     *,
     defaults: BacktestRuntimeDefaults,
@@ -220,52 +169,12 @@ def build_backtest_lazy_trades_detail_response(
     return BacktestLazyTradesDetailResponse.model_validate(result.as_mapping())
 
 
-def build_backtest_result_summary_response(
-    *,
-    result: BacktestResultSummaryReadModel,
-) -> BacktestResultSummaryResponse:
-    return BacktestResultSummaryResponse.model_validate(result.as_mapping())
-
-
-def build_backtest_result_series_response(
-    *,
-    result: BacktestResultSeriesReadModel,
-) -> BacktestResultSeriesResponse:
-    return BacktestResultSeriesResponse.model_validate(result.as_mapping())
-
-
-def build_backtest_result_monthly_stats_response(
-    *,
-    result: BacktestResultMonthlyStatsReadModel,
-) -> BacktestResultMonthlyStatsResponse:
-    return BacktestResultMonthlyStatsResponse.model_validate(result.as_mapping())
-
-
-def build_backtest_result_symbol_stats_response(
-    *,
-    result: BacktestResultSymbolStatsReadModel,
-) -> BacktestResultSymbolStatsResponse:
-    return BacktestResultSymbolStatsResponse.model_validate(result.as_mapping())
-
-
-def build_backtest_result_trades_page_response(
-    *,
-    result: BacktestResultTradesPageReadModel,
-) -> BacktestResultTradesPageResponse:
-    return BacktestResultTradesPageResponse.model_validate(result.as_mapping())
-
-
 __all__ = [
     "BacktestLazyTradesDetailResponse",
     "BacktestJobProgressResponse",
     "BacktestJobResponse",
     "BacktestJobsListResponse",
     "BacktestPreflightResponse",
-    "BacktestResultMonthlyStatsResponse",
-    "BacktestResultSeriesResponse",
-    "BacktestResultSummaryResponse",
-    "BacktestResultSymbolStatsResponse",
-    "BacktestResultTradesPageResponse",
     "BacktestRuntimeDefaultsResponse",
     "BacktestTopVariantResponse",
     "BacktestTopVariantsResponse",
@@ -273,11 +182,6 @@ __all__ = [
     "build_backtest_lazy_trades_detail_response",
     "build_backtest_jobs_list_response",
     "build_backtest_preflight_response",
-    "build_backtest_result_monthly_stats_response",
-    "build_backtest_result_series_response",
-    "build_backtest_result_summary_response",
-    "build_backtest_result_symbol_stats_response",
-    "build_backtest_result_trades_page_response",
     "build_backtest_runtime_defaults_response",
     "build_backtest_top_variant_response",
     "build_backtest_top_variants_response",

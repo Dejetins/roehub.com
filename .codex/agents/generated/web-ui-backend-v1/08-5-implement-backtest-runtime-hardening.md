@@ -85,7 +85,7 @@ task_toggles:
 
 package_contract:
   depends_on:
-    - "08-backtests-history-configurator accepted or job UI contract stable"
+    - "08-backtests-workstation accepted or job UI contract stable"
   owns:
     - "apps/api/wiring/modules/backtest.py"
     - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
@@ -149,7 +149,7 @@ required_literals:
   - "request_hash"
 
 non_goals:
-  - "Do not implement browser results UI; Stage 9 owns it."
+  - "Do not implement browser result endpoints/state; Stage 9 owns selected result state inside `/backtests`."
   - "Do not change canonical request hash."
   - "Do not store full trades in top rows."
   - "Do not claim benchmark acceptance from local tests alone if compute path changes."

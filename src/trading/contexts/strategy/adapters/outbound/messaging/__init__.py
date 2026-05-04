@@ -4,8 +4,6 @@ from .redis import (
     RedisStrategyRealtimeOutputPublisher,
     RedisStrategyRealtimeOutputPublisherConfig,
     RedisStrategyRealtimeOutputPublisherHooks,
-    RedisStrategyRealtimeOutputReader,
-    RedisStrategyRealtimeOutputReaderConfig,
 )
 from .telegram import (
     LogOnlyTelegramNotifier,
@@ -20,8 +18,6 @@ __all__ = [
     "RedisStrategyRealtimeOutputPublisher",
     "RedisStrategyRealtimeOutputPublisherConfig",
     "RedisStrategyRealtimeOutputPublisherHooks",
-    "RedisStrategyRealtimeOutputReader",
-    "RedisStrategyRealtimeOutputReaderConfig",
     "TelegramBotApiNotifierConfig",
     "TelegramNotifierHooks",
     "LogOnlyTelegramNotifier",

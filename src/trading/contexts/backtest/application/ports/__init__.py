@@ -8,7 +8,6 @@ from .backtest_job_repositories import (
     BacktestJobListQuery,
     BacktestJobRepository,
 )
-from .backtest_job_triggers import BacktestJobExecutionTrigger
 from .current_user import CurrentUser
 from .lazy_trades_cache import (
     BacktestLazyTradesCache,
@@ -25,7 +24,6 @@ __all__ = [
     "BacktestArtifactContextResolver",
     "BacktestArtifactContextUnavailable",
     "BacktestGridDefaultsProvider",
-    "BacktestJobExecutionTrigger",
     "BacktestJobLeaseRepository",
     "BacktestJobListPage",
     "BacktestJobListQuery",

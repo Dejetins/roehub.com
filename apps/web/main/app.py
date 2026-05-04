@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
@@ -15,23 +14,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from apps.web.main.api_client import (
-    AccountPreferencesApiClient,
-    AccountPreferencesApiResult,
     CurrentUserApiClient,
     CurrentUserApiResult,
-    HttpxAccountPreferencesApiClient,
     HttpxCurrentUserApiClient,
-    WebAccountPreferences,
     WebCurrentUser,
-)
-from apps.web.main.i18n import (
-    LOCALE_COOKIE_NAME,
-    SUPPORTED_LOCALES,
-    build_translator,
-    load_catalogs,
-    normalize_locale,
-    resolve_locale,
-    translate,
 )
 from apps.web.main.security import sanitize_next_path
 from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_settings
@@ -39,7 +25,6 @@ from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_setti
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 _TEMPLATES_PATH = _PACKAGE_ROOT / "templates"
 _DIST_PATH = _PACKAGE_ROOT / "dist"
-_DEFAULT_THEME = "terminal-orange"
 _HOP_BY_HOP_HEADERS = {
     "connection",
     "content-length",
@@ -54,47 +39,30 @@ _HOP_BY_HOP_HEADERS = {
 }
 
 
-@dataclass(frozen=True)
-class _NavItem:
-    key: str
-    href: str
-    label_key: str
-
-
-@dataclass(frozen=True)
-class _ThemeOption:
-    key: str
-    label_key: str
-
-
-@dataclass(frozen=True)
-class _LocaleOption:
-    key: str
-    label_key: str
-
-
-_PRIMARY_NAV_ITEMS = (
-    _NavItem(key="/", href="/", label_key="nav.home"),
-    _NavItem(key="/dashboard", href="/dashboard", label_key="nav.dashboard"),
-    _NavItem(key="/strategies", href="/strategies", label_key="nav.strategies"),
-    _NavItem(key="/backtests", href="/backtests", label_key="nav.backtests"),
-    _NavItem(key="/monitoring", href="/monitoring", label_key="nav.monitoring"),
-    _NavItem(key="/settings", href="/settings", label_key="nav.settings"),
-)
-_THEME_OPTIONS = (
-    _ThemeOption(key="terminal-orange", label_key="theme.terminal_orange"),
-    _ThemeOption(key="graphite", label_key="theme.graphite"),
-    _ThemeOption(key="matrix-green", label_key="theme.matrix_green"),
-    _ThemeOption(key="high-contrast", label_key="theme.high_contrast"),
-)
-_THEME_KEYS = {theme.key for theme in _THEME_OPTIONS}
-_LOCALE_OPTIONS = tuple(
-    _LocaleOption(key=locale, label_key=f"locale.{locale}") for locale in SUPPORTED_LOCALES
-)
-
-
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
-    """Build FastAPI web app with SSR templates, static assets, and auth shell routes."""
+    """
+    Build FastAPI web app with SSR templates, static assets, and auth page skeleton.
+
+    Docs:
+      - docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md
+      - docs/architecture/roadmap/milestone-6-epics-v1.md
+    Related:
+      - apps/web/main/main.py
+      - apps/web/main/settings.py
+      - apps/web/main/api_client.py
+
+    Args:
+        environ: Optional process environment mapping override.
+    Returns:
+        FastAPI: Configured Roehub Web application instance.
+    Assumptions:
+        `WEB_API_BASE_URL` and `WEB_API_UPSTREAM_URL` are configured before web
+        process startup.
+    Raises:
+        ValueError: If runtime settings are invalid.
+    Side Effects:
+        Reads environment mapping and configures static/template runtime wiring.
+    """
     effective_environ = os.environ if environ is None else environ
     runtime_settings = resolve_web_runtime_settings(environ=effective_environ)
 
@@ -102,9 +70,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app = FastAPI(title="Roehub Web", version="1.0.0")
     app.mount("/assets", StaticFiles(directory=str(_DIST_PATH)), name="assets")
     app.state.current_user_api_client = HttpxCurrentUserApiClient(
-        api_base_url=runtime_settings.api_base_url
-    )
-    app.state.account_preferences_api_client = HttpxAccountPreferencesApiClient(
         api_base_url=runtime_settings.api_base_url
     )
     app.state.api_proxy_transport = None
@@ -118,74 +83,120 @@ def _register_routes(
     templates: Jinja2Templates,
     runtime_settings: WebRuntimeSettings,
 ) -> None:
-    """Register web shell, auth entrypoints, protected placeholders, and API proxy."""
+    """
+    Register all web routes for landing, auth UX, and protected skeleton pages.
+
+    Args:
+        app: FastAPI application instance.
+        templates: Template renderer for SSR pages.
+        runtime_settings: Validated runtime settings payload.
+    Returns:
+        None.
+    Assumptions:
+        API client is already attached to `app.state.current_user_api_client`.
+    Raises:
+        ValueError: If runtime settings are invalid.
+    Side Effects:
+        Adds HTTP routes to the FastAPI application.
+    """
+    _ = runtime_settings
 
     @app.get("/", response_class=HTMLResponse)
     def get_landing_page(request: Request) -> Response:
-        return _render_public_page(
-            request=request,
-            templates=templates,
-            page_path="/",
-            page_title_key="page.landing.title",
-            template_name="pages/landing.html",
+        """
+        Render public landing page.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML landing page response.
+        Assumptions:
+            Landing route is always public and does not require auth checks.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return templates.TemplateResponse(
+            request,
+            "landing.html",
+            context=_build_template_context(
+                request=request,
+                page_path="/",
+                page_title="Roehub",
+                current_user=None,
+                error_message=None,
+            ),
         )
 
     @app.get("/favicon.ico", include_in_schema=False)
     def get_favicon() -> Response:
+        """
+        Return an empty favicon response so browser QA has no incidental 404 noise.
+        """
         return Response(status_code=204)
 
     @app.get("/login", response_class=HTMLResponse)
     def get_login_page(request: Request, next: str | None = None) -> Response:
+        """
+        Render login page with OIDC redirect entrypoint and guarded next target.
+
+        Args:
+            request: HTTP request object.
+            next: Optional redirect target requested by caller.
+        Returns:
+            Response: HTML login page response.
+        Assumptions:
+            API endpoint `/api/auth/login` starts Keycloak OIDC authorization flow.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
         safe_next_path = sanitize_next_path(raw_next=next)
+        login_query = urlencode({"next": safe_next_path})
         context = _build_template_context(
             request=request,
             page_path="/login",
-            page_title_key="page.login.title",
+            page_title="Login",
             current_user=None,
             error_message=None,
         )
-        context["oidc_login_url"] = _build_oidc_login_url(next_path=safe_next_path)
-        return _render_template_response(
-            request=request,
-            templates=templates,
-            template_name="pages/login.html",
-            context=context,
-        )
-
-    @app.get("/register", response_class=HTMLResponse)
-    def get_register_page(request: Request, next: str | None = None) -> Response:
-        safe_next_path = sanitize_next_path(raw_next=next, default_path="/dashboard")
-        context = _build_template_context(
-            request=request,
-            page_path="/register",
-            page_title_key="page.register.title",
-            current_user=None,
-            error_message=None,
-        )
-        context["oidc_register_url"] = _build_oidc_login_url(next_path=safe_next_path)
-        return _render_template_response(
-            request=request,
-            templates=templates,
-            template_name="pages/register.html",
-            context=context,
-        )
+        context["oidc_login_url"] = f"/api/auth/login?{login_query}"
+        return templates.TemplateResponse(request, "login.html", context=context)
 
     @app.get("/logout", response_class=HTMLResponse)
     def get_logout_page(request: Request, next: str | None = None) -> Response:
-        post_logout_redirect_path = sanitize_next_path(raw_next=next, default_path="/login")
+        """
+        Render logout page that closes local session and redirects to safe target.
+
+        Args:
+            request: HTTP request object.
+            next: Optional post-logout redirect path requested by caller.
+        Returns:
+            Response: HTML logout page response.
+        Assumptions:
+            API endpoint `/api/auth/logout` clears opaque Roehub auth session cookie.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        post_logout_redirect_path = sanitize_next_path(
+            raw_next=next,
+            default_path="/login",
+        )
         context = _build_template_context(
             request=request,
             page_path="/logout",
-            page_title_key="page.logout.title",
+            page_title="Logout",
             current_user=None,
             error_message=None,
         )
         context["post_logout_redirect_path"] = post_logout_redirect_path
-        context["logout_url"] = "/api/auth/logout"
-        return _render_template_response(
-            request=request,
-            templates=templates,
-            template_name="pages/logout.html",
+        return templates.TemplateResponse(
+            request,
+            "logout.html",
             context=context,
         )
 
@@ -194,6 +205,21 @@ def _register_routes(
         methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
     )
     async def proxy_api_request(request: Request, upstream_path: str) -> Response:
+        """
+        Proxy same-origin browser API requests to configured upstream API runtime.
+
+        Args:
+            request: Incoming browser request addressed to `/api/*` on web origin.
+            upstream_path: API path segment without the `/api/` prefix.
+        Returns:
+            Response: Upstream API response mirrored back to browser.
+        Assumptions:
+            API upstream serves routes without `/api` prefix.
+        Raises:
+            None.
+        Side Effects:
+            Performs one outbound HTTP request to configured API upstream.
+        """
         upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_path}"
         request_body = await request.body()
         request_headers = _build_proxy_request_headers(request=request)
@@ -228,124 +254,175 @@ def _register_routes(
             proxied_response.headers.append(header_name, header_value)
         return proxied_response
 
-    @app.get("/dashboard", response_class=HTMLResponse)
-    def get_dashboard_page(request: Request) -> Response:
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/dashboard",
-            page_title_key="page.dashboard.title",
-            page_description_key="page.dashboard.description",
-            template_name="pages/dashboard.html",
-        )
-
-    @app.get("/settings", response_class=HTMLResponse)
-    def get_settings_page(request: Request) -> Response:
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/settings",
-            page_title_key="page.settings.title",
-            page_description_key="page.settings.description",
-            template_name="pages/settings.html",
-            load_account_preferences=True,
-        )
-
     @app.get("/strategies", response_class=HTMLResponse)
     def get_strategies_page(request: Request) -> Response:
+        """
+        Render protected strategies list page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML strategies page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
         return _render_protected_page(
             request=request,
             templates=templates,
             page_path="/strategies",
-            page_title_key="page.strategies.title",
-            page_description_key="page.strategies.description",
-            template_name="pages/strategies.html",
-        )
-
-    @app.get("/strategies/new", response_class=HTMLResponse)
-    def get_new_strategy_page(request: Request) -> Response:
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/strategies",
-            page_title_key="page.strategy_new.title",
-            page_description_key="page.strategy_new.description",
-            template_name="pages/strategy_create.html",
-        )
-
-    @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
-    def get_strategy_details_page(request: Request, strategy_id: str) -> Response:
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/strategies",
-            page_title_key="page.strategy_detail.title",
-            page_description_key="page.strategy_detail.description",
-            template_name="pages/strategy_detail.html",
-            template_context={"strategy_id": strategy_id},
-        )
-
-    @app.get("/monitoring", response_class=HTMLResponse)
-    def get_monitoring_page(request: Request) -> Response:
-        return _render_protected_page(
-            request=request,
-            templates=templates,
-            page_path="/monitoring",
-            page_title_key="page.monitoring.title",
-            page_description_key="page.monitoring.description",
-            template_name="pages/monitoring.html",
+            page_title="Strategies",
+            template_name="strategies_list.html",
         )
 
     @app.get("/backtests", response_class=HTMLResponse)
     def get_backtests_page(request: Request) -> Response:
+        """
+        Render protected backtests page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML backtests page or login redirect response.
+        Assumptions:
+            Browser-side code consumes the public Backtest API through `/api/*`.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
         return _render_protected_page(
             request=request,
             templates=templates,
             page_path="/backtests",
-            page_title_key="page.backtests.title",
-            page_description_key="page.backtests.description",
-            template_name="pages/backtests_history.html",
+            page_title="Backtests",
+            template_name="backtests.html",
         )
 
-    @app.get("/backtests/new", response_class=HTMLResponse)
-    def get_new_backtest_page(request: Request) -> Response:
+    @app.get("/strategies/new", response_class=HTMLResponse)
+    def get_new_strategy_page(request: Request) -> Response:
+        """
+        Render protected strategy creation builder page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML strategy builder page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
         return _render_protected_page(
             request=request,
             templates=templates,
-            page_path="/backtests",
-            page_title_key="page.backtest_new.title",
-            page_description_key="page.backtest_new.description",
-            template_name="pages/backtests_run.html",
+            page_path="/strategies",
+            page_title="Create Strategy",
+            template_name="strategy_builder.html",
         )
 
-    @app.get("/backtests/{job_id}", response_class=HTMLResponse)
-    def get_backtest_result_page(request: Request, job_id: str) -> Response:
+    @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
+    def get_strategy_details_page(request: Request, strategy_id: str) -> Response:
+        """
+        Render protected strategy details page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+            strategy_id: Target strategy identifier string from route path.
+        Returns:
+            Response: HTML strategy details page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
         return _render_protected_page(
             request=request,
             templates=templates,
-            page_path="/backtests",
-            page_title_key="page.backtest_result.title",
-            page_description_key="page.backtest_result.description",
-            template_name="pages/backtests_result.html",
-            template_context={"job_id": job_id},
+            page_path="/strategies",
+            page_title="Strategy Details",
+            template_name="strategy_details.html",
+            template_context={"strategy_id": strategy_id},
+        )
+
+    @app.get("/_partial/user_badge", response_class=HTMLResponse)
+    def get_user_badge_partial(request: Request) -> Response:
+        """
+        Render HTMX partial snippet for authenticated user badge.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML badge snippet with status reflecting auth/API result.
+        Assumptions:
+            Endpoint is consumed by HTMX from protected SSR pages.
+        Raises:
+            None.
+        Side Effects:
+            Performs server-side identity API call for current user lookup.
+        """
+        api_client = _resolve_current_user_api_client(request=request)
+        api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
+        if api_result.status_code == 200 and api_result.user is not None:
+            return templates.TemplateResponse(
+                request,
+                "partials/user_badge.html",
+                context={"request": request, "current_user": api_result.user},
+            )
+        if api_result.status_code == 401:
+            return HTMLResponse(
+                status_code=401,
+                content='<span class="user-badge user-badge--guest">guest</span>',
+            )
+        return HTMLResponse(
+            status_code=502,
+            content='<span class="user-badge user-badge--error">api unavailable</span>',
         )
 
 
 def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClient:
+    """
+    Resolve server-side current-user API adapter from FastAPI application state.
+
+    Args:
+        request: HTTP request object.
+    Returns:
+        CurrentUserApiClient: Bound API adapter instance.
+    Assumptions:
+        `create_app` sets `app.state.current_user_api_client` at startup.
+    Raises:
+        ValueError: If API client is not configured in app state.
+    Side Effects:
+        None.
+    """
     api_client = getattr(request.app.state, "current_user_api_client", None)
     if api_client is None:
         raise ValueError("current_user_api_client is not configured in application state")
     return api_client
 
 
-def _resolve_account_preferences_api_client(*, request: Request) -> AccountPreferencesApiClient:
-    api_client = getattr(request.app.state, "account_preferences_api_client", None)
-    if api_client is None:
-        raise ValueError("account_preferences_api_client is not configured in application state")
-    return api_client
-
-
 def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:
+    """
+    Copy browser request headers for upstream API proxying.
+
+    Args:
+        request: Incoming browser request for `/api/*`.
+    Returns:
+        dict[str, str]: Forwarded header mapping without hop-by-hop transport headers.
+    Assumptions:
+        Browser cookies and content negotiation headers should be preserved verbatim.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
     forwarded_headers: dict[str, str] = {}
     for header_name, header_value in request.headers.items():
         if header_name.lower() in _HOP_BY_HOP_HEADERS:
@@ -354,324 +431,139 @@ def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:
     return forwarded_headers
 
 
-def _render_public_page(
-    *,
-    request: Request,
-    templates: Jinja2Templates,
-    page_path: str,
-    page_title_key: str,
-    template_name: str,
-    template_context: Mapping[str, Any] | None = None,
-) -> Response:
-    context = _build_template_context(
-        request=request,
-        page_path=page_path,
-        page_title_key=page_title_key,
-        current_user=None,
-        error_message=None,
-    )
-    if template_context is not None:
-        context.update(template_context)
-    return _render_template_response(
-        request=request,
-        templates=templates,
-        template_name=template_name,
-        context=context,
-    )
-
-
 def _render_protected_page(
     *,
     request: Request,
     templates: Jinja2Templates,
     page_path: str,
-    page_title_key: str,
-    page_description_key: str,
-    template_name: str = "pages/placeholder.html",
-    load_account_preferences: bool = False,
+    page_title: str,
+    page_description: str | None = None,
+    template_name: str = "protected_page.html",
     template_context: Mapping[str, Any] | None = None,
 ) -> Response:
+    """
+    Enforce login gate and render protected page template with shared context.
+
+    Args:
+        request: HTTP request object.
+        templates: Jinja2 template renderer.
+        page_path: Canonical route path for navigation state.
+        page_title: Page title shown in rendered HTML document.
+        page_description: Optional description for skeleton-like templates.
+        template_name: Template file name to render after login gate passes.
+        template_context: Optional template-specific key-value context mapping.
+    Returns:
+        Response: Login redirect or rendered protected page response.
+    Assumptions:
+        Auth state comes exclusively from `/api/auth/current-user` response status.
+    Raises:
+        None.
+    Side Effects:
+        Performs server-side request to identity API.
+    """
     api_client = _resolve_current_user_api_client(request=request)
     api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
 
     if api_result.status_code == 401:
-        return _build_login_redirect_response(current_path=_build_current_path(request=request))
+        return _build_login_redirect_response(current_path=request.url.path)
 
     current_user = api_result.user if api_result.status_code == 200 else None
-    preferences_result = _fetch_account_preferences(
-        request=request,
-        enabled=load_account_preferences and current_user is not None,
-    )
-    account_preferences = (
-        preferences_result.preferences if preferences_result is not None else None
-    )
-    current_locale, should_set_locale_cookie = _resolve_locale_state(
-        request=request,
-        account_locale=account_preferences.locale if account_preferences is not None else None,
-    )
-    error_message = _build_api_error_message(api_result=api_result, locale=current_locale)
+    error_message = _build_api_error_message(api_result=api_result)
     status_code = 200 if current_user is not None else 502
 
     context = _build_template_context(
         request=request,
         page_path=page_path,
-        page_title_key=page_title_key,
+        page_title=page_title,
         current_user=current_user,
         error_message=error_message,
-        locale=current_locale,
-        should_set_locale_cookie=should_set_locale_cookie,
-        account_preferences=account_preferences,
     )
-    context["page_description"] = translate(locale=current_locale, key=page_description_key)
-    context["page_description_key"] = page_description_key
-    context["placeholder_id"] = page_path.strip("/").replace("/", "-") or "home"
+    if page_description is not None:
+        context["page_description"] = page_description
     if template_context is not None:
         context.update(template_context)
-
-    response = _render_template_response(
-        request,
-        templates=templates,
-        template_name=template_name,
-        context=context,
-        status_code=status_code,
-    )
-    response.headers["Cache-Control"] = "no-store"
-    return response
-
-
-def _render_template_response(
-    request: Request,
-    *,
-    templates: Jinja2Templates,
-    template_name: str,
-    context: dict[str, Any],
-    status_code: int = 200,
-) -> Response:
-    response = templates.TemplateResponse(
+    return templates.TemplateResponse(
         request,
         template_name,
         context=context,
         status_code=status_code,
     )
-    if context.get("should_set_locale_cookie") is True:
-        response.set_cookie(
-            LOCALE_COOKIE_NAME,
-            str(context["current_locale"]),
-            max_age=31_536_000,
-            httponly=False,
-            samesite="lax",
-        )
-    return response
 
 
 def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
+    """
+    Build deterministic redirect response to `/login` with guarded `next` target.
+
+    Args:
+        current_path: Requested protected path.
+    Returns:
+        RedirectResponse: Redirect to login route with encoded safe next parameter.
+    Assumptions:
+        `current_path` originates from trusted server-side request routing.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
     safe_next_path = sanitize_next_path(raw_next=current_path)
     query = urlencode({"next": safe_next_path})
     return RedirectResponse(url=f"/login?{query}")
 
 
-def _build_oidc_login_url(*, next_path: str) -> str:
-    safe_next_path = sanitize_next_path(raw_next=next_path)
-    query = urlencode({"next": safe_next_path})
-    return f"/api/auth/login?{query}"
+def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:
+    """
+    Convert API lookup failure into human-readable SSR error banner message.
 
-
-def _build_current_path(*, request: Request) -> str:
-    query = str(request.url.query)
-    if not query:
-        return request.url.path
-    return f"{request.url.path}?{query}"
-
-
-def _build_api_error_message(
-    *,
-    api_result: CurrentUserApiResult,
-    locale: str,
-) -> str | None:
-    if api_result.status_code in (200, 401):
+    Args:
+        api_result: Current-user lookup result from internal API client.
+    Returns:
+        str | None: Error message suitable for UI banner or None when no error.
+    Assumptions:
+        Unauthorized responses are handled by redirect and never shown as error banners.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if api_result.status_code == 200:
+        return None
+    if api_result.status_code == 401:
         return None
     if api_result.error_message is None:
-        return translate(locale=locale, key="error.identity_api")
+        return "Identity API request failed"
     return api_result.error_message
-
-
-def _fetch_account_preferences(
-    *,
-    request: Request,
-    enabled: bool,
-) -> AccountPreferencesApiResult | None:
-    if not enabled:
-        return None
-    api_client = _resolve_account_preferences_api_client(request=request)
-    result = api_client.fetch_preferences(cookie_header=request.headers.get("cookie"))
-    if result.status_code != 200:
-        return None
-    return result
 
 
 def _build_template_context(
     *,
     request: Request,
     page_path: str,
-    page_title_key: str,
+    page_title: str,
     current_user: WebCurrentUser | None,
     error_message: str | None,
-    locale: str | None = None,
-    should_set_locale_cookie: bool | None = None,
-    account_preferences: WebAccountPreferences | None = None,
 ) -> dict[str, Any]:
-    current_theme = _resolve_theme(
-        request=request,
-        account_theme=account_preferences.theme if account_preferences is not None else None,
-    )
-    if locale is None or should_set_locale_cookie is None:
-        current_locale, should_set_cookie = _resolve_locale_state(
-            request=request,
-            account_locale=account_preferences.locale if account_preferences is not None else None,
-        )
-    else:
-        current_locale = locale
-        should_set_cookie = should_set_locale_cookie
-    t = build_translator(locale=current_locale)
+    """
+    Build base template context shared by all SSR page handlers.
+
+    Args:
+        request: HTTP request object.
+        page_path: Current route path for navigation highlighting.
+        page_title: Human-readable page title.
+        current_user: Optional authenticated user summary for badge rendering.
+        error_message: Optional API/web error banner text.
+    Returns:
+        dict[str, Any]: Template context payload.
+    Assumptions:
+        Template names consume the same core keys across all pages.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
     return {
         "request": request,
         "page_path": page_path,
-        "page_title_key": page_title_key,
-        "page_title": t(page_title_key),
+        "page_title": page_title,
         "current_user": current_user,
         "error_message": error_message,
-        "current_theme": current_theme,
-        "current_locale": current_locale,
-        "should_set_locale_cookie": should_set_cookie,
-        "t": t,
-        "nav_items": _build_nav_items(page_path=page_path, locale=current_locale),
-        "auth_actions": _build_auth_actions(
-            page_path=page_path,
-            current_user=current_user,
-            locale=current_locale,
-        ),
-        "theme_options": _build_theme_options(
-            request=request,
-            current_theme=current_theme,
-            locale=current_locale,
-        ),
-        "locale_options": _build_locale_options(request=request, current_locale=current_locale),
-        "client_i18n_catalogs": load_catalogs(),
     }
-
-
-def _resolve_locale_state(
-    *,
-    request: Request,
-    account_locale: str | None = None,
-) -> tuple[str, bool]:
-    raw_query_locale = request.query_params.get("locale")
-    resolved_locale = normalize_locale(account_locale) or resolve_locale(
-        query_locale=raw_query_locale,
-        cookie_locale=request.cookies.get(LOCALE_COOKIE_NAME),
-        accept_language=request.headers.get("accept-language"),
-    )
-    should_set_cookie = normalize_locale(raw_query_locale) is not None
-    return resolved_locale, should_set_cookie
-
-
-def _build_nav_items(*, page_path: str, locale: str) -> list[dict[str, str | bool]]:
-    return [
-        {
-            "key": item.key,
-            "href": item.href,
-            "label_key": item.label_key,
-            "label": translate(locale=locale, key=item.label_key),
-            "active": item.key == page_path,
-        }
-        for item in _PRIMARY_NAV_ITEMS
-    ]
-
-
-def _build_auth_actions(
-    *,
-    page_path: str,
-    current_user: WebCurrentUser | None,
-    locale: str,
-) -> list[dict[str, str | bool]]:
-    if current_user is not None:
-        return [
-            {
-                "key": "/logout",
-                "href": "/logout",
-                "label_key": "auth.logout",
-                "label": translate(locale=locale, key="auth.logout"),
-                "active": page_path == "/logout",
-            }
-        ]
-    return [
-        {
-            "key": "/login",
-            "href": "/login",
-            "label_key": "auth.login",
-            "label": translate(locale=locale, key="auth.login"),
-            "active": page_path == "/login",
-        },
-        {
-            "key": "/register",
-            "href": "/register",
-            "label_key": "auth.register",
-            "label": translate(locale=locale, key="auth.register"),
-            "active": page_path == "/register",
-        },
-    ]
-
-
-def _resolve_theme(*, request: Request, account_theme: str | None = None) -> str:
-    if account_theme in _THEME_KEYS:
-        return account_theme
-    requested_theme = request.query_params.get("theme")
-    if requested_theme in _THEME_KEYS:
-        return requested_theme
-    return _DEFAULT_THEME
-
-
-def _build_theme_options(
-    *,
-    request: Request,
-    current_theme: str,
-    locale: str,
-) -> list[dict[str, str | bool]]:
-    theme_options: list[dict[str, str | bool]] = []
-    for theme in _THEME_OPTIONS:
-        theme_options.append(
-            {
-                "key": theme.key,
-                "label": translate(locale=locale, key=theme.label_key),
-                "href": _build_control_href(request=request, updates={"theme": theme.key}),
-                "active": theme.key == current_theme,
-            }
-        )
-    return theme_options
-
-
-def _build_locale_options(
-    *,
-    request: Request,
-    current_locale: str,
-) -> list[dict[str, str | bool]]:
-    return [
-        {
-            "key": locale.key,
-            "label": translate(locale=current_locale, key=locale.label_key),
-            "href": _build_control_href(request=request, updates={"locale": locale.key}),
-            "active": locale.key == current_locale,
-        }
-        for locale in _LOCALE_OPTIONS
-    ]
-
-
-def _build_control_href(*, request: Request, updates: Mapping[str, str]) -> str:
-    query_params = dict(request.query_params)
-    if "next" in query_params:
-        query_params["next"] = sanitize_next_path(raw_next=query_params["next"])
-    query_params.update(updates)
-    query = urlencode(query_params)
-    if not query:
-        return request.url.path
-    return f"{request.url.path}?{query}"

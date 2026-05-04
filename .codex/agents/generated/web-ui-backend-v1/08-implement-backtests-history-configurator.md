@@ -1,8 +1,8 @@
 ---
-prompt_name: web_ui_backend_v1_08_backtests_history_configurator
+prompt_name: web_ui_backend_v1_08_backtests_workstation
 repo: roehub.com
 branch: main
-scope: "Этап 8: разделить backtests на историю и конфигуратор, добавить presets/counters при необходимости."
+scope: "Этап 8: /backtests как единая backtest workstation по stategy_backtest.png, с presets/workstation DTO при необходимости."
 
 language:
   implementation: python_fastapi_jinja_css_js_alembic
@@ -26,6 +26,10 @@ context_sources:
     - path: apps/web/dist/backtest_ui.js
       why: "current combined JS replacement target"
   conditional_bundles:
+    canonical_reference:
+      read_when: "always before implementation; this stage is reference-fidelity gated"
+      paths:
+        - /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
     presets_persistence:
       read_when: "if implementing `backtest_presets`"
       paths:
@@ -52,7 +56,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; canonical for this stage is stategy_backtest.png"
+  canonical_reference:
+    route: /backtests
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
+    fidelity: "hard reference-shaped contract for one-page backtest workstation"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -65,7 +73,9 @@ style_references:
   language_switch_required: true
 
 hard_requirements:
-  split_backtests_page: true
+  single_backtests_workstation: true
+  reference_fidelity_required: true
+  reject_generic_history_cards: true
   history_cursor_pagination: true
   configurator_uses_runtime_defaults: true
   preflight_advisory_create_authoritative: true
@@ -75,8 +85,8 @@ hard_requirements:
   browser_qa_required: true
 
 task_toggles:
-  implement_history_page: true
-  implement_configurator_page: true
+  implement_workstation_page: true
+  implement_backtests_new_compat_redirect_optional: true
   implement_presets_optional: true
   implement_job_events_optional: true
   implement_runtime_hardening: false
@@ -90,17 +100,15 @@ package_contract:
     - "apps/api/routes/ui_backtests.py"
     - "apps/api/dto/ui_backtests.py"
     - "apps/api/wiring/modules/ui_backtests.py"
-    - "apps/api/routes/backtests.py additive history/configurator behavior only"
-    - "apps/web/templates/pages/backtests_history.html"
-    - "apps/web/templates/pages/backtests_run.html"
+    - "apps/api/routes/backtests.py additive workstation behavior only"
+    - "apps/web/templates/pages/backtests.html"
     - "apps/web/templates/fragments/backtests/**"
-    - "apps/web/dist/js/pages/backtests_history.js"
-    - "apps/web/dist/js/pages/backtests_run.js"
+    - "apps/web/dist/js/pages/backtests.js"
     - "apps/web/dist/css/pages/backtests.css"
     - "tests/unit/apps/api/test_ui_backtests_routes.py"
   forbidden:
     - "backtest runtime worker hardening"
-    - "backtest results/statistics page"
+    - "backtest result endpoints/state"
     - "AI configurator"
     - "canonical request hash changes"
   integration_points:
@@ -109,7 +117,7 @@ package_contract:
     - "backtest_presets migration if implemented"
     - "apps/api/main.py route include"
   handoff:
-    - "split history/configurator pages and safe request draft flow"
+    - "reference-shaped backtest workstation and safe request draft flow"
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -121,7 +129,7 @@ skill_routing:
     timing: "during verification"
     reason: "stage has API, web, and optional migration surfaces"
   - skill: browser-qa-evidence
-    use_when: "verifying `/backtests`, `/backtests/new`, create/preflight/cancel/history flow, console/network, responsive layout"
+    use_when: "verifying `/backtests` workstation, optional `/backtests/new` redirect, create/preflight/cancel/table flow, reference fidelity, console/network, responsive layout"
     timing: "after backend tests"
     reason: "backtest configurator/history are browser-visible"
   - skill: playwright
@@ -140,7 +148,9 @@ target_envs:
 
 required_literals:
   - "/backtests"
+  - "stategy_backtest.png"
   - "/backtests/new"
+  - "/api/ui/backtests/workstation"
   - "/api/backtests/runtime-defaults"
   - "/api/backtests/preflight"
   - "/api/backtests/jobs"
@@ -149,10 +159,11 @@ required_literals:
   - "request_hash"
 
 non_goals:
-  - "Do not implement results/statistics page; Stage 9 owns it."
+  - "Do not implement result endpoints/state; Stage 9 owns selected result state inside `/backtests`."
   - "Do not harden sync_inline runtime; Stage 8.5 owns it."
   - "Do not change canonical backtest request hashing."
-  - "Do not load full results/trades on configurator."
+  - "Do not load full results/trades on `/backtests` workstation."
+  - "Do not split the UX into generic history and generic configurator pages unless only as compatibility redirects/fragments."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -184,11 +195,9 @@ expected_primary_touches:
   - "apps/api/routes/backtests.py"
   - "src/trading/contexts/backtest/**"
   - "alembic/versions/*.py"
-  - "apps/web/templates/pages/backtests_history.html"
-  - "apps/web/templates/pages/backtests_run.html"
+  - "apps/web/templates/pages/backtests.html"
   - "apps/web/templates/fragments/backtests/*"
-  - "apps/web/dist/js/pages/backtests_history.js"
-  - "apps/web/dist/js/pages/backtests_run.js"
+  - "apps/web/dist/js/pages/backtests.js"
   - "apps/web/dist/css/pages/backtests.css"
   - "tests/unit/apps/api/test_ui_backtests_routes.py"
   - "tests/unit/apps/web/test_app_routes.py"
@@ -202,16 +211,19 @@ safety_notes:
   - "Presets belong to Alembic/application DB unless a separate design decision moves them to identity DB."
   - "`POST /api/backtests/jobs` is browser path; backend route is `/backtests/jobs`."
   - "Preflight is advisory. Create repeats validation."
+  - "The `/backtests` page body after the global header must be reference-shaped against stategy_backtest.png."
 ---
 
 # Task
 
-Implement Stage 8 backtests history and configurator split.
+Implement Stage 8 `/backtests` backtest workstation.
 
 Done means:
 
-- `/backtests` shows only history/list with cursor pagination;
-- `/backtests/new` shows configurator using runtime defaults/reference endpoints;
+- `/backtests` is reference-shaped against `stategy_backtest.png`;
+- final report lists reference and implemented panel inventory;
+- `/backtests` combines config, AI/config placeholder, instruments, indicators, optimization/progress, recent events and jobs/variants table as one workstation;
+- `/backtests/new`, if preserved, is only a tested redirect/alias to the same workstation create/config mode;
 - create flow sends `Idempotency-Key`;
 - invalid requests never create jobs;
 - presets/counters exist only if implemented through proper contracts;
@@ -226,9 +238,12 @@ Done means:
 
 ## Requirements (Must)
 
+- Open `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` before coding.
+- Preserve the reference panel inventory: command bar, left config panel, AI configurator/analysis panel, instruments selector, indicators table/list, optimization overview/progress, recent events, main variants/results table, action/status buttons, bottom status/logos row.
+- Add or reuse `GET /api/ui/backtests/workstation?cursor=&state=&query=` as bounded first-render read-model when useful.
 - Preserve jobs vocabulary and public API compatibility.
 - Preserve canonical request hash/cache identity.
-- Keep full results/trades out of history/configurator first paint.
+- Keep full results/trades out of `/backtests` workstation first paint.
 - Use cursor pagination for history.
 - Add tests for preflight valid/invalid, idempotency replay/conflict, cancel UX, presets if implemented.
 - Use `publish-ci-deploy` only after full success.
@@ -245,7 +260,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, plan Stage 8, backtest artifact runtime doc if needed, then task entrypoints. Expand into persistence only if presets are implemented.
+Read `.codex/AGENTS.md`, plan Stage 8, design manifest backtests sections, `stategy_backtest.png`, backtest artifact runtime doc if needed, then task entrypoints. Expand into persistence only if presets are implemented.
 
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
@@ -258,23 +273,26 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Split routes/templates for history and configurator.
-2. Define optional UI backtest DTOs for presets/counters.
-3. Implement backend additions only when required.
-4. Implement page JS/CSS with bounded polling and no full results payloads.
-5. Add focused tests.
-6. Run browser QA and quality gates.
-7. Use `publish-ci-deploy` only after complete success.
+1. Open `stategy_backtest.png` and record panel inventory.
+2. Implement `/backtests` as a single reference-shaped workstation, not split generic pages.
+3. Define optional UI backtest DTOs for workstation/presets/counters.
+4. Implement backend additions only when required.
+5. Implement page JS/CSS with bounded polling and no full results payloads.
+6. Add focused tests.
+7. Run browser QA and quality gates.
+8. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
-- `/backtests` shows only history and paginates.
-- `/backtests/new` builds valid request from runtime defaults/reference endpoints.
+- Implemented panel inventory matches `stategy_backtest.png`; any deviation is named and justified.
+- `/backtests` builds valid request from runtime defaults/reference endpoints.
+- `/backtests/new`, if preserved, is route-tested as redirect/alias.
 - Invalid request never creates job.
 - Duplicate submit with same idempotency key returns same job.
 - Cancel is UX-idempotent.
 - History remains responsive with large job count.
 - Full results/trades are not loaded on configurator.
+- Generic history/configurator card pages are not acceptable as primary `/backtests` UX.
 
 # Implementation constraints
 
@@ -353,10 +371,7 @@ export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" open http://127.0.0.1:8010/backtests
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-history-desktop.png
-"$PWCLI" open http://127.0.0.1:8010/backtests/new
-"$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-run-desktop.png
+"$PWCLI" screenshot --filename output/playwright/backtests-workstation-desktop.png
 ```
 
 # i18n / language contract

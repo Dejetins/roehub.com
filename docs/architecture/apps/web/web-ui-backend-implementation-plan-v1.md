@@ -7,7 +7,9 @@
 - предлагаемый план реализации;
 - дизайн-источник правды: `docs/architecture/apps/web/web-ui-design-manifest-v1.md`;
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
-- текущая визуальная реализация `apps/web` заменяется полностью и не сохраняется как наследуемый режим.
+- текущая визуальная реализация `apps/web` заменяется полностью и не сохраняется как наследуемый режим;
+- обновление 2026-05-04: функциональные страницы привязаны к canonical PNG-референсам через жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются кандидатом на откат/замену, если не повторяют назначенный reference layout.
+- актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
 
 ## Цель
 
@@ -17,6 +19,7 @@
 - весь UI мультиязычный: основной язык `en`, дополнительный `ru`, переключение языка доступно из shell/settings;
 - затем отдельный план реализации для каждой страницы;
 - для каждой страницы явно указать backend API, состав UI, пользовательский функционал, затрагиваемые файлы, критерии приемки и Playwright CLI-проверки;
+- для функциональных страниц реализация обязана быть `reference-shaped`, а не "inspired by";
 - backend-логика остается в backend API/application services, не в `apps/web`;
 - после базовых этапов агенты могут работать параллельно с непересекающимися зонами записи.
 
@@ -51,10 +54,11 @@
 - UI-kit на design-токенах и переключатель темы;
 - i18n foundation: `en` default, `ru` secondary, language switcher, locale preference/fallback;
 - каркас с auth/register/header;
-- лендинг, dashboard, settings, monitoring стратегий, библиотека/детали стратегий, история/configurator/results backtest-задач;
+- лендинг, dashboard всех стратегий, settings, dashboard конкретной стратегии и backtest workstation;
 - backend API read-model-расширения под same-origin `/api/*`;
 - SSE/polling helpers для live UI;
 - Playwright CLI-приемка для каждой реализованной страницы;
+- reference fidelity evidence для каждой функциональной страницы;
 - обновление docs index.
 
 ## Что не входит
@@ -69,6 +73,40 @@
 - прямой запуск job AI-ассистентом без подтверждения пользователя;
 - темы, меняющие семантику финансовых цветов для доходности и процентных изменений.
 - локализация URL-маршрутов, `/api/*` paths, DTO fields, enum values, `job_id`, `variant_key`, market symbols и других технических identifiers.
+- destructive откат к baseline commit без отдельного явного запроса; этот документ фиксирует baseline, но не разрешает `git reset`.
+
+## Reference fidelity contract и карта страниц
+
+Для функциональных страниц часть после глобальной шапки сайта должна повторять назначенный PNG-референс по структуре, плотности, сетке панелей, таблицам, графикам, command bar и status bar. Референс является визуальным контрактом, а не настроением. Допускаются только контролируемые отклонения: бренд `Roehub` вместо `QUANT CLI`, `en`/`ru` copy, реальные данные вместо демо-значений, responsive collapse на mobile и typed degraded/unavailable panels вместо отсутствующих backend-данных.
+
+Canonical page map:
+
+| Route | Canonical reference | Смысл | Статус реализации |
+|---|---|---|---|
+| `/` | `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png` | public landing | этим обновлением не пересматривается. |
+| `/dashboard` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png` | dashboard по всем стратегиям | Stage 4 должен быть переписан как all-strategies workstation. |
+| `/settings` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png` | account/settings workstation | Stage 5 должен повторять панельный account layout. |
+| `/strategies` | `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | Stage 6 должен повторять analytics workstation layout. |
+| `/backtests` | `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` | backtest workstation/configurator | Stage 8 должен реализовать единую рабочую поверхность, а не split на generic pages. |
+| `/backtests/{job_id}` | нет canonical PNG в v1 map | optional deep link/API state | не является шестой функциональной страницей v1; если сохраняется, открывает `/backtests` с выбранной job/result state. |
+| `/monitoring` | нет canonical PNG в v1 map | compatibility/ops route only | не забирает strategy reference; может быть redirect/alias после отдельного решения. |
+
+В v1 не планируются отдельные visual pages для `/monitoring`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests/new` или `/backtests/{job_id}`. Эти entrypoints допустимы только как compatibility redirects/aliases или state внутри соответствующей canonical page.
+
+Обязательства implementation-агента:
+
+- открыть canonical PNG перед кодом и перечислить panel inventory в notes/final report;
+- сохранить форму каждой панели из референса даже при `degraded/unavailable` data state;
+- не заменять функциональную страницу generic card grid, overview cards или marketing layout;
+- не выдумывать production-данные ради заполнения panel inventory;
+- добавить Playwright desktop/mobile evidence и в final report отделить observed reference fidelity от inference;
+- если canonical PNG отсутствует, остановиться с blocker, а не реализовывать страницу по памяти.
+
+Rollback/baseline:
+
+- baseline commit для пересборки UI pack: `bae8bd88229ceec4736deee5d61ad178e1ab9060`;
+- если требуется физически откатить уже реализованный UI-код, использовать отдельный безопасный revert/publish workflow с проверками и Mac Studio sync;
+- этот план и prompt pack должны считать post-baseline generic UI реализацией, которую можно заменять, но не должны выполнять destructive reset без отдельного явного задания.
 
 ## Целевая архитектура
 
@@ -105,9 +143,9 @@ flowchart LR
 - Foundation-агент владеет `apps/web/main/app.py`, `apps/web/templates/base.html`, общими папками шаблонов и общими ассетами.
 - Design-system-агент владеет `apps/web/dist/css/**`, общими macros/components, переключателем темы и страницами visual QA fixture.
 - Settings-агент владеет account/settings-шаблонами и фрагментами, `identity` UI routes/read-models и тестами аккаунта.
-- Monitoring-агент владеет strategy monitoring API/SSE-мостом, monitoring-шаблонами/ассетами и тестами мониторинга стратегий.
-- Backtests configurator/history-агент владеет страницами истории/run, presets и интеграцией current jobs/preflight.
-- Backtests results-агент владеет summary/chart/stats/paginated trades endpoints и страницей результатов.
+- Strategies-dashboard агент владеет selected-strategy dashboard `/strategies`, strategy monitoring API/SSE-мостом, templates/assets и тестами стратегий.
+- Backtests workstation агент владеет `/backtests` как единой reference-shaped рабочей поверхностью, presets, history table и интеграцией current jobs/preflight.
+- Backtests results-агент владеет summary/chart/stats/paginated trades endpoints и selected result state внутри `/backtests`, без отдельной sixth page.
 - Dashboard-агент владеет dashboard read-model endpoints и обзорной страницей.
 - QA/hardening-агент владеет Playwright evidence, проверками CSP/CSRF/cache headers и drift docs index.
 
@@ -127,15 +165,11 @@ apps/web/templates/
     dashboard.html
     settings.html
     strategies.html
-    strategy_detail.html
-    monitoring.html
-    backtests_history.html
-    backtests_run.html
-    backtests_result.html
+    backtests.html
   fragments/
     account/
     dashboard/
-    monitoring/
+    strategies/
     backtests/
   components/
     panel.html
@@ -224,18 +258,18 @@ Backend-добавления:
 apps/api/routes/
   ui_account.py
   ui_dashboard.py
-  ui_strategies_monitoring.py
+  ui_strategies_dashboard.py
   ui_backtests.py
   streams.py
 apps/api/dto/
   ui_account.py
   ui_dashboard.py
-  ui_strategies_monitoring.py
+  ui_strategies_dashboard.py
   ui_backtests.py
 apps/api/wiring/modules/
   ui_account.py
   ui_dashboard.py
-  ui_strategies_monitoring.py
+  ui_strategies_dashboard.py
   ui_backtests.py
   streams.py
 ```
@@ -487,7 +521,7 @@ sequenceDiagram
 - web proxy и edge должны сохранять или пробрасывать `X-Request-ID`/correlation header, если он выбран;
 - boundary logs structured и не содержат secrets;
 - метрики: request count, status count, p50/p95 latency, payload size bucket, active SSE connections, SSE reconnects, polling errors, dependency failure count;
-- для dashboard/monitoring/results отдельно считать degraded panel count и dependency name;
+- для dashboard/strategies/backtests/results отдельно считать degraded panel count и dependency name;
 - для backtest jobs считать create latency, queue wait, running duration, cancel latency, lazy detail materialization time;
 - для load tests фиксировать CPU/RSS, DB pool wait, Redis latency и error rate.
 
@@ -498,7 +532,7 @@ sequenceDiagram
 | Auth | `401` во время polling/SSE | остановить live loops, redirect/login banner | stable 401 без stack traces |
 | Authorization | чужой ресурс | 403/404 без утечки деталей | owner scope до read/stream |
 | Dashboard | один источник недоступен | degraded panel, остальные panels работают | partial DTO или typed degraded source |
-| Monitoring SSE | network drop | reconnect 2s/5s/15s, затем polling fallback | read-only stream, bounded connections |
+| Strategy live SSE | network drop | reconnect 2s/5s/15s, затем polling fallback | read-only stream, bounded connections |
 | Backtest results | lazy detail cache miss | loading state, bounded materialization | no full payload in top rows |
 | CSV export | large export | отдельный download flow | streaming/file route, rate limit |
 | AI | provider timeout | draft not applied, deterministic error | cancellation, redaction, rate limit |
@@ -530,8 +564,8 @@ Prompt каждого этапа должен явно указать:
 | Web shell/auth | route smoke, protected redirect, next sanitization, no inline script smoke. |
 | JS core | если JS unit runner не вводится, добавить browser/Playwright flow для 401/422/abort/backoff; Python tests проверяют asset references. |
 | Account/settings | route tests, DTO validation, owner scope, duplicate 409, audit event write, preferences default resolution. |
-| Monitoring | route tests, stream auth, Redis reader adapter tests, fallback DTO, start/stop state reflection. |
-| Backtests history/configurator | preflight invalid/valid, idempotency key, cancel idempotency, presets persistence, request hash unchanged. |
+| Strategy dashboard/live bridge | route tests, stream auth, Redis reader adapter tests, fallback DTO, start/stop state reflection, missing-reference blocker. |
+| Backtests workstation | preflight invalid/valid, idempotency key, cancel idempotency, presets persistence, request hash unchanged, reference panel inventory. |
 | Backtests results | variant 404, downsampling bounds, paginated trades, CSV auth/ownership, no full trades in top rows. |
 | Migrations | upgrade/downgrade or equivalent migration smoke, indexes/unique constraints, default-read behavior. |
 
@@ -601,8 +635,8 @@ flowchart LR
 | Shell/assets | anonymous `/`, protected redirect, static assets | 30-60s, concurrency 10-25 | p95 HTML latency, asset cache hit, web RSS. |
 | Dashboard summary | `GET /api/ui/dashboard/summary` | 30-60s, concurrency 5-20 | p95, payload size, dependency fan-out, degraded source count. |
 | Settings | preferences/profile/audit read, exchange-key list | 30s, concurrency 5-10 | auth overhead, DB latency, no secret leakage. |
-| Monitoring snapshot | monitor list + selected snapshot | 60s, concurrency 10 plus 1-5 SSE clients | Redis/DB fan-out, active SSE connections, reconnects. |
-| Backtests history | `GET /api/backtests/jobs` cursor pages | 60s, concurrency 10-20 | cursor stability, DB indexes, p95. |
+| Strategies dashboard/live | selected snapshot + strategy list/SSE | 60s, concurrency 10 plus 1-5 SSE clients | Redis/DB fan-out, active SSE connections, reconnects. |
+| Backtests workstation | `GET /api/ui/backtests/workstation` + cursor job table | 60s, concurrency 10-20 | cursor stability, DB indexes, payload size, p95. |
 | Backtests results | summary/equity/drawdown/monthly/trades page | 60s, concurrency 5-15 | artifact/cache IO, chart downsampling cost, no full trades payload. |
 | Paginated trades | `GET /trades?page=&page_size=50/100` | 60s, concurrency 5-10 | page latency, memory, cache materialization misses. |
 | Backtest create/preflight | valid/invalid preflight, idempotent create | controlled low rate | no API-process compute saturation; queued/background behavior. |
@@ -626,9 +660,9 @@ flowchart TD
     S1 --> S2["Этап 2\ndesign system + JS core"]
     S2 --> D["Dashboard package"]
     S2 --> A["Account/settings package"]
-    S2 --> M["Monitoring package"]
-    S2 --> SL["Strategy library package"]
-    S2 --> BH["Backtests history/config package"]
+    S2 --> SL["Strategies dashboard package"]
+    S2 --> M["Live strategy data package"]
+    S2 --> BH["Backtests workstation package"]
     BH --> BRH["Backtest runtime hardening"]
     BRH --> BR["Backtest results package"]
     S2 --> QA["QA/hardening package"]
@@ -692,9 +726,9 @@ flowchart TD
 | `ANY /api/{upstream_path:path}` | local/dev same-origin proxy, снимает `/api` перед upstream | `move` | `/api/... browser-visible` contract сохраняется для browser/dev parity; backend routers остаются без второго `/api` prefix. |
 | `MOUNT /assets/*` | flat `apps/web/dist/*` | `move` | Browser-visible `/assets/*` сохраняется; внутренняя раскладка переезжает в `css/`, `js/`, `vendor/`. |
 | `GET /strategies` | protected `strategies_list.html` | `replace` | Этап 1 регистрирует route, этап 6 заменяет страницу на `pages/strategies.html` и fragments. |
-| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 1 сохраняет entrypoint; этап 6 делает create workflow или явный redirect на новый create UI. |
-| `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 1 регистрирует route, этап 6 заменяет details UI на `pages/strategy_detail.html`. |
-| `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 делит current monolith на history/run pages; этап 9 владеет results route `/backtests/{job_id}`. |
+| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 1 сохраняет entrypoint; этап 6 делает compatibility redirect/alias на `/strategies?mode=create` или create modal внутри `/strategies`. |
+| `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 1 регистрирует route, этап 6 делает compatibility redirect/alias на `/strategies?strategy_id=...`; отдельная visual page не создается. |
+| `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 заменяет current monolith на reference-shaped workstation; results state живет внутри `/backtests`. |
 | `GET /_partial/user_badge` | HTMX partial route для текущего header badge | `delete` | Не является stable public route; этап 1 переносит badge в shell component/fragment или server-rendered context. |
 
 Текущие шаблоны и ассеты:
@@ -707,9 +741,9 @@ flowchart TD
 | `apps/web/templates/logout.html` | `replace` | Этап 1: `apps/web/templates/pages/logout.html` или server redirect flow без inline JS. |
 | `apps/web/templates/protected_page.html` | `delete` | Stage placeholders/pages заменяют этот generic skeleton; legacy skin не сохраняется. |
 | `apps/web/templates/strategies_list.html` | `replace` | Этап 6: `pages/strategies.html` + `fragments/strategies/*`. |
-| `apps/web/templates/strategy_builder.html` | `replace` | Этап 6: create workflow для `/strategies/new` или redirect, без зависимости от старого layout. |
-| `apps/web/templates/strategy_details.html` | `replace` | Этап 6: `pages/strategy_detail.html` + strategy fragments. |
-| `apps/web/templates/backtests.html` | `replace` | Этап 8/9: `pages/backtests_history.html`, `pages/backtests_run.html`, `pages/backtests_result.html` + fragments. |
+| `apps/web/templates/strategy_builder.html` | `replace` | Этап 6: create workflow внутри `/strategies` или redirect, без отдельного page layout. |
+| `apps/web/templates/strategy_details.html` | `replace` | Этап 6: compatibility redirect/alias на `/strategies?strategy_id=...`; отдельная `pages/strategy_detail.html` в v1 не является целевой страницей. |
+| `apps/web/templates/backtests.html` | `replace` | Этап 8/9: `pages/backtests.html` + backtests fragments; отдельный `backtests_result.html` в v1 не является целевой страницей. |
 | `apps/web/templates/partials/user_badge.html` | `move` | Этап 1: shell component/fragment; route `/_partial/user_badge` не переносится как public contract. |
 | `apps/web/dist/site.css` | `replace` | Этап 2: `css/tokens.css`, `themes.css`, `base.css`, `layout.css`, `components.css`, `pages/*`; default palette `terminal-orange`. |
 | `apps/web/dist/strategy_ui.js` | `replace` | Этап 2/6: `js/core/*`, `js/pages/strategies*`, strategy-specific helpers. |
@@ -800,10 +834,10 @@ python -m tools.docs.generate_docs_index --check
   - `/strategies`;
   - `/strategies/new`;
   - `/strategies/{strategy_id}`;
-  - `/monitoring`;
+  - `/monitoring` только как compatibility route/redirect, если сохраняется;
   - `/backtests`;
-  - `/backtests/new`;
-  - `/backtests/{job_id}`.
+  - `/backtests/new` только как compatibility route/redirect, если сохраняется;
+  - `/backtests/{job_id}` только как compatibility deep link к `/backtests` selected job/result state, если сохраняется.
 - Сохранить server-side проверку защищенного маршрута через `/api/auth/current-user`.
 - Заменить inline JS для login/logout на внешний `apps/web/dist/js/pages/auth.js` или чистые серверные redirects там, где это возможно.
 - Self-host HTMX в `apps/web/dist/vendor/htmx.min.js`.
@@ -1014,9 +1048,13 @@ Playwright CLI:
 "$PWCLI" screenshot --filename output/playwright/landing-desktop.png
 ```
 
-## Этап 4 - dashboard / обзор
+## Этап 4 - dashboard всех стратегий
 
-Цель: создать компактный защищенный обзор активных стратегий, последних backtest-задач, статуса аккаунта и alerts.
+Цель: реализовать `/dashboard` как terminal workstation по всем стратегиям строго по `personal_dashboard.png`, а не как набор обзорных карточек. Это главная защищенная рабочая поверхность fleet monitoring: выбранная стратегия слева, общий equity/PnL live chart, плотная metric grid, таблицы позиций/исполнений, health/risk, alerts, allocation и правый список стратегий.
+
+Канонический референс:
+
+- `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png`.
 
 Маршрут страницы:
 
@@ -1028,14 +1066,69 @@ Backend/API:
 - опциональные cursor endpoints, если summary становится слишком большим:
   - `GET /api/ui/dashboard/alerts?cursor=`;
   - `GET /api/ui/dashboard/recent-jobs?limit=10`;
-  - `GET /api/ui/dashboard/strategy-health?limit=10`.
+  - `GET /api/ui/dashboard/strategy-list?state=&exchange=&sort=&cursor=`;
+  - `GET /api/ui/dashboard/strategy-health?limit=10`;
+  - `GET /api/ui/dashboard/selected-strategy?strategy_id=`.
+
+Минимальный contract `GET /api/ui/dashboard/summary`:
+
+- `selected_strategy_snapshot`:
+  - strategy id/name/version/exchange/symbols/direction/mode/timeframe/capital/leverage;
+  - status `live|paper|stopped|degraded|unknown`;
+  - latest update timestamp, uptime, action availability `can_start/can_stop/can_restart/can_open_settings`;
+  - degradation reason, если источник недоступен.
+- `equity_pnl_series`:
+  - bounded points, default range `1d`, max points 600;
+  - equity, realized/unrealized/total PnL, buy/sell markers, timestamps;
+  - chart state `ready|empty|degraded`.
+- `metric_grid`:
+  - total PnL, unrealized PnL, realized PnL, ROI, win rate, open positions, equity, max drawdown, exposure, trades today, uptime;
+  - финансовые значения передаются числом и formatted string отдельно, чтобы цвет решался семантически.
+- `open_positions`:
+  - symbol, side, entry, mark, PnL absolute/percent, ROE, leverage, opened at, close action availability;
+  - limit default 20, max 50.
+- `recent_executions`:
+  - timestamp, symbol, side, price, quantity, fee, realized PnL, reason;
+  - cursor или bounded latest rows, max 50.
+- `health_risk`:
+  - dependency checks, latency, feed freshness, slippage, open alerts, bar/progress values;
+  - state `ok|warn|error|unknown`.
+- `alerts`:
+  - timestamp, severity, message, source, strategy id, acknowledged state;
+  - cursor pagination.
+- `symbol_allocation`:
+  - symbol, PnL absolute/percent, share, bar ratio.
+- `strategy_list`:
+  - rows with strategy id/name/version/exchange/symbols/latest activity/PnL/PnL percent/mode/open positions/status;
+  - filters `state`, `exchange`, `mode`, `query`;
+  - sort `pnl|activity|name|open_positions`;
+  - cursor pagination and stable order;
+  - `mini_sparkline` bounded points per row or explicit degraded/omitted state.
+- `footer_status`:
+  - system status, account tier, mode, API/exchange label, latency, server time.
 
 Поведение backend:
 
-- агрегировать только компактные read models;
-- не раскладывать страницу на множество browser calls;
+- агрегировать только компактные owner-scoped read models;
+- не раскладывать first render на множество browser calls: один summary request должен заполнить все panels из референса;
 - деградировать по панели: один упавший источник не должен ломать всю страницу, если auth не упал;
-- целевой payload: менее 50 KB в сжатом виде.
+- целевой payload: менее 80 KB в сжатом виде для default viewport, большие таблицы только через cursor endpoints;
+- не выдумывать PnL/ROI/positions в production: при отсутствии данных панель остается в форме референса и показывает typed empty/degraded state;
+- все ids и filters owner-scoped, чужие стратегии возвращают `403` или не попадают в список.
+
+Frontend / panel inventory из reference:
+
+- command bar `>_ MONITORING STRATEGIES` с active badge;
+- selected strategy summary в две колонки плюс actions column;
+- большая panel `PNL / EQUITY MONITORING (LIVE)` с legend, chart, buy/sell markers и range controls;
+- metric grid справа от chart;
+- `OPEN POSITIONS`;
+- `RECENT EXECUTIONS`;
+- `HEALTH & RISK`;
+- `ALERTS & EVENTS`;
+- `SYMBOL ALLOCATION (PnL)`;
+- правая высокая panel `STRATEGY LIST` с tabs, filters/search/sort/refresh, totals strip, paginated strategy rows и mini sparklines;
+- bottom system status bar.
 
 Файлы:
 
@@ -1052,12 +1145,15 @@ Backend/API:
 
 Критерии приемки:
 
-- один summary request рендерит страницу;
+- агент открыл `personal_dashboard.png` и перечислил panel inventory в final report;
+- один summary request рендерит все reference panels;
 - auth-required behavior согласован с другими защищенными маршрутами;
-- если recent jobs недоступны, account/strategy panels все равно рендерятся с error state;
+- если часть источников недоступна, соответствующие panels остаются на экране с `degraded/unavailable/empty`, а не исчезают;
 - polling interval равен 10-15s и приостанавливается на hidden tab;
 - browser request overlap отсутствует;
-- financial deltas сохраняют фиксированные семантические цвета во всех темах.
+- financial deltas сохраняют фиксированные семантические цвета во всех темах;
+- desktop screenshot после глобальной шапки reference-shaped относительно `personal_dashboard.png`; generic cards/overview layout считается introduced failure;
+- mobile layout не обязан быть pixel-identical, но сохраняет те же информационные зоны и порядок приоритетов.
 
 Playwright CLI:
 
@@ -1076,6 +1172,10 @@ Playwright CLI:
 ## Этап 5 - настройки / аккаунт
 
 Цель: реализовать `personal_settings.png`: профиль, exchange keys, limits, integrations, notifications, security, sessions, audit, настройки темы и языка.
+
+Канонический референс:
+
+- `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png`.
 
 Маршрут страницы:
 
@@ -1113,6 +1213,20 @@ Backend/API-добавления:
 - sessions и audit используют cursor pagination, без load-all;
 - account preferences включают выбранную UI-тему и `locale` (`en`/`ru`), но не могут переопределять семантику финансовых цветов или локализовать технические identifiers.
 
+Frontend / panel inventory из reference:
+
+- command bar `>_ PERSONAL SETTINGS`;
+- profile/account summary;
+- connected exchange APIs с masked credentials и health/status;
+- subscription/limits;
+- integrations/webhooks;
+- notifications;
+- security;
+- recent sessions;
+- event log;
+- top action buttons;
+- bottom status bar.
+
 Вероятно потребуется хранение:
 
 - `identity_user_preferences`;
@@ -1138,6 +1252,7 @@ Backend/API-добавления:
 
 Критерии приемки:
 
+- агент открыл `personal_settings.png` и перечислил panel inventory в final report;
 - страница settings открывается за auth gate;
 - добавление exchange key работает; secret никогда не присутствует в response, DOM или logs;
 - duplicate exchange key возвращает видимый детерминированный `409` с code `exchange_key_already_exists`;
@@ -1147,6 +1262,7 @@ Backend/API-добавления:
 - language preference сохраняется, восстанавливается после reload и обновляет `<html lang>`/`data-locale`;
 - settings copy и controls имеют `en` и `ru` версии без layout overflow;
 - sessions и audit пагинируются;
+- desktop screenshot после глобальной шапки reference-shaped относительно `personal_settings.png`;
 - mobile layout складывается без горизонтального overflow.
 
 Playwright CLI:
@@ -1164,15 +1280,20 @@ Playwright CLI:
 - persisted schema: `compatible-change` через additive tables;
 - config schema: `compatible-change`, если locale defaults становятся настраиваемыми; иначе `none`.
 
-## Этап 6 - библиотека и детали стратегий
+## Этап 6 - dashboard конкретной стратегии
 
-Цель: заменить текущий strategy list/builder/detail UI новым дизайном, сохранив существующую семантику Strategy API.
+Цель: реализовать `/strategies` как selected-strategy analytics workstation строго по `strategy_statistic.png`: dashboard/statistics конкретной выбранной стратегии. Это не generic strategy library и не route `/monitoring`.
+
+Канонический референс:
+
+- `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png`.
 
 Маршруты страниц:
 
 - `GET /strategies`;
-- `GET /strategies/new` или явный redirect на новый create workflow;
-- `GET /strategies/{strategy_id}`.
+- `GET /strategies?strategy_id=...` как selected strategy state;
+- `GET /strategies/new` только как create entrypoint/modal/redirect, если create workflow сохраняется;
+- `GET /strategies/{strategy_id}` может быть только compatibility redirect/alias на `/strategies?strategy_id=...` или тем же workstation state без отдельной visual page.
 
 Текущий backend:
 
@@ -1189,34 +1310,72 @@ Playwright CLI:
 
 Backend/API-добавления:
 
-- для начальной замены ничего не требуется;
-- опциональная более поздняя read model: `GET /api/ui/strategies/library?cursor=&state=`.
+- `GET /api/ui/strategies/dashboard?strategy_id=&state=active|all&cursor=`;
+- `GET /api/ui/strategies/{strategy_id}/snapshot`;
+- `GET /api/ui/strategies/{strategy_id}/positions?limit=50`;
+- `GET /api/ui/strategies/{strategy_id}/fills?cursor=`;
+- `GET /api/ui/strategies/{strategy_id}/equity?range=1d&points=600`;
+- `GET /api/stream/strategies?strategy_id=&last_event_id=` как SSE-мост поверх существующих realtime sources, если Stage 7 реализует live bridge.
 
 Frontend:
 
 - сохранить immutable strategy model: редактирование означает clone/create, а не mutable update;
-- заменить JSON textarea на visual spec summary/builder controls;
-- не потерять create workflow: текущий `/strategies/new` либо становится новой страницей/фрагментом конструктора, либо возвращает контролируемый redirect на `/strategies` с открытием create modal;
-- details page может использовать layout из `strategy_statistic.png` только для статистики стратегии, реально подкрепленной данными; метрики не подделывать.
+- заменить generic list/detail на reference-shaped workstation;
+- не потерять create workflow: текущий `/strategies/new` либо становится modal/fragment в workstation, либо возвращает контролируемый redirect на `/strategies` с открытием create mode;
+- details/deep-link route использует тот же `/strategies` state и те же panels, а не отдельный generic detail page;
+- `strategy_statistic.png` закреплен за `/strategies`; отдельный `/backtests/{job_id}` page layout по этому PNG не планируется.
+
+Frontend / panel inventory:
+
+- command/status bars;
+- top summary/strategy info;
+- candlestick/trades chart или equity/trades chart с controls;
+- metrics grid;
+- saved strategies/variant/strategy selector, если присутствует в референсе;
+- monthly stats;
+- drawdown/equity panels;
+- best/worst days;
+- hourly results;
+- trades/events table;
+- symbol results/breakdowns.
+
+Поведение backend:
+
+- использовать существующие strategy repositories/run model;
+- DTO owner-scoped по current user/account;
+- start/stop/restart actions остаются существующими `/api/strategies/{strategy_id}/run|stop`, если contracts не меняются;
+- все list rows, fills, alerts и chart points bounded;
+- отсутствующие realtime sources дают panel-level degraded state.
 
 Файлы:
 
 - добавить/изменить `apps/web/templates/pages/strategies.html`;
-- добавить/изменить `apps/web/templates/pages/strategy_create.html`, если create остается отдельной страницей;
-- добавить/изменить `apps/web/templates/pages/strategy_detail.html`;
+- добавить create fragment/modal внутри `apps/web/templates/fragments/strategies/*`, если create workflow сохраняется;
+- не добавлять отдельную `apps/web/templates/pages/strategy_detail.html`;
 - добавить `apps/web/templates/fragments/strategies/*`;
 - добавить `apps/web/dist/js/pages/strategies.js`;
 - добавить `apps/web/dist/css/pages/strategies.css`;
-- вывести из использования старые `strategies_list.html`, `strategy_builder.html`, `strategy_details.html` после завершения замены маршрутов.
+- добавить `apps/api/routes/ui_strategies_dashboard.py`;
+- добавить `apps/api/dto/ui_strategies_dashboard.py`;
+- добавить `apps/api/wiring/modules/ui_strategies_dashboard.py`;
+- добавить backend read-model services/ports в `src/trading/contexts/strategy/application/**` по DDD/ports-and-adapters;
+- вывести из использования старые `strategies_list.html`, `strategy_builder.html`, `strategy_details.html` после завершения замены маршрутов;
+- тесты:
+  - `tests/unit/apps/api/test_ui_strategy_dashboard_routes.py`;
+  - `tests/unit/apps/web/test_app_routes.py`.
 
 Критерии приемки:
 
-- list, clone и soft-delete продолжают вызывать существующие `/api/strategies*` routes;
-- `/strategies/new` покрыт route test и browser check как create entrypoint или redirect на create modal;
+- агент открыл `strategy_statistic.png` и перечислил panel inventory в final report;
+- `/strategies` reference-shaped относительно `strategy_statistic.png`;
+- list, clone, run/stop и soft-delete продолжают вызывать существующие `/api/strategies*` routes или явно задокументированные UI API wrappers;
+- `/strategies/new` покрыт route test и browser check как compatibility redirect/alias на create mode внутри `/strategies`;
+- `/strategies/{strategy_id}` покрыт route test как compatibility redirect/alias на selected strategy state внутри `/strategies`;
 - create/clone сохраняет canonical indicator payload shape;
-- strategy route не означает live monitoring; live monitoring принадлежит `/monitoring`;
+- selected strategy snapshot и right strategy list рендерятся из backend DTO;
 - зависимость от старого `strategy_ui.js` отсутствует;
-- переключатель темы не перекрашивает финансовые метрики, если они показаны.
+- переключатель темы не перекрашивает финансовые метрики, если они показаны;
+- desktop screenshot сверяется с `strategy_statistic.png` по panels/order/density; generic cards считаются failure.
 
 Playwright CLI:
 
@@ -1228,25 +1387,31 @@ Playwright CLI:
 
 Влияние на контракты:
 
-- public API contract: `none` для начальной замены;
-- browser-visible behavior: `breaking-change`.
+- public API contract: `compatible-change`, если добавляются `/api/ui/strategies/dashboard*`;
+- browser-visible behavior: `breaking-change`;
+- DTO schema: `compatible-change`;
+- persisted schema: ожидается `none`.
 
-## Этап 7 - мониторинг стратегий
+## Этап 7 - live strategy data bridge
 
-Цель: реализовать `strategy_monitoring.png`: панель выбранной стратегии плюс правый список стратегий с live state.
+Цель: дать `/strategies` и `/dashboard` bounded live data/SSE/polling contract без создания отдельной primary page `/monitoring`. Route `/monitoring` в v1 map не имеет canonical PNG и не должен забирать `strategy_statistic.png` у `/strategies`; если сохраняется, то только как compatibility redirect/alias после отдельного решения.
 
-Маршрут страницы:
+Маршруты:
 
-- `GET /monitoring`.
+- primary UI consumers: `GET /strategies`, `GET /dashboard`;
+- optional compatibility: `GET /monitoring` -> redirect/alias на `/strategies` только если это не ломает навигацию и явно покрыто тестом.
 
 Backend/API-добавления:
 
-- `GET /api/ui/strategies/monitor?state=active|all&cursor=`;
-- `GET /api/ui/strategies/{strategy_id}/snapshot`;
-- `GET /api/ui/strategies/{strategy_id}/positions?limit=50`;
-- `GET /api/ui/strategies/{strategy_id}/fills?cursor=`;
-- `GET /api/ui/strategies/{strategy_id}/equity?range=1d&points=600`;
-- `GET /api/stream/strategies?strategy_id=&last_event_id=` как SSE-мост поверх существующих Redis Streams.
+- harden/extend endpoints from Stage 6:
+  - `GET /api/ui/strategies/dashboard?strategy_id=&state=active|all&cursor=`;
+  - `GET /api/ui/strategies/{strategy_id}/snapshot`;
+  - `GET /api/ui/strategies/{strategy_id}/positions?limit=50`;
+  - `GET /api/ui/strategies/{strategy_id}/fills?cursor=`;
+  - `GET /api/ui/strategies/{strategy_id}/equity?range=1d&points=600`;
+  - `GET /api/stream/strategies?strategy_id=&last_event_id=`;
+- optional dashboard integration:
+  - `GET /api/ui/dashboard/selected-strategy?strategy_id=`.
 
 Поведение backend:
 
@@ -1254,41 +1419,44 @@ Backend/API-добавления:
 - SSE-мост должен авторизовать current user перед чтением per-user streams;
 - SSE является read-only;
 - polling fallback использует snapshot endpoints;
-- ограничивать list rows, fills, alerts и chart points.
+- ограничивать list rows, fills, alerts и chart points;
+- один browser tab не держит больше одного idle SSE connection для strategy live data;
+- reconnect budget и heartbeat должны быть задокументированы в DTO/JS contract.
 
 Файлы:
 
-- добавить `apps/api/routes/ui_strategies_monitoring.py`;
+- добавить/изменить `apps/api/routes/ui_strategies_dashboard.py`;
 - добавить `apps/api/routes/streams.py` или stream-specific router;
-- добавить `apps/api/dto/ui_strategies_monitoring.py`;
-- добавить `apps/api/wiring/modules/ui_strategies_monitoring.py`;
+- добавить/изменить `apps/api/dto/ui_strategies_dashboard.py`;
+- добавить/изменить `apps/api/wiring/modules/ui_strategies_dashboard.py`;
 - добавить backend read-model services/ports в `src/trading/contexts/strategy/application/**`;
 - добавить Redis stream reader adapter, если текущий код только публикует;
-- добавить `apps/web/templates/pages/monitoring.html`;
-- добавить `apps/web/templates/fragments/monitoring/*`;
-- добавить `apps/web/dist/js/pages/monitoring.js`;
-- добавить `apps/web/dist/css/pages/monitoring.css`;
+- добавить/изменить `apps/web/dist/js/core/stream_client.js`, если общего SSE helper нет;
+- добавить/изменить `apps/web/dist/js/pages/strategies.js`;
+- добавить/изменить `apps/web/dist/js/pages/dashboard.js`;
+- не добавлять `apps/web/templates/pages/monitoring.html` как primary page без нового PNG/решения;
 - тесты:
-  - `tests/unit/apps/api/test_ui_strategy_monitoring_routes.py`;
+  - `tests/unit/apps/api/test_ui_strategy_dashboard_routes.py`;
   - `tests/unit/apps/api/test_strategy_stream_routes.py`;
   - `tests/unit/apps/web/test_app_routes.py`.
 
 Критерии приемки:
 
-- strategy list и selected strategy snapshot рендерятся из backend DTO;
+- `/strategies` и `/dashboard` используют один согласованный live data contract там, где пересекаются;
 - start/stop actions отражают состояние в течение одного refresh cycle;
 - SSE переподключается или деградирует до polling;
 - 401 останавливает stream и отправляет пользователя на login;
 - hidden tab приостанавливает polling;
-- mobile сворачивает list/detail во вкладки;
-- PnL, ROI, return и drawdown сохраняют фиксированные финансовые цвета во всех темах.
+- mobile сворачивает list/detail во вкладки без потери panels;
+- PnL, ROI, return и drawdown сохраняют фиксированные финансовые цвета во всех темах;
+- если `/monitoring` сохраняется, он не получает собственный divergent layout и не считается canonical implementation.
 
 Playwright CLI:
 
 ```bash
-"$PWCLI" open http://127.0.0.1:8010/monitoring
+"$PWCLI" open http://127.0.0.1:8010/strategies
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/monitoring-desktop.png
+"$PWCLI" screenshot --filename output/playwright/strategies-live-desktop.png
 ```
 
 Влияние на контракты:
@@ -1301,12 +1469,17 @@ Playwright CLI:
 
 ## Этап 8 - история и конфигуратор backtest-задач
 
-Цель: разделить текущий совмещенный `/backtests` monolith на историю и конфигуратор.
+Цель: реализовать `/backtests` как единую reference-shaped backtest workstation строго по `stategy_backtest.png`: конфигурация, AI/config zone, instruments, indicators, optimization progress/status, recent events и таблица variants/results в одной плотной рабочей поверхности. Не делить UX на generic history cards и отдельный `/backtests/new`, если это не требуется совместимостью.
+
+Канонический референс:
+
+- `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png`.
 
 Маршруты страниц:
 
-- `GET /backtests` - история/список;
-- `GET /backtests/new` - конфигуратор.
+- `GET /backtests` - primary backtest workstation;
+- `GET /backtests/new` - optional compatibility redirect/alias на `/backtests` с открытым create/config mode, если старые ссылки нужно сохранить;
+- `GET /backtests/{job_id}` не является отдельной страницей; если route сохраняется, Stage 9 владеет только compatibility redirect/alias на `/backtests?job_id=...` или тем же workstation state.
 
 Текущий backend:
 
@@ -1326,6 +1499,7 @@ Backend/API-добавления:
 - `GET /api/ui/backtest-presets`;
 - `POST /api/ui/backtest-presets`;
 - `DELETE /api/ui/backtest-presets/{preset_id}`;
+- `GET /api/ui/backtests/workstation?cursor=&state=&query=`;
 - опционально `GET /api/ui/backtests/counters`;
 - опционально `GET /api/backtests/jobs/{job_id}/events` SSE, если job progress доступен вне polling.
 
@@ -1336,6 +1510,32 @@ Backend/API-добавления:
 - preflight только advisory; create повторяет валидацию;
 - конфигуратор не может вычислять или materialize results локально;
 - presets хранят безопасные request drafts, а не result payloads.
+
+Минимальный contract `GET /api/ui/backtests/workstation`:
+
+- `runtime_defaults` summary и config limits;
+- `config_draft`/`selected_preset`;
+- `ai_configurator_state` placeholder/disabled/enabled state для Stage 10;
+- `instrument_universe` bounded symbols/exchanges/timeframes;
+- `indicator_catalog` bounded rows/categories/compatibility flags;
+- `optimization_overview` current job/progress/sizing/estimated runtime/worker state;
+- `recent_events` bounded latest rows;
+- `job_table` или `variant_table` с state, strategy/config summary, period, symbols, progress, top metrics, actions;
+- `pagination`/filters/sort для таблицы;
+- `footer_status` with backend/worker/queue status.
+
+Frontend / panel inventory из reference:
+
+- command bar `>_ BACKTEST STRATEGY`;
+- left config panel;
+- AI configurator/analysis panel;
+- instruments selector;
+- indicators table/list;
+- optimization overview/progress panel;
+- recent events panel;
+- main variants/results table;
+- action/status buttons;
+- bottom status/logos row.
 
 Вероятно потребуется хранение:
 
@@ -1349,13 +1549,12 @@ Backend/API-добавления:
 - добавить backtest preset use cases/ports/adapters в `src/trading/contexts/backtest/**`;
 - добавить Alembic migration в `alembic/versions/` для `backtest_presets`, если presets принадлежат backtest/application DB;
 - использовать `migrations/postgres/` только если отдельным design decision presets переносятся в identity/account DB;
-- добавить `apps/web/templates/pages/backtests_history.html`;
-- добавить `apps/web/templates/pages/backtests_run.html`;
+- добавить/изменить `apps/web/templates/pages/backtests.html`;
+- `apps/web/templates/pages/backtests_history.html` и `apps/web/templates/pages/backtests_run.html` либо удалить из active routing, либо оставить как fragments/compatibility redirects без самостоятельного generic layout;
 - добавить `apps/web/templates/fragments/backtests/*`;
-- добавить `apps/web/dist/js/pages/backtests_history.js`;
-- добавить `apps/web/dist/js/pages/backtests_run.js`;
+- добавить/изменить `apps/web/dist/js/pages/backtests.js`;
 - добавить `apps/web/dist/css/pages/backtests.css`;
-- вывести из использования старые `backtests.html` и `backtest_ui.js` после split;
+- вывести из использования старый монолитный `backtests.html` и `backtest_ui.js` после замены активного route на reference-shaped workstation;
 - тесты:
   - `tests/unit/apps/api/test_backtests_routes.py`;
   - `tests/unit/apps/api/test_ui_backtests_routes.py`;
@@ -1363,23 +1562,23 @@ Backend/API-добавления:
 
 Критерии приемки:
 
-- `/backtests` показывает только историю и пагинируется;
-- `/backtests/new` строит валидный request из runtime defaults/reference endpoints;
+- агент открыл `stategy_backtest.png` и перечислил panel inventory в final report;
+- `/backtests` reference-shaped относительно `stategy_backtest.png`;
+- `/backtests` строит валидный request из runtime defaults/reference endpoints;
+- `/backtests/new`, если сохранен, является tested redirect/alias на тот же workstation create mode;
 - invalid request никогда не создает job;
 - duplicate submit с тем же idempotency key воспроизводит ту же job;
 - cancel идемпотентен в UI;
-- history остается отзывчивой при большом числе jobs за счет cursor pagination;
-- полные results или trades не загружаются на странице конфигуратора.
+- таблица jobs/variants остается отзывчивой при большом числе rows за счет cursor pagination;
+- полные results или trades не загружаются на странице workstation;
+- generic history cards вместо reference workstation считаются introduced failure.
 
 Playwright CLI:
 
 ```bash
 "$PWCLI" open http://127.0.0.1:8010/backtests
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-history-desktop.png
-"$PWCLI" open http://127.0.0.1:8010/backtests/new
-"$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-run-desktop.png
+"$PWCLI" screenshot --filename output/playwright/backtests-workstation-desktop.png
 ```
 
 Влияние на контракты:
@@ -1465,13 +1664,14 @@ Backend/API:
 - performance risk: `unknown` до capacity/benchmark evidence;
 - persisted schema: `none` или `compatible-change`, если добавляется queue metadata.
 
-## Этап 9 - результаты и статистика backtest-задач
+## Этап 9 - backtest result API/state внутри workstation
 
-Цель: реализовать страницу результатов в стиле `strategy_statistic.png` без initial payload с полными trades.
+Цель: добавить bounded result/statistics endpoints и selected job/result state для `/backtests` workstation без создания отдельной шестой функциональной страницы. `strategy_statistic.png` закреплен за `/strategies`, поэтому Stage 9 не владеет отдельным page layout и не создает `backtests_result.html`.
 
 Маршрут страницы:
 
-- `GET /backtests/{job_id}`.
+- primary UI: `GET /backtests` с выбранной job/result state;
+- optional compatibility: `GET /backtests/{job_id}` redirect/alias на `/backtests?job_id=...` или server-rendered same workstation state без отдельного visual reference.
 
 Текущий backend:
 
@@ -1498,13 +1698,20 @@ Backend/API-добавления:
 - неизвестный публичный `variant_key` возвращает 404;
 - storage identity остается разделенной: публичный `variant_key`, стабильный `variant_hash`.
 
+Frontend integration:
+
+- Stage 9 добавляет result/detail state в `pages/backtests.html` и `apps/web/dist/js/pages/backtests.js`;
+- не меняет canonical visual reference `/backtests`: `stategy_backtest.png`;
+- full trades и тяжелые series не загружаются на first paint workstation;
+- selected variant/job panels используют bounded endpoints и degraded/loading states внутри существующей backtest workstation.
+
 Файлы:
 
 - расширить `apps/api/routes/backtests.py` и `apps/api/dto/backtests.py`;
 - добавить result summary/series/trades pagination services в `src/trading/contexts/backtest/application/services/v2/`;
 - расширить lazy trades cache/read model при необходимости, не сохраняя полные trades в top variant rows;
-- добавить `apps/web/templates/pages/backtests_result.html`;
-- добавить `apps/web/dist/js/pages/backtests_result.js`;
+- изменить `apps/web/templates/pages/backtests.html` result/detail state только в рамках backtest workstation;
+- изменить `apps/web/dist/js/pages/backtests.js` result/detail integration;
 - добавить chart helpers в `apps/web/dist/js/charts/*`;
 - тесты:
   - `tests/unit/apps/api/test_backtests_routes.py`;
@@ -1513,21 +1720,23 @@ Backend/API-добавления:
 
 Критерии приемки:
 
-- result page открывается напрямую по URL;
-- loading page не загружает все trades;
+- `/backtests` остается reference-shaped относительно `stategy_backtest.png`;
+- `/backtests/{job_id}`, если сохранен, открывает тот же workstation selected job/result state;
+- loading/result state не загружает все trades;
 - variant switch запрашивает summary/chart endpoints для одного варианта;
 - trades table использует server pagination;
 - CSV export отделен от table paging;
 - canvas/SVG charts nonblank;
 - multi-year series ограничен points limit;
-- все значения доходности и процентных изменений используют фиксированные финансовые цвета независимо от выбранной темы.
+- все значения доходности и процентных изменений используют фиксированные финансовые цвета независимо от выбранной темы;
+- generic result cards или отдельная шестая page layout считаются introduced failure.
 
 Playwright CLI:
 
 ```bash
-"$PWCLI" open http://127.0.0.1:8010/backtests/<job_id>
+"$PWCLI" open http://127.0.0.1:8010/backtests?job_id=<job_id>
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-result-desktop.png
+"$PWCLI" screenshot --filename output/playwright/backtests-result-state-desktop.png
 ```
 
 Влияние на контракты:
@@ -1540,11 +1749,12 @@ Playwright CLI:
 
 ## Этап 10 - AI-конфигуратор backtest-задач
 
-Цель: добавить AI-assisted draft config только после стабилизации backtest configurator и validation path.
+Цель: добавить AI-assisted draft config только после стабилизации `/backtests` workstation и validation path. AI-панель живет внутри reference-shaped `stategy_backtest.png` layout, а не на отдельной generic странице.
 
 Область страницы:
 
-- `/backtests/new`.
+- primary: `/backtests` AI/config panel;
+- optional compatibility: `/backtests/new` redirect/alias на `/backtests` с открытым config/AI mode.
 
 Backend/API-добавления:
 
@@ -1563,7 +1773,7 @@ Backend/API-добавления:
 Файлы:
 
 - добавить AI routes только после явного AI backend design decision;
-- добавить `apps/web/dist/js/pages/backtests_ai.js` или интегрировать в `backtests_run.js`.
+- добавить `apps/web/dist/js/pages/backtests_ai.js` или интегрировать в `apps/web/dist/js/pages/backtests.js`.
 
 Критерии приемки:
 
@@ -1594,6 +1804,7 @@ Backend/API-добавления:
 - Проверить, что SSE route buffering отключен на edge при деплое за proxy, который буферизует.
 - Добавить performance smoke для допущений 1 vCPU / 2 GB VPS.
 - Подготовить финальное Playwright evidence для всех основных страниц.
+- Для функциональных страниц подготовить reference fidelity evidence: desktop screenshot + перечень panels vs canonical PNG.
 - Проверить все поддерживаемые темы минимум на одной странице с видимыми financial deltas.
 
 Критерии приемки:
@@ -1627,11 +1838,11 @@ python -m tools.docs.generate_docs_index --check
 "$PWCLI" snapshot
 "$PWCLI" open http://127.0.0.1:8010/settings
 "$PWCLI" snapshot
-"$PWCLI" open http://127.0.0.1:8010/monitoring
+"$PWCLI" open http://127.0.0.1:8010/strategies
 "$PWCLI" snapshot
 "$PWCLI" open http://127.0.0.1:8010/backtests
 "$PWCLI" snapshot
-"$PWCLI" open http://127.0.0.1:8010/backtests/new
+"$PWCLI" open http://127.0.0.1:8010/backtests?job_id=<job_id>
 "$PWCLI" snapshot
 ```
 
@@ -1646,7 +1857,7 @@ python -m tools.docs.generate_docs_index --check
 - добавить или использовать существующий lightweight capacity harness;
 - если нового инструмента нет, создать planned `tools/load/web_capacity_smoke.py` на `httpx`, без Node/runtime server dependency;
 - описать test profile: host, branch/commit, env, process count, DB/Redis locality, cache warm/cold, duration, concurrency, dataset;
-- прогнать read-mostly сценарии: shell/assets, dashboard summary, settings reads, monitoring snapshot/SSE, backtests history, backtests results, paginated trades;
+- прогнать read-mostly сценарии: shell/assets, dashboard summary, settings reads, strategies dashboard/SSE, backtests workstation, selected backtest result state, paginated trades;
 - отдельно прогнать controlled preflight/create burst для backtest jobs после этапа 8.5;
 - собрать p50/p95/p99, error rate, payload sizes, RSS, CPU, DB/Redis latency signs, active SSE connections;
 - классифицировать каждую область как `green`, `yellow`, `red`;
@@ -1677,7 +1888,7 @@ uv run python tools/load/web_capacity_smoke.py \
   --profile local-smoke \
   --duration-s 60 \
   --concurrency 10 \
-  --scenario dashboard,monitoring,backtests_history
+  --scenario dashboard,strategies_live,backtests_workstation
 ```
 
 Примечание: конкретные ports и auth bootstrap зависят от local/prod profile; агент обязан не хардкодить secrets и не записывать cookies/tokens в report.
@@ -1704,7 +1915,7 @@ uv run python tools/load/web_capacity_smoke.py \
 | Поведение языка/locale | `compatible-change` | Мультиязычность additive: default `en`, secondary `ru`, route/API identifiers не локализуются, account preference/cookie/localStorage fallback совместимы. |
 | Runtime workflow | `compatible-change` или `unknown` | Backtest create должен стать bounded async path; фактический переход с `sync_inline` требует evidence и rollout notes. |
 | Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без Mac Studio evidence, если меняются compute paths. |
-| Performance risk | `unknown` до измерений | Dashboard/monitoring/results/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
+| Performance risk | `unknown` до измерений | Dashboard/strategies/backtests/result-state/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
 
 ## Открытые вопросы реализации
 

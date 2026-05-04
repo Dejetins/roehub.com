@@ -158,10 +158,10 @@ required_literals:
   - "/settings"
   - "/strategies"
   - "/strategies/new"
-  - "/monitoring"
+  - "/monitoring compatibility route optional"
   - "/backtests"
-  - "/backtests/new"
-  - "/backtests/{job_id}"
+  - "/backtests/new compatibility route optional"
+  - "/backtests/{job_id} compatibility deep link optional"
   - "/api/auth/current-user"
   - "apps/web/dist/vendor/htmx.min.js"
   - "apps/web/dist/js/pages/auth.js"
@@ -178,7 +178,8 @@ required_literals:
   - "terminal-orange"
 
 non_goals:
-  - "Do not implement real dashboard/settings/monitoring/backtest page functionality beyond placeholders."
+  - "Do not implement real dashboard/settings/strategies/backtest page functionality beyond placeholders."
+  - "Do not make `/monitoring` a primary page; it has no canonical PNG in the v1 reference map."
   - "Do not create local username/password registration."
   - "Do not migrate to React/Next/SPA."
   - "Do not change backend auth semantics unless Keycloak registration entrypoint is explicitly required."
@@ -252,7 +253,7 @@ Done means:
 
 - new terminal-style base shell and header tabs are in place;
 - public `/`, `/login`, `/logout`, `/register` routes exist;
-- protected placeholder routes exist for dashboard/settings/strategies/monitoring/backtests;
+- protected placeholder routes exist for dashboard/settings/strategies/backtests; `/monitoring` and `/backtests/new` may exist only as compatibility placeholders/redirects;
 - protected routes redirect anonymous users to `/login?next=<safe-local-path>`;
 - auth/logout no longer require inline scripts;
 - HTMX is self-hosted at `apps/web/dist/vendor/htmx.min.js` and no external CDN remains in the shell;

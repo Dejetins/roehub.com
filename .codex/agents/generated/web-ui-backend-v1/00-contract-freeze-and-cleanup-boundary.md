@@ -73,6 +73,7 @@ hard_requirements:
   favicon_no_incidental_404_invariant: true
   user_badge_partial_route_not_public_contract: true
   physical_delete_only_after_route_replacement: true
+  freeze_reference_fidelity_map: true
   update_docs_index_if_docs_change: true
 
 task_toggles:
@@ -95,6 +96,7 @@ package_contract:
   integration_points:
     - "route map"
     - "endpoint map"
+    - "reference fidelity map"
     - "cleanup inventory"
   handoff:
     - "accepted route/endpoint map and cleanup boundaries for Stage 1-2"
@@ -135,6 +137,11 @@ required_literals:
   - "MOUNT /assets/*"
   - "GET /_partial/user_badge"
   - "protected_page.html"
+  - "general_page.png -> /"
+  - "personal_dashboard.png -> /dashboard"
+  - "personal_settings.png -> /settings"
+  - "strategy_statistic.png -> /strategies"
+  - "stategy_backtest.png -> /backtests"
 
 non_goals:
   - "Не реализовывать новый UI, backend endpoints или миграции."
@@ -187,6 +194,8 @@ Done means:
 - `GET /favicon.ico`, `ANY /api/{upstream_path:path}`, `MOUNT /assets/*` и `GET /_partial/user_badge` имеют явный target decision;
 - `apps/web/templates/protected_page.html` классифицирован как `delete`, но без физического удаления на Stage 0;
 - route map и endpoint map из плана сверены с текущим кодом;
+- reference map закреплен ровно на 5 визуальных страницах: `general_page.png -> /`, `personal_dashboard.png -> /dashboard`, `personal_settings.png -> /settings`, `strategy_statistic.png -> /strategies`, `stategy_backtest.png -> /backtests`;
+- `/monitoring` зафиксирован как compatibility/ops route only без canonical PNG в v1 map;
 - `/api/...` нотация подтверждена как browser-visible contract, без добавления `/api` prefix в backend routers;
 - `/_partial/user_badge` зафиксирован как non-public legacy partial route, который заменяется shell component/fragment;
 - список handoff-инвариантов готов для этапов 1-2;

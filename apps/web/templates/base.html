@@ -1,80 +1,37 @@
 <!doctype html>
-<html
-  lang="{{ current_locale|default('en') }}"
-  data-locale="{{ current_locale|default('en') }}"
-  data-theme="{{ current_theme|default('terminal-orange') }}"
->
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
     <title>{{ page_title }} | Roehub</title>
-    <link rel="stylesheet" href="/assets/css/tokens.css">
-    <link rel="stylesheet" href="/assets/css/themes.css">
-    <link rel="stylesheet" href="/assets/css/base.css">
-    <link rel="stylesheet" href="/assets/css/layout.css">
-    <link rel="stylesheet" href="/assets/css/components.css">
-    <link rel="stylesheet" href="/assets/css/shell.css">
-    {% block styles %}{% endblock %}
-    <script src="/assets/vendor/htmx.min.js" defer></script>
+    <link rel="stylesheet" href="/assets/site.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   </head>
   <body>
-    <a class="rh-skip-link" href="#main-content">{{ t("shell.skip_to_content") }}</a>
-
-    <header class="rh-shell-header">
-      <a class="rh-brand" href="/" aria-label="{{ t('shell.brand_aria') }}">
-        <span class="rh-brand__terminal" aria-hidden="true">&gt;_</span>
-        <span class="rh-brand__name">ROEHUB</span>
-      </a>
-
-      <nav class="rh-primary-nav" aria-label="{{ t('shell.nav_aria') }}">
-        {% for item in nav_items %}
-          <a
-            class="rh-nav-tab{% if item.active %} rh-nav-tab--active{% endif %}"
-            href="{{ item.href }}"
-            data-nav-key="{{ item.key }}"
-            data-i18n="{{ item.label_key }}"
-            data-active="{{ 'true' if item.active else 'false' }}"
-            {% if item.active %}aria-current="page"{% endif %}
-          >{{ item.label }}</a>
-        {% endfor %}
+    <header class="site-header">
+      <a class="brand" href="/">Roehub</a>
+      <nav class="site-nav">
+        <a class="{% if page_path == '/' %}active{% endif %}" href="/">Home</a>
+        <a class="{% if page_path == '/strategies' %}active{% endif %}" href="/strategies">
+          Strategies
+        </a>
+        <a class="{% if page_path == '/backtests' %}active{% endif %}" href="/backtests">
+          Backtests
+        </a>
+        <a class="{% if page_path == '/login' %}active{% endif %}" href="/login">Login</a>
+        <a class="{% if page_path == '/logout' %}active{% endif %}" href="/logout">Logout</a>
       </nav>
-
-      <div class="rh-header-tools" aria-label="{{ t('shell.controls_aria') }}">
-        {% include "components/locale_switcher.html" %}
-        {% include "components/theme_switcher.html" %}
-
-        <nav class="rh-auth-actions" aria-label="{{ t('shell.auth_aria') }}">
-          {% for action in auth_actions %}
-            <a
-              class="rh-auth-link{% if action.active %} rh-auth-link--active{% endif %}"
-              href="{{ action.href }}"
-              data-auth-action="{{ action.key }}"
-              data-i18n="{{ action.label_key }}"
-              {% if action.active %}aria-current="page"{% endif %}
-            >{{ action.label }}</a>
-          {% endfor %}
-        </nav>
-
-        {% include "fragments/shell/user_badge.html" %}
+      <div class="header-badge">
+        {% include "partials/user_badge.html" %}
       </div>
     </header>
 
-    <main id="main-content" class="rh-main" tabindex="-1">
+    <main class="content">
       {% if error_message %}
-        <div class="rh-error-banner" role="alert">{{ error_message }}</div>
+        <div class="error-banner" role="alert">{{ error_message }}</div>
       {% endif %}
       {% block content %}{% endblock %}
     </main>
-
-    <footer class="rh-shell-footer" aria-label="{{ t('shell.status_aria') }}">
-      <span data-i18n="shell.status">{{ t("shell.status") }}</span>
-      <span data-current-locale>{{ current_locale|upper }}</span>
-    </footer>
-
-    <div class="rh-notification-region" data-notification-region aria-live="polite"></div>
-    <script id="rh-locale-catalogs" type="application/json">{{ client_i18n_catalogs|tojson }}</script>
-    <script type="module" src="/assets/js/components/shell.js"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -24,7 +24,6 @@ from .persistence import (
     PostgresBacktestJobRepository,
     PsycopgBacktestPostgresGateway,
 )
-from .queue import DatabaseBacktestJobExecutionTrigger
 
 __all__ = [
     "AtomicArtifactCurrentPointerWriterV2",
@@ -39,7 +38,6 @@ __all__ = [
     "BacktestArtifactsRuntimeConfig",
     "BacktestPostgresGateway",
     "DEFAULT_LAZY_TRADES_CACHE_ROOT",
-    "DatabaseBacktestJobExecutionTrigger",
     "FilesystemBacktestArtifactContextResolver",
     "LocalFileBacktestLazyTradesCache",
     "PostgresBacktestJobLeaseRepository",

@@ -102,9 +102,6 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     strategy_router = _build_ping_router(path="/strategies/ping")
     indicators_router = _build_ping_router(path="/indicators/ping")
     market_data_router = _build_ping_router(path="/market-data/markets")
-    ui_account_router = _build_ping_router(path="/ui/account/ping")
-    ui_dashboard_router = _build_ping_router(path="/ui/dashboard/summary")
-    ui_strategy_monitoring_router = _build_ping_router(path="/ui/strategy-monitoring/ping")
 
     monkeypatch.setattr(app_module, "build_indicators_registry", lambda *, environ: object())
     monkeypatch.setattr(
@@ -140,25 +137,7 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
         lambda *, environ: SimpleNamespace(
             router=identity_router,
             current_user_dependency=lambda _request: None,
-            account_settings_repository=object(),
-            list_exchange_keys_use_case=object(),
-            clock=object(),
         ),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_ui_account_api_module",
-        lambda *,
-        environ,
-        current_user_dependency,
-        account_settings_repository,
-        list_exchange_keys_use_case,
-        clock: SimpleNamespace(router=ui_account_router),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_ui_dashboard_module",
-        lambda *, environ, current_user_dependency: SimpleNamespace(router=ui_dashboard_router),
     )
     monkeypatch.setattr(
         app_module,
@@ -167,21 +146,8 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     )
     monkeypatch.setattr(
         app_module,
-        "build_strategy_api_module",
-        lambda *, environ, current_user_dependency: SimpleNamespace(
-            router=strategy_router,
-            strategy_repository=object(),
-            run_repository=object(),
-        ),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_ui_strategy_monitoring_api_module",
-        lambda *,
-        environ,
-        current_user_dependency,
-        strategy_repository,
-        run_repository: SimpleNamespace(router=ui_strategy_monitoring_router),
+        "build_strategy_router",
+        lambda *, environ, current_user_dependency: strategy_router,
     )
     monkeypatch.setattr(
         app_module,
@@ -221,7 +187,6 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
 
     assert "/health" in paths
     assert "/metrics" in paths
-    assert "/ui/dashboard/summary" in paths
     assert "/strategies/ping" in paths
     assert "/market-data/markets" in paths
 
@@ -257,7 +222,6 @@ def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
 
     assert "/health" in paths
     assert "/metrics" in paths
-    assert "/ui/dashboard/summary" in paths
     assert "/strategies/ping" not in paths
     assert "/identity/ping" in paths
     assert "/indicators/ping" in paths

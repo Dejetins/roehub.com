@@ -1,8 +1,8 @@
 ---
-prompt_name: web_ui_backend_v1_06_strategy_library_detail
+prompt_name: web_ui_backend_v1_06_strategy_dashboard
 repo: roehub.com
 branch: main
-scope: "Этап 6: новая библиотека стратегий, create flow и детали стратегии поверх существующего Strategy API."
+scope: "Этап 6: /strategies как selected-strategy analytics workstation по strategy_statistic.png."
 
 language:
   implementation: jinja_css_plain_js_python_tests
@@ -15,17 +15,21 @@ context_sources:
     - path: docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md
       why: "Этап 6 source of truth"
     - path: docs/architecture/apps/web/web-ui-design-manifest-v1.md
-      why: "strategy library visual rules"
+      why: "strategy dashboard visual/reference rules"
   task_entrypoints:
     - path: apps/web/main/app.py
       why: "strategies routes and /strategies/new"
     - path: apps/web/templates
-      why: "current strategy list/create/detail templates replacement targets"
+      why: "current strategy list/create/detail routes replacement targets"
     - path: apps/web/dist/strategy_ui.js
       why: "old strategy JS replacement target and API usage reference"
     - path: apps/api/routes/strategies.py
       why: "existing Strategy API contract"
   conditional_bundles:
+    canonical_reference:
+      read_when: "always before implementation; this stage is reference-fidelity gated"
+      paths:
+        - /Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png
     strategy_contract:
       read_when: "if create/clone/delete/run API semantics are unclear"
       paths:
@@ -46,7 +50,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; canonical for this stage is strategy_statistic.png"
+  canonical_reference:
+    route: /strategies
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png
+    fidelity: "hard reference-shaped contract for selected-strategy analytics workstation"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -62,15 +70,17 @@ hard_requirements:
   preserve_strategy_api: true
   preserve_immutable_strategy_model: true
   support_strategies_new: true
-  no_backend_api_required_initially: true
+  backend_read_model_required: true
   remove_old_strategy_ui_dependency: true
+  reference_fidelity_required: true
+  reject_generic_library_cards: true
   browser_qa_required: true
 
 task_toggles:
   implement_strategy_list: true
   implement_strategy_create: true
-  implement_strategy_detail: true
-  implement_new_backend_read_model: false
+  implement_strategy_deeplink_state: true
+  implement_new_backend_read_model: true
   publish_after_success: true
 
 package_contract:
@@ -79,24 +89,26 @@ package_contract:
     - "02-design-system-js-core accepted"
   owns:
     - "apps/web/templates/pages/strategies.html"
-    - "apps/web/templates/pages/strategy_create.html"
-    - "apps/web/templates/pages/strategy_detail.html"
     - "apps/web/templates/fragments/strategies/**"
     - "apps/web/dist/js/pages/strategies.js"
     - "apps/web/dist/css/pages/strategies.css"
+    - "apps/api/routes/ui_strategies_dashboard.py"
+    - "apps/api/dto/ui_strategies_dashboard.py"
+    - "apps/api/wiring/modules/ui_strategies_dashboard.py"
+    - "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
     - "tests/unit/apps/web/test_app_routes.py strategy assertions"
-    - "optional apps/api/routes/ui_strategies.py only if read-model is justified"
   forbidden:
-    - "monitoring/SSE package files"
+    - "separate /monitoring primary page files"
     - "backtest package files"
     - "settings/account package files"
     - "mutable Strategy API semantics"
   integration_points:
     - "existing /api/strategies* routes"
+    - "browser `/api/ui/strategies/dashboard*`; backend `/ui/strategies/dashboard*`"
     - "strategy create/clone payload shape"
     - "shared JS api.js"
   handoff:
-    - "strategy list/create/detail routes without old strategy_ui.js dependency"
+    - "selected-strategy dashboard route/read-model without old strategy_ui.js dependency"
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -108,9 +120,9 @@ skill_routing:
     timing: "during verification"
     reason: "stage touches Python web and possibly API calls/tests"
   - skill: browser-qa-evidence
-    use_when: "verifying list/create/detail, route `/strategies/new`, console/network, responsive layout"
+    use_when: "verifying selected strategy dashboard, `/strategies/new` compatibility, reference fidelity, console/network, responsive layout"
     timing: "after local tests"
-    reason: "strategy library is browser-visible"
+    reason: "selected-strategy dashboard is browser-visible"
   - skill: playwright
     use_when: "capturing Playwright evidence"
     timing: "during browser QA"
@@ -129,12 +141,16 @@ required_literals:
   - "/strategies"
   - "/strategies/new"
   - "/strategies/{strategy_id}"
+  - "strategy_statistic.png"
+  - "/api/ui/strategies/dashboard"
+  - "/ui/strategies/dashboard"
   - "/api/strategies"
   - "/api/strategies/clone"
   - "strategy_ui.js"
 
 non_goals:
-  - "Do not implement live monitoring on strategy detail; monitoring belongs to `/monitoring`."
+  - "Do not build a generic strategy library/card grid."
+  - "Do not create a separate primary `/monitoring` page for this reference."
   - "Do not make strategy mutable update endpoint."
   - "Do not fake metrics that backend does not provide."
 
@@ -154,6 +170,8 @@ final_report_format:
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/web/test_app_routes.py"
     expect: "passes; add strategy UI asset tests if needed"
+  - cmd: "uv run pytest -q tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
+    expect: "passes if UI strategy dashboard endpoint is added"
   - cmd: "uv run pytest -q tests/unit/apps/api/test_strategies_routes.py"
     expect: "passes if API assumptions/touched tests exist"
   - cmd: "uv run ruff check apps/web apps/api tests/unit/apps/web tests/unit/apps/api"
@@ -165,33 +183,37 @@ quality_gates:
 
 expected_primary_touches:
   - "apps/web/templates/pages/strategies.html"
-  - "apps/web/templates/pages/strategy_create.html"
-  - "apps/web/templates/pages/strategy_detail.html"
   - "apps/web/templates/fragments/strategies/*"
   - "apps/web/dist/js/pages/strategies.js"
   - "apps/web/dist/css/pages/strategies.css"
+  - "apps/api/routes/ui_strategies_dashboard.py"
+  - "apps/api/dto/ui_strategies_dashboard.py"
+  - "apps/api/wiring/modules/ui_strategies_dashboard.py"
+  - "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
   - "tests/unit/apps/web/test_app_routes.py"
 
 possible_secondary_touches:
   - "apps/web/main/app.py"
-  - "apps/api/routes/ui_strategies.py"
-  - "apps/api/dto/ui_strategies.py"
+  - "apps/api/main/app.py"
+  - "apps/api/wiring/modules/__init__.py"
 
 safety_notes:
-  - "Current `/strategies/new` must not disappear."
+  - "Current `/strategies/new` must remain a compatibility entrypoint, but not a separate visual page."
   - "Create/clone must preserve canonical indicator payload shape."
   - "Do not use old `strategy_ui.js` as long-term dependency."
+  - "The page body after the global header must be reference-shaped against strategy_statistic.png."
 ---
 
 # Task
 
-Implement Stage 6 strategy library/create/detail UI.
+Implement Stage 6 `/strategies` selected-strategy dashboard.
 
 Done means:
 
-- `/strategies` shows new strategy library;
-- `/strategies/new` works as create entrypoint or controlled redirect to create modal;
-- `/strategies/{strategy_id}` shows new detail page;
+- `/strategies` shows a selected-strategy analytics workstation shaped by `strategy_statistic.png`;
+- `/strategies/new` works as compatibility redirect/alias to create mode inside `/strategies`;
+- `/strategies/{strategy_id}` is a deep-link/redirect to the same `/strategies` workstation state, not an equivalent separate page body;
+- backend exposes owner-scoped bounded UI read-model where required;
 - create/list/clone/delete use existing Strategy API;
 - old `strategy_ui.js` dependency is removed from these pages;
 - Playwright evidence exists.
@@ -200,10 +222,14 @@ Done means:
 
 - Current Strategy API already supports immutable create/list/get/clone/delete/run/stop.
 - Strategy model is immutable: edit means clone/create, not update.
-- Live monitoring belongs to Stage 7 `/monitoring`.
+- `/strategies` owns the concrete strategy dashboard reference. `/monitoring` is compatibility-only in the v1 map.
 
 ## Requirements (Must)
 
+- Open `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` before coding.
+- List the reference panel inventory before implementation notes/final report.
+- Implement `/api/ui/strategies/dashboard?strategy_id=&state=active|all&cursor=` or a compatible bounded read-model required by the reference.
+- Preserve expected panels from the plan: command/status bars, top summary/strategy info, chart, metric grid, monthly stats, drawdown/equity, best/worst days, hourly results, trades/events table, symbol results/breakdowns.
 - Preserve public Strategy API semantics.
 - Preserve create workflow.
 - Do not fake unavailable strategy statistics.
@@ -223,7 +249,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, plan Stage 6, design manifest strategy sections, then task entrypoints. Expand only for API semantics or failing tests.
+Read `.codex/AGENTS.md`, plan Stage 6, design manifest strategy sections, `strategy_statistic.png`, then task entrypoints. Expand only for API semantics or failing tests.
 
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
@@ -236,20 +262,24 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Inspect current strategy routes/templates/JS.
-2. Implement new list/create/detail templates and page JS/CSS.
-3. Preserve existing API calls and payload shape.
-4. Add/adjust tests.
-5. Run browser QA and quality gates.
-6. Use `publish-ci-deploy` only after complete success.
+1. Open `strategy_statistic.png` and record panel inventory.
+2. Record panel inventory and route/deep-link decisions; keep visual pages limited to `/strategies`.
+3. Define/implement bounded UI read-model route/wiring if needed by the reference panels.
+4. Implement `/strategies` page/fragments/JS/CSS as selected-strategy workstation.
+5. Preserve existing API calls and payload shape for create/clone/delete/run/stop.
+6. Add/adjust tests.
+7. Run browser QA and quality gates.
+8. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
-- List, clone and soft-delete continue to call existing `/api/strategies*` routes.
+- Implemented panel inventory matches `strategy_statistic.png`; any deviation is named and justified.
+- List, clone, run/stop and soft-delete continue to call existing `/api/strategies*` routes or documented UI wrappers.
 - Create/clone preserve canonical indicator payload shape.
-- `/strategies/new` is route-tested and browser-checked.
-- Strategy detail does not imply live monitoring.
+- `/strategies/new` is route-tested and browser-checked as compatibility redirect/alias to create mode inside `/strategies`.
+- `/strategies/{strategy_id}` deep link behavior is route-tested as selected state inside `/strategies`.
 - No dependency on old `strategy_ui.js`.
+- Generic strategy card-grid/library layout is not acceptable.
 
 # Implementation constraints
 
@@ -297,7 +327,7 @@ For every browser-visible change, collect and report runtime evidence:
 
 ## API / contracts
 
-- Public API contract: `none` for initial replacement.
+- Public API contract: `compatible-change` if `/api/ui/strategies/dashboard*` is added.
 - Browser-visible behavior: intentional `breaking-change`.
 
 # Files to indicate (expected touched areas)
@@ -307,6 +337,7 @@ Use front matter touched paths.
 # Non-goals
 
 - Monitoring/SSE.
+- Separate primary `/monitoring` page.
 - New mutable strategy update API.
 - Backtest integration.
 
@@ -314,6 +345,7 @@ Use front matter touched paths.
 
 ```bash
 uv run pytest -q tests/unit/apps/web/test_app_routes.py
+uv run pytest -q tests/unit/apps/api/test_ui_strategy_dashboard_routes.py
 uv run pytest -q tests/unit/apps/api/test_strategies_routes.py
 uv run ruff check apps/web apps/api tests/unit/apps/web tests/unit/apps/api
 uv run pyright

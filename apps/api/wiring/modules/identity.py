@@ -19,11 +19,9 @@ from trading.contexts.identity.adapters.inbound.api.deps import (
 )
 from trading.contexts.identity.adapters.outbound import (
     AesGcmEnvelopeExchangeKeysSecretCipher,
-    InMemoryIdentityAccountSettingsRepository,
     InMemoryIdentityExchangeKeysRepository,
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
-    PostgresIdentityAccountSettingsRepository,
     PostgresIdentityExchangeKeysRepository,
     PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
@@ -32,9 +30,7 @@ from trading.contexts.identity.adapters.outbound import (
     SystemIdentityClock,
 )
 from trading.contexts.identity.application import (
-    AccountSettingsRepository,
     ExchangeKeysRepository,
-    IdentityClock,
     SessionRepository,
     UserRepository,
 )
@@ -192,9 +188,6 @@ class IdentityApiModule:
 
     router: APIRouter
     current_user_dependency: RequireCurrentUserDependency
-    account_settings_repository: AccountSettingsRepository
-    list_exchange_keys_use_case: ListExchangeKeysUseCase
-    clock: IdentityClock
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +206,6 @@ class _IdentityPersistenceBundle:
     exchange_keys_repository: ExchangeKeysRepository
     user_repository: UserRepository
     session_repository: SessionRepository
-    account_settings_repository: AccountSettingsRepository
 
 
 def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
@@ -319,9 +311,6 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
             delete_exchange_key_use_case=delete_exchange_key_use_case,
         ),
         current_user_dependency=current_user_dependency,
-        account_settings_repository=persistence.account_settings_repository,
-        list_exchange_keys_use_case=list_exchange_keys_use_case,
-        clock=clock,
     )
 
 def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _IdentityPersistenceBundle:
@@ -341,27 +330,19 @@ def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _Identi
     """
     if settings.postgres_dsn:
         gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
-        session_repository = PostgresIdentitySessionRepository(gateway=gateway)
         return _IdentityPersistenceBundle(
             exchange_keys_repository=PostgresIdentityExchangeKeysRepository(gateway=gateway),
             user_repository=PostgresIdentityUserRepository(gateway=gateway),
-            session_repository=session_repository,
-            account_settings_repository=PostgresIdentityAccountSettingsRepository(
-                gateway=gateway
-            ),
+            session_repository=PostgresIdentitySessionRepository(gateway=gateway),
         )
     if settings.env_name == "prod":
         raise ValueError(
             f"{_IDENTITY_PG_DSN_KEY} must be set in prod for persisted Roehub sessions"
         )
-    session_repository = InMemoryIdentitySessionRepository()
     return _IdentityPersistenceBundle(
         exchange_keys_repository=InMemoryIdentityExchangeKeysRepository(),
         user_repository=InMemoryIdentityUserRepository(),
-        session_repository=session_repository,
-        account_settings_repository=InMemoryIdentityAccountSettingsRepository(
-            session_repository=session_repository
-        ),
+        session_repository=InMemoryIdentitySessionRepository(),
     )
 
 

@@ -26,6 +26,10 @@ context_sources:
     - path: apps/web/templates/pages/settings.html
       why: "settings page target"
   conditional_bundles:
+    canonical_reference:
+      read_when: "always before implementation; this stage is reference-fidelity gated"
+      paths:
+        - /Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png
     identity_auth:
       read_when: "when sessions/current-user/profile behavior is implemented"
       paths:
@@ -53,7 +57,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; canonical for this stage is personal_settings.png"
+  canonical_reference:
+    route: /settings
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png
+    fidelity: "hard reference-shaped contract for the page body after global header"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -75,6 +83,8 @@ hard_requirements:
   theme_preference_preserves_financial_colors: true
   locale_preference_required: true
   language_switch_settings_required: true
+  reference_fidelity_required: true
+  reject_generic_settings_cards: true
   browser_qa_required: true
 
 task_toggles:
@@ -104,7 +114,7 @@ package_contract:
   forbidden:
     - "backtest context/files"
     - "strategy context/files"
-    - "monitoring package files"
+    - "strategy live bridge package files"
     - "exchange secret policy rewrites beyond additive UI needs"
   integration_points:
     - "identity migration chain"
@@ -148,6 +158,7 @@ target_envs:
 
 required_literals:
   - "/settings"
+  - "personal_settings.png"
   - "/api/exchange-keys"
   - "/api/ui/account/preferences"
   - "/ui/account/preferences"
@@ -166,6 +177,7 @@ non_goals:
   - "Do not implement local 2FA."
   - "Do not add arbitrary webhook integrations without validation."
   - "Do not localize routes, `/api/*`, DTO fields, exchange ids, session ids, or audit event type identifiers."
+  - "Do not replace the settings reference with generic account cards."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -214,6 +226,7 @@ safety_notes:
   - "Actual backend route paths are `/ui/account/...`; browser sees `/api/ui/account/...`."
   - "If CSRF strategy is not implemented, do not broaden mutation surface without a documented gate."
   - "Exchange secrets must not appear in DOM, JSON, logs, screenshots, or Playwright artifacts."
+  - "The page body after the global header must be reference-shaped against personal_settings.png."
 ---
 
 # Task
@@ -223,6 +236,8 @@ Implement Stage 5 settings/account.
 Done means:
 
 - protected `/settings` page exists;
+- page body after the global header is reference-shaped against `personal_settings.png`;
+- final report lists reference and implemented panel inventory;
 - account/profile/limits/integrations/notifications/preferences/sessions/audit endpoints exist as scoped UI API where required;
 - exchange keys UI uses existing secret-safe exchange-key endpoints;
 - theme preference persists and never changes financial color semantics;
@@ -240,6 +255,8 @@ Done means:
 
 ## Requirements (Must)
 
+- Open `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png` before coding.
+- Preserve these reference panels: command bar, profile/account summary, connected exchange APIs, subscription/limits, integrations/webhooks, notifications, security, recent sessions, event log, top actions, bottom status bar.
 - Preserve exchange-key v2 secret policy.
 - Duplicate active exchange key remains deterministic `409` with code `exchange_key_already_exists`.
 - Add owner-scoped persisted tables only through correct identity migration channel.
@@ -260,7 +277,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, plan Stage 5, design manifest settings sections, exchange-key policy, then task entrypoints. Expand into migrations only if adding tables.
+Read `.codex/AGENTS.md`, plan Stage 5, design manifest settings sections, `personal_settings.png`, exchange-key policy, then task entrypoints. Expand into migrations only if adding tables.
 
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
@@ -273,18 +290,20 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Confirm CSRF/state-changing gate and identity DB ownership.
-2. Define UI account DTOs/errors/pagination.
-3. Implement identity use cases/ports/adapters and migrations.
-4. Add API routes/wiring.
-5. Implement settings page/fragments/JS/CSS.
-6. Add tests for authz, validation, duplicates, audit, defaults, theme/locale preference, secret leak.
-7. Run browser QA and quality gates.
-8. Use `publish-ci-deploy` only after all gates pass.
+1. Open `personal_settings.png` and record panel inventory.
+2. Confirm CSRF/state-changing gate and identity DB ownership.
+3. Define UI account DTOs/errors/pagination.
+4. Implement identity use cases/ports/adapters and migrations.
+5. Add API routes/wiring.
+6. Implement settings page/fragments/JS/CSS as reference-shaped workstation.
+7. Add tests for authz, validation, duplicates, audit, defaults, theme/locale preference, secret leak.
+8. Run browser QA and quality gates.
+9. Use `publish-ci-deploy` only after all gates pass.
 
 # Acceptance criteria (Definition of Done)
 
 - `/settings` opens behind auth gate.
+- Implemented panel inventory matches `personal_settings.png`; any deviation is named and justified.
 - Add/list/delete exchange key flow works without secret leakage.
 - Duplicate exchange key shows deterministic 409.
 - Delete is confirmed and UX-idempotent.
@@ -293,6 +312,7 @@ Use front matter `context_sources`.
 - Language preference survives reload, updates `<html lang>`/`data-locale`, and settings copy works in `en` and `ru`.
 - Sessions/audit paginate.
 - Mobile layout has no horizontal overflow.
+- Generic account card layout is not acceptable.
 
 # Implementation constraints
 

@@ -1,6 +1,0 @@
-{% if current_user %}
-  <span class="rh-user-badge" title="{{ current_user.user_id }}" aria-label="{{ t('user.account') }}">
-    <span class="rh-user-badge__level">{{ current_user.paid_level|upper }}</span>
-    <span class="rh-user-badge__id">{{ current_user.user_id[:8] }}</span>
-  </span>
-{% endif %}

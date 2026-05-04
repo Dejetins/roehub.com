@@ -2,7 +2,7 @@
 prompt_name: web_ui_backend_v1_09_backtests_results
 repo: roehub.com
 branch: main
-scope: "Этап 9: backtest result page, summary/chart/stat endpoints, paginated trades, CSV export."
+scope: "Этап 9: backtest result API/state внутри /backtests workstation, summary/chart/stat endpoints, paginated trades, CSV export."
 
 language:
   implementation: python_fastapi_jinja_css_js
@@ -25,9 +25,13 @@ context_sources:
       why: "current response DTOs"
     - path: src/trading/contexts/backtest/application/use_cases/backtest_jobs.py
       why: "variant lookup and ownership"
-    - path: apps/web/templates/pages/backtests_result.html
-      why: "result page target"
+    - path: apps/web/templates/pages/backtests.html
+      why: "backtest workstation page target"
   conditional_bundles:
+    canonical_reference:
+      read_when: "when verifying result state still fits the backtest workstation reference"
+      paths:
+        - /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
     lazy_trades:
       read_when: "when implementing GET paginated trades over lazy detail/cache"
       paths:
@@ -51,7 +55,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; canonical `/backtests` page remains stategy_backtest.png"
+  canonical_reference:
+    route: /backtests
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
+    fidelity: "result state must stay inside the reference-shaped backtest workstation; no separate sixth page"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -64,7 +72,7 @@ style_references:
   language_switch_required: true
 
 hard_requirements:
-  direct_result_url_required: true
+  selected_result_state_required: true
   no_full_trades_initial_payload: true
   server_pagination_trades_required: true
   chart_points_bounded: true
@@ -72,30 +80,32 @@ hard_requirements:
   storage_identity_split_preserved: true
   no_full_trades_in_top_rows: true
   chart_nonblank_browser_check_required: true
+  no_separate_result_page_required: true
+  reject_generic_result_cards: true
 
 task_toggles:
   implement_summary_endpoints: true
   implement_chart_endpoints: true
   implement_paginated_trades_get: true
   implement_csv_export: true
-  implement_result_page: true
+  implement_result_state_in_backtests_page: true
   publish_after_success: true
 
 package_contract:
   depends_on:
-    - "08-backtests-history-configurator accepted"
+    - "08-backtests-workstation accepted"
     - "08.5-backtest-runtime-hardening accepted or runtime blocker documented"
   owns:
     - "apps/api/routes/backtests.py result endpoints only"
     - "apps/api/dto/backtests.py result DTO additions only"
     - "src/trading/contexts/backtest/application/services/v2/* result/lazy detail helpers"
-    - "apps/web/templates/pages/backtests_result.html"
-    - "apps/web/dist/js/pages/backtests_result.js"
+    - "apps/web/templates/pages/backtests.html result state only"
+    - "apps/web/dist/js/pages/backtests.js result state only"
     - "apps/web/dist/js/charts/**"
     - "apps/web/dist/css/pages/backtests.css result sections"
     - "tests/unit/apps/api/test_backtests_routes.py result assertions"
   forbidden:
-    - "history/configurator flow rewrites"
+    - "backtests workstation flow rewrites"
     - "worker runtime hardening"
     - "AI configurator"
     - "full trades in top rows"
@@ -105,7 +115,7 @@ package_contract:
     - "bounded chart point limits"
     - "CSV export route"
   handoff:
-    - "bounded results/statistics endpoints and result page evidence"
+    - "bounded results/statistics endpoints and `/backtests` result-state evidence"
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -121,7 +131,7 @@ skill_routing:
     timing: "during performance verification"
     reason: "result endpoints can become heavy"
   - skill: browser-qa-evidence
-    use_when: "verifying result page, variant switch, nonblank charts, table pagination, CSV link, console/network"
+    use_when: "verifying `/backtests` selected result state, variant switch, nonblank charts, table pagination, CSV link, console/network"
     timing: "after backend tests"
     reason: "results are browser-visible"
   - skill: playwright
@@ -139,7 +149,9 @@ target_envs:
   - github-actions
 
 required_literals:
-  - "/backtests/{job_id}"
+  - "/backtests"
+  - "/backtests?job_id="
+  - "stategy_backtest.png"
   - "/api/backtests/jobs/{job_id}/summary"
   - "/api/backtests/jobs/{job_id}/variants/{variant_key}/equity"
   - "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades"
@@ -151,7 +163,8 @@ non_goals:
   - "Do not change canonical request hash."
   - "Do not store full trades in top variant rows."
   - "Do not accept raw storage SHA as public route key."
-  - "Do not implement configurator/history flows here."
+  - "Do not create a separate sixth results page or `backtests_result.html` layout."
+  - "Do not replace the backtest workstation reference with generic result cards."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -181,8 +194,8 @@ expected_primary_touches:
   - "apps/api/dto/backtests.py"
   - "src/trading/contexts/backtest/application/services/v2/*"
   - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
-  - "apps/web/templates/pages/backtests_result.html"
-  - "apps/web/dist/js/pages/backtests_result.js"
+  - "apps/web/templates/pages/backtests.html"
+  - "apps/web/dist/js/pages/backtests.js"
   - "apps/web/dist/js/charts/*"
   - "apps/web/dist/css/pages/backtests.css"
   - "tests/unit/apps/api/test_backtests_routes.py"
@@ -196,16 +209,19 @@ safety_notes:
   - "GET /trades returns paginated rows; POST /trades may remain lazy materialization/cache warm path."
   - "Chart endpoints must downsample to bounded points."
   - "Unknown public `variant_key` returns 404."
+  - "The `/backtests` page body must remain reference-shaped against stategy_backtest.png while adding selected result state."
 ---
 
 # Task
 
-Implement Stage 9 backtest results page and bounded result APIs.
+Implement Stage 9 backtest result state and bounded result APIs inside `/backtests`.
 
 Done means:
 
-- `/backtests/{job_id}` opens directly;
-- page loads summary and one selected variant without all trades;
+- `/backtests` can open selected job/result state, normally via query/deep-link such as `/backtests?job_id=...`;
+- `/backtests/{job_id}`, if preserved, redirects/aliases to the same workstation state;
+- page body remains reference-shaped against `stategy_backtest.png`;
+- result state loads summary and one selected variant without all trades;
 - chart endpoints are bounded/downsampled;
 - trades table uses server pagination;
 - CSV export is separate;
@@ -220,6 +236,8 @@ Done means:
 
 ## Requirements (Must)
 
+- Keep result UI inside `/backtests`; do not add a separate `backtests_result.html` page.
+- Preserve `/backtests` reference shape from `stategy_backtest.png` while adding selected job/result state.
 - Add result summary, equity, drawdown, monthly, symbol stats, paginated trades and CSV endpoints as compatible additions.
 - Preserve public/storage identity split.
 - Keep initial page payload bounded.
@@ -239,7 +257,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, plan Stage 9, backtest runtime doc, then task entrypoints. Expand only for lazy trades or chart downsampling implementation.
+Read `.codex/AGENTS.md`, plan Stage 9, design manifest backtests sections, `stategy_backtest.png`, backtest runtime doc, then task entrypoints. Expand only for lazy trades or chart downsampling implementation.
 
 Reading budget: keep pre-implementation reading to the smallest sufficient set; default target `<= 8 files`, `<= ~45k tokens` unless this prompt states a tighter number.
 Stop reading when touched files, contract surfaces, and acceptance gates are bounded enough to implement safely.
@@ -252,24 +270,27 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Specify result endpoint DTOs and pagination.
-2. Implement backend services/routes/tests.
-3. Implement result page, JS charts/table, CSV action.
-4. Add nonblank chart/browser QA.
-5. Run performance smoke for heavy endpoints where feasible.
-6. Run gates.
-7. Use `publish-ci-deploy` only after complete success.
+1. Re-open `stategy_backtest.png` and confirm where selected result state fits inside the workstation.
+2. Specify result endpoint DTOs and pagination.
+3. Implement backend services/routes/tests.
+4. Implement `/backtests` result state, JS charts/table, CSV action without separate page layout.
+5. Add nonblank chart/browser QA.
+6. Run performance smoke for heavy endpoints where feasible.
+7. Run gates.
+8. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
-- Result page opens by URL.
-- Loading page does not fetch all trades.
+- `/backtests?job_id=...` opens result state; `/backtests/{job_id}`, if kept, aliases to it.
+- `/backtests` remains reference-shaped against `stategy_backtest.png`.
+- Loading/result state does not fetch all trades.
 - Variant switch fetches one variant's summary/chart endpoints.
 - Trades table uses server pagination.
 - CSV export is separate from table paging.
 - Canvas/SVG charts are nonblank.
 - Multi-year series respects point limits.
 - Financial colors remain invariant.
+- Generic result cards or separate sixth page layout are not acceptable.
 
 # Implementation constraints
 
@@ -346,9 +367,9 @@ Playwright CLI:
 ```bash
 export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
-"$PWCLI" open http://127.0.0.1:8010/backtests/<job_id>
+"$PWCLI" open http://127.0.0.1:8010/backtests?job_id=<job_id>
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/backtests-result-desktop.png
+"$PWCLI" screenshot --filename output/playwright/backtests-result-state-desktop.png
 ```
 
 # i18n / language contract

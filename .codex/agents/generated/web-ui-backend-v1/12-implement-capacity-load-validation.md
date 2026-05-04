@@ -187,7 +187,7 @@ Implement Stage 12 capacity/load validation for the current backend host.
 Done means:
 
 - lightweight capacity harness exists or an existing one is used;
-- scenarios cover shell/assets, dashboard, settings reads, monitoring snapshot/SSE, backtests history/results/trades, and controlled preflight/create burst after Stage 8.5;
+- scenarios cover shell/assets, dashboard summary, settings reads, strategies dashboard/SSE, backtests workstation/results/trades, and controlled preflight/create burst after Stage 8.5;
 - report records host class, commit, config, dataset/cache state, concurrency/duration;
 - report records p50/p95/p99, error rate, payload size, RSS, CPU, DB/Redis latency signs, active SSE connections where applicable;
 - each area is classified `green`, `yellow`, or `red`;
@@ -332,7 +332,7 @@ uv run python tools/load/web_capacity_smoke.py \
   --profile local-smoke \
   --duration-s 60 \
   --concurrency 10 \
-  --scenario dashboard,monitoring,backtests_history
+  --scenario dashboard,strategies_live,backtests_workstation
 ```
 
 # i18n / language contract

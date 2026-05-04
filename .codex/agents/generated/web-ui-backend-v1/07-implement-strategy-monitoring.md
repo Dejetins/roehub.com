@@ -1,8 +1,8 @@
 ---
-prompt_name: web_ui_backend_v1_07_strategy_monitoring
+prompt_name: web_ui_backend_v1_07_strategy_live_bridge
 repo: roehub.com
 branch: main
-scope: "Этап 7: strategy monitoring page, compact read-models и browser-facing SSE/polling bridge."
+scope: "Этап 7: live strategy data bridge для /strategies и /dashboard без отдельной primary /monitoring page."
 
 language:
   implementation: python_fastapi_jinja_css_js_redis
@@ -15,16 +15,18 @@ context_sources:
     - path: docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md
       why: "Этап 7 source of truth"
     - path: docs/architecture/apps/web/web-ui-design-manifest-v1.md
-      why: "monitoring visual/layout/theme rules"
+      why: "live strategy data and reference-fidelity rules"
   task_entrypoints:
     - path: docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md
       why: "existing realtime substrate contract"
     - path: apps/api/routes/strategies.py
       why: "existing strategy run/stop and list API"
     - path: apps/web/main/app.py
-      why: "monitoring protected route"
-    - path: apps/web/templates/pages/monitoring.html
-      why: "monitoring page target"
+      why: "strategies/dashboard routes and optional /monitoring compatibility"
+    - path: apps/web/templates/pages/strategies.html
+      why: "primary live strategy consumer page"
+    - path: apps/web/templates/pages/dashboard.html
+      why: "secondary live strategy consumer page"
   conditional_bundles:
     redis_runtime:
       read_when: "when implementing Redis stream reader/SSE bridge"
@@ -47,7 +49,7 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; /monitoring has no canonical PNG in v1 map"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -65,32 +67,32 @@ hard_requirements:
   polling_fallback_required: true
   bounded_payloads_required: true
   no_overlap_polling_required: true
+  no_primary_monitoring_page_without_reference: true
   browser_qa_required: true
 
 task_toggles:
-  implement_monitoring_read_models: true
+  implement_strategy_dashboard_read_models: true
   implement_sse_bridge: true
   implement_polling_fallback: true
-  implement_monitoring_page: true
+  implement_primary_monitoring_page: false
   publish_after_success: true
 
 package_contract:
   depends_on:
     - "01-shell-auth-register accepted"
     - "02-design-system-js-core accepted"
-    - "06-strategy-library-detail accepted or Strategy API contract stable"
+    - "06-selected-strategy-dashboard accepted or Strategy API contract stable"
   owns:
-    - "apps/api/routes/ui_strategies_monitoring.py"
+    - "apps/api/routes/ui_strategies_dashboard.py"
     - "apps/api/routes/streams.py strategy stream endpoints"
-    - "apps/api/dto/ui_strategies_monitoring.py"
-    - "apps/api/wiring/modules/ui_strategies_monitoring.py"
-    - "apps/web/templates/pages/monitoring.html"
-    - "apps/web/templates/fragments/monitoring/**"
-    - "apps/web/dist/js/pages/monitoring.js"
-    - "apps/web/dist/css/pages/monitoring.css"
-    - "tests/unit/apps/api/test_ui_strategy_monitoring_routes.py"
+    - "apps/api/dto/ui_strategies_dashboard.py"
+    - "apps/api/wiring/modules/ui_strategies_dashboard.py"
+    - "apps/web/dist/js/core/stream_client.js"
+    - "apps/web/dist/js/pages/strategies.js live integration only"
+    - "apps/web/dist/js/pages/dashboard.js live integration only"
+    - "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
   forbidden:
-    - "strategy library create/detail templates"
+    - "new apps/web/templates/pages/monitoring.html primary page without a new canonical PNG/decision"
     - "backtest package files"
     - "settings/account package files"
     - "trading live-control semantics beyond documented run/stop calls"
@@ -100,7 +102,7 @@ package_contract:
     - "JS core sse.js/poller.js"
     - "strategy run/stop existing API"
   handoff:
-    - "owner-scoped monitoring DTOs and stream/polling fallback"
+    - "owner-scoped strategy dashboard DTOs and stream/polling fallback"
 
 skill_routing:
   - skill: architecture-design
@@ -110,15 +112,15 @@ skill_routing:
   - skill: contract-impact-analysis
     use_when: "adding `/ui/strategies/*`, `/stream/strategies`, DTOs, stream event semantics, auth/owner checks, or polling defaults"
     timing: "before implementation and final report"
-    reason: "monitoring adds public API/SSE contracts"
+    reason: "live strategy bridge adds public API/SSE contracts"
   - skill: backend-quality-gates
     use_when: "running route/stream/service tests, ruff, pyright"
     timing: "during verification"
     reason: "backend route and stream code must be verified"
   - skill: browser-qa-evidence
-    use_when: "verifying monitoring page, SSE reconnect/polling fallback, 401 handling, mobile layout"
+    use_when: "verifying `/strategies` live behavior, SSE reconnect/polling fallback, 401 handling, mobile layout"
     timing: "after backend tests"
-    reason: "monitoring is live browser behavior"
+    reason: "strategy live data is browser-visible"
   - skill: playwright
     use_when: "capturing screenshots/snapshots"
     timing: "during browser QA"
@@ -126,7 +128,7 @@ skill_routing:
   - skill: backend-performance-evidence
     use_when: "measuring Redis/DB fan-out, SSE connection count, reconnect behavior, or load smoke"
     timing: "during performance verification"
-    reason: "live monitoring can stress current host"
+    reason: "strategy live data can stress current host"
   - skill: publish-ci-deploy
     use_when: "all tests, browser QA, stream auth, and performance smoke pass"
     timing: "after verification"
@@ -138,8 +140,9 @@ target_envs:
   - github-actions
 
 required_literals:
-  - "/monitoring"
-  - "/api/ui/strategies/monitor"
+  - "/strategies"
+  - "/dashboard"
+  - "/api/ui/strategies/dashboard"
   - "/api/stream/strategies"
   - "/stream/strategies"
   - "last_event_id"
@@ -147,6 +150,7 @@ required_literals:
   - "polling fallback"
 
 non_goals:
+  - "Do not create a new primary `/monitoring` page without a canonical PNG and explicit plan update."
   - "Do not rewrite strategy live worker."
   - "Do not implement trading/order routing."
   - "Do not use HTMX as high-frequency live transport."
@@ -166,7 +170,7 @@ final_report_format:
   - "Publish/deploy: direct-main publish-ci-deploy terminal state; if successful, include direct push to origin/main, main CI/deploy monitoring, local main sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact blocker or reason it was skipped"
 
 quality_gates:
-  - cmd: "uv run pytest -q tests/unit/apps/api/test_ui_strategy_monitoring_routes.py tests/unit/apps/api/test_strategy_stream_routes.py tests/unit/apps/web/test_app_routes.py"
+  - cmd: "uv run pytest -q tests/unit/apps/api/test_ui_strategy_dashboard_routes.py tests/unit/apps/api/test_strategy_stream_routes.py tests/unit/apps/web/test_app_routes.py"
     expect: "passes; create focused tests if missing"
   - cmd: "uv run ruff check apps/api apps/web src/trading/contexts/strategy tests/unit/apps/api tests/unit/apps/web"
     expect: "passes for touched paths"
@@ -176,17 +180,16 @@ quality_gates:
     expect: "passes if docs changed"
 
 expected_primary_touches:
-  - "apps/api/routes/ui_strategies_monitoring.py"
+  - "apps/api/routes/ui_strategies_dashboard.py"
   - "apps/api/routes/streams.py"
-  - "apps/api/dto/ui_strategies_monitoring.py"
-  - "apps/api/wiring/modules/ui_strategies_monitoring.py"
+  - "apps/api/dto/ui_strategies_dashboard.py"
+  - "apps/api/wiring/modules/ui_strategies_dashboard.py"
   - "apps/api/main/app.py"
   - "src/trading/contexts/strategy/application/**"
-  - "apps/web/templates/pages/monitoring.html"
-  - "apps/web/templates/fragments/monitoring/*"
-  - "apps/web/dist/js/pages/monitoring.js"
-  - "apps/web/dist/css/pages/monitoring.css"
-  - "tests/unit/apps/api/test_ui_strategy_monitoring_routes.py"
+  - "apps/web/dist/js/core/stream_client.js"
+  - "apps/web/dist/js/pages/strategies.js"
+  - "apps/web/dist/js/pages/dashboard.js"
+  - "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
   - "tests/unit/apps/api/test_strategy_stream_routes.py"
 
 possible_secondary_touches:
@@ -201,21 +204,23 @@ safety_notes:
 
 # Task
 
-Implement Stage 7 strategy monitoring.
+Implement Stage 7 live strategy data bridge.
 
 Done means:
 
-- protected `/monitoring` page exists;
-- backend has compact monitor/snapshot/positions/fills/equity endpoints;
+- `/strategies` and `/dashboard` can consume one bounded live strategy data contract;
+- `/monitoring`, if preserved, is compatibility-only redirect/alias and not a new primary page;
+- backend has compact dashboard/snapshot/positions/fills/equity endpoints;
 - backend has authorized SSE bridge over existing Redis Streams or a documented polling-only fallback if stream substrate is unavailable;
-- page reconnects/downgrades safely;
+- pages reconnect/downgrade safely;
 - Playwright evidence exists.
 
 ## Context / Current State
 
 - Strategy API supports list/get/run/stop.
 - Strategy runtime already publishes realtime primitives to Redis Streams.
-- UI lacks browser-facing monitoring read models and SSE bridge.
+- UI lacks browser-facing strategy dashboard read models and SSE bridge.
+- The v1 reference map assigns `strategy_statistic.png` to `/strategies`, not `/monitoring`.
 
 ## Requirements (Must)
 
@@ -230,7 +235,7 @@ Done means:
 ## Requirements (Should)
 
 - Use SSE for state/events and polling fallback for snapshots.
-- Keep at most one idle SSE connection per monitoring page.
+- Keep at most one idle SSE connection per browser tab for strategy live data.
 - Make mobile list/detail collapse into tabs.
 
 ## Requirements (Nice-to-have)
@@ -252,23 +257,24 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Define monitoring DTOs and stream event contract.
+1. Define strategy dashboard/live DTOs and stream event contract.
 2. Add application query/stream reader ports and adapters.
 3. Add routes/wiring.
-4. Implement page, JS SSE wrapper integration and CSS.
+4. Implement JS SSE wrapper integration in `/strategies` and `/dashboard`.
 5. Add tests for auth/owner scope, fallback, 401, bounded payloads.
 6. Run browser QA and gates.
 7. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
-- Strategy list and selected snapshot render from backend DTO.
+- Strategy list and selected snapshot render from backend DTO on `/strategies`.
 - Start/stop actions reflect state within one refresh cycle.
 - SSE reconnects or degrades to polling.
 - 401 stops stream and sends user to login.
 - Hidden tab pauses polling.
 - Mobile layout folds list/detail into tabs.
 - Financial colors remain invariant.
+- `/monitoring` is not introduced as a divergent primary page.
 
 # Implementation constraints
 
@@ -330,11 +336,12 @@ Use front matter touched paths.
 - Rebuilding strategy live worker.
 - Trading execution controls beyond existing run/stop.
 - Backtests.
+- New primary `/monitoring` page.
 
 # Quality gates (must run and pass)
 
 ```bash
-uv run pytest -q tests/unit/apps/api/test_ui_strategy_monitoring_routes.py tests/unit/apps/api/test_strategy_stream_routes.py tests/unit/apps/web/test_app_routes.py
+uv run pytest -q tests/unit/apps/api/test_ui_strategy_dashboard_routes.py tests/unit/apps/api/test_strategy_stream_routes.py tests/unit/apps/web/test_app_routes.py
 uv run ruff check apps/api apps/web src/trading/contexts/strategy tests/unit/apps/api tests/unit/apps/web
 uv run pyright
 python -m tools.docs.generate_docs_index --check
@@ -345,9 +352,9 @@ Playwright CLI:
 ```bash
 export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
-"$PWCLI" open http://127.0.0.1:8010/monitoring
+"$PWCLI" open http://127.0.0.1:8010/strategies
 "$PWCLI" snapshot
-"$PWCLI" screenshot --filename output/playwright/monitoring-desktop.png
+"$PWCLI" screenshot --filename output/playwright/strategies-live-desktop.png
 ```
 
 # i18n / language contract

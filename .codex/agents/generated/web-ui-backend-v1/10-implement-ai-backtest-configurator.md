@@ -2,7 +2,7 @@
 prompt_name: web_ui_backend_v1_10_ai_backtest_configurator
 repo: roehub.com
 branch: main
-scope: "Этап 10: AI-assisted draft config for backtest configurator, gated by explicit AI backend design decision."
+scope: "Этап 10: AI-assisted draft config внутри /backtests workstation по stategy_backtest.png, gated by explicit AI backend design decision."
 
 language:
   implementation: python_fastapi_jinja_css_js
@@ -17,10 +17,10 @@ context_sources:
     - path: docs/architecture/apps/web/web-ui-design-manifest-v1.md
       why: "configurator visual rules"
   task_entrypoints:
-    - path: apps/web/templates/pages/backtests_run.html
-      why: "configurator page target"
-    - path: apps/web/dist/js/pages/backtests_run.js
-      why: "manual configurator integration point"
+    - path: apps/web/templates/pages/backtests.html
+      why: "backtest workstation page target"
+    - path: apps/web/dist/js/pages/backtests.js
+      why: "manual workstation/configurator integration point"
     - path: apps/api/routes
       why: "API route location for AI routes if design decision exists"
   conditional_bundles:
@@ -44,7 +44,11 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; AI panel lives in stategy_backtest.png /backtests workstation"
+  canonical_reference:
+    route: /backtests
+    path: /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
+    fidelity: "AI zone must stay inside the reference-shaped backtest workstation"
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -74,7 +78,7 @@ task_toggles:
 
 package_contract:
   depends_on:
-    - "08-backtests-history-configurator accepted"
+    - "08-backtests-workstation accepted"
     - "08.5-backtest-runtime-hardening accepted or public rollout blocker documented"
     - "explicit AI backend design decision accepted"
   owns:
@@ -82,8 +86,8 @@ package_contract:
     - "apps/api/dto/ai_backtest_config.py"
     - "apps/api/wiring/modules/ai_backtest_config.py"
     - "apps/web/dist/js/pages/backtests_ai.js"
-    - "apps/web/dist/js/pages/backtests_run.js AI integration only"
-    - "apps/web/templates/pages/backtests_run.html AI zone only"
+    - "apps/web/dist/js/pages/backtests.js AI integration only"
+    - "apps/web/templates/pages/backtests.html AI zone only"
     - "tests/unit/apps/api/test_ai_backtest_config_routes.py"
     - "docs/architecture/apps/web/ai-backtest-configurator-v1.md if design artifact is needed"
   forbidden:
@@ -92,7 +96,7 @@ package_contract:
     - "provider implementation without accepted design decision"
     - "manual validation/preflight bypass"
   integration_points:
-    - "manual backtests_run.js apply/preflight/submit flow"
+    - "manual backtests.js apply/preflight/submit flow"
     - "AI provider adapter boundary"
     - "redaction/rate-limit/cancellation contract"
   handoff:
@@ -141,6 +145,7 @@ non_goals:
   - "Do not implement AI without explicit backend design decision."
   - "Do not let AI call `/api/backtests/jobs` directly."
   - "Do not send exchange keys, session cookies, API keys, or raw private audit logs to AI provider."
+  - "Do not move AI to a standalone generic page outside `/backtests` workstation."
   - "Do not bypass manual validation/preflight/submit."
 
 final_report_format:
@@ -171,8 +176,8 @@ expected_primary_touches:
   - "apps/api/dto/ai_backtest_config.py"
   - "apps/api/wiring/modules/ai_backtest_config.py"
   - "apps/web/dist/js/pages/backtests_ai.js"
-  - "apps/web/dist/js/pages/backtests_run.js"
-  - "apps/web/templates/pages/backtests_run.html"
+  - "apps/web/dist/js/pages/backtests.js"
+  - "apps/web/templates/pages/backtests.html"
   - "tests/unit/apps/api/test_ai_backtest_config_routes.py"
 
 possible_secondary_touches:
@@ -186,11 +191,11 @@ safety_notes:
 
 # Task
 
-Implement Stage 10 AI-assisted backtest draft configurator only if the required AI backend design decision exists.
+Implement Stage 10 AI-assisted backtest draft configurator inside `/backtests` only if the required AI backend design decision exists.
 
 Done means:
 
-- AI can produce a draft config only;
+- AI can produce a draft config only inside the `/backtests` workstation AI/config panel;
 - user must explicitly apply draft, run preflight, and submit job;
 - invalid AI draft shows deterministic validation errors;
 - stream cancellation works;
@@ -200,7 +205,7 @@ Done means:
 ## Context / Current State
 
 - Stage 10 is intentionally gated by open question: provider, storage, redaction and rate limits require explicit design decision.
-- Backtest configurator and validation path must already exist.
+- Backtest workstation and validation path must already exist.
 
 ## Requirements (Must)
 
@@ -326,7 +331,7 @@ Browser QA if implemented:
 ```bash
 export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
-"$PWCLI" open http://127.0.0.1:8010/backtests/new
+"$PWCLI" open http://127.0.0.1:8010/backtests
 "$PWCLI" snapshot
 "$PWCLI" screenshot --filename output/playwright/backtests-ai-draft-desktop.png
 ```

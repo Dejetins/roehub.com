@@ -53,7 +53,12 @@ style_references:
     purpose: "визуальный source of truth для токенов, тем, layouts, density и accessibility"
   external_reference_root:
     path: /Users/daniildegtyarev/Projects/roehub_web_ui
-    purpose: "reference screenshots/assets; inspect only stage-relevant pages"
+    purpose: "reference screenshots/assets; final sweep must compare functional pages against canonical PNG map"
+  canonical_references:
+    dashboard: /Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png
+    settings: /Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png
+    strategies: /Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png
+    backtests: /Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png
   default_palette: terminal-orange
   theme_variants:
     - terminal-orange
@@ -73,6 +78,7 @@ hard_requirements:
   edge_split_verified: true
   sse_buffering_checked_if_sse_exists: true
   full_browser_sweep_required: true
+  reference_fidelity_sweep_required: true
   full_backend_gates_required: true
 
 task_toggles:
@@ -362,13 +368,22 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 "$PWCLI" snapshot
 "$PWCLI" open http://127.0.0.1:8010/settings
 "$PWCLI" snapshot
-"$PWCLI" open http://127.0.0.1:8010/monitoring
+"$PWCLI" open http://127.0.0.1:8010/strategies
 "$PWCLI" snapshot
 "$PWCLI" open http://127.0.0.1:8010/backtests
 "$PWCLI" snapshot
-"$PWCLI" open http://127.0.0.1:8010/backtests/new
+"$PWCLI" open http://127.0.0.1:8010/backtests?job_id=<job_id>
 "$PWCLI" snapshot
 ```
+
+Reference fidelity sweep requirement:
+
+- compare `/dashboard` desktop screenshot against `personal_dashboard.png`;
+- compare `/settings` desktop screenshot against `personal_settings.png`;
+- compare `/strategies` desktop screenshot against `strategy_statistic.png`;
+- compare `/backtests` desktop screenshot against `stategy_backtest.png`;
+- compare `/backtests?job_id=<job_id>` desktop screenshot against `stategy_backtest.png` selected result state;
+- generic cards/overview layouts on functional pages are introduced failures, not cosmetic deviations.
 
 # i18n / language contract
 

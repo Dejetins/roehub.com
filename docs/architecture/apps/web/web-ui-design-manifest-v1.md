@@ -8,10 +8,11 @@
 - план реализации: `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md`;
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
 - обновление 2026-05-03: палитра, header и shell-инварианты сверены с `personal_settings.png`, `stategy_backtest.png` и текущим Stage 1 screenshot; текущая orange-grid реализация не является целевым дизайном;
+- обновление 2026-05-04: для функциональных страниц введен жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются визуально невалидными, если не повторяют назначенный PNG-референс;
+- актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`;
 - референсы дизайна:
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png`;
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png`;
-  - `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_monitoring.png`;
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png`;
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png`;
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png`.
@@ -26,6 +27,34 @@
 
 Референсы задают другой продуктовый язык: темная терминальная рабочая панель, плотные таблицы, тонкие янтарно-оранжевые контуры, моноширинные числа, зеленые/красные значения доходности и минимальная декоративность. В референсах нет полноэкранной декоративной orange-grid подложки: сетка допустима внутри графиков, таблиц и data panels, но не как фон всего приложения.
 
+## Жесткий reference fidelity contract
+
+Для функциональных страниц Roehub Web UI v1 PNG-референс является не moodboard и не "inspiration", а визуальным контрактом. Часть страницы **после глобальной шапки сайта** должна быть `reference-shaped`: повторять структуру, плотность, панельную сетку, порядок информационных зон, таблицы, графики, командную строку страницы и нижнюю статусную строку назначенного референса. Допускается заменить бренд `QUANT CLI` на `Roehub`, перевести пользовательский текст на `en`/`ru`, адаптировать ширины под реальные данные и свернуть layout на mobile, но нельзя заменять референс generic cards, marketing blocks или dashboard overview без соответствующей панельной структуры.
+
+Каноническая карта страниц:
+
+| Route | Канонический PNG | Смысл страницы | Обязательный подход |
+|---|---|---|---|
+| `/` | `general_page.png` | публичный лендинг | отдельный landing contract; текущим обновлением не пересматривается. |
+| `/dashboard` | `personal_dashboard.png` | dashboard по всем стратегиям/fleet workstation | полная панельная рабочая поверхность all-strategies monitoring, а не обзорные карточки. |
+| `/settings` | `personal_settings.png` | личный кабинет/account settings | профиль, биржевые подключения, лимиты, интеграции, уведомления, безопасность, сессии, аудит. |
+| `/strategies` | `strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | selected-strategy analytics workstation: chart, metrics, stats tables, trades/events/symbol/hour breakdowns. |
+| `/backtests` | `stategy_backtest.png` | backtest workstation/configurator | конфигурация, AI/config zone, instruments, indicators, optimization progress/results в одной плотной рабочей поверхности. |
+| `/monitoring` | нет отдельного PNG в v1 map | compatibility/ops route only | не является primary strategy dashboard; если route сохраняется, он не должен забирать reference у `/strategies`. |
+| `/backtests/{job_id}` | нет отдельного PNG в v1 map | optional deep link/API state | не является шестой функциональной страницей v1; если route сохраняется, он должен открывать `/backtests` с выбранной job/result state или служить API-backed detail state без отдельного reference layout. |
+
+Визуальные страницы v1 ограничены пятью PNG выше. `/monitoring`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests/new` и `/backtests/{job_id}` могут существовать только как compatibility redirects/aliases или state внутри canonical page.
+
+Reference fidelity acceptance:
+
+- каждый implementation-agent обязан открыть назначенный PNG до верстки и перечислить panel inventory в implementation notes или final report;
+- desktop Playwright screenshot должен визуально совпадать с референсом по крупной сетке: те же зоны, аналогичный порядок, аналогичная плотность и command/status bars;
+- generic `rh-dashboard-card` / "overview cards" вместо панельной workstation-компоновки считается introduced failure;
+- если backend пока не дает данные для панели, UI сохраняет форму панели из референса и показывает typed `unavailable/degraded/empty` state, а не удаляет панель;
+- финансовые значения, графики и таблицы должны использовать реальные bounded DTOs или явный mock/test fixture только в local visual QA; production route не должен выдумывать PnL/ROI;
+- mobile может перестраивать панели во вкладки/stack, но порядок и приоритет данных остаются совместимыми с desktop reference;
+- отсутствующий canonical PNG для функциональной страницы является blocker для implementation stage, а не поводом строить страницу по памяти.
+
 ## Охват
 
 - публичный лендинг;
@@ -33,10 +62,8 @@
 - мультиязычный UI: основной язык `English`, дополнительный язык `Русский`, переключатель языка;
 - обзорная панель;
 - настройки и аккаунт;
-- мониторинг стратегий;
-- история backtest-задач;
-- конфигуратор backtest-задач;
-- результаты и статистика backtest-задач;
+- dashboard/statistics выбранной стратегии внутри `/strategies`;
+- backtest workstation/configurator;
 - переиспользуемые панели, таблицы, бейджи, кнопки, формы, вкладки, прогресс, графики и статусные строки;
 - переключение тем и палитр.
 
@@ -412,21 +439,33 @@ Language switcher:
 
 Использовать `general_page.png` как основной референс. Hero должен показывать сам продукт: карту платформы Roehub, возможности и CTA в первом viewport. Визуальный ассет - темная продуктовая диаграмма. Не превращать лендинг в типовой SaaS-набор карточек.
 
+#### Dashboard всех стратегий
+
+Route: `/dashboard`. Канонический референс: `personal_dashboard.png`.
+
+Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, большой PnL/equity chart, metric grid, таблица открытых позиций, таблица последних исполнений, health/risk, alerts/events, symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+
 #### Настройки
 
-Использовать `personal_settings.png`. Страница является плотной операционной поверхностью аккаунта: профиль, биржевые ключи, лимиты, интеграции, уведомления, безопасность, сессии, аудит и управление темой. Секреты никогда не показываются, а замаскированные API-ключи должны выглядеть как операционные записи, а не как password-поля.
+Route: `/settings`. Канонический референс: `personal_settings.png`.
 
-#### Мониторинг стратегий
+Страница является плотной операционной поверхностью аккаунта. Обязательные зоны: профиль, подключенные API бирж, уведомления и лимиты, webhooks/integrations, уведомления, безопасность, недавние сессии, журнал событий, верхние actions edit/save/security и нижняя status bar. Секреты никогда не показываются, а замаскированные API-ключи должны выглядеть как операционные записи, а не как password-поля.
 
-Использовать `strategy_monitoring.png` и `personal_dashboard.png`; они фактически задают один мониторинговый референс. Сохранить двухзонную модель: панель выбранной стратегии слева, список стратегий справа. Живое состояние должно быть визуально очевидно через статусные точки, timestamps и lag.
+#### Dashboard конкретной стратегии
 
-#### Конфигуратор backtest-задач
+Route: `/strategies`. Канонический референс: `strategy_statistic.png`.
 
-Использовать `stategy_backtest.png`. Сохранить левую колонку конфигурации, центральную AI/config-зону с прогрессом/результатами и панели выбора инструмента/индикаторов. Реализация может перестраивать блоки ради адаптивности, но должна сохранить плотную рабочую поверхность.
+Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии, chart со сделками/TP/SL или equity/trades, сводные метрики, месячная статистика, drawdown/equity, таблица сделок и разрезы по символам/часам. Live/status controls и список/переключатель стратегий добавляются только если они не ломают форму референса.
 
-#### Результаты backtest-задач / статистика стратегий
+#### Backtest workstation / конфигуратор
 
-Использовать `strategy_statistic.png`. Страница строится вокруг аналитики: график, сводные метрики, месячная статистика, drawdown/equity, таблица сделок и разрезы по символам/часам. Загрузка одного варианта не должна вытягивать все тяжелые детали. Доходность и процентные изменения используют фиксированные финансовые цвета независимо от выбранной темы.
+Route: `/backtests`. Канонический референс: `stategy_backtest.png`.
+
+Сохранить левую колонку конфигурации, центральную AI/config-зону с прогрессом/результатами, панели выбора инструмента/индикаторов, optimization overview/progress, events и таблицу вариантов/results. AI-зона может быть gated до Stage 10, но форма панели и ручной workflow должны совпадать с референсом. Реализация может перестраивать блоки ради адаптивности, но должна сохранить плотную рабочую поверхность.
+
+#### Backtest results state
+
+Route: `/backtests/{job_id}` не является отдельной шестой страницей в Web UI v1. Если deep link сохраняется, он должен открыть `/backtests` с выбранной job/result state или отдать совместимый detail state внутри backtest workstation. Отдельный page layout под `strategy_statistic.png` не планируется, потому что этот PNG закреплен за `/strategies`.
 
 ### 10) Организация ассетов, CSS и i18n
 
@@ -444,7 +483,7 @@ apps/web/dist/
       landing.css
       dashboard.css
       settings.css
-      monitoring.css
+      strategies.css
       backtests.css
   js/
     core/
@@ -497,6 +536,7 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 
 - desktop-скриншот на широком viewport, обычно около `1440x1000`;
 - мобильный скриншот около `390x844`;
+- для функциональных страниц: screenshot должен быть сравнен с назначенным PNG из карты выше; final report перечисляет совпадающие панели и любые intentional deviations;
 - общий фон страницы не содержит orange-grid / graph-paper background;
 - header соответствует референсам: текстовый бренд без `RH` monogram, compact nav, active item border, auth/account справа, без крупного theme switcher в primary row;
 - language switcher видим/доступен в shell, меняет `en`/`ru`, обновляет `<html lang>` и не ломает header layout;
@@ -514,6 +554,7 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 ## Контракты и инварианты
 
 - Визуальный источник правды - этот документ и перечисленные PNG-референсы.
+- Для функциональных страниц действует `reference fidelity contract`: часть после глобальной шапки должна повторять назначенный PNG по структуре и panel inventory.
 - Новый UI заменяет старый; светлый наследуемый skin не сохраняется.
 - Палитра по умолчанию - `terminal-orange`.
 - Полноэкранная orange-grid подложка запрещена; сетка допустима только внутри графиков/data panels.
@@ -527,6 +568,7 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 - Не загружать полные сделки или сырые многолетние массивы графиков на первом рендере страницы.
 - Финансовые цвета для доходности и процентных изменений являются семантическими инвариантами и не меняются темами.
 - Locale preference является browser-visible/config/account-preference контрактом; fallback всегда `en`.
+- Baseline rollback target для пересборки Web UI pack: `bae8bd88229ceec4736deee5d61ad178e1ab9060`. Откат выполняется только явным revert/reset workflow по отдельному запросу; дизайн-манифест сам не разрешает destructive git operation.
 
 ## Связанные файлы
 
@@ -565,3 +607,4 @@ uv run ruff check .
 - Риск: переключение темы может случайно перекрасить финансовые значения. Митигация: отделить `financial`-токены от `base`/`accent`/`state`-токенов и проверять это через Playwright.
 - Риск: агенты могут добавить русские hardcoded строки в page templates. Митигация: общий i18n-helper, parity check ключей `en`/`ru`, browser evidence для language switch.
 - Риск: требования к иконкам могут привести к дублированию ad hoc SVG. Митигация: либо добавить явный self-hosted путь доставки Lucide на базовом этапе, либо использовать текстовые controls до появления такого пути.
+- Риск: `strategy_statistic.png` может восприниматься как backtest-result reference по старому плану. Митигация: canonical map v1 закрепляет его за `/strategies`; `/backtests/{job_id}` не считается отдельной функциональной страницей.
