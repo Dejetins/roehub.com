@@ -81,6 +81,10 @@ hard_requirements:
   preflight_advisory_create_authoritative: true
   idempotency_key_required_for_create: true
   no_full_results_or_trades_on_configurator: true
+  manual_refresh_required: true
+  autorefresh_controls_required: true
+  branded_dropdowns_required: true
+  visible_native_select_forbidden: true
   backtest_presets_owner_scoped_if_implemented: true
   browser_qa_required: true
 
@@ -115,6 +119,8 @@ package_contract:
     - "existing /api/backtests/jobs/preflight/defaults routes"
     - "Idempotency-Key semantics"
     - "backtest_presets migration if implemented"
+    - "branded dropdown/combobox component"
+    - "refresh/autorefresh helper"
     - "apps/api/main.py route include"
   handoff:
     - "reference-shaped backtest workstation and safe request draft flow"
@@ -157,6 +163,8 @@ required_literals:
   - "Idempotency-Key"
   - "backtest_presets"
   - "request_hash"
+  - "refresh_status"
+  - "retry_after_seconds"
 
 non_goals:
   - "Do not implement result endpoints/state; Stage 9 owns selected result state inside `/backtests`."
@@ -164,6 +172,7 @@ non_goals:
   - "Do not change canonical backtest request hashing."
   - "Do not load full results/trades on `/backtests` workstation."
   - "Do not split the UX into generic history and generic configurator pages unless only as compatibility redirects/fragments."
+  - "Do not use visible native select/system dropdowns for configurator/ranking/filter controls."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -212,6 +221,8 @@ safety_notes:
   - "`POST /api/backtests/jobs` is browser path; backend route is `/backtests/jobs`."
   - "Preflight is advisory. Create repeats validation."
   - "The `/backtests` page body after the global header must be reference-shaped against stategy_backtest.png."
+  - "Backtest config dropdowns must use shared branded controls; visible native select is only hidden fallback."
+  - "Manual refresh/autorefresh for jobs/progress must use no-overlap helpers and server retry windows."
 ---
 
 # Task
@@ -227,6 +238,8 @@ Done means:
 - create flow sends `Idempotency-Key`;
 - invalid requests never create jobs;
 - presets/counters exist only if implemented through proper contracts;
+- manual refresh/autorefresh for jobs/progress exists if progress/history is live;
+- all configurator dropdowns/selectors are branded controls, not visible native selects;
 - old combined `backtests.html` and `backtest_ui.js` are no longer long-term dependencies for these routes;
 - browser evidence exists.
 
@@ -241,6 +254,8 @@ Done means:
 - Open `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` before coding.
 - Preserve the reference panel inventory: command bar, left config panel, AI configurator/analysis panel, instruments selector, indicators table/list, optimization overview/progress, recent events, main variants/results table, action/status buttons, bottom status/logos row.
 - Add or reuse `GET /api/ui/backtests/workstation?cursor=&state=&query=` as bounded first-render read-model when useful.
+- Include `refresh_status`, `generated_at`, `next_allowed_refresh_at`/`retry_after_seconds` or equivalent for job/progress panels.
+- Use branded dropdown/combobox/listbox controls for market, symbol, timeframe, direction, risk mode, ranking metric/order, presets and filters.
 - Preserve jobs vocabulary and public API compatibility.
 - Preserve canonical request hash/cache identity.
 - Keep full results/trades out of `/backtests` workstation first paint.
@@ -251,6 +266,7 @@ Done means:
 ## Requirements (Should)
 
 - Keep browser polling no-overlap and hidden-tab aware.
+- Support safe manual refresh/autorefresh for jobs/progress with server retry windows.
 - Use shared JS core and design components.
 - Keep request drafts safe and owner-scoped.
 
@@ -291,6 +307,8 @@ Use front matter `context_sources`.
 - Duplicate submit with same idempotency key returns same job.
 - Cancel is UX-idempotent.
 - History remains responsive with large job count.
+- Manual refresh/autorefresh does not overlap and respects `retry_after_seconds`.
+- Open branded configurator dropdown/popover is captured in Playwright evidence.
 - Full results/trades are not loaded on configurator.
 - Generic history/configurator card pages are not acceptable as primary `/backtests` UX.
 

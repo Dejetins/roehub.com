@@ -67,12 +67,16 @@ hard_requirements:
   green_yellow_red_classification_required: true
   host_class_commit_config_required: true
   p50_p95_p99_error_rss_cpu_required: true
+  refresh_autorefresh_scenarios_required: true
+  exchange_rate_limit_smoke_required: true
   publish_after_success: true
 
 task_toggles:
   implement_lightweight_harness_if_missing: true
   implement_runbook_optional: true
   run_read_mostly_scenarios: true
+  run_refresh_autorefresh_scenarios: true
+  run_exchange_limiter_smoke: true
   run_controlled_create_burst_after_8_5: true
   publish_after_success: true
 
@@ -96,6 +100,8 @@ package_contract:
     - "same-origin local/prod topology"
     - "capacity report artifact path"
     - "green/yellow/red rollout notes"
+    - "refresh/autorefresh coalescing and retry window evidence"
+    - "exchange-bound limiter evidence"
   handoff:
     - "measured host capacity, limits, and rollout mitigations"
 
@@ -133,6 +139,9 @@ required_literals:
   - "p99"
   - "RSS"
   - "CPU"
+  - "retry_after_seconds"
+  - "autorefresh"
+  - "exchange limiter"
   - "no secrets"
 
 non_goals:
@@ -188,6 +197,7 @@ Done means:
 
 - lightweight capacity harness exists or an existing one is used;
 - scenarios cover shell/assets, dashboard summary, settings reads, strategies dashboard/SSE, backtests workstation/results/trades, and controlled preflight/create burst after Stage 8.5;
+- scenarios cover manual refresh bursts, autorefresh interval presets, hidden-tab/no-overlap behavior, backend `retry_after_seconds`, stale/degraded source responses and exchange-bound limiter smoke;
 - report records host class, commit, config, dataset/cache state, concurrency/duration;
 - report records p50/p95/p99, error rate, payload size, RSS, CPU, DB/Redis latency signs, active SSE connections where applicable;
 - each area is classified `green`, `yellow`, or `red`;
@@ -208,6 +218,8 @@ Done means:
 - Record exact commands.
 - Never record secrets/cookies/tokens.
 - Do not validate against unfinished placeholder pages as if they were final flows.
+- Do not simulate exchange-bound refresh by bypassing backend limiter/cache; use mock/fake adapter or controlled test account path.
+- Include refresh/autorefresh storm/coalescing scenario for `/dashboard`, `/strategies` and `/backtests` where implemented.
 - Use `publish-ci-deploy` only after harness/report/docs/tests pass.
 
 ## Requirements (Should)
@@ -249,6 +261,8 @@ Use front matter `context_sources`.
 - Capacity report contains commands, host class, commit and config.
 - No first-paint endpoint transfers unbounded data.
 - Polling/SSE loops do not overlap requests under latency.
+- Manual refresh bursts do not create parallel fan-out to exchanges.
+- Autorefresh preserves selected intervals and respects server retry windows.
 - Backtest create path does not execute full compute in API request path.
 - p95/RSS/error trends are recorded.
 - Known limits are in rollout notes and handoff.

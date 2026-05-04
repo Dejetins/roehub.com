@@ -76,6 +76,7 @@ hard_requirements:
   request_hash_cache_identity_unchanged: true
   macstudio_policy_if_compute_touched: true
   load_smoke_required: true
+  ui_refresh_retry_window_required: true
 
 task_toggles:
   implement_worker_trigger_or_adapter: true
@@ -103,6 +104,7 @@ package_contract:
     - "job state transitions"
     - "worker trigger port/adapter"
     - "idempotent enqueue"
+    - "bounded UI polling/refresh metadata for backtest job state"
     - "Mac Studio benchmark evidence if compute path changes"
   handoff:
     - "bounded async job create path and worker/queue contract for Stage 9/12"
@@ -147,11 +149,14 @@ required_literals:
   - "cancelled"
   - "Idempotency-Key"
   - "request_hash"
+  - "refresh_status"
+  - "retry_after_seconds"
 
 non_goals:
   - "Do not implement browser result endpoints/state; Stage 9 owns selected result state inside `/backtests`."
   - "Do not change canonical request hash."
   - "Do not store full trades in top rows."
+  - "Do not let browser refresh/autorefresh trigger compute or bypass bounded job-state polling contracts."
   - "Do not claim benchmark acceptance from local tests alone if compute path changes."
 
 final_report_format:
@@ -195,6 +200,7 @@ possible_secondary_touches:
 safety_notes:
   - "If full worker queue is not ready, document transitional adapter, timeout guard, and public rollout limitation."
   - "Do not silently change external response shape/status."
+  - "Backtest job status/progress refresh must be bounded, cache/read-model friendly, and expose retry-window semantics for UI autorefresh."
   - "Mac Studio evidence is required if verified compute path changes."
 ---
 
@@ -208,6 +214,7 @@ Done means:
 - idempotency replay does not enqueue duplicate work;
 - cancel remains deterministic for queued/running/terminal jobs;
 - UI can show `queued/running/succeeded|failed|cancelled`;
+- UI refresh/autorefresh can poll job state without overlapping compute, unbounded payloads or missing retry-window semantics;
 - request hash/cache identity are unchanged;
 - load smoke shows API process is not CPU-saturated by create path;
 - Mac Studio benchmark policy is followed if compute path is touched.
@@ -223,6 +230,7 @@ Done means:
 - Remove long-running compute from API request path or document a transitional adapter with explicit rollout ban.
 - Preserve public jobs API compatibility where possible.
 - Add tests for queued create, idempotency replay, cancel, worker claim/update.
+- Ensure job status/progress polling is bounded and can return `refresh_status`, `generated_at`, `next_allowed_refresh_at`/`retry_after_seconds` or an equivalent typed retry-window contract for Stage 8/9 UI refresh.
 - Run performance/load evidence.
 - Use `publish-ci-deploy` only after all required evidence passes.
 
@@ -264,6 +272,7 @@ Use front matter `context_sources`.
 - API create path is bounded by validation/persistence/enqueue.
 - Current job states do not regress.
 - No full result/trades payload is stored in top rows.
+- Job status/progress refresh cannot trigger compute and can communicate retry-window/coalescing state to UI.
 - Focused local tests pass.
 - Capacity/load evidence records create path behavior.
 - Any compute-path change has Mac Studio benchmark evidence or a documented blocker.

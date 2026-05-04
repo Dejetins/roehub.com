@@ -62,6 +62,9 @@ hard_requirements:
   no_page_specific_color_literals: true
   js_core_required: true
   no_overlap_poller_required: true
+  refresh_autorefresh_helper_required: true
+  branded_dropdowns_required: true
+  visible_native_select_forbidden: true
   api_client_error_mapping_required: true
   locale_js_required: true
   i18n_component_contract_required: true
@@ -99,6 +102,8 @@ package_contract:
     - "theme.js data-theme API"
     - "api.js/poller.js/sse.js/dom.js public JS helpers"
     - "locale.js language switcher/helper API"
+    - "branded dropdown/menu/listbox/combobox component API"
+    - "refresh/autorefresh helper API"
     - "shared macro/component names"
   handoff:
     - "stable UI kit, theme contract, and JS core for page packages"
@@ -143,6 +148,10 @@ required_literals:
   - "sse.js"
   - "dom.js"
   - "locale.js"
+  - "dropdown"
+  - "combobox"
+  - "listbox"
+  - "refresh"
   - "en"
   - "ru"
   - "data-locale"
@@ -153,6 +162,7 @@ non_goals:
   - "Do not add Node/Vite/React toolchain."
   - "Do not recolor financial semantics by theme."
   - "Do not hardcode user-visible component labels in only one language."
+  - "Do not rely on visible native `<select>` / system dropdown popups for protected functional pages."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -198,6 +208,8 @@ safety_notes:
   - "Use CSS variables for UI colors."
   - "Financial colors are semantic invariants and must not be theme-overridden."
   - "Mutation requests need one CSRF extension point in JS core, not ad hoc page code."
+  - "Shared dropdown/listbox/menu controls must be branded Roehub UI with keyboard/ARIA support; native select is only hidden fallback."
+  - "Refresh/autorefresh helpers must enforce no-overlap requests, hidden-tab pause, preset intervals, custom interval validation hook, and server `retry_after_seconds`."
 ---
 
 # Task
@@ -210,6 +222,8 @@ Done means:
 - shared Jinja macros/components exist and can render placeholders;
 - `theme.js`, `api.js`, `poller.js`, `sse.js`, `dom.js`, `notifications.js`, `formatters.js`, `validators.js` exist as scoped JS core;
 - `locale.js` exists as scoped JS core for language switcher state, cookie/localStorage sync, fallback `en`, and dynamic strings;
+- branded dropdown/menu/listbox/combobox components exist and do not use visible native system dropdowns as the primary UX;
+- refresh/autorefresh helper exists for manual refresh, interval presets, custom validation hooks, hidden-tab pause and server `retry_after_seconds`;
 - theme switch updates `data-theme` without reload and preserves financial colors;
 - shared components expose i18n hooks/keys for labels, empty states, errors and button text;
 - `poller.js` prevents overlapping requests and hidden-tab repeated polling;
@@ -229,6 +243,8 @@ Done means:
 - Keep `financial` tokens invariant across themes.
 - Implement JS core with deterministic 401/403/409/422/timeout handling.
 - Implement `locale.js` with `en`/`ru` support, safe fallback, and no localized route/API paths.
+- Implement branded dropdown/menu/listbox/combobox primitives with ARIA roles, keyboard navigation, typeahead where useful, focus management, overlay positioning and mobile branded fallback.
+- Implement refresh/autorefresh primitives with presets `off`, `10s`, `15s`, `30s`, `1m`, `5m`, custom interval validation hook, no-overlap behavior and hidden-tab pause.
 - Provide CSRF extension point for state-changing calls.
 - Add tests/smokes for asset references and theme hooks.
 - Run Playwright evidence.
@@ -262,11 +278,12 @@ Use front matter `context_sources`; avoid broad repo reads.
 1. Inspect current shell asset hooks.
 2. Add CSS token/theme/component files.
 3. Add shared Jinja macros/components.
-4. Add JS core modules, including the shared `dom.js` and `locale.js` helpers from the target asset structure.
-5. Wire shell placeholders to use the new assets.
-6. Add focused tests.
-7. Run browser QA and quality gates.
-8. Use `publish-ci-deploy` only after complete success.
+4. Add branded dropdown/menu/listbox/combobox primitives and refresh/autorefresh helpers.
+5. Add JS core modules, including the shared `dom.js` and `locale.js` helpers from the target asset structure.
+6. Wire shell placeholders to use the new assets.
+7. Add focused tests.
+8. Run browser QA and quality gates.
+9. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
@@ -279,6 +296,9 @@ Use front matter `context_sources`; avoid broad repo reads.
 - Financial values keep fixed semantic colors across all themes.
 - `api.js` handles 401, 403, 409, 422, timeout deterministically.
 - `poller.js` has no-overlap behavior and hidden-tab pause.
+- Refresh/autorefresh helper supports required presets, custom validation hook, `retry_after_seconds`, and no-overlap semantics.
+- Branded dropdown/menu/listbox/combobox opens in browser with Roehub styling; visible native system dropdown is absent from protected UI components.
+- Browser QA includes an open branded dropdown/popover state.
 - Components have accessible labels/focus states.
 
 # Implementation constraints

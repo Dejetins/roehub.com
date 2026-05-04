@@ -79,6 +79,8 @@ hard_requirements:
   public_variant_key_only: true
   storage_identity_split_preserved: true
   no_full_trades_in_top_rows: true
+  manual_refresh_required: true
+  autorefresh_rate_limit_required: true
   chart_nonblank_browser_check_required: true
   no_separate_result_page_required: true
   reject_generic_result_cards: true
@@ -113,6 +115,7 @@ package_contract:
     - "public variant_key mapping"
     - "lazy trades cache/materialization"
     - "bounded chart point limits"
+    - "refresh/autorefresh helper and retry_after_seconds"
     - "CSV export route"
   handoff:
     - "bounded results/statistics endpoints and `/backtests` result-state evidence"
@@ -158,6 +161,8 @@ required_literals:
   - "variant_key"
   - "variant_hash"
   - "summary-only"
+  - "retry_after_seconds"
+  - "refresh_status"
 
 non_goals:
   - "Do not change canonical request hash."
@@ -165,6 +170,7 @@ non_goals:
   - "Do not accept raw storage SHA as public route key."
   - "Do not create a separate sixth results page or `backtests_result.html` layout."
   - "Do not replace the backtest workstation reference with generic result cards."
+  - "Do not let result refresh/autorefresh fetch unbounded trades or trigger compute."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -210,6 +216,7 @@ safety_notes:
   - "Chart endpoints must downsample to bounded points."
   - "Unknown public `variant_key` returns 404."
   - "The `/backtests` page body must remain reference-shaped against stategy_backtest.png while adding selected result state."
+  - "Manual refresh/autorefresh for selected result state must be no-overlap, bounded and rate-limit aware."
 ---
 
 # Task
@@ -225,6 +232,7 @@ Done means:
 - chart endpoints are bounded/downsampled;
 - trades table uses server pagination;
 - CSV export is separate;
+- manual refresh/autorefresh for selected result state is bounded and respects server retry windows;
 - charts are nonblank in browser evidence;
 - variant lookup uses public `variant_key`.
 
@@ -241,6 +249,7 @@ Done means:
 - Add result summary, equity, drawdown, monthly, symbol stats, paginated trades and CSV endpoints as compatible additions.
 - Preserve public/storage identity split.
 - Keep initial page payload bounded.
+- Manual refresh/autorefresh must not fetch all trades, must not trigger compute, and must respect `retry_after_seconds`.
 - Add tests for 404, pagination, downsampling bounds, CSV auth/ownership.
 - Run browser nonblank chart evidence.
 - Use `publish-ci-deploy` only after all gates pass.
@@ -285,6 +294,7 @@ Use front matter `context_sources`.
 - `/backtests` remains reference-shaped against `stategy_backtest.png`.
 - Loading/result state does not fetch all trades.
 - Variant switch fetches one variant's summary/chart endpoints.
+- Manual refresh/autorefresh refreshes one selected job/variant state without overlapping requests.
 - Trades table uses server pagination.
 - CSV export is separate from table paging.
 - Canvas/SVG charts are nonblank.

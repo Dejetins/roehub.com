@@ -75,6 +75,11 @@ hard_requirements:
   no_fake_dashboard_kpis: true
   no_large_payloads: true
   no_overlap_polling: true
+  manual_refresh_required: true
+  autorefresh_required: true
+  exchange_rate_limits_respected: true
+  data_source_inventory_required: true
+  branded_dropdowns_required: true
   reference_fidelity_required: true
   reject_generic_cards: true
   browser_qa_required: true
@@ -83,6 +88,8 @@ task_toggles:
   implement_backend_read_model: true
   implement_dashboard_page: true
   implement_polling: true
+  implement_manual_refresh: true
+  implement_autorefresh: true
   implement_persistence: false
   publish_after_success: true
 
@@ -111,6 +118,8 @@ package_contract:
     - "apps/api/wiring/modules/__init__.py export"
     - "JS core api.js/poller.js"
     - "dashboard DTO contract"
+    - "refresh/autorefresh contract"
+    - "data source inventory and degraded source schema"
   handoff:
     - "bounded dashboard summary endpoint and page evidence"
 
@@ -156,6 +165,9 @@ required_literals:
   - "personal_dashboard.png"
   - "selected_strategy_snapshot"
   - "equity_pnl_series"
+  - "refresh_status"
+  - "next_allowed_refresh_at"
+  - "retry_after_seconds"
   - "degraded"
   - "terminal-orange"
 
@@ -164,6 +176,8 @@ non_goals:
   - "Do not materialize large strategy/backtest details."
   - "Do not add persistence unless explicitly required by read-model design."
   - "Do not invent dashboard KPIs/metrics that are not backed by accepted strategy/backtest/account read models."
+  - "Do not call exchanges directly from browser or bypass backend cache/rate limits."
+  - "Do not use visible native select/system dropdowns for strategy filters, sort or autorefresh controls."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -209,6 +223,8 @@ safety_notes:
   - "Dashboard must not import private domain internals without mapper/ACL."
   - "One failed source should degrade a panel, not the whole page, unless auth fails."
   - "The page body after the global header must be reference-shaped against personal_dashboard.png; generic cards are an introduced failure."
+  - "Current migrations do not yet cover all dashboard reference data; add bounded read-models/migrations or return typed degraded panels with explicit source inventory."
+  - "Manual refresh/autorefresh must use backend `/api/ui/dashboard/*` contracts, no-overlap polling, server `retry_after_seconds`, and per-user/per-exchange limits."
 ---
 
 # Task
@@ -223,13 +239,15 @@ Done means:
 - the final report lists the panel inventory observed in the reference and the implemented page;
 - page uses one summary request where practical;
 - degraded panel behavior exists;
-- polling is 10-15s, no-overlap, hidden-tab aware;
+- polling/autorefresh is 10-15s by default, no-overlap, hidden-tab aware, and rate-limit aware;
+- manual refresh is available and reports freshness/degraded/rate-limited sources;
 - Playwright evidence exists.
 
 ## Context / Current State
 
 - Existing backend has auth, strategies and backtest jobs APIs.
 - There is no current dashboard read-model.
+- Current migrations do not provide typed portfolio/position/execution/equity/symbol allocation snapshots for every reference panel.
 - Stage 2 JS core should provide `api.js` and `poller.js`.
 - Exact data sources may be incomplete; preserve reference panel shapes with explicit degraded/unavailable states rather than replacing them with generic cards.
 
@@ -243,6 +261,9 @@ Done means:
 - Use ports/query services/ACL for cross-context assembly.
 - Use only real accepted read-model fields; never fabricate KPI values to fill the UI.
 - Implement these minimum DTO zones: `selected_strategy_snapshot`, `equity_pnl_series`, `metric_grid`, `open_positions`, `recent_executions`, `health_risk`, `alerts`, `symbol_allocation`, `strategy_list`, `footer_status`.
+- Implement data-source inventory in the DTO: `sources[]`, `generated_at`, `refresh_status`, `next_allowed_refresh_at`/`retry_after_seconds` where applicable.
+- Add manual refresh and autorefresh controls using branded dropdown/menu UI; visible native select is not acceptable.
+- Respect exchange/backend limits: browser refresh never calls exchanges directly; backend may return cached/coalesced/degraded snapshots.
 - Preserve the reference panel inventory: command bar, selected strategy summary/actions, PnL/equity chart, metric grid, open positions, recent executions, health/risk, alerts/events, symbol allocation, right strategy list with filters/totals/mini sparklines, bottom status bar.
 - Add focused API and web tests.
 - Verify browser behavior and theme financial colors.

@@ -9,6 +9,7 @@
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
 - обновление 2026-05-03: палитра, header и shell-инварианты сверены с `personal_settings.png`, `stategy_backtest.png` и текущим Stage 1 screenshot; текущая orange-grid реализация не является целевым дизайном;
 - обновление 2026-05-04: для функциональных страниц введен жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются визуально невалидными, если не повторяют назначенный PNG-референс;
+- обновление 2026-05-05: зафиксированы auth UX contract, фирменные dropdown/popover controls вместо системных select-меню, а также manual refresh/autorefresh contract для live-data страниц;
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`;
 - референсы дизайна:
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png`;
@@ -125,6 +126,22 @@ Language switcher:
 - переключение языка не меняет route и не требует локализованных path aliases;
 - переключение обновляет cookie/localStorage и перерисовывает SSR/fragment surface через reload или controlled refresh;
 - после реализации settings/account preference выбор синхронизируется в backend preference.
+
+### 2.1) Auth UX: login как modal, registration как отдельная страница
+
+Авторизация в Roehub Web UI v1 не должна открывать отдельную полноэкранную login page как основной пользовательский путь. Основной login UX - фирменное модальное окно поверх текущей страницы или landing/shell, оформленное теми же токенами, рамками и typography, что и остальные controls.
+
+Правила:
+
+- кнопка `Login` / `Войти` открывает branded auth modal/dialog;
+- modal содержит короткий account/auth summary, sanitized `next` target и primary action, запускающий существующий Keycloak/OIDC flow через `/api/auth/login`;
+- modal не реализует локальную username/password форму Roehub;
+- прямой `GET /login?next=...` допускается только как compatibility/deep-link entrypoint: он рендерит shell/landing с login modal уже открытым или выполняет контролируемый переход к такому состоянию;
+- `next` всегда остается safe local path; внешние URL отбрасываются;
+- login modal закрывается по `Esc`, backdrop и явной кнопке close, возвращая focus на исходный control;
+- при `401` во время polling/SSE UI останавливает live loops и показывает login modal/banner, а не уводит пользователя на отдельную страницу без контекста;
+- registration остается отдельной страницей `GET /register`, потому что onboarding/registration требует больше контекста, legal/security copy и Keycloak-backed registration/get-started flow;
+- registration page использует тот же global shell, i18n, theme tokens и branded controls, но не является modal внутри dashboard/workstation.
 
 ### 3) Визуальная модель: темная терминальная панель
 
@@ -391,11 +408,23 @@ Language switcher:
 
 - подписи сверху или слева в зависимости от плотности;
 - поля ввода высотой 34-40px;
-- select/dropdown-элементы имеют ясное кольцо фокуса;
+- select/dropdown/listbox/menu-элементы реализуются через фирменные Roehub controls, а не через видимые системные popup-меню браузера/OS;
+- видимый native `<select>` с серым системным dropdown, как в стандартном browser UI, считается визуальным failure для функциональных страниц;
+- native `<select>` допустим только как hidden/progressive-enhancement fallback, если видимый control остается branded combobox/listbox/menu с теми же токенами;
+- branded dropdown допускает GitHub-like popover-поведение: темная поверхность, тонкая рамка, icon/label rows, разделители, keyboard navigation, visible focus и portal/overlay-layer внутри shell;
+- все выпадающие списки должны оставаться в одной стилистике с terminal panels: без системных серых меню, без light popup, без platform-specific arrow-only surface;
 - сегментированные контролы для взаимоисключающих режимов;
 - чекбоксы/переключатели для бинарных настроек;
 - степперы или числовые поля для диапазонов backtest-задач;
 - ошибки валидации остаются рядом с полем и дополнительно суммируются сверху для длинных форм.
+
+Branded dropdown acceptance:
+
+- ARIA pattern: `menu`, `listbox` или `combobox` по реальному поведению;
+- клавиатура: `Tab`, `Esc`, стрелки, `Enter`/`Space`, typeahead для длинных списков;
+- popover не обрезается ближайшей panel overflow-зоной и не выходит за viewport;
+- мобильная версия использует тот же branded surface или controlled drawer, а не OS-native picker как основной видимый UX;
+- Playwright evidence для backtests/settings/strategies обязан включать хотя бы один открытый custom dropdown/menu, если stage добавляет такие controls.
 
 #### Переключатель темы
 
@@ -420,6 +449,26 @@ Language switcher:
 - имеет доступное имя `Language` / `Язык`;
 - в Playwright evidence проверяется хотя бы одна смена языка и корректный `<html lang>`.
 
+#### Refresh и autorefresh
+
+Live-data страницы (`/dashboard`, `/strategies`, `/backtests`) имеют явный ручной refresh и управляемый autorefresh. Refresh не является декоративной кнопкой: это контракт между UI, backend read-models и внешними exchange/source limits.
+
+Правила UI:
+
+- каждая live-data workstation имеет заметную, но компактную кнопку `Refresh` / icon control в command bar или panel toolbar;
+- рядом с refresh доступен branded dropdown/segmented control для autorefresh: `Off`, `10s`, `15s`, `30s`, `1m`, `5m`, плюс custom seconds/minutes там, где stage это реализует;
+- custom interval валидируется на client и server; значение ниже минимального безопасного интервала отклоняется или округляется по documented policy;
+- один browser tab не должен запускать overlapping refresh requests: новый refresh disabled/queued, пока текущий не завершен или не abort-нут;
+- hidden tab снижает частоту или ставит autorefresh на pause по shared `poller.js`;
+- UI всегда показывает `updated_at`, `source_freshness`, `stale/degraded` state или equivalent status, чтобы пользователь понимал возраст данных.
+
+Правила данных:
+
+- browser никогда не обращается напрямую к биржам;
+- manual refresh и autorefresh вызывают backend `/api/ui/*`/stream contracts, которые читают bounded read-model/cache и только при необходимости инициируют backend-controlled upstream refresh;
+- если backend не может обратиться к бирже из-за rate limit, source degradation или отсутствия ключа, UI получает typed `refresh_status`/`degraded` state с `retry_after_seconds`, а не бесконечный spinner;
+- финансовые значения обновляются только из trusted backend DTO/read-models, не вычисляются из случайных строк DOM.
+
 #### Графики
 
 Графики должны раскрывать данные, а не служить декором:
@@ -443,7 +492,9 @@ Language switcher:
 
 Route: `/dashboard`. Канонический референс: `personal_dashboard.png`.
 
-Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, большой PnL/equity chart, metric grid, таблица открытых позиций, таблица последних исполнений, health/risk, alerts/events, symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, большой PnL/equity chart, metric grid, таблица открытых позиций, таблица последних исполнений, health/risk, alerts/events, symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+
+Dashboard показывает текущее состояние портфеля стратегий online, но читает его только через backend read-models/cache: strategy storage/run state, realtime Redis streams/readers, planned portfolio/position/execution/equity snapshots, market-data reference и exchange account read-models. Если источник еще не реализован, соответствующая panel остается в форме референса и показывает typed `unavailable/degraded/stale` state.
 
 #### Настройки
 
@@ -451,17 +502,23 @@ Route: `/settings`. Канонический референс: `personal_setting
 
 Страница является плотной операционной поверхностью аккаунта. Обязательные зоны: профиль, подключенные API бирж, уведомления и лимиты, webhooks/integrations, уведомления, безопасность, недавние сессии, журнал событий, верхние actions edit/save/security и нижняя status bar. Секреты никогда не показываются, а замаскированные API-ключи должны выглядеть как операционные записи, а не как password-поля.
 
+Settings является местом persistent preferences для theme, locale, density и autorefresh defaults. Все меню выбора темы, языка, биржи, режима уведомлений и интервалов refresh используют branded dropdown/listbox controls.
+
 #### Dashboard конкретной стратегии
 
 Route: `/strategies`. Канонический референс: `strategy_statistic.png`.
 
-Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии, chart со сделками/TP/SL или equity/trades, сводные метрики, месячная статистика, drawdown/equity, таблица сделок и разрезы по символам/часам. Live/status controls и список/переключатель стратегий добавляются только если они не ломают форму референса.
+Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии, chart со сделками/TP/SL или equity/trades, сводные метрики, месячная статистика, drawdown/equity, таблица сделок и разрезы по символам/часам. Live/status controls, manual refresh/autorefresh и список/переключатель стратегий добавляются только если они не ломают форму референса.
+
+Источники данных: strategy storage/run state, Redis realtime output/readers, planned strategy position/execution/equity read-models, market-data candles/reference и exchange account snapshots. Панели обязаны показывать freshness/lag для live-состояний.
 
 #### Backtest workstation / конфигуратор
 
 Route: `/backtests`. Канонический референс: `stategy_backtest.png`.
 
 Сохранить левую колонку конфигурации, центральную AI/config-зону с прогрессом/результатами, панели выбора инструмента/индикаторов, optimization overview/progress, events и таблицу вариантов/results. AI-зона может быть gated до Stage 10, но форма панели и ручной workflow должны совпадать с референсом. Реализация может перестраивать блоки ради адаптивности, но должна сохранить плотную рабочую поверхность.
+
+Все выпадающие списки конфигуратора (`market`, `symbol`, `timeframe`, `risk mode`, `ranking metric`, `direction`, `preset`, `job/result filter`) используют branded combobox/listbox controls. `stategy_backtest.png` не допускает системный gray native dropdown как основной визуальный слой.
 
 #### Backtest results state
 
@@ -560,6 +617,9 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 - Полноэкранная orange-grid подложка запрещена; сетка допустима только внутри графиков/data panels.
 - Квадратный `RH` monogram и декоративные corner badges не являются частью v1 shell.
 - Header строится по референсам `personal_settings.png` и `stategy_backtest.png`: компактный текстовый бренд, nav, active border, account/auth справа, command bar под header.
+- Login строится как branded modal/dialog; `/login` является compatibility modal state, а registration остается отдельной `/register` page.
+- Выпадающие списки, меню и combobox/listbox controls выполняются фирменным Roehub UI; visible native system dropdown/select запрещен для protected functional pages.
+- Live-data страницы имеют manual refresh и управляемый autorefresh с no-overlap, hidden-tab pause, freshness/degraded state и backend rate-limit awareness.
 - UI мультиязычный: default `en`, вторичный `ru`, language switcher обязателен, routes/API/technical identifiers не локализуются.
 - Переключение тем является обязательной продуктовой функцией.
 - Same-origin browser contract остается `/api/*`.

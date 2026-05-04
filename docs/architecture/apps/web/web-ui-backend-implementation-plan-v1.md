@@ -9,6 +9,7 @@
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
 - текущая визуальная реализация `apps/web` заменяется полностью и не сохраняется как наследуемый режим;
 - обновление 2026-05-04: функциональные страницы привязаны к canonical PNG-референсам через жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются кандидатом на откат/замену, если не повторяют назначенный reference layout.
+- обновление 2026-05-05: login реализуется как branded modal, registration остается отдельной страницей, все dropdown/listbox/menu controls должны быть фирменными, а live-data страницы получают explicit data-source/refresh/autorefresh/rate-limit contracts.
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
 
 ## Цель
@@ -35,6 +36,16 @@
 - Backtest jobs API уже использует терминологию `jobs`, публично читаемый `variant_key`, summary-only top rows и lazy trades endpoint.
 - Strategy runtime уже имеет Redis Streams realtime output primitives; для UI не хватает browser-facing read-model/SSE-моста.
 
+Факты по текущему хранению данных на момент обновления 2026-05-05:
+
+- `migrations/postgres/0001-0005` покрывают identity/users, Keycloak session bridge и encrypted/masked exchange keys; в этой цепочке пока нет `identity_user_preferences`, `identity_audit_events`, `identity_integrations` и persistent autorefresh defaults.
+- `alembic/versions/20260215_0001` и `20260216_0002` покрывают `strategy_strategies`, `strategy_runs`, `strategy_events` и `strategy_runs.metadata_json`; этого достаточно для immutable strategy specs/run metadata/events, но недостаточно для полноценного online portfolio dashboard: нет typed positions, fills/executions, equity/PnL time series, symbol allocation snapshots, per-strategy/hour/month aggregates.
+- `alembic/versions/20260222_0003` ... `20260418_0009` покрывают `backtest_jobs`, `backtest_job_top_variants`, shortlist/runtime metadata и persisted-run summary columns; этого достаточно для bounded jobs/history/top-variant surfaces, но presets и UI workstation state еще не имеют отдельной таблицы.
+- `migrations/clickhouse/market_data_ddl.sql` покрывает `market_data.ref_market`, `ref_instruments`, raw/canonical 1m candles и stats; это источник market/instrument/candle reference, но не источник account portfolio, exchange balances, live positions или strategy PnL snapshots.
+- Redis streams существуют как runtime/live transport для market-data и strategy output, но для браузера нужен explicit read-model/SSE bridge с owner scope, freshness/degraded states и rate limits.
+
+Следствие: implementation-агенты не должны "добивать" панели synthetic production data. Если текущая БД/stream не поддерживает требуемую панель из референса, этап обязан добавить migration/read-model/port или сохранить панель с typed `unavailable/degraded/stale` state и задокументировать backend gap.
+
 ## Нотация API-путей
 
 В этом документе пути вида `/api/...` описывают **browser-visible same-origin contract**. Это путь, который видит браузер на `roehub.com` или локально через `apps/web`.
@@ -47,6 +58,31 @@
 - browser `/api/stream/strategies` -> backend API `/stream/strategies`.
 
 Причина: production `Caddy handle_path /api/*` и локальный `apps/web` proxy оба снимают `/api` перед upstream API. Implementation-агенты не должны добавлять второй `/api` prefix внутри FastAPI router. Если этот edge/proxy contract меняется, нужно обновить `docs/runbooks/web-ui-gateway-same-origin.md`, `infra/caddy/Caddyfile.vps`, web proxy tests и smoke-проверки public edge.
+
+## Auth UX contract
+
+Web UI v1 различает login и registration:
+
+- login - не отдельная основная страница. Кнопка `Login` / `Войти` открывает branded modal/dialog поверх текущей страницы или shell.
+- Login modal использует общий терминальный UI: темная surface, тонкая рамка, focus trap, accessible close, i18n copy, sanitized `next` и primary action для существующего Keycloak/OIDC flow через browser-visible `/api/auth/login`.
+- Прямой `GET /login?next=...` остается compatibility/deep-link entrypoint: он должен отрендерить shell/landing с открытым login modal или выполнить контролируемый redirect к состоянию с открытым modal. Он не является самостоятельной визуальной страницей v1.
+- При `401` во время polling/SSE/JSON refresh client останавливает live loops и показывает login modal/banner; нельзя оставлять бесконечный spinner или native browser prompt.
+- Registration - отдельная страница `GET /register`. Она может вести в Keycloak-backed registration/get-started flow, но не реализует локальную username/password регистрацию в Roehub web.
+- `next` для login/register всегда sanitizes to safe local path; external URL запрещены.
+
+## Branded controls contract
+
+Все выпадающие интерфейсы в новом Web UI должны быть фирменными, а не системными popup-меню браузера или OS. Это касается theme/language/account menus, filters/sort, strategy selectors, backtest config selects, risk/ranking/order dropdowns и autorefresh interval menus.
+
+Правила:
+
+- видимый native `<select>` с системным серым dropdown считается introduced visual failure для функциональных страниц;
+- native `<select>` допустим только как hidden/progressive fallback, если видимый control - Roehub branded combobox/listbox/menu;
+- shared implementation принадлежит Stage 2: `apps/web/dist/js/components/*`, `apps/web/templates/components/*`, `apps/web/dist/css/components.css`;
+- компонент обязан поддерживать keyboard navigation (`Tab`, `Esc`, arrows, `Enter`/`Space`), visible focus, ARIA role (`menu`, `listbox` или `combobox`) и typeahead там, где список длинный;
+- popover должен рендериться в controlled overlay layer, не обрезаться panel overflow и не выходить за viewport;
+- mobile может использовать branded drawer/sheet, но не OS-native picker как основной acceptance path;
+- Playwright evidence для stages с новыми dropdown/listbox controls должно включать открытый branded menu/popover.
 
 ## Охват
 
@@ -160,13 +196,14 @@ apps/web/templates/
   base.html
   pages/
     landing.html
-    login.html
     logout.html
+    register.html
     dashboard.html
     settings.html
     strategies.html
     backtests.html
   fragments/
+    auth/
     account/
     dashboard/
     strategies/
@@ -468,6 +505,54 @@ Idempotency:
 - default-read behavior tested;
 - docs index updated when architecture/persistence contract changes.
 
+## Источники данных, refresh/autorefresh и лимиты бирж
+
+`/dashboard` и `/strategies` отображают текущее online-состояние портфеля стратегий. Браузер никогда не ходит напрямую к биржам: все данные приходят через backend read-models, Redis/DB/cache adapters и same-origin `/api/*`.
+
+Стандартный refresh contract для live-data страниц:
+
+- каждая workstation имеет ручной `Refresh` action;
+- autorefresh имеет шаблоны `off`, `10s`, `15s`, `30s`, `1m`, `5m`;
+- custom interval допускается только с server-side validation: минимальный безопасный интервал по умолчанию `10s` для cached/internal read-model refresh и `30s` для exchange-bound upstream refresh, если конкретный adapter не задает более строгий лимит;
+- UI не запускает overlapping refresh requests; `poller.js` должен иметь no-overlap, hidden-tab pause и backoff;
+- каждый response содержит `generated_at`, `sources[]`, `refresh_status`, `next_allowed_refresh_at` или equivalent fields, если данные live/stale/degraded;
+- manual refresh не гарантирует немедленный запрос к бирже: backend может вернуть fresh cached snapshot, coalesced refresh, queued refresh или `429` с `retry_after_seconds`;
+- backend применяет per-user/per-account и per-exchange token-bucket или эквивалентный limiter для exchange-bound refresh;
+- если exchange/API limit исчерпан, UI показывает typed degraded/stale state и `retry_after`, а не маскирует проблему.
+
+Источник данных по страницам:
+
+| Page | Основные источники сейчас | Планируемые gaps / additions | Refresh behavior |
+|---|---|---|---|
+| `/` | статический SSR/landing copy; auth CTA only | нет backend dependency на first render | no autorefresh. |
+| `/dashboard` | `strategy_strategies`, `strategy_runs`, `strategy_events`, backtest jobs summaries, Redis strategy output, market-data refs | `strategy_portfolio_snapshots`, `strategy_position_snapshots`, `strategy_execution_fills`, `strategy_equity_points`, `strategy_symbol_allocations`, exchange/account balance snapshots или typed degraded panels | manual refresh + autorefresh; один summary endpoint заполняет panels; upstream exchange refresh coalesced/rate-limited. |
+| `/settings` | current-user, `identity_sessions`, `identity_exchange_keys` | `identity_user_preferences`, `identity_integrations`, `identity_audit_events`, optional profile overrides; хранение default refresh/autorefresh preferences | refresh для account panels; no exchange secret leakage; preferences save writes audit event. |
+| `/strategies` | `strategy_strategies`, `strategy_runs`, `strategy_events`, Redis output, ClickHouse candles/reference | typed positions/fills/equity/monthly/hourly/symbol stats read-models или materialized projections; selected-strategy live snapshot | manual refresh + autorefresh; SSE preferred for live deltas, polling fallback bounded. |
+| `/backtests` | `backtest_jobs`, `backtest_job_top_variants`, shortlist metadata, artifacts/lazy cache, market-data refs, indicators | `backtest_presets`, optional job events, workstation counters | manual refresh + optional autorefresh для jobs/progress; create/preflight остается controlled low-rate. |
+
+Планируемые persistence/read-model additions:
+
+| Таблица/read-model | Owner DB | Назначение | Индексы/лимиты |
+|---|---|---|---|
+| `identity_user_preferences` | identity SQL migrations | theme, locale, density, default autorefresh preset/custom interval | unique `owner_user_id`, `updated_at`, checks locale/theme/interval. |
+| `identity_audit_events` | identity SQL migrations | settings/security/live-control/refresh policy audit | `owner_user_id`, `created_at DESC`, `event_type`; retention policy. |
+| `identity_integrations` | identity SQL migrations | non-secret integration toggles/config refs | `owner_user_id`, `provider`, `enabled`; secrets stay outside UI tables. |
+| `strategy_portfolio_snapshots` | main Alembic DB | account-level totals, equity, realized/unrealized PnL, exposure, source freshness | `user_id`, `as_of DESC`; bounded latest read. |
+| `strategy_position_snapshots` | main Alembic DB | open positions for dashboard/strategy panels | `user_id`, `strategy_id`, `as_of DESC`, `symbol`; latest-only or retention window. |
+| `strategy_execution_fills` | main Alembic DB | recent executions/fills and realized PnL | `user_id`, `strategy_id`, `ts DESC`, cursor key; retention/window. |
+| `strategy_equity_points` | main Alembic DB or ClickHouse projection | equity/PnL chart series per account/strategy | `user_id`, `strategy_id`, `ts`; server downsampling required. |
+| `strategy_symbol_allocations` | main Alembic DB or derived read-model | symbol allocation/PnL bars | `user_id`, `strategy_id`, `as_of DESC`; can be derived from positions/fills if cheap. |
+| `backtest_presets` | main Alembic DB unless separate decision | safe request drafts for `/backtests` configurator | `owner_user_id`, `created_at DESC`, `name`, optional `request_hash`. |
+
+Implementation stages may choose a simpler derived read-model if it is bounded and measured, but they must not perform unbounded per-request aggregation over full event/history tables for first paint.
+
+Exchange/API limit contract:
+
+- exchange adapters own concrete upstream limits; UI stages only set product-level minimum intervals and request coalescing;
+- manual refresh can request a fresh snapshot but backend may serve cached data when `next_allowed_refresh_at` is in the future;
+- refresh responses include source freshness so users see whether data is fresh, stale, degraded, or blocked by rate limit;
+- tests cover `429`/`retry_after_seconds`, no-overlap polling and hidden-tab pause; load stage covers refresh storm/coalescing.
+
 ## Security и граница доверия
 
 Security является частью каждого этапа, а не только финального hardening.
@@ -721,7 +806,7 @@ flowchart TD
 |---|---|---:|---|
 | `GET /` | `landing.html`, public landing | `replace` | Этап 1 сохраняет public entrypoint, этап 3 заменяет содержимое на `apps/web/templates/pages/landing.html`. |
 | `GET /favicon.ico` | `204`, чтобы убрать browser 404 noise | `replace` | Инвариант "favicon не дает incidental 404" сохраняется; позже можно заменить на static/versioned asset. |
-| `GET /login` | `login.html`, inline JS redirect на `/api/auth/login` | `replace` | Этап 1 сохраняет OIDC entrypoint, но убирает inline script в внешний `auth.js` или server redirect. |
+| `GET /login` | `login.html`, inline JS redirect на `/api/auth/login` | `replace` | Этап 1 сохраняет compatibility entrypoint, но целевой UX - branded login modal; direct `/login` открывает modal state, а не standalone page. |
 | `GET /logout` | `logout.html`, inline JS `POST /api/auth/logout` | `replace` | Этап 1 сохраняет logout entrypoint, но убирает inline script. |
 | `ANY /api/{upstream_path:path}` | local/dev same-origin proxy, снимает `/api` перед upstream | `move` | `/api/... browser-visible` contract сохраняется для browser/dev parity; backend routers остаются без второго `/api` prefix. |
 | `MOUNT /assets/*` | flat `apps/web/dist/*` | `move` | Browser-visible `/assets/*` сохраняется; внутренняя раскладка переезжает в `css/`, `js/`, `vendor/`. |
@@ -737,7 +822,7 @@ flowchart TD
 |---|---:|---|
 | `apps/web/templates/base.html` | `replace` | Этап 1: terminal shell, self-hosted HTMX, no legacy light skin. |
 | `apps/web/templates/landing.html` | `replace` | Этап 3: `apps/web/templates/pages/landing.html`. |
-| `apps/web/templates/login.html` | `replace` | Этап 1: `apps/web/templates/pages/login.html` или согласованный auth fragment без inline JS. |
+| `apps/web/templates/login.html` | `replace` | Этап 1: `fragments/auth/login_modal.html` или thin compatibility wrapper с modal pre-open; standalone full-page login не является целевым UX. |
 | `apps/web/templates/logout.html` | `replace` | Этап 1: `apps/web/templates/pages/logout.html` или server redirect flow без inline JS. |
 | `apps/web/templates/protected_page.html` | `delete` | Stage placeholders/pages заменяют этот generic skeleton; legacy skin не сохраняется. |
 | `apps/web/templates/strategies_list.html` | `replace` | Этап 6: `pages/strategies.html` + `fragments/strategies/*`. |
@@ -819,7 +904,7 @@ python -m tools.docs.generate_docs_index --check
 
 ## Этап 1 - каркас приложения, вкладки шапки, auth/register
 
-Цель: создать новый skeleton: базовую компоновку, вкладки шапки, точки входа login/logout/register и gate защищенных страниц.
+Цель: создать новый skeleton: базовую компоновку, вкладки шапки, login modal, отдельную registration page и gate защищенных страниц.
 
 Задачи:
 
@@ -840,6 +925,11 @@ python -m tools.docs.generate_docs_index --check
   - `/backtests/{job_id}` только как compatibility deep link к `/backtests` selected job/result state, если сохраняется.
 - Сохранить server-side проверку защищенного маршрута через `/api/auth/current-user`.
 - Заменить inline JS для login/logout на внешний `apps/web/dist/js/pages/auth.js` или чистые серверные redirects там, где это возможно.
+- Реализовать login как branded modal/dialog, а не как standalone visual page:
+  - header `Login` открывает modal;
+  - direct `/login?next=...` открывает shell/landing с modal pre-open;
+  - primary modal action запускает `/api/auth/login` с safe `next`;
+  - modal получает focus trap, `Esc` close и i18n copy.
 - Self-host HTMX в `apps/web/dist/vendor/htmx.min.js`.
 - Добавить route-level template contexts для активного состояния nav, title страницы и user badge.
 - Добавить i18n foundation в shell:
@@ -850,6 +940,7 @@ python -m tools.docs.generate_docs_index --check
   - locale cookie для SSR;
   - route/template context для `locale` и translation helper.
 - Добавить `/register` как web entrypoint, запускающий Keycloak-backed registration/get-started flow.
+- `/register` остается отдельной страницей с branded shell, i18n и CTA к Keycloak-backed registration.
 - Не реализовывать локальную регистрацию username/password в Roehub web.
 
 Backend/API:
@@ -865,7 +956,9 @@ Backend/API:
 
 - изменить `apps/web/main/app.py`;
 - изменить `apps/web/templates/base.html`;
-- переместить/пересоздать текущие `login.html`, `logout.html` в `apps/web/templates/pages/` или согласованные auth fragments;
+- заменить текущий `login.html` на `apps/web/templates/fragments/auth/login_modal.html` или equivalent modal fragment; `apps/web/templates/pages/login.html` допускается только как thin compatibility wrapper с modal pre-open;
+- переместить/пересоздать `logout.html` в `apps/web/templates/pages/` или согласованные auth fragments;
+- добавить/изменить `apps/web/templates/pages/register.html` как отдельную registration page;
 - переместить/пересоздать текущий `partials/user_badge.html` как shell component/fragment без сохранения `/_partial/user_badge` как public route;
 - добавить placeholder-шаблоны `apps/web/templates/pages/*.html`;
 - добавить `apps/web/main/i18n.py`;
@@ -882,7 +975,10 @@ Backend/API:
 - внешний `next=https://...` санитизируется;
 - шапка показывает вкладки и корректное активное состояние;
 - login и logout не требуют inline scripts;
+- login как основной flow открывается через branded modal; standalone full-page login считается invalid для v1 UX;
+- прямой `/login?next=...` открывает modal state и сохраняет safe-local `next`;
 - register CTA присутствует и ведет в выбранный Keycloak-backed entrypoint;
+- `/register` является отдельной страницей и не замещается login modal;
 - `/strategies/new` остается поддержанным entrypoint для создания стратегии или явно редиректит на новый create workflow;
 - в базовом каркасе не остается внешнего CDN-скрипта.
 - shell copy по умолчанию на английском, русская версия доступна через language switcher;
@@ -945,12 +1041,20 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
   - empty/error state;
   - command bar;
   - modal shell;
+  - branded dropdown/menu/listbox/combobox;
   - переключатель темы.
   - переключатель языка.
+- Реализовать branded dropdown/popover foundation:
+  - no visible native `<select>` для основного UX;
+  - ARIA `menu`/`listbox`/`combobox` patterns;
+  - keyboard navigation, typeahead, focus management, outside click/Esc close;
+  - overlay layer, который не обрезается панелями и не выходит за viewport;
+  - mobile drawer/sheet fallback в той же стилистике.
 - Реализовать JS core:
   - `api.js` с `credentials: "include"`, timeout, abort, 401 redirect, mapping для 403/409/422;
   - CSRF/Origin integration point для state-changing requests, даже если конкретная server strategy включается на hardening stage;
   - `poller.js` с no-overlap polling, hidden-tab pause и backoff;
+  - `refresh.js` или расширение `poller.js` для manual refresh/autorefresh controls, шаблонов интервалов и `retry_after_seconds`;
   - `sse.js` с EventSource wrapper и downgrade callback;
   - `notifications.js`, `formatters.js`, `validators.js`.
 - Один раз принять решение по доставке иконок:
@@ -977,6 +1081,8 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
 - `api.js` детерминированно обрабатывает 401, 403, 409, 422 и timeout;
 - mutation requests имеют единый extension point для CSRF token/header и не реализуют ad hoc защиту в page modules;
 - `poller.js` не допускает overlapping requests;
+- refresh/autorefresh helper поддерживает `off`, `10s`, `15s`, `30s`, `1m`, `5m`, custom interval validation hook, hidden-tab pause и server `retry_after_seconds`;
+- branded dropdown/menu открывается в Playwright без системного native popup;
 - hidden tab приостанавливает repeated polling в течение 5s;
 - компоненты имеют accessible labels/focus states.
 - language switcher доступен с клавиатуры, имеет accessible label и не ломает header на `en`/`ru`;
@@ -1106,12 +1212,19 @@ Backend/API:
   - `mini_sparkline` bounded points per row or explicit degraded/omitted state.
 - `footer_status`:
   - system status, account tier, mode, API/exchange label, latency, server time.
+- `refresh_control`:
+  - `manual_refresh_available`, `autorefresh_enabled`, `interval_seconds`, `preset_key`;
+  - `generated_at`, `next_allowed_refresh_at`, `retry_after_seconds`, `last_refresh_reason`;
+  - per-source freshness/degradation in `sources[]`.
 
 Поведение backend:
 
 - агрегировать только компактные owner-scoped read models;
 - не раскладывать first render на множество browser calls: один summary request должен заполнить все panels из референса;
 - деградировать по панели: один упавший источник не должен ломать всю страницу, если auth не упал;
+- manual refresh использует тот же endpoint с `refresh=manual` или эквивалентным explicit query/header contract; backend решает, можно ли обновить upstream или нужно вернуть cached/coalesced snapshot;
+- autorefresh не ходит к биржам напрямую и не обходит backend rate limits;
+- exchange/account источники читаются через cached account/portfolio snapshots; прямой upstream refresh ограничен per-user/per-exchange limiter и возвращает `429`/`retry_after_seconds` при превышении;
 - целевой payload: менее 80 KB в сжатом виде для default viewport, большие таблицы только через cursor endpoints;
 - не выдумывать PnL/ROI/positions в production: при отсутствии данных панель остается в форме референса и показывает typed empty/degraded state;
 - все ids и filters owner-scoped, чужие стратегии возвращают `403` или не попадают в список.
@@ -1129,6 +1242,15 @@ Frontend / panel inventory из reference:
 - `SYMBOL ALLOCATION (PnL)`;
 - правая высокая panel `STRATEGY LIST` с tabs, filters/search/sort/refresh, totals strip, paginated strategy rows и mini sparklines;
 - bottom system status bar.
+
+Data source inventory:
+
+- `strategy_strategies`, `strategy_runs`, `strategy_events` - текущие specs/run/events;
+- Redis strategy realtime output - live deltas/status, если Stage 7 bridge принят;
+- planned `strategy_portfolio_snapshots`, `strategy_position_snapshots`, `strategy_execution_fills`, `strategy_equity_points`, `strategy_symbol_allocations` - для online portfolio state;
+- `backtest_jobs`/top rows - recent jobs/status summary;
+- ClickHouse `market_data.ref_*` - market/symbol reference only;
+- exchange account/balance/position source - только через backend cached snapshots и rate-limited adapters.
 
 Файлы:
 
@@ -1150,6 +1272,8 @@ Frontend / panel inventory из reference:
 - auth-required behavior согласован с другими защищенными маршрутами;
 - если часть источников недоступна, соответствующие panels остаются на экране с `degraded/unavailable/empty`, а не исчезают;
 - polling interval равен 10-15s и приостанавливается на hidden tab;
+- manual refresh и autorefresh control видимы как branded controls, interval dropdown не использует native system popup;
+- server `retry_after_seconds`/`next_allowed_refresh_at` отображается пользователю при rate limit или stale source;
 - browser request overlap отсутствует;
 - financial deltas сохраняют фиксированные семантические цвета во всех темах;
 - desktop screenshot после глобальной шапки reference-shaped относительно `personal_dashboard.png`; generic cards/overview layout считается introduced failure;
@@ -1212,6 +1336,7 @@ Backend/API-добавления:
 - каждая destructive/settings mutation пишет audit event;
 - sessions и audit используют cursor pagination, без load-all;
 - account preferences включают выбранную UI-тему и `locale` (`en`/`ru`), но не могут переопределять семантику финансовых цветов или локализовать технические identifiers.
+- account preferences включают default autorefresh policy для live-data страниц: enabled/off, preset key, custom interval seconds/minutes, per-page override только если это явно реализовано; значения валидируются server-side и не могут быть ниже продуктовых/adapter лимитов.
 
 Frontend / panel inventory из reference:
 
@@ -1226,6 +1351,7 @@ Frontend / panel inventory из reference:
 - event log;
 - top action buttons;
 - bottom status bar.
+- branded dropdown/listbox controls для theme, language, notification modes, integrations и autorefresh intervals; visible native select недопустим.
 
 Вероятно потребуется хранение:
 
@@ -1260,6 +1386,8 @@ Frontend / panel inventory из reference:
 - notification/integration toggles сохраняются без полного reload страницы;
 - theme preference сохраняется и корректно восстанавливается после reload;
 - language preference сохраняется, восстанавливается после reload и обновляет `<html lang>`/`data-locale`;
+- autorefresh preference сохраняется, валидируется и восстанавливается после reload; invalid/custom слишком малый interval дает deterministic validation error;
+- все settings dropdown/popover controls выполнены фирменным UI, а не системным native select;
 - settings copy и controls имеют `en` и `ru` версии без layout overflow;
 - sessions и audit пагинируются;
 - desktop screenshot после глобальной шапки reference-shaped относительно `personal_settings.png`;
@@ -1316,6 +1444,7 @@ Backend/API-добавления:
 - `GET /api/ui/strategies/{strategy_id}/fills?cursor=`;
 - `GET /api/ui/strategies/{strategy_id}/equity?range=1d&points=600`;
 - `GET /api/stream/strategies?strategy_id=&last_event_id=` как SSE-мост поверх существующих realtime sources, если Stage 7 реализует live bridge.
+- snapshot/dashboard endpoints должны поддержать manual refresh/autorefresh metadata (`refresh_status`, `generated_at`, `sources[]`, `next_allowed_refresh_at`) или явно задокументированный эквивалент.
 
 Frontend:
 
@@ -1338,6 +1467,8 @@ Frontend / panel inventory:
 - hourly results;
 - trades/events table;
 - symbol results/breakdowns.
+- manual refresh/autorefresh controls, если они не ломают форму `strategy_statistic.png`;
+- branded strategy selector/filter dropdowns; native system dropdown недопустим.
 
 Поведение backend:
 
@@ -1346,6 +1477,8 @@ Frontend / panel inventory:
 - start/stop/restart actions остаются существующими `/api/strategies/{strategy_id}/run|stop`, если contracts не меняются;
 - все list rows, fills, alerts и chart points bounded;
 - отсутствующие realtime sources дают panel-level degraded state.
+- не выполнять unbounded aggregation over `strategy_events` на first paint; если для reference panels нужны positions/fills/equity/monthly/hourly stats, добавить bounded read-model/projection или typed degraded panel;
+- exchange-bound refresh использует backend limiter/cache и не вызывается напрямую из browser.
 
 Файлы:
 
@@ -1373,6 +1506,8 @@ Frontend / panel inventory:
 - `/strategies/{strategy_id}` покрыт route test как compatibility redirect/alias на selected strategy state внутри `/strategies`;
 - create/clone сохраняет canonical indicator payload shape;
 - selected strategy snapshot и right strategy list рендерятся из backend DTO;
+- manual refresh работает без overlapping requests; autorefresh интервал соблюдает backend `retry_after_seconds`;
+- открытый branded selector/filter dropdown входит в Playwright evidence;
 - зависимость от старого `strategy_ui.js` отсутствует;
 - переключатель темы не перекрашивает финансовые метрики, если они показаны;
 - desktop screenshot сверяется с `strategy_statistic.png` по panels/order/density; generic cards считаются failure.
@@ -1419,6 +1554,8 @@ Backend/API-добавления:
 - SSE-мост должен авторизовать current user перед чтением per-user streams;
 - SSE является read-only;
 - polling fallback использует snapshot endpoints;
+- manual refresh форсирует только backend-level read-model refresh/coalescing, но не прямой browser exchange call;
+- autorefresh defaults берутся из account preferences или safe product defaults; слишком частые интервалы блокируются;
 - ограничивать list rows, fills, alerts и chart points;
 - один browser tab не держит больше одного idle SSE connection для strategy live data;
 - reconnect budget и heartbeat должны быть задокументированы в DTO/JS contract.
@@ -1445,6 +1582,8 @@ Backend/API-добавления:
 - `/strategies` и `/dashboard` используют один согласованный live data contract там, где пересекаются;
 - start/stop actions отражают состояние в течение одного refresh cycle;
 - SSE переподключается или деградирует до polling;
+- manual refresh/autorefresh обновляют live panels без overlapping requests и показывают freshness/lag;
+- exchange/source rate limits возвращают visible `retry_after`/degraded state;
 - 401 останавливает stream и отправляет пользователя на login;
 - hidden tab приостанавливает polling;
 - mobile сворачивает list/detail во вкладки без потери panels;
@@ -1523,6 +1662,7 @@ Backend/API-добавления:
 - `job_table` или `variant_table` с state, strategy/config summary, period, symbols, progress, top metrics, actions;
 - `pagination`/filters/sort для таблицы;
 - `footer_status` with backend/worker/queue status.
+- `refresh_control` for jobs/progress: manual refresh, optional autorefresh preset, generated_at, retry_after_seconds.
 
 Frontend / panel inventory из reference:
 
@@ -1536,6 +1676,7 @@ Frontend / panel inventory из reference:
 - main variants/results table;
 - action/status buttons;
 - bottom status/logos row.
+- branded dropdown/combobox controls for market, symbol, timeframe, direction, risk mode, ranking metric, ranking order, preset, job/result filters; native system dropdown is not acceptable.
 
 Вероятно потребуется хранение:
 
@@ -1570,6 +1711,8 @@ Frontend / panel inventory из reference:
 - duplicate submit с тем же idempotency key воспроизводит ту же job;
 - cancel идемпотентен в UI;
 - таблица jobs/variants остается отзывчивой при большом числе rows за счет cursor pagination;
+- manual refresh обновляет jobs/progress/status без overlapping requests; optional autorefresh соблюдает safe interval и server `retry_after_seconds`;
+- все выпадающие controls в конфигураторе и фильтрах выполнены branded UI и проверены в Playwright с открытым popover;
 - полные results или trades не загружаются на странице workstation;
 - generic history cards вместо reference workstation считаются introduced failure.
 
@@ -1704,6 +1847,7 @@ Frontend integration:
 - не меняет canonical visual reference `/backtests`: `stategy_backtest.png`;
 - full trades и тяжелые series не загружаются на first paint workstation;
 - selected variant/job panels используют bounded endpoints и degraded/loading states внутри существующей backtest workstation.
+- result/progress refresh использует same-page `/backtests` state, no-overlap polling/autorefresh и не запускает повторный compute.
 
 Файлы:
 
@@ -1724,6 +1868,7 @@ Frontend integration:
 - `/backtests/{job_id}`, если сохранен, открывает тот же workstation selected job/result state;
 - loading/result state не загружает все trades;
 - variant switch запрашивает summary/chart endpoints для одного варианта;
+- manual refresh/autorefresh для selected result state не загружает heavy payload и уважает `retry_after_seconds`;
 - trades table использует server pagination;
 - CSV export отделен от table paging;
 - canvas/SVG charts nonblank;
@@ -1802,6 +1947,8 @@ Backend/API-добавления:
 - Добавить asset versioning по git SHA или manifest.
 - Проверить, что edge route split сохраняется: HTML/assets в web, `/api/*` в backend.
 - Проверить, что SSE route buffering отключен на edge при деплое за proxy, который буферизует.
+- Проверить refresh/autorefresh hardening: no-overlap, hidden-tab pause, server `retry_after_seconds`, per-user/per-exchange limits, visible freshness/degraded state.
+- Проверить, что все visible dropdown/listbox/menu controls являются branded Roehub controls; native system select popup не допускается в protected functional pages.
 - Добавить performance smoke для допущений 1 vCPU / 2 GB VPS.
 - Подготовить финальное Playwright evidence для всех основных страниц.
 - Для функциональных страниц подготовить reference fidelity evidence: desktop screenshot + перечень panels vs canonical PNG.
@@ -1812,6 +1959,9 @@ Backend/API-добавления:
 - для core auth flow не нужны inline scripts;
 - в базовом каркасе нет external script CDN;
 - state-changing requests несут CSRF/Origin protection;
+- login открывается как branded modal, `/register` остается отдельной страницей;
+- manual refresh и autorefresh не создают overlapping requests и не обходят exchange/backend rate limits;
+- visible native dropdown/select отсутствует на функциональных страницах, кроме явно hidden fallback;
 - protected HTML использует no-store;
 - assets versioned;
 - browser QA содержит desktop/mobile screenshots и отсутствие console errors для основных страниц;
@@ -1858,10 +2008,13 @@ python -m tools.docs.generate_docs_index --check
 - если нового инструмента нет, создать planned `tools/load/web_capacity_smoke.py` на `httpx`, без Node/runtime server dependency;
 - описать test profile: host, branch/commit, env, process count, DB/Redis locality, cache warm/cold, duration, concurrency, dataset;
 - прогнать read-mostly сценарии: shell/assets, dashboard summary, settings reads, strategies dashboard/SSE, backtests workstation, selected backtest result state, paginated trades;
+- прогнать refresh/autorefresh сценарии: manual refresh burst, hidden-tab pause, interval presets, server `retry_after_seconds`, coalescing, stale/degraded source response;
+- прогнать exchange-bound limiter smoke на mock/fake adapter или controlled test account, чтобы доказать, что UI не может превысить per-user/per-exchange лимиты;
 - отдельно прогнать controlled preflight/create burst для backtest jobs после этапа 8.5;
 - собрать p50/p95/p99, error rate, payload sizes, RSS, CPU, DB/Redis latency signs, active SSE connections;
 - классифицировать каждую область как `green`, `yellow`, `red`;
 - для `yellow/red` добавить mitigation: payload bound, index, cache, polling interval, SSE cap, worker queue, endpoint split или rollout limit.
+- для refresh/autorefresh `yellow/red` mitigation может быть: увеличить min interval, включить coalescing, добавить cached snapshots, разделить exchange-bound refresh и internal read-model refresh, ограничить SSE clients или отключить autorefresh на конкретной панели.
 
 Файлы:
 
@@ -1875,6 +2028,8 @@ python -m tools.docs.generate_docs_index --check
 - capacity report содержит точные команды, host class, commit и config;
 - endpoint-ы first paint не передают unbounded data;
 - polling/SSE loops не накладывают новые requests поверх еще не завершенных при повышенной latency;
+- manual refresh burst не создает параллельный fan-out к биржам;
+- autorefresh сохраняет заданный интервал и уважает server-side retry window;
 - backtest create path не выполняет full compute в API request path;
 - p95/RSS/error trends записаны для текущего host;
 - known limits внесены в rollout notes и stage handoff.
@@ -1913,6 +2068,9 @@ uv run python tools/load/web_capacity_smoke.py \
 | Browser-visible behavior | `breaking-change` | Намеренная замена текущего UI. |
 | Поведение тем | `compatible-change` | Переключение тем является additive; палитра по умолчанию остается `terminal-orange`; семантика финансовых цветов остается инвариантом. |
 | Поведение языка/locale | `compatible-change` | Мультиязычность additive: default `en`, secondary `ru`, route/API identifiers не локализуются, account preference/cookie/localStorage fallback совместимы. |
+| Auth UX | `compatible-change` для API, `breaking-change` для browser UX | Login становится branded modal/deep-link modal state; registration остается отдельной страницей. |
+| Branded controls | `breaking-change` для browser UX | Visible native select/dropdown заменяется shared Roehub controls; hidden fallback допустим. |
+| Refresh/autorefresh | `compatible-change` | Добавляются manual refresh/autorefresh DTO fields, limits и preference defaults; exchange-bound refresh не обходит backend limiter. |
 | Runtime workflow | `compatible-change` или `unknown` | Backtest create должен стать bounded async path; фактический переход с `sync_inline` требует evidence и rollout notes. |
 | Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без Mac Studio evidence, если меняются compute paths. |
 | Performance risk | `unknown` до измерений | Dashboard/strategies/backtests/result-state/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
@@ -1922,6 +2080,7 @@ uv run python tools/load/web_capacity_smoke.py \
 Эти вопросы не блокируют базовые этапы, но ответственный агент должен закрыть их до реализации затронутой функции:
 
 - Registration: будет ли `/register` вызывать отдельный Keycloak registration action или существующий login/get-started flow, зависит от Keycloak realm/client configuration.
+- Refresh data sources: для каждой панели Stage 4/6/7 должен закрыть source inventory и решить, нужен ли persistent read-model или typed degraded state до первой production реализации.
 - Icons: добавить ли self-hosted Lucide delivery path или оставить text-only controls для v1.
 - AI assistant: provider, storage, redaction и rate limits требуют отдельного design decision перед Этап 10.
 - Backtest runtime: final queue/worker trigger shape должен быть подтвержден до публичного results/configurator rollout.

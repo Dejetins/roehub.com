@@ -79,6 +79,9 @@ hard_requirements:
   sse_buffering_checked_if_sse_exists: true
   full_browser_sweep_required: true
   reference_fidelity_sweep_required: true
+  auth_modal_register_contract_verified: true
+  branded_controls_sweep_required: true
+  refresh_autorefresh_hardening_required: true
   full_backend_gates_required: true
 
 task_toggles:
@@ -113,6 +116,9 @@ package_contract:
     - "CSP policy"
     - "Cache-Control/asset versioning"
     - "edge split and SSE buffering"
+    - "login modal/register page verification"
+    - "branded dropdown/select sweep"
+    - "refresh/autorefresh/rate-limit hardening"
     - "final Playwright sweep"
   handoff:
     - "release hardening evidence and deploy-ready gate status"
@@ -161,6 +167,9 @@ required_literals:
   - "connect-src 'self'"
   - "/api/*"
   - "terminal-orange"
+  - "login modal"
+  - "branded dropdown"
+  - "retry_after_seconds"
 
 non_goals:
   - "Do not implement unfinished product page features."
@@ -225,6 +234,9 @@ Done means:
 - edge split HTML/assets vs `/api/*` is verified;
 - SSE buffering is checked if SSE routes exist;
 - full browser sweep passes;
+- login modal/register page contract passes;
+- branded dropdown/menu sweep passes without visible native select popup;
+- refresh/autorefresh hardening is verified for no-overlap, hidden-tab pause and retry windows;
 - full backend gates pass.
 
 ## Context / Current State
@@ -239,6 +251,9 @@ Done means:
 - Add cache headers and asset versioning.
 - Tighten CSP without breaking auth/UI.
 - Verify production edge route assumptions.
+- Verify login as modal and `/register` as separate page.
+- Verify visible dropdown/listbox/menu controls are branded Roehub UI, not native system popup.
+- Verify refresh/autorefresh no-overlap, hidden-tab pause, source freshness/degraded state and server `retry_after_seconds`.
 - Run full gates.
 - Run final Playwright sweep.
 - Use `publish-ci-deploy` only after all checks pass.
@@ -281,6 +296,9 @@ Use front matter `context_sources`.
 - Core auth flow does not need inline scripts.
 - No external script CDN remains in shell.
 - State-changing requests carry CSRF/Origin protection.
+- Login opens branded modal; `/register` remains a separate page.
+- Visible native select/dropdown is absent from functional pages except hidden fallback.
+- Manual refresh/autorefresh does not overlap and respects retry windows/rate limits.
 - Protected HTML has no-store.
 - Assets are versioned.
 - Browser QA has desktop/mobile screenshots and no console errors for main pages.

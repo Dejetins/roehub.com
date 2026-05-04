@@ -68,6 +68,8 @@ hard_requirements:
   no_secrets_in_prompt_or_session: true
   rate_limit_required: true
   cancellation_required: true
+  branded_controls_required: true
+  no_native_select_for_ai_draft_controls: true
   browser_qa_required_if_implemented: true
 
 task_toggles:
@@ -97,6 +99,7 @@ package_contract:
     - "manual validation/preflight bypass"
   integration_points:
     - "manual backtests.js apply/preflight/submit flow"
+    - "branded backtests controls/dropdown components"
     - "AI provider adapter boundary"
     - "redaction/rate-limit/cancellation contract"
   handoff:
@@ -139,6 +142,7 @@ required_literals:
   - "/api/ai/backtest-config/validate"
   - "draft config"
   - "preflight"
+  - "branded dropdown"
   - "no secrets"
 
 non_goals:
@@ -147,6 +151,7 @@ non_goals:
   - "Do not send exchange keys, session cookies, API keys, or raw private audit logs to AI provider."
   - "Do not move AI to a standalone generic page outside `/backtests` workstation."
   - "Do not bypass manual validation/preflight/submit."
+  - "Do not use visible native select/system dropdowns for AI draft controls or patched config values."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -187,6 +192,7 @@ possible_secondary_touches:
 safety_notes:
   - "If no design decision exists, do not implement code. Stop with blocker or produce the minimal design artifact only if explicitly allowed by the prompt/user."
   - "AI output is untrusted and must pass same validation as manual config."
+  - "AI draft controls inherit `/backtests` branded dropdown/listbox contract; native select is only hidden fallback."
 ---
 
 # Task
@@ -199,6 +205,7 @@ Done means:
 - user must explicitly apply draft, run preflight, and submit job;
 - invalid AI draft shows deterministic validation errors;
 - stream cancellation works;
+- AI draft/apply controls use branded Roehub UI inside the existing backtest workstation;
 - no secrets/private tokens are sent to AI routes/provider;
 - browser evidence exists if implemented.
 
@@ -213,6 +220,7 @@ Done means:
 - If missing, stop and report blocker. Do not improvise provider/storage/security.
 - AI endpoints must not call job creation.
 - AI output must pass normal validation/preflight.
+- AI draft controls must not introduce visible native dropdown/system popups.
 - Add tests for redaction, invalid draft, rate limit/cancellation, no auto-submit.
 - Use `publish-ci-deploy` only after full success.
 

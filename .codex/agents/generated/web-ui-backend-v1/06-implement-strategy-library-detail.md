@@ -71,6 +71,11 @@ hard_requirements:
   preserve_immutable_strategy_model: true
   support_strategies_new: true
   backend_read_model_required: true
+  data_source_inventory_required: true
+  manual_refresh_required: true
+  autorefresh_controls_required: true
+  branded_dropdowns_required: true
+  visible_native_select_forbidden: true
   remove_old_strategy_ui_dependency: true
   reference_fidelity_required: true
   reject_generic_library_cards: true
@@ -107,6 +112,8 @@ package_contract:
     - "browser `/api/ui/strategies/dashboard*`; backend `/ui/strategies/dashboard*`"
     - "strategy create/clone payload shape"
     - "shared JS api.js"
+    - "refresh/autorefresh helper"
+    - "branded dropdown/selector component"
   handoff:
     - "selected-strategy dashboard route/read-model without old strategy_ui.js dependency"
 
@@ -147,12 +154,17 @@ required_literals:
   - "/api/strategies"
   - "/api/strategies/clone"
   - "strategy_ui.js"
+  - "refresh_status"
+  - "retry_after_seconds"
+  - "branded dropdown"
 
 non_goals:
   - "Do not build a generic strategy library/card grid."
   - "Do not create a separate primary `/monitoring` page for this reference."
   - "Do not make strategy mutable update endpoint."
   - "Do not fake metrics that backend does not provide."
+  - "Do not use visible native select/system dropdowns for strategy selectors, filters, sort or autorefresh."
+  - "Do not run unbounded aggregation over strategy events for first paint."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -202,6 +214,8 @@ safety_notes:
   - "Create/clone must preserve canonical indicator payload shape."
   - "Do not use old `strategy_ui.js` as long-term dependency."
   - "The page body after the global header must be reference-shaped against strategy_statistic.png."
+  - "Current storage may not cover all reference stats; add bounded read-models/projections or typed degraded panels with explicit data-source inventory."
+  - "Manual refresh/autorefresh must use shared no-overlap helpers and backend `retry_after_seconds`; browser must not call exchanges directly."
 ---
 
 # Task
@@ -214,6 +228,8 @@ Done means:
 - `/strategies/new` works as compatibility redirect/alias to create mode inside `/strategies`;
 - `/strategies/{strategy_id}` is a deep-link/redirect to the same `/strategies` workstation state, not an equivalent separate page body;
 - backend exposes owner-scoped bounded UI read-model where required;
+- data-source inventory/freshness/degraded states are explicit for every live/stat panel;
+- manual refresh/autorefresh controls exist where live data is shown;
 - create/list/clone/delete use existing Strategy API;
 - old `strategy_ui.js` dependency is removed from these pages;
 - Playwright evidence exists.
@@ -229,7 +245,10 @@ Done means:
 - Open `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` before coding.
 - List the reference panel inventory before implementation notes/final report.
 - Implement `/api/ui/strategies/dashboard?strategy_id=&state=active|all&cursor=` or a compatible bounded read-model required by the reference.
+- Include `sources[]`, `generated_at`, `refresh_status`, `next_allowed_refresh_at`/`retry_after_seconds` or equivalent in live/stat DTOs.
+- Use branded selector/filter/autorefresh dropdowns; visible native select is not acceptable.
 - Preserve expected panels from the plan: command/status bars, top summary/strategy info, chart, metric grid, monthly stats, drawdown/equity, best/worst days, hourly results, trades/events table, symbol results/breakdowns.
+- Add persistent read-model/projection requirements when current migrations cannot support a reference panel; otherwise keep the panel as typed `degraded/unavailable/stale`.
 - Preserve public Strategy API semantics.
 - Preserve create workflow.
 - Do not fake unavailable strategy statistics.
@@ -279,6 +298,8 @@ Use front matter `context_sources`.
 - `/strategies/new` is route-tested and browser-checked as compatibility redirect/alias to create mode inside `/strategies`.
 - `/strategies/{strategy_id}` deep link behavior is route-tested as selected state inside `/strategies`.
 - No dependency on old `strategy_ui.js`.
+- Manual refresh/autorefresh works without overlapping requests and respects backend retry windows.
+- Open branded selector/filter dropdown is captured in browser evidence.
 - Generic strategy card-grid/library layout is not acceptable.
 
 # Implementation constraints

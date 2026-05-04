@@ -2,6 +2,8 @@
 
 Документ фиксирует архитектуру WEB-EPIC-01: `apps/web` как отдельный web upstream (Python SSR + Jinja2 + HTMX), который рендерит HTML, использует JSON API через `/api/...` и обеспечивает обязательный login gate.
 
+> Статус 2026-05-05: базовая SSR/auth идея остается актуальной, но целевой UX авторизации уточнен в `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md` и `docs/architecture/apps/web/web-ui-design-manifest-v1.md`. Login больше не является отдельной полноэкранной страницей основного сценария: основной вход открывается как branded modal поверх shell/landing, а registration остается отдельной страницей `/register`.
+
 ## Цель
 
 - запустить минимальный web UI процесс отдельно от API;
@@ -30,17 +32,21 @@
 - SSR templates (Jinja2) и базовый layout;
 - страницы v1:
   - `/` (public landing)
-  - `/login`
+  - `/login` (compatibility/deep-link modal state)
+  - `/register`
   - `/logout`
   - `/strategies` (protected)
 
 ### 2) Auth UX (Keycloak OIDC)
 
-- `/login` рендерит кнопку/ссылку в `GET /api/auth/login`;
+- header action `Login` открывает branded login modal/dialog;
+- `/login?next=...` является compatibility/deep-link entrypoint: он рендерит shell/landing с открытым login modal или делает controlled redirect к такому состоянию;
+- primary action внутри login modal запускает `GET /api/auth/login`;
+- `/register` остается отдельной branded page/entrypoint для Keycloak-backed registration/get-started flow;
 - `/api/auth/login` запускает OIDC flow и делает redirect в Keycloak;
 - `GET /auth/callback` в API завершает code flow и ставит opaque cookie `roehub_session_id`;
 - protected pages делают server-side check `GET /api/auth/current-user`;
-- при `401` web редиректит на `/login`.
+- при `401` protected page может редиректить на `/login?next=<safe-local-path>`, а live polling/SSE должны остановиться и показать login modal/banner без бесконечных запросов.
 
 ### 3) Logout UX
 
@@ -72,7 +78,7 @@ Web не wires domain/application use-cases напрямую, а работае�
 Auth state определяется только ответом API current-user dependency:
 
 - `200` -> страница доступна;
-- `401` -> redirect на `/login`.
+- `401` -> redirect на `/login?next=<safe-local-path>` для protected page navigation или login modal/banner для live polling/SSE.
 
 ### 3) Browser cookie — только opaque Roehub session id
 
@@ -89,6 +95,10 @@ Web не читает и не парсит provider token; auth-cookie обра�
 - `/logout` всегда выполняет `POST /api/auth/logout`;
 - Telegram widget script не используется в templates.
 
+### 5) Branded controls
+
+Functional pages не должны использовать visible native `<select>`/system dropdown как основной UX. Theme/language/account menus, filters/sort, strategy selectors и backtest config controls выполняются через shared Roehub branded dropdown/menu/listbox/combobox primitives; native controls допустимы только как hidden/progressive fallback.
+
 ## Связанные файлы
 
 Docs:
@@ -103,7 +113,9 @@ API:
 Web:
 - `apps/web/main/app.py`
 - `apps/web/main/api_client.py`
-- `apps/web/templates/login.html`
+- `apps/web/templates/fragments/auth/login_modal.html`
+- `apps/web/templates/pages/login.html` (compatibility wrapper only, if present)
+- `apps/web/templates/pages/register.html`
 - `apps/web/templates/logout.html`
 
 ## Как проверить
@@ -118,7 +130,10 @@ python -m tools.docs.generate_docs_index --check
 
 Manual smoke:
 
-1. открыть `/login` и перейти по кнопке `Continue with Keycloak`;
-2. пройти Keycloak login;
-3. открыть `/strategies` (должно быть `200`);
-4. открыть `/logout` и убедиться в redirect на `/login`.
+1. открыть `/` и убедиться, что `Login` открывает branded modal;
+2. открыть `/login?next=/strategies` и убедиться, что это modal pre-open/deep-link state, а не отдельная полноэкранная login page;
+3. открыть `/register` и убедиться, что registration является отдельной страницей;
+4. перейти из login modal через `Continue with Keycloak`;
+5. пройти Keycloak login;
+6. открыть `/strategies` (должно быть `200`);
+7. открыть `/logout` и убедиться в redirect на safe login/modal state.

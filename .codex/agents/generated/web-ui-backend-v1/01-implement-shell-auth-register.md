@@ -2,7 +2,7 @@
 prompt_name: web_ui_backend_v1_01_shell_auth_register
 repo: roehub.com
 branch: main
-scope: "Этап 1: новый app shell, header tabs, login/logout/register entrypoints и protected route gate."
+scope: "Этап 1: новый app shell, header tabs, login modal, отдельная register page и protected route gate."
 
 language:
   implementation: python_jinja_css_js
@@ -69,7 +69,10 @@ style_references:
 hard_requirements:
   replace_shell: true
   protected_routes_login_gate: true
+  login_modal_required: true
+  standalone_login_page_for_primary_ux_forbidden: true
   register_entrypoint_keycloak_backed: true
+  register_separate_page_required: true
   no_local_username_password_registration: true
   no_external_cdn_script: true
   no_inline_auth_scripts: true
@@ -96,8 +99,10 @@ package_contract:
   owns:
     - "apps/web/main/app.py shell/auth routes"
     - "apps/web/templates/base.html"
-    - "apps/web/templates/pages/login.html"
+    - "apps/web/templates/fragments/auth/login_modal.html"
+    - "apps/web/templates/pages/login.html compatibility wrapper only"
     - "apps/web/templates/pages/logout.html"
+    - "apps/web/templates/pages/register.html"
     - "apps/web/templates/pages/* placeholders only"
     - "apps/web/templates/components/user_badge.html"
     - "apps/web/templates/fragments/shell/user_badge.html"
@@ -181,6 +186,7 @@ non_goals:
   - "Do not implement real dashboard/settings/strategies/backtest page functionality beyond placeholders."
   - "Do not make `/monitoring` a primary page; it has no canonical PNG in the v1 reference map."
   - "Do not create local username/password registration."
+  - "Do not implement login as a standalone primary page; direct `/login` is only a modal pre-open/deep-link state."
   - "Do not migrate to React/Next/SPA."
   - "Do not change backend auth semantics unless Keycloak registration entrypoint is explicitly required."
   - "Do not preserve `/_partial/user_badge` as a public route; render badge through shell context/component/fragment."
@@ -213,7 +219,9 @@ expected_primary_touches:
   - "apps/web/main/app.py"
   - "apps/web/templates/base.html"
   - "apps/web/templates/pages/login.html"
+  - "apps/web/templates/fragments/auth/login_modal.html"
   - "apps/web/templates/pages/logout.html"
+  - "apps/web/templates/pages/register.html"
   - "apps/web/templates/pages/*.html"
   - "apps/web/templates/components/user_badge.html"
   - "apps/web/templates/fragments/shell/user_badge.html"
@@ -243,6 +251,8 @@ safety_notes:
   - "`/_partial/user_badge` is a legacy partial route to remove from the public route map after shell badge replacement."
   - "Language switcher belongs near auth/account controls and must not compete with primary nav."
   - "If registration requires a Keycloak realm/client choice that is not discoverable, stop and ask."
+  - "Login is a branded modal/dialog that launches Keycloak through `/api/auth/login`; it must sanitize `next`, trap focus, close with Esc/backdrop/control, and restore focus."
+  - "`GET /login?next=...` is a compatibility route that renders shell/landing with login modal pre-open, not a separate visual page."
 ---
 
 # Task
@@ -253,6 +263,8 @@ Done means:
 
 - new terminal-style base shell and header tabs are in place;
 - public `/`, `/login`, `/logout`, `/register` routes exist;
+- primary login UX is a branded modal/dialog, while direct `/login` opens the modal state;
+- `/register` is a separate branded page/entrypoint;
 - protected placeholder routes exist for dashboard/settings/strategies/backtests; `/monitoring` and `/backtests/new` may exist only as compatibility placeholders/redirects;
 - protected routes redirect anonymous users to `/login?next=<safe-local-path>`;
 - auth/logout no longer require inline scripts;
@@ -275,6 +287,8 @@ Done means:
 ## Requirements (Must)
 
 - Implement only shell/auth/register and placeholders.
+- Implement login as a branded modal/dialog; direct `/login?next=...` must pre-open that modal and must not become a standalone primary login page.
+- Implement `/register` as a separate page/entrypoint, not as login modal content.
 - Preserve production same-origin split: browser `/api/*`, backend routes without `/api` prefix.
 - Keep web stateless: no domain use-case imports in `apps/web`.
 - Add/adjust tests for route map, protected redirects, `next` sanitization, asset references.
@@ -285,7 +299,7 @@ Done means:
 
 ## Requirements (Should)
 
-- Prefer server-side redirects over JS where practical.
+- Prefer server-side redirects over JS where practical, but preserve the login modal UX contract.
 - Keep templates organized under `pages/`, `components/`, `macros/` as the plan defines.
 - Keep user-facing product copy available in English and Russian; technical route/API identifiers stay unchanged.
 
@@ -318,7 +332,7 @@ Use front matter `context_sources`. Do not preload all conditional bundles.
 
 1. Inspect current route/template/test shape.
 2. Implement route map and protected placeholder pages.
-3. Replace shared shell/header and auth/register entrypoints.
+3. Replace shared shell/header and auth/register entrypoints, including login modal and separate register page.
 4. Add SSR i18n helper, `en`/`ru` catalogs, `<html lang>`, `data-locale`, and compact language switcher.
 5. Remove external CDN/inline auth script dependency.
 6. Add focused tests.
@@ -332,6 +346,9 @@ Use front matter `context_sources`. Do not preload all conditional bundles.
 - Protected pages redirect to `/login?next=<safe-local-path>`.
 - External `next` target is sanitized.
 - Header tabs render and active state is deterministic.
+- Login button opens branded modal; direct `/login` opens the same modal state.
+- Modal focus trap, close behavior and safe `next` behavior are browser-verified.
+- `/register` renders as a separate branded page/entrypoint.
 - Login/logout do not require inline scripts.
 - Register CTA leads to selected Keycloak-backed entrypoint or a documented compatible auth extension.
 - No external CDN script remains in base shell.

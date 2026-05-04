@@ -62,6 +62,8 @@ hard_requirements:
   product_diagram_required: true
   no_stock_orb_gradient_backgrounds: true
   mobile_no_horizontal_overflow: true
+  login_cta_opens_modal: true
+  register_cta_goes_to_separate_page: true
   browser_qa_required: true
 
 task_toggles:
@@ -229,6 +231,7 @@ Use front matter `context_sources`.
 
 - `/` loads anonymously without API dependency.
 - Auth/register CTAs route correctly.
+- Login CTA opens the branded login modal; Register CTA goes to the separate `/register` page/entrypoint.
 - Desktop and mobile screenshots show no overflow or broken text.
 - No failed same-origin network requests except expected optional auth checks.
 - No console errors.

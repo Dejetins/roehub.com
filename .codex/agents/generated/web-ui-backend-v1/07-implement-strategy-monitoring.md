@@ -67,6 +67,10 @@ hard_requirements:
   polling_fallback_required: true
   bounded_payloads_required: true
   no_overlap_polling_required: true
+  manual_refresh_required: true
+  autorefresh_rate_limit_required: true
+  source_freshness_required: true
+  exchange_rate_limits_respected: true
   no_primary_monitoring_page_without_reference: true
   browser_qa_required: true
 
@@ -100,6 +104,7 @@ package_contract:
     - "apps/api/main.py route include"
     - "SSE event contract"
     - "JS core sse.js/poller.js"
+    - "refresh/autorefresh helper and retry_after_seconds"
     - "strategy run/stop existing API"
   handoff:
     - "owner-scoped strategy dashboard DTOs and stream/polling fallback"
@@ -148,6 +153,8 @@ required_literals:
   - "last_event_id"
   - "SSE"
   - "polling fallback"
+  - "retry_after_seconds"
+  - "refresh_status"
 
 non_goals:
   - "Do not create a new primary `/monitoring` page without a canonical PNG and explicit plan update."
@@ -155,6 +162,7 @@ non_goals:
   - "Do not implement trading/order routing."
   - "Do not use HTMX as high-frequency live transport."
   - "Do not leak another user's stream events."
+  - "Do not let browser refresh/autorefresh bypass backend cache, coalescing or exchange rate limits."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -200,6 +208,8 @@ safety_notes:
   - "Browser path `/api/stream/strategies` maps to backend `/stream/strategies`."
   - "SSE is read-only and must authorize before stream read."
   - "Keep rows/fills/chart points bounded."
+  - "Live DTOs must expose freshness/degraded/rate-limited source state."
+  - "Manual refresh/autorefresh must enforce no-overlap, hidden-tab pause, one SSE connection per tab, and server retry windows."
 ---
 
 # Task
@@ -213,6 +223,7 @@ Done means:
 - backend has compact dashboard/snapshot/positions/fills/equity endpoints;
 - backend has authorized SSE bridge over existing Redis Streams or a documented polling-only fallback if stream substrate is unavailable;
 - pages reconnect/downgrade safely;
+- manual refresh and autorefresh work through backend read-model/stream contracts without exchange-limit bypass;
 - Playwright evidence exists.
 
 ## Context / Current State
@@ -229,6 +240,9 @@ Done means:
 - Limit list rows, fills, alerts and chart points.
 - Implement 401 stream stop/redirect behavior.
 - Implement hidden-tab pause/no-overlap polling.
+- Implement manual refresh/autorefresh metadata and `retry_after_seconds` handling.
+- Expose freshness/lag/degraded state for each live source.
+- Respect exchange/source limits through backend adapters/cache/coalescing; browser never calls exchanges.
 - Add focused backend/web tests.
 - Use `publish-ci-deploy` only after full success.
 
@@ -270,6 +284,8 @@ Use front matter `context_sources`.
 - Strategy list and selected snapshot render from backend DTO on `/strategies`.
 - Start/stop actions reflect state within one refresh cycle.
 - SSE reconnects or degrades to polling.
+- Manual refresh/autorefresh updates live panels without overlapping requests and respects backend retry windows.
+- Rate-limited/stale sources are visible as typed state.
 - 401 stops stream and sends user to login.
 - Hidden tab pauses polling.
 - Mobile layout folds list/detail into tabs.

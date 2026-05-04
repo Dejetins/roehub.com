@@ -82,6 +82,9 @@ hard_requirements:
   csrf_strategy_gate_required_for_mutations: true
   theme_preference_preserves_financial_colors: true
   locale_preference_required: true
+  autorefresh_preference_required: true
+  branded_dropdowns_required: true
+  visible_native_select_forbidden: true
   language_switch_settings_required: true
   reference_fidelity_required: true
   reject_generic_settings_cards: true
@@ -122,6 +125,7 @@ package_contract:
     - "exchange-key route contract"
     - "theme preference default resolution"
     - "locale preference default resolution"
+    - "autorefresh preference default resolution"
   handoff:
     - "owner-scoped account/preferences/audit endpoints and settings UI"
 
@@ -165,6 +169,8 @@ required_literals:
   - "exchange_key_already_exists"
   - "identity_user_preferences"
   - "identity_audit_events"
+  - "autorefresh"
+  - "refresh_interval_seconds"
   - "terminal-orange"
   - "locale"
   - "en"
@@ -178,6 +184,7 @@ non_goals:
   - "Do not add arbitrary webhook integrations without validation."
   - "Do not localize routes, `/api/*`, DTO fields, exchange ids, session ids, or audit event type identifiers."
   - "Do not replace the settings reference with generic account cards."
+  - "Do not use visible native select/system dropdowns for theme, language, notification, integration or autorefresh controls."
 
 final_report_format:
   - "Intent: что реализовано и почему это нужно пользователю"
@@ -227,6 +234,8 @@ safety_notes:
   - "If CSRF strategy is not implemented, do not broaden mutation surface without a documented gate."
   - "Exchange secrets must not appear in DOM, JSON, logs, screenshots, or Playwright artifacts."
   - "The page body after the global header must be reference-shaped against personal_settings.png."
+  - "Preferences include theme, locale, density if implemented, and autorefresh defaults; validate intervals server-side."
+  - "Settings dropdowns/menus must use shared branded controls; native select is only hidden fallback."
 ---
 
 # Task
@@ -242,6 +251,8 @@ Done means:
 - exchange keys UI uses existing secret-safe exchange-key endpoints;
 - theme preference persists and never changes financial color semantics;
 - locale preference persists for `en`/`ru` and updates language switch/default rendering;
+- autorefresh defaults persist and validate safe interval presets/custom values;
+- settings controls use branded dropdown/listbox/menu UI rather than visible native system dropdowns;
 - destructive/settings mutations write audit events;
 - sessions/audit are cursor-paginated;
 - browser/security evidence exists.
@@ -249,7 +260,7 @@ Done means:
 ## Context / Current State
 
 - Current backend already has auth/current-user and exchange keys.
-- Missing account preferences, integrations, audit, sessions UI read-models.
+- Missing account preferences, integrations, audit, sessions UI read-models and autorefresh/default refresh policy persistence.
 - Identity SQL migrations live under `migrations/postgres`.
 - Shell i18n exists before this stage; settings persists authenticated account locale preference.
 
@@ -263,6 +274,8 @@ Done means:
 - Add authorization/owner-scope tests.
 - Add secret leak checks in tests or browser evidence.
 - Add locale preference validation: allowed `en`/`ru`, deterministic error for unsupported locale, reload restores selected language.
+- Add autorefresh preference validation: allowed presets `off|10s|15s|30s|1m|5m`, custom interval bounds, deterministic error for too-low intervals.
+- Use branded dropdown/listbox/menu controls for theme, language, notification modes, integration modes and refresh intervals; visible native select is not acceptable.
 - Use `publish-ci-deploy` only after complete success.
 
 ## Requirements (Should)
@@ -310,6 +323,8 @@ Use front matter `context_sources`.
 - Toggles/preferences save without full reload where implemented.
 - Theme preference survives reload and preserves financial colors.
 - Language preference survives reload, updates `<html lang>`/`data-locale`, and settings copy works in `en` and `ru`.
+- Autorefresh preference survives reload and is available to dashboard/strategies/backtests consumers.
+- Branded dropdown/menu controls are browser-verified in an open state.
 - Sessions/audit paginate.
 - Mobile layout has no horizontal overflow.
 - Generic account card layout is not acceptable.

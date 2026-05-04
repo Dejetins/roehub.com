@@ -70,6 +70,10 @@ hard_requirements:
   freeze_route_map: true
   freeze_endpoint_map: true
   preserve_api_prefix_notation: true
+  freeze_auth_modal_register_page_contract: true
+  freeze_branded_controls_contract: true
+  freeze_data_source_refresh_contract: true
+  current_migrations_gap_inventory_required: true
   favicon_no_incidental_404_invariant: true
   user_badge_partial_route_not_public_contract: true
   physical_delete_only_after_route_replacement: true
@@ -97,6 +101,9 @@ package_contract:
     - "route map"
     - "endpoint map"
     - "reference fidelity map"
+    - "auth modal/register page contract"
+    - "branded controls contract"
+    - "data source/refresh/autorefresh contract"
     - "cleanup inventory"
   handoff:
     - "accepted route/endpoint map and cleanup boundaries for Stage 1-2"
@@ -142,6 +149,11 @@ required_literals:
   - "personal_settings.png -> /settings"
   - "strategy_statistic.png -> /strategies"
   - "stategy_backtest.png -> /backtests"
+  - "login modal"
+  - "register page"
+  - "branded dropdown"
+  - "autorefresh"
+  - "retry_after_seconds"
 
 non_goals:
   - "Не реализовывать новый UI, backend endpoints или миграции."
@@ -198,6 +210,10 @@ Done means:
 - `/monitoring` зафиксирован как compatibility/ops route only без canonical PNG в v1 map;
 - `/api/...` нотация подтверждена как browser-visible contract, без добавления `/api` prefix в backend routers;
 - `/_partial/user_badge` зафиксирован как non-public legacy partial route, который заменяется shell component/fragment;
+- login зафиксирован как branded modal/deep-link modal state, а registration как отдельная `/register` page;
+- branded dropdown/listbox/menu controls зафиксированы как обязательные; visible native select не является целевым UX;
+- текущие migrations/read-model gaps для live dashboard/reference panels зафиксированы;
+- manual refresh/autorefresh/rate-limit contract зафиксирован для live-data страниц;
 - список handoff-инвариантов готов для этапов 1-2;
 - docs index проходит.
 
@@ -217,6 +233,8 @@ Done means:
 - Не превращай `/_partial/user_badge` в стабильный публичный контракт.
 - Не допускай возврата browser 404 noise для `GET /favicon.ico`.
 - Классифицируй contract impact: public API, browser-visible behavior, persisted schema, config.
+- Проверь текущие identity SQL migrations, Alembic migrations и ClickHouse DDL настолько, чтобы не заявлять несуществующие live-data источники.
+- Зафиксируй, какие reference panels требуют новых read-model/persistence additions или typed degraded state.
 - Если все проверки прошли и этап завершен на 100%, запусти delivery chain через `publish-ci-deploy`. Если нет, не публикуй и отчитай blocker.
 
 ## Requirements (Should)
