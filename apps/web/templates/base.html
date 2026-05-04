@@ -8,8 +8,16 @@
     <link rel="stylesheet" href="/assets/css/themes.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/shell.css">
     <script src="/assets/vendor/htmx.min.js" defer></script>
+    <script type="application/json" id="roehub-locale-catalogs">{{ locale_catalogs_json|safe }}</script>
+    <script type="module" src="/assets/js/core/theme.js"></script>
+    <script type="module" src="/assets/js/core/locale.js"></script>
+    <script type="module" src="/assets/js/components/dropdown.js"></script>
+    <script type="module" src="/assets/js/components/listbox.js"></script>
+    <script type="module" src="/assets/js/components/combobox.js"></script>
+    <script type="module" src="/assets/js/components/refresh-control.js"></script>
     <script src="/assets/js/pages/auth.js" defer></script>
   </head>
   <body>
@@ -31,16 +39,7 @@
           {% endfor %}
         </nav>
         <div class="header-controls">
-          <div class="language-switcher" aria-label="{{ t('common.language') }}">
-            {% for option in language_options %}
-              <a
-                class="language-switcher__option{% if option.is_active %} language-switcher__option--active{% endif %}"
-                href="{{ option.url }}"
-                hreflang="{{ option.code }}"
-                data-locale-option="{{ option.code }}"
-              >{{ option.label }}</a>
-            {% endfor %}
-          </div>
+          {% include "components/shell_preferences.html" %}
           {% include "fragments/shell/user_badge.html" %}
           {% if current_user %}
             <a class="shell-button shell-button--ghost" href="/logout">{{ t("auth.logout") }}</a>

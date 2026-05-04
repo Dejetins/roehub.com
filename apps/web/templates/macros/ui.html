@@ -1,0 +1,117 @@
+{% macro panel(title, body=None, tone="default", attrs="") -%}
+  <section class="rh-panel rh-panel--{{ tone }}" {{ attrs|safe }}>
+    <header class="rh-panel__header">
+      <span class="rh-panel__marker" aria-hidden="true">&gt;_</span>
+      <h2 class="rh-panel__title">{{ title }}</h2>
+    </header>
+    {% if body %}
+      <div class="rh-panel__body">{{ body }}</div>
+    {% endif %}
+  </section>
+{%- endmacro %}
+
+{% macro metric_card(label, value, meta="", direction="neutral") -%}
+  <article class="rh-metric" data-i18n-label="{{ label }}">
+    <span class="rh-metric__label">{{ label }}</span>
+    <strong class="rh-metric__value rh-financial rh-financial--{{ direction }}">{{ value }}</strong>
+    {% if meta %}<span class="rh-metric__meta">{{ meta }}</span>{% endif %}
+  </article>
+{%- endmacro %}
+
+{% macro status_badge(label, tone="muted") -%}
+  <span class="rh-status rh-status--{{ tone }}" data-i18n-label="{{ label }}">
+    <span class="rh-status__dot" aria-hidden="true"></span>
+    {{ label }}
+  </span>
+{%- endmacro %}
+
+{% macro empty_state(title, body, action_label=None) -%}
+  <div class="rh-empty" data-empty-state>
+    <h2>{{ title }}</h2>
+    <p>{{ body }}</p>
+    {% if action_label %}
+      <button class="rh-button rh-button--secondary" type="button">{{ action_label }}</button>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro data_table(label, columns, rows) -%}
+  <div class="rh-table-wrap" role="region" aria-label="{{ label }}" tabindex="0">
+    <table class="rh-table">
+      <thead>
+        <tr>
+          {% for column in columns %}
+            <th scope="col">{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% for cell in row %}
+              <td>{{ cell }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{%- endmacro %}
+
+{% macro tabs(label, items, active_key) -%}
+  <div class="rh-tabs" role="tablist" aria-label="{{ label }}">
+    {% for item in items %}
+      <button
+        class="rh-tab{% if item.key == active_key %} rh-tab--active{% endif %}"
+        type="button"
+        role="tab"
+        aria-selected="{{ 'true' if item.key == active_key else 'false' }}"
+        data-tab-key="{{ item.key }}"
+      >{{ item.label }}</button>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro menu(id, label, items, trigger_label=None) -%}
+  <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="menu">
+    <button
+      class="rh-button rh-button--secondary rh-dropdown__trigger"
+      type="button"
+      id="{{ id }}-trigger"
+      aria-haspopup="menu"
+      aria-expanded="false"
+      aria-controls="{{ id }}-menu"
+      data-rh-dropdown-trigger
+    >{{ trigger_label or label }}</button>
+    <div class="rh-popover" id="{{ id }}-menu" role="menu" aria-labelledby="{{ id }}-trigger" hidden data-rh-dropdown-menu>
+      {% for item in items %}
+        <button class="rh-menu-item" type="button" role="menuitem" data-rh-dropdown-item="{{ item.key }}">
+          <span>{{ item.label }}</span>
+        </button>
+      {% endfor %}
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro combobox(id, label, options) -%}
+  <div class="rh-combobox" data-rh-combobox>
+    <label class="rh-field-label" for="{{ id }}-input">{{ label }}</label>
+    <input
+      class="rh-combobox__input"
+      id="{{ id }}-input"
+      type="text"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded="true"
+      aria-controls="{{ id }}-listbox"
+      autocomplete="off"
+    >
+    <div class="rh-popover rh-popover--static" id="{{ id }}-listbox" role="listbox">
+      {% for option in options %}
+        <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="{{ option.key }}">
+          {{ option.label }}
+        </button>
+      {% endfor %}
+    </div>
+  </div>
+{%- endmacro %}

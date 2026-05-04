@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,7 @@ from apps.web.main.i18n import (
     DEFAULT_LOCALE,
     LOCALE_COOKIE_NAME,
     SUPPORTED_LOCALES,
+    load_catalog,
     normalize_locale,
     resolve_locale,
     translate,
@@ -130,6 +132,20 @@ _PROTECTED_PAGES: dict[str, _ProtectedPage] = {
         description_key="page.monitoring.desc",
     ),
 }
+_THEME_OPTIONS: tuple[dict[str, str], ...] = (
+    {"key": "terminal-orange", "label_key": "theme.terminal_orange"},
+    {"key": "graphite", "label_key": "theme.graphite"},
+    {"key": "matrix-green", "label_key": "theme.matrix_green"},
+    {"key": "high-contrast", "label_key": "theme.high_contrast"},
+)
+_REFRESH_PRESETS: tuple[dict[str, str], ...] = (
+    {"key": "off", "label": "Off"},
+    {"key": "10s", "label": "10s"},
+    {"key": "15s", "label": "15s"},
+    {"key": "30s", "label": "30s"},
+    {"key": "1m", "label": "1m"},
+    {"key": "5m", "label": "5m"},
+)
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -483,6 +499,10 @@ def _build_template_context(
     current_browser_path = _build_current_browser_path(request=request)
     page_title = translate(locale=locale, key=page_title_key)
     safe_auth_next_path = sanitize_next_path(raw_next=auth_next_path)
+    locale_catalogs = {
+        catalog_locale: load_catalog(locale=catalog_locale)
+        for catalog_locale in SUPPORTED_LOCALES
+    }
     return {
         "request": request,
         "page_path": page_path,
@@ -493,6 +513,9 @@ def _build_template_context(
         "locale": locale,
         "default_locale": DEFAULT_LOCALE,
         "supported_locales": SUPPORTED_LOCALES,
+        "locale_catalogs_json": json.dumps(locale_catalogs, ensure_ascii=False, sort_keys=True),
+        "theme_options": _THEME_OPTIONS,
+        "refresh_presets": _REFRESH_PRESETS,
         "t": lambda key: translate(locale=locale, key=key),
         "nav_items": _build_nav_items(locale=locale, active_path=active_path),
         "language_options": _build_language_options(

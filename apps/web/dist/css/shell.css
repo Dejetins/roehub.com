@@ -39,7 +39,7 @@
 .shell-button:hover {
   border-color: var(--rh-line-strong);
   background: var(--rh-accent);
-  color: #120804;
+  color: var(--rh-on-accent);
 }
 
 .shell-button--ghost {
@@ -200,7 +200,7 @@
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--rh-backdrop);
 }
 
 .auth-modal__dialog {

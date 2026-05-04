@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -9,6 +10,8 @@ from fastapi.testclient import TestClient
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
 from apps.web.main.i18n import LOCALE_COOKIE_NAME, catalog_key_sets
+
+_WEB_ROOT = Path(__file__).resolve().parents[4] / "apps" / "web"
 
 
 def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
@@ -87,9 +90,16 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'data-nav-key="dashboard"' in response.text
     assert 'data-nav-key="settings"' in response.text
     assert "/assets/vendor/htmx.min.js" in response.text
+    assert "/assets/css/components.css" in response.text
+    assert "/assets/js/core/theme.js" in response.text
+    assert "/assets/js/core/locale.js" in response.text
+    assert "/assets/js/components/dropdown.js" in response.text
     assert "/assets/js/pages/auth.js" in response.text
     assert "https://unpkg.com" not in response.text
     assert 'data-auth-modal' in response.text
+    assert 'id="theme-switcher-trigger"' in response.text
+    assert 'data-theme-value="terminal-orange"' in response.text
+    assert "site.css" not in response.text
 
 
 @pytest.mark.parametrize(
@@ -198,6 +208,13 @@ def test_authorized_placeholder_routes_render_active_navigation() -> None:
     assert 'data-page="protected-placeholder"' in settings_response.text
     assert 'data-nav-key="settings"' in settings_response.text
     assert 'nav-tab--active"' in settings_response.text
+    assert 'data-ui-kit-placeholder' in settings_response.text
+    assert 'data-refresh-control' in settings_response.text
+    assert 'data-refresh-preset="10s"' in settings_response.text
+    assert 'role="listbox"' in settings_response.text
+    assert 'role="combobox"' in settings_response.text
+    assert 'data-rh-combobox' in settings_response.text
+    assert '<select' not in settings_response.text
     assert 'data-nav-key="strategies"' in strategies_response.text
     assert 'nav-tab--active"' in strategies_response.text
 
@@ -241,3 +258,57 @@ def test_locale_catalog_keys_match() -> None:
     key_sets = catalog_key_sets()
 
     assert key_sets["en"] == key_sets["ru"]
+
+
+def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None:
+    expected_assets = [
+        "dist/css/tokens.css",
+        "dist/css/themes.css",
+        "dist/css/base.css",
+        "dist/css/layout.css",
+        "dist/css/components.css",
+        "dist/js/core/theme.js",
+        "dist/js/core/api.js",
+        "dist/js/core/poller.js",
+        "dist/js/core/sse.js",
+        "dist/js/core/dom.js",
+        "dist/js/core/locale.js",
+        "dist/js/core/notifications.js",
+        "dist/js/core/formatters.js",
+        "dist/js/core/validators.js",
+        "dist/js/core/refresh.js",
+        "dist/js/components/dropdown.js",
+        "dist/js/components/listbox.js",
+        "dist/js/components/combobox.js",
+        "dist/js/components/refresh-control.js",
+    ]
+
+    for asset in expected_assets:
+        assert (_WEB_ROOT / asset).is_file(), asset
+
+    tokens_css = (_WEB_ROOT / "dist/css/tokens.css").read_text(encoding="utf-8")
+    themes_css = (_WEB_ROOT / "dist/css/themes.css").read_text(encoding="utf-8")
+    theme_js = (_WEB_ROOT / "dist/js/core/theme.js").read_text(encoding="utf-8")
+    api_js = (_WEB_ROOT / "dist/js/core/api.js").read_text(encoding="utf-8")
+    poller_js = (_WEB_ROOT / "dist/js/core/poller.js").read_text(encoding="utf-8")
+    locale_js = (_WEB_ROOT / "dist/js/core/locale.js").read_text(encoding="utf-8")
+    refresh_js = (_WEB_ROOT / "dist/js/core/refresh.js").read_text(encoding="utf-8")
+
+    assert "--rh-financial-positive" in tokens_css
+    assert "--rh-financial-negative" in tokens_css
+    assert "--rh-financial-positive" not in themes_css
+    assert "--rh-financial-negative" not in themes_css
+    for theme in ["terminal-orange", "graphite", "matrix-green", "high-contrast"]:
+        assert theme in theme_js
+        assert f'data-theme="{theme}"' in tokens_css or theme in themes_css
+
+    for status in ["401", "403", "409", "422", "timeout"]:
+        assert status in api_js
+    assert "x-csrf-token" in api_js
+    assert "this.running" in poller_js
+    assert "document.hidden" in poller_js
+    assert "retry_after_seconds" in poller_js
+    assert "roehub_locale" in locale_js
+    assert "DEFAULT_LOCALE = \"en\"" in locale_js
+    for preset in ['"10s"', '"15s"', '"30s"', '"1m"', '"5m"']:
+        assert preset in refresh_js

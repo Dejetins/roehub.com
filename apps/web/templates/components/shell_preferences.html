@@ -1,0 +1,78 @@
+<div class="shell-preferences" aria-label="{{ t('common.preferences') }}">
+  <div class="rh-dropdown rh-dropdown--compact" data-rh-dropdown data-rh-dropdown-kind="listbox">
+    <button
+      class="rh-button rh-button--compact rh-dropdown__trigger"
+      type="button"
+      id="theme-switcher-trigger"
+      aria-haspopup="listbox"
+      aria-expanded="false"
+      aria-controls="theme-switcher-menu"
+      data-rh-dropdown-trigger
+      data-i18n-key="theme.label"
+    >
+      {{ t("theme.label") }}
+      <span class="rh-dropdown__value" data-theme-current>terminal-orange</span>
+    </button>
+    <div
+      class="rh-popover rh-popover--theme"
+      id="theme-switcher-menu"
+      role="listbox"
+      aria-labelledby="theme-switcher-trigger"
+      hidden
+      data-rh-dropdown-menu
+      data-theme-menu
+    >
+      {% for theme in theme_options %}
+        <button
+          class="rh-menu-item rh-theme-option"
+          type="button"
+          role="option"
+          aria-selected="{{ 'true' if theme.key == 'terminal-orange' else 'false' }}"
+          data-rh-dropdown-item="{{ theme.key }}"
+          data-theme-option
+          data-theme-value="{{ theme.key }}"
+        >
+          <span class="rh-theme-option__swatch" data-theme-swatch="{{ theme.key }}" aria-hidden="true"></span>
+          <span>{{ t(theme.label_key) }}</span>
+        </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="rh-dropdown rh-dropdown--compact" data-rh-dropdown data-rh-dropdown-kind="listbox">
+    <button
+      class="rh-button rh-button--compact rh-dropdown__trigger"
+      type="button"
+      id="locale-switcher-trigger"
+      aria-haspopup="listbox"
+      aria-expanded="false"
+      aria-controls="locale-switcher-menu"
+      data-rh-dropdown-trigger
+      data-i18n-key="common.language"
+    >
+      {{ t("common.language") }}
+      <span class="rh-dropdown__value" data-locale-current>{{ locale|upper }}</span>
+    </button>
+    <div
+      class="rh-popover"
+      id="locale-switcher-menu"
+      role="listbox"
+      aria-labelledby="locale-switcher-trigger"
+      hidden
+      data-rh-dropdown-menu
+      data-locale-menu
+    >
+      {% for option in language_options %}
+        <button
+          class="rh-menu-item"
+          type="button"
+          role="option"
+          aria-selected="{{ 'true' if option.is_active else 'false' }}"
+          data-rh-dropdown-item="{{ option.code }}"
+          data-locale-option="{{ option.code }}"
+          data-locale-url="{{ option.url }}"
+        >{{ option.label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</div>

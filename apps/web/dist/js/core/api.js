@@ -1,0 +1,107 @@
+export class RoehubApiError extends Error {
+  constructor(message, { status = 0, code = "request_failed", payload = null, retryAfterSeconds = null } = {}) {
+    super(message);
+    this.name = "RoehubApiError";
+    this.status = status;
+    this.code = code;
+    this.payload = payload;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+export function createCsrfProvider(provider) {
+  let csrfProvider = typeof provider === "function" ? provider : null;
+  return {
+    set(nextProvider) {
+      csrfProvider = typeof nextProvider === "function" ? nextProvider : null;
+    },
+    get() {
+      return csrfProvider ? csrfProvider() : null;
+    },
+  };
+}
+
+export const csrf = createCsrfProvider();
+
+function isMutation(method) {
+  return !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+}
+
+function normalizeErrorPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+  return {
+    code: payload.code || payload.error_code || payload.error || "request_failed",
+    message: payload.message || payload.detail || "Request failed",
+    fieldErrors: payload.field_errors || payload.errors || null,
+    retryAfterSeconds: payload.retry_after_seconds ?? null,
+  };
+}
+
+async function parsePayload(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+  return response.text();
+}
+
+export async function apiFetch(path, options = {}) {
+  const method = options.method || "GET";
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 15000;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const headers = new Headers(options.headers || {});
+
+  if (isMutation(method)) {
+    const token = csrf.get();
+    if (token) {
+      headers.set("x-csrf-token", token);
+    }
+  }
+
+  try {
+    const response = await fetch(path, {
+      ...options,
+      method,
+      headers,
+      credentials: "include",
+      signal: options.signal || controller.signal,
+    });
+
+    const payload = await parsePayload(response);
+    if (response.ok) {
+      return payload;
+    }
+
+    const normalized = normalizeErrorPayload(payload);
+    const retryAfter = response.headers.get("retry-after");
+    const retryAfterSeconds = normalized.retryAfterSeconds ?? (retryAfter ? Number(retryAfter) : null);
+    const codeByStatus = {
+      401: "unauthenticated",
+      403: "forbidden",
+      409: "conflict",
+      422: "validation_error",
+    };
+    throw new RoehubApiError(normalized.message, {
+      status: response.status,
+      code: codeByStatus[response.status] || normalized.code,
+      payload,
+      retryAfterSeconds,
+    });
+  } catch (error) {
+    if (error instanceof RoehubApiError) {
+      if (error.status === 401) {
+        document.dispatchEvent(new CustomEvent("roehub:auth-required", { detail: error }));
+      }
+      throw error;
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new RoehubApiError("Request timed out", { code: "timeout" });
+    }
+    throw new RoehubApiError(error?.message || "Network request failed", { code: "network_error" });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}

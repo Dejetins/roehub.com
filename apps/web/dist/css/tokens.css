@@ -20,6 +20,8 @@
   --rh-warning: #ff9d00;
   --rh-info: #00a6c8;
   --rh-focus: #ffb000;
+  --rh-on-accent: #120804;
+  --rh-backdrop: rgba(0, 0, 0, 0.72);
   --rh-shadow-panel: none;
   --rh-shadow-glow: 0 0 18px rgba(255, 106, 0, 0.08);
   --rh-financial-positive: #57d33b;
