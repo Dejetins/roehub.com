@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="auth-panel"
+    data-auth-logout
+    data-logout-redirect="{{ post_logout_redirect_path }}"
+  >
+    <p class="eyebrow">{{ t("auth.logout") }}</p>
+    <h1>{{ t("auth.logout") }}</h1>
+    <p>{{ t("auth.logout_body") }}</p>
+    <a class="shell-button shell-button--ghost" href="{{ post_logout_redirect_path }}">
+      {{ t("auth.logout_fallback") }}
+    </a>
+  </section>
+{% endblock %}

@@ -1,0 +1,38 @@
+<div
+  class="auth-modal{% if open_login_modal %} auth-modal--open{% endif %}"
+  data-auth-modal
+  data-open-on-load="{{ 'true' if open_login_modal else 'false' }}"
+  aria-hidden="{{ 'false' if open_login_modal else 'true' }}"
+>
+  <button class="auth-modal__backdrop" type="button" data-auth-close tabindex="-1"></button>
+  <section
+    class="auth-modal__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="auth-modal-title"
+    aria-describedby="auth-modal-body"
+    tabindex="-1"
+  >
+    <div class="auth-modal__header">
+      <p class="eyebrow">{{ t("auth.login_eyebrow") }}</p>
+      <button class="icon-button" type="button" data-auth-close aria-label="{{ t('auth.close') }}">
+        <span aria-hidden="true">x</span>
+      </button>
+    </div>
+    <h2 id="auth-modal-title">{{ t("auth.login_title") }}</h2>
+    <p id="auth-modal-body">{{ t("auth.login_body") }}</p>
+    <dl class="auth-modal__next">
+      <dt>{{ t("auth.next_label") }}</dt>
+      <dd data-auth-next-label>{{ auth_next_path }}</dd>
+    </dl>
+    <div class="auth-modal__actions">
+      <a
+        id="keycloak-login-link"
+        class="shell-button shell-button--primary"
+        href="{{ oidc_login_url }}"
+        data-auth-primary
+      >{{ t("auth.continue") }}</a>
+      <a class="shell-button shell-button--ghost" href="/register">{{ t("auth.register") }}</a>
+    </div>
+  </section>
+</div>

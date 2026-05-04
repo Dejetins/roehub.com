@@ -1,37 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ locale }}" data-locale="{{ locale }}" data-theme="terminal-orange">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} | Roehub</title>
-    <link rel="stylesheet" href="/assets/site.css">
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/assets/css/tokens.css">
+    <link rel="stylesheet" href="/assets/css/themes.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/shell.css">
+    <script src="/assets/vendor/htmx.min.js" defer></script>
+    <script src="/assets/js/pages/auth.js" defer></script>
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="/">Roehub</a>
-      <nav class="site-nav">
-        <a class="{% if page_path == '/' %}active{% endif %}" href="/">Home</a>
-        <a class="{% if page_path == '/strategies' %}active{% endif %}" href="/strategies">
-          Strategies
+    <a class="skip-link" href="#main-content">{{ t("shell.skip") }}</a>
+    <div class="app-shell">
+      <header class="app-header" data-shell-header>
+        <a class="brand" href="/" aria-label="Roehub home">
+          <span class="brand__mark" aria-hidden="true">&gt;_</span>
+          <span class="brand__text">Roehub</span>
         </a>
-        <a class="{% if page_path == '/backtests' %}active{% endif %}" href="/backtests">
-          Backtests
-        </a>
-        <a class="{% if page_path == '/login' %}active{% endif %}" href="/login">Login</a>
-        <a class="{% if page_path == '/logout' %}active{% endif %}" href="/logout">Logout</a>
-      </nav>
-      <div class="header-badge">
-        {% include "partials/user_badge.html" %}
-      </div>
-    </header>
+        <nav class="primary-nav" aria-label="Primary">
+          {% for item in nav_items %}
+            <a
+              class="nav-tab{% if item.is_active %} nav-tab--active{% endif %}"
+              href="{{ item.path }}"
+              {% if item.is_active %}aria-current="page"{% endif %}
+              data-nav-key="{{ item.key }}"
+            >{{ item.label }}</a>
+          {% endfor %}
+        </nav>
+        <div class="header-controls">
+          <div class="language-switcher" aria-label="{{ t('common.language') }}">
+            {% for option in language_options %}
+              <a
+                class="language-switcher__option{% if option.is_active %} language-switcher__option--active{% endif %}"
+                href="{{ option.url }}"
+                hreflang="{{ option.code }}"
+                data-locale-option="{{ option.code }}"
+              >{{ option.label }}</a>
+            {% endfor %}
+          </div>
+          {% include "fragments/shell/user_badge.html" %}
+          {% if current_user %}
+            <a class="shell-button shell-button--ghost" href="/logout">{{ t("auth.logout") }}</a>
+          {% else %}
+            <button
+              class="shell-button"
+              type="button"
+              data-auth-open
+              data-auth-next="{{ auth_next_path }}"
+            >{{ t("auth.login") }}</button>
+            <a class="shell-button shell-button--ghost" href="/register">{{ t("auth.register") }}</a>
+          {% endif %}
+        </div>
+      </header>
 
-    <main class="content">
-      {% if error_message %}
-        <div class="error-banner" role="alert">{{ error_message }}</div>
-      {% endif %}
-      {% block content %}{% endblock %}
-    </main>
+      <div class="command-bar" aria-label="Page command line">
+        <span class="command-bar__prompt">{{ t("shell.command") }}</span>
+        <span class="command-bar__path">{{ page_path }}</span>
+        <span class="command-bar__status">{{ t("shell.service") }} / {{ t("shell.ready") }}</span>
+      </div>
+
+      <main id="main-content" class="page-shell" tabindex="-1">
+        {% if error_message %}
+          <div class="error-banner" role="alert">{{ error_message }}</div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="status-bar">
+        <span>{{ t("common.status") }}: {{ t("shell.ready") }}</span>
+        <span>{{ locale }}</span>
+      </footer>
+    </div>
+
+    {% include "fragments/auth/login_modal.html" %}
     {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="landing-hero" data-page="landing">
+    <div class="landing-hero__copy">
+      <p class="eyebrow">{{ t("landing.eyebrow") }}</p>
+      <h1>{{ t("landing.title") }}</h1>
+      <p class="landing-hero__body">{{ t("landing.body") }}</p>
+      <div class="landing-hero__actions">
+        <button class="shell-button shell-button--primary" type="button" data-auth-open>
+          {{ t("landing.primary_cta") }}
+        </button>
+        <a class="shell-button shell-button--ghost" href="/register">
+          {{ t("landing.secondary_cta") }}
+        </a>
+      </div>
+    </div>
+    <div class="product-map" aria-label="Roehub product map">
+      <div class="product-map__node product-map__node--primary">ROEHUB</div>
+      <div class="product-map__node">Dashboard</div>
+      <div class="product-map__node">Strategies</div>
+      <div class="product-map__node">Backtests</div>
+      <div class="product-map__node">Settings</div>
+    </div>
+    <dl class="landing-stats">
+      <div>
+        <dt>{{ t("landing.stat_ui") }}</dt>
+        <dd>terminal-orange</dd>
+      </div>
+      <div>
+        <dt>{{ t("landing.stat_shell") }}</dt>
+        <dd>Jinja2</dd>
+      </div>
+      <div>
+        <dt>{{ t("landing.stat_auth") }}</dt>
+        <dd>/api/auth/login</dd>
+      </div>
+    </dl>
+  </section>
+{% endblock %}

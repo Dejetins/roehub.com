@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="register-page" data-page="register">
+    <div class="register-page__copy">
+      <p class="eyebrow">{{ t("auth.register") }}</p>
+      <h1>{{ t("auth.register_title") }}</h1>
+      <p>{{ t("auth.register_body") }}</p>
+      <p class="muted-text">{{ t("auth.register_note") }}</p>
+      <a
+        class="shell-button shell-button--primary"
+        href="{{ register_entrypoint_url }}"
+        data-register-entrypoint="{{ register_entrypoint_url }}"
+      >{{ t("auth.register_cta") }}</a>
+    </div>
+  </section>
+{% endblock %}

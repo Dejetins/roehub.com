@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="workspace-placeholder" data-page="protected-placeholder">
+    <div class="workspace-placeholder__header">
+      <p class="eyebrow">{{ page_path }}</p>
+      <h1>{{ page_title }}</h1>
+      <p>{{ page_description }}</p>
+    </div>
+    <section class="terminal-panel">
+      <h2>{{ t("page.placeholder.heading") }}</h2>
+      <p>{{ t("page.placeholder.note") }}</p>
+      <dl class="key-value-grid">
+        <dt>{{ t("common.current_user") }}</dt>
+        <dd>{{ current_user.user_id if current_user else t("common.unavailable") }}</dd>
+        <dt>{{ t("common.status") }}</dt>
+        <dd>{{ t("shell.ready") }}</dd>
+        {% if strategy_id %}
+          <dt>strategy_id</dt>
+          <dd>{{ strategy_id }}</dd>
+        {% endif %}
+        {% if job_id %}
+          <dt>job_id</dt>
+          <dd>{{ job_id }}</dd>
+        {% endif %}
+      </dl>
+    </section>
+  </section>
+{% endblock %}

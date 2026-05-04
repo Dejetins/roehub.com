@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
@@ -18,6 +19,14 @@ from apps.web.main.api_client import (
     CurrentUserApiResult,
     HttpxCurrentUserApiClient,
     WebCurrentUser,
+)
+from apps.web.main.i18n import (
+    DEFAULT_LOCALE,
+    LOCALE_COOKIE_NAME,
+    SUPPORTED_LOCALES,
+    normalize_locale,
+    resolve_locale,
+    translate,
 )
 from apps.web.main.security import sanitize_next_path
 from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_settings
@@ -39,30 +48,92 @@ _HOP_BY_HOP_HEADERS = {
 }
 
 
+@dataclass(frozen=True)
+class _NavItem:
+    key: str
+    label_key: str
+    path: str
+    active_path: str
+
+
+@dataclass(frozen=True)
+class _ProtectedPage:
+    page_path: str
+    active_path: str
+    title_key: str
+    description_key: str
+
+
+_NAV_ITEMS: tuple[_NavItem, ...] = (
+    _NavItem(key="home", label_key="nav.home", path="/", active_path="/"),
+    _NavItem(
+        key="dashboard",
+        label_key="nav.dashboard",
+        path="/dashboard",
+        active_path="/dashboard",
+    ),
+    _NavItem(
+        key="strategies",
+        label_key="nav.strategies",
+        path="/strategies",
+        active_path="/strategies",
+    ),
+    _NavItem(
+        key="backtests",
+        label_key="nav.backtests",
+        path="/backtests",
+        active_path="/backtests",
+    ),
+    _NavItem(key="settings", label_key="nav.settings", path="/settings", active_path="/settings"),
+)
+_PROTECTED_PAGES: dict[str, _ProtectedPage] = {
+    "/dashboard": _ProtectedPage(
+        page_path="/dashboard",
+        active_path="/dashboard",
+        title_key="page.dashboard.title",
+        description_key="page.dashboard.desc",
+    ),
+    "/settings": _ProtectedPage(
+        page_path="/settings",
+        active_path="/settings",
+        title_key="page.settings.title",
+        description_key="page.settings.desc",
+    ),
+    "/strategies": _ProtectedPage(
+        page_path="/strategies",
+        active_path="/strategies",
+        title_key="page.strategies.title",
+        description_key="page.strategies.desc",
+    ),
+    "/strategies/new": _ProtectedPage(
+        page_path="/strategies/new",
+        active_path="/strategies",
+        title_key="page.strategies.new_title",
+        description_key="page.strategies.new_desc",
+    ),
+    "/backtests": _ProtectedPage(
+        page_path="/backtests",
+        active_path="/backtests",
+        title_key="page.backtests.title",
+        description_key="page.backtests.desc",
+    ),
+    "/backtests/new": _ProtectedPage(
+        page_path="/backtests/new",
+        active_path="/backtests",
+        title_key="page.backtests.title",
+        description_key="page.backtests.desc",
+    ),
+    "/monitoring": _ProtectedPage(
+        page_path="/monitoring",
+        active_path="/dashboard",
+        title_key="page.monitoring.title",
+        description_key="page.monitoring.desc",
+    ),
+}
+
+
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
-    """
-    Build FastAPI web app with SSR templates, static assets, and auth page skeleton.
-
-    Docs:
-      - docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md
-      - docs/architecture/roadmap/milestone-6-epics-v1.md
-    Related:
-      - apps/web/main/main.py
-      - apps/web/main/settings.py
-      - apps/web/main/api_client.py
-
-    Args:
-        environ: Optional process environment mapping override.
-    Returns:
-        FastAPI: Configured Roehub Web application instance.
-    Assumptions:
-        `WEB_API_BASE_URL` and `WEB_API_UPSTREAM_URL` are configured before web
-        process startup.
-    Raises:
-        ValueError: If runtime settings are invalid.
-    Side Effects:
-        Reads environment mapping and configures static/template runtime wiring.
-    """
+    """Build FastAPI web app with SSR templates, assets, auth gate, and API proxy."""
     effective_environ = os.environ if environ is None else environ
     runtime_settings = resolve_web_runtime_settings(environ=effective_environ)
 
@@ -83,143 +154,92 @@ def _register_routes(
     templates: Jinja2Templates,
     runtime_settings: WebRuntimeSettings,
 ) -> None:
-    """
-    Register all web routes for landing, auth UX, and protected skeleton pages.
-
-    Args:
-        app: FastAPI application instance.
-        templates: Template renderer for SSR pages.
-        runtime_settings: Validated runtime settings payload.
-    Returns:
-        None.
-    Assumptions:
-        API client is already attached to `app.state.current_user_api_client`.
-    Raises:
-        ValueError: If runtime settings are invalid.
-    Side Effects:
-        Adds HTTP routes to the FastAPI application.
-    """
-    _ = runtime_settings
+    """Register public shell, auth UX, protected placeholders, and `/api/*` proxy."""
 
     @app.get("/", response_class=HTMLResponse)
     def get_landing_page(request: Request) -> Response:
-        """
-        Render public landing page.
-
-        Args:
-            request: HTTP request object.
-        Returns:
-            Response: HTML landing page response.
-        Assumptions:
-            Landing route is always public and does not require auth checks.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return templates.TemplateResponse(
-            request,
-            "landing.html",
-            context=_build_template_context(
-                request=request,
-                page_path="/",
-                page_title="Roehub",
-                current_user=None,
-                error_message=None,
-            ),
+        return _render_public_page(
+            request=request,
+            templates=templates,
+            template_name="pages/landing.html",
+            page_path="/",
+            active_path="/",
+            title_key="landing.title",
+            open_login_modal=False,
         )
 
     @app.get("/favicon.ico", include_in_schema=False)
     def get_favicon() -> Response:
-        """
-        Return an empty favicon response so browser QA has no incidental 404 noise.
-        """
         return Response(status_code=204)
+
+    @app.get("/locale", include_in_schema=False)
+    def set_locale(
+        request: Request,
+        locale: str | None = None,
+        next: str | None = None,
+    ) -> Response:
+        selected_locale = normalize_locale(locale)
+        redirect_path = sanitize_next_path(raw_next=next)
+        response = RedirectResponse(url=redirect_path)
+        response.set_cookie(
+            key=LOCALE_COOKIE_NAME,
+            value=selected_locale,
+            max_age=60 * 60 * 24 * 365,
+            path="/",
+            secure=False,
+            httponly=False,
+            samesite="lax",
+        )
+        return response
 
     @app.get("/login", response_class=HTMLResponse)
     def get_login_page(request: Request, next: str | None = None) -> Response:
-        """
-        Render login page with OIDC redirect entrypoint and guarded next target.
-
-        Args:
-            request: HTTP request object.
-            next: Optional redirect target requested by caller.
-        Returns:
-            Response: HTML login page response.
-        Assumptions:
-            API endpoint `/api/auth/login` starts Keycloak OIDC authorization flow.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        safe_next_path = sanitize_next_path(raw_next=next)
-        login_query = urlencode({"next": safe_next_path})
-        context = _build_template_context(
+        return _render_public_page(
             request=request,
+            templates=templates,
+            template_name="pages/login.html",
             page_path="/login",
-            page_title="Login",
-            current_user=None,
-            error_message=None,
+            active_path="/",
+            title_key="auth.login_title",
+            open_login_modal=True,
+            auth_next_path=sanitize_next_path(raw_next=next),
         )
-        context["oidc_login_url"] = f"/api/auth/login?{login_query}"
-        return templates.TemplateResponse(request, "login.html", context=context)
 
     @app.get("/logout", response_class=HTMLResponse)
     def get_logout_page(request: Request, next: str | None = None) -> Response:
-        """
-        Render logout page that closes local session and redirects to safe target.
-
-        Args:
-            request: HTTP request object.
-            next: Optional post-logout redirect path requested by caller.
-        Returns:
-            Response: HTML logout page response.
-        Assumptions:
-            API endpoint `/api/auth/logout` clears opaque Roehub auth session cookie.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        post_logout_redirect_path = sanitize_next_path(
-            raw_next=next,
-            default_path="/login",
-        )
+        post_logout_redirect_path = sanitize_next_path(raw_next=next, default_path="/login")
         context = _build_template_context(
             request=request,
             page_path="/logout",
-            page_title="Logout",
+            active_path="/",
+            page_title_key="auth.logout",
             current_user=None,
             error_message=None,
+            auth_next_path=post_logout_redirect_path,
         )
         context["post_logout_redirect_path"] = post_logout_redirect_path
-        return templates.TemplateResponse(
-            request,
-            "logout.html",
-            context=context,
+        return templates.TemplateResponse(request, "pages/logout.html", context=context)
+
+    @app.get("/register", response_class=HTMLResponse)
+    def get_register_page(request: Request, next: str | None = None) -> Response:
+        safe_next_path = sanitize_next_path(raw_next=next, default_path="/dashboard")
+        context = _build_template_context(
+            request=request,
+            page_path="/register",
+            active_path="/",
+            page_title_key="auth.register_title",
+            current_user=None,
+            error_message=None,
+            auth_next_path=safe_next_path,
         )
+        context["register_entrypoint_url"] = _build_oidc_login_url(next_path=safe_next_path)
+        return templates.TemplateResponse(request, "pages/register.html", context=context)
 
     @app.api_route(
         "/api/{upstream_path:path}",
         methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
     )
     async def proxy_api_request(request: Request, upstream_path: str) -> Response:
-        """
-        Proxy same-origin browser API requests to configured upstream API runtime.
-
-        Args:
-            request: Incoming browser request addressed to `/api/*` on web origin.
-            upstream_path: API path segment without the `/api/` prefix.
-        Returns:
-            Response: Upstream API response mirrored back to browser.
-        Assumptions:
-            API upstream serves routes without `/api` prefix.
-        Raises:
-            None.
-        Side Effects:
-            Performs one outbound HTTP request to configured API upstream.
-        """
         upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_path}"
         request_body = await request.body()
         request_headers = _build_proxy_request_headers(request=request)
@@ -254,154 +274,125 @@ def _register_routes(
             proxied_response.headers.append(header_name, header_value)
         return proxied_response
 
-    @app.get("/strategies", response_class=HTMLResponse)
-    def get_strategies_page(request: Request) -> Response:
-        """
-        Render protected strategies list page behind current-user login gate.
-
-        Args:
-            request: HTTP request object.
-        Returns:
-            Response: HTML strategies page or login redirect response.
-        Assumptions:
-            Identity API determines current user via forwarded cookies.
-        Raises:
-            None.
-        Side Effects:
-            May perform server-side API request to `/api/auth/current-user`.
-        """
-        return _render_protected_page(
+    @app.get("/dashboard", response_class=HTMLResponse)
+    def get_dashboard_page(request: Request) -> Response:
+        return _render_protected_placeholder(
             request=request,
             templates=templates,
-            page_path="/strategies",
-            page_title="Strategies",
-            template_name="strategies_list.html",
+            page=_PROTECTED_PAGES["/dashboard"],
         )
 
-    @app.get("/backtests", response_class=HTMLResponse)
-    def get_backtests_page(request: Request) -> Response:
-        """
-        Render protected backtests page behind current-user login gate.
-
-        Args:
-            request: HTTP request object.
-        Returns:
-            Response: HTML backtests page or login redirect response.
-        Assumptions:
-            Browser-side code consumes the public Backtest API through `/api/*`.
-        Raises:
-            None.
-        Side Effects:
-            May perform server-side API request to `/api/auth/current-user`.
-        """
-        return _render_protected_page(
+    @app.get("/settings", response_class=HTMLResponse)
+    def get_settings_page(request: Request) -> Response:
+        return _render_protected_placeholder(
             request=request,
             templates=templates,
-            page_path="/backtests",
-            page_title="Backtests",
-            template_name="backtests.html",
+            page=_PROTECTED_PAGES["/settings"],
+        )
+
+    @app.get("/strategies", response_class=HTMLResponse)
+    def get_strategies_page(request: Request) -> Response:
+        return _render_protected_placeholder(
+            request=request,
+            templates=templates,
+            page=_PROTECTED_PAGES["/strategies"],
         )
 
     @app.get("/strategies/new", response_class=HTMLResponse)
     def get_new_strategy_page(request: Request) -> Response:
-        """
-        Render protected strategy creation builder page behind current-user login gate.
-
-        Args:
-            request: HTTP request object.
-        Returns:
-            Response: HTML strategy builder page or login redirect response.
-        Assumptions:
-            Identity API determines current user via forwarded cookies.
-        Raises:
-            None.
-        Side Effects:
-            May perform server-side API request to `/api/auth/current-user`.
-        """
-        return _render_protected_page(
+        return _render_protected_placeholder(
             request=request,
             templates=templates,
-            page_path="/strategies",
-            page_title="Create Strategy",
-            template_name="strategy_builder.html",
+            page=_PROTECTED_PAGES["/strategies/new"],
         )
 
     @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
     def get_strategy_details_page(request: Request, strategy_id: str) -> Response:
-        """
-        Render protected strategy details page behind current-user login gate.
-
-        Args:
-            request: HTTP request object.
-            strategy_id: Target strategy identifier string from route path.
-        Returns:
-            Response: HTML strategy details page or login redirect response.
-        Assumptions:
-            Identity API determines current user via forwarded cookies.
-        Raises:
-            None.
-        Side Effects:
-            May perform server-side API request to `/api/auth/current-user`.
-        """
-        return _render_protected_page(
+        return _render_protected_placeholder(
             request=request,
             templates=templates,
-            page_path="/strategies",
-            page_title="Strategy Details",
-            template_name="strategy_details.html",
+            page=_PROTECTED_PAGES["/strategies"],
             template_context={"strategy_id": strategy_id},
         )
 
-    @app.get("/_partial/user_badge", response_class=HTMLResponse)
-    def get_user_badge_partial(request: Request) -> Response:
-        """
-        Render HTMX partial snippet for authenticated user badge.
+    @app.get("/backtests", response_class=HTMLResponse)
+    def get_backtests_page(request: Request) -> Response:
+        return _render_protected_placeholder(
+            request=request,
+            templates=templates,
+            page=_PROTECTED_PAGES["/backtests"],
+        )
 
-        Args:
-            request: HTTP request object.
-        Returns:
-            Response: HTML badge snippet with status reflecting auth/API result.
-        Assumptions:
-            Endpoint is consumed by HTMX from protected SSR pages.
-        Raises:
-            None.
-        Side Effects:
-            Performs server-side identity API call for current user lookup.
-        """
-        api_client = _resolve_current_user_api_client(request=request)
-        api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
-        if api_result.status_code == 200 and api_result.user is not None:
-            return templates.TemplateResponse(
-                request,
-                "partials/user_badge.html",
-                context={"request": request, "current_user": api_result.user},
-            )
-        if api_result.status_code == 401:
-            return HTMLResponse(
-                status_code=401,
-                content='<span class="user-badge user-badge--guest">guest</span>',
-            )
-        return HTMLResponse(
-            status_code=502,
-            content='<span class="user-badge user-badge--error">api unavailable</span>',
+    @app.get("/backtests/new", response_class=HTMLResponse)
+    def get_new_backtest_page(request: Request) -> Response:
+        return _render_protected_placeholder(
+            request=request,
+            templates=templates,
+            page=_PROTECTED_PAGES["/backtests/new"],
+        )
+
+    @app.get("/backtests/{job_id}", response_class=HTMLResponse)
+    def get_backtest_deep_link(request: Request, job_id: str) -> Response:
+        return _render_protected_placeholder(
+            request=request,
+            templates=templates,
+            page=_PROTECTED_PAGES["/backtests"],
+            template_context={"job_id": job_id},
+        )
+
+    @app.get("/monitoring", response_class=HTMLResponse)
+    def get_monitoring_page(request: Request) -> Response:
+        return _render_protected_placeholder(
+            request=request,
+            templates=templates,
+            page=_PROTECTED_PAGES["/monitoring"],
         )
 
 
-def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClient:
-    """
-    Resolve server-side current-user API adapter from FastAPI application state.
+def _render_public_page(
+    *,
+    request: Request,
+    templates: Jinja2Templates,
+    template_name: str,
+    page_path: str,
+    active_path: str,
+    title_key: str,
+    open_login_modal: bool,
+    auth_next_path: str = "/dashboard",
+) -> Response:
+    context = _build_template_context(
+        request=request,
+        page_path=page_path,
+        active_path=active_path,
+        page_title_key=title_key,
+        current_user=None,
+        error_message=None,
+        auth_next_path=auth_next_path,
+    )
+    context["open_login_modal"] = open_login_modal
+    return templates.TemplateResponse(request, template_name, context=context)
 
-    Args:
-        request: HTTP request object.
-    Returns:
-        CurrentUserApiClient: Bound API adapter instance.
-    Assumptions:
-        `create_app` sets `app.state.current_user_api_client` at startup.
-    Raises:
-        ValueError: If API client is not configured in app state.
-    Side Effects:
-        None.
-    """
+
+def _render_protected_placeholder(
+    *,
+    request: Request,
+    templates: Jinja2Templates,
+    page: _ProtectedPage,
+    template_context: Mapping[str, Any] | None = None,
+) -> Response:
+    return _render_protected_page(
+        request=request,
+        templates=templates,
+        page_path=page.page_path,
+        active_path=page.active_path,
+        page_title_key=page.title_key,
+        page_description_key=page.description_key,
+        template_name="pages/placeholder.html",
+        template_context=template_context,
+    )
+
+
+def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClient:
     api_client = getattr(request.app.state, "current_user_api_client", None)
     if api_client is None:
         raise ValueError("current_user_api_client is not configured in application state")
@@ -409,20 +400,6 @@ def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClien
 
 
 def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:
-    """
-    Copy browser request headers for upstream API proxying.
-
-    Args:
-        request: Incoming browser request for `/api/*`.
-    Returns:
-        dict[str, str]: Forwarded header mapping without hop-by-hop transport headers.
-    Assumptions:
-        Browser cookies and content negotiation headers should be preserved verbatim.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
     forwarded_headers: dict[str, str] = {}
     for header_name, header_value in request.headers.items():
         if header_name.lower() in _HOP_BY_HOP_HEADERS:
@@ -436,31 +413,12 @@ def _render_protected_page(
     request: Request,
     templates: Jinja2Templates,
     page_path: str,
-    page_title: str,
-    page_description: str | None = None,
-    template_name: str = "protected_page.html",
+    active_path: str,
+    page_title_key: str,
+    page_description_key: str | None = None,
+    template_name: str = "pages/placeholder.html",
     template_context: Mapping[str, Any] | None = None,
 ) -> Response:
-    """
-    Enforce login gate and render protected page template with shared context.
-
-    Args:
-        request: HTTP request object.
-        templates: Jinja2 template renderer.
-        page_path: Canonical route path for navigation state.
-        page_title: Page title shown in rendered HTML document.
-        page_description: Optional description for skeleton-like templates.
-        template_name: Template file name to render after login gate passes.
-        template_context: Optional template-specific key-value context mapping.
-    Returns:
-        Response: Login redirect or rendered protected page response.
-    Assumptions:
-        Auth state comes exclusively from `/api/auth/current-user` response status.
-    Raises:
-        None.
-    Side Effects:
-        Performs server-side request to identity API.
-    """
     api_client = _resolve_current_user_api_client(request=request)
     api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
 
@@ -474,12 +432,17 @@ def _render_protected_page(
     context = _build_template_context(
         request=request,
         page_path=page_path,
-        page_title=page_title,
+        active_path=active_path,
+        page_title_key=page_title_key,
         current_user=current_user,
         error_message=error_message,
+        auth_next_path=page_path,
     )
-    if page_description is not None:
-        context["page_description"] = page_description
+    if page_description_key is not None:
+        context["page_description"] = translate(
+            locale=context["locale"],
+            key=page_description_key,
+        )
     if template_context is not None:
         context.update(template_context)
     return templates.TemplateResponse(
@@ -491,40 +454,12 @@ def _render_protected_page(
 
 
 def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
-    """
-    Build deterministic redirect response to `/login` with guarded `next` target.
-
-    Args:
-        current_path: Requested protected path.
-    Returns:
-        RedirectResponse: Redirect to login route with encoded safe next parameter.
-    Assumptions:
-        `current_path` originates from trusted server-side request routing.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
     safe_next_path = sanitize_next_path(raw_next=current_path)
     query = urlencode({"next": safe_next_path})
     return RedirectResponse(url=f"/login?{query}")
 
 
 def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:
-    """
-    Convert API lookup failure into human-readable SSR error banner message.
-
-    Args:
-        api_result: Current-user lookup result from internal API client.
-    Returns:
-        str | None: Error message suitable for UI banner or None when no error.
-    Assumptions:
-        Unauthorized responses are handled by redirect and never shown as error banners.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
     if api_result.status_code == 200:
         return None
     if api_result.status_code == 401:
@@ -538,32 +473,72 @@ def _build_template_context(
     *,
     request: Request,
     page_path: str,
-    page_title: str,
+    active_path: str,
+    page_title_key: str,
     current_user: WebCurrentUser | None,
     error_message: str | None,
+    auth_next_path: str,
 ) -> dict[str, Any]:
-    """
-    Build base template context shared by all SSR page handlers.
-
-    Args:
-        request: HTTP request object.
-        page_path: Current route path for navigation highlighting.
-        page_title: Human-readable page title.
-        current_user: Optional authenticated user summary for badge rendering.
-        error_message: Optional API/web error banner text.
-    Returns:
-        dict[str, Any]: Template context payload.
-    Assumptions:
-        Template names consume the same core keys across all pages.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
+    locale = resolve_locale(request=request)
+    current_browser_path = _build_current_browser_path(request=request)
+    page_title = translate(locale=locale, key=page_title_key)
+    safe_auth_next_path = sanitize_next_path(raw_next=auth_next_path)
     return {
         "request": request,
         "page_path": page_path,
+        "active_path": active_path,
         "page_title": page_title,
         "current_user": current_user,
         "error_message": error_message,
+        "locale": locale,
+        "default_locale": DEFAULT_LOCALE,
+        "supported_locales": SUPPORTED_LOCALES,
+        "t": lambda key: translate(locale=locale, key=key),
+        "nav_items": _build_nav_items(locale=locale, active_path=active_path),
+        "language_options": _build_language_options(
+            locale=locale,
+            current_browser_path=current_browser_path,
+        ),
+        "open_login_modal": False,
+        "auth_next_path": safe_auth_next_path,
+        "oidc_login_url": _build_oidc_login_url(next_path=safe_auth_next_path),
     }
+
+
+def _build_current_browser_path(*, request: Request) -> str:
+    if request.url.query:
+        return sanitize_next_path(raw_next=f"{request.url.path}?{request.url.query}")
+    return sanitize_next_path(raw_next=request.url.path)
+
+
+def _build_nav_items(*, locale: str, active_path: str) -> list[dict[str, str | bool]]:
+    return [
+        {
+            "key": item.key,
+            "label": translate(locale=locale, key=item.label_key),
+            "path": item.path,
+            "is_active": item.active_path == active_path,
+        }
+        for item in _NAV_ITEMS
+    ]
+
+
+def _build_language_options(
+    *,
+    locale: str,
+    current_browser_path: str,
+) -> list[dict[str, str | bool]]:
+    return [
+        {
+            "code": option,
+            "label": option.upper(),
+            "is_active": option == locale,
+            "url": f"/locale?{urlencode({'locale': option, 'next': current_browser_path})}",
+        }
+        for option in SUPPORTED_LOCALES
+    ]
+
+
+def _build_oidc_login_url(*, next_path: str) -> str:
+    safe_next_path = sanitize_next_path(raw_next=next_path)
+    return f"/api/auth/login?{urlencode({'next': safe_next_path})}"
