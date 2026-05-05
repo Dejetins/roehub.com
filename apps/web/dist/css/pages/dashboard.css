@@ -1,5 +1,4 @@
 .page-shell:has(.dashboard-workstation) {
-  width: 100%;
   min-height: 0;
   padding: 7px 8px 0;
 }
@@ -507,8 +506,6 @@
 .dashboard-status-line {
   flex-wrap: nowrap;
   overflow: visible;
-  width: calc(100% - 16px);
-  margin: 0 8px 8px;
 }
 
 .dashboard-status-actions {
@@ -517,6 +514,13 @@
   gap: 6px;
   margin-left: auto;
   overflow: visible;
+}
+
+.dashboard-status-line .rh-button {
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1;
 }
 
 .shell-status-panel > .dashboard-status-actions {

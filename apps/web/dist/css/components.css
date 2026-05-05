@@ -128,14 +128,6 @@
   background: linear-gradient(135deg, #050607 50%, #d4dde8 50%);
 }
 
-.rh-theme-option__swatch[data-theme-swatch="matrix-green"] {
-  background: linear-gradient(135deg, #010705 50%, #30dc6b 50%);
-}
-
-.rh-theme-option__swatch[data-theme-swatch="high-contrast"] {
-  background: linear-gradient(135deg, #000000 50%, #ffd166 50%);
-}
-
 .rh-panel,
 .rh-metric,
 .rh-empty,

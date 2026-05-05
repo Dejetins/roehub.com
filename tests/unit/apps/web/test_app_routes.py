@@ -322,7 +322,10 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "Strategy list" in response.text
     assert 'role="listbox"' in response.text
     assert "data-dashboard-refresh-preset" in response.text
-    assert "shell-status-panel app-bottom-status dashboard-status-line" in response.text
+    assert (
+        "shell-status-panel app-bottom-status shell-global-status dashboard-status-line"
+        in response.text
+    )
     assert "dashboard-workstation__command" not in response.text
     assert "dashboard-command-actions" not in response.text
     assert "dashboard-status-line" in response.text
@@ -424,9 +427,13 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert ".dashboard-cli-meter" in components_css
     assert "--rh-financial-positive" not in themes_css
     assert "--rh-financial-negative" not in themes_css
-    for theme in ["terminal-orange", "graphite", "matrix-green", "high-contrast"]:
+    for theme in ["terminal-orange", "graphite"]:
         assert theme in theme_js
         assert f'data-theme="{theme}"' in tokens_css or theme in themes_css
+    assert "matrix-green" not in theme_js
+    assert "high-contrast" not in theme_js
+    assert 'data-theme="matrix-green"' not in themes_css
+    assert 'data-theme="high-contrast"' not in themes_css
 
     for status in ["401", "403", "409", "422", "timeout"]:
         assert status in api_js

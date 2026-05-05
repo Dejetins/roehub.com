@@ -135,8 +135,6 @@ _PROTECTED_PAGES: dict[str, _ProtectedPage] = {
 _THEME_OPTIONS: tuple[dict[str, str], ...] = (
     {"key": "terminal-orange", "label_key": "theme.terminal_orange"},
     {"key": "graphite", "label_key": "theme.graphite"},
-    {"key": "matrix-green", "label_key": "theme.matrix_green"},
-    {"key": "high-contrast", "label_key": "theme.high_contrast"},
 )
 _REFRESH_PRESETS: tuple[dict[str, str], ...] = (
     {"key": "off", "label": "Off"},

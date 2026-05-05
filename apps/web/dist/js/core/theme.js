@@ -1,7 +1,7 @@
 import { dispatchRoehubEvent, qsa, setText } from "./dom.js";
 
 export const THEME_STORAGE_KEY = "roehub_theme";
-export const SUPPORTED_THEMES = ["terminal-orange", "graphite", "matrix-green", "high-contrast"];
+export const SUPPORTED_THEMES = ["terminal-orange", "graphite"];
 export const DEFAULT_THEME = "terminal-orange";
 
 export function normalizeTheme(value) {
