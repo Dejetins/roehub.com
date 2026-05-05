@@ -39,18 +39,14 @@
     </header>
 
     <div class="settings-grid">
-      <div class="settings-grid__left">
-        {% include "fragments/account/profile.html" %}
-        {% include "fragments/account/limits.html" %}
-        {% include "fragments/account/notifications.html" %}
-        {% include "fragments/account/sessions.html" %}
-      </div>
-      <div class="settings-grid__right">
-        {% include "fragments/account/exchange_keys.html" %}
-        {% include "fragments/account/integrations.html" %}
-        {% include "fragments/account/security.html" %}
-        {% include "fragments/account/audit.html" %}
-      </div>
+      {% include "fragments/account/profile.html" %}
+      {% include "fragments/account/exchange_keys.html" %}
+      {% include "fragments/account/limits.html" %}
+      {% include "fragments/account/integrations.html" %}
+      {% include "fragments/account/notifications.html" %}
+      {% include "fragments/account/security.html" %}
+      {% include "fragments/account/sessions.html" %}
+      {% include "fragments/account/audit.html" %}
     </div>
 
     {% include "fragments/account/status_bar.html" %}

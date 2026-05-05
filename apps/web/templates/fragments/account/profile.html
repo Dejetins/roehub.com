@@ -17,7 +17,7 @@
       <div><dt>{{ t("settings.profile.subscription") }}</dt><dd data-profile-subscription>{{ current_user.paid_level if current_user else "PRO" }}</dd></div>
     </dl>
   </div>
-  <form class="settings-form settings-form--inline" data-profile-form autocomplete="off">
+  <form class="settings-form settings-form--inline" data-profile-form hidden autocomplete="off">
     <input name="username" type="text" maxlength="80" aria-label="{{ t('settings.profile.username') }}" placeholder="quant_trader">
     <input name="email" type="email" maxlength="160" aria-label="{{ t('settings.profile.email') }}" placeholder="quant_trader@example.com">
     <input name="timezone" type="text" maxlength="80" aria-label="{{ t('settings.profile.timezone') }}" placeholder="Europe/Moscow">

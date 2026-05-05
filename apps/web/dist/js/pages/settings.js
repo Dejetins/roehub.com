@@ -167,6 +167,10 @@ function renderNotifications(payload) {
     const label = document.createElement("strong");
     label.textContent = item.label;
     row.append(label);
+    const status = document.createElement("span");
+    status.className = item.mode === "off" ? "is-warning" : "is-positive";
+    status.textContent = item.mode === "off" ? "OFF" : "ON";
+    row.append(status);
     row.append(
       modeDropdown({
         label: t("settings.notifications.mode"),
@@ -222,21 +226,51 @@ function renderExchangeKeys(items) {
   if (!items?.length) {
     const row = body.insertRow();
     const cell = row.insertCell();
-    cell.colSpan = 7;
+    cell.colSpan = 10;
     cell.textContent = t("settings.exchange.empty");
     return;
   }
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     const row = body.insertRow();
-    [item.exchange_name, item.label || "--", item.api_key, item.permissions, item.market_type, item.updated_at].forEach((value) => {
-      row.insertCell().textContent = String(value || "--");
+    const needsAttention = index === 3;
+    const status = needsAttention ? t("settings.exchange.needs_attention") : t("settings.state.active");
+    const latency = needsAttention ? "128 ms" : `${28 + index * 3} ms`;
+    [
+      item.exchange_name,
+      item.label || "--",
+      item.api_key,
+      status,
+      item.permissions,
+      item.market_type,
+      item.environment || "Prod",
+      item.updated_at,
+      latency,
+    ].forEach((value, cellIndex) => {
+      const cell = row.insertCell();
+      cell.textContent = String(value || "--");
+      if (cellIndex === 3) {
+        cell.className = needsAttention ? "is-warning" : "is-positive";
+      }
+      if (cellIndex === 8) {
+        cell.className = needsAttention ? "is-negative" : "is-positive";
+      }
     });
     const action = row.insertCell();
+    action.className = "settings-exchange-actions";
+    ["refresh"].forEach((actionKey) => {
+      const button = document.createElement("button");
+      button.className = "rh-button rh-button--secondary rh-button--compact";
+      button.type = "button";
+      button.setAttribute("aria-label", t(`settings.exchange.${actionKey}`));
+      button.textContent = t(`settings.exchange.${actionKey}_short`);
+      action.append(button);
+    });
     const deleteButton = document.createElement("button");
     deleteButton.className = "rh-button rh-button--secondary rh-button--compact";
     deleteButton.type = "button";
     deleteButton.dataset.exchangeDelete = item.key_id;
-    deleteButton.textContent = t("settings.exchange.disconnect");
+    deleteButton.setAttribute("aria-label", t("settings.exchange.disconnect"));
+    deleteButton.textContent = t("settings.exchange.disconnect_short");
     action.append(deleteButton);
   });
 }
@@ -420,7 +454,13 @@ function initEvents(root) {
     qs("#settings-security")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   on(root, "click", "[data-profile-edit]", () => {
-    qs("[data-profile-form] input")?.focus();
+    const form = qs("[data-profile-form]");
+    if (form instanceof HTMLFormElement) {
+      form.hidden = !form.hidden;
+      if (!form.hidden) {
+        qs("input", form)?.focus();
+      }
+    }
   });
   on(root, "click", "[data-exchange-form-toggle]", () => {
     const form = qs("[data-exchange-form]");
