@@ -99,9 +99,19 @@ function renderLimits(limits) {
   pairs.forEach(([key, used, max]) => {
     const meter = qs(`[data-limit-meter="${key}"]`);
     const value = qs(`[data-limit-value="${key}"]`);
-    if (meter instanceof HTMLMeterElement) {
-      meter.value = Number(used);
-      meter.max = Number(max);
+    const usedValue = Number(used);
+    const maxValue = Number(max);
+    if (meter instanceof HTMLElement) {
+      const filledCells = maxValue > 0 ? Math.max(0, Math.min(10, Math.round((usedValue / maxValue) * 10))) : 0;
+      meter.setAttribute("aria-valuemax", String(maxValue));
+      meter.setAttribute("aria-valuenow", String(usedValue));
+      meter.replaceChildren();
+      for (let index = 0; index < 10; index += 1) {
+        const cell = document.createElement("span");
+        cell.className = `settings-cli-meter__cell${index < filledCells ? " settings-cli-meter__cell--fill" : ""}`;
+        cell.setAttribute("aria-hidden", "true");
+        meter.append(cell);
+      }
     }
     if (value) value.textContent = `${used} / ${max}`;
   });
@@ -132,7 +142,20 @@ function renderIntegrations(payload) {
   const root = qs("[data-integrations-list]");
   if (!root) return;
   root.replaceChildren();
-  (payload?.items || []).forEach((item) => {
+  const byKey = new Map((payload?.items || []).map((item) => [item.integration_key, item]));
+  const requiredItems = [
+    ["telegram", "Telegram"],
+    ["discord", "Discord"],
+  ].map(([integrationKey, label]) => ({
+    integration_key: integrationKey,
+    label,
+    mode: "off",
+    status: "disconnected",
+    webhook_url_masked: null,
+    ...byKey.get(integrationKey),
+  }));
+  const extraItems = (payload?.items || []).filter((item) => !["telegram", "discord"].includes(item.integration_key));
+  [...requiredItems, ...extraItems].forEach((item) => {
     const row = document.createElement("div");
     row.className = "settings-list-row";
     row.dataset.integrationKey = item.integration_key;
@@ -143,6 +166,16 @@ function renderIntegrations(payload) {
     status.className = item.status === "connected" ? "is-positive" : "is-negative";
     status.textContent = item.status;
     row.append(status);
+    const connect = document.createElement("button");
+    connect.className = "rh-button rh-button--secondary rh-button--compact";
+    connect.type = "button";
+    connect.dataset.integrationConnect = item.integration_key;
+    connect.textContent =
+      item.status === "connected" ? t("settings.integrations.connected") : t("settings.integrations.connect");
+    if (item.status === "connected") {
+      connect.disabled = true;
+    }
+    row.append(connect);
     row.append(
       modeDropdown({
         label: t("settings.integrations.mode"),
@@ -409,6 +442,18 @@ function initEvents(root) {
     renderIntegrations(integrations);
     setStatus(t("settings.state.saved"), true);
   });
+  on(root, "click", "[data-integration-connect]", async (_event, item) => {
+    const integrationKey = item.dataset.integrationConnect;
+    if (!integrationKey) return;
+    await apiFetch(endpoint(root, "integrationsEndpoint"), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ integration_key: integrationKey, mode: "alerts", webhook_url: null }),
+    });
+    const integrations = await loadJson(endpoint(root, "integrationsEndpoint"), { items: [] });
+    renderIntegrations(integrations);
+    setStatus(t("settings.state.saved"), true);
+  });
   on(root, "click", "[data-notification-mode-option]", async (_event, item) => {
     const row = item.closest("[data-channel-key]");
     const channelKey = row?.dataset.channelKey;
@@ -449,9 +494,6 @@ function initEvents(root) {
       { items: [], next_cursor: null }
     );
     renderAudit(payload, true);
-  });
-  on(root, "click", "[data-security-focus]", () => {
-    qs("#settings-security")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   on(root, "click", "[data-profile-edit]", () => {
     const form = qs("[data-profile-form]");

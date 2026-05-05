@@ -1,6 +1,5 @@
 <section class="terminal-panel settings-panel" data-settings-panel="limits">
   <header class="panel-heading">
-    <span aria-hidden="true">&gt;_</span>
     <h2>{{ t("settings.limits.title") }}</h2>
   </header>
   <div class="settings-limits">
@@ -12,7 +11,18 @@
     ] %}
       <div class="settings-limit" data-limit-key="{{ item.key }}">
         <span>{{ t(item.label) }}</span>
-        <meter min="0" max="100" value="55" data-limit-meter="{{ item.key }}"></meter>
+        <span
+          class="settings-cli-meter"
+          role="meter"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="55"
+          data-limit-meter="{{ item.key }}"
+        >
+          {% for step in range(10) %}
+            <span class="settings-cli-meter__cell{% if step < 5 %} settings-cli-meter__cell--fill{% endif %}" aria-hidden="true"></span>
+          {% endfor %}
+        </span>
         <strong data-limit-value="{{ item.key }}">{{ item.value }}</strong>
       </div>
     {% endfor %}

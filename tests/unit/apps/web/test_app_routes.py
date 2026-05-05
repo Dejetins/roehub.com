@@ -219,6 +219,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-profile-endpoint="/api/ui/account/profile"' in settings_response.text
     assert 'data-preferences-endpoint="/api/ui/account/preferences"' in settings_response.text
     assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
+    assert '<div class="command-bar"' not in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
@@ -237,6 +238,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
         assert f'data-settings-panel="{panel}"' in settings_response.text
     assert 'role="listbox"' in settings_response.text
     assert '<select' not in settings_response.text
+    assert '<meter' not in settings_response.text
+    assert "settings-cli-meter" in settings_response.text
+    assert 'data-security-focus' not in settings_response.text
+    assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
 
 
 def test_authorized_placeholder_routes_render_active_navigation() -> None:
