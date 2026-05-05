@@ -1,0 +1,23 @@
+<section class="terminal-panel settings-panel" data-settings-panel="sessions">
+  <header class="panel-heading panel-heading--with-tools">
+    <span aria-hidden="true">&gt;_</span>
+    <h2>{{ t("settings.sessions.title") }}</h2>
+    <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-sessions-more>{{ t("settings.actions.more") }}</button>
+  </header>
+  <div class="settings-table-wrap">
+    <table class="settings-table settings-table--sessions">
+      <thead>
+        <tr>
+          <th>{{ t("settings.sessions.time") }}</th>
+          <th>{{ t("settings.sessions.ip") }}</th>
+          <th>{{ t("settings.sessions.device") }}</th>
+          <th>{{ t("settings.sessions.location") }}</th>
+          <th>{{ t("common.status") }}</th>
+        </tr>
+      </thead>
+      <tbody data-sessions-body>
+        <tr><td colspan="5">{{ t("settings.loading") }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

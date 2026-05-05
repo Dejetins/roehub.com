@@ -1,0 +1,21 @@
+<section class="terminal-panel settings-panel" data-settings-panel="audit">
+  <header class="panel-heading panel-heading--with-tools">
+    <span aria-hidden="true">&gt;_</span>
+    <h2>{{ t("settings.audit.title") }}</h2>
+    <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-audit-more>{{ t("settings.actions.more") }}</button>
+  </header>
+  <div class="settings-table-wrap">
+    <table class="settings-table">
+      <thead>
+        <tr>
+          <th>{{ t("settings.audit.time") }}</th>
+          <th>{{ t("settings.audit.event") }}</th>
+          <th>{{ t("settings.audit.details") }}</th>
+        </tr>
+      </thead>
+      <tbody data-audit-body>
+        <tr><td colspan="3">{{ t("settings.loading") }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -304,10 +304,14 @@ def _register_routes(
 
     @app.get("/settings", response_class=HTMLResponse)
     def get_settings_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/settings"],
+            page_path="/settings",
+            active_path="/settings",
+            page_title_key="page.settings.title",
+            page_description_key="page.settings.desc",
+            template_name="pages/settings.html",
         )
 
     @app.get("/strategies", response_class=HTMLResponse)

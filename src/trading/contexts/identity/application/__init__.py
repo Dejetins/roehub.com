@@ -1,4 +1,5 @@
 from .ports import (
+    AccountSettingsRepository,
     CurrentUser,
     CurrentUserPrincipal,
     CurrentUserUnauthorizedError,
@@ -10,6 +11,8 @@ from .ports import (
     UserRepository,
 )
 from .use_cases import (
+    AccountSettingsUseCase,
+    AccountSettingsValidationError,
     CreateExchangeKeyUseCase,
     DeleteExchangeKeyUseCase,
     ExchangeKeyAlreadyExistsError,
@@ -22,6 +25,9 @@ from .use_cases import (
 
 __all__ = [
     "CreateExchangeKeyUseCase",
+    "AccountSettingsRepository",
+    "AccountSettingsUseCase",
+    "AccountSettingsValidationError",
     "CurrentUser",
     "CurrentUserPrincipal",
     "CurrentUserUnauthorizedError",

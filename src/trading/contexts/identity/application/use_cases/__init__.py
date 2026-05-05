@@ -1,3 +1,4 @@
+from .account_settings import AccountSettingsUseCase, AccountSettingsValidationError
 from .create_exchange_key import CreateExchangeKeyUseCase
 from .delete_exchange_key import DeleteExchangeKeyUseCase
 from .exchange_keys_errors import (
@@ -11,6 +12,8 @@ from .list_exchange_keys import ListExchangeKeysUseCase
 
 __all__ = [
     "CreateExchangeKeyUseCase",
+    "AccountSettingsUseCase",
+    "AccountSettingsValidationError",
     "DeleteExchangeKeyUseCase",
     "ExchangeKeyAlreadyExistsError",
     "ExchangeKeyNotFoundError",

@@ -1,0 +1,341 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from apps.api.common import register_api_error_handlers
+from apps.api.routes.ui_account import build_ui_account_router
+from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
+    InMemoryAccountSettingsRepository,
+    InMemoryIdentitySessionRepository,
+    InMemoryIdentityUserRepository,
+)
+from trading.contexts.identity.adapters.outbound.security.current_user import (
+    RoehubSessionCurrentUser,
+)
+from trading.contexts.identity.application.ports.account_settings_repository import (
+    AccountSessionView,
+)
+from trading.contexts.identity.application.ports.clock import IdentityClock
+from trading.contexts.identity.application.use_cases.account_settings import (
+    AccountSettingsUseCase,
+)
+from trading.shared_kernel.primitives import UserId
+
+_SESSION_COOKIE_NAME = "roehub_session_id"
+
+
+class _MutableClock(IdentityClock):
+    def __init__(self, *, now_value: datetime) -> None:
+        self._now = now_value
+
+    def now(self) -> datetime:
+        return self._now
+
+
+def test_ui_account_routes_require_authenticated_user() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+    client.cookies.clear()
+
+    responses = [
+        client.get("/ui/account/profile"),
+        client.get("/ui/account/preferences"),
+        client.get("/ui/account/sessions"),
+        client.get("/ui/account/audit-events"),
+        client.put(
+            "/ui/account/preferences",
+            json={
+                "theme": "terminal-orange",
+                "locale": "en",
+                "density": "compact",
+                "autorefresh_preset": "15s",
+            },
+        ),
+    ]
+
+    for response in responses:
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "auth.required"
+
+
+def test_ui_account_profile_limits_integrations_and_notifications_contracts() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    profile = client.get("/ui/account/profile")
+    limits = client.get("/ui/account/limits")
+    integrations = client.get("/ui/account/integrations")
+    notifications = client.get("/ui/account/notifications")
+
+    assert profile.status_code == 200
+    assert profile.json()["username"] == "quant_trader"
+    assert profile.json()["locale"] == "en"
+    assert profile.json()["subscription_status"] == "free"
+    assert limits.status_code == 200
+    assert limits.json()["exchange_connections_limit"] == 10
+    assert integrations.status_code == 200
+    assert [item["integration_key"] for item in integrations.json()["items"]] == [
+        "telegram",
+        "discord",
+        "slack",
+    ]
+    assert notifications.status_code == 200
+    assert len(notifications.json()["items"]) == 7
+
+
+def test_ui_account_preferences_persist_locale_theme_autorefresh_and_write_audit() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    update = client.put(
+        "/ui/account/preferences",
+        json={
+            "theme": "matrix-green",
+            "locale": "ru",
+            "density": "comfortable",
+            "autorefresh_preset": "custom",
+            "refresh_interval_seconds": 45,
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert update.status_code == 200
+    payload = update.json()
+    assert payload["theme"] == "matrix-green"
+    assert payload["locale"] == "ru"
+    assert payload["autorefresh"]["preset_key"] == "custom"
+    assert payload["autorefresh"]["refresh_interval_seconds"] == 45
+
+    restored = client.get("/ui/account/preferences")
+    assert restored.status_code == 200
+    assert restored.json()["theme"] == "matrix-green"
+    assert restored.json()["locale"] == "ru"
+    assert restored.json()["autorefresh"]["refresh_interval_seconds"] == 45
+
+    audit = client.get("/ui/account/audit-events")
+    assert audit.status_code == 200
+    assert audit.json()["items"][0]["event_type"] == "preferences_updated"
+    assert audit.json()["items"][0]["metadata"]["locale"] == "ru"
+
+
+def test_ui_account_preferences_reject_unsupported_locale_and_too_low_interval() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    unsupported_locale = client.put(
+        "/ui/account/preferences",
+        json={
+            "theme": "terminal-orange",
+            "locale": "de",
+            "density": "compact",
+            "autorefresh_preset": "15s",
+        },
+    )
+    assert unsupported_locale.status_code == 422
+    assert unsupported_locale.json()["error"]["details"]["errors"][0] == {
+        "code": "unsupported_locale",
+        "message": "Unsupported locale preference.",
+        "path": "locale",
+    }
+
+    too_low_interval = client.put(
+        "/ui/account/preferences",
+        json={
+            "theme": "terminal-orange",
+            "locale": "en",
+            "density": "compact",
+            "autorefresh_preset": "custom",
+            "refresh_interval_seconds": 5,
+        },
+    )
+    assert too_low_interval.status_code == 422
+    assert too_low_interval.json()["error"]["details"]["errors"][0]["code"] == (
+        "autorefresh_interval_too_low"
+    )
+
+
+def test_ui_account_integrations_and_notifications_mutations_mask_webhook_and_audit() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    integration = client.put(
+        "/ui/account/integrations",
+        json={
+            "integration_key": "slack",
+            "mode": "alerts",
+            "webhook_url": "https://hooks.slack.test/services/T000/B000/SECRET",
+        },
+    )
+    assert integration.status_code == 200
+    assert integration.json()["status"] == "connected"
+    assert integration.json()["webhook_url_masked"] == "https://...CRET"
+    assert "SECRET" not in integration.text
+
+    notification = client.put(
+        "/ui/account/notifications",
+        json={"channel_key": "risk_alerts", "mode": "critical"},
+    )
+    assert notification.status_code == 200
+    assert notification.json()["mode"] == "critical"
+
+    audit = client.get("/ui/account/audit-events?limit=10")
+    event_types = [item["event_type"] for item in audit.json()["items"]]
+    assert event_types == ["notifications_updated", "integration_updated"]
+
+
+def test_ui_account_sessions_and_audit_are_owner_scoped_and_cursor_paginated() -> None:
+    client, account_repository, session_ids = _build_test_client()
+    account_repository.append_audit_event(
+        owner_user_id=session_ids["first_user_id"],
+        event_type="profile_updated",
+        summary="first user event 1",
+        metadata={},
+        created_at=datetime(2026, 2, 15, 14, 0, tzinfo=timezone.utc),
+    )
+    account_repository.append_audit_event(
+        owner_user_id=session_ids["first_user_id"],
+        event_type="preferences_updated",
+        summary="first user event 2",
+        metadata={},
+        created_at=datetime(2026, 2, 15, 15, 0, tzinfo=timezone.utc),
+    )
+    account_repository.append_audit_event(
+        owner_user_id=session_ids["second_user_id"],
+        event_type="profile_updated",
+        summary="foreign user event",
+        metadata={},
+        created_at=datetime(2026, 2, 15, 16, 0, tzinfo=timezone.utc),
+    )
+
+    first_page = client.get("/ui/account/audit-events?limit=1")
+    assert first_page.status_code == 200
+    assert first_page.json()["items"][0]["summary"] == "first user event 2"
+    assert first_page.json()["next_cursor"] == "1"
+
+    second_page = client.get(
+        f"/ui/account/audit-events?limit=1&cursor={first_page.json()['next_cursor']}"
+    )
+    assert second_page.status_code == 200
+    assert second_page.json()["items"][0]["summary"] == "first user event 1"
+    assert "foreign user event" not in second_page.text
+
+    sessions = client.get("/ui/account/sessions?limit=1")
+    assert sessions.status_code == 200
+    assert len(sessions.json()["items"]) == 1
+    assert sessions.json()["next_cursor"] == "1"
+
+
+def test_ui_account_mutations_reject_cross_origin_requests() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    response = client.put(
+        "/ui/account/profile",
+        json={"username": "quant_trader"},
+        headers={"origin": "https://evil.example"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["details"] == {"reason": "csrf_origin_mismatch"}
+
+
+def _build_test_client() -> tuple[
+    TestClient,
+    InMemoryAccountSettingsRepository,
+    dict[str, UserId],
+]:
+    now = datetime(2026, 2, 15, 13, 0, 0, tzinfo=timezone.utc)
+    clock = _MutableClock(now_value=now)
+    user_repository = InMemoryIdentityUserRepository()
+    session_repository = InMemoryIdentitySessionRepository()
+    account_repository = InMemoryAccountSettingsRepository()
+
+    first_user = user_repository.upsert_keycloak_login(
+        keycloak_subject="ui-account-user-1",
+        login_at=now,
+    )
+    second_user = user_repository.upsert_keycloak_login(
+        keycloak_subject="ui-account-user-2",
+        login_at=now,
+    )
+    first_session = session_repository.create_session(
+        user_id=first_user.user_id,
+        now=now,
+        idle_ttl_seconds=1800,
+        absolute_ttl_seconds=43200,
+    )
+    second_session = session_repository.create_session(
+        user_id=second_user.user_id,
+        now=now,
+        idle_ttl_seconds=1800,
+        absolute_ttl_seconds=43200,
+    )
+    account_repository.record_session(
+        session=AccountSessionView(
+            session_id=str(first_session.session_id),
+            owner_user_id=first_user.user_id,
+            created_at=now,
+            last_seen_at=now + timedelta(minutes=5),
+            idle_expires_at=first_session.idle_expires_at,
+            absolute_expires_at=first_session.absolute_expires_at,
+            revoked_at=None,
+            device="Chrome / macOS",
+            ip_address="185.67.23.118",
+            location="Moscow, RU",
+            is_current=True,
+        )
+    )
+    account_repository.record_session(
+        session=AccountSessionView(
+            session_id="older-session",
+            owner_user_id=first_user.user_id,
+            created_at=now,
+            last_seen_at=now,
+            idle_expires_at=first_session.idle_expires_at,
+            absolute_expires_at=first_session.absolute_expires_at,
+            revoked_at=None,
+            device="Safari / iOS",
+            ip_address="185.130.155.156",
+            location="Kiev, UA",
+            is_current=False,
+        )
+    )
+    account_repository.record_session(
+        session=AccountSessionView(
+            session_id=str(second_session.session_id),
+            owner_user_id=second_user.user_id,
+            created_at=now,
+            last_seen_at=now + timedelta(minutes=15),
+            idle_expires_at=second_session.idle_expires_at,
+            absolute_expires_at=second_session.absolute_expires_at,
+            revoked_at=None,
+            device="Foreign browser",
+            ip_address="203.0.113.10",
+            location="foreign",
+            is_current=True,
+        )
+    )
+
+    current_user_port = RoehubSessionCurrentUser(
+        session_repository=session_repository,
+        user_repository=user_repository,
+        clock=clock,
+    )
+    current_user_dependency = RequireCurrentUserDependency(
+        current_user=current_user_port,
+        cookie_name=_SESSION_COOKIE_NAME,
+    )
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+    app.include_router(
+        build_ui_account_router(
+            account_settings=AccountSettingsUseCase(
+                repository=account_repository,
+                clock=clock,
+            ),
+            current_user_dependency=current_user_dependency,
+        )
+    )
+    client = TestClient(app)
+    client.cookies.set(_SESSION_COOKIE_NAME, str(first_session.session_id))
+    return client, account_repository, {
+        "first_user_id": first_user.user_id,
+        "second_user_id": second_user.user_id,
+    }

@@ -1,0 +1,27 @@
+<section class="terminal-panel settings-panel settings-profile" data-settings-panel="profile">
+  <header class="panel-heading">
+    <span aria-hidden="true">&gt;_</span>
+    <h1>{{ t("settings.profile.title") }}</h1>
+    <span class="settings-status-dot settings-status-dot--ok" data-profile-status>{{ t("settings.state.active") }}</span>
+  </header>
+  <div class="settings-profile__body">
+    <div class="settings-avatar" aria-hidden="true">QT</div>
+    <dl class="settings-kv">
+      <div><dt>{{ t("settings.profile.username") }}</dt><dd data-profile-username>quant_trader</dd></div>
+      <div><dt>{{ t("settings.profile.email") }}</dt><dd data-profile-email>quant_trader@example.com</dd></div>
+      <div><dt>{{ t("settings.profile.user_id") }}</dt><dd data-profile-user-id>{{ current_user.user_id if current_user else "--" }}</dd></div>
+      <div><dt>{{ t("common.status") }}</dt><dd class="is-positive">{{ t("settings.state.active") }}</dd></div>
+      <div><dt>{{ t("settings.profile.timezone") }}</dt><dd data-profile-timezone>Europe/Moscow</dd></div>
+      <div><dt>{{ t("common.language") }}</dt><dd data-profile-locale>{{ locale }}</dd></div>
+      <div><dt>{{ t("settings.profile.contact") }}</dt><dd data-profile-contact>@quant_trader</dd></div>
+      <div><dt>{{ t("settings.profile.subscription") }}</dt><dd data-profile-subscription>{{ current_user.paid_level if current_user else "PRO" }}</dd></div>
+    </dl>
+  </div>
+  <form class="settings-form settings-form--inline" data-profile-form autocomplete="off">
+    <input name="username" type="text" maxlength="80" aria-label="{{ t('settings.profile.username') }}" placeholder="quant_trader">
+    <input name="email" type="email" maxlength="160" aria-label="{{ t('settings.profile.email') }}" placeholder="quant_trader@example.com">
+    <input name="timezone" type="text" maxlength="80" aria-label="{{ t('settings.profile.timezone') }}" placeholder="Europe/Moscow">
+    <input name="telegram_discord" type="text" maxlength="160" aria-label="{{ t('settings.profile.contact') }}" placeholder="@quant_trader">
+    <button class="rh-button rh-button--primary rh-button--compact" type="submit">{{ t("settings.actions.save") }}</button>
+  </form>
+</section>

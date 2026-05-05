@@ -1,0 +1,20 @@
+<section class="terminal-panel settings-panel" data-settings-panel="limits">
+  <header class="panel-heading">
+    <span aria-hidden="true">&gt;_</span>
+    <h2>{{ t("settings.limits.title") }}</h2>
+  </header>
+  <div class="settings-limits">
+    {% for item in [
+      {"key": "exchange_connections", "label": "settings.limits.exchanges", "value": "5 / 10"},
+      {"key": "api_keys", "label": "settings.limits.api_keys", "value": "7 / 10"},
+      {"key": "active_strategies", "label": "settings.limits.strategies", "value": "12 / 50"},
+      {"key": "webhook_events", "label": "settings.limits.webhooks", "value": "88 / 100"}
+    ] %}
+      <div class="settings-limit" data-limit-key="{{ item.key }}">
+        <span>{{ t(item.label) }}</span>
+        <meter min="0" max="100" value="55" data-limit-meter="{{ item.key }}"></meter>
+        <strong data-limit-value="{{ item.key }}">{{ item.value }}</strong>
+      </div>
+    {% endfor %}
+  </div>
+</section>

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="/assets/css/pages/settings.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="settings-workstation"
+    data-page="settings"
+    data-settings-root
+    data-profile-endpoint="/api/ui/account/profile"
+    data-limits-endpoint="/api/ui/account/limits"
+    data-integrations-endpoint="/api/ui/account/integrations"
+    data-notifications-endpoint="/api/ui/account/notifications"
+    data-preferences-endpoint="/api/ui/account/preferences"
+    data-sessions-endpoint="/api/ui/account/sessions"
+    data-audit-endpoint="/api/ui/account/audit-events"
+    data-exchange-keys-endpoint="/api/exchange-keys"
+    aria-label="{{ t('settings.aria') }}"
+  >
+    <header class="settings-command" data-settings-panel="command_bar">
+      <div class="settings-command__title">
+        <span aria-hidden="true">&gt;_</span>
+        <strong>{{ t("settings.command") }}</strong>
+        <span class="settings-pill settings-pill--ok" data-settings-save-state>{{ t("settings.state.ready") }}</span>
+      </div>
+      <div class="settings-command__actions" data-settings-panel="top_actions">
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-profile-edit>
+          {{ t("settings.actions.edit_profile") }}
+        </button>
+        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-save-all>
+          {{ t("settings.actions.save") }}
+        </button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-security-focus>
+          {{ t("settings.actions.security") }}
+        </button>
+      </div>
+    </header>
+
+    <div class="settings-grid">
+      <div class="settings-grid__left">
+        {% include "fragments/account/profile.html" %}
+        {% include "fragments/account/limits.html" %}
+        {% include "fragments/account/notifications.html" %}
+        {% include "fragments/account/sessions.html" %}
+      </div>
+      <div class="settings-grid__right">
+        {% include "fragments/account/exchange_keys.html" %}
+        {% include "fragments/account/integrations.html" %}
+        {% include "fragments/account/security.html" %}
+        {% include "fragments/account/audit.html" %}
+      </div>
+    </div>
+
+    {% include "fragments/account/status_bar.html" %}
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/settings.js"></script>
+{% endblock %}

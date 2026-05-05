@@ -125,6 +125,7 @@ def test_apply_identity_baseline_sql_skips_0003_and_0004_when_v2_layout_is_preex
         "0001_identity_v1.sql",
         "0002_identity_2fa_totp_v1.sql",
         "0005_identity_keycloak_cutover_v1.sql",
+        "0006_identity_account_settings_v1.sql",
     ]
 
 
@@ -202,4 +203,5 @@ def test_apply_identity_baseline_sql_runs_0003_and_guarded_0004_for_v1_flow(
         "0003_identity_exchange_keys_v1.sql",
         "0004_identity_exchange_keys_v2.sql",
         "0005_identity_keycloak_cutover_v1.sql",
+        "0006_identity_account_settings_v1.sql",
     ]

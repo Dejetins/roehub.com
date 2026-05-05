@@ -1,0 +1,55 @@
+<section class="terminal-panel settings-panel settings-exchange" data-settings-panel="exchange_keys">
+  <header class="panel-heading panel-heading--with-tools">
+    <span aria-hidden="true">&gt;_</span>
+    <h2>{{ t("settings.exchange.title") }}</h2>
+    <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-exchange-form-toggle>
+      {{ t("settings.exchange.add") }}
+    </button>
+  </header>
+  <form class="settings-exchange-form" data-exchange-form hidden autocomplete="off">
+    <div class="settings-form-grid">
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-name-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-name-menu" data-rh-dropdown-trigger>
+          {{ t("settings.exchange.exchange") }} <span class="rh-dropdown__value" data-exchange-name-current>binance</span>
+        </button>
+        <div class="rh-popover" id="exchange-name-menu" role="listbox" hidden data-rh-dropdown-menu>
+          <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="binance" data-exchange-name-option="binance">Binance</button>
+          <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="bybit" data-exchange-name-option="bybit">Bybit</button>
+        </div>
+      </div>
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-market-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-market-menu" data-rh-dropdown-trigger>
+          {{ t("settings.exchange.market") }} <span class="rh-dropdown__value" data-market-current>futures</span>
+        </button>
+        <div class="rh-popover" id="exchange-market-menu" role="listbox" hidden data-rh-dropdown-menu>
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="spot" data-market-option="spot">Spot</button>
+          <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="futures" data-market-option="futures">Futures</button>
+        </div>
+      </div>
+      <input name="label" type="text" maxlength="80" placeholder="main_binance" aria-label="{{ t('settings.exchange.account') }}">
+      <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
+      <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
+      <input name="passphrase" type="password" autocomplete="off" placeholder="Passphrase" aria-label="Passphrase">
+      <button class="rh-button rh-button--primary rh-button--compact" type="submit">{{ t("settings.exchange.add") }}</button>
+    </div>
+    <output class="settings-inline-status" data-exchange-form-status aria-live="polite"></output>
+  </form>
+  <div class="settings-table-wrap">
+    <table class="settings-table">
+      <thead>
+        <tr>
+          <th>{{ t("settings.exchange.exchange") }}</th>
+          <th>{{ t("settings.exchange.account") }}</th>
+          <th>API</th>
+          <th>{{ t("settings.exchange.permissions") }}</th>
+          <th>{{ t("settings.exchange.market") }}</th>
+          <th>{{ t("settings.exchange.updated") }}</th>
+          <th>{{ t("settings.exchange.actions") }}</th>
+        </tr>
+      </thead>
+      <tbody data-exchange-keys-body>
+        <tr><td colspan="7">{{ t("settings.loading") }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

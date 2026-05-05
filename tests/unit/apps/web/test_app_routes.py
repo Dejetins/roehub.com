@@ -207,23 +207,44 @@ def test_user_badge_partial_route_is_not_publicly_registered() -> None:
     assert response.status_code == 404
 
 
-def test_authorized_placeholder_routes_render_active_navigation() -> None:
+def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     client = _build_test_client()
 
     settings_response = client.get("/settings")
-    strategies_response = client.get("/strategies/new")
 
     assert settings_response.status_code == 200
-    assert 'data-page="protected-placeholder"' in settings_response.text
+    assert 'data-page="settings"' in settings_response.text
     assert 'data-nav-key="settings"' in settings_response.text
     assert 'nav-tab--active"' in settings_response.text
-    assert 'data-ui-kit-placeholder' in settings_response.text
-    assert 'data-refresh-control' in settings_response.text
-    assert 'data-refresh-preset="10s"' in settings_response.text
+    assert 'data-profile-endpoint="/api/ui/account/profile"' in settings_response.text
+    assert 'data-preferences-endpoint="/api/ui/account/preferences"' in settings_response.text
+    assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
+    assert "/assets/css/pages/settings.css" in settings_response.text
+    assert "/assets/js/pages/settings.js" in settings_response.text
+    for panel in [
+        "command_bar",
+        "profile",
+        "exchange_keys",
+        "limits",
+        "integrations",
+        "notifications",
+        "security",
+        "sessions",
+        "audit",
+        "top_actions",
+        "bottom_status",
+    ]:
+        assert f'data-settings-panel="{panel}"' in settings_response.text
     assert 'role="listbox"' in settings_response.text
-    assert 'role="combobox"' in settings_response.text
-    assert 'data-rh-combobox' in settings_response.text
     assert '<select' not in settings_response.text
+
+
+def test_authorized_placeholder_routes_render_active_navigation() -> None:
+    client = _build_test_client()
+
+    strategies_response = client.get("/strategies/new")
+
+    assert strategies_response.status_code == 200
     assert 'data-nav-key="strategies"' in strategies_response.text
     assert 'nav-tab--active"' in strategies_response.text
 
@@ -323,6 +344,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
         "dist/js/components/listbox.js",
         "dist/js/components/combobox.js",
         "dist/js/components/refresh-control.js",
+        "dist/js/pages/settings.js",
+        "dist/css/pages/settings.css",
     ]
 
     for asset in expected_assets:

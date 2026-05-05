@@ -1,0 +1,58 @@
+<section class="terminal-panel settings-panel" id="settings-security" data-settings-panel="security">
+  <header class="panel-heading">
+    <span aria-hidden="true">&gt;_</span>
+    <h2>{{ t("settings.security.title") }}</h2>
+  </header>
+  <dl class="settings-kv settings-kv--two">
+    <div><dt>{{ t("settings.security.two_factor") }}</dt><dd class="is-positive">{{ t("settings.state.enabled") }}</dd></div>
+    <div><dt>{{ t("settings.security.password") }}</dt><dd>{{ t("settings.security.updated") }}</dd></div>
+    <div><dt>{{ t("settings.security.sessions") }}</dt><dd class="is-warning">2 {{ t("settings.state.active") }}</dd></div>
+    <div><dt>{{ t("settings.security.allowlist") }}</dt><dd class="is-positive">{{ t("settings.state.active") }}</dd></div>
+    <div><dt>{{ t("settings.security.last_login") }}</dt><dd>185.67.23.118</dd></div>
+    <div><dt>{{ t("settings.security.api_password") }}</dt><dd>2024-05-21 19:21:44</dd></div>
+  </dl>
+  <section class="settings-preferences" data-settings-panel="preferences">
+    <h3>{{ t("settings.preferences.title") }}</h3>
+    <div class="settings-preference-grid">
+      {% for control in [
+        {"id": "settings-theme", "label": "theme.label", "value": "terminal-orange", "items": theme_options, "attr": "data-settings-theme-option"},
+      ] %}
+        <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+          <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="{{ control.id }}-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ control.id }}-menu" data-rh-dropdown-trigger>
+            {{ t(control.label) }} <span class="rh-dropdown__value" data-settings-theme-current>{{ control.value }}</span>
+          </button>
+          <div class="rh-popover" id="{{ control.id }}-menu" role="listbox" hidden data-rh-dropdown-menu>
+            {% for theme in control["items"] %}
+              <button class="rh-menu-item rh-theme-option" type="button" role="option" data-rh-dropdown-item="{{ theme.key }}" data-settings-theme-option="{{ theme.key }}">
+                <span class="rh-theme-option__swatch" data-theme-swatch="{{ theme.key }}" aria-hidden="true"></span>
+                <span>{{ t(theme.label_key) }}</span>
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="settings-locale-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="settings-locale-menu" data-rh-dropdown-trigger>
+          {{ t("common.language") }} <span class="rh-dropdown__value" data-settings-locale-current>{{ locale|upper }}</span>
+        </button>
+        <div class="rh-popover" id="settings-locale-menu" role="listbox" hidden data-rh-dropdown-menu>
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="en" data-settings-locale-option="en">EN</button>
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="ru" data-settings-locale-option="ru">RU</button>
+        </div>
+      </div>
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="settings-refresh-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="settings-refresh-menu" data-rh-dropdown-trigger>
+          {{ t("refresh.autorefresh") }} <span class="rh-dropdown__value" data-settings-refresh-current>15s</span>
+        </button>
+        <div class="rh-popover" id="settings-refresh-menu" role="listbox" hidden data-rh-dropdown-menu>
+          {% for preset in refresh_presets %}
+            <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="{{ preset.key }}" data-settings-refresh-option="{{ preset.key }}">{{ preset.label }}</button>
+          {% endfor %}
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="custom" data-settings-refresh-option="custom">Custom</button>
+        </div>
+      </div>
+      <input class="settings-custom-interval" type="number" min="10" max="1800" step="5" value="45" data-settings-custom-interval aria-label="{{ t('settings.preferences.custom_interval') }}">
+    </div>
+    <output class="settings-inline-status" data-preferences-status aria-live="polite"></output>
+  </section>
+</section>

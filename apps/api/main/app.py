@@ -21,6 +21,7 @@ from apps.api.wiring.modules import (
     build_indicators_registry,
     build_market_data_reference_router,
     build_strategy_router,
+    build_ui_account_router,
     build_ui_dashboard_router,
     is_strategy_api_enabled,
 )
@@ -94,6 +95,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     )
     app.include_router(
         build_backtests_router(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
+        )
+    )
+    app.include_router(
+        build_ui_account_router(
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
         )
