@@ -213,15 +213,6 @@ function renderSelected(root, snapshot) {
   setText("[data-selected-leverage]", snapshot?.leverage || t("common.unavailable"), root);
   setText("[data-selected-updated]", localTime(snapshot?.latest_update), root);
   setText("[data-selected-status]", snapshot?.status || t("dashboard.status.unknown"), root);
-  qsa("[data-selected-action]", root).forEach((button) => {
-    const action = button.dataset.selectedAction;
-    const enabledByAction = {
-      stop: snapshot?.actions?.can_stop,
-      restart: snapshot?.actions?.can_restart,
-      settings: snapshot?.actions?.can_open_settings,
-    };
-    button.disabled = !enabledByAction[action];
-  });
 }
 
 function renderChart(root, series) {
@@ -331,7 +322,7 @@ function renderHealth(root, healthRisk) {
     target.innerHTML = `<div class="dashboard-empty-block">${escapeHtml(panelStatusText(healthRisk?.state, healthRisk?.degradation_reason))}</div>`;
     return;
   }
-  target.innerHTML = checks
+  target.innerHTML = checks.slice(0, 4)
     .map((check) => `
       <div class="dashboard-health-row">
         <span>${escapeHtml(check.label)}</span>

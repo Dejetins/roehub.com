@@ -255,6 +255,7 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "Strategy list" in response.text
     assert 'role="listbox"' in response.text
     assert "data-dashboard-refresh-preset" in response.text
+    assert "data-selected-action" not in response.text
     assert "<select" not in response.text
 
 
@@ -360,5 +361,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "createPoller" in dashboard_js
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
+    assert "data-selected-action" not in dashboard_js
+    assert ".command-bar" in dashboard_css
+    assert "display: none" in dashboard_css
     assert "--rh-financial-positive" in dashboard_css
     assert "--rh-financial-negative" in dashboard_css
