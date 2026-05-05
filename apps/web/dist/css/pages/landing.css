@@ -15,9 +15,8 @@
 }
 
 .page-shell:has(.landing-page) {
-  width: 100%;
-  height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - var(--rh-space-3));
-  padding: var(--rh-space-5) var(--rh-space-5) var(--rh-space-3);
+  height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - 18px);
+  padding: 7px 8px 0;
   overflow: hidden;
 }
 

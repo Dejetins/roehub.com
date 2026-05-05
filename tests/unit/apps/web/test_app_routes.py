@@ -110,6 +110,9 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert "&gt;_ ROEHUB WEB" not in response.text
     assert '<div class="command-bar"' not in response.text
     assert 'data-shell-status-bar' in response.text
+    assert "WEB SSR:" not in response.text
+    assert "Account:" not in response.text
+    assert "Mode:" not in response.text
     assert '<span class="user-badge__value">Authentication required</span>' not in response.text
     assert 'id="theme-switcher-trigger"' in response.text
     assert 'data-theme-value="terminal-orange"' in response.text
@@ -258,6 +261,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert '<div class="command-bar"' not in settings_response.text
     assert '<footer class="status-bar">' not in settings_response.text
     assert "shell-status-panel app-bottom-status shell-global-status" in settings_response.text
+    assert "WEB SSR:" not in settings_response.text
+    assert "Account:" not in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
@@ -329,6 +334,12 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "dashboard-workstation__command" not in response.text
     assert "dashboard-command-actions" not in response.text
     assert "dashboard-status-line" in response.text
+    assert 'data-dashboard-loading hidden aria-hidden="true"' in response.text
+    assert "<span>Loading dashboard summary</span>" not in response.text
+    assert "data-footer-account" not in response.text
+    assert "data-footer-mode" not in response.text
+    assert "WEB SSR:" not in response.text
+    assert "Account:" not in response.text
     assert "dashboard-pagination" not in response.text
     assert "dashboard-page-button" not in response.text
     assert '<footer class="status-bar">' not in response.text

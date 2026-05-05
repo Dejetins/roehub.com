@@ -124,6 +124,10 @@
   background: linear-gradient(135deg, var(--rh-bg) 50%, var(--rh-accent) 50%);
 }
 
+.rh-theme-option__swatch[data-theme-swatch="terminal-orange"] {
+  background: linear-gradient(135deg, #020607 50%, #ff7a00 50%);
+}
+
 .rh-theme-option__swatch[data-theme-swatch="graphite"] {
   background: linear-gradient(135deg, #050607 50%, #d4dde8 50%);
 }

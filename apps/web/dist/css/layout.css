@@ -9,9 +9,10 @@
   position: fixed;
   inset: 0 0 auto;
   z-index: 20;
-  display: grid;
-  grid-template-columns: minmax(132px, auto) 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  gap: var(--rh-space-2);
   min-height: var(--rh-header-height);
   padding-inline: var(--rh-space-4);
   border-bottom: 1px solid var(--rh-divider);
@@ -29,6 +30,8 @@
 }
 
 .brand {
+  position: absolute;
+  inset-inline-start: var(--rh-space-4);
   gap: var(--rh-space-2);
   min-width: 0;
   color: var(--rh-text-strong);
@@ -43,11 +46,11 @@
   justify-content: center;
   gap: var(--rh-space-2);
   min-width: 0;
-  padding-inline: var(--rh-space-3);
+  padding-inline: 0;
 }
 
 .header-controls {
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: var(--rh-space-2);
   min-width: 0;
 }
@@ -102,9 +105,14 @@
 
 @media (max-width: 860px) {
   .app-header {
+    display: grid;
     grid-template-columns: 1fr;
     gap: var(--rh-space-2);
     padding-block: var(--rh-space-2);
+  }
+
+  .brand {
+    position: static;
   }
 
   .app-shell {

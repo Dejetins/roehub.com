@@ -416,8 +416,6 @@ function renderStrategyList(root, strategyList) {
 
 function renderFooter(root, footer) {
   setText("[data-footer-system]", footer?.system_status || "--", root);
-  setText("[data-footer-account]", footer?.account_tier || "--", root);
-  setText("[data-footer-mode]", footer?.mode || "--", root);
   setText("[data-footer-api]", footer?.api_label || "--", root);
   setText("[data-footer-latency]", footer?.latency_ms ? `${footer.latency_ms} ms` : "--", root);
   setText("[data-footer-time]", localTime(footer?.server_time), root);
@@ -468,7 +466,6 @@ function renderSummary(root, summary) {
 function initDashboard(root) {
   const endpoint = root.dataset.summaryEndpoint || SUMMARY_ENDPOINT;
   const refreshButton = qs("[data-dashboard-refresh]", document);
-  const loading = qs("[data-dashboard-loading]", root);
   let activeRequest = null;
   let poller = null;
   let delayedStart = null;
@@ -477,9 +474,6 @@ function initDashboard(root) {
   function setRunning(isRunning) {
     if (refreshButton instanceof HTMLButtonElement) {
       refreshButton.disabled = isRunning;
-    }
-    if (loading) {
-      loading.hidden = !isRunning && Boolean(lastSummary);
     }
   }
 

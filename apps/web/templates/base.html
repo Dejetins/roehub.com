@@ -65,9 +65,6 @@
 
       {% block status_bar %}
         <footer class="shell-status-panel app-bottom-status shell-global-status" data-shell-status-bar>
-          <span>{{ t("shell.service") }}: <strong>{{ t("shell.ready") }}</strong></span>
-          <span>{{ t("dashboard.footer.account") }}: <strong data-status-account>{{ current_user.paid_level|upper if current_user else t("common.guest") }}</strong></span>
-          <span>{{ t("dashboard.footer.mode") }}: <strong>SSR</strong></span>
           <span>{{ t("dashboard.footer.api") }}: <strong>Prod</strong></span>
           <span>{{ t("dashboard.footer.latency") }}: <strong>--</strong></span>
           <span>{{ t("dashboard.footer.server_time") }}: <strong>--</strong></span>
