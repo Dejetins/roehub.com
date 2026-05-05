@@ -292,10 +292,14 @@ def _register_routes(
 
     @app.get("/dashboard", response_class=HTMLResponse)
     def get_dashboard_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/dashboard"],
+            page_path="/dashboard",
+            active_path="/dashboard",
+            page_title_key="page.dashboard.title",
+            page_description_key="page.dashboard.desc",
+            template_name="pages/dashboard.html",
         )
 
     @app.get("/settings", response_class=HTMLResponse)

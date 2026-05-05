@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="/assets/css/pages/dashboard.css">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="dashboard-workstation"
+    data-page="dashboard"
+    data-dashboard-root
+    data-summary-endpoint="/api/ui/dashboard/summary"
+    aria-label="{{ t('dashboard.aria') }}"
+  >
+    <header class="dashboard-workstation__command">
+      <div class="dashboard-command-title">
+        <span aria-hidden="true">&gt;_</span>
+        <strong>{{ t("dashboard.command") }}</strong>
+        <span class="dashboard-pill" data-dashboard-refresh-status>{{ t("refresh.idle") }}</span>
+      </div>
+      <div class="dashboard-command-actions" data-dashboard-refresh-control>
+        <button
+          class="rh-button rh-button--primary rh-button--compact"
+          type="button"
+          data-dashboard-refresh
+        >{{ t("refresh.manual") }}</button>
+        <div class="rh-dropdown dashboard-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+          <button
+            class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+            type="button"
+            id="dashboard-refresh-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="dashboard-refresh-menu"
+            data-rh-dropdown-trigger
+          >
+            {{ t("refresh.autorefresh") }}
+            <span class="rh-dropdown__value" data-dashboard-refresh-current>15s</span>
+          </button>
+          <div
+            class="rh-popover"
+            id="dashboard-refresh-menu"
+            role="listbox"
+            aria-labelledby="dashboard-refresh-trigger"
+            hidden
+            data-rh-dropdown-menu
+          >
+            {% for preset in refresh_presets %}
+              <button
+                class="rh-menu-item"
+                type="button"
+                role="option"
+                aria-selected="{{ 'true' if preset.key == '15s' else 'false' }}"
+                data-rh-dropdown-item="{{ preset.key }}"
+                data-dashboard-refresh-preset="{{ preset.key }}"
+              >{{ preset.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+        <output class="dashboard-freshness" data-dashboard-freshness aria-live="polite">
+          {{ t("dashboard.awaiting_data") }}
+        </output>
+      </div>
+    </header>
+
+    {% include "fragments/dashboard/loading_state.html" %}
+
+    <div class="dashboard-grid">
+      <section class="dashboard-main">
+        <section class="terminal-panel dashboard-selected" data-dashboard-panel="selected_strategy_snapshot">
+          <header class="panel-heading">
+            <span aria-hidden="true">&gt;_</span>
+            <h1>{{ t("dashboard.selected.title") }}</h1>
+            <span class="dashboard-pill" data-selected-status>{{ t("dashboard.status.unknown") }}</span>
+          </header>
+          <div class="dashboard-selected__body">
+            <dl class="dashboard-kv dashboard-kv--split">
+              <div><dt>{{ t("dashboard.selected.strategy") }}</dt><dd data-selected-name>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.version") }}</dt><dd data-selected-version>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.exchange") }}</dt><dd data-selected-exchange>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.symbols") }}</dt><dd data-selected-symbols>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.timeframe") }}</dt><dd data-selected-timeframe>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.mode") }}</dt><dd data-selected-mode>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.capital") }}</dt><dd data-selected-capital>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.leverage") }}</dt><dd data-selected-leverage>--</dd></div>
+              <div><dt>{{ t("dashboard.selected.updated") }}</dt><dd data-selected-updated>--</dd></div>
+            </dl>
+            <div class="dashboard-selected__actions" aria-label="{{ t('dashboard.selected.actions') }}">
+              <button class="rh-button rh-button--primary" type="button" data-selected-action="stop" disabled>
+                {{ t("dashboard.action.stop") }}
+              </button>
+              <button class="rh-button rh-button--secondary" type="button" data-selected-action="restart" disabled>
+                {{ t("dashboard.action.restart") }}
+              </button>
+              <button class="rh-button rh-button--secondary" type="button" data-selected-action="settings" disabled>
+                {{ t("dashboard.action.settings") }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-chart-row">
+          <section class="terminal-panel dashboard-chart-panel" data-dashboard-panel="equity_pnl_series">
+            <header class="panel-heading panel-heading--with-tools">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.chart.title") }}</h2>
+              <div class="dashboard-segments" aria-label="{{ t('dashboard.chart.range') }}">
+                <button class="dashboard-segment" type="button">1H</button>
+                <button class="dashboard-segment" type="button">6H</button>
+                <button class="dashboard-segment dashboard-segment--active" type="button">1D</button>
+                <span class="dashboard-live-indicator">LIVE</span>
+              </div>
+            </header>
+            <div class="dashboard-chart-wrap">
+              <svg
+                class="dashboard-chart"
+                viewBox="0 0 720 250"
+                role="img"
+                aria-label="{{ t('dashboard.chart.title') }}"
+                data-dashboard-chart
+              ></svg>
+              <div class="dashboard-panel-state" data-chart-state></div>
+            </div>
+            <div class="dashboard-chart-legend">
+              <span class="legend-line legend-line--equity">{{ t("dashboard.chart.equity") }}</span>
+              <span class="legend-line legend-line--pnl">{{ t("dashboard.chart.pnl") }}</span>
+              <span class="legend-marker legend-marker--buy">{{ t("dashboard.chart.buy") }}</span>
+              <span class="legend-marker legend-marker--sell">{{ t("dashboard.chart.sell") }}</span>
+            </div>
+          </section>
+
+          <section class="terminal-panel dashboard-metrics" data-dashboard-panel="metric_grid">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.metrics.title") }}</h2>
+            </header>
+            <div class="dashboard-metric-grid" data-dashboard-metrics></div>
+          </section>
+        </div>
+
+        <div class="dashboard-table-row">
+          <section class="terminal-panel" data-dashboard-panel="open_positions">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.positions.title") }}</h2>
+            </header>
+            <div class="dashboard-table-wrap">
+              <table class="dashboard-table">
+                <thead>
+                  <tr>
+                    <th>{{ t("dashboard.positions.symbol") }}</th>
+                    <th>{{ t("dashboard.positions.side") }}</th>
+                    <th>{{ t("dashboard.positions.entry") }}</th>
+                    <th>{{ t("dashboard.positions.mark") }}</th>
+                    <th>{{ t("dashboard.positions.pnl") }}</th>
+                    <th>{{ t("dashboard.positions.roe") }}</th>
+                    <th>{{ t("dashboard.positions.leverage") }}</th>
+                    <th>{{ t("dashboard.positions.opened") }}</th>
+                    <th>{{ t("dashboard.positions.action") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-open-positions></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="terminal-panel" data-dashboard-panel="recent_executions">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.executions.title") }}</h2>
+            </header>
+            <div class="dashboard-table-wrap">
+              <table class="dashboard-table">
+                <thead>
+                  <tr>
+                    <th>{{ t("dashboard.executions.time") }}</th>
+                    <th>{{ t("dashboard.executions.symbol") }}</th>
+                    <th>{{ t("dashboard.executions.side") }}</th>
+                    <th>{{ t("dashboard.executions.price") }}</th>
+                    <th>{{ t("dashboard.executions.qty") }}</th>
+                    <th>{{ t("dashboard.executions.fee") }}</th>
+                    <th>{{ t("dashboard.executions.pnl") }}</th>
+                    <th>{{ t("dashboard.executions.reason") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-recent-executions></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="dashboard-bottom-row">
+          <section class="terminal-panel dashboard-health" data-dashboard-panel="health_risk">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.health.title") }}</h2>
+            </header>
+            <div class="dashboard-health-list" data-health-risk></div>
+          </section>
+
+          <section class="terminal-panel dashboard-alerts" data-dashboard-panel="alerts">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.alerts.title") }}</h2>
+            </header>
+            <div class="dashboard-alert-list" data-alerts></div>
+          </section>
+
+          <section class="terminal-panel dashboard-allocation" data-dashboard-panel="symbol_allocation">
+            <header class="panel-heading">
+              <span aria-hidden="true">&gt;_</span>
+              <h2>{{ t("dashboard.allocation.title") }}</h2>
+            </header>
+            <div class="dashboard-allocation-list" data-symbol-allocation></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="terminal-panel dashboard-strategy-list" data-dashboard-panel="strategy_list">
+        <header class="panel-heading">
+          <span aria-hidden="true">&gt;_</span>
+          <h2>{{ t("dashboard.strategy_list.title") }}</h2>
+        </header>
+        <div class="dashboard-list-controls">
+          <div class="dashboard-tabs" role="tablist" aria-label="{{ t('dashboard.strategy_list.tabs') }}">
+            <button class="dashboard-tab dashboard-tab--active" type="button" role="tab" aria-selected="true">
+              {{ t("dashboard.strategy_list.running") }}
+            </button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false">
+              {{ t("dashboard.strategy_list.stopped") }}
+            </button>
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false">
+              {{ t("dashboard.strategy_list.degraded") }}
+            </button>
+          </div>
+          <input
+            class="dashboard-search"
+            type="search"
+            data-strategy-search
+            aria-label="{{ t('dashboard.strategy_list.search') }}"
+            placeholder="{{ t('dashboard.strategy_list.search') }}"
+          >
+          <div class="dashboard-filter-line">
+            <div class="rh-dropdown dashboard-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="dashboard-exchange-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="dashboard-exchange-menu"
+                data-rh-dropdown-trigger
+              >
+                {{ t("dashboard.strategy_list.exchange") }}
+                <span class="rh-dropdown__value" data-exchange-current>{{ t("common.unavailable") }}</span>
+              </button>
+              <div class="rh-popover" id="dashboard-exchange-menu" role="listbox" hidden data-rh-dropdown-menu>
+                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="all">
+                  {{ t("dashboard.strategy_list.all") }}
+                </button>
+              </div>
+            </div>
+            <div class="rh-dropdown dashboard-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="dashboard-sort-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="dashboard-sort-menu"
+                data-rh-dropdown-trigger
+              >
+                {{ t("dashboard.strategy_list.sort") }}
+                <span class="rh-dropdown__value" data-sort-current>activity</span>
+              </button>
+              <div class="rh-popover" id="dashboard-sort-menu" role="listbox" hidden data-rh-dropdown-menu>
+                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="activity">
+                  {{ t("dashboard.strategy_list.sort_activity") }}
+                </button>
+                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="pnl">
+                  {{ t("dashboard.strategy_list.sort_pnl") }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dashboard-totals" data-strategy-totals></div>
+        <div class="dashboard-strategy-rows" data-strategy-rows></div>
+        <footer class="dashboard-pagination">
+          <button class="dashboard-page-button" type="button" disabled>&lt;</button>
+          <span>1</span>
+          <button class="dashboard-page-button" type="button" disabled>&gt;</button>
+        </footer>
+      </aside>
+    </div>
+
+    <footer class="dashboard-status-line" data-dashboard-footer-status>
+      <span>{{ t("common.status") }}: <strong data-footer-system>--</strong></span>
+      <span>{{ t("dashboard.footer.account") }}: <strong data-footer-account>--</strong></span>
+      <span>{{ t("dashboard.footer.mode") }}: <strong data-footer-mode>--</strong></span>
+      <span>{{ t("dashboard.footer.api") }}: <strong data-footer-api>--</strong></span>
+      <span>{{ t("dashboard.footer.latency") }}: <strong data-footer-latency>--</strong></span>
+      <span>{{ t("dashboard.footer.server_time") }}: <strong data-footer-time>--</strong></span>
+    </footer>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/pages/dashboard.js"></script>
+{% endblock %}

@@ -57,6 +57,21 @@ from .market_data_reference import (
     build_market_data_instruments_response,
     build_market_data_markets_response,
 )
+from .ui_dashboard import (
+    DashboardAlertsResponse,
+    DashboardEquityPnlSeriesResponse,
+    DashboardExecutionsResponse,
+    DashboardFooterStatusResponse,
+    DashboardHealthRiskResponse,
+    DashboardMetricResponse,
+    DashboardPositionsResponse,
+    DashboardRefreshControlResponse,
+    DashboardSelectedStrategySnapshotResponse,
+    DashboardSourceResponse,
+    DashboardStrategyListResponse,
+    DashboardSummaryResponse,
+    DashboardSymbolAllocationResponse,
+)
 
 __all__ = [
     "BacktestPreflightResponse",
@@ -112,4 +127,17 @@ __all__ = [
     "MarketDataInstrumentsResponse",
     "build_market_data_markets_response",
     "build_market_data_instruments_response",
+    "DashboardAlertsResponse",
+    "DashboardEquityPnlSeriesResponse",
+    "DashboardExecutionsResponse",
+    "DashboardFooterStatusResponse",
+    "DashboardHealthRiskResponse",
+    "DashboardMetricResponse",
+    "DashboardPositionsResponse",
+    "DashboardRefreshControlResponse",
+    "DashboardSelectedStrategySnapshotResponse",
+    "DashboardSourceResponse",
+    "DashboardStrategyListResponse",
+    "DashboardSummaryResponse",
+    "DashboardSymbolAllocationResponse",
 ]

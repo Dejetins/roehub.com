@@ -8,9 +8,11 @@ from .indicators import (
 )
 from .market_data_reference import build_market_data_reference_router
 from .strategy import build_strategy_router, is_strategy_api_enabled
+from .ui_dashboard import build_dashboard_summary_service, build_ui_dashboard_router
 
 __all__ = [
     "build_backtests_router",
+    "build_dashboard_summary_service",
     "build_identity_api_module",
     "build_identity_router",
     "bind_indicators_runtime_dependencies",
@@ -19,5 +21,6 @@ __all__ = [
     "build_indicators_registry",
     "build_market_data_reference_router",
     "build_strategy_router",
+    "build_ui_dashboard_router",
     "is_strategy_api_enabled",
 ]

@@ -228,6 +228,36 @@ def test_authorized_placeholder_routes_render_active_navigation() -> None:
     assert 'nav-tab--active"' in strategies_response.text
 
 
+def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
+    client = _build_test_client()
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert 'data-page="dashboard"' in response.text
+    assert 'data-dashboard-root' in response.text
+    assert 'data-summary-endpoint="/api/ui/dashboard/summary"' in response.text
+    assert "/assets/css/pages/dashboard.css" in response.text
+    assert "/assets/js/pages/dashboard.js" in response.text
+    for panel in [
+        "selected_strategy_snapshot",
+        "equity_pnl_series",
+        "metric_grid",
+        "open_positions",
+        "recent_executions",
+        "health_risk",
+        "alerts",
+        "symbol_allocation",
+        "strategy_list",
+    ]:
+        assert f'data-dashboard-panel="{panel}"' in response.text
+    assert "Monitoring strategies" in response.text
+    assert "Strategy list" in response.text
+    assert 'role="listbox"' in response.text
+    assert "data-dashboard-refresh-preset" in response.text
+    assert "<select" not in response.text
+
+
 def test_locale_cookie_selects_russian_shell_without_localizing_routes() -> None:
     client = _build_test_client()
 
@@ -286,6 +316,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
         "dist/js/core/formatters.js",
         "dist/js/core/validators.js",
         "dist/js/core/refresh.js",
+        "dist/js/pages/dashboard.js",
+        "dist/css/pages/dashboard.css",
         "dist/js/components/dropdown.js",
         "dist/js/components/listbox.js",
         "dist/js/components/combobox.js",
@@ -302,6 +334,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     poller_js = (_WEB_ROOT / "dist/js/core/poller.js").read_text(encoding="utf-8")
     locale_js = (_WEB_ROOT / "dist/js/core/locale.js").read_text(encoding="utf-8")
     refresh_js = (_WEB_ROOT / "dist/js/core/refresh.js").read_text(encoding="utf-8")
+    dashboard_js = (_WEB_ROOT / "dist/js/pages/dashboard.js").read_text(encoding="utf-8")
+    dashboard_css = (_WEB_ROOT / "dist/css/pages/dashboard.css").read_text(encoding="utf-8")
 
     assert "--rh-financial-positive" in tokens_css
     assert "--rh-financial-negative" in tokens_css
@@ -321,3 +355,10 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "DEFAULT_LOCALE = \"en\"" in locale_js
     for preset in ['"10s"', '"15s"', '"30s"', '"1m"', '"5m"']:
         assert preset in refresh_js
+        assert preset in dashboard_js
+    assert "/api/ui/dashboard/summary" in dashboard_js
+    assert "createPoller" in dashboard_js
+    assert "activeRequest" in dashboard_js
+    assert "hiddenTabPause" in dashboard_js
+    assert "--rh-financial-positive" in dashboard_css
+    assert "--rh-financial-negative" in dashboard_css

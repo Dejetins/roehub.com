@@ -102,6 +102,7 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     strategy_router = _build_ping_router(path="/strategies/ping")
     indicators_router = _build_ping_router(path="/indicators/ping")
     market_data_router = _build_ping_router(path="/market-data/markets")
+    ui_dashboard_router = _build_ping_router(path="/ui/dashboard/summary")
 
     monkeypatch.setattr(app_module, "build_indicators_registry", lambda *, environ: object())
     monkeypatch.setattr(
@@ -154,6 +155,11 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
         "build_market_data_reference_router",
         lambda *, environ, current_user_dependency: market_data_router,
     )
+    monkeypatch.setattr(
+        app_module,
+        "build_ui_dashboard_router",
+        lambda *, environ, current_user_dependency: ui_dashboard_router,
+    )
 
 
 def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
@@ -189,6 +195,7 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
     assert "/metrics" in paths
     assert "/strategies/ping" in paths
     assert "/market-data/markets" in paths
+    assert "/ui/dashboard/summary" in paths
 
 
 def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
@@ -226,3 +233,4 @@ def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
     assert "/identity/ping" in paths
     assert "/indicators/ping" in paths
     assert "/market-data/markets" in paths
+    assert "/ui/dashboard/summary" in paths
