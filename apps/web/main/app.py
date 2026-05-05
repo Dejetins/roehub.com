@@ -384,12 +384,13 @@ def _render_public_page(
     open_login_modal: bool,
     auth_next_path: str = "/dashboard",
 ) -> Response:
+    current_user = _resolve_optional_public_current_user(request=request)
     context = _build_template_context(
         request=request,
         page_path=page_path,
         active_path=active_path,
         page_title_key=title_key,
-        current_user=None,
+        current_user=current_user,
         error_message=None,
         auth_next_path=auth_next_path,
     )
@@ -421,6 +422,26 @@ def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClien
     if api_client is None:
         raise ValueError("current_user_api_client is not configured in application state")
     return api_client
+
+
+def _resolve_optional_public_current_user(*, request: Request) -> WebCurrentUser | None:
+    cookie_header = request.headers.get("cookie")
+    if not _has_auth_cookie(cookie_header=cookie_header):
+        return None
+    api_client = _resolve_current_user_api_client(request=request)
+    api_result = api_client.fetch_current_user(cookie_header=cookie_header)
+    if api_result.status_code == 200:
+        return api_result.user
+    return None
+
+
+def _has_auth_cookie(*, cookie_header: str | None) -> bool:
+    if not cookie_header:
+        return False
+    return any(
+        cookie.strip().startswith("roehub_session_id=")
+        for cookie in cookie_header.split(";")
+    )
 
 
 def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:

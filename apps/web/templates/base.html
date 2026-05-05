@@ -56,14 +56,6 @@
         </div>
       </header>
 
-      {% if page_path != "/settings" %}
-        <div class="command-bar" aria-label="Page command line">
-          <span class="command-bar__prompt">{{ t("shell.command") }}</span>
-          <span class="command-bar__path">{{ page_path }}</span>
-          <span class="command-bar__status">{{ t("shell.service") }} / {{ t("shell.ready") }}</span>
-        </div>
-      {% endif %}
-
       <main id="main-content" class="page-shell" tabindex="-1">
         {% if error_message %}
           <div class="error-banner" role="alert">{{ error_message }}</div>
@@ -71,6 +63,16 @@
         {% block content %}{% endblock %}
       </main>
 
+      {% block status_bar %}
+        <footer class="shell-status-panel app-bottom-status shell-global-status" data-shell-status-bar>
+          <span>{{ t("shell.service") }}: <strong>{{ t("shell.ready") }}</strong></span>
+          <span>{{ t("dashboard.footer.account") }}: <strong data-status-account>{{ current_user.paid_level|upper if current_user else t("common.guest") }}</strong></span>
+          <span>{{ t("dashboard.footer.mode") }}: <strong>SSR</strong></span>
+          <span>{{ t("dashboard.footer.api") }}: <strong>Prod</strong></span>
+          <span>{{ t("dashboard.footer.latency") }}: <strong>--</strong></span>
+          <span>{{ t("dashboard.footer.server_time") }}: <strong>--</strong></span>
+        </footer>
+      {% endblock %}
     </div>
 
     {% include "fragments/auth/login_modal.html" %}

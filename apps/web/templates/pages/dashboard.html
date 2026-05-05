@@ -220,6 +220,10 @@
       </aside>
     </div>
 
+  </section>
+{% endblock %}
+
+{% block status_bar %}
     <footer class="shell-status-panel app-bottom-status dashboard-status-line" data-dashboard-footer-status>
       <span>{{ t("dashboard.command") }}: <strong data-dashboard-refresh-status>{{ t("refresh.idle") }}</strong></span>
       <span>{{ t("dashboard.footer.account") }}: <strong data-footer-account>--</strong></span>
@@ -271,7 +275,6 @@
         </output>
       </span>
     </footer>
-  </section>
 {% endblock %}
 
 {% block scripts %}

@@ -1,6 +1,8 @@
 .landing-page {
   display: grid;
-  gap: var(--rh-space-4);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .landing-hero {
@@ -8,7 +10,15 @@
   grid-template-columns: minmax(320px, 0.78fr) minmax(520px, 1.22fr);
   gap: var(--rh-space-5);
   align-items: stretch;
-  min-height: min(620px, calc(100vh - var(--rh-header-height) - var(--rh-commandbar-height) - var(--rh-footer-height) - 72px));
+  min-height: 0;
+  height: 100%;
+}
+
+.page-shell:has(.landing-page) {
+  width: 100%;
+  height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - var(--rh-space-3));
+  padding: var(--rh-space-5) var(--rh-space-5) var(--rh-space-3);
+  overflow: hidden;
 }
 
 .landing-hero__copy,
@@ -25,8 +35,9 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 0;
   min-width: 0;
-  padding: clamp(var(--rh-space-4), 3vw, 44px);
+  padding: clamp(var(--rh-space-4), 2.4vw, 38px);
 }
 
 .landing-hero h1 {
@@ -82,6 +93,7 @@
 .landing-platform {
   display: grid;
   grid-template-rows: auto 1fr;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
@@ -93,10 +105,6 @@
   min-height: 42px;
   padding-inline: var(--rh-space-4);
   border-bottom: 1px solid var(--rh-divider);
-}
-
-.landing-platform__prompt {
-  color: var(--rh-accent);
 }
 
 .landing-platform__header h2 {
@@ -111,7 +119,7 @@
   grid-template-rows: auto auto auto;
   gap: var(--rh-space-4);
   align-content: center;
-  min-height: 410px;
+  min-height: 0;
   padding: var(--rh-space-5);
 }
 
@@ -257,8 +265,18 @@
 }
 
 @media (max-width: 1180px) {
+  .page-shell:has(.landing-page) {
+    height: auto;
+    overflow: visible;
+  }
+
+  .landing-page {
+    overflow: visible;
+  }
+
   .landing-hero {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
     min-height: auto;
   }
 
@@ -273,16 +291,7 @@
 
 @media (max-width: 760px) {
   .app-shell {
-    padding-block-start: 208px;
-  }
-
-  .command-bar {
-    top: 208px;
-    grid-template-columns: auto 1fr;
-  }
-
-  .command-bar__status {
-    display: none;
+    padding-block-start: 176px;
   }
 
   .header-controls {

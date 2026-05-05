@@ -456,18 +456,18 @@ function renderSummary(root, summary) {
   renderAlerts(root, summary.alerts);
   renderAllocation(root, summary.symbol_allocation);
   renderStrategyList(root, summary.strategy_list);
-  renderFooter(root, summary.footer_status);
-  renderFreshness(root, summary);
+  renderFooter(document, summary.footer_status);
+  renderFreshness(document, summary);
   setText(
     "[data-dashboard-refresh-status]",
     summary.refresh_status || t("refresh.idle"),
-    root,
+    document,
   );
 }
 
 function initDashboard(root) {
   const endpoint = root.dataset.summaryEndpoint || SUMMARY_ENDPOINT;
-  const refreshButton = qs("[data-dashboard-refresh]", root);
+  const refreshButton = qs("[data-dashboard-refresh]", document);
   const loading = qs("[data-dashboard-loading]", root);
   let activeRequest = null;
   let poller = null;
@@ -498,8 +498,8 @@ function initDashboard(root) {
         return summary;
       })
       .catch((error) => {
-        setText("[data-dashboard-refresh-status]", error.code || "failed", root);
-        setText("[data-dashboard-freshness]", error.message || t("dashboard.refresh.failed"), root);
+        setText("[data-dashboard-refresh-status]", error.code || "failed", document);
+        setText("[data-dashboard-freshness]", error.message || t("dashboard.refresh.failed"), document);
         throw error;
       })
       .finally(() => {
@@ -523,8 +523,8 @@ function initDashboard(root) {
   function setAutorefresh(presetKey) {
     stopAutorefresh();
     const intervalMs = REFRESH_PRESETS[presetKey] ?? 0;
-    setText("[data-dashboard-refresh-current]", presetKey, root);
-    qsa("[data-dashboard-refresh-preset]", root).forEach((item) => {
+    setText("[data-dashboard-refresh-current]", presetKey, document);
+    qsa("[data-dashboard-refresh-preset]", document).forEach((item) => {
       item.setAttribute("aria-selected", item.dataset.dashboardRefreshPreset === presetKey ? "true" : "false");
     });
     if (intervalMs <= 0) {
@@ -545,7 +545,7 @@ function initDashboard(root) {
   refreshButton?.addEventListener("click", () => {
     loadSummary("manual").catch(() => null);
   });
-  qsa("[data-dashboard-refresh-preset]", root).forEach((item) => {
+  qsa("[data-dashboard-refresh-preset]", document).forEach((item) => {
     item.addEventListener("click", () => {
       setAutorefresh(item.dataset.dashboardRefreshPreset || "off");
     });

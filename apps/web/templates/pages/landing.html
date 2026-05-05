@@ -28,7 +28,6 @@
 
       <div class="landing-platform" aria-labelledby="landing-platform-title">
         <div class="landing-platform__header">
-          <span class="landing-platform__prompt" aria-hidden="true">&gt;_</span>
           <h2 id="landing-platform-title">{{ t("landing.platform_title") }}</h2>
         </div>
         <div class="landing-platform__grid" aria-label="{{ t('landing.platform_label') }}">
@@ -66,69 +65,6 @@
           </div>
         </div>
       </div>
-    </section>
-
-    <section class="landing-capabilities" aria-labelledby="landing-capabilities-title">
-      <h2 id="landing-capabilities-title">{{ t("landing.capabilities_title") }}</h2>
-      <div class="landing-capabilities__grid">
-        <article>
-          <h3>{{ t("landing.capability_backtests_title") }}</h3>
-          <p>{{ t("landing.capability_backtests_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.capability_exchanges_title") }}</h3>
-          <p>{{ t("landing.capability_exchanges_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.capability_portfolio_title") }}</h3>
-          <p>{{ t("landing.capability_portfolio_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.capability_cloud_title") }}</h3>
-          <p>{{ t("landing.capability_cloud_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.capability_online_title") }}</h3>
-          <p>{{ t("landing.capability_online_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.capability_paper_title") }}</h3>
-          <p>{{ t("landing.capability_paper_body") }}</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="landing-audience" aria-labelledby="landing-audience-title">
-      <h2 id="landing-audience-title">{{ t("landing.audience_title") }}</h2>
-      <div class="landing-audience__grid">
-        <article>
-          <h3>{{ t("landing.audience_researchers_title") }}</h3>
-          <p>{{ t("landing.audience_researchers_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.audience_developers_title") }}</h3>
-          <p>{{ t("landing.audience_developers_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.audience_traders_title") }}</h3>
-          <p>{{ t("landing.audience_traders_body") }}</p>
-        </article>
-        <article>
-          <h3>{{ t("landing.audience_teams_title") }}</h3>
-          <p>{{ t("landing.audience_teams_body") }}</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="landing-terminal-cta" aria-label="{{ t('landing.final_cta_label') }}">
-      <div>
-        <span aria-hidden="true">&gt;_</span>
-        <h2>{{ t("landing.final_title") }}</h2>
-        <p>{{ t("landing.final_body") }}</p>
-      </div>
-      <a class="shell-button shell-button--primary" href="/register">
-        {{ t("landing.final_cta") }}
-      </a>
     </section>
   </div>
 {% endblock %}

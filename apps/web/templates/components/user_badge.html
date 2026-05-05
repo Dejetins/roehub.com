@@ -1,9 +1,7 @@
 <div class="user-badge" data-user-badge>
   {% if current_user %}
-    <span class="user-badge__label">{{ t("common.current_user") }}</span>
-    <span class="user-badge__value">{{ current_user.paid_level }}</span>
+    <span class="user-badge__value">{{ current_user.paid_level|upper }}</span>
   {% else %}
-    <span class="user-badge__label">{{ t("common.guest") }}</span>
-    <span class="user-badge__value">{{ t("common.auth_required") }}</span>
+    <span class="user-badge__value">{{ t("common.guest") }}</span>
   {% endif %}
 </div>

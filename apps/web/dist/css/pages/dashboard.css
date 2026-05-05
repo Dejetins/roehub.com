@@ -1,10 +1,6 @@
-.command-bar {
-  display: none;
-}
-
 .page-shell:has(.dashboard-workstation) {
   width: 100%;
-  min-height: calc(100vh - var(--rh-header-height));
+  min-height: 0;
   padding: 7px 8px 0;
 }
 
@@ -549,7 +545,7 @@
   }
 
   .dashboard-workstation {
-    height: calc(100vh - var(--rh-header-height) - 12px);
+    height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - 20px);
     overflow: hidden;
   }
 
@@ -659,10 +655,6 @@
 
   .app-shell {
     padding-block-start: 128px;
-  }
-
-  .command-bar {
-    display: none;
   }
 
   .primary-nav {

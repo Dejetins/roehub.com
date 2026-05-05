@@ -104,11 +104,47 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'href="/register"' in response.text
     assert 'data-auth-open' in response.text
     assert "Roehub platform" in response.text
-    assert "Cloud backtests" in response.text
+    assert 'id="landing-capabilities-title"' not in response.text
     assert "Roehub: research, validate, automate, execute." in response.text
+    assert "ROEHUB WEB" in response.text
+    assert "&gt;_ ROEHUB WEB" not in response.text
+    assert '<div class="command-bar"' not in response.text
+    assert 'data-shell-status-bar' in response.text
+    assert '<span class="user-badge__value">Authentication required</span>' not in response.text
     assert 'id="theme-switcher-trigger"' in response.text
     assert 'data-theme-value="terminal-orange"' in response.text
     assert "site.css" not in response.text
+
+
+def test_public_landing_does_not_require_current_user_api_without_auth_cookie() -> None:
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+        }
+    )
+
+    def fail_fetch_current_user(*, cookie_header: str | None) -> CurrentUserApiResult:
+        raise AssertionError(f"unexpected current-user lookup: {cookie_header}")
+
+    app.state.current_user_api_client = SimpleNamespace(fetch_current_user=fail_fetch_current_user)
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Guest" in response.text
+
+
+def test_public_landing_shows_current_user_when_auth_cookie_is_present() -> None:
+    client = _build_test_client()
+
+    response = client.get("/", cookies={"roehub_session_id": "session-123"})
+
+    assert response.status_code == 200
+    assert '<span class="user-badge__value">FREE</span>' in response.text
+    assert "Logout" in response.text
+    assert 'data-auth-next="/dashboard"\n            >Login</button>' not in response.text
 
 
 @pytest.mark.parametrize(
@@ -221,7 +257,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
     assert '<div class="command-bar"' not in settings_response.text
     assert '<footer class="status-bar">' not in settings_response.text
-    assert "shell-status-panel app-bottom-status settings-bottom-status" in settings_response.text
+    assert "shell-status-panel app-bottom-status shell-global-status" in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
@@ -235,7 +271,6 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
         "sessions",
         "audit",
         "top_actions",
-        "bottom_status",
     ]:
         assert f'data-settings-panel="{panel}"' in settings_response.text
     assert 'role="listbox"' in settings_response.text
@@ -409,7 +444,6 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "rh-cli-meter dashboard-cli-meter" not in dashboard_js
     assert "dashboard-page-button" not in dashboard_css
     assert "data-selected-action" not in dashboard_js
-    assert ".command-bar" in dashboard_css
-    assert "display: none" in dashboard_css
+    assert ".command-bar" not in dashboard_css
     assert "--rh-financial-positive" in dashboard_css
     assert "--rh-financial-negative" in dashboard_css

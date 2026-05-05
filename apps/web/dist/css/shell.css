@@ -1,8 +1,10 @@
 .nav-tab,
 .shell-button,
 .language-switcher__option,
+.user-badge,
+.header-controls .rh-dropdown__trigger,
 .icon-button {
-  min-height: 30px;
+  min-height: 34px;
   border: 1px solid var(--rh-line-muted);
   border-radius: var(--rh-radius-2);
   background: var(--rh-surface-2);
@@ -61,16 +63,16 @@
 }
 
 .user-badge {
-  display: grid;
-  gap: 1px;
-  min-width: 112px;
-  padding: 3px 8px;
-  border: 1px solid var(--rh-divider);
-  border-radius: var(--rh-radius-2);
-  background: var(--rh-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 122px;
+  flex: 0 0 122px;
+  padding: 6px 10px;
 }
 
 .user-badge__label {
+  display: none;
   color: var(--rh-muted);
   font-size: 10px;
   letter-spacing: 0.04em;
@@ -272,6 +274,7 @@ body.auth-modal-lock {
   }
 
   .user-badge {
-    min-width: 96px;
+    width: 100%;
+    flex-basis: auto;
   }
 }
