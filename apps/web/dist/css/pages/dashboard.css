@@ -507,6 +507,8 @@
 .dashboard-status-line {
   flex-wrap: nowrap;
   overflow: visible;
+  width: calc(100% - 16px);
+  margin: 0 8px 8px;
 }
 
 .dashboard-status-actions {

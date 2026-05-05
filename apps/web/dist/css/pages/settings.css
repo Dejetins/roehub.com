@@ -1,5 +1,5 @@
 .page-shell:has(.settings-workstation) {
-  padding: 7px 8px 8px;
+  padding: 7px 8px 0;
 }
 
 .settings-workstation {
@@ -7,6 +7,8 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - 18px);
+  min-height: 0;
   color: var(--rh-text);
   font-size: 12px;
   line-height: 1.22;
@@ -77,13 +79,20 @@
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(520px, 0.78fr) minmax(0, 1.22fr);
+  grid-template-rows:
+    minmax(190px, 1.02fr)
+    minmax(126px, 0.68fr)
+    minmax(176px, 0.9fr)
+    minmax(164px, 0.82fr);
   grid-template-areas:
     "profile exchange"
     "limits integrations"
     "notifications security"
     "sessions audit";
   gap: 6px;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
 }
 
 .settings-panel {
@@ -100,42 +109,34 @@
 
 .settings-panel[data-settings-panel="profile"] {
   grid-area: profile;
-  height: 198px;
 }
 
 .settings-panel[data-settings-panel="exchange_keys"] {
   grid-area: exchange;
-  height: 198px;
 }
 
 .settings-panel[data-settings-panel="limits"] {
   grid-area: limits;
-  height: 122px;
 }
 
 .settings-panel[data-settings-panel="integrations"] {
   grid-area: integrations;
-  height: 122px;
 }
 
 .settings-panel[data-settings-panel="notifications"] {
   grid-area: notifications;
-  height: 168px;
 }
 
 .settings-panel[data-settings-panel="security"] {
   grid-area: security;
-  height: 168px;
 }
 
 .settings-panel[data-settings-panel="sessions"] {
   grid-area: sessions;
-  height: 154px;
 }
 
 .settings-panel[data-settings-panel="audit"] {
   grid-area: audit;
-  height: 154px;
 }
 
 .settings-panel .panel-heading {
@@ -264,21 +265,21 @@
 }
 
 .settings-panel[data-settings-panel="exchange_keys"] .settings-table-wrap {
-  max-height: 144px;
+  max-height: none;
 }
 
 .settings-panel[data-settings-panel="sessions"] .settings-table-wrap,
 .settings-panel[data-settings-panel="audit"] .settings-table-wrap {
-  max-height: 108px;
+  max-height: none;
 }
 
 .settings-panel[data-settings-panel="integrations"] .settings-list {
-  max-height: 76px;
+  max-height: none;
   overflow: auto;
 }
 
 .settings-panel[data-settings-panel="notifications"] .settings-list {
-  max-height: 124px;
+  max-height: none;
   overflow: auto;
 }
 
@@ -465,8 +466,14 @@
     padding: 8px 8px 40px;
   }
 
+  .settings-workstation {
+    height: auto;
+    min-height: 0;
+  }
+
   .settings-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
     grid-template-areas:
       "profile"
       "exchange"

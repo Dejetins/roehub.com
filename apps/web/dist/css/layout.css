@@ -111,7 +111,7 @@
   }
 
   .app-shell {
-    padding-block-start: 128px;
+    padding-block-start: 136px;
   }
 
   .primary-nav,
@@ -119,6 +119,10 @@
     justify-content: flex-start;
     overflow-x: auto;
     padding-inline: 0;
+  }
+
+  .primary-nav {
+    transform: translateY(6px);
   }
 
   .page-shell {

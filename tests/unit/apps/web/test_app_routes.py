@@ -289,6 +289,10 @@ def test_authorized_placeholder_routes_render_active_navigation() -> None:
     assert strategies_response.status_code == 200
     assert 'data-nav-key="strategies"' in strategies_response.text
     assert 'nav-tab--active"' in strategies_response.text
+    assert 'id="placeholder-market-listbox"' not in strategies_response.text
+    assert "BTCUSDT" not in strategies_response.text
+    assert "ETHUSDT" not in strategies_response.text
+    assert "SOLUSDT" not in strategies_response.text
 
 
 def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
