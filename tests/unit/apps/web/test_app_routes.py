@@ -91,12 +91,21 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'data-nav-key="settings"' in response.text
     assert "/assets/vendor/htmx.min.js" in response.text
     assert "/assets/css/components.css" in response.text
+    assert "/assets/css/pages/landing.css" in response.text
     assert "/assets/js/core/theme.js" in response.text
     assert "/assets/js/core/locale.js" in response.text
     assert "/assets/js/components/dropdown.js" in response.text
     assert "/assets/js/pages/auth.js" in response.text
+    assert "/assets/js/pages/landing.js" in response.text
     assert "https://unpkg.com" not in response.text
     assert 'data-auth-modal' in response.text
+    assert 'data-page="landing"' in response.text
+    assert 'data-landing-root' in response.text
+    assert 'href="/register"' in response.text
+    assert 'data-auth-open' in response.text
+    assert "Roehub platform" in response.text
+    assert "Cloud backtests" in response.text
+    assert "Roehub: research, validate, automate, execute." in response.text
     assert 'id="theme-switcher-trigger"' in response.text
     assert 'data-theme-value="terminal-orange"' in response.text
     assert "site.css" not in response.text
@@ -226,7 +235,7 @@ def test_locale_cookie_selects_russian_shell_without_localizing_routes() -> None
 
     assert response.status_code == 200
     assert '<html lang="ru" data-locale="ru" data-theme="terminal-orange">' in response.text
-    assert "Открыть вход" in response.text
+    assert "Открыть вход в Roehub" in response.text
     assert 'href="/strategies"' in response.text
     assert "/api/auth/login" in response.text
 
@@ -238,7 +247,7 @@ def test_invalid_locale_cookie_falls_back_to_english() -> None:
 
     assert response.status_code == 200
     assert '<html lang="en" data-locale="en" data-theme="terminal-orange">' in response.text
-    assert "Open login" in response.text
+    assert "Open Roehub login" in response.text
 
 
 def test_locale_switch_sets_cookie_and_keeps_route_path() -> None:

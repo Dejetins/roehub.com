@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/assets/css/layout.css">
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/shell.css">
+    {% block page_assets %}{% endblock %}
     <script src="/assets/vendor/htmx.min.js" defer></script>
     <script type="application/json" id="roehub-locale-catalogs">{{ locale_catalogs_json|safe }}</script>
     <script type="module" src="/assets/js/core/theme.js"></script>

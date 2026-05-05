@@ -1,40 +1,139 @@
 {% extends "base.html" %}
 
+{% block page_assets %}
+    <link rel="stylesheet" href="/assets/css/pages/landing.css">
+{% endblock %}
+
 {% block content %}
-  <section class="landing-hero" data-page="landing">
-    <div class="landing-hero__copy">
-      <p class="eyebrow">{{ t("landing.eyebrow") }}</p>
-      <h1>{{ t("landing.title") }}</h1>
-      <p class="landing-hero__body">{{ t("landing.body") }}</p>
-      <div class="landing-hero__actions">
-        <button class="shell-button shell-button--primary" type="button" data-auth-open>
-          {{ t("landing.primary_cta") }}
-        </button>
-        <a class="shell-button shell-button--ghost" href="/register">
-          {{ t("landing.secondary_cta") }}
-        </a>
+  <div class="landing-page" data-page="landing" data-landing-root>
+    <section class="landing-hero" aria-labelledby="landing-title">
+      <div class="landing-hero__copy">
+        <p class="eyebrow">{{ t("landing.eyebrow") }}</p>
+        <h1 id="landing-title">{{ t("landing.title") }}</h1>
+        <p class="landing-hero__body">{{ t("landing.body") }}</p>
+        <div class="landing-hero__actions">
+          <button class="shell-button shell-button--primary" type="button" data-auth-open>
+            {{ t("landing.primary_cta") }}
+          </button>
+          <a class="shell-button shell-button--ghost" href="/register">
+            {{ t("landing.secondary_cta") }}
+          </a>
+        </div>
+        <div class="landing-hero__proof" aria-label="{{ t('landing.proof_label') }}">
+          <span>{{ t("landing.proof_cloud") }}</span>
+          <span>{{ t("landing.proof_secure") }}</span>
+          <span>{{ t("landing.proof_scale") }}</span>
+        </div>
       </div>
-    </div>
-    <div class="product-map" aria-label="Roehub product map">
-      <div class="product-map__node product-map__node--primary">ROEHUB</div>
-      <div class="product-map__node">Dashboard</div>
-      <div class="product-map__node">Strategies</div>
-      <div class="product-map__node">Backtests</div>
-      <div class="product-map__node">Settings</div>
-    </div>
-    <dl class="landing-stats">
+
+      <div class="landing-platform" aria-labelledby="landing-platform-title">
+        <div class="landing-platform__header">
+          <span class="landing-platform__prompt" aria-hidden="true">&gt;_</span>
+          <h2 id="landing-platform-title">{{ t("landing.platform_title") }}</h2>
+        </div>
+        <div class="landing-platform__grid" aria-label="{{ t('landing.platform_label') }}">
+          <div class="landing-platform__node">
+            <span>{{ t("landing.node_backtests") }}</span>
+            <strong>{{ t("landing.state_ready") }}</strong>
+          </div>
+          <div class="landing-platform__node">
+            <span>{{ t("landing.node_exchanges") }}</span>
+            <strong>{{ t("landing.state_connected") }}</strong>
+          </div>
+          <div class="landing-platform__node">
+            <span>{{ t("landing.node_strategies") }}</span>
+            <strong>{{ t("landing.state_active") }}</strong>
+          </div>
+          <div class="landing-platform__node">
+            <span>{{ t("landing.node_alerts") }}</span>
+            <strong>{{ t("landing.state_monitoring") }}</strong>
+          </div>
+          <div class="landing-platform__engine">
+            <span>{{ t("landing.node_engine") }}</span>
+            <strong>{{ t("landing.state_running") }}</strong>
+          </div>
+          <div class="landing-platform__node landing-platform__node--lower">
+            <span>{{ t("landing.node_paper") }}</span>
+            <strong>{{ t("landing.state_simulated") }}</strong>
+          </div>
+          <div class="landing-platform__node landing-platform__node--lower">
+            <span>{{ t("landing.node_cloud") }}</span>
+            <strong>{{ t("landing.state_live") }}</strong>
+          </div>
+          <div class="landing-platform__node landing-platform__node--lower">
+            <span>{{ t("landing.node_bots") }}</span>
+            <strong>{{ t("landing.state_operational") }}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-capabilities" aria-labelledby="landing-capabilities-title">
+      <h2 id="landing-capabilities-title">{{ t("landing.capabilities_title") }}</h2>
+      <div class="landing-capabilities__grid">
+        <article>
+          <h3>{{ t("landing.capability_backtests_title") }}</h3>
+          <p>{{ t("landing.capability_backtests_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.capability_exchanges_title") }}</h3>
+          <p>{{ t("landing.capability_exchanges_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.capability_portfolio_title") }}</h3>
+          <p>{{ t("landing.capability_portfolio_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.capability_cloud_title") }}</h3>
+          <p>{{ t("landing.capability_cloud_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.capability_online_title") }}</h3>
+          <p>{{ t("landing.capability_online_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.capability_paper_title") }}</h3>
+          <p>{{ t("landing.capability_paper_body") }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-audience" aria-labelledby="landing-audience-title">
+      <h2 id="landing-audience-title">{{ t("landing.audience_title") }}</h2>
+      <div class="landing-audience__grid">
+        <article>
+          <h3>{{ t("landing.audience_researchers_title") }}</h3>
+          <p>{{ t("landing.audience_researchers_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.audience_developers_title") }}</h3>
+          <p>{{ t("landing.audience_developers_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.audience_traders_title") }}</h3>
+          <p>{{ t("landing.audience_traders_body") }}</p>
+        </article>
+        <article>
+          <h3>{{ t("landing.audience_teams_title") }}</h3>
+          <p>{{ t("landing.audience_teams_body") }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-terminal-cta" aria-label="{{ t('landing.final_cta_label') }}">
       <div>
-        <dt>{{ t("landing.stat_ui") }}</dt>
-        <dd>terminal-orange</dd>
+        <span aria-hidden="true">&gt;_</span>
+        <h2>{{ t("landing.final_title") }}</h2>
+        <p>{{ t("landing.final_body") }}</p>
       </div>
-      <div>
-        <dt>{{ t("landing.stat_shell") }}</dt>
-        <dd>Jinja2</dd>
-      </div>
-      <div>
-        <dt>{{ t("landing.stat_auth") }}</dt>
-        <dd>/api/auth/login</dd>
-      </div>
-    </dl>
-  </section>
+      <a class="shell-button shell-button--primary" href="/register">
+        {{ t("landing.final_cta") }}
+      </a>
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="module" src="/assets/js/pages/landing.js"></script>
 {% endblock %}

@@ -1101,8 +1101,6 @@
 |   |-- notebook_tests/
 |   |   |-- 01_sync_instruments.ipynb
 |   |   |-- 02_rest_catchup_1m.ipynb
-|   |   |-- 03_new_engine.ipynb
-|   |   |-- 04_cpu_memory_quick_benchmark.ipynb
 |   |   |-- 04_indicator_grid_export.ipynb
 |   |   |-- 05_hit_time_grid.ipynb
 |   |   |-- 06_backtest_compute.ipynb
