@@ -81,20 +81,27 @@
   display: none;
 }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 0.54fr);
-  gap: 6px;
-  flex: 1 1 auto;
-  min-height: 0;
-  align-items: start;
-}
-
+.dashboard-grid,
 .dashboard-main,
+.dashboard-top-row,
 .dashboard-selected__body {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.dashboard-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.42fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.dashboard-top-row {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.42fr);
+  align-items: stretch;
 }
 
 .terminal-panel {
@@ -126,13 +133,13 @@
   margin: 0;
 }
 
-.dashboard-kv--split {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.dashboard-selected .dashboard-kv--split {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dashboard-kv div {
   display: grid;
-  grid-template-columns: minmax(80px, 0.38fr) minmax(0, 1fr);
+  grid-template-columns: minmax(74px, 0.44fr) minmax(0, 1fr);
   gap: 6px;
   min-width: 0;
 }
@@ -156,7 +163,7 @@
 
 .dashboard-chart-row {
   display: grid;
-  grid-template-columns: minmax(0, 2.15fr) minmax(260px, 0.95fr);
+  grid-template-columns: minmax(0, 2.05fr) minmax(284px, 0.95fr);
   gap: 6px;
   min-width: 0;
 }
@@ -273,18 +280,19 @@
 
 .dashboard-metric {
   display: grid;
-  gap: 3px;
-  min-height: 52px;
+  gap: 1px;
+  min-height: 39px;
   min-width: 0;
-  padding: 6px;
+  padding: 3px 5px;
   border-right: 1px solid var(--rh-divider);
   border-bottom: 1px solid var(--rh-divider);
+  line-height: 1.05;
 }
 
 .dashboard-metric__value {
   overflow: hidden;
   color: var(--rh-financial-neutral);
-  font-size: 14px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -292,7 +300,7 @@
 .dashboard-metric__source {
   overflow: hidden;
   color: var(--rh-muted);
-  font-size: 10px;
+  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -305,7 +313,7 @@
 }
 
 .dashboard-table-row {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
 }
 
 .dashboard-bottom-row {
@@ -358,9 +366,19 @@
   border-bottom: 1px solid var(--rh-divider);
 }
 
+.dashboard-health-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--rh-divider);
+  border-left: 1px solid var(--rh-divider);
+}
+
 .dashboard-health-row {
-  grid-template-columns: minmax(0, 1fr) minmax(54px, auto) 64px;
+  grid-template-columns: minmax(0, 1fr) minmax(38px, auto);
   align-items: center;
+  min-height: 34px;
+  padding: 5px 6px;
+  border-right: 1px solid var(--rh-divider);
   font-size: 10px;
 }
 
@@ -394,9 +412,7 @@
 }
 
 .dashboard-strategy-list {
-  position: sticky;
-  top: calc(var(--rh-header-height) + 6px);
-  max-height: calc(100vh - var(--rh-header-height) - 16px);
+  max-height: none;
   overflow: auto;
 }
 
@@ -494,7 +510,6 @@
 
 .dashboard-status-line {
   flex-wrap: nowrap;
-  flex: 0 0 auto;
   overflow: visible;
 }
 
@@ -546,12 +561,15 @@
 
   .dashboard-main {
     grid-template-rows:
-      minmax(108px, 0.48fr)
       minmax(244px, 1.25fr)
       minmax(104px, 0.46fr)
       minmax(126px, 0.58fr);
     min-height: 0;
     overflow: hidden;
+  }
+
+  .dashboard-top-row {
+    min-height: 0;
   }
 
   .dashboard-chart-row,
@@ -564,7 +582,6 @@
   }
 
   .dashboard-table-wrap,
-  .dashboard-health-list,
   .dashboard-alert-list,
   .dashboard-allocation-list,
   .dashboard-strategy-rows {
@@ -573,7 +590,6 @@
   }
 
   .dashboard-strategy-list {
-    position: static;
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr);
     max-height: none;
@@ -586,6 +602,7 @@
 
 @media (max-width: 1180px) {
   .dashboard-grid,
+  .dashboard-top-row,
   .dashboard-chart-row,
   .dashboard-table-row,
   .dashboard-bottom-row {
@@ -593,7 +610,6 @@
   }
 
   .dashboard-strategy-list {
-    position: static;
     max-height: none;
   }
 }
@@ -606,7 +622,9 @@
   }
 
   .dashboard-kv--split,
+  .dashboard-selected .dashboard-kv--split,
   .dashboard-metric-grid,
+  .dashboard-health-list,
   .dashboard-totals {
     grid-template-columns: 1fr;
   }

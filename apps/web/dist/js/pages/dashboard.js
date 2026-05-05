@@ -202,14 +202,6 @@ function drawSparkline(values) {
   return svg.outerHTML;
 }
 
-function cliMeter(ratio) {
-  const boundedRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
-  const filledCells = Math.round(boundedRatio * 10);
-  return Array.from({ length: 10 }, (_, index) => (
-    `<span class="rh-cli-meter__cell${index < filledCells ? " rh-cli-meter__cell--fill" : ""}"></span>`
-  )).join("");
-}
-
 function renderSelected(root, snapshot) {
   setText("[data-selected-name]", snapshot?.name || t("common.unavailable"), root);
   setText("[data-selected-version]", snapshot?.version || "--", root);
@@ -320,24 +312,16 @@ function renderExecutions(root, executions) {
     .join("");
 }
 
-function renderHealth(root, healthRisk) {
+function renderHealth(root) {
   const target = qs("[data-health-risk]", root);
   if (!target) {
     return;
   }
-  const checks = healthRisk?.checks || [];
-  if (!checks.length) {
-    target.innerHTML = `<div class="dashboard-empty-block">${escapeHtml(panelStatusText(healthRisk?.state, healthRisk?.degradation_reason))}</div>`;
-    return;
-  }
-  target.innerHTML = checks.slice(0, 4)
-    .map((check) => `
+  target.innerHTML = ["metric_1", "metric_2", "metric_3", "metric_4"]
+    .map((metric) => `
       <div class="dashboard-health-row">
-        <span>${escapeHtml(check.label)}</span>
-        <strong>${escapeHtml(check.value)}</strong>
-        <span class="rh-cli-meter dashboard-cli-meter" aria-label="${Math.round((check.ratio || 0) * 100)} percent">
-          ${cliMeter(check.ratio)}
-        </span>
+        <span>${escapeHtml(metric)}</span>
+        <strong>--</strong>
       </div>
     `)
     .join("");

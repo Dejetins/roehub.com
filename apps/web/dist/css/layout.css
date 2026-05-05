@@ -119,6 +119,12 @@
   font-weight: 500;
 }
 
+.app-bottom-status {
+  flex: 0 0 auto;
+  min-height: 32px;
+  font-size: 12px;
+}
+
 @media (max-width: 860px) {
   .app-header {
     grid-template-columns: 1fr;

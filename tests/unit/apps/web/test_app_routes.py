@@ -221,7 +221,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
     assert '<div class="command-bar"' not in settings_response.text
     assert '<footer class="status-bar">' not in settings_response.text
-    assert "shell-status-panel settings-bottom-status" in settings_response.text
+    assert "shell-status-panel app-bottom-status settings-bottom-status" in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
@@ -283,7 +283,7 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "Strategy list" in response.text
     assert 'role="listbox"' in response.text
     assert "data-dashboard-refresh-preset" in response.text
-    assert "shell-status-panel dashboard-status-line" in response.text
+    assert "shell-status-panel app-bottom-status dashboard-status-line" in response.text
     assert "dashboard-workstation__command" not in response.text
     assert "dashboard-command-actions" not in response.text
     assert "dashboard-status-line" in response.text
@@ -404,7 +404,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "createPoller" in dashboard_js
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
-    assert "rh-cli-meter dashboard-cli-meter" in dashboard_js
+    for placeholder in ["metric_1", "metric_2", "metric_3", "metric_4"]:
+        assert placeholder in dashboard_js
+    assert "rh-cli-meter dashboard-cli-meter" not in dashboard_js
     assert "dashboard-page-button" not in dashboard_css
     assert "data-selected-action" not in dashboard_js
     assert ".command-bar" in dashboard_css

@@ -15,7 +15,7 @@
     {% include "fragments/dashboard/loading_state.html" %}
 
     <div class="dashboard-grid">
-      <section class="dashboard-main">
+      <div class="dashboard-top-row">
         <section class="terminal-panel dashboard-selected" data-dashboard-panel="selected_strategy_snapshot">
           <header class="panel-heading">
             <h1>{{ t("dashboard.selected.title") }}</h1>
@@ -36,6 +36,15 @@
           </div>
         </section>
 
+        <section class="terminal-panel dashboard-health" data-dashboard-panel="health_risk">
+          <header class="panel-heading">
+            <h2>{{ t("dashboard.health.title") }}</h2>
+          </header>
+          <div class="dashboard-health-list" data-health-risk></div>
+        </section>
+      </div>
+
+      <section class="dashboard-main">
         <div class="dashboard-chart-row">
           <section class="terminal-panel dashboard-chart-panel" data-dashboard-panel="equity_pnl_series">
             <header class="panel-heading panel-heading--with-tools">
@@ -96,13 +105,6 @@
                 <tbody data-open-positions></tbody>
               </table>
             </div>
-          </section>
-
-          <section class="terminal-panel dashboard-health" data-dashboard-panel="health_risk">
-            <header class="panel-heading">
-              <h2>{{ t("dashboard.health.title") }}</h2>
-            </header>
-            <div class="dashboard-health-list" data-health-risk></div>
           </section>
         </div>
 
@@ -218,7 +220,7 @@
       </aside>
     </div>
 
-    <footer class="shell-status-panel dashboard-status-line" data-dashboard-footer-status>
+    <footer class="shell-status-panel app-bottom-status dashboard-status-line" data-dashboard-footer-status>
       <span>{{ t("dashboard.command") }}: <strong data-dashboard-refresh-status>{{ t("refresh.idle") }}</strong></span>
       <span>{{ t("dashboard.footer.account") }}: <strong data-footer-account>--</strong></span>
       <span>{{ t("dashboard.footer.mode") }}: <strong data-footer-mode>--</strong></span>
