@@ -220,6 +220,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-preferences-endpoint="/api/ui/account/preferences"' in settings_response.text
     assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
     assert '<div class="command-bar"' not in settings_response.text
+    assert '<footer class="status-bar">' not in settings_response.text
+    assert "shell-status-panel settings-bottom-status" in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
@@ -281,6 +283,12 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "Strategy list" in response.text
     assert 'role="listbox"' in response.text
     assert "data-dashboard-refresh-preset" in response.text
+    assert "shell-status-panel dashboard-status-line" in response.text
+    assert "dashboard-workstation__command" not in response.text
+    assert "dashboard-command-actions" not in response.text
+    assert "dashboard-status-line" in response.text
+    assert '<footer class="status-bar">' not in response.text
+    assert '<span aria-hidden="true">&gt;_</span>' not in response.text
     assert "data-selected-action" not in response.text
     assert "<select" not in response.text
 
@@ -368,6 +376,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
 
     assert "--rh-financial-positive" in tokens_css
     assert "--rh-financial-negative" in tokens_css
+    assert "--rh-workstation-panel-bg" in tokens_css
+    assert "--rh-cli-meter-fill" in tokens_css
     assert "--rh-financial-positive" not in themes_css
     assert "--rh-financial-negative" not in themes_css
     for theme in ["terminal-orange", "graphite", "matrix-green", "high-contrast"]:
@@ -389,6 +399,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "createPoller" in dashboard_js
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
+    assert "dashboard-cli-meter" in dashboard_js
     assert "data-selected-action" not in dashboard_js
     assert ".command-bar" in dashboard_css
     assert "display: none" in dashboard_css

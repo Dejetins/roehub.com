@@ -1,6 +1,6 @@
 .app-shell {
   min-height: 100vh;
-  padding-block: var(--rh-header-height) var(--rh-footer-height);
+  padding-block: var(--rh-header-height) 0;
 }
 
 .app-header {
@@ -82,24 +82,41 @@
 
 .page-shell {
   width: min(100%, var(--rh-page-max));
-  min-height: calc(100vh - var(--rh-header-height) - var(--rh-commandbar-height) - var(--rh-footer-height));
+  min-height: calc(100vh - var(--rh-header-height) - var(--rh-commandbar-height));
   margin-inline: auto;
   padding: calc(var(--rh-commandbar-height) + var(--rh-space-5)) var(--rh-space-5) var(--rh-space-5);
 }
 
-.status-bar {
-  position: fixed;
-  inset: auto 0 0;
-  z-index: 18;
+.shell-status-panel {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: var(--rh-footer-height);
-  padding-inline: var(--rh-space-4);
-  border-top: 1px solid var(--rh-divider);
-  background: var(--rh-bg-elevated);
+  justify-content: flex-start;
+  gap: var(--rh-space-2);
+  min-height: 32px;
+  overflow: hidden;
+  padding: 4px 10px;
+  border: 1px solid var(--rh-workstation-panel-border);
+  background: var(--rh-workstation-panel-bg);
   color: var(--rh-muted);
   font-size: 12px;
+}
+
+.shell-status-panel > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-status-panel > span + span::before {
+  margin-right: var(--rh-space-2);
+  color: var(--rh-accent);
+  content: "|";
+}
+
+.shell-status-panel strong {
+  color: var(--rh-text-strong);
+  font-weight: 500;
 }
 
 @media (max-width: 860px) {

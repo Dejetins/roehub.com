@@ -15,8 +15,8 @@
 .settings-command,
 .settings-bottom-status,
 .settings-panel.terminal-panel {
-  border: 1px solid var(--rh-line-strong);
-  background: color-mix(in srgb, var(--rh-surface) 88%, transparent);
+  border: 1px solid var(--rh-workstation-panel-border);
+  background: var(--rh-workstation-panel-bg);
   box-shadow: none;
 }
 
@@ -270,11 +270,11 @@
 .settings-cli-meter__cell {
   width: 4px;
   height: 8px;
-  background: color-mix(in srgb, var(--rh-divider) 78%, transparent);
+  background: var(--rh-cli-meter-empty);
 }
 
 .settings-cli-meter__cell--fill {
-  background: var(--rh-accent);
+  background: var(--rh-cli-meter-fill);
 }
 
 .settings-table-wrap {
