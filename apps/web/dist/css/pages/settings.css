@@ -258,25 +258,6 @@
   white-space: nowrap;
 }
 
-.settings-cli-meter {
-  display: grid;
-  grid-template-columns: repeat(10, 4px);
-  gap: 2px;
-  align-items: center;
-  justify-content: start;
-  min-width: 58px;
-}
-
-.settings-cli-meter__cell {
-  width: 4px;
-  height: 8px;
-  background: var(--rh-cli-meter-empty);
-}
-
-.settings-cli-meter__cell--fill {
-  background: var(--rh-cli-meter-fill);
-}
-
 .settings-table-wrap {
   min-width: 0;
   overflow: auto;

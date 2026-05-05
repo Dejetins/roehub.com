@@ -206,7 +206,7 @@ function cliMeter(ratio) {
   const boundedRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
   const filledCells = Math.round(boundedRatio * 10);
   return Array.from({ length: 10 }, (_, index) => (
-    `<span class="dashboard-cli-meter__cell${index < filledCells ? " dashboard-cli-meter__cell--fill" : ""}"></span>`
+    `<span class="rh-cli-meter__cell${index < filledCells ? " rh-cli-meter__cell--fill" : ""}"></span>`
   )).join("");
 }
 
@@ -335,7 +335,7 @@ function renderHealth(root, healthRisk) {
       <div class="dashboard-health-row">
         <span>${escapeHtml(check.label)}</span>
         <strong>${escapeHtml(check.value)}</strong>
-        <span class="dashboard-cli-meter" aria-label="${Math.round((check.ratio || 0) * 100)} percent">
+        <span class="rh-cli-meter dashboard-cli-meter" aria-label="${Math.round((check.ratio || 0) * 100)} percent">
           ${cliMeter(check.ratio)}
         </span>
       </div>

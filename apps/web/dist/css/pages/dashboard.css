@@ -5,7 +5,7 @@
 .page-shell:has(.dashboard-workstation) {
   width: 100%;
   min-height: calc(100vh - var(--rh-header-height));
-  padding: 6px;
+  padding: 7px 8px 0;
 }
 
 .dashboard-workstation {
@@ -35,10 +35,10 @@
 .panel-heading h2 {
   overflow: hidden;
   margin: 0;
-  color: var(--rh-accent);
+  color: var(--rh-accent-2);
   font-size: 13px;
-  letter-spacing: 0;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  line-height: 1;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -140,7 +140,7 @@
 .dashboard-kv dt,
 .dashboard-table th,
 .dashboard-metric__label {
-  color: var(--rh-accent);
+  color: var(--rh-muted);
   font-size: 10px;
   font-weight: 700;
 }
@@ -234,8 +234,7 @@
 }
 
 .dashboard-segment,
-.dashboard-tab,
-.dashboard-page-button {
+.dashboard-tab {
   min-height: 23px;
   border: 0;
   border-inline-end: 1px solid var(--rh-line-muted);
@@ -377,25 +376,6 @@
   justify-self: end;
 }
 
-.dashboard-cli-meter {
-  display: grid;
-  grid-template-columns: repeat(10, 4px);
-  gap: 2px;
-  align-items: center;
-  justify-content: start;
-  min-width: 58px;
-}
-
-.dashboard-cli-meter__cell {
-  width: 4px;
-  height: 8px;
-  background: var(--rh-cli-meter-empty);
-}
-
-.dashboard-cli-meter__cell--fill {
-  background: var(--rh-cli-meter-fill);
-}
-
 .dashboard-progress {
   height: 7px;
   border: 1px solid var(--rh-line-muted);
@@ -427,12 +407,12 @@
 
 .dashboard-search {
   width: 100%;
-  min-height: 26px;
-  padding-inline: 8px;
+  min-height: 24px;
+  padding: 0 7px;
   border: 1px solid var(--rh-line-muted);
   border-radius: var(--rh-radius-1);
-  background: var(--rh-bg);
-  color: var(--rh-text-strong);
+  background: var(--rh-surface-2);
+  color: var(--rh-text);
   font: inherit;
 }
 
@@ -510,17 +490,6 @@
 .dashboard-sparkline {
   width: 68px;
   height: 24px;
-}
-
-.dashboard-pagination {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.dashboard-page-button {
-  width: 24px;
-  border: 1px solid var(--rh-line-muted);
 }
 
 .dashboard-status-line {
@@ -605,7 +574,13 @@
 
   .dashboard-strategy-list {
     position: static;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
     max-height: none;
+  }
+
+  .dashboard-strategy-rows {
+    overflow: auto;
   }
 }
 
@@ -700,4 +675,20 @@
     overflow-wrap: anywhere;
     white-space: normal;
   }
+}
+
+.dashboard-workstation .rh-button,
+.dashboard-workstation .rh-menu-item {
+  min-height: 23px;
+  border-radius: 2px;
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.dashboard-workstation .rh-dropdown__trigger {
+  min-width: 84px;
+}
+
+.dashboard-workstation .rh-popover {
+  padding: 3px;
 }

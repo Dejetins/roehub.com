@@ -287,6 +287,8 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "dashboard-workstation__command" not in response.text
     assert "dashboard-command-actions" not in response.text
     assert "dashboard-status-line" in response.text
+    assert "dashboard-pagination" not in response.text
+    assert "dashboard-page-button" not in response.text
     assert '<footer class="status-bar">' not in response.text
     assert '<span aria-hidden="true">&gt;_</span>' not in response.text
     assert "data-selected-action" not in response.text
@@ -371,6 +373,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     poller_js = (_WEB_ROOT / "dist/js/core/poller.js").read_text(encoding="utf-8")
     locale_js = (_WEB_ROOT / "dist/js/core/locale.js").read_text(encoding="utf-8")
     refresh_js = (_WEB_ROOT / "dist/js/core/refresh.js").read_text(encoding="utf-8")
+    components_css = (_WEB_ROOT / "dist/css/components.css").read_text(encoding="utf-8")
     dashboard_js = (_WEB_ROOT / "dist/js/pages/dashboard.js").read_text(encoding="utf-8")
     dashboard_css = (_WEB_ROOT / "dist/css/pages/dashboard.css").read_text(encoding="utf-8")
 
@@ -378,6 +381,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "--rh-financial-negative" in tokens_css
     assert "--rh-workstation-panel-bg" in tokens_css
     assert "--rh-cli-meter-fill" in tokens_css
+    assert ".rh-cli-meter" in components_css
+    assert ".dashboard-cli-meter" in components_css
     assert "--rh-financial-positive" not in themes_css
     assert "--rh-financial-negative" not in themes_css
     for theme in ["terminal-orange", "graphite", "matrix-green", "high-contrast"]:
@@ -399,7 +404,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "createPoller" in dashboard_js
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
-    assert "dashboard-cli-meter" in dashboard_js
+    assert "rh-cli-meter dashboard-cli-meter" in dashboard_js
+    assert "dashboard-page-button" not in dashboard_css
     assert "data-selected-action" not in dashboard_js
     assert ".command-bar" in dashboard_css
     assert "display: none" in dashboard_css

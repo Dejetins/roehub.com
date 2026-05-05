@@ -286,6 +286,31 @@
   color: var(--rh-muted);
 }
 
+.rh-cli-meter,
+.settings-cli-meter,
+.dashboard-cli-meter {
+  display: grid;
+  grid-template-columns: repeat(10, 4px);
+  gap: 2px;
+  align-items: center;
+  justify-content: start;
+  min-width: 58px;
+}
+
+.rh-cli-meter__cell,
+.settings-cli-meter__cell,
+.dashboard-cli-meter__cell {
+  width: 4px;
+  height: 8px;
+  background: var(--rh-cli-meter-empty);
+}
+
+.rh-cli-meter__cell--fill,
+.settings-cli-meter__cell--fill,
+.dashboard-cli-meter__cell--fill {
+  background: var(--rh-cli-meter-fill);
+}
+
 .rh-combobox {
   display: grid;
   gap: var(--rh-space-2);
