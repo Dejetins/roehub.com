@@ -8,7 +8,6 @@
   <div class="landing-page" data-page="landing" data-landing-root>
     <section class="landing-hero" aria-labelledby="landing-title">
       <div class="landing-hero__copy">
-        <p class="eyebrow">{{ t("landing.eyebrow") }}</p>
         <h1 id="landing-title">{{ t("landing.title") }}</h1>
         <p class="landing-hero__body">{{ t("landing.body") }}</p>
         <div class="landing-hero__actions">
@@ -18,51 +17,6 @@
           <a class="shell-button shell-button--ghost" href="/register">
             {{ t("landing.secondary_cta") }}
           </a>
-        </div>
-        <div class="landing-hero__proof" aria-label="{{ t('landing.proof_label') }}">
-          <span>{{ t("landing.proof_cloud") }}</span>
-          <span>{{ t("landing.proof_secure") }}</span>
-          <span>{{ t("landing.proof_scale") }}</span>
-        </div>
-      </div>
-
-      <div class="landing-platform" aria-labelledby="landing-platform-title">
-        <div class="landing-platform__header">
-          <h2 id="landing-platform-title">{{ t("landing.platform_title") }}</h2>
-        </div>
-        <div class="landing-platform__grid" aria-label="{{ t('landing.platform_label') }}">
-          <div class="landing-platform__node">
-            <span>{{ t("landing.node_backtests") }}</span>
-            <strong>{{ t("landing.state_ready") }}</strong>
-          </div>
-          <div class="landing-platform__node">
-            <span>{{ t("landing.node_exchanges") }}</span>
-            <strong>{{ t("landing.state_connected") }}</strong>
-          </div>
-          <div class="landing-platform__node">
-            <span>{{ t("landing.node_strategies") }}</span>
-            <strong>{{ t("landing.state_active") }}</strong>
-          </div>
-          <div class="landing-platform__node">
-            <span>{{ t("landing.node_alerts") }}</span>
-            <strong>{{ t("landing.state_monitoring") }}</strong>
-          </div>
-          <div class="landing-platform__engine">
-            <span>{{ t("landing.node_engine") }}</span>
-            <strong>{{ t("landing.state_running") }}</strong>
-          </div>
-          <div class="landing-platform__node landing-platform__node--lower">
-            <span>{{ t("landing.node_paper") }}</span>
-            <strong>{{ t("landing.state_simulated") }}</strong>
-          </div>
-          <div class="landing-platform__node landing-platform__node--lower">
-            <span>{{ t("landing.node_cloud") }}</span>
-            <strong>{{ t("landing.state_live") }}</strong>
-          </div>
-          <div class="landing-platform__node landing-platform__node--lower">
-            <span>{{ t("landing.node_bots") }}</span>
-            <strong>{{ t("landing.state_operational") }}</strong>
-          </div>
         </div>
       </div>
     </section>

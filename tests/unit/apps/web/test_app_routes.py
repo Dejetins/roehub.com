@@ -104,10 +104,10 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'data-landing-root' in response.text
     assert 'href="/register"' in response.text
     assert 'data-auth-open' in response.text
-    assert "Roehub platform" in response.text
+    assert "Roehub platform" not in response.text
     assert 'id="landing-capabilities-title"' not in response.text
     assert "Roehub: research, validate, automate, execute." in response.text
-    assert "ROEHUB WEB" in response.text
+    assert "ROEHUB WEB" not in response.text
     assert "&gt;_ ROEHUB WEB" not in response.text
     assert '<div class="command-bar"' not in response.text
     assert 'data-shell-status-bar' in response.text
