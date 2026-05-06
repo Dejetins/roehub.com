@@ -20,7 +20,7 @@
       <div><dt>{{ t("settings.profile.timezone") }}</dt><dd data-profile-timezone>Europe/Moscow</dd></div>
       <div><dt>{{ t("common.language") }}</dt><dd data-profile-locale>{{ locale }}</dd></div>
       <div><dt>{{ t("settings.profile.contact") }}</dt><dd data-profile-contact>@quant_trader</dd></div>
-      <div><dt>{{ t("settings.profile.subscription") }}</dt><dd data-profile-subscription>{{ current_user.paid_level if current_user else "PRO" }}</dd></div>
+      <div><dt>{{ t("settings.profile.subscription") }}</dt><dd data-profile-subscription>{{ current_user.paid_level|lower|capitalize if current_user else "Pro" }}</dd></div>
     </dl>
   </div>
   <form class="settings-form settings-form--inline" data-profile-form hidden autocomplete="off">

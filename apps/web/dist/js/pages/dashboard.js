@@ -35,6 +35,15 @@ const sourceStatusKeys = {
   unavailable: "dashboard.source.unavailable",
 };
 
+const alertSeverityRank = {
+  critical: 5,
+  error: 4,
+  warning: 3,
+  warn: 3,
+  info: 2,
+  debug: 1,
+};
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -328,43 +337,69 @@ function renderHealth(root) {
 }
 
 function renderAlerts(root, alerts) {
-  const target = qs("[data-alerts]", root);
-  if (!target) {
+  const tbody = qs("[data-alerts]", root);
+  if (!tbody) {
     return;
   }
-  const items = alerts?.items || [];
+  const direction = root.dataset.alertSortDirection === "asc" ? "asc" : "desc";
+  const items = [...(alerts?.items || [])].sort((left, right) => {
+    const leftRank = alertSeverityRank[String(left.severity || "").toLowerCase()] ?? 0;
+    const rightRank = alertSeverityRank[String(right.severity || "").toLowerCase()] ?? 0;
+    return direction === "asc" ? leftRank - rightRank : rightRank - leftRank;
+  });
   if (!items.length) {
-    target.innerHTML = `<div class="dashboard-empty-block">${escapeHtml(panelStatusText(alerts?.state, alerts?.degradation_reason))}</div>`;
+    tbody.innerHTML = `
+      <tr><td class="dashboard-empty-row" colspan="3">
+        ${escapeHtml(panelStatusText(alerts?.state, alerts?.degradation_reason))}
+      </td></tr>
+    `;
     return;
   }
-  target.innerHTML = items
-    .map((item) => `
-      <div class="dashboard-alert-row">
-        <strong>${escapeHtml(localTime(item.timestamp))} / ${escapeHtml(item.severity)}</strong>
-        <span>${escapeHtml(item.message)}</span>
-      </div>
-    `)
+  tbody.innerHTML = items
+    .map((item) => {
+      const severity = String(item.severity || "info").toLowerCase();
+      const severityClass = severity.replace(/[^a-z0-9_-]/g, "");
+      return `
+        <tr>
+          <td>${escapeHtml(localTime(item.timestamp))}</td>
+          <td class="dashboard-alert-level dashboard-alert-level--${escapeHtml(severityClass)}">
+            ${escapeHtml(item.severity || "info")}
+          </td>
+          <td>${escapeHtml(item.message || "--")}</td>
+        </tr>
+      `;
+    })
     .join("");
 }
 
 function renderAllocation(root, allocation) {
-  const target = qs("[data-symbol-allocation]", root);
-  if (!target) {
+  const tbody = qs("[data-symbol-allocation]", root);
+  if (!tbody) {
     return;
   }
   const items = allocation?.items || [];
   if (!items.length) {
-    target.innerHTML = `<div class="dashboard-empty-block">${escapeHtml(panelStatusText(allocation?.state, allocation?.degradation_reason))}</div>`;
+    tbody.innerHTML = `
+      <tr><td class="dashboard-empty-row" colspan="3">
+        ${escapeHtml(panelStatusText(allocation?.state, allocation?.degradation_reason))}
+      </td></tr>
+    `;
     return;
   }
-  target.innerHTML = items
-    .map((item) => `
-      <div class="dashboard-allocation-row">
-        <strong>${escapeHtml(item.symbol)}</strong>
-        <span class="${financialClass(item.direction)}">${escapeHtml(item.pnl ?? "--")}</span>
-        <span class="dashboard-progress"><span style="width: ${Math.round((item.bar_ratio || 0) * 100)}%"></span></span>
-      </div>
-    `)
+  tbody.innerHTML = items
+    .map((item) => {
+      const share =
+        item.share_percent ??
+        item.allocation_percent ??
+        (Number.isFinite(Number(item.bar_ratio)) ? `${Math.round(Number(item.bar_ratio) * 100)}%` : "--");
+      return `
+        <tr>
+          <td>${escapeHtml(item.symbol || "--")}</td>
+          <td class="${financialClass(item.direction)}">${escapeHtml(item.position_size ?? item.position_value ?? item.notional ?? "--")}</td>
+          <td>${escapeHtml(share)}</td>
+        </tr>
+      `;
+    })
     .join("");
 }
 
@@ -543,6 +578,12 @@ function initDashboard(root) {
     item.addEventListener("click", () => {
       setAutorefresh(item.dataset.dashboardRefreshPreset || "off");
     });
+  });
+  qs("[data-alert-sort-level]", root)?.addEventListener("click", () => {
+    root.dataset.alertSortDirection = root.dataset.alertSortDirection === "asc" ? "desc" : "asc";
+    if (lastSummary) {
+      renderAlerts(root, lastSummary.alerts);
+    }
   });
 
   window.__roehubDashboard = {

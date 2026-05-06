@@ -1233,7 +1233,7 @@ Frontend / panel inventory из reference:
 
 - command bar `>_ MONITORING STRATEGIES` с active badge;
 - selected strategy summary в две колонки плюс actions column;
-- большая panel `PNL / EQUITY MONITORING (LIVE)` с legend, chart, buy/sell markers и range controls;
+- panel `PNL / EQUITY MONITORING` с legend, chart, buy/sell markers и range controls `1H/6H/1D/1W/1M`;
 - metric grid справа от chart;
 - `OPEN POSITIONS`;
 - `RECENT EXECUTIONS`;

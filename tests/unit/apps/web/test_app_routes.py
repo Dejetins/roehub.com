@@ -150,7 +150,7 @@ def test_public_landing_shows_current_user_when_auth_cookie_is_present() -> None
     response = client.get("/", cookies={"roehub_session_id": "session-123"})
 
     assert response.status_code == 200
-    assert '<span class="user-badge__value">FREE</span>' in response.text
+    assert '<span class="user-badge__value">Free</span>' in response.text
     assert "Logout" in response.text
     assert 'data-auth-next="/dashboard"\n            >Login</button>' not in response.text
 
@@ -292,6 +292,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     )
     assert "data-save-all" not in settings_response.text
     assert "data-settings-custom-interval" not in settings_response.text
+    assert 'data-settings-panel="preferences"' not in settings_response.text
+    assert "data-settings-theme-option" not in settings_response.text
+    assert "data-settings-locale-option" not in settings_response.text
+    assert "data-settings-refresh-option" not in settings_response.text
     assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
     assert '<select' not in settings_response.text
@@ -340,6 +344,14 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
         assert f'data-dashboard-panel="{panel}"' in response.text
     assert "Monitoring strategies" in response.text
     assert "Strategy list" in response.text
+    assert "PnL / equity monitoring (live)" not in response.text
+    assert "PnL / equity monitoring" in response.text
+    assert ">1W</button>" in response.text
+    assert ">1M</button>" in response.text
+    assert "dashboard-live-indicator" not in response.text
+    assert "data-alert-sort-level" in response.text
+    assert "dashboard-table--alerts" in response.text
+    assert "dashboard-table--allocation" in response.text
     assert 'role="listbox"' in response.text
     assert "data-dashboard-refresh-preset" in response.text
     assert (

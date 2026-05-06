@@ -1,7 +1,6 @@
 import { apiFetch } from "../core/api.js";
-import { on, qs, qsa } from "../core/dom.js";
-import { applyLocale, persistLocale, t } from "../core/locale.js";
-import { applyTheme } from "../core/theme.js";
+import { on, qs } from "../core/dom.js";
+import { t } from "../core/locale.js";
 import { initDropdowns } from "../components/dropdown.js";
 
 const AUTOREFRESH_STORAGE_KEY = "roehub_autorefresh_defaults";
@@ -76,10 +75,9 @@ function formatTimestampToSeconds(value) {
   return text.replace("T", " ").replace(/\.\d+/, "").replace(/Z$/, "");
 }
 
-function updateSelected(selector, attribute, value) {
-  qsa(selector).forEach((item) => {
-    item.setAttribute("aria-selected", item.dataset[attribute] === value ? "true" : "false");
-  });
+function formatPlan(value) {
+  const normalized = String(value || "free").trim().toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Free";
 }
 
 function renderProfile(profile) {
@@ -90,8 +88,8 @@ function renderProfile(profile) {
   setText("[data-profile-timezone]", profile.timezone);
   setText("[data-profile-locale]", profile.locale.toUpperCase());
   setText("[data-profile-contact]", profile.telegram_discord || "--");
-  setText("[data-profile-subscription]", profile.subscription_status.toUpperCase());
-  setText("[data-status-account]", profile.subscription_status.toUpperCase());
+  setText("[data-profile-subscription]", formatPlan(profile.subscription_status));
+  setText("[data-status-account]", formatPlan(profile.subscription_status));
 }
 
 function renderLimits(limits) {
@@ -232,14 +230,6 @@ function renderPreferences(payload) {
     autorefresh_preset: payload.autorefresh.preset_key,
     refresh_interval_seconds: payload.autorefresh.refresh_interval_seconds,
   };
-  setDropdownValue("[data-settings-theme-current]", payload.theme);
-  setDropdownValue("[data-settings-locale-current]", payload.locale.toUpperCase());
-  setDropdownValue("[data-settings-refresh-current]", payload.autorefresh.preset_key);
-  updateSelected("[data-settings-theme-option]", "settingsThemeOption", payload.theme);
-  updateSelected("[data-settings-locale-option]", "settingsLocaleOption", payload.locale);
-  updateSelected("[data-settings-refresh-option]", "settingsRefreshOption", payload.autorefresh.preset_key);
-  applyTheme(payload.theme, { persist: true });
-  persistLocale(payload.locale);
   persistAutorefresh();
 }
 
@@ -344,33 +334,6 @@ function renderAudit(payload, append = false) {
   });
 }
 
-async function savePreferences(root) {
-  const payload = {
-    theme: state.preferences.theme,
-    locale: state.preferences.locale,
-    density: state.preferences.density,
-    autorefresh_preset: state.preferences.autorefresh_preset,
-    refresh_interval_seconds: state.preferences.refresh_interval_seconds,
-  };
-  try {
-    const saved = await apiFetch(endpoint(root, "preferencesEndpoint"), {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    renderPreferences(saved);
-    applyLocale(saved.locale, { persist: true });
-    setStatus(t("settings.state.saved"), true);
-    const status = qs("[data-preferences-status]");
-    if (status) status.textContent = t("settings.state.saved");
-  } catch (error) {
-    const message = errorMessage(error);
-    setStatus(message, false);
-    const status = qs("[data-preferences-status]");
-    if (status) status.textContent = message;
-  }
-}
-
 async function initSettings(root) {
   const [
     profile,
@@ -403,29 +366,6 @@ async function initSettings(root) {
 }
 
 function initEvents(root) {
-  on(root, "click", "[data-settings-theme-option]", (_event, item) => {
-    state.preferences.theme = item.dataset.settingsThemeOption || "terminal-orange";
-    applyTheme(state.preferences.theme);
-    setDropdownValue("[data-settings-theme-current]", state.preferences.theme);
-    updateSelected("[data-settings-theme-option]", "settingsThemeOption", state.preferences.theme);
-  });
-  on(root, "click", "[data-settings-locale-option]", (_event, item) => {
-    state.preferences.locale = item.dataset.settingsLocaleOption || "en";
-    applyLocale(state.preferences.locale, { persist: true });
-    setDropdownValue("[data-settings-locale-current]", state.preferences.locale.toUpperCase());
-    updateSelected("[data-settings-locale-option]", "settingsLocaleOption", state.preferences.locale);
-  });
-  on(root, "click", "[data-settings-refresh-option]", (_event, item) => {
-    state.preferences.autorefresh_preset = item.dataset.settingsRefreshOption || "15s";
-    const presetSeconds = { off: 0, "10s": 10, "15s": 15, "30s": 30, "1m": 60, "5m": 300 };
-    state.preferences.refresh_interval_seconds =
-      presetSeconds[state.preferences.autorefresh_preset] ?? state.preferences.refresh_interval_seconds;
-    setDropdownValue("[data-settings-refresh-current]", state.preferences.autorefresh_preset);
-    updateSelected("[data-settings-refresh-option]", "settingsRefreshOption", state.preferences.autorefresh_preset);
-  });
-  on(root, "click", "[data-save-all]", () => {
-    void savePreferences(root);
-  });
   on(root, "click", "[data-integration-mode-option]", async (_event, item) => {
     const row = item.closest("[data-integration-key]");
     const integrationKey = row?.dataset.integrationKey;

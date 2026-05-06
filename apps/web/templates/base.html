@@ -68,6 +68,49 @@
           <span>{{ t("dashboard.footer.api") }}: <strong>Prod</strong></span>
           <span>{{ t("dashboard.footer.latency") }}: <strong>--</strong></span>
           <span>{{ t("dashboard.footer.server_time") }}: <strong>--</strong></span>
+          <span class="dashboard-status-actions" data-dashboard-refresh-control>
+            <button
+              class="rh-button rh-button--primary rh-button--compact"
+              type="button"
+              data-dashboard-refresh
+            >{{ t("refresh.manual") }}</button>
+            <span class="rh-dropdown dashboard-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="shell-refresh-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="shell-refresh-menu"
+                data-rh-dropdown-trigger
+              >
+                {{ t("refresh.autorefresh") }}
+                <span class="rh-dropdown__value" data-dashboard-refresh-current>15s</span>
+              </button>
+              <span
+                class="rh-popover"
+                id="shell-refresh-menu"
+                role="listbox"
+                aria-labelledby="shell-refresh-trigger"
+                hidden
+                data-rh-dropdown-menu
+              >
+                {% for preset in refresh_presets %}
+                  <button
+                    class="rh-menu-item"
+                    type="button"
+                    role="option"
+                    aria-selected="{{ 'true' if preset.key == '15s' else 'false' }}"
+                    data-rh-dropdown-item="{{ preset.key }}"
+                    data-dashboard-refresh-preset="{{ preset.key }}"
+                  >{{ preset.label }}</button>
+                {% endfor %}
+              </span>
+            </span>
+            <output class="dashboard-freshness" data-dashboard-freshness aria-live="polite">
+              {{ t("dashboard.awaiting_data") }}
+            </output>
+          </span>
         </footer>
       {% endblock %}
     </div>

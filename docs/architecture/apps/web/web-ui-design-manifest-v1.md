@@ -492,7 +492,7 @@ Live-data страницы (`/dashboard`, `/strategies`, `/backtests`) имею�
 
 Route: `/dashboard`. Канонический референс: `personal_dashboard.png`.
 
-Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, большой PnL/equity chart, metric grid, таблица открытых позиций, таблица последних исполнений, health/risk, alerts/events, symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, PnL/equity chart с range controls `1H/6H/1D/1W/1M`, metric grid, таблица открытых позиций, полноширинная таблица последних исполнений, health/risk, табличные alerts/events, табличный symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
 
 Dashboard показывает текущее состояние портфеля стратегий online, но читает его только через backend read-models/cache: strategy storage/run state, realtime Redis streams/readers, planned portfolio/position/execution/equity snapshots, market-data reference и exchange account read-models. Если источник еще не реализован, соответствующая panel остается в форме референса и показывает typed `unavailable/degraded/stale` state.
 

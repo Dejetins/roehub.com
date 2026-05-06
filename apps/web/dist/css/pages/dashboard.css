@@ -170,7 +170,7 @@
 .dashboard-chart-wrap {
   position: relative;
   min-height: 0;
-  height: 210px;
+  height: 166px;
   border: 1px solid var(--rh-divider);
   background:
     linear-gradient(var(--rh-chart-grid-line) 1px, transparent 1px),
@@ -182,7 +182,7 @@
 .dashboard-chart {
   display: block;
   width: 100%;
-  height: 210px;
+  height: 166px;
 }
 
 .dashboard-panel-state {
@@ -258,13 +258,6 @@
   color: var(--rh-state-success);
 }
 
-.dashboard-live-indicator {
-  display: inline-flex;
-  align-items: center;
-  padding-inline: 6px;
-  font-size: 10px;
-}
-
 .dashboard-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -300,6 +293,7 @@
   white-space: nowrap;
 }
 
+.dashboard-executions-row,
 .dashboard-table-row,
 .dashboard-bottom-row {
   display: grid;
@@ -307,12 +301,13 @@
   min-width: 0;
 }
 
+.dashboard-executions-row,
 .dashboard-table-row {
   grid-template-columns: 1fr;
 }
 
 .dashboard-bottom-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dashboard-table-wrap {
@@ -327,6 +322,11 @@
   font-size: 11px;
 }
 
+.dashboard-table--alerts,
+.dashboard-table--allocation {
+  min-width: 0;
+}
+
 .dashboard-table th,
 .dashboard-table td {
   padding: 5px 7px;
@@ -339,6 +339,25 @@
 .dashboard-empty-row,
 .dashboard-empty-block {
   color: var(--rh-muted);
+}
+
+.dashboard-alert-level {
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.dashboard-alert-level--critical,
+.dashboard-alert-level--error {
+  color: var(--rh-financial-negative);
+}
+
+.dashboard-alert-level--warning,
+.dashboard-alert-level--warn {
+  color: var(--rh-state-warning);
+}
+
+.dashboard-alert-level--info {
+  color: var(--rh-state-success);
 }
 
 .dashboard-health-list,
@@ -563,9 +582,10 @@
 
   .dashboard-main {
     grid-template-rows:
-      minmax(244px, 1.25fr)
-      minmax(104px, 0.46fr)
-      minmax(126px, 0.58fr);
+      minmax(210px, 1fr)
+      minmax(78px, 0.28fr)
+      minmax(92px, 0.34fr)
+      minmax(112px, 0.42fr);
     min-height: 0;
     overflow: hidden;
   }
@@ -575,6 +595,7 @@
   }
 
   .dashboard-chart-row,
+  .dashboard-executions-row,
   .dashboard-table-row,
   .dashboard-bottom-row,
   .dashboard-strategy-list,
@@ -584,8 +605,6 @@
   }
 
   .dashboard-table-wrap,
-  .dashboard-alert-list,
-  .dashboard-allocation-list,
   .dashboard-strategy-rows {
     min-height: 0;
     overflow: auto;
@@ -606,6 +625,7 @@
   .dashboard-grid,
   .dashboard-top-row,
   .dashboard-chart-row,
+  .dashboard-executions-row,
   .dashboard-table-row,
   .dashboard-bottom-row {
     grid-template-columns: 1fr;

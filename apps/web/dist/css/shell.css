@@ -114,6 +114,50 @@
   min-width: 156px;
 }
 
+.header-controls #locale-switcher-trigger {
+  width: 86px;
+  min-width: 86px;
+}
+
+.shell-global-status {
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.dashboard-status-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  overflow: visible;
+}
+
+.shell-global-status .rh-button {
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.dashboard-freshness {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  max-width: 320px;
+  overflow: hidden;
+  padding: 1px 6px;
+  border: 1px solid var(--rh-line-muted);
+  color: var(--rh-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-global-status .rh-popover {
+  inset-block-start: auto;
+  inset-block-end: calc(100% + var(--rh-space-1));
+}
+
 .landing-hero,
 .register-page,
 .workspace-placeholder,

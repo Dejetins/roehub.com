@@ -43,13 +43,12 @@
       class="rh-button rh-button--compact rh-dropdown__trigger"
       type="button"
       id="locale-switcher-trigger"
+      aria-label="{{ t('common.language') }}"
       aria-haspopup="listbox"
       aria-expanded="false"
       aria-controls="locale-switcher-menu"
       data-rh-dropdown-trigger
-      data-i18n-key="common.language"
     >
-      {{ t("common.language") }}
       <span class="rh-dropdown__value" data-locale-current>{{ locale|upper }}</span>
     </button>
     <div
