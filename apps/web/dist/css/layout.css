@@ -3,6 +3,7 @@
   flex-direction: column;
   min-height: 100vh;
   padding-block: var(--rh-header-height) 0;
+  background: var(--rh-canvas);
 }
 
 .app-header {

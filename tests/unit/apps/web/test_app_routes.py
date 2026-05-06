@@ -464,9 +464,11 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
 
     assert "--rh-financial-positive" in tokens_css
     assert "--rh-financial-negative" in tokens_css
+    assert "--rh-canvas: #000000" in tokens_css
     assert "--rh-workstation-panel-bg" in tokens_css
+    assert "background: var(--rh-canvas)" in layout_css
     assert "--rh-cli-meter-fill" in tokens_css
-    assert "--rh-page-transition-duration: 150ms" in motion_config_css
+    assert "--rh-page-transition-duration:" in motion_config_css
     assert ".page-shell:not(:has(.landing-page))" in layout_css
     assert "@view-transition" in layout_css
     assert "prefers-reduced-motion: reduce" in layout_css

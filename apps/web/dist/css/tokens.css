@@ -1,6 +1,7 @@
 :root,
 :root[data-theme="terminal-orange"] {
   color-scheme: dark;
+  --rh-canvas: #000000;
   --rh-bg: #020607;
   --rh-bg-elevated: #050a0c;
   --rh-surface: #071012;

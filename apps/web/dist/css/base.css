@@ -3,7 +3,7 @@
 }
 
 html {
-  background: var(--rh-bg);
+  background: var(--rh-canvas);
   color: var(--rh-text);
   font-family: var(--rh-font-mono);
   line-height: 1.45;
@@ -12,7 +12,7 @@ html {
 body {
   min-width: 320px;
   margin: 0;
-  background: var(--rh-bg);
+  background: var(--rh-canvas);
   color: var(--rh-text);
   font-size: 14px;
 }
