@@ -91,6 +91,7 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'data-nav-key="settings"' in response.text
     assert "/assets/vendor/htmx.min.js" in response.text
     assert "/assets/css/components.css" in response.text
+    assert "/assets/css/motion-config.css" in response.text
     assert "/assets/css/pages/landing.css" in response.text
     assert "/assets/js/core/theme.js" in response.text
     assert "/assets/js/core/locale.js" in response.text
@@ -420,6 +421,7 @@ def test_locale_catalog_keys_match() -> None:
 def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None:
     expected_assets = [
         "dist/css/tokens.css",
+        "dist/css/motion-config.css",
         "dist/css/themes.css",
         "dist/css/base.css",
         "dist/css/layout.css",
@@ -449,6 +451,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
 
     tokens_css = (_WEB_ROOT / "dist/css/tokens.css").read_text(encoding="utf-8")
     themes_css = (_WEB_ROOT / "dist/css/themes.css").read_text(encoding="utf-8")
+    motion_config_css = (_WEB_ROOT / "dist/css/motion-config.css").read_text(encoding="utf-8")
+    layout_css = (_WEB_ROOT / "dist/css/layout.css").read_text(encoding="utf-8")
     theme_js = (_WEB_ROOT / "dist/js/core/theme.js").read_text(encoding="utf-8")
     api_js = (_WEB_ROOT / "dist/js/core/api.js").read_text(encoding="utf-8")
     poller_js = (_WEB_ROOT / "dist/js/core/poller.js").read_text(encoding="utf-8")
@@ -462,6 +466,11 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "--rh-financial-negative" in tokens_css
     assert "--rh-workstation-panel-bg" in tokens_css
     assert "--rh-cli-meter-fill" in tokens_css
+    assert "--rh-page-transition-duration: 150ms" in motion_config_css
+    assert ".page-shell:not(:has(.landing-page))" in layout_css
+    assert "@view-transition" in layout_css
+    assert "prefers-reduced-motion: reduce" in layout_css
+    assert "view-transition-name: none" in layout_css
     assert ".rh-cli-meter" in components_css
     assert ".dashboard-cli-meter" in components_css
     assert "--rh-financial-positive" not in themes_css
@@ -482,6 +491,12 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "retry_after_seconds" in poller_js
     assert "roehub_locale" in locale_js
     assert "DEFAULT_LOCALE = \"en\"" in locale_js
+    assert "__roehubDropdownDelegatesInitialized" in (
+        _WEB_ROOT / "dist/js/components/dropdown.js"
+    ).read_text(encoding="utf-8")
+    assert "__roehubListboxDelegatesInitialized" in (
+        _WEB_ROOT / "dist/js/components/listbox.js"
+    ).read_text(encoding="utf-8")
     for preset in ['"10s"', '"15s"', '"30s"', '"1m"', '"5m"']:
         assert preset in refresh_js
         assert preset in dashboard_js

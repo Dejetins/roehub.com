@@ -65,6 +65,68 @@
   padding: var(--rh-space-5);
 }
 
+.page-shell:not(:has(.landing-page)) {
+  animation: rh-page-enter var(--rh-page-transition-duration) var(--rh-page-transition-easing) both;
+  view-transition-name: rh-page-shell;
+}
+
+.app-header,
+.app-bottom-status {
+  view-transition-name: none;
+}
+
+@keyframes rh-page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(
+      var(--rh-page-transition-inline-shift),
+      var(--rh-page-transition-distance),
+      0
+    );
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes rh-page-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(
+      calc(var(--rh-page-transition-inline-shift) * -1),
+      calc(var(--rh-page-transition-distance) * -1),
+      0
+    );
+  }
+}
+
+@supports (view-transition-name: none) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-old(rh-page-shell) {
+    animation: rh-page-exit var(--rh-page-transition-duration) var(--rh-page-transition-easing) both;
+  }
+
+  ::view-transition-new(rh-page-shell) {
+    animation: rh-page-enter var(--rh-page-transition-duration) var(--rh-page-transition-easing) both;
+  }
+}
+
 .shell-status-panel {
   display: flex;
   align-items: center;
@@ -139,5 +201,15 @@
 
   h1 {
     font-size: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-shell:not(:has(.landing-page)),
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(rh-page-shell),
+  ::view-transition-new(rh-page-shell) {
+    animation: none;
   }
 }
