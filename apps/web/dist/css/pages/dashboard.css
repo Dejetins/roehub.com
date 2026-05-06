@@ -314,6 +314,12 @@
   grid-template-columns: 1fr;
 }
 
+.dashboard-executions-row .terminal-panel,
+.dashboard-table-row .terminal-panel {
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .dashboard-bottom-row {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -590,12 +596,17 @@
 
   .dashboard-main {
     grid-template-rows:
-      minmax(210px, 1fr)
-      minmax(78px, 0.28fr)
-      minmax(92px, 0.34fr)
+      minmax(180px, 0.72fr)
+      minmax(132px, 0.52fr)
+      minmax(132px, 0.52fr)
       minmax(112px, 0.42fr);
     min-height: 0;
     overflow: hidden;
+  }
+
+  .dashboard-chart-wrap,
+  .dashboard-chart {
+    height: 126px;
   }
 
   .dashboard-top-row {

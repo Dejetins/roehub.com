@@ -83,31 +83,6 @@
           </section>
         </div>
 
-        <div class="dashboard-executions-row">
-          <section class="terminal-panel" data-dashboard-panel="recent_executions">
-            <header class="panel-heading">
-              <h2>{{ t("dashboard.executions.title") }}</h2>
-            </header>
-            <div class="dashboard-table-wrap">
-              <table class="dashboard-table dashboard-table--executions">
-                <thead>
-                  <tr>
-                    <th>{{ t("dashboard.executions.time") }}</th>
-                    <th>{{ t("dashboard.executions.symbol") }}</th>
-                    <th>{{ t("dashboard.executions.side") }}</th>
-                    <th>{{ t("dashboard.executions.price") }}</th>
-                    <th>{{ t("dashboard.executions.qty") }}</th>
-                    <th>{{ t("dashboard.executions.fee") }}</th>
-                    <th>{{ t("dashboard.executions.pnl") }}</th>
-                    <th>{{ t("dashboard.executions.reason") }}</th>
-                  </tr>
-                </thead>
-                <tbody data-recent-executions></tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
         <div class="dashboard-table-row">
           <section class="terminal-panel" data-dashboard-panel="open_positions">
             <header class="panel-heading">
@@ -129,6 +104,31 @@
                   </tr>
                 </thead>
                 <tbody data-open-positions></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="dashboard-executions-row">
+          <section class="terminal-panel" data-dashboard-panel="recent_executions">
+            <header class="panel-heading">
+              <h2>{{ t("dashboard.executions.title") }}</h2>
+            </header>
+            <div class="dashboard-table-wrap">
+              <table class="dashboard-table dashboard-table--executions">
+                <thead>
+                  <tr>
+                    <th>{{ t("dashboard.executions.time") }}</th>
+                    <th>{{ t("dashboard.executions.symbol") }}</th>
+                    <th>{{ t("dashboard.executions.side") }}</th>
+                    <th>{{ t("dashboard.executions.price") }}</th>
+                    <th>{{ t("dashboard.executions.qty") }}</th>
+                    <th>{{ t("dashboard.executions.fee") }}</th>
+                    <th>{{ t("dashboard.executions.pnl") }}</th>
+                    <th>{{ t("dashboard.executions.reason") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-recent-executions></tbody>
               </table>
             </div>
           </section>
