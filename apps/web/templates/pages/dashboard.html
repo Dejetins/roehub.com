@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block page_assets %}
-  <link rel="stylesheet" href="/assets/css/pages/dashboard.css">
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/dashboard.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -276,5 +276,5 @@
 {% endblock %}
 
 {% block scripts %}
-  <script type="module" src="/assets/js/pages/dashboard.js"></script>
+  <script type="module" src="{{ asset_url('/assets/js/pages/dashboard.js') }}"></script>
 {% endblock %}

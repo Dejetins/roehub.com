@@ -229,16 +229,20 @@
 }
 
 .settings-form--inline,
-.settings-form-grid,
-.settings-preference-grid {
+.settings-form-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 5px;
 }
 
+.settings-preference-grid {
+  display: grid;
+  grid-template-columns: repeat(3, max-content) minmax(0, 1fr);
+  gap: 5px;
+}
+
 .settings-form input,
 .settings-exchange-form input,
-.settings-custom-interval,
 .dashboard-search {
   min-height: 24px;
   border: 1px solid var(--rh-line-muted);
@@ -419,7 +423,7 @@
 }
 
 .settings-preference-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content) minmax(0, 1fr);
 }
 
 .settings-inline-status {

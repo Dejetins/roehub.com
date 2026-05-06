@@ -47,10 +47,8 @@
           {% for preset in refresh_presets %}
             <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="{{ preset.key }}" data-settings-refresh-option="{{ preset.key }}">{{ preset.label }}</button>
           {% endfor %}
-          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="custom" data-settings-refresh-option="custom">Custom</button>
         </div>
       </div>
-      <input class="settings-custom-interval" type="number" min="10" max="1800" step="5" value="45" data-settings-custom-interval aria-label="{{ t('settings.preferences.custom_interval') }}">
     </div>
     <output class="settings-inline-status" data-preferences-status aria-live="polite"></output>
   </section>

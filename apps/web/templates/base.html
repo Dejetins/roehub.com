@@ -4,22 +4,22 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} | Roehub</title>
-    <link rel="stylesheet" href="/assets/css/tokens.css">
-    <link rel="stylesheet" href="/assets/css/themes.css">
-    <link rel="stylesheet" href="/assets/css/base.css">
-    <link rel="stylesheet" href="/assets/css/layout.css">
-    <link rel="stylesheet" href="/assets/css/components.css">
-    <link rel="stylesheet" href="/assets/css/shell.css">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/themes.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/base.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/layout.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/components.css') }}">
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/shell.css') }}">
     {% block page_assets %}{% endblock %}
-    <script src="/assets/vendor/htmx.min.js" defer></script>
+    <script src="{{ asset_url('/assets/vendor/htmx.min.js') }}" defer></script>
     <script type="application/json" id="roehub-locale-catalogs">{{ locale_catalogs_json|safe }}</script>
-    <script type="module" src="/assets/js/core/theme.js"></script>
-    <script type="module" src="/assets/js/core/locale.js"></script>
-    <script type="module" src="/assets/js/components/dropdown.js"></script>
-    <script type="module" src="/assets/js/components/listbox.js"></script>
-    <script type="module" src="/assets/js/components/combobox.js"></script>
-    <script type="module" src="/assets/js/components/refresh-control.js"></script>
-    <script src="/assets/js/pages/auth.js" defer></script>
+    <script type="module" src="{{ asset_url('/assets/js/core/theme.js') }}"></script>
+    <script type="module" src="{{ asset_url('/assets/js/core/locale.js') }}"></script>
+    <script type="module" src="{{ asset_url('/assets/js/components/dropdown.js') }}"></script>
+    <script type="module" src="{{ asset_url('/assets/js/components/listbox.js') }}"></script>
+    <script type="module" src="{{ asset_url('/assets/js/components/combobox.js') }}"></script>
+    <script type="module" src="{{ asset_url('/assets/js/components/refresh-control.js') }}"></script>
+    <script src="{{ asset_url('/assets/js/pages/auth.js') }}" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">{{ t("shell.skip") }}</a>

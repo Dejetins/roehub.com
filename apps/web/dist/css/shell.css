@@ -20,6 +20,9 @@
   color: var(--rh-muted);
   font-size: 12px;
   letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+  text-transform: none !important;
   white-space: nowrap;
 }
 
@@ -37,6 +40,9 @@
   gap: var(--rh-space-2);
   padding: 6px 11px;
   cursor: pointer;
+  line-height: 1;
+  text-align: center;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -88,6 +94,24 @@
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.primary-nav,
+.header-controls {
+  transform: translateY(3px);
+}
+
+.header-controls .rh-dropdown__trigger {
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-align: center;
+  text-transform: none;
+}
+
+.header-controls #theme-switcher-trigger {
+  width: 156px;
+  min-width: 156px;
 }
 
 .landing-hero,

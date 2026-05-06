@@ -115,6 +115,11 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert "Mode:" not in response.text
     assert '<span class="user-badge__value">Authentication required</span>' not in response.text
     assert 'id="theme-switcher-trigger"' in response.text
+    assert "/assets/css/shell.css?v=" in response.text
+    theme_trigger = response.text.split('id="theme-switcher-trigger"', maxsplit=1)[1].split(
+        "</button>", maxsplit=1
+    )[0]
+    assert ">Theme" not in theme_trigger
     assert 'data-theme-value="terminal-orange"' in response.text
     assert "site.css" not in response.text
 
@@ -265,6 +270,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "Account:" not in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
+    assert ">Home</a>" in settings_response.text
+    assert ">HOME</a>" not in settings_response.text
     for panel in [
         "profile",
         "profile_actions",
@@ -283,6 +290,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert settings_response.text.index('data-profile-edit') > settings_response.text.index(
         'data-settings-panel="profile"'
     )
+    assert "data-save-all" not in settings_response.text
+    assert "data-settings-custom-interval" not in settings_response.text
+    assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
     assert '<select' not in settings_response.text
     assert '<meter' not in settings_response.text

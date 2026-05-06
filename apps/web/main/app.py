@@ -158,6 +158,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         api_base_url=runtime_settings.api_base_url
     )
     app.state.api_proxy_transport = None
+    app.state.asset_version = _resolve_asset_version(environ=effective_environ)
     _register_routes(app=app, templates=templates, runtime_settings=runtime_settings)
     return app
 
@@ -530,6 +531,7 @@ def _build_template_context(
         catalog_locale: load_catalog(locale=catalog_locale)
         for catalog_locale in SUPPORTED_LOCALES
     }
+    asset_version = str(getattr(request.app.state, "asset_version", "dev"))
     return {
         "request": request,
         "page_path": page_path,
@@ -541,6 +543,7 @@ def _build_template_context(
         "default_locale": DEFAULT_LOCALE,
         "supported_locales": SUPPORTED_LOCALES,
         "locale_catalogs_json": json.dumps(locale_catalogs, ensure_ascii=False, sort_keys=True),
+        "asset_url": lambda path: _build_asset_url(path=path, asset_version=asset_version),
         "theme_options": _THEME_OPTIONS,
         "refresh_presets": _REFRESH_PRESETS,
         "t": lambda key: translate(locale=locale, key=key),
@@ -571,6 +574,31 @@ def _build_nav_items(*, locale: str, active_path: str) -> list[dict[str, str | b
         }
         for item in _NAV_ITEMS
     ]
+
+
+def _resolve_asset_version(*, environ: Mapping[str, str]) -> str:
+    explicit_version = (
+        environ.get("WEB_ASSET_VERSION")
+        or environ.get("ROEHUB_WEB_ASSET_VERSION")
+        or ""
+    ).strip()
+    if explicit_version:
+        return explicit_version
+    try:
+        return str(
+            max(
+                path.stat().st_mtime_ns
+                for path in _DIST_PATH.rglob("*")
+                if path.is_file()
+            )
+        )
+    except (OSError, ValueError):
+        return "dev"
+
+
+def _build_asset_url(*, path: str, asset_version: str) -> str:
+    separator = "&" if "?" in path else "?"
+    return f"{path}{separator}v={asset_version}"
 
 
 def _build_language_options(

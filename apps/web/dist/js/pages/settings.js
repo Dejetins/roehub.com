@@ -70,6 +70,12 @@ function setText(selector, value) {
   }
 }
 
+function formatTimestampToSeconds(value) {
+  const text = String(value || "").trim();
+  if (!text) return "--";
+  return text.replace("T", " ").replace(/\.\d+/, "").replace(/Z$/, "");
+}
+
 function updateSelected(selector, attribute, value) {
   qsa(selector).forEach((item) => {
     item.setAttribute("aria-selected", item.dataset[attribute] === value ? "true" : "false");
@@ -229,10 +235,6 @@ function renderPreferences(payload) {
   setDropdownValue("[data-settings-theme-current]", payload.theme);
   setDropdownValue("[data-settings-locale-current]", payload.locale.toUpperCase());
   setDropdownValue("[data-settings-refresh-current]", payload.autorefresh.preset_key);
-  const custom = qs("[data-settings-custom-interval]");
-  if (custom instanceof HTMLInputElement) {
-    custom.value = String(payload.autorefresh.refresh_interval_seconds || 45);
-  }
   updateSelected("[data-settings-theme-option]", "settingsThemeOption", payload.theme);
   updateSelected("[data-settings-locale-option]", "settingsLocaleOption", payload.locale);
   updateSelected("[data-settings-refresh-option]", "settingsRefreshOption", payload.autorefresh.preset_key);
@@ -315,7 +317,7 @@ function renderSessions(payload, append = false) {
   state.sessionsCursor = payload?.next_cursor || null;
   (payload?.items || []).forEach((item) => {
     const row = body.insertRow();
-    [item.last_seen_at, item.ip_address, item.device, item.location, item.is_current ? t("settings.state.active") : t("settings.state.ready")].forEach((value) => {
+    [formatTimestampToSeconds(item.last_seen_at), item.ip_address, item.device, item.location, item.is_current ? t("settings.state.active") : t("settings.state.ready")].forEach((value) => {
       row.insertCell().textContent = String(value || "--");
     });
   });
@@ -336,23 +338,19 @@ function renderAudit(payload, append = false) {
   }
   items.forEach((item) => {
     const row = body.insertRow();
-    [item.created_at, item.event_type, item.summary].forEach((value) => {
+    [formatTimestampToSeconds(item.created_at), item.event_type, item.summary].forEach((value) => {
       row.insertCell().textContent = String(value || "--");
     });
   });
 }
 
 async function savePreferences(root) {
-  const custom = qs("[data-settings-custom-interval]");
   const payload = {
     theme: state.preferences.theme,
     locale: state.preferences.locale,
     density: state.preferences.density,
     autorefresh_preset: state.preferences.autorefresh_preset,
-    refresh_interval_seconds:
-      state.preferences.autorefresh_preset === "custom" && custom instanceof HTMLInputElement
-        ? Number(custom.value)
-        : state.preferences.refresh_interval_seconds,
+    refresh_interval_seconds: state.preferences.refresh_interval_seconds,
   };
   try {
     const saved = await apiFetch(endpoint(root, "preferencesEndpoint"), {
