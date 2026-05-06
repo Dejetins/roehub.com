@@ -266,8 +266,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "/assets/css/pages/settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
     for panel in [
-        "command_bar",
         "profile",
+        "profile_actions",
         "exchange_keys",
         "limits",
         "integrations",
@@ -275,9 +275,14 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
         "security",
         "sessions",
         "audit",
-        "top_actions",
     ]:
         assert f'data-settings-panel="{panel}"' in settings_response.text
+    assert 'data-settings-panel="command_bar"' not in settings_response.text
+    assert 'data-settings-panel="top_actions"' not in settings_response.text
+    assert '<header class="settings-command"' not in settings_response.text
+    assert settings_response.text.index('data-profile-edit') > settings_response.text.index(
+        'data-settings-panel="profile"'
+    )
     assert 'role="listbox"' in settings_response.text
     assert '<select' not in settings_response.text
     assert '<meter' not in settings_response.text

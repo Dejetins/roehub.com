@@ -1,7 +1,17 @@
 <section class="terminal-panel settings-panel settings-profile" data-settings-panel="profile">
-  <header class="panel-heading">
-    <h1>{{ t("settings.profile.title") }}</h1>
-    <span class="settings-status-dot settings-status-dot--ok" data-profile-status>{{ t("settings.state.active") }}</span>
+  <header class="panel-heading panel-heading--with-tools">
+    <div class="settings-panel-title">
+      <h1>{{ t("settings.profile.title") }}</h1>
+      <span class="settings-status-dot settings-status-dot--ok" data-profile-status>{{ t("settings.state.active") }}</span>
+    </div>
+    <div class="settings-profile__actions" data-settings-panel="profile_actions">
+      <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-profile-edit>
+        {{ t("settings.actions.edit_profile") }}
+      </button>
+      <button class="rh-button rh-button--primary rh-button--compact" type="button" data-save-all>
+        {{ t("settings.actions.save") }}
+      </button>
+    </div>
   </header>
   <div class="settings-profile__body">
     <div class="settings-avatar" aria-hidden="true">QT</div>

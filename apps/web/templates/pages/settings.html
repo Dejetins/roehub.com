@@ -19,21 +19,6 @@
     data-exchange-keys-endpoint="/api/exchange-keys"
     aria-label="{{ t('settings.aria') }}"
   >
-    <header class="settings-command" data-settings-panel="command_bar">
-      <div class="settings-command__title">
-        <strong>{{ t("settings.command") }}</strong>
-        <span class="settings-pill settings-pill--ok" data-settings-save-state>{{ t("settings.state.ready") }}</span>
-      </div>
-      <div class="settings-command__actions" data-settings-panel="top_actions">
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-profile-edit>
-          {{ t("settings.actions.edit_profile") }}
-        </button>
-        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-save-all>
-          {{ t("settings.actions.save") }}
-        </button>
-      </div>
-    </header>
-
     <div class="settings-grid">
       {% include "fragments/account/profile.html" %}
       {% include "fragments/account/exchange_keys.html" %}

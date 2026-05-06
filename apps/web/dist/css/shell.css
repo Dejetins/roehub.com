@@ -12,11 +12,14 @@
 }
 
 .nav-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
   padding: 6px 10px;
   color: var(--rh-muted);
   font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 

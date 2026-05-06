@@ -9,12 +9,12 @@
   position: fixed;
   inset: 0 0 auto;
   z-index: 20;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
   gap: var(--rh-space-2);
   min-height: var(--rh-header-height);
-  padding-inline: var(--rh-space-4);
+  padding-inline: max(var(--rh-space-4), calc((100vw - var(--rh-page-max)) / 2 + 8px));
   border-bottom: 1px solid var(--rh-divider);
   background: color-mix(in srgb, var(--rh-bg-elevated) 96%, transparent);
 }
@@ -30,8 +30,8 @@
 }
 
 .brand {
-  position: absolute;
-  inset-inline-start: var(--rh-space-4);
+  width: max-content;
+  justify-self: start;
   gap: var(--rh-space-2);
   min-width: 0;
   color: var(--rh-text-strong);
@@ -43,6 +43,7 @@
 }
 
 .primary-nav {
+  justify-self: center;
   justify-content: center;
   gap: var(--rh-space-2);
   min-width: 0;
@@ -50,6 +51,7 @@
 }
 
 .header-controls {
+  justify-self: end;
   justify-content: flex-start;
   gap: var(--rh-space-2);
   min-width: 0;
@@ -105,14 +107,10 @@
 
 @media (max-width: 860px) {
   .app-header {
-    display: grid;
     grid-template-columns: 1fr;
     gap: var(--rh-space-2);
+    padding-inline: var(--rh-space-4);
     padding-block: var(--rh-space-2);
-  }
-
-  .brand {
-    position: static;
   }
 
   .app-shell {
