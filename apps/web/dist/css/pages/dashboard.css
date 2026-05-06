@@ -259,33 +259,41 @@
 }
 
 .dashboard-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  display: block;
+  max-height: 100%;
+  overflow-y: auto;
   border-top: 1px solid var(--rh-divider);
-  border-left: 1px solid var(--rh-divider);
 }
 
 .dashboard-metric {
   display: grid;
-  gap: 1px;
-  min-height: 39px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: baseline;
+  min-height: 34px;
   min-width: 0;
-  padding: 3px 5px;
-  border-right: 1px solid var(--rh-divider);
+  padding: 4px 6px;
   border-bottom: 1px solid var(--rh-divider);
   line-height: 1.05;
+}
+
+.dashboard-metric__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-metric__value {
   overflow: hidden;
   color: var(--rh-financial-neutral);
   font-size: 12px;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dashboard-metric__source {
+  grid-column: 1 / -1;
   overflow: hidden;
   color: var(--rh-muted);
   font-size: 9px;

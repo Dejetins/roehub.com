@@ -346,6 +346,7 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "Strategy list" in response.text
     assert "PnL / equity monitoring (live)" not in response.text
     assert "PnL / equity monitoring" in response.text
+    assert ">4H</button>" in response.text
     assert ">1W</button>" in response.text
     assert ">1M</button>" in response.text
     assert "dashboard-live-indicator" not in response.text

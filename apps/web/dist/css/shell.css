@@ -75,8 +75,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 122px;
-  flex: 0 0 122px;
+  width: 86px;
+  flex: 0 0 86px;
   padding: 6px 10px;
 }
 
@@ -110,13 +110,13 @@
 }
 
 .header-controls #theme-switcher-trigger {
-  width: 156px;
-  min-width: 156px;
+  width: 124px;
+  min-width: 124px;
 }
 
 .header-controls #locale-switcher-trigger {
-  width: 86px;
-  min-width: 86px;
+  width: 56px;
+  min-width: 56px;
 }
 
 .shell-global-status {

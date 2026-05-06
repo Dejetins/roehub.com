@@ -1018,7 +1018,7 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
 
 - Реализовать CSS token-файлы из дизайн-манифеста.
 - Зафиксировать `terminal-orange` как тему по умолчанию.
-- Добавить `themes.css` минимум с `terminal-orange`, `graphite`, `matrix-green`, `high-contrast` как placeholders или полные блоки токенов.
+- Добавить `themes.css` минимум с `terminal-orange` и `graphite` как поддерживаемыми блоками токенов.
 - Реализовать `apps/web/dist/js/core/theme.js`:
   - читает начальную тему из backend preference, если она доступна;
   - затем использует `localStorage`;
@@ -1233,7 +1233,7 @@ Frontend / panel inventory из reference:
 
 - command bar `>_ MONITORING STRATEGIES` с active badge;
 - selected strategy summary в две колонки плюс actions column;
-- panel `PNL / EQUITY MONITORING` с legend, chart, buy/sell markers и range controls `1H/6H/1D/1W/1M`;
+- panel `PNL / EQUITY MONITORING` с legend, chart, buy/sell markers и range controls `1H/4H/1D/1W/1M`;
 - metric grid справа от chart;
 - `OPEN POSITIONS`;
 - `RECENT EXECUTIONS`;

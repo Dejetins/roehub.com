@@ -3,9 +3,18 @@ import { dispatchRoehubEvent, qsa, setText } from "./dom.js";
 export const THEME_STORAGE_KEY = "roehub_theme";
 export const SUPPORTED_THEMES = ["terminal-orange", "graphite"];
 export const DEFAULT_THEME = "terminal-orange";
+const THEME_LABELS = {
+  "terminal-orange": "Orange",
+  graphite: "Graphite",
+};
 
 export function normalizeTheme(value) {
   return SUPPORTED_THEMES.includes(value) ? value : DEFAULT_THEME;
+}
+
+export function themeDisplayName(theme) {
+  const normalizedTheme = normalizeTheme(theme);
+  return THEME_LABELS[normalizedTheme] || normalizedTheme;
 }
 
 export function getStoredTheme() {
@@ -30,7 +39,7 @@ export function applyTheme(theme, { persist = true } = {}) {
     const isSelected = option.dataset.themeValue === normalizedTheme;
     option.setAttribute("aria-selected", isSelected ? "true" : "false");
   });
-  setText("[data-theme-current]", normalizedTheme);
+  setText("[data-theme-current]", themeDisplayName(normalizedTheme));
   dispatchRoehubEvent("theme-change", { theme: normalizedTheme });
   return normalizedTheme;
 }

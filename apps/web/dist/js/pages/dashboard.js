@@ -248,9 +248,7 @@ function renderMetrics(root, metrics) {
       return `
         <article class="dashboard-metric">
           <span class="dashboard-metric__label">${escapeHtml(label)}</span>
-          <strong class="dashboard-metric__value ${financialClass(metric.direction)}">
-            ${escapeHtml(metric.formatted)}
-          </strong>
+          <strong class="dashboard-metric__value ${financialClass(metric.direction)}">${escapeHtml(metric.formatted)}</strong>
           <span class="dashboard-metric__source">${escapeHtml(metric.source)} / ${escapeHtml(status)}</span>
         </article>
       `;

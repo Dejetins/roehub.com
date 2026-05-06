@@ -281,12 +281,10 @@ Language switcher:
 
 Важно: `--rh-chart-grid-line` используется только внутри графиков, chart panels и отдельных data-areas. Для общего фона страницы сетка запрещена. Если временно сохраняется устаревший alias `--rh-grid-line`, он не должен применяться к `body`, `.app-shell`, `.page-shell`, hero или общему container background.
 
-Минимальный набор дополнительных тем для реализации после базового слоя:
+Минимальный набор тем для текущего Web UI v1:
 
 - `terminal-orange` - тема по умолчанию, совпадает с референсами;
-- `graphite` - нейтральная темная тема с приглушенным акцентом;
-- `matrix-green` - зеленый акцент для пользователей, которым нужен классический терминальный вид;
-- `high-contrast` - доступная тема с усиленными границами и контрастом текста.
+- `graphite` - нейтральная темная тема с приглушенным акцентом.
 
 Дополнительные палитры добавляются только через новые блоки токенов. Они не должны менять `--rh-financial-positive`, `--rh-financial-negative`, `--rh-financial-neutral`, если это не отдельное решение доступности с явным ревью.
 
@@ -433,7 +431,7 @@ Branded dropdown acceptance:
 - доступен из каркаса приложения через компактный account/settings control, но не занимает primary header-nav row;
 - полные настройки доступны на странице настроек;
 - тип контрола: сегментированный переключатель или меню с превью-свотчами;
-- на страницах приложения предпочтительно меню/compact segmented control с swatches, а не четыре крупные текстовые кнопки `Orange / Graphite / Matrix / Contrast` в шапке;
+- на страницах приложения предпочтительно меню/compact segmented control с swatches, а не крупные текстовые кнопки в шапке;
 - превью-свотчи используют цвета `base`/`accent`, а не финансовые цвета;
 - применение темы сразу обновляет `data-theme`;
 - предпочтение сначала сохраняется в `localStorage`, затем в backend-настройку, когда API настроек аккаунта доступен.
@@ -492,7 +490,7 @@ Live-data страницы (`/dashboard`, `/strategies`, `/backtests`) имею�
 
 Route: `/dashboard`. Канонический референс: `personal_dashboard.png`.
 
-Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, PnL/equity chart с range controls `1H/6H/1D/1W/1M`, metric grid, таблица открытых позиций, полноширинная таблица последних исполнений, health/risk, табличные alerts/events, табличный symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, PnL/equity chart с range controls `1H/4H/1D/1W/1M`, metric grid, таблица открытых позиций, полноширинная таблица последних исполнений, health/risk, табличные alerts/events, табличный symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
 
 Dashboard показывает текущее состояние портфеля стратегий online, но читает его только через backend read-models/cache: strategy storage/run state, realtime Redis streams/readers, planned portfolio/position/execution/equity snapshots, market-data reference и exchange account read-models. Если источник еще не реализован, соответствующая panel остается в форме референса и показывает typed `unavailable/degraded/stale` state.
 
@@ -575,7 +573,7 @@ apps/web/locales/
 - live-регионы ограничены и не спамят screen reader;
 - клавиатурная навигация работает через вкладки шапки, фильтры, модальные окна, переключатель темы и основные формы;
 - клавиатурная навигация работает через language switcher;
-- тема `high-contrast` проходит те же layout-проверки, что и тема по умолчанию.
+- обе поддерживаемые темы проходят те же layout-проверки, что и тема по умолчанию.
 
 ### 12) Приемка Browser QA
 
