@@ -1,5 +1,5 @@
 :root {
-  --rh-page-transition-duration: 300ms;
+  --rh-page-transition-duration: 500ms;
   --rh-page-transition-distance: 4px;
   --rh-page-transition-inline-shift: 0;
   --rh-page-transition-easing: cubic-bezier(0.2, 0, 0.2, 1);
