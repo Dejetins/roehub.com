@@ -10,7 +10,6 @@
     role="dialog"
     aria-modal="true"
     aria-labelledby="auth-modal-title"
-    aria-describedby="auth-modal-body"
     tabindex="-1"
   >
     <div class="auth-modal__header">
@@ -20,18 +19,47 @@
       </button>
     </div>
     <h2 id="auth-modal-title">{{ t("auth.login_title") }}</h2>
-    <p id="auth-modal-body">{{ t("auth.login_body") }}</p>
     <dl class="auth-modal__next">
       <dt>{{ t("auth.next_label") }}</dt>
       <dd data-auth-next-label>{{ auth_next_path }}</dd>
     </dl>
+    <form
+      class="auth-modal__form"
+      data-auth-login-form
+      data-auth-error-default="{{ t('auth.login_error') }}"
+      novalidate
+    >
+      <input type="hidden" name="next" value="{{ auth_next_path }}">
+      <label class="auth-modal__field">
+        <span>{{ t("auth.username_label") }}</span>
+        <input
+          type="text"
+          name="username"
+          autocomplete="username"
+          inputmode="email"
+          required
+          maxlength="320"
+          placeholder="{{ t('auth.username_placeholder') }}"
+          data-auth-initial
+        >
+      </label>
+      <label class="auth-modal__field">
+        <span>{{ t("auth.password_label") }}</span>
+        <input
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          required
+          maxlength="4096"
+          placeholder="{{ t('auth.password_placeholder') }}"
+        >
+      </label>
+      <p class="auth-modal__error" data-auth-error hidden></p>
+      <button class="shell-button shell-button--primary" type="submit" data-auth-primary>
+        {{ t("auth.sign_in") }}
+      </button>
+    </form>
     <div class="auth-modal__actions">
-      <a
-        id="keycloak-login-link"
-        class="shell-button shell-button--primary"
-        href="{{ oidc_login_url }}"
-        data-auth-primary
-      >{{ t("auth.continue") }}</a>
       <a class="shell-button shell-button--ghost" href="/register">{{ t("auth.register") }}</a>
     </div>
   </section>
