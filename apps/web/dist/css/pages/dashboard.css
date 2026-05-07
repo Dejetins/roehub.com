@@ -314,7 +314,8 @@
 }
 
 .dashboard-executions-row .terminal-panel,
-.dashboard-table-row .terminal-panel {
+.dashboard-table-row .terminal-panel,
+.dashboard-bottom-row .terminal-panel {
   align-content: stretch;
   grid-template-rows: auto minmax(0, 1fr);
 }
@@ -324,6 +325,7 @@
 }
 
 .dashboard-table-wrap {
+  min-height: 0;
   overflow: auto;
   border-top: 1px solid var(--rh-divider);
 }
@@ -595,9 +597,9 @@
 
   .dashboard-main {
     grid-template-rows:
-      minmax(clamp(120px, 14vh, 190px), 0.45fr)
-      minmax(clamp(188px, 23vh, 360px), 0.86fr)
-      minmax(clamp(188px, 23vh, 360px), 0.86fr)
+      minmax(clamp(168px, 22vh, 320px), 1.22fr)
+      minmax(clamp(112px, 13vh, 210px), 0.42fr)
+      minmax(clamp(112px, 13vh, 210px), 0.42fr)
       minmax(clamp(106px, 12vh, 220px), 0.34fr);
     min-height: 0;
     overflow: hidden;
@@ -605,7 +607,7 @@
 
   .dashboard-chart-wrap,
   .dashboard-chart {
-    height: clamp(92px, 9.5vh, 132px);
+    height: clamp(116px, 15vh, 210px);
   }
 
   .dashboard-top-row {
@@ -629,7 +631,8 @@
   }
 
   .dashboard-executions-row .dashboard-table-wrap,
-  .dashboard-table-row .dashboard-table-wrap {
+  .dashboard-table-row .dashboard-table-wrap,
+  .dashboard-bottom-row .dashboard-table-wrap {
     max-height: none;
     overflow: auto;
   }
