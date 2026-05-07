@@ -179,7 +179,7 @@ def _register_routes(
             template_name="pages/landing.html",
             page_path="/",
             active_path="/",
-            title_key="landing.page_title",
+            title_key="landing.title",
             open_login_modal=False,
         )
 

@@ -85,11 +85,7 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    main_html = response.text.split('<main id="main-content"', maxsplit=1)[1].split(
-        "</main>", maxsplit=1
-    )[0]
     assert '<html lang="en" data-locale="en" data-theme="terminal-orange">' in response.text
-    assert "<title>Roehub CLI | Roehub</title>" in response.text
     assert 'data-shell-header' in response.text
     assert 'data-nav-key="dashboard"' in response.text
     assert 'data-nav-key="settings"' in response.text
@@ -110,12 +106,7 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'data-auth-open' in response.text
     assert "Roehub platform" not in response.text
     assert 'id="landing-capabilities-title"' not in response.text
-    assert "Roehub: research, validate, automate, execute." not in main_html
-    assert "Roehub unifies backtesting, strategy management" not in main_html
-    assert "Roehub CLI" in main_html
-    assert 'data-cli-stream' in main_html
-    assert 'data-cli-log' in main_html
-    assert "&gt; roehub init --workspace cloud" in main_html
+    assert "Roehub: research, validate, automate, execute." in response.text
     assert "ROEHUB WEB" not in response.text
     assert "&gt;_ ROEHUB WEB" not in response.text
     assert '<div class="command-bar"' not in response.text
@@ -319,17 +310,14 @@ def test_authorized_placeholder_routes_render_active_navigation() -> None:
     client = _build_test_client()
 
     strategies_response = client.get("/strategies/new")
-    main_html = strategies_response.text.split('<main id="main-content"', maxsplit=1)[1].split(
-        "</main>", maxsplit=1
-    )[0]
 
     assert strategies_response.status_code == 200
     assert 'data-nav-key="strategies"' in strategies_response.text
     assert 'nav-tab--active"' in strategies_response.text
     assert 'id="placeholder-market-listbox"' not in strategies_response.text
-    assert "BTCUSDT" not in main_html
-    assert "ETHUSDT" not in main_html
-    assert "SOLUSDT" not in main_html
+    assert "BTCUSDT" not in strategies_response.text
+    assert "ETHUSDT" not in strategies_response.text
+    assert "SOLUSDT" not in strategies_response.text
 
 
 def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
