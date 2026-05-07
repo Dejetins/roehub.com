@@ -350,40 +350,6 @@
   white-space: nowrap;
 }
 
-.auth-modal__form {
-  display: grid;
-  gap: var(--rh-space-3);
-  margin-block-start: var(--rh-space-4);
-}
-
-.auth-modal__field {
-  display: grid;
-  gap: var(--rh-space-2);
-  color: var(--rh-muted);
-  font-size: var(--rh-font-size-xs);
-  text-transform: uppercase;
-}
-
-.auth-modal__field input {
-  min-height: 42px;
-  width: 100%;
-  border: 1px solid var(--rh-line);
-  background: var(--rh-bg-elevated);
-  color: var(--rh-text);
-  font: inherit;
-  text-transform: none;
-}
-
-.auth-modal__field input:focus {
-  outline: 1px solid var(--rh-accent);
-  outline-offset: 1px;
-}
-
-.auth-modal__error {
-  margin: 0;
-  color: var(--rh-financial-negative);
-}
-
 .auth-modal__actions {
   gap: var(--rh-space-3);
   margin-block-start: var(--rh-space-4);

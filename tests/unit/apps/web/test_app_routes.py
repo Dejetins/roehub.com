@@ -192,11 +192,8 @@ def test_login_route_sanitizes_external_next_and_preopens_modal() -> None:
     response = client.get("/login?next=https://evil.example/path")
 
     assert response.status_code == 200
-    assert 'data-auth-login-form' in response.text
-    assert 'name="username"' in response.text
-    assert 'name="password"' in response.text
-    assert 'id="keycloak-login-link"' not in response.text
-    assert "Keycloak-backed account flow" not in response.text
+    assert "/api/auth/login?next=%2F" in response.text
+    assert 'id="keycloak-login-link"' in response.text
     assert 'data-open-on-load="true"' in response.text
     assert "Sign in to Roehub" in response.text
     assert "https://evil.example/path" not in response.text
@@ -211,7 +208,8 @@ def test_register_route_is_separate_keycloak_backed_entrypoint() -> None:
     assert 'data-page="register"' in response.text
     assert 'data-register-entrypoint="/api/auth/login?next=%2Fsettings"' in response.text
     assert "Create your Roehub account" in response.text
-    assert 'href="/api/auth/login?next=%2Fsettings"' in response.text
+    assert "<input" not in response.text
+    assert "<form" not in response.text
 
 
 def test_favicon_route_avoids_browser_404_noise() -> None:
@@ -386,9 +384,9 @@ def test_locale_cookie_selects_russian_shell_without_localizing_routes() -> None
 
     assert response.status_code == 200
     assert '<html lang="ru" data-locale="ru" data-theme="terminal-orange">' in response.text
-    assert "Открыть Roehub" in response.text
+    assert "Открыть вход в Roehub" in response.text
     assert 'href="/strategies"' in response.text
-    assert "/api/auth/password-login" not in response.text
+    assert "/api/auth/login" in response.text
 
 
 def test_invalid_locale_cookie_falls_back_to_english() -> None:
@@ -398,7 +396,7 @@ def test_invalid_locale_cookie_falls_back_to_english() -> None:
 
     assert response.status_code == 200
     assert '<html lang="en" data-locale="en" data-theme="terminal-orange">' in response.text
-    assert "Open Roehub" in response.text
+    assert "Open Roehub login" in response.text
 
 
 def test_locale_switch_sets_cookie_and_keeps_route_path() -> None:

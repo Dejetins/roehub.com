@@ -1,6 +1,6 @@
 # Identity Keycloak Auth Model v1
 
-Документ фиксирует каноническую модель аутентификации Roehub после cutover на Keycloak: login через Keycloak + локальная server-side сессия Roehub.
+Документ фиксирует каноническую модель аутентификации Roehub после cutover на Keycloak: OIDC login через Keycloak + локальная server-side сессия Roehub.
 
 ## Статус
 
@@ -20,9 +20,7 @@
 
 ### 1) Внешний IdP
 
-- внешний identity provider: Keycloak;
-- базовый внешний flow: OIDC Authorization Code;
-- Web UI modal flow: same-origin credential form, где API обменивает username/password на Keycloak token через token endpoint и затем выпускает локальную Roehub session.
+- внешний identity provider: Keycloak (OIDC Authorization Code flow).
 - внешний ключ пользователя: `keycloak_subject` (claim `sub`), хранится как opaque string.
 
 ### 2) Локальная identity Roehub
@@ -36,12 +34,11 @@
 - браузер хранит только cookie `roehub_session_id` (имя настраивается через env);
 - cookie значение — opaque UUID session id;
 - raw Keycloak `access_token`/`id_token`/`refresh_token` в browser cookie не пишутся.
-- username/password из Web UI login modal отправляются только в same-origin `POST /auth/password-login`, не пишутся в cookie и не сохраняются в Roehub DB.
 
 ### 4) Session lifecycle
 
 - server-side сессии хранятся в `identity_sessions`;
-- на `/auth/callback` или `/auth/password-login` создаётся/обновляется локальный user + создаётся session record;
+- на `/auth/callback` создаётся/обновляется локальный user + создаётся session record;
 - на `/auth/logout` session помечается revoked и cookie удаляется;
 - `/auth/current-user` резолвит principal через session -> user snapshot.
 
@@ -51,7 +48,6 @@ Identity endpoints:
 
 - `GET /auth/login` — redirect в Keycloak authorize endpoint;
 - `GET /auth/callback` — code exchange + introspection + upsert user + create local session;
-- `POST /auth/password-login` — request DTO `{ "username": string, "password": string, "next": string | null }`; password grant через Keycloak token endpoint + introspection + upsert user + create local session; response DTO `{ "next": "/relative-path" }` + opaque session cookie; status `200/401/422/500`;
 - `POST /auth/logout` — revoke local session + clear auth cookies;
 - `GET /auth/current-user` — возвращает `{ "user_id": "...", "paid_level": "..." }`.
 

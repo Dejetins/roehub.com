@@ -1,5 +1,4 @@
 const modal = document.querySelector("[data-auth-modal]");
-const loginForm = document.querySelector("[data-auth-login-form]");
 let lastFocusedElement = null;
 
 function isFocusable(element) {
@@ -27,11 +26,8 @@ function openModal(trigger) {
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("auth-modal-lock");
   const dialog = modal.querySelector("[role='dialog']");
-  const initial = modal.querySelector("[data-auth-initial]");
   const primary = modal.querySelector("[data-auth-primary]");
-  if (initial instanceof HTMLElement) {
-    initial.focus();
-  } else if (primary instanceof HTMLElement) {
+  if (primary instanceof HTMLElement) {
     primary.focus();
   } else if (dialog instanceof HTMLElement) {
     dialog.focus();
@@ -101,79 +97,6 @@ document.querySelectorAll("[data-locale-option]").forEach((option) => {
     }
   });
 });
-
-if (loginForm instanceof HTMLFormElement) {
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(loginForm);
-    const username = String(formData.get("username") || "").trim();
-    const password = String(formData.get("password") || "");
-    const nextPath = String(formData.get("next") || "/dashboard");
-    const errorElement = loginForm.querySelector("[data-auth-error]");
-    const submitButton = loginForm.querySelector("[data-auth-primary]");
-    const defaultError = loginForm.dataset.authErrorDefault || "Unable to sign in";
-
-    if (errorElement instanceof HTMLElement) {
-      errorElement.hidden = true;
-      errorElement.textContent = "";
-    }
-
-    if (!username || !password) {
-      if (errorElement instanceof HTMLElement) {
-        errorElement.textContent = defaultError;
-        errorElement.hidden = false;
-      }
-      return;
-    }
-
-    if (submitButton instanceof HTMLButtonElement) {
-      submitButton.disabled = true;
-    }
-
-    try {
-      const response = await fetch("/api/auth/password-login", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          next: nextPath,
-        }),
-      });
-      let payload = null;
-      try {
-        payload = await response.json();
-      } catch (_error) {
-        payload = null;
-      }
-      if (!response.ok) {
-        const detail = payload && typeof payload === "object" ? payload.detail : null;
-        const message =
-          detail && typeof detail === "object" && typeof detail.message === "string"
-            ? detail.message
-            : defaultError;
-        throw new Error(message);
-      }
-      const redirectPath =
-        payload && typeof payload === "object" && typeof payload.next === "string"
-          ? payload.next
-          : "/dashboard";
-      window.location.assign(redirectPath);
-    } catch (error) {
-      if (errorElement instanceof HTMLElement) {
-        errorElement.textContent = error instanceof Error ? error.message : defaultError;
-        errorElement.hidden = false;
-      }
-      if (submitButton instanceof HTMLButtonElement) {
-        submitButton.disabled = false;
-      }
-    }
-  });
-}
 
 const logoutPanel = document.querySelector("[data-auth-logout]");
 if (logoutPanel instanceof HTMLElement) {

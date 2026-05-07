@@ -9,8 +9,8 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from trading.contexts.identity.adapters.inbound.api.deps.current_user import (
     RequireCurrentUserDependency,
@@ -44,22 +44,6 @@ class CurrentUserResponse(BaseModel):
 
     user_id: str
     paid_level: Literal["free", "base", "pro", "ultra"]
-
-
-class PasswordLoginRequest(BaseModel):
-    """
-    PasswordLoginRequest — same-origin login form credentials exchanged with Keycloak.
-
-    Docs:
-      - docs/architecture/identity/identity-keycloak-auth-model-v1.md
-    Related:
-      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py
-      - apps/web/templates/fragments/auth/login_modal.html
-    """
-
-    username: str = Field(min_length=1, max_length=320)
-    password: str = Field(min_length=1, max_length=4096)
-    next: str | None = Field(default="/dashboard", max_length=2048)
 
 
 class _OidcCallbackError(ValueError):
@@ -402,91 +386,6 @@ def build_auth_oidc_router(
         )
         return redirect_response
 
-    @router.post("/auth/password-login", response_model=None)
-    def post_auth_password_login(payload: PasswordLoginRequest) -> JSONResponse:
-        """
-        Exchange same-origin login-form credentials with Keycloak and create Roehub session.
-
-        Args:
-            payload: Username/password credentials and optional post-login path.
-        Returns:
-            JSONResponse: Sanitized next path with opaque Roehub session cookie.
-        Assumptions:
-            Passwords are never persisted by Roehub; Keycloak remains the credential authority.
-        Raises:
-            HTTPException: 401 with deterministic payload when credentials/token validation fails.
-        Side Effects:
-            Performs token/introspection HTTP requests, upserts local user, creates local
-            session, and writes opaque session cookie.
-        """
-        try:
-            token_payload = _exchange_password_credentials(
-                token_url=normalized_keycloak_token_url,
-                username=payload.username,
-                password=payload.password,
-                client_id=normalized_keycloak_client_id,
-                client_secret=normalized_keycloak_client_secret,
-                scope=normalized_oidc_scope,
-                timeout_seconds=oidc_token_timeout_seconds,
-                transport=oidc_http_transport,
-            )
-            access_token = _extract_access_token(token_payload=token_payload)
-            try:
-                keycloak_subject = _resolve_keycloak_subject_from_access_token(
-                    introspection_url=normalized_keycloak_introspection_url,
-                    access_token=access_token,
-                    client_id=normalized_keycloak_client_id,
-                    client_secret=normalized_keycloak_client_secret,
-                    timeout_seconds=oidc_token_timeout_seconds,
-                    transport=oidc_http_transport,
-                )
-            except _OidcCallbackError as introspection_error:
-                if introspection_error.code != "inactive_access_token":
-                    raise
-                keycloak_subject = _extract_subject_from_access_token_payload(
-                    access_token=access_token
-                )
-        except _OidcCallbackError as error_payload:
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": error_payload.code,
-                    "message": error_payload.message,
-                },
-            ) from error_payload
-
-        login_at = clock.now()
-        safe_next_path = _sanitize_next_path(raw_next=payload.next)
-        user = user_repository.upsert_keycloak_login(
-            keycloak_subject=keycloak_subject,
-            login_at=login_at,
-        )
-        session = session_repository.create_session(
-            user_id=user.user_id,
-            now=login_at,
-            idle_ttl_seconds=session_idle_ttl_seconds,
-            absolute_ttl_seconds=session_absolute_ttl_seconds,
-        )
-        response = JSONResponse({"next": safe_next_path})
-        _set_session_cookie(
-            response=response,
-            cookie_name=normalized_cookie_name,
-            cookie_value=str(session.session_id),
-            cookie_path=normalized_cookie_path,
-            cookie_secure=cookie_secure,
-            cookie_samesite=cookie_samesite,
-            expires_in_seconds=session_absolute_ttl_seconds,
-        )
-        response.delete_cookie(
-            key=normalized_oidc_state_cookie_name,
-            path=normalized_cookie_path,
-        )
-        response.delete_cookie(
-            key=normalized_oidc_next_cookie_name,
-            path=normalized_cookie_path,
-        )
-        return response
-
     @router.post("/auth/logout", status_code=204, response_model=None)
     def post_auth_logout(request: Request, response: Response) -> None:
         """
@@ -673,80 +572,6 @@ def _exchange_authorization_code(
         raise _OidcCallbackError(
             code="oidc_token_exchange_failed",
             message="OIDC token exchange returned non-JSON payload",
-        ) from error
-
-
-def _exchange_password_credentials(
-    *,
-    token_url: str,
-    username: str,
-    password: str,
-    client_id: str,
-    client_secret: str,
-    scope: str,
-    timeout_seconds: float,
-    transport: httpx.BaseTransport | None,
-) -> object:
-    """
-    Exchange username/password credentials for a Keycloak token payload.
-
-    Args:
-        token_url: Keycloak token endpoint URL.
-        username: Login identifier submitted by the browser form.
-        password: Password submitted by the browser form.
-        client_id: OIDC client identifier.
-        client_secret: OIDC client secret.
-        scope: OIDC scope string.
-        timeout_seconds: Outbound token request timeout.
-        transport: Optional httpx transport override used in tests.
-    Returns:
-        object: Parsed JSON payload returned by token endpoint.
-    Assumptions:
-        Endpoint accepts password grant for the configured confidential client.
-    Raises:
-        _OidcCallbackError: If request fails, credentials are rejected, or body is not JSON.
-    Side Effects:
-        Performs one outbound HTTP POST request.
-    """
-    try:
-        with httpx.Client(
-            follow_redirects=False,
-            timeout=timeout_seconds,
-            transport=transport,
-        ) as client:
-            response = client.post(
-                token_url,
-                data={
-                    "grant_type": "password",
-                    "username": username,
-                    "password": password,
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "scope": scope,
-                },
-            )
-    except httpx.HTTPError as error:
-        raise _OidcCallbackError(
-            code="password_token_exchange_failed",
-            message=f"Password token exchange failed: {error}",
-        ) from error
-
-    if response.status_code in {400, 401}:
-        raise _OidcCallbackError(
-            code="invalid_credentials",
-            message="Invalid username or password",
-        )
-    if response.status_code != 200:
-        raise _OidcCallbackError(
-            code="password_token_exchange_failed",
-            message=f"Password token exchange failed with status {response.status_code}",
-        )
-    try:
-        return response.json()
-    except ValueError as error:
-        raise _OidcCallbackError(
-            code="password_token_exchange_failed",
-            message="Password token exchange returned non-JSON payload",
         ) from error
 
 
