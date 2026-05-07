@@ -50,7 +50,22 @@
   --rh-radius-2: 4px;
   --rh-radius-3: 6px;
   --rh-header-height: 44px;
+  --rh-header-tablet-height: 98px;
+  --rh-header-mobile-height: 228px;
   --rh-commandbar-height: 36px;
   --rh-footer-height: 30px;
   --rh-page-max: 1920px;
+  --rh-workarea-gutter: 8px;
+  --rh-workarea-height: calc(
+    100vh - var(--rh-header-height) - var(--rh-footer-height) - (var(--rh-workarea-gutter) * 2 + 4px)
+  );
+}
+
+@supports (height: 100dvh) {
+  :root,
+  :root[data-theme="terminal-orange"] {
+    --rh-workarea-height: calc(
+      100dvh - var(--rh-header-height) - var(--rh-footer-height) - (var(--rh-workarea-gutter) * 2 + 4px)
+    );
+  }
 }

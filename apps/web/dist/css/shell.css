@@ -75,8 +75,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 86px;
-  flex: 0 0 86px;
+  width: 70px;
+  flex: 0 0 70px;
   padding: 6px 10px;
 }
 
@@ -98,7 +98,7 @@
 
 .primary-nav,
 .header-controls {
-  transform: translateY(3px);
+  transform: translateY(2px);
 }
 
 .header-controls .rh-dropdown__trigger {
@@ -115,8 +115,8 @@
 }
 
 .header-controls #locale-switcher-trigger {
-  width: 56px;
-  min-width: 56px;
+  width: 48px;
+  min-width: 48px;
 }
 
 .shell-global-status {
@@ -151,6 +151,27 @@
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .shell-global-status {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .dashboard-status-actions {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .dashboard-freshness {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 .shell-global-status .rh-popover {
@@ -254,6 +275,15 @@
 
 .workspace-placeholder {
   grid-template-columns: minmax(0, 1fr);
+  height: var(--rh-workarea-height);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-placeholder__header,
+.workspace-placeholder > .terminal-panel {
+  min-height: 0;
+  overflow: auto;
 }
 
 .auth-modal {
@@ -335,6 +365,11 @@ body.auth-modal-lock {
     grid-template-columns: 1fr;
   }
 
+  .workspace-placeholder {
+    height: auto;
+    overflow: visible;
+  }
+
   .landing-stats,
   .key-value-grid {
     grid-template-columns: 1fr;
@@ -345,7 +380,76 @@ body.auth-modal-lock {
   }
 
   .user-badge {
+    width: 70px;
+    flex-basis: 70px;
+  }
+}
+
+@media (max-width: 640px) {
+  .primary-nav,
+  .header-controls {
+    transform: none;
+  }
+
+  .nav-tab,
+  .shell-button,
+  .user-badge,
+  .header-controls .rh-dropdown__trigger {
     width: 100%;
-    flex-basis: auto;
+    min-width: 0;
+    min-height: 30px;
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+
+  .header-controls .shell-preferences {
+    display: contents;
+  }
+
+  .header-controls #theme-switcher-trigger {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-controls #locale-switcher-trigger {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .user-badge {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .header-controls .shell-button {
+    grid-column: span 1;
+  }
+
+  .header-controls .shell-button--ghost:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .shell-global-status {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .dashboard-status-actions {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .shell-global-status .rh-button {
+    min-height: 24px;
+    padding-inline: 7px;
+  }
+
+  .dashboard-freshness {
+    width: 100%;
+    max-width: none;
   }
 }

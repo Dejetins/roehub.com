@@ -1,5 +1,5 @@
 .page-shell:has(.settings-workstation) {
-  padding: 7px 8px 0;
+  min-height: var(--rh-workarea-height);
 }
 
 .settings-workstation {
@@ -7,7 +7,7 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
-  height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - 18px);
+  height: var(--rh-workarea-height);
   min-height: 0;
   color: var(--rh-text);
   font-size: 12px;
@@ -80,10 +80,10 @@
   display: grid;
   grid-template-columns: minmax(520px, 0.78fr) minmax(0, 1.22fr);
   grid-template-rows:
-    minmax(190px, 1.02fr)
-    minmax(126px, 0.68fr)
-    minmax(176px, 0.9fr)
-    minmax(164px, 0.82fr);
+    minmax(clamp(168px, 21vh, 280px), 1fr)
+    minmax(clamp(116px, 15vh, 220px), 0.76fr)
+    minmax(clamp(154px, 19vh, 260px), 0.88fr)
+    minmax(clamp(148px, 18vh, 260px), 0.84fr);
   grid-template-areas:
     "profile exchange"
     "limits integrations"
@@ -105,6 +105,23 @@
   align-content: start;
   gap: 7px;
   padding: 8px 10px;
+}
+
+@media (min-width: 981px) {
+  .settings-panel.terminal-panel {
+    align-content: stretch;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .settings-profile__body,
+  .settings-limits,
+  .settings-list,
+  .settings-table-wrap,
+  .settings-panel[data-settings-panel="security"] .settings-kv--two {
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 .settings-panel[data-settings-panel="profile"] {

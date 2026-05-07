@@ -1,6 +1,5 @@
 .page-shell:has(.dashboard-workstation) {
-  min-height: 0;
-  padding: 7px 8px 0;
+  min-height: var(--rh-workarea-height);
 }
 
 .dashboard-workstation {
@@ -584,7 +583,7 @@
   }
 
   .dashboard-workstation {
-    height: calc(100vh - var(--rh-header-height) - var(--rh-footer-height) - 20px);
+    height: var(--rh-workarea-height);
     overflow: hidden;
   }
 
@@ -596,17 +595,17 @@
 
   .dashboard-main {
     grid-template-rows:
-      minmax(180px, 0.72fr)
-      minmax(132px, 0.52fr)
-      minmax(132px, 0.52fr)
-      minmax(112px, 0.42fr);
+      minmax(clamp(120px, 14vh, 190px), 0.45fr)
+      minmax(clamp(188px, 23vh, 360px), 0.86fr)
+      minmax(clamp(188px, 23vh, 360px), 0.86fr)
+      minmax(clamp(106px, 12vh, 220px), 0.34fr);
     min-height: 0;
     overflow: hidden;
   }
 
   .dashboard-chart-wrap,
   .dashboard-chart {
-    height: 126px;
+    height: clamp(92px, 9.5vh, 132px);
   }
 
   .dashboard-top-row {
@@ -629,6 +628,12 @@
     overflow: auto;
   }
 
+  .dashboard-executions-row .dashboard-table-wrap,
+  .dashboard-table-row .dashboard-table-wrap {
+    max-height: none;
+    overflow: auto;
+  }
+
   .dashboard-strategy-list {
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -641,6 +646,15 @@
 }
 
 @media (max-width: 1180px) {
+  .page-shell:has(.dashboard-workstation) {
+    overflow: visible;
+  }
+
+  .dashboard-workstation {
+    height: auto;
+    overflow: visible;
+  }
+
   .dashboard-grid,
   .dashboard-top-row,
   .dashboard-chart-row,
@@ -652,6 +666,16 @@
 
   .dashboard-strategy-list {
     max-height: none;
+  }
+
+  .dashboard-chart-wrap,
+  .dashboard-chart {
+    height: clamp(128px, 24vw, 220px);
+  }
+
+  .dashboard-executions-row .terminal-panel,
+  .dashboard-table-row .terminal-panel {
+    min-height: clamp(180px, 28vw, 320px);
   }
 }
 
@@ -696,10 +720,6 @@
   .dashboard-freshness {
     width: 100%;
     max-width: 100%;
-  }
-
-  .app-shell {
-    padding-block-start: 128px;
   }
 
   .primary-nav {
