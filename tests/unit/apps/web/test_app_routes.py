@@ -112,7 +112,10 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert 'id="landing-capabilities-title"' not in response.text
     assert "Roehub: research, validate, automate, execute." not in main_html
     assert "Roehub unifies backtesting, strategy management" not in main_html
-    assert "Roehub CLI" in main_html
+    assert "Roehub CLI" not in main_html
+    assert "booting" not in main_html
+    assert 'data-cli-state' not in main_html
+    assert "landing-cli__toolbar" not in main_html
     assert 'data-cli-stream' in main_html
     assert 'data-cli-log' in main_html
     assert "&gt; roehub init --workspace cloud" in main_html

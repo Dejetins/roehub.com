@@ -30,7 +30,7 @@ function initCliStream(container) {
   const state = container.querySelector("[data-cli-state]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-  if (!(log instanceof HTMLOListElement) || !(state instanceof HTMLElement)) {
+  if (!(log instanceof HTMLOListElement)) {
     return;
   }
 
@@ -73,7 +73,9 @@ function initCliStream(container) {
     STREAM.slice(-MAX_VISIBLE_LINES).forEach((item) => {
       appendLine(item.kind, t(item.key));
     });
-    state.textContent = t("landing.cli.state_ready");
+    if (state instanceof HTMLElement) {
+      state.textContent = t("landing.cli.state_ready");
+    }
   };
 
   const typeNextCharacter = () => {
@@ -102,11 +104,15 @@ function initCliStream(container) {
       return;
     }
     if (itemIndex >= STREAM.length) {
-      state.textContent = t("landing.cli.state_ready");
+      if (state instanceof HTMLElement) {
+        state.textContent = t("landing.cli.state_ready");
+      }
       schedule(() => {
         itemIndex = 0;
         log.replaceChildren();
-        state.textContent = t("landing.cli.state_booting");
+        if (state instanceof HTMLElement) {
+          state.textContent = t("landing.cli.state_booting");
+        }
         runNextItem();
       }, RESTART_PAUSE_MS);
       return;
@@ -135,7 +141,9 @@ function initCliStream(container) {
       return;
     }
     log.replaceChildren();
-    state.textContent = t("landing.cli.state_booting");
+    if (state instanceof HTMLElement) {
+      state.textContent = t("landing.cli.state_booting");
+    }
     itemIndex = 0;
     schedule(runNextItem, 240);
   };

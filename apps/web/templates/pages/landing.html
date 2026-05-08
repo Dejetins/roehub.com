@@ -6,13 +6,9 @@
 
 {% block content %}
   <div class="landing-page" data-page="landing" data-landing-root>
-    <section class="landing-hero" aria-labelledby="landing-title">
+    <section class="landing-hero" aria-label="{{ t('landing.cli.aria') }}">
       <div class="landing-hero__copy">
         <div class="landing-cli" data-cli-stream aria-label="{{ t('landing.cli.aria') }}">
-          <div class="landing-cli__toolbar">
-            <h1 id="landing-title">{{ t("landing.cli.title") }}</h1>
-            <span data-cli-state>{{ t("landing.cli.state_booting") }}</span>
-          </div>
           <div class="landing-cli__screen">
             <ol class="landing-cli__log" data-cli-log aria-live="off">
               <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_init") }}</li>
