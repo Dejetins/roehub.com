@@ -1,11 +1,31 @@
 {% extends "base.html" %}
 
+{% block page_assets %}
+    <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/landing.css') }}">
+{% endblock %}
+
 {% block content %}
-  <section class="landing-hero landing-hero--compact" data-page="login-compat">
-    <div class="landing-hero__copy">
-      <p class="eyebrow">{{ t("landing.eyebrow") }}</p>
-      <h1>{{ t("landing.title") }}</h1>
-      <p class="landing-hero__body">{{ t("auth.login_body") }}</p>
-    </div>
-  </section>
+  <div class="landing-page" data-page="login" data-landing-root>
+    <section class="landing-hero" aria-label="{{ t('landing.cli.aria') }}">
+      <div class="landing-hero__copy">
+        <div class="landing-cli" data-cli-stream aria-label="{{ t('landing.cli.aria') }}">
+          <div class="landing-cli__screen">
+            <ol class="landing-cli__log" data-cli-log aria-live="off">
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_init") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_shell") }}</li>
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_backtest") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_variants") }}</li>
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_deploy") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_ready") }}</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script type="module" src="{{ asset_url('/assets/js/pages/landing.js') }}"></script>
 {% endblock %}

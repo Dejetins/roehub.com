@@ -209,6 +209,18 @@ def test_login_route_sanitizes_external_next_and_preopens_modal() -> None:
     assert 'data-open-on-load="true"' in response.text
     assert "Sign in to Roehub" in response.text
     assert "https://evil.example/path" not in response.text
+    main_html = response.text.split('<main id="main-content"', maxsplit=1)[1].split(
+        "</main>", maxsplit=1
+    )[0]
+    assert 'data-page="login"' in main_html
+    assert 'data-landing-root' in main_html
+    assert 'data-cli-stream' in main_html
+    assert "/assets/css/pages/landing.css" in response.text
+    assert "/assets/js/pages/landing.js" in response.text
+    assert "Roehub: research, validate, automate, execute." not in main_html
+    assert "Roehub uses a Keycloak-backed account flow" not in main_html
+    assert "landing-cli__toolbar" not in main_html
+    assert 'data-cli-state' not in main_html
 
 
 def test_register_route_is_separate_keycloak_backed_entrypoint() -> None:
