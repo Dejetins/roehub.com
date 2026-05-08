@@ -8,8 +8,22 @@
   <div class="landing-page" data-page="landing" data-landing-root>
     <section class="landing-hero" aria-labelledby="landing-title">
       <div class="landing-hero__copy">
-        <h1 id="landing-title">{{ t("landing.title") }}</h1>
-        <p class="landing-hero__body">{{ t("landing.body") }}</p>
+        <div class="landing-cli" data-cli-stream aria-label="{{ t('landing.cli.aria') }}">
+          <div class="landing-cli__toolbar">
+            <h1 id="landing-title">{{ t("landing.cli.title") }}</h1>
+            <span data-cli-state>{{ t("landing.cli.state_booting") }}</span>
+          </div>
+          <div class="landing-cli__screen">
+            <ol class="landing-cli__log" data-cli-log aria-live="off">
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_init") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_shell") }}</li>
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_backtest") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_variants") }}</li>
+              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_deploy") }}</li>
+              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_ready") }}</li>
+            </ol>
+          </div>
+        </div>
         <div class="landing-hero__actions">
           <button class="shell-button shell-button--primary" type="button" data-auth-open>
             {{ t("landing.primary_cta") }}
