@@ -273,6 +273,8 @@
   "strategies.risk.worst_trade": "Worst trade",
   "strategies.saved.active": "Active",
   "strategies.saved.all": "All",
+  "strategies.saved.no_matches": "No matching strategies",
+  "strategies.saved.search": "Search strategies",
   "strategies.saved.state": "State",
   "strategies.saved.strategy": "Strategy",
   "strategies.saved.title": "Saved strategies / load statistics",

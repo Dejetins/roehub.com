@@ -110,6 +110,23 @@ function panelStatusText(state, reason, source = null) {
   return reason ? `${base}${sourceSuffix}: ${reason}` : `${base}${sourceSuffix}`;
 }
 
+function normalizeSearchValue(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function savedRowMatchesQuery(row, query) {
+  if (!query) {
+    return true;
+  }
+  return [
+    row.strategy_id,
+    row.name,
+    row.version,
+    row.status,
+    row.latest_activity,
+  ].some((value) => normalizeSearchValue(value).includes(query));
+}
+
 function clearSvg(svg) {
   while (svg.firstChild) {
     svg.removeChild(svg.firstChild);
@@ -204,7 +221,7 @@ function renderMetrics(root, metricGrid) {
     .join("");
 }
 
-function renderSelector(root, selector) {
+function renderSelector(root, selector, savedQuery = "") {
   const selectedId = selector?.selected_strategy_id || "";
   const selectedRow = (selector?.items || []).find((row) => row.strategy_id === selectedId);
   setText("[data-selector-current]", selectedRow?.name || selectedId || "--", root);
@@ -236,6 +253,8 @@ function renderSelector(root, selector) {
     return;
   }
   const rows = selector?.items || [];
+  const query = normalizeSearchValue(savedQuery);
+  const filteredRows = rows.filter((row) => savedRowMatchesQuery(row, query));
   if (!rows.length) {
     saved.innerHTML = `
       <tr><td class="strategies-empty-row" colspan="3">
@@ -244,7 +263,15 @@ function renderSelector(root, selector) {
     `;
     return;
   }
-  saved.innerHTML = rows
+  if (!filteredRows.length) {
+    saved.innerHTML = `
+      <tr><td class="strategies-empty-row" colspan="3">
+        ${escapeHtml(t("strategies.saved.no_matches"))}
+      </td></tr>
+    `;
+    return;
+  }
+  saved.innerHTML = filteredRows
     .map((row) => `
       <tr data-saved-strategy-id="${escapeHtml(row.strategy_id)}">
         <td>${escapeHtml(row.name)}</td>
@@ -489,9 +516,9 @@ function renderFreshness(summary) {
   );
 }
 
-function renderDashboard(root, summary) {
+function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
-  renderSelector(root, summary.strategy_selector);
+  renderSelector(root, summary.strategy_selector, state.savedQuery);
   renderChart(root, summary.chart);
   renderMetrics(root, summary.metric_grid);
   renderMonthly(root, summary.monthly_stats);
@@ -574,6 +601,7 @@ function initStrategies(root) {
     selectorState: "all",
     createMarketType: "spot",
     createTimeframe: "1m",
+    savedQuery: "",
   };
   let activeRequest = null;
   let poller = null;
@@ -586,10 +614,14 @@ function initStrategies(root) {
     return manualRefreshBlockedUntilMs > Date.now();
   }
 
+  function manualRefreshRetrySeconds() {
+    return Math.max(1, Math.ceil((manualRefreshBlockedUntilMs - Date.now()) / 1000));
+  }
+
   function setRunning(isRunning) {
     qsa("[data-strategies-refresh]", document).forEach((button) => {
       if (button instanceof HTMLButtonElement) {
-        button.disabled = isRunning || isManualRefreshBlocked();
+        button.disabled = isRunning;
       }
     });
   }
@@ -610,6 +642,9 @@ function initStrategies(root) {
       manualRefreshGateTimer = window.setTimeout(() => {
         manualRefreshGateTimer = null;
         manualRefreshBlockedUntilMs = 0;
+        if (lastSummary) {
+          renderFreshness({ ...lastSummary, retry_after_seconds: null });
+        }
         setRunning(false);
       }, Math.max(1, manualRefreshBlockedUntilMs - Date.now()));
     }
@@ -628,6 +663,12 @@ function initStrategies(root) {
 
   async function loadDashboard(reason = "auto") {
     if (reason === "manual" && isManualRefreshBlocked()) {
+      setText("[data-strategies-refresh-status]", "rate_limited", document);
+      setText(
+        "[data-strategies-freshness]",
+        t("strategies.refresh.rate_limited", { seconds: manualRefreshRetrySeconds() }),
+        document,
+      );
       return lastSummary;
     }
     if (activeRequest) {
@@ -640,7 +681,7 @@ function initStrategies(root) {
         root.dataset.strategiesLoaded = "true";
         root.dataset.strategiesLastRefresh = reason;
         state.selectedStrategyId = summary?.selected_strategy?.strategy_id || state.selectedStrategyId;
-        renderDashboard(root, summary);
+        renderDashboard(root, summary, state);
         syncManualRefreshGate(summary);
         return summary;
       })
@@ -692,15 +733,61 @@ function initStrategies(root) {
     }, intervalMs);
   }
 
+  function closeStatusRefreshMenu() {
+    const trigger = qs("#strategies-refresh-trigger", document);
+    const menu = qs("#strategies-refresh-menu", document);
+    const dropdown = trigger?.closest("[data-rh-dropdown]");
+    if (trigger instanceof HTMLElement) {
+      trigger.setAttribute("aria-expanded", "false");
+    }
+    if (menu instanceof HTMLElement) {
+      menu.hidden = true;
+    }
+    if (dropdown instanceof HTMLElement) {
+      dropdown.dataset.open = "false";
+    }
+  }
+
+  function positionStatusRefreshMenu() {
+    const trigger = qs("#strategies-refresh-trigger", document);
+    const menu = qs("#strategies-refresh-menu", document);
+    if (!(trigger instanceof HTMLElement) || !(menu instanceof HTMLElement) || menu.hidden) {
+      return;
+    }
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const left = Math.min(Math.max(8, triggerRect.left), window.innerWidth - menuRect.width - 8);
+    const top = Math.max(8, triggerRect.top - menuRect.height - 6);
+    menu.style.position = "fixed";
+    menu.style.insetInlineStart = `${left}px`;
+    menu.style.insetInlineEnd = "auto";
+    menu.style.insetBlockStart = `${top}px`;
+    menu.style.insetBlockEnd = "auto";
+  }
+
   qsa("[data-strategies-refresh]", document).forEach((button) => {
     button.addEventListener("click", () => {
       loadDashboard("manual").catch(() => null);
     });
   });
+  qs("#strategies-refresh-trigger", document)?.addEventListener("click", () => {
+    window.requestAnimationFrame(positionStatusRefreshMenu);
+  });
   qsa("[data-strategies-refresh-preset]", document).forEach((item) => {
     item.addEventListener("click", () => {
       setAutorefresh(item.dataset.strategiesRefreshPreset || "off");
+      closeStatusRefreshMenu();
     });
+  });
+  window.addEventListener("resize", positionStatusRefreshMenu);
+  window.addEventListener("scroll", positionStatusRefreshMenu, true);
+  qs("[data-saved-search]", root)?.addEventListener("input", (event) => {
+    if (event.target instanceof HTMLInputElement) {
+      state.savedQuery = event.target.value;
+      if (lastSummary) {
+        renderSelector(root, lastSummary.strategy_selector, state.savedQuery);
+      }
+    }
   });
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) {

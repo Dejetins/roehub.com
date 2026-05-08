@@ -95,27 +95,36 @@
       <section class="terminal-panel strategies-saved" data-strategies-panel="saved_strategies">
         <header class="panel-heading panel-heading--with-tools">
           <h2>{{ t("strategies.saved.title") }}</h2>
-          <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-            <button
-              class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
-              type="button"
-              id="strategy-state-trigger"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-              aria-controls="strategy-state-menu"
-              data-rh-dropdown-trigger
-              data-strategy-control="branded dropdown"
+          <div class="strategies-saved-tools">
+            <input
+              class="strategies-search strategies-search--saved"
+              type="search"
+              data-saved-search
+              aria-label="{{ t('strategies.saved.search') }}"
+              placeholder="{{ t('strategies.saved.search') }}"
             >
-              {{ t("strategies.saved.state") }}
-              <span class="rh-dropdown__value" data-state-current>all</span>
-            </button>
-            <div class="rh-popover" id="strategy-state-menu" role="listbox" hidden data-rh-dropdown-menu>
-              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-strategy-state="all">
-                {{ t("strategies.saved.all") }}
+            <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="strategy-state-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="strategy-state-menu"
+                data-rh-dropdown-trigger
+                data-strategy-control="branded dropdown"
+              >
+                {{ t("strategies.saved.state") }}
+                <span class="rh-dropdown__value" data-state-current>all</span>
               </button>
-              <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-strategy-state="active">
-                {{ t("strategies.saved.active") }}
-              </button>
+              <div class="rh-popover" id="strategy-state-menu" role="listbox" hidden data-rh-dropdown-menu>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-strategy-state="all">
+                  {{ t("strategies.saved.all") }}
+                </button>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-strategy-state="active">
+                  {{ t("strategies.saved.active") }}
+                </button>
+              </div>
             </div>
           </div>
         </header>

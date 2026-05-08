@@ -76,59 +76,60 @@
   flex: 1 1 auto;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows:
-    minmax(82px, 0.55fr)
-    minmax(190px, 1.22fr)
-    minmax(76px, 0.45fr)
-    minmax(104px, 0.68fr)
-    minmax(116px, 0.7fr);
+    minmax(112px, 0.68fr)
+    minmax(154px, 0.95fr)
+    minmax(76px, 0.42fr)
+    minmax(104px, 0.62fr)
+    minmax(64px, 0.34fr)
+    minmax(104px, 0.62fr);
   gap: 6px;
   min-width: 0;
   min-height: 0;
 }
 
 .strategies-summary {
-  grid-column: 1 / 8;
+  grid-column: 1 / 7;
   grid-row: 1;
 }
 
 .strategies-statistics {
-  grid-column: 8 / 10;
+  grid-column: 7 / 10;
   grid-row: 1;
 }
 
 .strategies-saved {
   grid-column: 10 / 13;
-  grid-row: 1;
+  grid-row: 1 / 3;
 }
 
 .strategies-chart-panel {
-  grid-column: 1 / 8;
+  grid-column: 1 / 7;
   grid-row: 2;
 }
 
 .strategies-long-short {
-  grid-column: 8 / 10;
+  grid-column: 7 / 10;
   grid-row: 2;
 }
 
 .strategies-risk {
   grid-column: 10 / 13;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .strategies-monthly {
-  grid-column: 1 / 8;
+  grid-column: 1 / 7;
   grid-row: 3;
 }
 
 .strategies-stat-tiles {
-  grid-column: 8 / 10;
+  grid-column: 7 / 10;
   grid-row: 3;
 }
 
 .strategies-days {
-  grid-column: 10 / 13;
-  grid-row: 3;
+  grid-column: 1 / 13;
+  grid-row: 5;
 }
 
 .strategies-drawdown {
@@ -142,18 +143,18 @@
 }
 
 .strategies-hours {
-  grid-column: 7 / 10;
+  grid-column: 10 / 13;
   grid-row: 4;
 }
 
 .strategies-symbols {
-  grid-column: 10 / 13;
+  grid-column: 7 / 10;
   grid-row: 4;
 }
 
 .strategies-trades {
   grid-column: 1 / 13;
-  grid-row: 5;
+  grid-row: 6;
 }
 
 .strategies-kv {
@@ -438,6 +439,17 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.strategies-saved-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.strategies-search--saved {
+  width: min(180px, 100%);
+}
+
 .strategies-long-short .strategies-table th,
 .strategies-long-short .strategies-table td {
   padding: 3px 5px;
@@ -544,11 +556,15 @@
 }
 
 .strategies-status-line {
+  position: relative;
+  z-index: 70;
   flex-wrap: nowrap;
   overflow: visible;
 }
 
 .strategies-status-actions {
+  position: relative;
+  z-index: 71;
   margin-left: auto;
   overflow: visible;
 }
@@ -565,6 +581,8 @@
 .strategies-status-line .rh-popover {
   inset-block-start: auto;
   inset-block-end: calc(100% + var(--rh-space-1));
+  z-index: 120;
+  min-width: 128px;
 }
 
 .strategies-workstation .rh-button,

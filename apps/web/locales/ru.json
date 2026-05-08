@@ -273,6 +273,8 @@
   "strategies.risk.worst_trade": "Worst trade",
   "strategies.saved.active": "Активные",
   "strategies.saved.all": "Все",
+  "strategies.saved.no_matches": "Нет подходящих стратегий",
+  "strategies.saved.search": "Поиск стратегий",
   "strategies.saved.state": "Состояние",
   "strategies.saved.strategy": "Стратегия",
   "strategies.saved.title": "Сохраненные стратегии / загрузка статистики",

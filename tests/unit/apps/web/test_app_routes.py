@@ -358,6 +358,7 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert "<select" not in strategies_response.text
     assert 'role="listbox"' in strategies_response.text
     assert 'data-strategy-control="branded dropdown"' in strategies_response.text
+    assert 'data-saved-search' in strategies_response.text
     assert 'class="strategies-command"' not in strategies_response.text
     assert 'data-strategies-panel="command_status"' not in strategies_response.text
     for panel in [
@@ -594,6 +595,13 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "createPoller" in strategies_js
     assert "activeRequest" in strategies_js
     assert "hiddenTabPause" in strategies_js
+    assert "manualRefreshRetrySeconds" in strategies_js
+    assert "button.disabled = isRunning;" in strategies_js
+    assert "positionStatusRefreshMenu" in strategies_js
+    assert "closeStatusRefreshMenu" in strategies_js
+    assert "data-saved-search" in strategies_js
+    assert "strategies.saved.no_matches" in strategies_js
+    assert "grid-row: 1 / 3" in strategies_css
     assert "strategy_ui.js" not in strategies_js
     assert "--rh-financial-positive" in strategies_css
     assert "--rh-financial-negative" in strategies_css
