@@ -4,13 +4,37 @@
 
 ## Статус
 
-- предлагаемый план реализации;
+- living implementation plan; на 2026-05-08 документ совмещает целевое состояние и фактический checkpoint текущей реализации;
 - дизайн-источник правды: `docs/architecture/apps/web/web-ui-design-manifest-v1.md`;
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
-- текущая визуальная реализация `apps/web` заменяется полностью и не сохраняется как наследуемый режим;
+- baseline light UI больше не является целевым режимом; текущая реализация `apps/web` уже частично заменена новым terminal shell;
 - обновление 2026-05-04: функциональные страницы привязаны к canonical PNG-референсам через жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются кандидатом на откат/замену, если не повторяют назначенный reference layout.
 - обновление 2026-05-05: login реализуется как branded modal, registration остается отдельной страницей, все dropdown/listbox/menu controls должны быть фирменными, а live-data страницы получают explicit data-source/refresh/autorefresh/rate-limit contracts.
+- обновление 2026-05-08: фактическая реализация ушла вперед от старого "предлагаемого" плана; в `main` уже присутствуют Stage 0-5 surfaces, а `/strategies`, `/backtests`, Stage 8.5 runtime hardening, AI, hardening и load validation остаются неисполненными этапами.
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
+
+## Фактический checkpoint реализации на 2026-05-08
+
+Этот раздел фиксирует текущее состояние кода и является стартовой точкой для следующих implementation-агентов. Если фактический код и нижеописанный stage-план расходятся, сначала обновить этот checkpoint или код, а не выполнять следующий prompt "по памяти".
+
+| Stage | Prompt | Фактический статус в текущем дереве | Что считается следующим действием |
+|---|---|---|---|
+| 00 | `00-contract-freeze-and-cleanup-boundary.md` | Принят в документации/prompt-pack: canonical map на 5 страниц, reference fidelity, modal login/register, branded controls, refresh/autorefresh. Runtime-код этот stage напрямую не меняет. | Не перезапускать, если не меняется карта страниц или reference contract. |
+| 01 | `01-implement-shell-auth-register.md` | Реализовано: `apps/web/main/app.py`, `base.html`, self-hosted HTMX, locale foundation, modal login fragment, `/register`, protected route gate, `/api/*` proxy, route tests. | Дальше только багфиксы shell/auth; не делать отдельную login page. |
+| 02 | `02-implement-design-system-js-core.md` | Реализовано частично/достаточно для Stage 4-5: token/theme/base/layout/components CSS, shell CSS, `api.js`, `poller.js`, `refresh.js`, `sse.js`, `theme.js`, `locale.js`, branded dropdown/listbox/combobox/refresh-control modules. | При следующих страницах расширять shared primitives, не создавать page-local native select/dropdown. |
+| 03 | `03-implement-landing.md` | Реализовано: `/` использует `pages/landing.html`, CLI stream visual, `landing.css`, `landing.js`, login modal CTA и `/register` CTA. Landing intentionally not being reworked in текущем цикле. | Не трогать без отдельного визуального запроса. |
+| 04 | `04-implement-dashboard.md` | Реализовано частично как current baseline: `/dashboard` рендерит `pages/dashboard.html`; есть `GET /api/ui/dashboard/summary`, DTO, wiring, tests, manual refresh limiter, degraded source inventory. Полные portfolio/positions/fills/equity/symbol allocation storage sources еще отсутствуют и возвращаются как typed unavailable/degraded panels. | Не переделывать как generic cards. Следующие live-data этапы должны заменить degraded panels реальными read-models. |
+| 05 | `05-implement-settings-account.md` | Реализовано как current baseline: `/settings`, account fragments, `settings.css/js`, `GET/PUT /api/ui/account/*`, additive `migrations/postgres/0006_identity_account_settings_v1.sql`, identity account settings use case/ports/adapters, route tests. | Следующий основной prompt - Stage 6. Stage 5 дорабатывать только если QA найдет drift от `personal_settings.png` или bug в account persistence. |
+| 06 | `06-implement-strategy-library-detail.md` | Не реализовано: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` сейчас рендерят `pages/placeholder.html`; `strategies_list.html`, `strategy_builder.html`, `strategy_details.html`, `strategy_ui.js` остаются legacy/unwired surfaces. | Следующим выполнять Stage 6: заменить placeholder на `/strategies` selected-strategy analytics workstation по `strategy_statistic.png`. |
+| 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. Dashboard использует bounded polling summary, но не полноценный strategy live SSE bridge. | Выполнять после Stage 6 или совместно с ним только при стабильном DTO handoff. |
+| 08 | `08-implement-backtests-history-configurator.md` | Не реализовано: `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас placeholder; old top-level `backtests.html` и `backtest_ui.js` не являются целевым workstation implementation. | Выполнять после Stage 6/7 или отдельным агентом при сохранении shared UI contracts. |
+| 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Не реализовано в рамках Web UI pack checkpoint; публичный backtest UI пока не должен полагаться на отсутствие `sync_inline` без отдельной проверки runtime wiring. | Выполнить до публичного запуска real `/backtests` create/results flow. |
+| 09 | `09-implement-backtests-results.md` | Не реализовано: selected result state внутри `/backtests` отсутствует. | Выполнять только после Stage 8 и 8.5. |
+| 10 | `10-implement-ai-backtest-configurator.md` | Не реализовано. | Требует отдельного AI backend design decision перед реализацией. |
+| 11 | `11-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 11. | Выполнять после завершения всех browser-visible страниц. |
+| 12 | `12-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 11 или перед публичным запуском live/autorefresh-heavy surfaces. |
+
+Практический resume point: если нужно продолжать Web UI v1 по этому plan/prompt-pack, стартовать с `06-implement-strategy-library-detail.md`, предварительно сверив, что Stage 4-5 текущего дерева остаются green.
 
 ## Цель
 
@@ -29,16 +53,19 @@
 Факты текущего репозитория:
 
 - `apps/web` - FastAPI SSR/Jinja2-приложение с login gate через `/api/auth/current-user`, защищенными страницами и static mount `/assets`.
-- Текущие шаблоны лежат top-level файлами, текущие ассеты - `apps/web/dist/site.css`, `strategy_ui.js`, `backtest_ui.js`.
-- Текущий `base.html` грузит HTMX из CDN, а login/logout-шаблоны используют встроенный JavaScript.
+- Целевой shell уже находится в `apps/web/templates/base.html`, `apps/web/templates/pages/*`, `apps/web/templates/fragments/*`, `apps/web/templates/macros/ui.html`; top-level `landing.html`, `backtests.html`, `strategies_list.html`, `strategy_builder.html`, `strategy_details.html`, `site.css`, `strategy_ui.js`, `backtest_ui.js` остаются legacy/compatibility artifacts, если не подключены активными routes.
+- `base.html` уже использует self-hosted `apps/web/dist/vendor/htmx.min.js`, модальный login fragment и внешние JS assets. Внешний CDN для shell не является текущим behavior.
+- Активно реализованные browser-visible страницы: `/`, `/dashboard`, `/settings`, `/login` как modal pre-open state, `/logout`, `/register`.
+- Активные placeholders: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests`, `/backtests/new`, `/backtests/{job_id}`, `/monitoring`.
 - Production routing должен оставаться same-origin на edge: HTML/assets идут в web, `/api/*` идет напрямую в backend. Встроенный web-proxy `/api/*` остается local/dev parity-путем, а не production-целью.
-- Backend уже предоставляет auth/current-user, exchange keys, strategy CRUD/run/stop, справочники market-data, indicators и backtest jobs API.
+- Backend уже предоставляет auth/current-user, exchange keys, account UI routes, dashboard summary UI route, strategy CRUD/run/stop, справочники market-data, indicators и backtest jobs API.
 - Backtest jobs API уже использует терминологию `jobs`, публично читаемый `variant_key`, summary-only top rows и lazy trades endpoint.
 - Strategy runtime уже имеет Redis Streams realtime output primitives; для UI не хватает browser-facing read-model/SSE-моста.
 
-Факты по текущему хранению данных на момент обновления 2026-05-05:
+Факты по текущему хранению данных на момент обновления 2026-05-08:
 
-- `migrations/postgres/0001-0005` покрывают identity/users, Keycloak session bridge и encrypted/masked exchange keys; в этой цепочке пока нет `identity_user_preferences`, `identity_audit_events`, `identity_integrations` и persistent autorefresh defaults.
+- `migrations/postgres/0001-0005` покрывают identity/users, Keycloak session bridge и encrypted/masked exchange keys.
+- `migrations/postgres/0006_identity_account_settings_v1.sql` добавляет `identity_user_preferences`, `identity_user_profile_overrides`, `identity_integrations`, `identity_notification_preferences`, `identity_audit_events` и persistent autorefresh defaults. Это закрывает Stage 5 persistence baseline.
 - `alembic/versions/20260215_0001` и `20260216_0002` покрывают `strategy_strategies`, `strategy_runs`, `strategy_events` и `strategy_runs.metadata_json`; этого достаточно для immutable strategy specs/run metadata/events, но недостаточно для полноценного online portfolio dashboard: нет typed positions, fills/executions, equity/PnL time series, symbol allocation snapshots, per-strategy/hour/month aggregates.
 - `alembic/versions/20260222_0003` ... `20260418_0009` покрывают `backtest_jobs`, `backtest_job_top_variants`, shortlist/runtime metadata и persisted-run summary columns; этого достаточно для bounded jobs/history/top-variant surfaces, но presets и UI workstation state еще не имеют отдельной таблицы.
 - `migrations/clickhouse/market_data_ddl.sql` покрывает `market_data.ref_market`, `ref_instruments`, raw/canonical 1m candles и stats; это источник market/instrument/candle reference, но не источник account portfolio, exchange balances, live positions или strategy PnL snapshots.
@@ -119,13 +146,13 @@ Canonical page map:
 
 | Route | Canonical reference | Смысл | Статус реализации |
 |---|---|---|---|
-| `/` | `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png` | public landing | этим обновлением не пересматривается. |
-| `/dashboard` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png` | dashboard по всем стратегиям | Stage 4 должен быть переписан как all-strategies workstation. |
-| `/settings` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png` | account/settings workstation | Stage 5 должен повторять панельный account layout. |
-| `/strategies` | `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | Stage 6 должен повторять analytics workstation layout. |
-| `/backtests` | `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` | backtest workstation/configurator | Stage 8 должен реализовать единую рабочую поверхность, а не split на generic pages. |
-| `/backtests/{job_id}` | нет canonical PNG в v1 map | optional deep link/API state | не является шестой функциональной страницей v1; если сохраняется, открывает `/backtests` с выбранной job/result state. |
-| `/monitoring` | нет canonical PNG в v1 map | compatibility/ops route only | не забирает strategy reference; может быть redirect/alias после отдельного решения. |
+| `/` | `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png` | public landing | Реализовано как current baseline; в текущем цикле не пересматривается. |
+| `/dashboard` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png` | dashboard по всем стратегиям | Реализовано частично как Stage 4 baseline: layout/API есть, часть live panels typed unavailable до read-model migrations. |
+| `/settings` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png` | account/settings workstation | Реализовано как Stage 5 baseline: page/API/persistence есть; дорабатывать только по QA drift/bugs. |
+| `/strategies` | `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | Не реализовано; сейчас placeholder. Следующий основной этап - Stage 6. |
+| `/backtests` | `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` | backtest workstation/configurator | Не реализовано; сейчас placeholder. Stage 8 выполняется после Stage 6/7 или отдельным bounded агентом. |
+| `/backtests/{job_id}` | нет canonical PNG в v1 map | optional deep link/API state | Сейчас placeholder с `job_id`; целевой вариант - `/backtests` selected job/result state, не отдельная sixth page. |
+| `/monitoring` | нет canonical PNG в v1 map | compatibility/ops route only | Сейчас placeholder; не забирает strategy reference; целевой вариант - redirect/alias после отдельного решения. |
 
 В v1 не планируются отдельные visual pages для `/monitoring`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests/new` или `/backtests/{job_id}`. Эти entrypoints допустимы только как compatibility redirects/aliases или state внутри соответствующей canonical page.
 
@@ -485,15 +512,16 @@ Idempotency:
 - retention policy задается для audit/events/sessions/AI transcript-like data;
 - default resolution должен быть deterministic: server default -> account preference -> browser local fallback -> hardcoded safe default.
 
-Минимальные планируемые схемы:
+Минимальные схемы: уже реализованные для Stage 5 и планируемые для следующих stages.
 
-| Таблица | Назначение | Ключи и индексы | Rollback/default |
-|---|---|---|---|
-| `identity_user_preferences` | UI theme, density, `locale` (`en`/`ru`) и другие account preferences | unique `owner_user_id`; check/validation `locale in ('en', 'ru')`; index `updated_at` | при rollback UI использует `terminal-orange`, locale cookie/localStorage и fallback `en`; таблицу можно оставить unused. |
-| `identity_integrations` | non-secret integration toggles/config refs | `owner_user_id`, `provider`, `enabled` | disable-on-read fallback; secrets отдельно. |
-| `identity_audit_events` | account/settings/security/live-control audit | `owner_user_id`, `created_at`, `event_type` | append-only; rollback к read-only ignored events. |
-| `identity_user_profile_overrides` | optional display/profile overrides | unique `owner_user_id` | fallback на `current-user` claims. |
-| `backtest_presets` | safe request drafts для configurator | `owner_user_id`, `created_at`, `name`, optional `request_hash` | configurator продолжает работать без presets. |
+| Таблица | Статус 2026-05-08 | Назначение | Ключи и индексы | Rollback/default |
+|---|---|---|---|---|
+| `identity_user_preferences` | Реализовано в `migrations/postgres/0006_identity_account_settings_v1.sql` | UI theme, density, `locale` (`en`/`ru`) и autorefresh defaults | unique `owner_user_id`; checks for theme/locale/density/autorefresh interval; index `updated_at` | при rollback UI использует `terminal-orange`, locale cookie/localStorage и fallback `en`; таблицу можно оставить unused. |
+| `identity_integrations` | Реализовано в `0006` | non-secret integration toggles/config refs | `owner_user_id`, `integration_key`, `mode`, index `owner_user_id, updated_at` | disable-on-read fallback; secrets отдельно. |
+| `identity_notification_preferences` | Реализовано в `0006` | notification channel modes | `owner_user_id`, `channel_key`, `mode` | fallback на default notification modes. |
+| `identity_audit_events` | Реализовано в `0006` | account/settings/security/live-control audit | `owner_user_id`, `created_at DESC`, `event_id DESC`, `event_type` | append-only; rollback к read-only ignored events. |
+| `identity_user_profile_overrides` | Реализовано в `0006` | optional display/profile overrides | unique `owner_user_id` | fallback на `current-user` claims. |
+| `backtest_presets` | Не реализовано | safe request drafts для configurator | `owner_user_id`, `created_at`, `name`, optional `request_hash` | configurator продолжает работать без presets. |
 
 Чеклист миграции:
 
@@ -525,24 +553,25 @@ Idempotency:
 | Page | Основные источники сейчас | Планируемые gaps / additions | Refresh behavior |
 |---|---|---|---|
 | `/` | статический SSR/landing copy; auth CTA only | нет backend dependency на first render | no autorefresh. |
-| `/dashboard` | `strategy_strategies`, `strategy_runs`, `strategy_events`, backtest jobs summaries, Redis strategy output, market-data refs | `strategy_portfolio_snapshots`, `strategy_position_snapshots`, `strategy_execution_fills`, `strategy_equity_points`, `strategy_symbol_allocations`, exchange/account balance snapshots или typed degraded panels | manual refresh + autorefresh; один summary endpoint заполняет panels; upstream exchange refresh coalesced/rate-limited. |
-| `/settings` | current-user, `identity_sessions`, `identity_exchange_keys` | `identity_user_preferences`, `identity_integrations`, `identity_audit_events`, optional profile overrides; хранение default refresh/autorefresh preferences | refresh для account panels; no exchange secret leakage; preferences save writes audit event. |
+| `/dashboard` | `strategy_strategies`, `strategy_runs` через `GET /api/ui/dashboard/summary`; остальное сейчас typed unavailable/degraded | `strategy_portfolio_snapshots`, `strategy_position_snapshots`, `strategy_execution_fills`, `strategy_equity_points`, `strategy_symbol_allocations`, exchange/account balance snapshots; Redis strategy output integration | manual refresh + autorefresh; один summary endpoint заполняет panels; upstream exchange refresh coalesced/rate-limited. |
+| `/settings` | current-user, `identity_sessions`, `identity_exchange_keys`, `identity_user_preferences`, `identity_integrations`, `identity_notification_preferences`, `identity_audit_events`, profile overrides | дальнейшие gaps только по product requirements: реальные subscription/limit counters, external integration health, security actions | refresh для account panels; no exchange secret leakage; preferences save writes audit event. |
 | `/strategies` | `strategy_strategies`, `strategy_runs`, `strategy_events`, Redis output, ClickHouse candles/reference | typed positions/fills/equity/monthly/hourly/symbol stats read-models или materialized projections; selected-strategy live snapshot | manual refresh + autorefresh; SSE preferred for live deltas, polling fallback bounded. |
 | `/backtests` | `backtest_jobs`, `backtest_job_top_variants`, shortlist metadata, artifacts/lazy cache, market-data refs, indicators | `backtest_presets`, optional job events, workstation counters | manual refresh + optional autorefresh для jobs/progress; create/preflight остается controlled low-rate. |
 
-Планируемые persistence/read-model additions:
+Текущие и планируемые persistence/read-model additions:
 
-| Таблица/read-model | Owner DB | Назначение | Индексы/лимиты |
-|---|---|---|---|
-| `identity_user_preferences` | identity SQL migrations | theme, locale, density, default autorefresh preset/custom interval | unique `owner_user_id`, `updated_at`, checks locale/theme/interval. |
-| `identity_audit_events` | identity SQL migrations | settings/security/live-control/refresh policy audit | `owner_user_id`, `created_at DESC`, `event_type`; retention policy. |
-| `identity_integrations` | identity SQL migrations | non-secret integration toggles/config refs | `owner_user_id`, `provider`, `enabled`; secrets stay outside UI tables. |
-| `strategy_portfolio_snapshots` | main Alembic DB | account-level totals, equity, realized/unrealized PnL, exposure, source freshness | `user_id`, `as_of DESC`; bounded latest read. |
-| `strategy_position_snapshots` | main Alembic DB | open positions for dashboard/strategy panels | `user_id`, `strategy_id`, `as_of DESC`, `symbol`; latest-only or retention window. |
-| `strategy_execution_fills` | main Alembic DB | recent executions/fills and realized PnL | `user_id`, `strategy_id`, `ts DESC`, cursor key; retention/window. |
-| `strategy_equity_points` | main Alembic DB or ClickHouse projection | equity/PnL chart series per account/strategy | `user_id`, `strategy_id`, `ts`; server downsampling required. |
-| `strategy_symbol_allocations` | main Alembic DB or derived read-model | symbol allocation/PnL bars | `user_id`, `strategy_id`, `as_of DESC`; can be derived from positions/fills if cheap. |
-| `backtest_presets` | main Alembic DB unless separate decision | safe request drafts for `/backtests` configurator | `owner_user_id`, `created_at DESC`, `name`, optional `request_hash`. |
+| Таблица/read-model | Статус 2026-05-08 | Owner DB | Назначение | Индексы/лимиты |
+|---|---|---|---|---|
+| `identity_user_preferences` | Реализовано | identity SQL migrations | theme, locale, density, default autorefresh preset/custom interval | unique `owner_user_id`, `updated_at`, checks locale/theme/interval. |
+| `identity_audit_events` | Реализовано | identity SQL migrations | settings/security/live-control/refresh policy audit | `owner_user_id`, `created_at DESC`, `event_type`; retention policy still needs product decision. |
+| `identity_integrations` | Реализовано | identity SQL migrations | non-secret integration toggles/config refs | `owner_user_id`, `integration_key`, `mode`; secrets stay outside UI tables. |
+| `identity_notification_preferences` | Реализовано | identity SQL migrations | notification channel modes | `owner_user_id`, `channel_key`, `mode`. |
+| `strategy_portfolio_snapshots` | Не реализовано | main Alembic DB | account-level totals, equity, realized/unrealized PnL, exposure, source freshness | `user_id`, `as_of DESC`; bounded latest read. |
+| `strategy_position_snapshots` | Не реализовано | main Alembic DB | open positions for dashboard/strategy panels | `user_id`, `strategy_id`, `as_of DESC`, `symbol`; latest-only or retention window. |
+| `strategy_execution_fills` | Не реализовано | main Alembic DB | recent executions/fills and realized PnL | `user_id`, `strategy_id`, `ts DESC`, cursor key; retention/window. |
+| `strategy_equity_points` | Не реализовано | main Alembic DB or ClickHouse projection | equity/PnL chart series per account/strategy | `user_id`, `strategy_id`, `ts`; server downsampling required. |
+| `strategy_symbol_allocations` | Не реализовано | main Alembic DB or derived read-model | symbol allocation/PnL bars | `user_id`, `strategy_id`, `as_of DESC`; can be derived from positions/fills if cheap. |
+| `backtest_presets` | Не реализовано | main Alembic DB unless separate decision | safe request drafts for `/backtests` configurator | `owner_user_id`, `created_at DESC`, `name`, optional `request_hash`. |
 
 Implementation stages may choose a simpler derived read-model if it is bounded and measured, but they must not perform unbounded per-request aggregation over full event/history tables for first paint.
 
@@ -791,7 +820,7 @@ flowchart TD
 - Проинвентаризировать текущие web-файлы и пометить каждый как replace, move или delete.
 - Зафиксировать route map и endpoint map до начала работ над страницами.
 
-Основные файлы:
+Baseline inventory files на момент Stage 0. На 2026-05-08 часть уже заменена; использовать этот список как cleanup map, а не как описание текущего active routing:
 
 - `apps/web/main/app.py`;
 - `apps/web/templates/*.html`;
@@ -800,7 +829,7 @@ flowchart TD
 - `apps/web/dist/backtest_ui.js`;
 - `tests/unit/apps/web/test_app_routes.py`.
 
-Текущая route map и целевые решения:
+Baseline route map и целевые решения:
 
 | Текущий route/static surface | Текущий шаблон/поведение | Решение | Handoff для этапов |
 |---|---|---:|---|
@@ -816,7 +845,7 @@ flowchart TD
 | `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 заменяет current monolith на reference-shaped workstation; results state живет внутри `/backtests`. |
 | `GET /_partial/user_badge` | HTMX partial route для текущего header badge | `delete` | Не является stable public route; этап 1 переносит badge в shell component/fragment или server-rendered context. |
 
-Текущие шаблоны и ассеты:
+Baseline шаблоны и ассеты / cleanup map:
 
 | Current file | Target decision | Целевое владение |
 |---|---:|---|
@@ -903,6 +932,8 @@ python -m tools.docs.generate_docs_index --check
 - performance risk: `none` для этапа 0, потому что runtime behavior не меняется.
 
 ## Этап 1 - каркас приложения, вкладки шапки, auth/register
+
+Статус 2026-05-08: реализовано в текущем дереве. Этот этап не нужно повторять перед Stage 6, если route tests остаются green.
 
 Цель: создать новый skeleton: базовую компоновку, вкладки шапки, login modal, отдельную registration page и gate защищенных страниц.
 
@@ -1012,6 +1043,8 @@ uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/web/test
 
 ## Этап 2 - дизайн-система, темы и JS core
 
+Статус 2026-05-08: реализовано как shared baseline для текущих Stage 3-5 страниц. Дальнейшие stages должны расширять эти primitives, а не создавать локальные аналоги.
+
 Цель: создать shared UI primitives, переключатель темы и JS core до того, как page-команды начнут строить реальные экраны.
 
 Задачи:
@@ -1111,6 +1144,8 @@ uv run pytest -q tests/unit/apps/web
 
 ## Этап 3 - лендинг
 
+Статус 2026-05-08: реализовано как current baseline. Landing не является следующей рабочей зоной без отдельного запроса.
+
 Цель: построить публичный первый экран по `general_page.png`.
 
 Маршрут страницы:
@@ -1155,6 +1190,8 @@ Playwright CLI:
 ```
 
 ## Этап 4 - dashboard всех стратегий
+
+Статус 2026-05-08: реализовано частично и принято как current Stage 4 baseline. В наличии `/dashboard`, `GET /api/ui/dashboard/summary`, DTO/wiring/tests, manual refresh limiter и panel-level `unavailable/degraded` states. Не реализованы реальные typed portfolio/position/fill/equity/symbol-allocation read-models, поэтому часть reference panels пока заполняется degraded/unavailable state.
 
 Цель: реализовать `/dashboard` как terminal workstation по всем стратегиям строго по `personal_dashboard.png`, а не как набор обзорных карточек. Это главная защищенная рабочая поверхность fleet monitoring: выбранная стратегия слева, общий equity/PnL live chart, плотная metric grid, таблицы позиций/исполнений, health/risk, alerts, allocation и правый список стратегий.
 
@@ -1254,16 +1291,8 @@ Data source inventory:
 
 Файлы:
 
-- добавить `apps/api/routes/ui_dashboard.py`;
-- добавить `apps/api/dto/ui_dashboard.py`;
-- добавить `apps/api/wiring/modules/ui_dashboard.py`;
-- обновить `apps/api/main/app.py`;
-- добавить `apps/web/templates/pages/dashboard.html`;
-- добавить `apps/web/templates/fragments/dashboard/*`;
-- добавить `apps/web/dist/js/pages/dashboard.js`;
-- добавить `apps/web/dist/css/pages/dashboard.css`;
-- добавить тесты в `tests/unit/apps/api/test_ui_dashboard_routes.py`;
-- обновить `tests/unit/apps/web/test_app_routes.py`.
+- текущие реализованные файлы: `apps/api/routes/ui_dashboard.py`, `apps/api/dto/ui_dashboard.py`, `apps/api/wiring/modules/ui_dashboard.py`, `apps/web/templates/pages/dashboard.html`, `apps/web/templates/fragments/dashboard/loading_state.html`, `apps/web/dist/js/pages/dashboard.js`, `apps/web/dist/css/pages/dashboard.css`, `tests/unit/apps/api/test_ui_dashboard_routes.py`, `tests/unit/apps/web/test_app_routes.py`;
+- будущие live-data доработки Stage 6/7 должны добавлять read-model services/ports/migrations для typed sources, а не переписывать dashboard shell.
 
 Критерии приемки:
 
@@ -1294,6 +1323,8 @@ Playwright CLI:
 - persisted schema: `none`.
 
 ## Этап 5 - настройки / аккаунт
+
+Статус 2026-05-08: реализовано как current Stage 5 baseline. В наличии `/settings`, account fragments, account UI API routes/DTO/wiring, identity account settings use case/ports/adapters, additive postgres migration `0006_identity_account_settings_v1.sql`, tests. Следующие этапы не должны повторно создавать settings persistence.
 
 Цель: реализовать `personal_settings.png`: профиль, exchange keys, limits, integrations, notifications, security, sessions, audit, настройки темы и языка.
 
@@ -1355,26 +1386,16 @@ Frontend / panel inventory из reference:
 
 Вероятно потребуется хранение:
 
-- `identity_user_preferences`;
-- `identity_integrations`;
-- `identity_audit_events`;
-- опционально `identity_user_profile_overrides`.
+- уже добавлено `migrations/postgres/0006_identity_account_settings_v1.sql`:
+  - `identity_user_preferences`;
+  - `identity_user_profile_overrides`;
+  - `identity_integrations`;
+  - `identity_notification_preferences`;
+  - `identity_audit_events`.
 
 Файлы:
 
-- добавить `apps/api/routes/ui_account.py`;
-- добавить `apps/api/dto/ui_account.py`;
-- добавить `apps/api/wiring/modules/ui_account.py`;
-- добавить identity application use cases/ports/adapters по необходимости в `src/trading/contexts/identity/**`;
-- добавить миграцию в `migrations/postgres/`;
-- добавить `apps/web/templates/pages/settings.html`;
-- добавить `apps/web/templates/fragments/account/*`;
-- добавить `apps/web/dist/js/pages/settings.js`;
-- добавить `apps/web/dist/css/pages/settings.css`;
-- тесты:
-  - `tests/unit/apps/api/test_ui_account_routes.py`;
-  - `tests/unit/apps/api/test_identity_exchange_keys_routes.py`;
-  - `tests/unit/apps/web/test_app_routes.py`.
+- текущие реализованные файлы: `apps/api/routes/ui_account.py`, `apps/api/dto/ui_account.py`, `apps/api/wiring/modules/ui_account.py`, `src/trading/contexts/identity/application/use_cases/account_settings.py`, `src/trading/contexts/identity/application/ports/account_settings_repository.py`, account settings persistence adapters, `migrations/postgres/0006_identity_account_settings_v1.sql`, `apps/web/templates/pages/settings.html`, `apps/web/templates/fragments/account/*`, `apps/web/dist/js/pages/settings.js`, `apps/web/dist/css/pages/settings.css`, `tests/unit/apps/api/test_ui_account_routes.py`, `tests/unit/apps/api/test_identity_exchange_keys_routes.py`, `tests/unit/apps/web/test_app_routes.py`.
 
 Критерии приемки:
 
@@ -1409,6 +1430,8 @@ Playwright CLI:
 - config schema: `compatible-change`, если locale defaults становятся настраиваемыми; иначе `none`.
 
 ## Этап 6 - dashboard конкретной стратегии
+
+Статус 2026-05-08: не реализовано. Активные web routes `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` сейчас используют `pages/placeholder.html`; `strategy_ui.js` и старые strategy templates не являются целевым Stage 6 implementation. Это следующий основной этап после текущего checkpoint.
 
 Цель: реализовать `/strategies` как selected-strategy analytics workstation строго по `strategy_statistic.png`: dashboard/statistics конкретной выбранной стратегии. Это не generic strategy library и не route `/monitoring`.
 
@@ -1529,6 +1552,8 @@ Playwright CLI:
 
 ## Этап 7 - live strategy data bridge
 
+Статус 2026-05-08: не реализовано как самостоятельный live bridge. Dashboard имеет bounded polling summary, но `/strategies` SSE/read-model contract и `/monitoring` redirect/alias еще не сделаны.
+
 Цель: дать `/strategies` и `/dashboard` bounded live data/SSE/polling contract без создания отдельной primary page `/monitoring`. Route `/monitoring` в v1 map не имеет canonical PNG и не должен забирать `strategy_statistic.png` у `/strategies`; если сохраняется, то только как compatibility redirect/alias после отдельного решения.
 
 Маршруты:
@@ -1607,6 +1632,8 @@ Playwright CLI:
 - performance risk: контролировать Redis и DB fan-out; использовать bounded DTO.
 
 ## Этап 8 - история и конфигуратор backtest-задач
+
+Статус 2026-05-08: не реализовано. Активные web routes `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас используют `pages/placeholder.html`; old `backtests.html`/`backtest_ui.js` не являются целевым Stage 8 workstation.
 
 Цель: реализовать `/backtests` как единую reference-shaped backtest workstation строго по `stategy_backtest.png`: конфигурация, AI/config zone, instruments, indicators, optimization progress/status, recent events и таблица variants/results в одной плотной рабочей поверхности. Не делить UX на generic history cards и отдельный `/backtests/new`, если это не требуется совместимостью.
 
@@ -1733,6 +1760,8 @@ Playwright CLI:
 
 ## Этап 8.5 - backtest runtime hardening перед публичным UI
 
+Статус 2026-05-08: не реализовано в рамках Web UI v1 checkpoint. Перед публичным `/backtests` create/results flow нужно заново проверить текущую wiring-семантику и убрать/ограничить `sync_inline` path, если он все еще достижим из API request path.
+
 Цель: убрать архитектурный риск `sync_inline` execution в API process как публичный путь для configurator/results. Browser contract уже должен быть job-based, но фактическое выполнение нужно привести к queued/background semantics до того, как results/configurator станут основной пользовательской поверхностью.
 
 Наблюдаемое основание:
@@ -1808,6 +1837,8 @@ Backend/API:
 - persisted schema: `none` или `compatible-change`, если добавляется queue metadata.
 
 ## Этап 9 - backtest result API/state внутри workstation
+
+Статус 2026-05-08: не реализовано. Selected result state отсутствует, потому что Stage 8 workstation еще не заменил placeholder route.
 
 Цель: добавить bounded result/statistics endpoints и selected job/result state для `/backtests` workstation без создания отдельной шестой функциональной страницы. `strategy_statistic.png` закреплен за `/strategies`, поэтому Stage 9 не владеет отдельным page layout и не создает `backtests_result.html`.
 
@@ -1894,6 +1925,8 @@ Playwright CLI:
 
 ## Этап 10 - AI-конфигуратор backtest-задач
 
+Статус 2026-05-08: не реализовано. Не начинать до Stage 8/9 и отдельного AI backend design decision.
+
 Цель: добавить AI-assisted draft config только после стабилизации `/backtests` workstation и validation path. AI-панель живет внутри reference-shaped `stategy_backtest.png` layout, а не на отдельной generic странице.
 
 Область страницы:
@@ -1934,6 +1967,8 @@ Backend/API-добавления:
 - security risk: требуется отдельное review перед реализацией.
 
 ## Этап 11 - security, performance и delivery hardening
+
+Статус 2026-05-08: финальный sweep не выполнен. Отдельные элементы уже существуют в текущих этапах, но этот раздел остается обязательным перед production-ready завершением всего Web UI v1.
 
 Цель: довести полный UI до production-ready состояния после реализации page streams.
 
@@ -1997,6 +2032,8 @@ python -m tools.docs.generate_docs_index --check
 ```
 
 ## Этап 12 - capacity/load validation текущего backend host
+
+Статус 2026-05-08: не выполнено. Этот этап нельзя считать закрытым по unit tests или browser smoke; он требует отдельного capacity/load evidence.
 
 Цель: проверить, насколько текущий host подходит как backend machine для новой UI/API нагрузки, и зафиксировать масштабируемость до публичного rollout.
 
