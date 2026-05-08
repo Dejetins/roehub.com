@@ -21,59 +21,53 @@
   >
     {% include "fragments/strategies/loading_state.html" %}
 
-    <header class="strategies-command" data-strategies-panel="command_status">
-      <div class="strategies-command__title">
-        <span aria-hidden="true">&gt;_</span>
-        <h1>{{ t("strategies.command.title") }}</h1>
-        <strong data-command-state>{{ t("strategies.status.ready") }}</strong>
-      </div>
-      <div class="strategies-command__tools">
-        <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-          <button
-            class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
-            type="button"
-            id="strategy-selector-trigger"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-controls="strategy-selector-menu"
-            data-rh-dropdown-trigger
-            data-strategy-control="branded dropdown"
-          >
-            {{ t("strategies.selector.label") }}
-            <span class="rh-dropdown__value" data-selector-current>--</span>
-          </button>
-          <div
-            class="rh-popover strategies-selector-menu"
-            id="strategy-selector-menu"
-            role="listbox"
-            hidden
-            data-rh-dropdown-menu
-            data-strategy-selector-menu
-          ></div>
-        </div>
-        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-strategy-create-open>
-          {{ t("strategies.actions.create") }}
-        </button>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-run>
-          {{ t("strategies.actions.run") }}
-        </button>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop>
-          {{ t("strategies.actions.stop") }}
-        </button>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-clone>
-          {{ t("strategies.actions.clone") }}
-        </button>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-delete>
-          {{ t("strategies.actions.delete") }}
-        </button>
-      </div>
-    </header>
-
     <div class="strategies-grid">
       <section class="terminal-panel strategies-summary" data-strategies-panel="selected_strategy">
-        <header class="panel-heading">
-          <h2>{{ t("strategies.selected.title") }}</h2>
-          <span class="strategies-pill" data-selected-status>{{ t("strategies.status.unknown") }}</span>
+        <header class="panel-heading panel-heading--with-tools">
+          <div class="strategies-summary-title">
+            <h2>{{ t("strategies.selected.title") }}</h2>
+            <span class="strategies-pill" data-selected-status>{{ t("strategies.status.unknown") }}</span>
+          </div>
+          <div class="strategies-summary-actions">
+            <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="strategy-selector-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="strategy-selector-menu"
+                data-rh-dropdown-trigger
+                data-strategy-control="branded dropdown"
+              >
+                {{ t("strategies.selector.label") }}
+                <span class="rh-dropdown__value" data-selector-current>--</span>
+              </button>
+              <div
+                class="rh-popover strategies-selector-menu"
+                id="strategy-selector-menu"
+                role="listbox"
+                hidden
+                data-rh-dropdown-menu
+                data-strategy-selector-menu
+              ></div>
+            </div>
+            <button class="rh-button rh-button--primary rh-button--compact" type="button" data-strategy-create-open>
+              {{ t("strategies.actions.create") }}
+            </button>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-run>
+              {{ t("strategies.actions.run") }}
+            </button>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop>
+              {{ t("strategies.actions.stop") }}
+            </button>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-clone>
+              {{ t("strategies.actions.clone") }}
+            </button>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-delete>
+              {{ t("strategies.actions.delete") }}
+            </button>
+          </div>
         </header>
         <dl class="strategies-kv strategies-kv--summary">
           <div><dt>{{ t("strategies.selected.strategy") }}</dt><dd data-selected-name>--</dd></div>

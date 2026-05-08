@@ -358,8 +358,9 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert "<select" not in strategies_response.text
     assert 'role="listbox"' in strategies_response.text
     assert 'data-strategy-control="branded dropdown"' in strategies_response.text
+    assert 'class="strategies-command"' not in strategies_response.text
+    assert 'data-strategies-panel="command_status"' not in strategies_response.text
     for panel in [
-        "command_status",
         "selected_strategy",
         "chart_trades",
         "metric_grid",
