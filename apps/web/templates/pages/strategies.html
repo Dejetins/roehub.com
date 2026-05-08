@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/strategies.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="strategies-workstation"
+    data-page="strategies"
+    data-strategies-root
+    data-dashboard-endpoint="/api/ui/strategies/dashboard"
+    data-api-create-path="/api/strategies"
+    data-api-clone-path="/api/strategies/clone"
+    data-api-delete-path-template="/api/strategies/{strategy_id}"
+    data-api-run-path-template="/api/strategies/{strategy_id}/run"
+    data-api-stop-path-template="/api/strategies/{strategy_id}/stop"
+    data-initial-mode="{{ strategy_initial_mode }}"
+    data-initial-strategy-id="{{ strategy_initial_id }}"
+    aria-label="{{ t('strategies.aria') }}"
+  >
+    {% include "fragments/strategies/loading_state.html" %}
+
+    <header class="strategies-command" data-strategies-panel="command_status">
+      <div class="strategies-command__title">
+        <span aria-hidden="true">&gt;_</span>
+        <h1>{{ t("strategies.command.title") }}</h1>
+        <strong data-command-state>{{ t("strategies.status.ready") }}</strong>
+      </div>
+      <div class="strategies-command__tools">
+        <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+          <button
+            class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+            type="button"
+            id="strategy-selector-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="strategy-selector-menu"
+            data-rh-dropdown-trigger
+            data-strategy-control="branded dropdown"
+          >
+            {{ t("strategies.selector.label") }}
+            <span class="rh-dropdown__value" data-selector-current>--</span>
+          </button>
+          <div
+            class="rh-popover strategies-selector-menu"
+            id="strategy-selector-menu"
+            role="listbox"
+            hidden
+            data-rh-dropdown-menu
+            data-strategy-selector-menu
+          ></div>
+        </div>
+        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-strategy-create-open>
+          {{ t("strategies.actions.create") }}
+        </button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-run>
+          {{ t("strategies.actions.run") }}
+        </button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop>
+          {{ t("strategies.actions.stop") }}
+        </button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-clone>
+          {{ t("strategies.actions.clone") }}
+        </button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-delete>
+          {{ t("strategies.actions.delete") }}
+        </button>
+      </div>
+    </header>
+
+    <div class="strategies-grid">
+      <section class="terminal-panel strategies-summary" data-strategies-panel="selected_strategy">
+        <header class="panel-heading">
+          <h2>{{ t("strategies.selected.title") }}</h2>
+          <span class="strategies-pill" data-selected-status>{{ t("strategies.status.unknown") }}</span>
+        </header>
+        <dl class="strategies-kv strategies-kv--summary">
+          <div><dt>{{ t("strategies.selected.strategy") }}</dt><dd data-selected-name>--</dd></div>
+          <div><dt>{{ t("strategies.selected.version") }}</dt><dd data-selected-version>--</dd></div>
+          <div><dt>{{ t("strategies.selected.exchange") }}</dt><dd data-selected-exchange>--</dd></div>
+          <div><dt>{{ t("strategies.selected.symbols") }}</dt><dd data-selected-symbols>--</dd></div>
+          <div><dt>{{ t("strategies.selected.capital") }}</dt><dd data-selected-capital>--</dd></div>
+          <div><dt>{{ t("strategies.selected.commission") }}</dt><dd data-selected-commission>--</dd></div>
+          <div><dt>{{ t("strategies.selected.period") }}</dt><dd data-selected-period>--</dd></div>
+          <div><dt>{{ t("strategies.selected.direction") }}</dt><dd data-selected-direction>--</dd></div>
+          <div><dt>{{ t("strategies.selected.timeframe") }}</dt><dd data-selected-timeframe>--</dd></div>
+          <div><dt>{{ t("strategies.selected.slippage") }}</dt><dd data-selected-slippage>--</dd></div>
+          <div><dt>{{ t("strategies.selected.runs") }}</dt><dd data-selected-run-state>--</dd></div>
+          <div><dt>{{ t("strategies.selected.updated") }}</dt><dd data-selected-updated>--</dd></div>
+        </dl>
+      </section>
+
+      <section class="terminal-panel strategies-statistics" data-strategies-panel="metric_grid">
+        <header class="panel-heading">
+          <h2>{{ t("strategies.metrics.title") }}</h2>
+        </header>
+        <div class="strategies-stat-list" data-strategy-metrics></div>
+      </section>
+
+      <section class="terminal-panel strategies-saved" data-strategies-panel="saved_strategies">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.saved.title") }}</h2>
+          <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+            <button
+              class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+              type="button"
+              id="strategy-state-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="strategy-state-menu"
+              data-rh-dropdown-trigger
+              data-strategy-control="branded dropdown"
+            >
+              {{ t("strategies.saved.state") }}
+              <span class="rh-dropdown__value" data-state-current>all</span>
+            </button>
+            <div class="rh-popover" id="strategy-state-menu" role="listbox" hidden data-rh-dropdown-menu>
+              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-strategy-state="all">
+                {{ t("strategies.saved.all") }}
+              </button>
+              <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-strategy-state="active">
+                {{ t("strategies.saved.active") }}
+              </button>
+            </div>
+          </div>
+        </header>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--saved">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.saved.strategy") }}</th>
+                <th>{{ t("strategies.saved.version") }}</th>
+                <th>{{ t("strategies.saved.updated") }}</th>
+              </tr>
+            </thead>
+            <tbody data-strategy-saved-rows></tbody>
+          </table>
+        </div>
+        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-strategy-load>
+          {{ t("strategies.actions.load_statistics") }}
+        </button>
+      </section>
+
+      <section class="terminal-panel strategies-chart-panel" data-strategies-panel="chart_trades">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.chart.title") }}</h2>
+          <div class="strategies-chart-controls">
+            <button class="strategies-segment" type="button" data-chart-symbol>--</button>
+            <button class="strategies-segment" type="button">1m</button>
+            <button class="strategies-segment strategies-segment--active" type="button">1h</button>
+            <button class="strategies-segment" type="button">4h</button>
+            <button class="strategies-segment" type="button">1D</button>
+          </div>
+        </header>
+        <div class="strategies-chart-wrap">
+          <svg
+            class="strategies-chart"
+            viewBox="0 0 900 270"
+            role="img"
+            aria-label="{{ t('strategies.chart.title') }}"
+            data-strategy-chart
+          ></svg>
+          <div class="strategies-panel-state" data-chart-state></div>
+        </div>
+        <div class="strategies-chart-legend">
+          <span class="legend-dot legend-dot--buy">{{ t("strategies.chart.buy") }}</span>
+          <span class="legend-dot legend-dot--sell">{{ t("strategies.chart.sell") }}</span>
+          <span class="legend-dot legend-dot--tp">{{ t("strategies.chart.tp") }}</span>
+          <span class="legend-dot legend-dot--sl">{{ t("strategies.chart.sl") }}</span>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-long-short" data-strategies-panel="long_short">
+        <header class="panel-heading"><h2>{{ t("strategies.long_short.title") }}</h2></header>
+        <div class="strategies-table-wrap strategies-table-wrap--compact">
+          <table class="strategies-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>{{ t("strategies.long_short.long") }}</th>
+                <th>{{ t("strategies.long_short.short") }}</th>
+                <th>{{ t("strategies.long_short.total") }}</th>
+              </tr>
+            </thead>
+            <tbody data-long-short-rows></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-risk" data-strategies-panel="risk_execution">
+        <header class="panel-heading"><h2>{{ t("strategies.risk.title") }}</h2></header>
+        <dl class="strategies-risk-list" data-risk-execution></dl>
+      </section>
+
+      <section class="terminal-panel strategies-monthly" data-strategies-panel="monthly_stats">
+        <header class="panel-heading"><h2>{{ t("strategies.monthly.title") }}</h2></header>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--monthly">
+            <thead data-monthly-head></thead>
+            <tbody data-monthly-rows></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-stat-tiles" data-strategies-panel="stat_tiles">
+        <div class="strategies-tile-grid" data-stat-tiles></div>
+      </section>
+
+      <section class="terminal-panel strategies-drawdown" data-strategies-panel="drawdown">
+        <header class="panel-heading"><h2>{{ t("strategies.drawdown.title") }}</h2></header>
+        <div class="strategies-mini-chart-wrap">
+          <svg class="strategies-mini-chart" viewBox="0 0 360 120" role="img" data-drawdown-chart></svg>
+          <div class="strategies-panel-state" data-drawdown-state></div>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-equity" data-strategies-panel="equity_curve">
+        <header class="panel-heading"><h2>{{ t("strategies.equity.title") }}</h2></header>
+        <div class="strategies-mini-chart-wrap">
+          <svg class="strategies-mini-chart" viewBox="0 0 360 120" role="img" data-equity-chart></svg>
+          <div class="strategies-panel-state" data-equity-state></div>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-days" data-strategies-panel="best_worst_days">
+        <header class="panel-heading"><h2>{{ t("strategies.days.title") }}</h2></header>
+        <div class="strategies-table-wrap strategies-table-wrap--compact">
+          <table class="strategies-table">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.days.best") }}</th>
+                <th>{{ t("strategies.days.pnl") }}</th>
+                <th>{{ t("strategies.days.worst") }}</th>
+                <th>{{ t("strategies.days.pnl") }}</th>
+              </tr>
+            </thead>
+            <tbody data-best-worst-days></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-hours" data-strategies-panel="hourly_results">
+        <header class="panel-heading"><h2>{{ t("strategies.hours.title") }}</h2></header>
+        <div class="strategies-table-wrap strategies-table-wrap--compact">
+          <table class="strategies-table">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.hours.hour") }}</th>
+                <th>{{ t("strategies.hours.win_rate") }}</th>
+                <th>{{ t("strategies.hours.pnl") }}</th>
+              </tr>
+            </thead>
+            <tbody data-hourly-results></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-trades" data-strategies-panel="trades">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.trades.title") }}</h2>
+          <div class="strategies-trade-tools">
+            <input
+              class="strategies-search"
+              type="search"
+              data-trade-search
+              aria-label="{{ t('strategies.trades.search') }}"
+              placeholder="{{ t('strategies.trades.search') }}"
+            >
+            <button class="strategies-segment strategies-segment--active" type="button">{{ t("strategies.trades.all") }}</button>
+            <button class="strategies-segment" type="button">{{ t("strategies.trades.long") }}</button>
+            <button class="strategies-segment" type="button">{{ t("strategies.trades.direction") }}</button>
+            <div class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="strategy-trade-filter-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="strategy-trade-filter-menu"
+                data-rh-dropdown-trigger
+                data-strategy-control="branded dropdown"
+              >
+                {{ t("strategies.trades.filter") }}
+                <span class="rh-dropdown__value" data-trade-filter-current>{{ t("strategies.trades.all") }}</span>
+              </button>
+              <div class="rh-popover" id="strategy-trade-filter-menu" role="listbox" hidden data-rh-dropdown-menu>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-trade-filter="all">
+                  {{ t("strategies.trades.all") }}
+                </button>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-trade-filter="tp">TP</button>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-trade-filter="sl">SL</button>
+              </div>
+            </div>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trade-reset>
+              {{ t("strategies.trades.reset") }}
+            </button>
+            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trade-export>
+              {{ t("strategies.trades.export") }}
+            </button>
+          </div>
+        </header>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--trades">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ t("strategies.trades.symbol") }}</th>
+                <th>{{ t("strategies.trades.side") }}</th>
+                <th>{{ t("strategies.trades.entry_time") }}</th>
+                <th>{{ t("strategies.trades.entry") }}</th>
+                <th>{{ t("strategies.trades.exit_time") }}</th>
+                <th>{{ t("strategies.trades.exit") }}</th>
+                <th>{{ t("strategies.trades.pnl_pct") }}</th>
+                <th>{{ t("strategies.trades.pnl_usdt") }}</th>
+                <th>{{ t("strategies.trades.bars") }}</th>
+                <th>{{ t("strategies.trades.hold_time") }}</th>
+                <th>{{ t("strategies.trades.phase") }}</th>
+                <th>{{ t("strategies.trades.reason") }}</th>
+                <th>{{ t("strategies.trades.note") }}</th>
+              </tr>
+            </thead>
+            <tbody data-trade-rows></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-symbols" data-strategies-panel="symbol_results">
+        <header class="panel-heading"><h2>{{ t("strategies.symbols.title") }}</h2></header>
+        <div class="strategies-table-wrap strategies-table-wrap--compact">
+          <table class="strategies-table">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.symbols.symbol") }}</th>
+                <th>{{ t("strategies.symbols.trades") }}</th>
+                <th>{{ t("strategies.symbols.win_rate") }}</th>
+                <th>{{ t("strategies.symbols.pnl_pct") }}</th>
+                <th>{{ t("strategies.symbols.pnl_usdt") }}</th>
+              </tr>
+            </thead>
+            <tbody data-symbol-results></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    {% include "fragments/strategies/create_modal.html" %}
+  </section>
+{% endblock %}
+
+{% block status_bar %}
+  <footer class="shell-status-panel app-bottom-status shell-global-status strategies-status-line" data-strategies-footer-status>
+    <span>{{ t("strategies.footer.connection") }}: <strong data-footer-connection>--</strong></span>
+    <span>{{ t("strategies.footer.data") }}: <strong data-footer-data>--</strong></span>
+    <span>{{ t("dashboard.footer.api") }}: <strong data-footer-api>--</strong></span>
+    <span>{{ t("dashboard.footer.latency") }}: <strong data-footer-latency>--</strong></span>
+    <span>{{ t("strategies.footer.capital") }}: <strong data-footer-capital>--</strong></span>
+    <span>{{ t("dashboard.footer.server_time") }}: <strong data-footer-time>--</strong></span>
+    <span class="strategies-status-actions">
+      <button
+        class="rh-button rh-button--primary rh-button--compact"
+        type="button"
+        data-strategies-refresh
+      >{{ t("refresh.manual") }}</button>
+      <span class="rh-dropdown strategies-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button
+          class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+          type="button"
+          id="strategies-refresh-trigger"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="strategies-refresh-menu"
+          data-rh-dropdown-trigger
+          data-strategy-control="branded dropdown"
+        >
+          {{ t("refresh.autorefresh") }}
+          <span class="rh-dropdown__value" data-strategies-refresh-current>15s</span>
+        </button>
+        <span
+          class="rh-popover"
+          id="strategies-refresh-menu"
+          role="listbox"
+          aria-labelledby="strategies-refresh-trigger"
+          hidden
+          data-rh-dropdown-menu
+        >
+          {% for preset in refresh_presets %}
+            <button
+              class="rh-menu-item"
+              type="button"
+              role="option"
+              aria-selected="{{ 'true' if preset.key == '15s' else 'false' }}"
+              data-rh-dropdown-item="{{ preset.key }}"
+              data-strategies-refresh-preset="{{ preset.key }}"
+            >{{ preset.label }}</button>
+          {% endfor %}
+        </span>
+      </span>
+      <output class="strategies-freshness" data-strategies-freshness aria-live="polite">
+        {{ t("strategies.awaiting_data") }}
+      </output>
+      <strong data-strategies-refresh-status>{{ t("refresh.idle") }}</strong>
+    </span>
+  </footer>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{{ asset_url('/assets/js/pages/strategies.js') }}"></script>
+{% endblock %}

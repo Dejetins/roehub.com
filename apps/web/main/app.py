@@ -315,27 +315,50 @@ def _register_routes(
 
     @app.get("/strategies", response_class=HTMLResponse)
     def get_strategies_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/strategies"],
+            page_path="/strategies",
+            active_path="/strategies",
+            page_title_key="page.strategies.title",
+            page_description_key="page.strategies.desc",
+            template_name="pages/strategies.html",
+            template_context={
+                "strategy_initial_mode": request.query_params.get("mode") or "dashboard",
+                "strategy_initial_id": request.query_params.get("strategy_id") or "",
+            },
         )
 
     @app.get("/strategies/new", response_class=HTMLResponse)
     def get_new_strategy_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/strategies/new"],
+            page_path="/strategies",
+            active_path="/strategies",
+            page_title_key="page.strategies.new_title",
+            page_description_key="page.strategies.new_desc",
+            template_name="pages/strategies.html",
+            template_context={
+                "strategy_initial_mode": "create",
+                "strategy_initial_id": "",
+            },
         )
 
     @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
     def get_strategy_details_page(request: Request, strategy_id: str) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/strategies"],
-            template_context={"strategy_id": strategy_id},
+            page_path="/strategies",
+            active_path="/strategies",
+            page_title_key="page.strategies.title",
+            page_description_key="page.strategies.desc",
+            template_name="pages/strategies.html",
+            template_context={
+                "strategy_initial_mode": "dashboard",
+                "strategy_initial_id": strategy_id,
+            },
         )
 
     @app.get("/backtests", response_class=HTMLResponse)

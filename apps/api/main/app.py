@@ -23,6 +23,7 @@ from apps.api.wiring.modules import (
     build_strategy_router,
     build_ui_account_router,
     build_ui_dashboard_router,
+    build_ui_strategies_dashboard_router,
     is_strategy_api_enabled,
 )
 from trading.platform.config import load_indicators_compute_numba_config
@@ -107,6 +108,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     )
     app.include_router(
         build_ui_dashboard_router(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
+        )
+    )
+    app.include_router(
+        build_ui_strategies_dashboard_router(
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
         )

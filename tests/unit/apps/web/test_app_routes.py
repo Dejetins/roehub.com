@@ -330,21 +330,73 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
 
 
-def test_authorized_placeholder_routes_render_active_navigation() -> None:
+def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> None:
     client = _build_test_client()
 
-    strategies_response = client.get("/strategies/new")
+    strategies_response = client.get("/strategies")
     main_html = strategies_response.text.split('<main id="main-content"', maxsplit=1)[1].split(
         "</main>", maxsplit=1
     )[0]
 
     assert strategies_response.status_code == 200
+    assert 'data-page="strategies"' in strategies_response.text
+    assert 'data-strategies-root' in strategies_response.text
+    assert 'data-dashboard-endpoint="/api/ui/strategies/dashboard"' in strategies_response.text
+    assert 'data-api-create-path="/api/strategies"' in strategies_response.text
+    assert 'data-api-clone-path="/api/strategies/clone"' in strategies_response.text
+    assert 'data-api-run-path-template="/api/strategies/{strategy_id}/run"' in (
+        strategies_response.text
+    )
+    assert 'data-api-stop-path-template="/api/strategies/{strategy_id}/stop"' in (
+        strategies_response.text
+    )
     assert 'data-nav-key="strategies"' in strategies_response.text
     assert 'nav-tab--active"' in strategies_response.text
-    assert 'id="placeholder-market-listbox"' not in strategies_response.text
-    assert "BTCUSDT" not in main_html
-    assert "ETHUSDT" not in main_html
-    assert "SOLUSDT" not in main_html
+    assert "/assets/css/pages/strategies.css" in strategies_response.text
+    assert "/assets/js/pages/strategies.js" in strategies_response.text
+    assert "/assets/strategy_ui.js" not in strategies_response.text
+    assert "<select" not in strategies_response.text
+    assert 'role="listbox"' in strategies_response.text
+    assert 'data-strategy-control="branded dropdown"' in strategies_response.text
+    for panel in [
+        "command_status",
+        "selected_strategy",
+        "chart_trades",
+        "metric_grid",
+        "saved_strategies",
+        "long_short",
+        "risk_execution",
+        "monthly_stats",
+        "stat_tiles",
+        "drawdown",
+        "equity_curve",
+        "best_worst_days",
+        "hourly_results",
+        "trades",
+        "symbol_results",
+    ]:
+        assert f'data-strategies-panel="{panel}"' in strategies_response.text
+    assert "Protected workspace placeholder" not in main_html
+    assert "strategy_ui.js" not in main_html
+    assert 'data-strategy-create-panel' in strategies_response.text
+    assert 'data-strategies-refresh-preset' in strategies_response.text
+    assert "shell-status-panel app-bottom-status shell-global-status strategies-status-line" in (
+        strategies_response.text
+    )
+
+    new_response = client.get("/strategies/new")
+    assert new_response.status_code == 200
+    assert 'data-page="strategies"' in new_response.text
+    assert 'data-initial-mode="create"' in new_response.text
+    assert 'data-strategy-create-panel' in new_response.text
+    assert "/assets/strategy_ui.js" not in new_response.text
+
+    strategy_id = "00000000-0000-0000-0000-000000000123"
+    detail_response = client.get(f"/strategies/{strategy_id}")
+    assert detail_response.status_code == 200
+    assert 'data-page="strategies"' in detail_response.text
+    assert f'data-initial-strategy-id="{strategy_id}"' in detail_response.text
+    assert "/assets/strategy_ui.js" not in detail_response.text
 
 
 def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
@@ -465,6 +517,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
         "dist/js/core/refresh.js",
         "dist/js/pages/dashboard.js",
         "dist/css/pages/dashboard.css",
+        "dist/js/pages/strategies.js",
+        "dist/css/pages/strategies.css",
         "dist/js/components/dropdown.js",
         "dist/js/components/listbox.js",
         "dist/js/components/combobox.js",
@@ -488,6 +542,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     components_css = (_WEB_ROOT / "dist/css/components.css").read_text(encoding="utf-8")
     dashboard_js = (_WEB_ROOT / "dist/js/pages/dashboard.js").read_text(encoding="utf-8")
     dashboard_css = (_WEB_ROOT / "dist/css/pages/dashboard.css").read_text(encoding="utf-8")
+    strategies_js = (_WEB_ROOT / "dist/js/pages/strategies.js").read_text(encoding="utf-8")
+    strategies_css = (_WEB_ROOT / "dist/css/pages/strategies.css").read_text(encoding="utf-8")
 
     assert "--rh-financial-positive" in tokens_css
     assert "--rh-financial-negative" in tokens_css
@@ -531,6 +587,15 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
         assert preset in dashboard_js
     assert "/api/ui/dashboard/summary" in dashboard_js
     assert "createPoller" in dashboard_js
+    assert "/api/ui/strategies/dashboard" in strategies_js
+    assert "/api/strategies/clone" in strategies_js
+    assert "source_strategy_id" in strategies_js
+    assert "createPoller" in strategies_js
+    assert "activeRequest" in strategies_js
+    assert "hiddenTabPause" in strategies_js
+    assert "strategy_ui.js" not in strategies_js
+    assert "--rh-financial-positive" in strategies_css
+    assert "--rh-financial-negative" in strategies_css
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
     for placeholder in ["metric_1", "metric_2", "metric_3", "metric_4"]:
