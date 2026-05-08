@@ -4,12 +4,14 @@
 
 ## Статус
 
-- предлагаемый источник правды для реализации UI;
+- источник правды для визуальной модели Web UI v1, синхронизированный с текущей реализацией `apps/web`;
+- если этот документ расходится с уже реализованным Stage 1-5 shell/dashboard/settings baseline, первичным источником считается текущая реализация, а манифест должен быть уточнен без изменения runtime behavior;
 - план реализации: `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md`;
 - исследовательский ввод: `docs/web-ui+backend-plan-deep-research.md`;
 - обновление 2026-05-03: палитра, header и shell-инварианты сверены с `personal_settings.png`, `stategy_backtest.png` и текущим Stage 1 screenshot; текущая orange-grid реализация не является целевым дизайном;
-- обновление 2026-05-04: для функциональных страниц введен жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются визуально невалидными, если не повторяют назначенный PNG-референс;
+- обновление 2026-05-04: для функциональных страниц введен `reference fidelity contract`; после пересборки Stage 1-5 он применяется как target для еще не выполненных или явно переоткрытых этапов, но не отменяет текущий принятый shell/dashboard/settings baseline;
 - обновление 2026-05-05: зафиксированы auth UX contract, фирменные dropdown/popover controls вместо системных select-меню, а также manual refresh/autorefresh contract для live-data страниц;
+- обновление 2026-05-09: зафиксирована текущая UI-модель Stage 1-5: `>_ Roehub` shell, login modal, отдельная `/register`, compact theme/language dropdowns, глобальная нижняя status/refresh строка, dashboard/settings без отдельной full-width page command bar;
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`;
 - референсы дизайна:
   - `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png`;
@@ -24,13 +26,15 @@
 
 ## Контекст
 
-Текущий `apps/web` уже является FastAPI SSR/Jinja2-фасадом поверх backend JSON API, но его шаблоны и ассеты являются прототипом: светлая тема, монолитный `site.css`, скрипты страниц `strategy_ui.js` и `backtest_ui.js`, HTMX из CDN и встроенные auth-скрипты. Новая реализация полностью заменяет текущий UI. Старые шаблоны и ассеты можно использовать только как источник маршрутов и API-точек во время миграции, но не как визуальную основу.
+Текущий `apps/web` уже является FastAPI SSR/Jinja2-фасадом поверх backend JSON API и содержит принятый Stage 1-5 baseline: темный terminal shell, Jinja2 pages/fragments, CSS-токены, branded dropdown/listbox/combobox controls, login modal, i18n helper, theme helper, dashboard/settings page modules и same-origin `/api/*` proxy. Оставшиеся legacy templates или routes можно использовать только как источник маршрутов и API-точек во время миграции, но не как визуальную основу для новых функциональных страниц.
 
 Референсы задают другой продуктовый язык: темная терминальная рабочая панель, плотные таблицы, тонкие янтарно-оранжевые контуры, моноширинные числа, зеленые/красные значения доходности и минимальная декоративность. В референсах нет полноэкранной декоративной orange-grid подложки: сетка допустима внутри графиков, таблиц и data panels, но не как фон всего приложения.
 
 ## Жесткий reference fidelity contract
 
 Для функциональных страниц Roehub Web UI v1 PNG-референс является не moodboard и не "inspiration", а визуальным контрактом. Часть страницы **после глобальной шапки сайта** должна быть `reference-shaped`: повторять структуру, плотность, панельную сетку, порядок информационных зон, таблицы, графики, командную строку страницы и нижнюю статусную строку назначенного референса. Допускается заменить бренд `QUANT CLI` на `Roehub`, перевести пользовательский текст на `en`/`ru`, адаптировать ширины под реальные данные и свернуть layout на mobile, но нельзя заменять референс generic cards, marketing blocks или dashboard overview без соответствующей панельной структуры.
+
+Текущий checkpoint Stage 1-5 уточняет этот контракт: уже реализованные `/dashboard` и `/settings` считаются валидным baseline даже там, где они используют глобальную нижнюю status/refresh строку и panel toolbars вместо отдельной full-width command bar сразу под header. Для еще не выполненных `/strategies` и `/backtests` агент должен следовать назначенному PNG жестче и явно перечислять panel inventory до верстки. Если какой-либо этап требуется переделать под буквальную PNG-точность, это считается новым scope и должно быть отражено в соответствующем prompt pack до реализации.
 
 Каноническая карта страниц:
 
@@ -324,8 +328,10 @@ Language switcher:
 - header не содержит крупный theme switcher из нескольких текстовых кнопок; theme control допускается только как компактный элемент account/settings;
 - header содержит компактный language switcher (`EN/RU` или меню), расположенный рядом с account/auth controls и не конкурирующий с primary nav;
 - header не содержит квадратный `RH`-логотип, отдельный `GUEST` chip как декоративный badge, corner `v1` или footer-brand дубликаты;
-- командная строка страницы под шапкой для хлебных крошек и действий страницы обязательна на плотных app pages: слева `>_ SECTION / SUBSECTION`, справа page actions;
-- фиксированная или липкая нижняя статусная строка на плотных страницах приложения;
+- текущий shell использует бренд `>_ Roehub`, compact theme dropdown, compact locale dropdown, auth/account controls и общий bottom status/refresh bar;
+- отдельная full-width command bar под шапкой не является обязательной для уже реализованных `/dashboard` и `/settings`: page actions могут жить в panel headers, toolbar controls и bottom status bar;
+- для будущих reference-shaped страниц `/strategies` и `/backtests` command bar добавляется только если она нужна для совпадения с назначенным PNG или workflow;
+- фиксированная или липкая нижняя статусная строка на плотных страницах приложения является частью текущей модели shell;
 - максимальная ширина контента `--rh-page-max`; на лендинге допустимы полноширинные секции.
 
 Настольная компоновка:
@@ -484,13 +490,15 @@ Live-data страницы (`/dashboard`, `/strategies`, `/backtests`) имею�
 
 #### Лендинг
 
-Использовать `general_page.png` как основной референс. Hero должен показывать сам продукт: карту платформы Roehub, возможности и CTA в первом viewport. Визуальный ассет - темная продуктовая диаграмма. Не превращать лендинг в типовой SaaS-набор карточек.
+Route: `/`. Канонический референс: `general_page.png`.
+
+Текущий baseline лендинга - компактный terminal/CLI preview в центре страницы с CTA `Login` и `/register`, без декоративной full-page grid и без generic SaaS cards. `general_page.png` остается route reference, но landing не переоткрывается в текущем Stage 1-5 checkpoint. Если Stage 3 будет выполняться заново, prompt должен явно решить, сохраняется ли текущий CLI preview или возвращается требование продуктовой карты/диаграммы.
 
 #### Dashboard всех стратегий
 
 Route: `/dashboard`. Канонический референс: `personal_dashboard.png`.
 
-Страница является плотной рабочей поверхностью по всем стратегиям. Обязательные зоны: command bar `>_`, верхняя selected-strategy summary panel с действиями stop/restart/settings, PnL/equity chart с range controls `1H/4H/1D/1W/1M`, metric grid, таблица открытых позиций, полноширинная таблица последних исполнений, health/risk, табличные alerts/events, табличный symbol allocation, правый список стратегий с tabs/search/filter/sort/refresh/autorefresh/summary counters/sparklines/pagination и нижняя status bar. Реализация не может быть заменена на generic account/strategies/backtests/alerts cards.
+Текущий Stage 04 baseline - плотная рабочая поверхность по всем стратегиям, а не generic overview cards. Реализованные зоны: selected-strategy summary panel, health/risk panel, PnL/equity chart с range controls `1H/4H/1D/1W/1M`, metric grid, таблица открытых позиций, таблица последних исполнений, alerts/events, symbol allocation, правый список стратегий с tabs/search/filter/sort controls и нижняя status/refresh/autorefresh строка. Отдельная full-width command bar и action buttons stop/restart/settings в верхней summary panel не являются обязательными для текущего принятого baseline; если их нужно добавить для буквального совпадения с `personal_dashboard.png`, Stage 04 должен быть переоткрыт отдельной задачей.
 
 Dashboard показывает текущее состояние портфеля стратегий online, но читает его только через backend read-models/cache: strategy storage/run state, realtime Redis streams/readers, planned portfolio/position/execution/equity snapshots, market-data reference и exchange account read-models. Если источник еще не реализован, соответствующая panel остается в форме референса и показывает typed `unavailable/degraded/stale` state.
 
@@ -498,7 +506,7 @@ Dashboard показывает текущее состояние портфел�
 
 Route: `/settings`. Канонический референс: `personal_settings.png`.
 
-Страница является плотной операционной поверхностью аккаунта. Обязательные зоны: профиль, подключенные API бирж, уведомления и лимиты, webhooks/integrations, уведомления, безопасность, недавние сессии, журнал событий, верхние actions edit/save/security и нижняя status bar. Секреты никогда не показываются, а замаскированные API-ключи должны выглядеть как операционные записи, а не как password-поля.
+Страница является плотной операционной поверхностью аккаунта. Текущий Stage 05 baseline - двухколоночная panel grid: профиль, подключенные API-ключи бирж, лимиты, integrations/webhooks, уведомления, безопасность, недавние сессии и журнал событий. Верхние actions живут внутри соответствующих panel headers/forms, а глобальная нижняя status/refresh строка наследуется из shell. Отдельная full-width settings command bar сейчас не является обязательной. Секреты никогда не показываются, а замаскированные API-ключи должны выглядеть как операционные записи, а не как password-поля.
 
 Settings является местом persistent preferences для theme, locale, density и autorefresh defaults. Все меню выбора темы, языка, биржи, режима уведомлений и интервалов refresh используют branded dropdown/listbox controls.
 
@@ -614,7 +622,7 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 - Палитра по умолчанию - `terminal-orange`.
 - Полноэкранная orange-grid подложка запрещена; сетка допустима только внутри графиков/data panels.
 - Квадратный `RH` monogram и декоративные corner badges не являются частью v1 shell.
-- Header строится по референсам `personal_settings.png` и `stategy_backtest.png`: компактный текстовый бренд, nav, active border, account/auth справа, command bar под header.
+- Header строится по текущему Stage 1-5 shell: компактный `>_ Roehub` бренд, nav, active border, compact theme/language dropdowns, account/auth справа; command bar под header является page-specific, а не обязательным глобальным элементом.
 - Login строится как branded modal/dialog; `/login` является compatibility modal state, а registration остается отдельной `/register` page.
 - Выпадающие списки, меню и combobox/listbox controls выполняются фирменным Roehub UI; visible native system dropdown/select запрещен для protected functional pages.
 - Live-data страницы имеют manual refresh и управляемый autorefresh с no-overlap, hidden-tab pause, freshness/degraded state и backend rate-limit awareness.
@@ -631,11 +639,13 @@ export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 ## Связанные файлы
 
 - `apps/web/main/app.py` - composition root web-маршрутов.
-- `apps/web/templates/base.html` - текущая цель замены каркаса.
-- `apps/web/templates/**` - текущие шаблоны, заменяемые на `pages/`, `components/`, `fragments/`, `macros/`.
-- `apps/web/dist/site.css` - текущая цель замены CSS.
-- `apps/web/dist/strategy_ui.js` - текущая цель замены JS для стратегий.
-- `apps/web/dist/backtest_ui.js` - текущая цель замены JS для backtest-задач.
+- `apps/web/templates/base.html` - текущий shell baseline: `>_ Roehub`, nav, preferences, login modal hook, bottom status/refresh bar.
+- `apps/web/templates/pages/landing.html` - текущий `/` baseline.
+- `apps/web/templates/pages/dashboard.html` и `apps/web/dist/js/pages/dashboard.js` - текущий `/dashboard` baseline.
+- `apps/web/templates/pages/settings.html`, `apps/web/templates/fragments/account/**` и `apps/web/dist/js/pages/settings.js` - текущий `/settings` baseline.
+- `apps/web/templates/pages/placeholder.html` - временный state для еще не реализованных canonical pages.
+- `apps/web/dist/css/tokens.css`, `themes.css`, `base.css`, `layout.css`, `components.css`, `shell.css`, `pages/*.css` - текущий CSS source.
+- legacy `strategy_ui.js`, `backtest_ui.js` и старый `site.css`, если появляются в ветке, считаются целями удаления/замены, а не долгосрочными файлами.
 - `docs/web-ui+backend-plan-deep-research.md` - исследовательский ввод для архитектуры и карты endpoint-ов.
 - `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md` - план параллельной реализации.
 
