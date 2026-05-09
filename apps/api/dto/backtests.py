@@ -76,6 +76,10 @@ class BacktestJobResponse(BaseModel):
     started_at: str | None
     finished_at: str | None
     updated_at: str
+    refresh_status: str
+    generated_at: str
+    next_allowed_refresh_at: str
+    retry_after_seconds: int
     terminal_summary: dict[str, Any]
     links: dict[str, Any]
     idempotent_replay: bool | None = None

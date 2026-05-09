@@ -5,7 +5,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Mapping, Protocol, cast
+from typing import Any, Mapping, cast
 from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import (
@@ -20,6 +20,7 @@ from trading.contexts.backtest.application.dto import (
     build_top_variant_read_model,
 )
 from trading.contexts.backtest.application.ports import (
+    BacktestJobExecutionTrigger,
     BacktestJobListQuery,
     BacktestJobRepository,
 )
@@ -33,7 +34,6 @@ from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJob,
     BacktestJobArtifactPin,
-    BacktestJobErrorPayload,
     BacktestJobState,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -53,23 +53,12 @@ BACKTEST_ERROR_RATE_LIMITED = "backtest.rate_limited"
 BACKTEST_ERROR_QUEUE_SATURATED = "backtest.queue_saturated"
 
 
-class BacktestJobExecutor(Protocol):
-    def execute(
-        self,
-        *,
-        job_id: UUID,
-        preflight: BacktestPreflightResult,
-        updated_at: datetime,
-    ) -> Any:
-        ...
-
-
 @dataclass(frozen=True, slots=True)
 class BacktestJobsUseCase:
     job_repository: BacktestJobRepository
     preflight_service: BacktestPreflightService
     runtime_config: BacktestRuntimeConfig
-    executor: BacktestJobExecutor | None = None
+    execution_trigger: BacktestJobExecutionTrigger | None = None
     lazy_trades_service: BacktestLazyTradesDetailService | None = None
     idempotency_ttl_seconds: int = 86_400
 
@@ -115,7 +104,7 @@ class BacktestJobsUseCase:
             engine_params_hash=preflight.result_config_hash,
             backtest_runtime_config_hash=preflight.result_config_hash,
             artifact_pin=_artifact_pin(preflight=preflight),
-            execution_mode="sync_inline",
+            execution_mode="background_auto",
             market_id=_market_id(preflight=preflight),
             symbol=_symbol(preflight=preflight),
             timeframe=str(preflight.normalized_request["timeframe"]),
@@ -124,75 +113,14 @@ class BacktestJobsUseCase:
             ranking_secondary_metric=None,
         )
         stored_job = self.job_repository.create(job=queued_job)
-        if self.executor is None:
-            return BacktestJobCreateResult(
-                job=build_backtest_job_read_model(job=stored_job),
-                idempotent_replay=False,
-            )
-
-        locked_by = f"sync_inline:{job_id.hex[:16]}"
-        running = self.job_repository.claim_for_inline_execution(
-            job_id=job_id,
-            user_id=user_id,
-            now=datetime.now(UTC),
-            locked_by=locked_by,
-            lease_expires_at=datetime.now(UTC)
-            + timedelta(seconds=self.runtime_config.guardrails.job_wall_timeout_seconds),
-        )
-        if running is None:
-            raise _error(
-                code=BACKTEST_ERROR_QUEUE_SATURATED,
-                message="Backtest job could not be claimed for execution",
-                details={"job_id": str(job_id)},
-            )
-
-        try:
-            execution_result = self.executor.execute(
-                job_id=job_id,
-                preflight=preflight,
-                updated_at=datetime.now(UTC),
-            )
-        except Exception as error:  # noqa: BLE001
-            self.job_repository.finish_with_top_variants(
-                job_id=job_id,
+        if self.execution_trigger is not None:
+            self.execution_trigger.enqueue(
+                job_id=stored_job.job_id,
                 user_id=user_id,
-                now=datetime.now(UTC),
-                locked_by=locked_by,
-                next_state="failed",
-                top_variants=(),
-                last_error=str(error),
-                last_error_json=BacktestJobErrorPayload(
-                    code="unexpected_error",
-                    message="Backtest job execution failed",
-                    details={"reason": str(error)},
-                ),
+                request_hash=stored_job.request_hash,
             )
-            raise _error(
-                code="unexpected_error",
-                message="Backtest job execution failed",
-                details={"job_id": str(job_id), "reason": str(error)},
-            ) from error
-
-        finished = self.job_repository.finish_with_top_variants(
-            job_id=job_id,
-            user_id=user_id,
-            now=datetime.now(UTC),
-            locked_by=locked_by,
-            next_state="succeeded",
-            top_variants=tuple(execution_result.top_variants),
-        )
-        if finished is None:
-            raise _error(
-                code=BACKTEST_ERROR_QUEUE_SATURATED,
-                message="Backtest job lease was lost before terminal persistence",
-                details={"job_id": str(job_id)},
-            )
-        top_rows = self.job_repository.list_top_variants(job_id=job_id)
         return BacktestJobCreateResult(
-            job=build_backtest_job_read_model(
-                job=finished,
-                top_variants_count=len(top_rows),
-            ),
+            job=build_backtest_job_read_model(job=stored_job),
             idempotent_replay=False,
         )
 
@@ -487,6 +415,5 @@ __all__ = [
     "BACKTEST_ERROR_NOT_FOUND",
     "BACKTEST_ERROR_QUEUE_SATURATED",
     "BACKTEST_ERROR_RATE_LIMITED",
-    "BacktestJobExecutor",
     "BacktestJobsUseCase",
 ]

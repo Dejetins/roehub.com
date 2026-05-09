@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -45,6 +45,10 @@ class BacktestJobReadModel:
     started_at: datetime | None
     finished_at: datetime | None
     updated_at: datetime
+    refresh_status: str
+    generated_at: datetime
+    next_allowed_refresh_at: datetime
+    retry_after_seconds: int
     terminal_summary: Mapping[str, Any] = field(default_factory=dict)
     links: Mapping[str, Any] = field(default_factory=dict)
 
@@ -78,6 +82,10 @@ class BacktestJobReadModel:
             "started_at": _format_datetime(self.started_at),
             "finished_at": _format_datetime(self.finished_at),
             "updated_at": _format_datetime(self.updated_at),
+            "refresh_status": self.refresh_status,
+            "generated_at": _format_datetime(self.generated_at),
+            "next_allowed_refresh_at": _format_datetime(self.next_allowed_refresh_at),
+            "retry_after_seconds": self.retry_after_seconds,
             "terminal_summary": dict(self.terminal_summary),
             "links": dict(self.links),
         }
@@ -218,6 +226,8 @@ def build_backtest_job_read_model(
 ) -> BacktestJobReadModel:
     request = dict(job.request_json)
     ranking = _ranking_from_job(job=job, request=request)
+    generated_at = now or datetime.now(UTC)
+    retry_after_seconds = _retry_after_seconds(job=job)
     return BacktestJobReadModel(
         job_id=str(job.job_id),
         state=job.state,
@@ -232,6 +242,10 @@ def build_backtest_job_read_model(
         started_at=job.started_at,
         finished_at=job.finished_at,
         updated_at=job.updated_at,
+        refresh_status=_refresh_status(job=job),
+        generated_at=generated_at,
+        next_allowed_refresh_at=generated_at + _retry_delta(seconds=retry_after_seconds),
+        retry_after_seconds=retry_after_seconds,
         terminal_summary=_terminal_summary(job=job, top_variants_count=top_variants_count),
         links=_job_links(job_id=str(job.job_id)),
     )
@@ -348,6 +362,24 @@ def _terminal_summary(
     if job.last_error_json is not None:
         summary["last_error"] = job.last_error_json.to_mapping()
     return summary
+
+
+def _refresh_status(*, job: BacktestJob) -> str:
+    if job.state in {"queued", "running"}:
+        return "poll"
+    return "terminal"
+
+
+def _retry_after_seconds(*, job: BacktestJob) -> int:
+    if job.state == "queued":
+        return 2
+    if job.state == "running":
+        return 5
+    return 30
+
+
+def _retry_delta(*, seconds: int) -> timedelta:
+    return timedelta(seconds=seconds)
 
 
 def _job_links(*, job_id: str) -> dict[str, str]:

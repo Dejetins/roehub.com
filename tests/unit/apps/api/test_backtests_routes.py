@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -113,7 +113,10 @@ def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() ->
 
 def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> None:
     repository = _FakeJobRepository()
-    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    trigger = _FakeExecutionTrigger()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(repository=repository, execution_trigger=trigger)
+    )
 
     response = client.post(
         "/backtests/jobs",
@@ -123,9 +126,18 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["state"] == "succeeded"
-    assert payload["progress"]["pipeline_stage"] == "succeeded"
-    assert payload["terminal_summary"]["top_variants_count"] == 1
+    assert payload["state"] == "queued"
+    assert payload["progress"]["pipeline_stage"] == "queued"
+    assert payload["refresh_status"] == "poll"
+    assert payload["retry_after_seconds"] == 2
+    assert payload["terminal_summary"] == {}
+    assert payload["idempotent_replay"] is False
+    assert repository.jobs is not None
+    stored = repository.jobs[UUID(payload["job_id"])]
+    assert stored.execution_mode == "background_auto"
+    assert trigger.calls == ((stored.job_id, stored.request_hash),)
+
+    _complete_job(repository=repository, job_id=stored.job_id)
     top_response = client.get(
         f"/backtests/jobs/{payload['job_id']}/top",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
@@ -158,6 +170,7 @@ def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> No
         headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
         json=_valid_request(),
     )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
     top = client.get(
         f"/backtests/jobs/{created.json()['job_id']}/top",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000215"},
@@ -196,6 +209,7 @@ def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
         headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
         json=_valid_request(),
     )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
     top = client.get(
         f"/backtests/jobs/{created.json()['job_id']}/top",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000216"},
@@ -212,7 +226,10 @@ def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
 
 def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     repository = _FakeJobRepository()
-    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    trigger = _FakeExecutionTrigger()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(repository=repository, execution_trigger=trigger)
+    )
     headers = {
         "x-user-id": "00000000-0000-0000-0000-000000000206",
         "Idempotency-Key": "stable-key",
@@ -225,9 +242,11 @@ def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     conflict = client.post("/backtests/jobs", headers=headers, json=changed_request)
 
     assert first.status_code == 201
+    assert first.json()["state"] == "queued"
     assert replay.status_code == 200
     assert replay.json()["job_id"] == first.json()["job_id"]
     assert replay.json()["idempotent_replay"] is True
+    assert trigger.calls == ((UUID(first.json()["job_id"]), first.json()["request_hash"]),)
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "backtest.idempotency_key_conflict"
 
@@ -258,6 +277,7 @@ def test_post_backtest_job_cancel_terminal_job_is_idempotent() -> None:
         headers={"x-user-id": "00000000-0000-0000-0000-000000000209"},
         json=_valid_request(),
     )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
 
     response = client.post(
         f"/backtests/jobs/{created.json()['job_id']}/cancel",
@@ -351,6 +371,7 @@ def _build_client(
 def _build_jobs_use_case(
     *,
     repository: "_FakeJobRepository",
+    execution_trigger: Any | None = None,
     lazy_trades_service: Any | None = None,
 ) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
@@ -369,7 +390,7 @@ def _build_jobs_use_case(
             runtime_config=runtime_config,
         ),
         runtime_config=runtime_config,
-        executor=_FakeExecutor(),
+        execution_trigger=execution_trigger,
         lazy_trades_service=lazy_trades_service,
     )
 
@@ -406,6 +427,48 @@ class _FakeExecutor:
             summary_hash=assembly.summary_hash,
             cleanup_evidence={"result_contains_heavy_references": False},
         )
+
+
+def _complete_job(*, repository: "_FakeJobRepository", job_id: UUID) -> None:
+    assert repository.jobs is not None
+    job = repository.jobs[job_id]
+    locked_by = "test-worker"
+    now = datetime.now(UTC)
+    running = repository.claim_for_inline_execution(
+        job_id=job_id,
+        user_id=job.user_id,
+        now=now,
+        locked_by=locked_by,
+        lease_expires_at=now + timedelta(seconds=60),
+    )
+    assert running is not None
+    top_result = BacktestNoRiskTopResult(
+        rank=1,
+        score=12.5,
+        indicator_rows={"ma.dema": 7},
+        metrics={"total_return_pct": 12.5, "trade_count": 2.0},
+        metadata={
+            "ma.dema.source": "close",
+            "ma.dema.window": 5,
+            "confirm_count": 1,
+            "proxy_score": 0.25,
+        },
+    )
+    assembly = BacktestTopResultAssemblyService().assemble(
+        job_id=job_id,
+        normalized_request=dict(job.request_json),
+        top_results=(top_result,),
+        updated_at=now,
+    )
+    finished = repository.finish_with_top_variants(
+        job_id=job_id,
+        user_id=job.user_id,
+        now=now,
+        locked_by=locked_by,
+        next_state="succeeded",
+        top_variants=assembly.top_variants,
+    )
+    assert finished is not None
 
 
 @dataclass
@@ -455,6 +518,15 @@ class _FakeLazyTradesService:
             cache={"status": "miss"},
             timing={"lazy_trades_compute": 0.001},
         )
+
+
+@dataclass
+class _FakeExecutionTrigger:
+    calls: tuple[tuple[UUID, str], ...] = ()
+
+    def enqueue(self, *, job_id: UUID, user_id: UserId, request_hash: str) -> None:
+        _ = user_id
+        self.calls = (*self.calls, (job_id, request_hash))
 
 
 @dataclass

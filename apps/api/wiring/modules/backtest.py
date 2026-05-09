@@ -9,6 +9,7 @@ from apps.api.routes import build_backtests_router as build_backtests_api_router
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
+    DatabaseBacktestJobExecutionTrigger,
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestJobRepository,
@@ -22,15 +23,11 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest.application.services.v2 import (
-    BacktestComboPlanningService,
     BacktestLazyTradesDetailService,
-    BacktestNoRiskExactScoringService,
     BacktestPreflightService,
     BacktestPreparePoolsService,
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
-    BacktestRuntimeJobOrchestrationService,
-    BacktestTpSlExactScoringService,
     BacktestTpSlHitTimesService,
 )
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
@@ -128,19 +125,11 @@ def _build_jobs_use_case(
     tp_sl_hit_times = BacktestTpSlHitTimesService(
         artifact_array_loader=artifact_array_loader
     )
-    executor = BacktestRuntimeJobOrchestrationService(
-        prepare_pools=prepare_pools,
-        combo_planning=BacktestComboPlanningService(),
-        no_risk_exact=BacktestNoRiskExactScoringService(),
-        tp_sl_hit_times=tp_sl_hit_times,
-        tp_sl_exact=BacktestTpSlExactScoringService(),
-        artifact_array_loader=artifact_array_loader,
-    )
     return BacktestJobsUseCase(
         job_repository=job_repository,
         preflight_service=preflight_service,
         runtime_config=runtime_config,
-        executor=executor,
+        execution_trigger=DatabaseBacktestJobExecutionTrigger(),
         lazy_trades_service=BacktestLazyTradesDetailService(
             prepare_pools=prepare_pools,
             tp_sl_hit_times=tp_sl_hit_times,
