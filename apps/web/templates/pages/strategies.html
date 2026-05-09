@@ -139,16 +139,22 @@
         </div>
       </section>
 
-      <section class="terminal-panel strategies-statistics" data-strategies-panel="metric_grid">
-        <header class="panel-heading">
-          <h2>{{ t("strategies.metrics.title") }}</h2>
-        </header>
-        <div class="strategies-stat-list" data-strategy-metrics></div>
-      </section>
-
-      <section class="terminal-panel strategies-chart-panel" data-strategies-panel="chart_trades">
+      <section class="terminal-panel strategies-chart-panel" data-strategies-panel="visual_workspace">
         <header class="panel-heading panel-heading--with-tools">
-          <h2>{{ t("strategies.chart.title") }}</h2>
+          <div class="strategies-panel-title-group">
+            <h2>{{ t("strategies.visual.title") }}</h2>
+            <div class="strategies-tabbar" role="tablist" aria-label="{{ t('strategies.visual.title') }}">
+              <button class="strategies-tab strategies-tab--active" type="button" role="tab" aria-selected="true" data-chart-mode="trades">
+                {{ t("strategies.visual.trades") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-chart-mode="equity">
+                {{ t("strategies.visual.equity") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-chart-mode="drawdown">
+                {{ t("strategies.visual.drawdown") }}
+              </button>
+            </div>
+          </div>
           <div class="strategies-chart-controls">
             <button class="strategies-segment" type="button" data-chart-symbol>--</button>
             <button class="strategies-segment" type="button">1m</button>
@@ -167,79 +173,81 @@
           ></svg>
           <div class="strategies-panel-state" data-chart-state></div>
         </div>
-        <div class="strategies-chart-legend">
+        <div class="strategies-chart-legend" data-chart-legend>
           <span class="legend-dot legend-dot--buy">{{ t("strategies.chart.buy") }}</span>
           <span class="legend-dot legend-dot--sell">{{ t("strategies.chart.sell") }}</span>
           <span class="legend-dot legend-dot--tp">{{ t("strategies.chart.tp") }}</span>
           <span class="legend-dot legend-dot--sl">{{ t("strategies.chart.sl") }}</span>
         </div>
-        <div class="strategies-chart-supplements">
-          <section class="strategies-chart-mini" data-strategies-panel="drawdown">
-            <header class="panel-heading"><h2>{{ t("strategies.drawdown.title") }}</h2></header>
-            <div class="strategies-mini-chart-wrap">
-              <svg class="strategies-mini-chart-svg" viewBox="0 0 360 120" role="img" data-drawdown-chart></svg>
-              <div class="strategies-panel-state" data-drawdown-state></div>
+      </section>
+
+      <section class="terminal-panel strategies-statistics" data-strategies-panel="statistics_workspace">
+        <header class="panel-heading panel-heading--with-tools">
+          <div class="strategies-panel-title-group">
+            <h2>{{ t("strategies.statistics.title") }}</h2>
+            <div class="strategies-tabbar" role="tablist" aria-label="{{ t('strategies.statistics.title') }}">
+              <button class="strategies-tab strategies-tab--active" type="button" role="tab" aria-selected="true" data-stat-mode="overall">
+                {{ t("strategies.statistics.overall") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="long_short">
+                {{ t("strategies.statistics.long_short") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="hourly">
+                {{ t("strategies.statistics.hourly") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="risk">
+                {{ t("strategies.statistics.risk") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="monthly">
+                {{ t("strategies.statistics.monthly") }}
+              </button>
+            </div>
+          </div>
+        </header>
+        <div class="strategies-stat-views">
+          <section class="strategies-tab-panel" data-stat-view="overall" data-strategies-panel="metric_grid">
+            <div class="strategies-stat-list" data-strategy-metrics></div>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="long_short" data-strategies-panel="long_short" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>{{ t("strategies.long_short.long") }}</th>
+                    <th>{{ t("strategies.long_short.short") }}</th>
+                    <th>{{ t("strategies.long_short.total") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-long-short-rows></tbody>
+              </table>
             </div>
           </section>
-          <section class="strategies-chart-mini" data-strategies-panel="equity_curve">
-            <header class="panel-heading"><h2>{{ t("strategies.equity.title") }}</h2></header>
-            <div class="strategies-mini-chart-wrap">
-              <svg class="strategies-mini-chart-svg" viewBox="0 0 360 120" role="img" data-equity-chart></svg>
-              <div class="strategies-panel-state" data-equity-state></div>
+          <section class="strategies-tab-panel" data-stat-view="hourly" data-strategies-panel="hourly_results" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table">
+                <thead>
+                  <tr>
+                    <th>{{ t("strategies.hours.hour") }}</th>
+                    <th>{{ t("strategies.hours.win_rate") }}</th>
+                    <th>{{ t("strategies.hours.pnl") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-hourly-results></tbody>
+              </table>
             </div>
           </section>
-        </div>
-      </section>
-
-      <section class="terminal-panel strategies-long-short" data-strategies-panel="long_short">
-        <header class="panel-heading"><h2>{{ t("strategies.long_short.title") }}</h2></header>
-        <div class="strategies-table-wrap strategies-table-wrap--compact">
-          <table class="strategies-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>{{ t("strategies.long_short.long") }}</th>
-                <th>{{ t("strategies.long_short.short") }}</th>
-                <th>{{ t("strategies.long_short.total") }}</th>
-              </tr>
-            </thead>
-            <tbody data-long-short-rows></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="terminal-panel strategies-risk" data-strategies-panel="risk_execution">
-        <header class="panel-heading"><h2>{{ t("strategies.risk.title") }}</h2></header>
-        <dl class="strategies-risk-list" data-risk-execution></dl>
-      </section>
-
-      <section class="terminal-panel strategies-monthly" data-strategies-panel="monthly_stats">
-        <header class="panel-heading"><h2>{{ t("strategies.monthly.title") }}</h2></header>
-        <div class="strategies-table-wrap">
-          <table class="strategies-table strategies-table--monthly">
-            <thead data-monthly-head></thead>
-            <tbody data-monthly-rows></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="terminal-panel strategies-stat-tiles" data-strategies-panel="stat_tiles">
-        <div class="strategies-tile-grid" data-stat-tiles></div>
-      </section>
-
-      <section class="terminal-panel strategies-hours" data-strategies-panel="hourly_results">
-        <header class="panel-heading"><h2>{{ t("strategies.hours.title") }}</h2></header>
-        <div class="strategies-table-wrap strategies-table-wrap--compact">
-          <table class="strategies-table">
-            <thead>
-              <tr>
-                <th>{{ t("strategies.hours.hour") }}</th>
-                <th>{{ t("strategies.hours.win_rate") }}</th>
-                <th>{{ t("strategies.hours.pnl") }}</th>
-              </tr>
-            </thead>
-            <tbody data-hourly-results></tbody>
-          </table>
+          <section class="strategies-tab-panel" data-stat-view="risk" data-strategies-panel="risk_execution" hidden>
+            <dl class="strategies-risk-list" data-risk-execution></dl>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="monthly" data-strategies-panel="monthly_stats" hidden>
+            <div class="strategies-table-wrap">
+              <table class="strategies-table strategies-table--monthly">
+                <thead data-monthly-head></thead>
+                <tbody data-monthly-rows></tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -312,23 +320,6 @@
         </div>
       </section>
 
-      <section class="terminal-panel strategies-symbols" data-strategies-panel="symbol_results">
-        <header class="panel-heading"><h2>{{ t("strategies.symbols.title") }}</h2></header>
-        <div class="strategies-table-wrap strategies-table-wrap--compact">
-          <table class="strategies-table">
-            <thead>
-              <tr>
-                <th>{{ t("strategies.symbols.symbol") }}</th>
-                <th>{{ t("strategies.symbols.trades") }}</th>
-                <th>{{ t("strategies.symbols.win_rate") }}</th>
-                <th>{{ t("strategies.symbols.pnl_pct") }}</th>
-                <th>{{ t("strategies.symbols.pnl_usdt") }}</th>
-              </tr>
-            </thead>
-            <tbody data-symbol-results></tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
     {% include "fragments/strategies/create_modal.html" %}

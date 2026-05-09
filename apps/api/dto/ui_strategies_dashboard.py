@@ -167,7 +167,6 @@ class StrategyMonthlyStatsResponse(BaseModel):
     state: PanelState
     columns: list[str]
     rows: list[dict[str, str | float | int | None]]
-    summary: list[StrategyMetricResponse]
     degradation_reason: str | None = None
 
 
@@ -258,27 +257,6 @@ class StrategyTradesResponse(BaseModel):
     degradation_reason: str | None = None
 
 
-class StrategySymbolResultResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    symbol: str
-    trades: int | None
-    win_rate_percent: float | None
-    pnl_percent: float | None
-    pnl_usdt: float | None
-    direction: FinancialDirection
-
-
-class StrategySymbolResultsResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    source: str
-    state: PanelState
-    items: list[StrategySymbolResultResponse]
-    total: StrategySymbolResultResponse | None = None
-    degradation_reason: str | None = None
-
-
 class StrategyDashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -323,6 +301,5 @@ class StrategyDashboardResponse(BaseModel):
     equity_curve: StrategySeriesPanelResponse
     hourly_results: StrategyHourlyResultsResponse
     trades: StrategyTradesResponse
-    symbol_results: StrategySymbolResultsResponse
     footer_status: StrategyDashboardFooterStatusResponse
     refresh_control: StrategyDashboardRefreshControlResponse

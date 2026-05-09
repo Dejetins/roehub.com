@@ -43,7 +43,7 @@
 | `/` | `general_page.png` | публичный лендинг | отдельный landing contract; текущим обновлением не пересматривается. |
 | `/dashboard` | `personal_dashboard.png` | dashboard по всем стратегиям/fleet workstation | полная панельная рабочая поверхность all-strategies monitoring, а не обзорные карточки. |
 | `/settings` | `personal_settings.png` | личный кабинет/account settings | профиль, биржевые подключения, лимиты, интеграции, уведомления, безопасность, сессии, аудит. |
-| `/strategies` | `strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | selected-strategy analytics workstation: chart, metrics, stats tables, trades/events/symbol/hour breakdowns. |
+| `/strategies` | `strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | selected-strategy analytics workstation: strategy control, visual tabs, statistics tabs, trades history. |
 | `/backtests` | `stategy_backtest.png` | backtest workstation/configurator | конфигурация, AI/config zone, instruments, indicators, optimization progress/results в одной плотной рабочей поверхности. |
 | `/monitoring` | нет отдельного PNG в v1 map | compatibility/ops route only | не является primary strategy dashboard; если route сохраняется, он не должен забирать reference у `/strategies`. |
 | `/backtests/{job_id}` | нет отдельного PNG в v1 map | optional deep link/API state | не является шестой функциональной страницей v1; если route сохраняется, он должен открывать `/backtests` с выбранной job/result state или служить API-backed detail state без отдельного reference layout. |
@@ -514,7 +514,7 @@ Settings является местом persistent preferences для theme, loca
 
 Route: `/strategies`. Канонический референс: `strategy_statistic.png`.
 
-Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии с поиском/выбором сохраненной стратегии, chart со сделками/TP/SL и встроенными drawdown/equity mini-series, сводные метрики, месячная статистика, таблица сделок и разрезы по символам/часам. Live/status controls, manual refresh/autorefresh и список/переключатель стратегий добавляются только если они не ломают форму референса.
+Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Текущий Stage 6 baseline структурирует `strategy_statistic.png` в четыре рабочие зоны: Strategy Control с поиском/выбором сохраненной стратегии и lifecycle actions; Visual Workspace с вкладками Trades / Candles, Equity, Drawdown; Statistics Workspace с вкладками Overall, Long / Short, Hourly, Risk & Execution, Monthly; Trades History с широкой таблицей сделок. Equity и Drawdown не являются отдельными mini-panels, Symbol Results и отдельные Best/Worst/Profitable month tiles исключены из baseline до появления реального multi-symbol attribution/use case. Live/status controls, manual refresh/autorefresh и список/переключатель стратегий сохраняются.
 
 Источники данных: strategy storage/run state, Redis realtime output/readers, planned strategy position/execution/equity read-models, market-data candles/reference и exchange account snapshots. Панели обязаны показывать freshness/lag для live-состояний.
 

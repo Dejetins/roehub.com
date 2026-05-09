@@ -30,8 +30,6 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyMetricResponse,
     StrategyMonthlyStatsResponse,
     StrategySeriesPanelResponse,
-    StrategySymbolResultResponse,
-    StrategySymbolResultsResponse,
     StrategyTradesResponse,
 )
 from apps.api.routes.ui_strategies_dashboard import (
@@ -160,7 +158,10 @@ class StrategyDashboardQueryService:
                 name=_STAT_SOURCE,
                 status="unavailable",
                 generated_at=generated_at,
-                detail="monthly, drawdown, equity, hourly and symbol statistics need projections",
+                detail=(
+                    "strategy statistics, drawdown, equity and hourly projections are "
+                    "not migrated yet"
+                ),
             ),
             _source(
                 name=_TRADES_SOURCE,
@@ -215,7 +216,6 @@ class StrategyDashboardQueryService:
             equity_curve=_build_unavailable_series(title="equity_curve"),
             hourly_results=_build_hourly_results(),
             trades=_build_trades(),
-            symbol_results=_build_symbol_results(symbol=selected_symbol),
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
                 data_status="degraded" if _has_degraded_sources(sources) else "actual",
@@ -634,11 +634,6 @@ def _build_monthly_stats() -> StrategyMonthlyStatsResponse:
             "total",
         ],
         rows=[],
-        summary=[
-            _unavailable_metric(key="best_month", source=_STAT_SOURCE),
-            _unavailable_metric(key="worst_month", source=_STAT_SOURCE),
-            _unavailable_metric(key="profitable_months", source=_STAT_SOURCE),
-        ],
         degradation_reason="monthly_statistics_projection_unavailable",
     )
 
@@ -720,22 +715,4 @@ def _build_trades() -> StrategyTradesResponse:
         items=[],
         next_cursor=None,
         degradation_reason="strategy_trades_projection_unavailable",
-    )
-
-
-def _build_symbol_results(*, symbol: str | None) -> StrategySymbolResultsResponse:
-    total = StrategySymbolResultResponse(
-        symbol=symbol or "total",
-        trades=None,
-        win_rate_percent=None,
-        pnl_percent=None,
-        pnl_usdt=None,
-        direction="neutral",
-    )
-    return StrategySymbolResultsResponse(
-        source=_STAT_SOURCE,
-        state="unavailable",
-        items=[],
-        total=total,
-        degradation_reason="symbol_statistics_projection_unavailable",
     )

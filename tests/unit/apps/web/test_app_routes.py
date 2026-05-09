@@ -366,22 +366,31 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert 'data-strategies-panel="best_worst_days"' not in strategies_response.text
     assert 'class="terminal-panel strategies-drawdown"' not in strategies_response.text
     assert 'class="terminal-panel strategies-equity"' not in strategies_response.text
+    assert 'class="strategies-chart-mini"' not in strategies_response.text
+    assert 'data-strategies-panel="stat_tiles"' not in strategies_response.text
+    assert 'data-strategies-panel="symbol_results"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-long-short"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-risk"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-monthly"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-hours"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-symbols"' not in strategies_response.text
     for panel in [
         "selected_strategy",
-        "chart_trades",
-        "metric_grid",
+        "visual_workspace",
+        "statistics_workspace",
         "saved_strategies",
+        "metric_grid",
         "long_short",
         "risk_execution",
         "monthly_stats",
-        "stat_tiles",
-        "drawdown",
-        "equity_curve",
         "hourly_results",
         "trades",
-        "symbol_results",
     ]:
         assert f'data-strategies-panel="{panel}"' in strategies_response.text
+    for mode in ["trades", "equity", "drawdown"]:
+        assert f'data-chart-mode="{mode}"' in strategies_response.text
+    for mode in ["overall", "long_short", "hourly", "risk", "monthly"]:
+        assert f'data-stat-mode="{mode}"' in strategies_response.text
     assert "Protected workspace placeholder" not in main_html
     assert "strategy_ui.js" not in main_html
     assert 'data-strategy-create-panel' in strategies_response.text
@@ -605,7 +614,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "closeStatusRefreshMenu" in strategies_js
     assert "data-saved-search" in strategies_js
     assert "strategies.saved.no_matches" in strategies_js
-    assert "grid-row: 1 / 3" in strategies_css
+    assert "grid-row: 1;" in strategies_css
+    assert "data-chart-mode" in strategies_js
+    assert "data-stat-mode" in strategies_js
     assert "strategy_ui.js" not in strategies_js
     assert "--rh-financial-positive" in strategies_css
     assert "--rh-financial-negative" in strategies_css

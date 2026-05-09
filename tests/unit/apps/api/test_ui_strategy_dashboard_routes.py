@@ -86,11 +86,12 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         "equity_curve",
         "hourly_results",
         "trades",
-        "symbol_results",
     ]:
         assert payload[panel]["state"] == "unavailable"
         assert payload[panel]["source"]
         assert payload[panel]["degradation_reason"]
+    assert "summary" not in payload["monthly_stats"]
+    assert "symbol_results" not in payload
     assert payload["refresh_control"]["interval_seconds"] == 15
     assert payload["refresh_control"]["preset_key"] == "15s"
     source_statuses = {source["name"]: source["status"] for source in payload["sources"]}

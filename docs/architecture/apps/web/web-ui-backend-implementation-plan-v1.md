@@ -24,8 +24,8 @@
 | 02 | `02-implement-design-system-js-core.md` | Реализовано частично/достаточно для Stage 4-5: token/theme/base/layout/components CSS, shell CSS, `api.js`, `poller.js`, `refresh.js`, `sse.js`, `theme.js`, `locale.js`, branded dropdown/listbox/combobox/refresh-control modules. | При следующих страницах расширять shared primitives, не создавать page-local native select/dropdown. |
 | 03 | `03-implement-landing.md` | Реализовано: `/` использует `pages/landing.html`, CLI stream visual, `landing.css`, `landing.js`, login modal CTA и `/register` CTA. Landing intentionally not being reworked in текущем цикле. | Не трогать без отдельного визуального запроса. |
 | 04 | `04-implement-dashboard.md` | Реализовано частично как current baseline: `/dashboard` рендерит `pages/dashboard.html`; есть `GET /api/ui/dashboard/summary`, DTO, wiring, tests, manual refresh limiter, degraded source inventory. Полные portfolio/positions/fills/equity/symbol allocation storage sources еще отсутствуют и возвращаются как typed unavailable/degraded panels. | Не переделывать как generic cards. Следующие live-data этапы должны заменить degraded panels реальными read-models. |
-| 05 | `05-implement-settings-account.md` | Реализовано как current baseline: `/settings`, account fragments, `settings.css/js`, `GET/PUT /api/ui/account/*`, additive `migrations/postgres/0006_identity_account_settings_v1.sql`, identity account settings use case/ports/adapters, route tests. | Следующий основной prompt - Stage 6. Stage 5 дорабатывать только если QA найдет drift от `personal_settings.png` или bug в account persistence. |
-| 06 | `06-implement-strategy-library-detail.md` | Не реализовано: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` сейчас рендерят `pages/placeholder.html`; `strategies_list.html`, `strategy_builder.html`, `strategy_details.html`, `strategy_ui.js` остаются legacy/unwired surfaces. | Следующим выполнять Stage 6: заменить placeholder на `/strategies` selected-strategy analytics workstation по `strategy_statistic.png`. |
+| 05 | `05-implement-settings-account.md` | Реализовано как current baseline: `/settings`, account fragments, `settings.css/js`, `GET/PUT /api/ui/account/*`, additive `migrations/postgres/0006_identity_account_settings_v1.sql`, identity account settings use case/ports/adapters, route tests. | Stage 5 дорабатывать только если QA найдет drift от `personal_settings.png` или bug в account persistence. |
+| 06 | `06-implement-strategy-library-detail.md` | Реализовано как current baseline: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; есть bounded `GET /api/ui/strategies/dashboard`, DTO/wiring/tests, create modal, old `strategy_ui.js` не подключается. Текущая компоновка - 4 зоны: Strategy Control, Visual Workspace tabs, Statistics Workspace tabs, Trades History. | Следующие этапы должны добавлять реальные read-model/projections для unavailable panels, не возвращая generic card grid. |
 | 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. Dashboard использует bounded polling summary, но не полноценный strategy live SSE bridge. | Выполнять после Stage 6 или совместно с ним только при стабильном DTO handoff. |
 | 08 | `08-implement-backtests-history-configurator.md` | Не реализовано: `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас placeholder; old top-level `backtests.html` и `backtest_ui.js` не являются целевым workstation implementation. | Выполнять после Stage 6/7 или отдельным агентом при сохранении shared UI contracts. |
 | 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Не реализовано в рамках Web UI pack checkpoint; публичный backtest UI пока не должен полагаться на отсутствие `sync_inline` без отдельной проверки runtime wiring. | Выполнить до публичного запуска real `/backtests` create/results flow. |
@@ -149,7 +149,7 @@ Canonical page map:
 | `/` | `/Users/daniildegtyarev/Projects/roehub_web_ui/general_page.png` | public landing | Реализовано как current baseline; в текущем цикле не пересматривается. |
 | `/dashboard` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_dashboard.png` | dashboard по всем стратегиям | Реализовано частично как Stage 4 baseline: layout/API есть, часть live panels typed unavailable до read-model migrations. |
 | `/settings` | `/Users/daniildegtyarev/Projects/roehub_web_ui/personal_settings.png` | account/settings workstation | Реализовано как Stage 5 baseline: page/API/persistence есть; дорабатывать только по QA drift/bugs. |
-| `/strategies` | `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | Не реализовано; сейчас placeholder. Следующий основной этап - Stage 6. |
+| `/strategies` | `/Users/daniildegtyarev/Projects/roehub_web_ui/strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | Реализовано как Stage 6 baseline: selected-strategy workstation с control/search/actions, visual tabs, statistics tabs, trades history и typed degraded panels. |
 | `/backtests` | `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` | backtest workstation/configurator | Не реализовано; сейчас placeholder. Stage 8 выполняется после Stage 6/7 или отдельным bounded агентом. |
 | `/backtests/{job_id}` | нет canonical PNG в v1 map | optional deep link/API state | Сейчас placeholder с `job_id`; целевой вариант - `/backtests` selected job/result state, не отдельная sixth page. |
 | `/monitoring` | нет canonical PNG в v1 map | compatibility/ops route only | Сейчас placeholder; не забирает strategy reference; целевой вариант - redirect/alias после отдельного решения. |
@@ -839,9 +839,9 @@ Baseline route map и целевые решения:
 | `GET /logout` | `logout.html`, inline JS `POST /api/auth/logout` | `replace` | Этап 1 сохраняет logout entrypoint, но убирает inline script. |
 | `ANY /api/{upstream_path:path}` | local/dev same-origin proxy, снимает `/api` перед upstream | `move` | `/api/... browser-visible` contract сохраняется для browser/dev parity; backend routers остаются без второго `/api` prefix. |
 | `MOUNT /assets/*` | flat `apps/web/dist/*` | `move` | Browser-visible `/assets/*` сохраняется; внутренняя раскладка переезжает в `css/`, `js/`, `vendor/`. |
-| `GET /strategies` | protected `strategies_list.html` | `replace` | Этап 1 регистрирует route, этап 6 заменяет страницу на `pages/strategies.html` и fragments. |
-| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 1 сохраняет entrypoint; этап 6 делает compatibility redirect/alias на `/strategies?mode=create` или create modal внутри `/strategies`. |
-| `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 1 регистрирует route, этап 6 делает compatibility redirect/alias на `/strategies?strategy_id=...`; отдельная visual page не создается. |
+| `GET /strategies` | protected `strategies_list.html` | `replace` | Этап 6 реализует страницу как `pages/strategies.html` selected-strategy workstation. |
+| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 6 сохраняет entrypoint как create mode/modal внутри `/strategies`. |
+| `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 6 использует тот же workstation state с выбранным `strategy_id`; отдельная visual page не создается. |
 | `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 заменяет current monolith на reference-shaped workstation; results state живет внутри `/backtests`. |
 | `GET /_partial/user_badge` | HTMX partial route для текущего header badge | `delete` | Не является stable public route; этап 1 переносит badge в shell component/fragment или server-rendered context. |
 
@@ -1431,7 +1431,7 @@ Playwright CLI:
 
 ## Этап 6 - dashboard конкретной стратегии
 
-Статус 2026-05-08: не реализовано. Активные web routes `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` сейчас используют `pages/placeholder.html`; `strategy_ui.js` и старые strategy templates не являются целевым Stage 6 implementation. Это следующий основной этап после текущего checkpoint.
+Статус 2026-05-09: реализовано как current baseline. Активные web routes `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; `strategy_ui.js` и старые strategy templates не подключаются к целевому Stage 6 implementation.
 
 Цель: реализовать `/strategies` как selected-strategy analytics workstation строго по `strategy_statistic.png`: dashboard/statistics конкретной выбранной стратегии. Это не generic strategy library и не route `/monitoring`.
 
@@ -1479,16 +1479,16 @@ Frontend:
 
 Frontend / panel inventory:
 
-- command/status bars;
-- top summary/strategy info;
-- candlestick/trades chart или equity/trades chart с controls;
-- metrics grid;
-- saved strategies/variant/strategy selector, если присутствует в референсе;
-- monthly stats;
-- drawdown/equity folded into the chart workspace, not as separate full panels;
-- hourly results;
+- Strategy Control: selected strategy details, search, saved strategy selector, create/run/stop/clone/delete controls;
+- Visual Workspace: один chart-блок с вкладками Trades / Candles, Equity, Drawdown и range controls;
+- Statistics Workspace: один блок с вкладками Overall, Long / Short, Hourly, Risk & Execution, Monthly;
+- Trades History: широкая таблица сделок с search/filter/export и horizontal/vertical scroll;
+- top summary / strategy info;
+- overall statistics / metric grid;
+- drawdown/equity folded into the chart workspace, not as separate full panels or mini-panels;
+- hourly results as a Statistics tab;
 - trades/events table;
-- symbol results/breakdowns.
+- Symbol Results and separate Best/Worst/Profitable month tiles are not part of the Stage 6 baseline; reintroduce only with a real multi-symbol attribution/read-model use case.
 - manual refresh/autorefresh controls, если они не ломают форму `strategy_statistic.png`;
 - branded strategy selector/filter dropdowns; native system dropdown недопустим.
 

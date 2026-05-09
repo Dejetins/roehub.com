@@ -26,9 +26,6 @@ const metricLabelKeys = {
   avg_hold: "strategies.metric.avg_hold",
   exposure: "strategies.metric.exposure",
   avg_trade: "strategies.metric.avg_trade",
-  best_month: "strategies.metric.best_month",
-  worst_month: "strategies.metric.worst_month",
-  profitable_months: "strategies.metric.profitable_months",
 };
 
 const breakdownLabelKeys = {
@@ -286,17 +283,46 @@ function renderSelector(root, selector, savedQuery = "") {
     .join("");
 }
 
-function renderChart(root, chart) {
+function syncTabGroup(root, selector, activeValue, dataName) {
+  qsa(selector, root).forEach((button) => {
+    const isActive = button.dataset[dataName] === activeValue;
+    button.classList.toggle("strategies-tab--active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+}
+
+function syncStatWorkspace(root, activeMode) {
+  syncTabGroup(root, "[data-stat-mode]", activeMode, "statMode");
+  qsa("[data-stat-view]", root).forEach((panel) => {
+    if (panel instanceof HTMLElement) {
+      panel.hidden = panel.dataset.statView !== activeMode;
+    }
+  });
+}
+
+function renderChart(root, summary, state) {
   const svg = root.querySelector("[data-strategy-chart]");
+  const chart = summary?.chart || {};
+  const chartMode = state.chartMode || "trades";
   if (svg instanceof SVGElement) {
-    drawPlaceholderChart(svg);
+    drawPlaceholderChart(svg, { negative: chartMode === "drawdown" });
   }
+  syncTabGroup(root, "[data-chart-mode]", chartMode, "chartMode");
   setText("[data-chart-symbol]", chart?.symbol || "--", root);
+  const sourcePanel = chartMode === "equity"
+    ? summary?.equity_curve
+    : chartMode === "drawdown"
+      ? summary?.drawdown
+      : chart;
   setText(
     "[data-chart-state]",
-    panelStatusText(chart?.state, chart?.degradation_reason, chart?.source),
+    panelStatusText(sourcePanel?.state, sourcePanel?.degradation_reason, sourcePanel?.source),
     root,
   );
+  const legend = qs("[data-chart-legend]", root);
+  if (legend instanceof HTMLElement) {
+    legend.hidden = chartMode !== "trades";
+  }
 }
 
 function renderMonthly(root, monthly) {
@@ -318,22 +344,6 @@ function renderMonthly(root, monthly) {
   body.innerHTML = monthly.rows
     .map((row) => `
       <tr>${columns.map((column) => `<td>${escapeHtml(row[column] ?? "--")}</td>`).join("")}</tr>
-    `)
-    .join("");
-}
-
-function renderStatTiles(root, monthly) {
-  const target = qs("[data-stat-tiles]", root);
-  if (!target) {
-    return;
-  }
-  target.innerHTML = (monthly?.summary || [])
-    .map((metric) => `
-      <article class="strategies-tile">
-        <span class="strategies-tile__label">${escapeHtml(t(metricLabelKeys[metric.key] || metric.key))}</span>
-        <strong class="strategies-tile__value ${financialClass(metric.direction)}">${escapeHtml(valueOrUnavailable(metric.formatted))}</strong>
-        <span class="strategies-tile__source">${escapeHtml(metric.source)} / ${escapeHtml(metric.status)}</span>
-      </article>
     `)
     .join("");
 }
@@ -373,18 +383,6 @@ function renderRisk(root, panel) {
       </div>
     `)
     .join("");
-}
-
-function renderSeries(root, panel, selector, { negative = false } = {}) {
-  const svg = root.querySelector(selector.chart);
-  if (svg instanceof SVGElement) {
-    drawPlaceholderChart(svg, { negative });
-  }
-  setText(
-    selector.state,
-    panelStatusText(panel?.state, panel?.degradation_reason, panel?.source),
-    root,
-  );
 }
 
 function renderHours(root, panel) {
@@ -440,29 +438,6 @@ function renderTrades(root, trades) {
     .join("");
 }
 
-function renderSymbols(root, symbols) {
-  const target = qs("[data-symbol-results]", root);
-  if (!target) {
-    return;
-  }
-  const rows = symbols?.items || [];
-  if (!rows.length) {
-    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="5">${escapeHtml(panelStatusText(symbols?.state, symbols?.degradation_reason, symbols?.source))}</td></tr>`;
-    return;
-  }
-  target.innerHTML = rows
-    .map((row) => `
-      <tr>
-        <td>${escapeHtml(row.symbol)}</td>
-        <td>${escapeHtml(valueOrUnavailable(row.trades))}</td>
-        <td>${escapeHtml(valueOrUnavailable(row.win_rate_percent))}</td>
-        <td class="${financialClass(row.direction)}">${escapeHtml(valueOrUnavailable(row.pnl_percent))}</td>
-        <td class="${financialClass(row.direction)}">${escapeHtml(valueOrUnavailable(row.pnl_usdt))}</td>
-      </tr>
-    `)
-    .join("");
-}
-
 function renderFooter(summary) {
   const footer = summary?.footer_status || {};
   setText("[data-footer-connection]", footer.connection_status || "--", document);
@@ -499,23 +474,14 @@ function renderFreshness(summary) {
 function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
   renderSelector(root, summary.strategy_selector, state.savedQuery);
-  renderChart(root, summary.chart);
+  renderChart(root, summary, state);
+  syncStatWorkspace(root, state.statMode || "overall");
   renderMetrics(root, summary.metric_grid);
   renderMonthly(root, summary.monthly_stats);
-  renderStatTiles(root, summary.monthly_stats);
   renderLongShort(root, summary.long_short);
   renderRisk(root, summary.risk_execution);
-  renderSeries(root, summary.drawdown, {
-    chart: "[data-drawdown-chart]",
-    state: "[data-drawdown-state]",
-  }, { negative: true });
-  renderSeries(root, summary.equity_curve, {
-    chart: "[data-equity-chart]",
-    state: "[data-equity-state]",
-  });
   renderHours(root, summary.hourly_results);
   renderTrades(root, summary.trades);
-  renderSymbols(root, summary.symbol_results);
   renderFooter(summary);
   renderFreshness(summary);
   setText("[data-strategies-refresh-status]", summary.refresh_status || t("refresh.idle"), document);
@@ -581,6 +547,8 @@ function initStrategies(root) {
     createMarketType: "spot",
     createTimeframe: "1m",
     savedQuery: "",
+    chartMode: "trades",
+    statMode: "overall",
   };
   let activeRequest = null;
   let poller = null;
@@ -733,7 +701,7 @@ function initStrategies(root) {
     }
     state.selectedStrategyId = strategyId;
     setBrowserStrategyState(strategyId);
-    loadDashboard("manual").catch(() => null);
+    loadDashboard("initial").catch(() => null);
   }
 
   function positionStatusRefreshMenu() {
@@ -795,7 +763,21 @@ function initStrategies(root) {
     if (stateOption instanceof HTMLElement) {
       state.selectorState = stateOption.dataset.strategyState === "active" ? "active" : "all";
       setText("[data-state-current]", state.selectorState, root);
-      loadDashboard("manual").catch(() => null);
+      loadDashboard("initial").catch(() => null);
+      return;
+    }
+    const chartMode = event.target.closest("[data-chart-mode]");
+    if (chartMode instanceof HTMLElement) {
+      state.chartMode = chartMode.dataset.chartMode || "trades";
+      if (lastSummary) {
+        renderChart(root, lastSummary, state);
+      }
+      return;
+    }
+    const statMode = event.target.closest("[data-stat-mode]");
+    if (statMode instanceof HTMLElement) {
+      state.statMode = statMode.dataset.statMode || "overall";
+      syncStatWorkspace(root, state.statMode);
       return;
     }
     const createOpen = event.target.closest("[data-strategy-create-open]");
@@ -844,14 +826,14 @@ function initStrategies(root) {
       return;
     }
     const path = root.dataset.apiRunPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
-    apiFetch(path, { method: "POST" }).then(() => loadDashboard("manual")).catch(() => null);
+    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
   });
   qs("[data-strategy-stop]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
       return;
     }
     const path = root.dataset.apiStopPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
-    apiFetch(path, { method: "POST" }).then(() => loadDashboard("manual")).catch(() => null);
+    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
   });
   qs("[data-strategy-clone]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
@@ -865,7 +847,7 @@ function initStrategies(root) {
       .then((strategy) => {
         state.selectedStrategyId = strategy.strategy_id;
         setBrowserStrategyState(strategy.strategy_id);
-        return loadDashboard("manual");
+        return loadDashboard("initial");
       })
       .catch(() => null);
   });
@@ -878,7 +860,7 @@ function initStrategies(root) {
       .then(() => {
         state.selectedStrategyId = null;
         window.history.replaceState({}, "", "/strategies");
-        return loadDashboard("manual");
+        return loadDashboard("initial");
       })
       .catch(() => null);
   });
@@ -901,7 +883,7 @@ function initStrategies(root) {
           state.selectedStrategyId = strategy.strategy_id;
           setBrowserStrategyState(strategy.strategy_id);
           closeCreate(root);
-          return loadDashboard("manual");
+          return loadDashboard("initial");
         })
         .catch((error) => {
           if (status) {
