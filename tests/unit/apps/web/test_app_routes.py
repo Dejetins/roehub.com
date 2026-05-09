@@ -342,7 +342,7 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert 'data-page="strategies"' in strategies_response.text
     assert 'data-strategies-root' in strategies_response.text
     assert 'data-dashboard-endpoint="/api/ui/strategies/dashboard"' in strategies_response.text
-    assert 'data-api-create-path="/api/strategies"' in strategies_response.text
+    assert 'data-api-create-path="/api/strategies"' not in strategies_response.text
     assert 'data-api-clone-path="/api/strategies/clone"' in strategies_response.text
     assert 'data-api-run-path-template="/api/strategies/{strategy_id}/run"' in (
         strategies_response.text
@@ -360,7 +360,10 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert 'data-strategy-control="branded dropdown"' in strategies_response.text
     assert 'data-saved-search' in strategies_response.text
     assert 'data-strategy-saved-rows' in strategies_response.text
+    assert 'data-strategy-load' not in strategies_response.text
+    assert "Load statistics" not in strategies_response.text
     assert 'id="strategy-manage-trigger"' in strategies_response.text
+    assert 'data-strategy-create-open' not in strategies_response.text
     assert 'class="strategies-command"' not in strategies_response.text
     assert 'data-strategies-panel="command_status"' not in strategies_response.text
     assert 'data-strategies-panel="best_worst_days"' not in strategies_response.text
@@ -393,7 +396,7 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
         assert f'data-stat-mode="{mode}"' in strategies_response.text
     assert "Protected workspace placeholder" not in main_html
     assert "strategy_ui.js" not in main_html
-    assert 'data-strategy-create-panel' in strategies_response.text
+    assert 'data-strategy-create-panel' not in strategies_response.text
     assert 'data-strategies-refresh-preset' in strategies_response.text
     assert "shell-status-panel app-bottom-status shell-global-status strategies-status-line" in (
         strategies_response.text
@@ -402,8 +405,8 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     new_response = client.get("/strategies/new")
     assert new_response.status_code == 200
     assert 'data-page="strategies"' in new_response.text
-    assert 'data-initial-mode="create"' in new_response.text
-    assert 'data-strategy-create-panel' in new_response.text
+    assert 'data-initial-mode="dashboard"' in new_response.text
+    assert 'data-strategy-create-panel' not in new_response.text
     assert "/assets/strategy_ui.js" not in new_response.text
 
     strategy_id = "00000000-0000-0000-0000-000000000123"

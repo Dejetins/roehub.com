@@ -340,7 +340,7 @@ def _register_routes(
             page_description_key="page.strategies.new_desc",
             template_name="pages/strategies.html",
             template_context={
-                "strategy_initial_mode": "create",
+                "strategy_initial_mode": "dashboard",
                 "strategy_initial_id": "",
             },
         )

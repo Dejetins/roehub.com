@@ -25,7 +25,7 @@
 | 03 | `03-implement-landing.md` | Реализовано: `/` использует `pages/landing.html`, CLI stream visual, `landing.css`, `landing.js`, login modal CTA и `/register` CTA. Landing intentionally not being reworked in текущем цикле. | Не трогать без отдельного визуального запроса. |
 | 04 | `04-implement-dashboard.md` | Реализовано частично как current baseline: `/dashboard` рендерит `pages/dashboard.html`; есть `GET /api/ui/dashboard/summary`, DTO, wiring, tests, manual refresh limiter, degraded source inventory. Полные portfolio/positions/fills/equity/symbol allocation storage sources еще отсутствуют и возвращаются как typed unavailable/degraded panels. | Не переделывать как generic cards. Следующие live-data этапы должны заменить degraded panels реальными read-models. |
 | 05 | `05-implement-settings-account.md` | Реализовано как current baseline: `/settings`, account fragments, `settings.css/js`, `GET/PUT /api/ui/account/*`, additive `migrations/postgres/0006_identity_account_settings_v1.sql`, identity account settings use case/ports/adapters, route tests. | Stage 5 дорабатывать только если QA найдет drift от `personal_settings.png` или bug в account persistence. |
-| 06 | `06-implement-strategy-library-detail.md` | Реализовано как current baseline: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; есть bounded `GET /api/ui/strategies/dashboard`, DTO/wiring/tests, create modal, old `strategy_ui.js` не подключается. Текущая компоновка - 4 зоны: Strategy Control, Visual Workspace tabs, Statistics Workspace tabs, Trades History. | Следующие этапы должны добавлять реальные read-model/projections для unavailable panels, не возвращая generic card grid. |
+| 06 | `06-implement-strategy-library-detail.md` | Реализовано как current baseline: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; есть bounded `GET /api/ui/strategies/dashboard`, DTO/wiring/tests, old `strategy_ui.js` не подключается. Текущая компоновка - Strategy Control, Visual Workspace tabs, Saved Strategies, Statistics Workspace tabs, Trades History. Create UI и ручная `Load statistics` кнопка исключены из workstation: статистика подгружается сразу для выбранной строки стратегии. | Следующие этапы должны добавлять реальные read-model/projections для unavailable panels, не возвращая generic card grid. |
 | 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. Dashboard использует bounded polling summary, но не полноценный strategy live SSE bridge. | Выполнять после Stage 6 или совместно с ним только при стабильном DTO handoff. |
 | 08 | `08-implement-backtests-history-configurator.md` | Не реализовано: `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас placeholder; old top-level `backtests.html` и `backtest_ui.js` не являются целевым workstation implementation. | Выполнять после Stage 6/7 или отдельным агентом при сохранении shared UI contracts. |
 | 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Не реализовано в рамках Web UI pack checkpoint; публичный backtest UI пока не должен полагаться на отсутствие `sync_inline` без отдельной проверки runtime wiring. | Выполнить до публичного запуска real `/backtests` create/results flow. |
@@ -840,7 +840,7 @@ Baseline route map и целевые решения:
 | `ANY /api/{upstream_path:path}` | local/dev same-origin proxy, снимает `/api` перед upstream | `move` | `/api/... browser-visible` contract сохраняется для browser/dev parity; backend routers остаются без второго `/api` prefix. |
 | `MOUNT /assets/*` | flat `apps/web/dist/*` | `move` | Browser-visible `/assets/*` сохраняется; внутренняя раскладка переезжает в `css/`, `js/`, `vendor/`. |
 | `GET /strategies` | protected `strategies_list.html` | `replace` | Этап 6 реализует страницу как `pages/strategies.html` selected-strategy workstation. |
-| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 6 сохраняет entrypoint как create mode/modal внутри `/strategies`. |
+| `GET /strategies/new` | protected `strategy_builder.html` | `replace` | Этап 6 сохраняет entrypoint как compatibility alias на `/strategies` workstation без отдельного create UI. |
 | `GET /strategies/{strategy_id}` | protected `strategy_details.html` | `replace` | Этап 6 использует тот же workstation state с выбранным `strategy_id`; отдельная visual page не создается. |
 | `GET /backtests` | protected монолитный `backtests.html` | `replace` | Этап 8 заменяет current monolith на reference-shaped workstation; results state живет внутри `/backtests`. |
 | `GET /_partial/user_badge` | HTMX partial route для текущего header badge | `delete` | Не является stable public route; этап 1 переносит badge в shell component/fragment или server-rendered context. |
@@ -855,7 +855,7 @@ Baseline шаблоны и ассеты / cleanup map:
 | `apps/web/templates/logout.html` | `replace` | Этап 1: `apps/web/templates/pages/logout.html` или server redirect flow без inline JS. |
 | `apps/web/templates/protected_page.html` | `delete` | Stage placeholders/pages заменяют этот generic skeleton; legacy skin не сохраняется. |
 | `apps/web/templates/strategies_list.html` | `replace` | Этап 6: `pages/strategies.html` + `fragments/strategies/*`. |
-| `apps/web/templates/strategy_builder.html` | `replace` | Этап 6: create workflow внутри `/strategies` или redirect, без отдельного page layout. |
+| `apps/web/templates/strategy_builder.html` | `replace` | Этап 6: не используется как primary layout; `/strategies/new` остается compatibility alias на selected-strategy workstation. |
 | `apps/web/templates/strategy_details.html` | `replace` | Этап 6: compatibility redirect/alias на `/strategies?strategy_id=...`; отдельная `pages/strategy_detail.html` в v1 не является целевой страницей. |
 | `apps/web/templates/backtests.html` | `replace` | Этап 8/9: `pages/backtests.html` + backtests fragments; отдельный `backtests_result.html` в v1 не является целевой страницей. |
 | `apps/web/templates/partials/user_badge.html` | `move` | Этап 1: shell component/fragment; route `/_partial/user_badge` не переносится как public contract. |
@@ -1010,7 +1010,7 @@ Backend/API:
 - прямой `/login?next=...` открывает modal state и сохраняет safe-local `next`;
 - register CTA присутствует и ведет в выбранный Keycloak-backed entrypoint;
 - `/register` является отдельной страницей и не замещается login modal;
-- `/strategies/new` остается поддержанным entrypoint для создания стратегии или явно редиректит на новый create workflow;
+- `/strategies/new` остается поддержанным compatibility entrypoint на `/strategies`; отдельный create UI в workstation не показывается;
 - в базовом каркасе не остается внешнего CDN-скрипта.
 - shell copy по умолчанию на английском, русская версия доступна через language switcher;
 - переключение языка обновляет cookie/`<html lang>`/`data-locale` и не меняет route path;
@@ -1443,7 +1443,7 @@ Playwright CLI:
 
 - `GET /strategies`;
 - `GET /strategies?strategy_id=...` как selected strategy state;
-- `GET /strategies/new` только как create entrypoint/modal/redirect, если create workflow сохраняется;
+- `GET /strategies/new` только как compatibility alias на `/strategies` workstation без отдельного create UI;
 - `GET /strategies/{strategy_id}` может быть только compatibility redirect/alias на `/strategies?strategy_id=...` или тем же workstation state без отдельной visual page.
 
 Текущий backend:
@@ -1473,15 +1473,16 @@ Frontend:
 
 - сохранить immutable strategy model: редактирование означает clone/create, а не mutable update;
 - заменить generic list/detail на reference-shaped workstation;
-- не потерять create workflow: текущий `/strategies/new` либо становится modal/fragment в workstation, либо возвращает контролируемый redirect на `/strategies` с открытием create mode;
+- не показывать create workflow внутри `/strategies`: выбранные/сохраненные стратегии подгружаются из существующих backend rows, а `/strategies/new` остается compatibility alias без отдельного page body;
 - details/deep-link route использует тот же `/strategies` state и те же panels, а не отдельный generic detail page;
 - `strategy_statistic.png` закреплен за `/strategies`; отдельный `/backtests/{job_id}` page layout по этому PNG не планируется.
 
 Frontend / panel inventory:
 
-- Strategy Control: selected strategy details, search, saved strategy selector, create/run/stop/clone/delete controls;
+- Strategy Control: selected strategy details and run/stop/clone/delete controls; create controls are intentionally absent from the workstation;
 - Visual Workspace: один chart-блок с вкладками Trades / Candles, Equity, Drawdown и range controls;
-- Statistics Workspace: один блок с вкладками Overall, Long / Short, Hourly, Risk & Execution, Monthly;
+- Saved Strategies: отдельный searchable list в правой рабочей зоне; выбор строки сразу обновляет выбранную стратегию и связанные panels, без кнопки `Load statistics`;
+- Statistics Workspace: один блок с вкладками Overall, Long / Short, Hourly, Risk & Execution, Monthly; Monthly рендерится строками, а не month-as-column wide table;
 - Trades History: широкая таблица сделок с search/filter/export и horizontal/vertical scroll;
 - top summary / strategy info;
 - overall statistics / metric grid;
@@ -1505,7 +1506,7 @@ Frontend / panel inventory:
 Файлы:
 
 - добавить/изменить `apps/web/templates/pages/strategies.html`;
-- добавить create fragment/modal внутри `apps/web/templates/fragments/strategies/*`, если create workflow сохраняется;
+- не добавлять create fragment/modal внутри `apps/web/templates/fragments/strategies/*` для `/strategies`;
 - не добавлять отдельную `apps/web/templates/pages/strategy_detail.html`;
 - добавить `apps/web/templates/fragments/strategies/*`;
 - добавить `apps/web/dist/js/pages/strategies.js`;
@@ -1524,7 +1525,7 @@ Frontend / panel inventory:
 - агент открыл `strategy_statistic.png` и перечислил panel inventory в final report;
 - `/strategies` reference-shaped относительно `strategy_statistic.png`;
 - list, clone, run/stop и soft-delete продолжают вызывать существующие `/api/strategies*` routes или явно задокументированные UI API wrappers;
-- `/strategies/new` покрыт route test и browser check как compatibility redirect/alias на create mode внутри `/strategies`;
+- `/strategies/new` покрыт route test и browser check как compatibility alias на dashboard mode внутри `/strategies`;
 - `/strategies/{strategy_id}` покрыт route test как compatibility redirect/alias на selected strategy state внутри `/strategies`;
 - create/clone сохраняет canonical indicator payload shape;
 - selected strategy snapshot и right strategy list рендерятся из backend DTO;

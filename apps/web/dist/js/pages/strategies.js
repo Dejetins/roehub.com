@@ -332,19 +332,31 @@ function renderMonthly(root, monthly) {
     return;
   }
   const columns = monthly?.columns || [];
-  head.innerHTML = `<tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr>`;
+  head.innerHTML = `
+    <tr>
+      <th>${escapeHtml(t("strategies.monthly.period"))}</th>
+      <th>${escapeHtml(t("strategies.monthly.value"))}</th>
+    </tr>
+  `;
   if (!monthly?.rows?.length) {
     body.innerHTML = `
-      <tr><td class="strategies-empty-row" colspan="${Math.max(columns.length, 1)}">
+      <tr><td class="strategies-empty-row" colspan="2">
         ${escapeHtml(panelStatusText(monthly?.state, monthly?.degradation_reason, monthly?.source))}
       </td></tr>
     `;
     return;
   }
+  const valueColumns = columns.filter((column) => column !== "year");
   body.innerHTML = monthly.rows
-    .map((row) => `
-      <tr>${columns.map((column) => `<td>${escapeHtml(row[column] ?? "--")}</td>`).join("")}</tr>
-    `)
+    .flatMap((row) => valueColumns.map((column) => {
+      const year = row.year ? `${row.year} ` : "";
+      return `
+        <tr>
+          <td>${escapeHtml(`${year}${column}`)}</td>
+          <td class="${financialClass(directionFromNumber(row[column]))}">${escapeHtml(valueOrUnavailable(row[column]))}</td>
+        </tr>
+      `;
+    }))
     .join("");
 }
 
@@ -487,47 +499,6 @@ function renderDashboard(root, summary, state = {}) {
   setText("[data-strategies-refresh-status]", summary.refresh_status || t("refresh.idle"), document);
 }
 
-function openCreate(root) {
-  const panel = qs("[data-strategy-create-panel]", root);
-  if (panel) {
-    panel.hidden = false;
-    root.dataset.strategyMode = "create";
-  }
-}
-
-function closeCreate(root) {
-  const panel = qs("[data-strategy-create-panel]", root);
-  if (panel) {
-    panel.hidden = true;
-    root.dataset.strategyMode = "dashboard";
-  }
-}
-
-function buildCreatePayload(form, state) {
-  const symbol = String(form.elements.symbol?.value || "").trim().toUpperCase();
-  const marketId = Number(form.elements.market_id?.value || 0);
-  const instrumentKey = String(form.elements.instrument_key?.value || "").trim();
-  const signalTemplate = String(form.elements.signal_template?.value || "").trim();
-  const indicators = JSON.parse(String(form.elements.indicators?.value || "[]"));
-  if (!symbol || !Number.isInteger(marketId) || marketId <= 0 || !instrumentKey) {
-    throw new Error(t("strategies.create.invalid_identity"));
-  }
-  if (!Array.isArray(indicators)) {
-    throw new Error(t("strategies.create.invalid_indicators"));
-  }
-  return {
-    instrument_id: {
-      market_id: marketId,
-      symbol,
-    },
-    instrument_key: instrumentKey,
-    market_type: state.createMarketType,
-    timeframe: state.createTimeframe,
-    indicators,
-    ...(signalTemplate ? { signal_template: signalTemplate } : {}),
-  };
-}
-
 function setBrowserStrategyState(strategyId) {
   if (!strategyId) {
     return;
@@ -544,8 +515,6 @@ function initStrategies(root) {
   const state = {
     selectedStrategyId: root.dataset.initialStrategyId || null,
     selectorState: "all",
-    createMarketType: "spot",
-    createTimeframe: "1m",
     savedQuery: "",
     chartMode: "trades",
     statMode: "overall",
@@ -780,28 +749,6 @@ function initStrategies(root) {
       syncStatWorkspace(root, state.statMode);
       return;
     }
-    const createOpen = event.target.closest("[data-strategy-create-open]");
-    if (createOpen) {
-      openCreate(root);
-      return;
-    }
-    const createClose = event.target.closest("[data-strategy-create-close]");
-    if (createClose) {
-      closeCreate(root);
-      return;
-    }
-    const market = event.target.closest("[data-create-market]");
-    if (market instanceof HTMLElement) {
-      state.createMarketType = market.dataset.createMarket || "spot";
-      setText("[data-create-market-current]", state.createMarketType, root);
-      return;
-    }
-    const timeframe = event.target.closest("[data-create-timeframe]");
-    if (timeframe instanceof HTMLElement) {
-      state.createTimeframe = timeframe.dataset.createTimeframe || "1m";
-      setText("[data-create-timeframe-current]", state.createTimeframe, root);
-      return;
-    }
   });
 
   root.addEventListener("keydown", (event) => {
@@ -818,9 +765,6 @@ function initStrategies(root) {
     }
   });
 
-  qs("[data-strategy-load]", root)?.addEventListener("click", () => {
-    loadDashboard("manual").catch(() => null);
-  });
   qs("[data-strategy-run]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
       return;
@@ -865,42 +809,9 @@ function initStrategies(root) {
       .catch(() => null);
   });
 
-  const form = qs("[data-strategy-create-form]", root);
-  form?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const status = qs("[data-strategy-create-status]", root);
-    try {
-      const payload = buildCreatePayload(form, state);
-      if (status) {
-        status.textContent = t("strategies.create.submitting");
-      }
-      apiFetch(root.dataset.apiCreatePath, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then((strategy) => {
-          state.selectedStrategyId = strategy.strategy_id;
-          setBrowserStrategyState(strategy.strategy_id);
-          closeCreate(root);
-          return loadDashboard("initial");
-        })
-        .catch((error) => {
-          if (status) {
-            status.textContent = error.message || t("strategies.create.failed");
-          }
-        });
-    } catch (error) {
-      if (status) {
-        status.textContent = error.message || t("strategies.create.failed");
-      }
-    }
-  });
-
   window.__roehubStrategies = {
     loadDashboard,
     setAutorefresh,
-    openCreate: () => openCreate(root),
     get activeRequest() {
       return activeRequest;
     },
@@ -909,9 +820,6 @@ function initStrategies(root) {
     },
   };
 
-  if (root.dataset.initialMode === "create") {
-    openCreate(root);
-  }
   loadDashboard("initial")
     .catch(() => null)
     .finally(() => setAutorefresh(DEFAULT_REFRESH_PRESET));
