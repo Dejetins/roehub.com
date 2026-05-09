@@ -60,6 +60,7 @@ _STAT_SOURCE = "strategy_stat_projections"
 _CANDLE_SOURCE = "market_candles"
 _TRADES_SOURCE = "execution_fills"
 _EVENTS_SOURCE = "strategy_events"
+_RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +149,7 @@ class StrategyDashboardQueryService:
         )
         sources = [
             *dynamic_sources,
+            _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name=_CANDLE_SOURCE,
                 status="unavailable",
@@ -211,7 +213,7 @@ class StrategyDashboardQueryService:
             metric_grid=_build_metric_grid(),
             monthly_stats=_build_monthly_stats(),
             long_short=_build_long_short(),
-            risk_execution=_build_risk_execution(),
+            risk_execution=_build_risk_execution(run=selected_run),
             drawdown=_build_unavailable_series(title="drawdown"),
             equity_curve=_build_unavailable_series(title="equity_curve"),
             hourly_results=_build_hourly_results(),
@@ -276,6 +278,10 @@ class StrategyDashboardQueryService:
                 name="strategy_strategies",
                 status="available",
                 generated_at=generated_at,
+                age_seconds=_latest_strategy_age_seconds(
+                    strategies=tuple(strategies),
+                    generated_at=generated_at,
+                ),
                 detail=f"{len(strategies)} owner strategies loaded",
             )
         except Exception as error:  # noqa: BLE001
@@ -336,6 +342,10 @@ class StrategyDashboardQueryService:
                     name="strategy_runs",
                     status="degraded" if run_error is not None else "available",
                     generated_at=generated_at,
+                    age_seconds=_latest_run_age_seconds(
+                        runs=tuple(runs_by_strategy_id.values()),
+                        generated_at=generated_at,
+                    ),
                     detail=(
                         str(run_error)
                         if run_error is not None
@@ -381,13 +391,44 @@ def _source(
     status: SourceStatus,
     generated_at: datetime,
     detail: str,
+    age_seconds: int | None = 0,
 ) -> StrategyDashboardSourceResponse:
     return StrategyDashboardSourceResponse(
         name=name,
         status=status,
         generated_at=generated_at,
-        age_seconds=0,
+        age_seconds=age_seconds,
         detail=detail,
+    )
+
+
+def _runtime_metadata_source(
+    *,
+    run: StrategyRun | None,
+    generated_at: datetime,
+) -> StrategyDashboardSourceResponse:
+    if run is None:
+        return _source(
+            name=_RUNTIME_METADATA_SOURCE,
+            status="unavailable",
+            generated_at=generated_at,
+            age_seconds=None,
+            detail="no active selected strategy run metadata is available",
+        )
+    if not run.metadata_json and run.checkpoint_ts_open is None:
+        return _source(
+            name=_RUNTIME_METADATA_SOURCE,
+            status="degraded",
+            generated_at=generated_at,
+            age_seconds=_age_seconds(generated_at=generated_at, observed_at=run.updated_at),
+            detail="active strategy run has not published warmup or rollup metadata yet",
+        )
+    return _source(
+        name=_RUNTIME_METADATA_SOURCE,
+        status="available",
+        generated_at=generated_at,
+        age_seconds=_age_seconds(generated_at=generated_at, observed_at=run.updated_at),
+        detail="active selected strategy run warmup/rollup metadata loaded",
     )
 
 
@@ -405,6 +446,36 @@ def _resolve_refresh_status(
 
 def _has_degraded_sources(sources: list[StrategyDashboardSourceResponse]) -> bool:
     return any(source.status in {"degraded", "unavailable"} for source in sources)
+
+
+def _latest_strategy_age_seconds(
+    *,
+    strategies: tuple[Strategy, ...],
+    generated_at: datetime,
+) -> int | None:
+    if not strategies:
+        return None
+    return _age_seconds(
+        generated_at=generated_at,
+        observed_at=max(strategy.created_at for strategy in strategies),
+    )
+
+
+def _latest_run_age_seconds(
+    *,
+    runs: tuple[StrategyRun, ...],
+    generated_at: datetime,
+) -> int | None:
+    if not runs:
+        return None
+    return _age_seconds(
+        generated_at=generated_at,
+        observed_at=max(run.updated_at for run in runs),
+    )
+
+
+def _age_seconds(*, generated_at: datetime, observed_at: datetime) -> int:
+    return max(0, int((generated_at - observed_at).total_seconds()))
 
 
 def _select_strategy(
@@ -653,7 +724,27 @@ def _build_long_short() -> StrategyBreakdownPanelResponse:
     )
 
 
-def _build_risk_execution() -> StrategyBreakdownPanelResponse:
+def _build_risk_execution(*, run: StrategyRun | None) -> StrategyBreakdownPanelResponse:
+    if run is not None and (run.metadata_json or run.checkpoint_ts_open is not None):
+        return StrategyBreakdownPanelResponse(
+            source=_RUNTIME_METADATA_SOURCE,
+            state="ready",
+            rows=[
+                _runtime_breakdown("run_state", run.state),
+                _runtime_breakdown("warmup_progress", _format_warmup_progress(run.metadata_json)),
+                _runtime_breakdown("warmup_satisfied", _format_warmup_satisfied(run.metadata_json)),
+                _runtime_breakdown(
+                    "rollup_bucket_count_1m",
+                    _format_rollup_count(run.metadata_json),
+                ),
+                _runtime_breakdown(
+                    "checkpoint_ts_open",
+                    _format_optional_datetime(run.checkpoint_ts_open),
+                ),
+                _runtime_breakdown("last_error", run.last_error),
+            ],
+            degradation_reason=None,
+        )
     return StrategyBreakdownPanelResponse(
         source=_STAT_SOURCE,
         state="unavailable",
@@ -678,6 +769,60 @@ def _unavailable_breakdown(key: str) -> StrategyBreakdownRowResponse:
         total_value="Unavailable",
         direction="neutral",
     )
+
+
+def _runtime_breakdown(key: str, value: str | None) -> StrategyBreakdownRowResponse:
+    return StrategyBreakdownRowResponse(
+        key=key,
+        label=key,
+        long_value=None,
+        short_value=None,
+        total_value=value or "Unavailable",
+        direction="neutral",
+    )
+
+
+def _format_warmup_progress(metadata_json: Mapping[str, object]) -> str | None:
+    warmup = metadata_json.get("warmup")
+    if not isinstance(warmup, Mapping):
+        return None
+    bars = _non_negative_int_or_none(warmup.get("bars"))
+    processed = _non_negative_int_or_none(warmup.get("processed_bars"))
+    if bars is None or processed is None:
+        return None
+    return f"{processed}/{bars}"
+
+
+def _format_warmup_satisfied(metadata_json: Mapping[str, object]) -> str | None:
+    warmup = metadata_json.get("warmup")
+    if not isinstance(warmup, Mapping):
+        return None
+    satisfied = warmup.get("satisfied")
+    if isinstance(satisfied, bool):
+        return "yes" if satisfied else "no"
+    return None
+
+
+def _format_rollup_count(metadata_json: Mapping[str, object]) -> str | None:
+    rollup = metadata_json.get("rollup")
+    if not isinstance(rollup, Mapping):
+        return None
+    bucket_count = _non_negative_int_or_none(rollup.get("bucket_count_1m"))
+    return None if bucket_count is None else str(bucket_count)
+
+
+def _non_negative_int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value >= 0:
+        return value
+    return None
+
+
+def _format_optional_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
 
 
 def _build_unavailable_series(*, title: str) -> StrategySeriesPanelResponse:

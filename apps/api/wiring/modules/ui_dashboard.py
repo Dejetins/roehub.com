@@ -52,6 +52,7 @@ _STRATEGY_LIST_LIMIT = 20
 _OPEN_POSITIONS_LIMIT = 20
 _RECENT_EXECUTIONS_LIMIT = 20
 _EQUITY_MAX_POINTS = 600
+_RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,8 +129,15 @@ class DashboardSummaryQueryService:
             user_id=user_id,
             generated_at=generated_at,
         )
+        selected_strategy = strategies[0] if strategies else None
+        selected_run = (
+            runs_by_strategy_id.get(selected_strategy.strategy_id)
+            if selected_strategy is not None
+            else None
+        )
         inventory_sources = [
             *dynamic_sources,
+            _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name="strategy_events",
                 status="unavailable",
@@ -182,12 +190,6 @@ class DashboardSummaryQueryService:
         effective_refresh_status = _resolve_refresh_status(
             refresh_decision=refresh_decision,
             sources=inventory_sources,
-        )
-        selected_strategy = strategies[0] if strategies else None
-        selected_run = (
-            runs_by_strategy_id.get(selected_strategy.strategy_id)
-            if selected_strategy is not None
-            else None
         )
 
         return DashboardSummaryResponse(
@@ -292,6 +294,10 @@ class DashboardSummaryQueryService:
                 name="strategy_strategies",
                 status="available",
                 generated_at=generated_at,
+                age_seconds=_latest_strategy_age_seconds(
+                    strategies=tuple(strategies),
+                    generated_at=generated_at,
+                ),
                 detail=f"{len(strategies)} owner strategies loaded",
             )
         except Exception as error:  # noqa: BLE001
@@ -347,6 +353,10 @@ class DashboardSummaryQueryService:
             name="strategy_runs",
             status="degraded" if run_error is not None else "available",
             generated_at=generated_at,
+            age_seconds=_latest_run_age_seconds(
+                runs=tuple(runs_by_strategy_id.values()),
+                generated_at=generated_at,
+            ),
             detail=(
                 str(run_error)
                 if run_error is not None
@@ -388,13 +398,44 @@ def _source(
     status: SourceStatus,
     generated_at: datetime,
     detail: str,
+    age_seconds: int | None = 0,
 ) -> DashboardSourceResponse:
     return DashboardSourceResponse(
         name=name,
         status=status,
         generated_at=generated_at,
-        age_seconds=0,
+        age_seconds=age_seconds,
         detail=detail,
+    )
+
+
+def _runtime_metadata_source(
+    *,
+    run: StrategyRun | None,
+    generated_at: datetime,
+) -> DashboardSourceResponse:
+    if run is None:
+        return _source(
+            name=_RUNTIME_METADATA_SOURCE,
+            status="unavailable",
+            generated_at=generated_at,
+            age_seconds=None,
+            detail="no active selected strategy run metadata is available",
+        )
+    if not run.metadata_json and run.checkpoint_ts_open is None:
+        return _source(
+            name=_RUNTIME_METADATA_SOURCE,
+            status="degraded",
+            generated_at=generated_at,
+            age_seconds=_age_seconds(generated_at=generated_at, observed_at=run.updated_at),
+            detail="active strategy run has not published warmup or rollup metadata yet",
+        )
+    return _source(
+        name=_RUNTIME_METADATA_SOURCE,
+        status="available",
+        generated_at=generated_at,
+        age_seconds=_age_seconds(generated_at=generated_at, observed_at=run.updated_at),
+        detail="active selected strategy run warmup/rollup metadata loaded",
     )
 
 
@@ -412,6 +453,36 @@ def _resolve_refresh_status(
 
 def _has_degraded_sources(sources: list[DashboardSourceResponse]) -> bool:
     return any(source.status in {"degraded", "unavailable"} for source in sources)
+
+
+def _latest_strategy_age_seconds(
+    *,
+    strategies: tuple[Strategy, ...],
+    generated_at: datetime,
+) -> int | None:
+    if not strategies:
+        return None
+    return _age_seconds(
+        generated_at=generated_at,
+        observed_at=max(strategy.created_at for strategy in strategies),
+    )
+
+
+def _latest_run_age_seconds(
+    *,
+    runs: tuple[StrategyRun, ...],
+    generated_at: datetime,
+) -> int | None:
+    if not runs:
+        return None
+    return _age_seconds(
+        generated_at=generated_at,
+        observed_at=max(run.updated_at for run in runs),
+    )
+
+
+def _age_seconds(*, generated_at: datetime, observed_at: datetime) -> int:
+    return max(0, int((generated_at - observed_at).total_seconds()))
 
 
 def _build_selected_strategy_snapshot(

@@ -52,6 +52,19 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 5, 6, 9, 0, tzinfo=UTC),
+        metadata_json={
+            "warmup": {
+                "algorithm": "numeric_max_param_v1",
+                "bars": 5,
+                "processed_bars": 3,
+                "satisfied": False,
+            },
+            "rollup": {
+                "timeframe": "1m",
+                "bucket_open_ts": "2026-05-06T09:00:00Z",
+                "bucket_count_1m": 2,
+            },
+        },
     )
     service = StrategyDashboardQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
@@ -81,7 +94,6 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         "metric_grid",
         "monthly_stats",
         "long_short",
-        "risk_execution",
         "drawdown",
         "equity_curve",
         "hourly_results",
@@ -97,8 +109,20 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     source_statuses = {source["name"]: source["status"] for source in payload["sources"]}
     assert source_statuses["strategy_strategies"] == "available"
     assert source_statuses["strategy_runs"] == "available"
+    assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"
+    source_freshness = {source["name"]: source["age_seconds"] for source in payload["sources"]}
+    assert isinstance(source_freshness["strategy_strategies"], int)
+    assert isinstance(source_freshness["strategy_runs"], int)
+    assert isinstance(source_freshness["strategy_run_metadata"], int)
+    risk_rows = {row["key"]: row for row in payload["risk_execution"]["rows"]}
+    assert payload["risk_execution"]["source"] == "strategy_run_metadata"
+    assert payload["risk_execution"]["state"] == "ready"
+    assert risk_rows["run_state"]["total_value"] == "starting"
+    assert risk_rows["warmup_progress"]["total_value"] == "3/5"
+    assert risk_rows["warmup_satisfied"]["total_value"] == "no"
+    assert risk_rows["rollup_bucket_count_1m"]["total_value"] == "2"
     compressed = gzip.compress(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     assert len(compressed) < 96 * 1024
 

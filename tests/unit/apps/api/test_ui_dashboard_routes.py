@@ -37,11 +37,29 @@ _SUMMARY_ENDPOINT_CONTRACT = {
 
 
 def test_dashboard_summary_exposes_bounded_degraded_contract() -> None:
+    strategy = _strategy(symbol="BTCUSDT")
+    run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-000000009101"),
+        user_id=strategy.user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 5, 5, 9, 5, tzinfo=UTC),
+        metadata_json={
+            "warmup": {
+                "algorithm": "numeric_max_param_v1",
+                "bars": 5,
+                "processed_bars": 3,
+                "satisfied": False,
+            },
+            "rollup": {
+                "timeframe": "1m",
+                "bucket_open_ts": "2026-05-05T09:05:00Z",
+                "bucket_count_1m": 2,
+            },
+        },
+    )
     service = DashboardSummaryQueryService(
-        strategy_repository=_FakeStrategyRepository(
-            strategies=(_strategy(symbol="BTCUSDT"),),
-        ),
-        run_repository=_FakeRunRepository(),
+        strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
+        run_repository=_FakeRunRepository(runs=(run,)),
     )
     client = _build_client(service=service)
 
@@ -64,8 +82,14 @@ def test_dashboard_summary_exposes_bounded_degraded_contract() -> None:
     assert payload["refresh_control"]["preset_key"] == "15s"
     source_statuses = {source["name"]: source["status"] for source in payload["sources"]}
     assert source_statuses["strategy_strategies"] == "available"
+    assert source_statuses["strategy_runs"] == "available"
+    assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["portfolio_snapshots"] == "unavailable"
     assert source_statuses["position_snapshots"] == "unavailable"
+    source_freshness = {source["name"]: source["age_seconds"] for source in payload["sources"]}
+    assert isinstance(source_freshness["strategy_strategies"], int)
+    assert isinstance(source_freshness["strategy_runs"], int)
+    assert isinstance(source_freshness["strategy_run_metadata"], int)
     compressed = gzip.compress(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     assert len(compressed) < 80 * 1024
 
