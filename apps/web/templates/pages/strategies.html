@@ -21,6 +21,98 @@
     {% include "fragments/strategies/loading_state.html" %}
 
     <div class="strategies-grid">
+      <section class="terminal-panel strategies-statistics" data-strategies-panel="statistics_workspace">
+        <header class="panel-heading panel-heading--with-tools">
+          <div class="strategies-panel-title-group">
+            <h2>{{ t("strategies.statistics.title") }}</h2>
+            <div class="strategies-tabbar" role="tablist" aria-label="{{ t('strategies.statistics.title') }}">
+              <button class="strategies-tab strategies-tab--active" type="button" role="tab" aria-selected="true" data-stat-mode="overall">
+                {{ t("strategies.statistics.overall") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="long_short">
+                {{ t("strategies.statistics.long_short") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="hourly">
+                {{ t("strategies.statistics.hourly") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="risk">
+                {{ t("strategies.statistics.risk") }}
+              </button>
+              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="monthly">
+                {{ t("strategies.statistics.monthly") }}
+              </button>
+            </div>
+          </div>
+        </header>
+        <div class="strategies-stat-views">
+          <section class="strategies-tab-panel" data-stat-view="overall" data-strategies-panel="metric_grid">
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table strategies-table--stats">
+                <thead>
+                  <tr>
+                    <th>{{ t("strategies.statistics.metric") }}</th>
+                    <th>{{ t("strategies.statistics.value") }}</th>
+                    <th>{{ t("strategies.statistics.source") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-strategy-metrics></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="long_short" data-strategies-panel="long_short" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table strategies-table--stats">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>{{ t("strategies.long_short.long") }}</th>
+                    <th>{{ t("strategies.long_short.short") }}</th>
+                    <th>{{ t("strategies.long_short.total") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-long-short-rows></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="hourly" data-strategies-panel="hourly_results" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table strategies-table--stats">
+                <thead>
+                  <tr>
+                    <th>{{ t("strategies.hours.hour") }}</th>
+                    <th>{{ t("strategies.hours.win_rate") }}</th>
+                    <th>{{ t("strategies.hours.pnl") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-hourly-results></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="risk" data-strategies-panel="risk_execution" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table strategies-table--stats">
+                <thead>
+                  <tr>
+                    <th>{{ t("strategies.statistics.metric") }}</th>
+                    <th>{{ t("strategies.statistics.value") }}</th>
+                    <th>{{ t("strategies.statistics.source") }}</th>
+                  </tr>
+                </thead>
+                <tbody data-risk-execution></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="strategies-tab-panel" data-stat-view="monthly" data-strategies-panel="monthly_stats" hidden>
+            <div class="strategies-table-wrap strategies-table-wrap--compact">
+              <table class="strategies-table strategies-table--stats strategies-table--monthly">
+                <thead data-monthly-head></thead>
+                <tbody data-monthly-rows></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section class="terminal-panel strategies-summary" data-strategies-panel="selected_strategy">
         <header class="panel-heading panel-heading--with-tools">
           <div class="strategies-summary-title">
@@ -169,76 +261,6 @@
             </thead>
             <tbody data-strategy-saved-rows></tbody>
           </table>
-        </div>
-      </section>
-
-      <section class="terminal-panel strategies-statistics" data-strategies-panel="statistics_workspace">
-        <header class="panel-heading panel-heading--with-tools">
-          <div class="strategies-panel-title-group">
-            <h2>{{ t("strategies.statistics.title") }}</h2>
-            <div class="strategies-tabbar" role="tablist" aria-label="{{ t('strategies.statistics.title') }}">
-              <button class="strategies-tab strategies-tab--active" type="button" role="tab" aria-selected="true" data-stat-mode="overall">
-                {{ t("strategies.statistics.overall") }}
-              </button>
-              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="long_short">
-                {{ t("strategies.statistics.long_short") }}
-              </button>
-              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="hourly">
-                {{ t("strategies.statistics.hourly") }}
-              </button>
-              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="risk">
-                {{ t("strategies.statistics.risk") }}
-              </button>
-              <button class="strategies-tab" type="button" role="tab" aria-selected="false" data-stat-mode="monthly">
-                {{ t("strategies.statistics.monthly") }}
-              </button>
-            </div>
-          </div>
-        </header>
-        <div class="strategies-stat-views">
-          <section class="strategies-tab-panel" data-stat-view="overall" data-strategies-panel="metric_grid">
-            <div class="strategies-stat-list" data-strategy-metrics></div>
-          </section>
-          <section class="strategies-tab-panel" data-stat-view="long_short" data-strategies-panel="long_short" hidden>
-            <div class="strategies-table-wrap strategies-table-wrap--compact">
-              <table class="strategies-table">
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th>{{ t("strategies.long_short.long") }}</th>
-                    <th>{{ t("strategies.long_short.short") }}</th>
-                    <th>{{ t("strategies.long_short.total") }}</th>
-                  </tr>
-                </thead>
-                <tbody data-long-short-rows></tbody>
-              </table>
-            </div>
-          </section>
-          <section class="strategies-tab-panel" data-stat-view="hourly" data-strategies-panel="hourly_results" hidden>
-            <div class="strategies-table-wrap strategies-table-wrap--compact">
-              <table class="strategies-table">
-                <thead>
-                  <tr>
-                    <th>{{ t("strategies.hours.hour") }}</th>
-                    <th>{{ t("strategies.hours.win_rate") }}</th>
-                    <th>{{ t("strategies.hours.pnl") }}</th>
-                  </tr>
-                </thead>
-                <tbody data-hourly-results></tbody>
-              </table>
-            </div>
-          </section>
-          <section class="strategies-tab-panel" data-stat-view="risk" data-strategies-panel="risk_execution" hidden>
-            <dl class="strategies-risk-list" data-risk-execution></dl>
-          </section>
-          <section class="strategies-tab-panel" data-stat-view="monthly" data-strategies-panel="monthly_stats" hidden>
-            <div class="strategies-table-wrap">
-              <table class="strategies-table strategies-table--monthly">
-                <thead data-monthly-head></thead>
-                <tbody data-monthly-rows></tbody>
-              </table>
-            </div>
-          </section>
         </div>
       </section>
 

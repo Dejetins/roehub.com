@@ -397,9 +397,23 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert "Protected workspace placeholder" not in main_html
     assert "strategy_ui.js" not in main_html
     assert 'data-strategy-create-panel' not in strategies_response.text
+    assert 'class="strategies-stat"' not in strategies_response.text
+    assert 'class="strategies-risk-list"' not in strategies_response.text
+    assert "<th>Metric</th>" in main_html
+    assert "<th>Value</th>" in main_html
+    assert "<th>Source</th>" in main_html
     assert 'data-strategies-refresh-preset' in strategies_response.text
     assert "shell-status-panel app-bottom-status shell-global-status strategies-status-line" in (
         strategies_response.text
+    )
+    assert main_html.index('data-strategies-panel="statistics_workspace"') < main_html.index(
+        'data-strategies-panel="selected_strategy"'
+    )
+    assert main_html.index('data-strategies-panel="visual_workspace"') < main_html.index(
+        'data-strategies-panel="saved_strategies"'
+    )
+    assert main_html.index('data-strategies-panel="saved_strategies"') < main_html.index(
+        'data-strategies-panel="trades"'
     )
 
     new_response = client.get("/strategies/new")

@@ -75,7 +75,7 @@
 .strategies-grid {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(16, minmax(0, 1fr));
   grid-template-rows:
     minmax(165px, 0.72fr)
     minmax(360px, 1.52fr)
@@ -86,29 +86,29 @@
 }
 
 .strategies-summary {
-  grid-column: 1 / 5;
+  grid-column: 11 / 17;
   grid-row: 1;
 }
 
 .strategies-chart-panel {
-  grid-column: 1 / 7;
+  grid-column: 1 / 11;
   grid-row: 2;
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .strategies-statistics {
-  grid-column: 5 / 13;
+  grid-column: 1 / 11;
   grid-row: 1;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
 .strategies-library {
-  grid-column: 7 / 13;
+  grid-column: 11 / 17;
   grid-row: 2;
 }
 
 .strategies-trades {
-  grid-column: 1 / 13;
+  grid-column: 1 / 17;
   grid-row: 3;
 }
 
@@ -123,8 +123,7 @@
   gap: 2px 14px;
 }
 
-.strategies-kv div,
-.strategies-risk-list div {
+.strategies-kv div {
   display: grid;
   grid-template-columns: minmax(86px, 0.48fr) minmax(0, 1fr);
   gap: 6px;
@@ -132,16 +131,15 @@
 }
 
 .strategies-kv dt,
-.strategies-risk-list dt,
 .strategies-table th,
-.strategies-stat__label {
+.strategies-stat__label,
+.strategies-source-cell {
   color: var(--rh-muted);
   font-size: 10px;
   font-weight: 700;
 }
 
-.strategies-kv dd,
-.strategies-risk-list dd {
+.strategies-kv dd {
   overflow: hidden;
   margin: 0;
   color: var(--rh-text-strong);
@@ -357,6 +355,7 @@
 }
 
 .strategies-table--monthly,
+.strategies-table--stats,
 .strategies-table--saved {
   min-width: 0;
 }
@@ -367,14 +366,6 @@
 
 .strategies-table--trades {
   min-width: 1500px;
-}
-
-.strategies-tab-panel[data-stat-view="long_short"] .strategies-table {
-  min-width: 440px;
-}
-
-.strategies-tab-panel[data-stat-view="hourly"] .strategies-table {
-  min-width: 640px;
 }
 
 .strategies-table th,
@@ -484,21 +475,15 @@
   color: var(--rh-financial-negative);
 }
 
-.strategies-tab-panel[data-stat-view="long_short"] .strategies-table th,
-.strategies-tab-panel[data-stat-view="long_short"] .strategies-table td {
+.strategies-statistics .strategies-table th,
+.strategies-statistics .strategies-table td {
   padding: 3px 5px;
 }
 
-.strategies-risk-list {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  border-top: 1px solid var(--rh-divider);
-}
-
-.strategies-risk-list div {
-  padding: 5px 0;
-  border-bottom: 1px solid var(--rh-divider);
+.strategies-source-cell {
+  overflow: hidden;
+  max-width: 240px;
+  text-overflow: ellipsis;
 }
 
 .strategies-search {
@@ -602,8 +587,7 @@
   }
 
   .strategies-table-wrap,
-  .strategies-stat-list,
-  .strategies-risk-list {
+  .strategies-stat-list {
     min-height: 0;
     overflow: auto;
   }
@@ -659,8 +643,7 @@
     align-items: stretch;
   }
 
-  .strategies-kv div,
-  .strategies-risk-list div {
+  .strategies-kv div {
     grid-template-columns: 1fr;
   }
 

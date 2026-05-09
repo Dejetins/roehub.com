@@ -204,15 +204,19 @@ function renderMetrics(root, metricGrid) {
     return;
   }
   const items = metricGrid?.items || [];
+  if (!items.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="3">${escapeHtml(panelStatusText(metricGrid?.state, metricGrid?.degradation_reason, metricGrid?.source))}</td></tr>`;
+    return;
+  }
   target.innerHTML = items
     .map((metric) => {
       const label = t(metricLabelKeys[metric.key] || metric.label || metric.key);
       return `
-        <article class="strategies-stat">
-          <span class="strategies-stat__label">${escapeHtml(label)}</span>
-          <strong class="strategies-stat__value ${financialClass(metric.direction)}">${escapeHtml(valueOrUnavailable(metric.formatted))}</strong>
-          <span class="strategies-stat__source">${escapeHtml(metric.source)} / ${escapeHtml(metric.status)}</span>
-        </article>
+        <tr>
+          <td>${escapeHtml(label)}</td>
+          <td class="${financialClass(metric.direction)}">${escapeHtml(valueOrUnavailable(metric.formatted))}</td>
+          <td class="strategies-source-cell">${escapeHtml(metric.source)} / ${escapeHtml(metric.status)}</td>
+        </tr>
       `;
     })
     .join("");
@@ -387,12 +391,18 @@ function renderRisk(root, panel) {
   if (!target) {
     return;
   }
-  target.innerHTML = (panel?.rows || [])
+  const rows = panel?.rows || [];
+  if (!rows.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="3">${escapeHtml(panelStatusText(panel?.state, panel?.degradation_reason, panel?.source))}</td></tr>`;
+    return;
+  }
+  target.innerHTML = rows
     .map((row) => `
-      <div>
-        <dt>${escapeHtml(t(breakdownLabelKeys[row.key] || row.label || row.key))}</dt>
-        <dd class="${financialClass(row.direction)}">${escapeHtml(valueOrUnavailable(row.total_value))}</dd>
-      </div>
+      <tr>
+        <td>${escapeHtml(t(breakdownLabelKeys[row.key] || row.label || row.key))}</td>
+        <td class="${financialClass(row.direction)}">${escapeHtml(valueOrUnavailable(row.total_value))}</td>
+        <td class="strategies-source-cell">${escapeHtml(panel?.source || "--")} / ${escapeHtml(panel?.state || "--")}</td>
+      </tr>
     `)
     .join("");
 }
