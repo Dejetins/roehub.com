@@ -26,8 +26,15 @@ context_sources:
         - BacktestJobExecutor
     - path: src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       why: "job repository queue/claim/lease contract"
+      inspect_symbols:
+        - BacktestJobRepository
+        - BacktestJobLeaseRepository
+    - path: src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py
+      why: "existing Postgres claim_next/SKIP LOCKED lease implementation for worker boundary"
     - path: apps/api/routes/backtests.py
       why: "public job create/cancel routes"
+    - path: src/trading/contexts/backtest/application/dto/backtest_jobs.py
+      why: "public job/status DTO surface and refresh metadata target"
   conditional_bundles:
     tests:
       read_when: "when adding job runtime/use-case/API tests"
@@ -37,7 +44,6 @@ context_sources:
     worker_runtime:
       read_when: "when implementing worker trigger/adapter or queue claim loop"
       paths:
-        - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py
         - apps/worker
         - scripts/macos
     benchmark_policy:
@@ -77,9 +83,11 @@ hard_requirements:
   macstudio_policy_if_compute_touched: true
   load_smoke_required: true
   ui_refresh_retry_window_required: true
+  current_code_has_no_worker_use_case: true
+  must_introduce_worker_boundary_from_existing_lease_port: true
 
 task_toggles:
-  implement_worker_trigger_or_adapter: true
+  implement_worker_use_case_and_trigger_adapter: true
   implement_job_state_tests: true
   implement_public_api_breaking_change: false
   publish_after_success: true
@@ -91,6 +99,8 @@ package_contract:
     - "apps/api/wiring/modules/backtest.py"
     - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
     - "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py"
+    - "src/trading/contexts/backtest/application/dto/backtest_jobs.py"
+    - "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py"
     - "src/trading/contexts/backtest/** worker trigger/queue/adapter additions"
     - "apps/worker/** backtest worker additions"
     - "tests/unit/apps/api/test_backtests_routes.py job runtime assertions"
@@ -103,6 +113,7 @@ package_contract:
   integration_points:
     - "job state transitions"
     - "worker trigger port/adapter"
+    - "BacktestJobLeaseRepository.claim_next worker claim path"
     - "idempotent enqueue"
     - "bounded UI polling/refresh metadata for backtest job state"
     - "Mac Studio benchmark evidence if compute path changes"
@@ -149,6 +160,10 @@ required_literals:
   - "cancelled"
   - "Idempotency-Key"
   - "request_hash"
+  - "background_auto"
+  - "claim_next"
+  - "BacktestJobWorkerUseCase"
+  - "execution_trigger"
   - "refresh_status"
   - "retry_after_seconds"
 
@@ -173,8 +188,10 @@ final_report_format:
   - "Publish/deploy: direct-main publish-ci-deploy terminal state; if successful, include direct push to origin/main, main CI/deploy monitoring, local main sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact blocker or reason it was skipped"
 
 quality_gates:
-  - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/ports tests/unit/contexts/backtest/adapters/outbound/persistence/postgres"
-    expect: "passes; adjust to existing focused tests if directory names differ"
+  - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py"
+    expect: "passes"
+  - cmd: "uv run pytest -q tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py"
+    expect: "passes after adding this worker-boundary test file; if the file is named differently, run the exact added worker-boundary test file and report the substitution"
   - cmd: "uv run ruff check apps/api src/trading/contexts/backtest tests/unit/apps/api tests/unit/contexts/backtest"
     expect: "passes for touched paths"
   - cmd: "uv run pyright"
@@ -186,6 +203,8 @@ expected_primary_touches:
   - "apps/api/wiring/modules/backtest.py"
   - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
   - "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py"
+  - "src/trading/contexts/backtest/application/dto/backtest_jobs.py"
+  - "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py"
   - "src/trading/contexts/backtest/**"
   - "apps/api/routes/backtests.py"
   - "tests/unit/apps/api/test_backtests_routes.py"
@@ -223,11 +242,17 @@ Done means:
 
 - Current wiring builds `BacktestRuntimeJobOrchestrationService` in API process.
 - `BacktestJobsUseCase.create()` can execute via `sync_inline`.
+- Current source does **not** provide `BacktestJobWorkerUseCase`, `execution_trigger`, or an enqueue adapter yet; this stage must introduce the boundary instead of assuming it exists.
+- Current source already provides `BacktestJobLeaseRepository.claim_next` and `PostgresBacktestJobLeaseRepository` with FIFO/SKIP LOCKED semantics; prefer this existing lease seam over introducing a broker.
+- Historical `sync_inline` literals may remain for legacy persisted rows and migration compatibility, but the public API create path must stop using them for new jobs.
 - Public UI must treat create as async job flow.
 
 ## Requirements (Must)
 
 - Remove long-running compute from API request path or document a transitional adapter with explicit rollout ban.
+- Change new job creation from `execution_mode="sync_inline"` to a background execution mode, normally `background_auto`, unless current persisted-contract evidence requires a different compatible literal.
+- Remove `claim_for_inline_execution()` and `executor.execute()` from `BacktestJobsUseCase.create()`; creation must persist a queued job and trigger/signal worker execution only.
+- Introduce a minimal worker use case around the existing lease port: `claim_next -> update progress/heartbeat -> executor.execute -> finish_with_top_variants`, with deterministic failure persistence.
 - Preserve public jobs API compatibility where possible.
 - Add tests for queued create, idempotency replay, cancel, worker claim/update.
 - Ensure job status/progress polling is bounded and can return `refresh_status`, `generated_at`, `next_allowed_refresh_at`/`retry_after_seconds` or an equivalent typed retry-window contract for Stage 8/9 UI refresh.
@@ -260,16 +285,19 @@ Use front matter `context_sources`.
 # Work plan (agent should follow)
 
 1. Classify current sync_inline path and target queue/adapter boundary.
-2. Design minimal compatible runtime transition.
-3. Implement use case/wiring/worker changes.
-4. Add focused tests.
-5. Run load smoke and benchmark evidence if compute path changed.
-6. Run quality gates.
-7. Use `publish-ci-deploy` only after complete success.
+2. Confirm with `rg` whether `BacktestJobWorkerUseCase`, `execution_trigger`, and enqueue adapter exist in the current checkout; if absent, implement them as new target-state code.
+3. Design minimal compatible runtime transition using existing `BacktestJobLeaseRepository.claim_next`.
+4. Implement use case/wiring/worker changes.
+5. Add focused tests.
+6. Run load smoke and benchmark evidence if executor/scoring/orchestration internals changed.
+7. Run quality gates.
+8. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
 - API create path is bounded by validation/persistence/enqueue.
+- New create returns an existing job DTO with `state="queued"` for non-idempotent submissions unless the worker has already completed via a clearly documented asynchronous trigger outside the request path.
+- New create rows do not use `execution_mode="sync_inline"`; legacy support may remain read-compatible.
 - Current job states do not regress.
 - No full result/trades payload is stored in top rows.
 - Job status/progress refresh cannot trigger compute and can communicate retry-window/coalescing state to UI.
@@ -327,6 +355,7 @@ For every browser-visible change, collect and report runtime evidence:
 - Runtime workflow: `compatible-change` or documented `unknown`.
 - Request hash/cache identity: `none`.
 - Persisted schema: `none` or additive `compatible-change`.
+- Historical `sync_inline` storage literals: keep readable unless a migration/backfill is explicitly implemented and reversible.
 
 # Files to indicate (expected touched areas)
 
@@ -342,6 +371,7 @@ Use front matter touched paths.
 
 ```bash
 uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py
+uv run pytest -q tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py
 uv run ruff check apps/api src/trading/contexts/backtest tests/unit/apps/api tests/unit/contexts/backtest
 uv run pyright
 python -m tools.docs.generate_docs_index --check
