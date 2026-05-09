@@ -11,7 +11,6 @@ from fastapi import APIRouter
 from apps.api.dto.ui_strategies_dashboard import (
     RefreshStatus,
     SourceStatus,
-    StrategyBestWorstDaysResponse,
     StrategyBreakdownPanelResponse,
     StrategyBreakdownRowResponse,
     StrategyChartResponse,
@@ -214,7 +213,6 @@ class StrategyDashboardQueryService:
             risk_execution=_build_risk_execution(),
             drawdown=_build_unavailable_series(title="drawdown"),
             equity_curve=_build_unavailable_series(title="equity_curve"),
-            best_worst_days=_build_best_worst_days(),
             hourly_results=_build_hourly_results(),
             trades=_build_trades(),
             symbol_results=_build_symbol_results(symbol=selected_symbol),
@@ -695,16 +693,6 @@ def _build_unavailable_series(*, title: str) -> StrategySeriesPanelResponse:
         max_points=_SERIES_MAX_POINTS,
         points=[],
         degradation_reason=f"{title}_projection_unavailable",
-    )
-
-
-def _build_best_worst_days() -> StrategyBestWorstDaysResponse:
-    return StrategyBestWorstDaysResponse(
-        source=_STAT_SOURCE,
-        state="unavailable",
-        best_days=[],
-        worst_days=[],
-        degradation_reason="daily_statistics_projection_unavailable",
     )
 
 

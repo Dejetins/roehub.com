@@ -273,7 +273,11 @@ function renderSelector(root, selector, savedQuery = "") {
   }
   saved.innerHTML = filteredRows
     .map((row) => `
-      <tr data-saved-strategy-id="${escapeHtml(row.strategy_id)}">
+      <tr
+        data-saved-strategy-id="${escapeHtml(row.strategy_id)}"
+        tabindex="0"
+        aria-selected="${row.strategy_id === selectedId ? "true" : "false"}"
+      >
         <td>${escapeHtml(row.name)}</td>
         <td>${escapeHtml(row.version || "--")}</td>
         <td>${escapeHtml(localTime(row.latest_activity))}</td>
@@ -381,30 +385,6 @@ function renderSeries(root, panel, selector, { negative = false } = {}) {
     panelStatusText(panel?.state, panel?.degradation_reason, panel?.source),
     root,
   );
-}
-
-function renderDays(root, panel) {
-  const target = qs("[data-best-worst-days]", root);
-  if (!target) {
-    return;
-  }
-  if (!panel?.best_days?.length && !panel?.worst_days?.length) {
-    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="4">${escapeHtml(panelStatusText(panel?.state, panel?.degradation_reason, panel?.source))}</td></tr>`;
-    return;
-  }
-  const maxRows = Math.max(panel.best_days.length, panel.worst_days.length);
-  target.innerHTML = Array.from({ length: maxRows }, (_, index) => {
-    const best = panel.best_days[index] || {};
-    const worst = panel.worst_days[index] || {};
-    return `
-      <tr>
-        <td>${escapeHtml(best.date || "--")}</td>
-        <td class="${financialClass(best.direction)}">${escapeHtml(best.formatted || "--")}</td>
-        <td>${escapeHtml(worst.date || "--")}</td>
-        <td class="${financialClass(worst.direction)}">${escapeHtml(worst.formatted || "--")}</td>
-      </tr>
-    `;
-  }).join("");
 }
 
 function renderHours(root, panel) {
@@ -533,7 +513,6 @@ function renderDashboard(root, summary, state = {}) {
     chart: "[data-equity-chart]",
     state: "[data-equity-state]",
   });
-  renderDays(root, summary.best_worst_days);
   renderHours(root, summary.hourly_results);
   renderTrades(root, summary.trades);
   renderSymbols(root, summary.symbol_results);
@@ -748,6 +727,15 @@ function initStrategies(root) {
     }
   }
 
+  function selectSavedStrategy(strategyId) {
+    if (!strategyId) {
+      return;
+    }
+    state.selectedStrategyId = strategyId;
+    setBrowserStrategyState(strategyId);
+    loadDashboard("manual").catch(() => null);
+  }
+
   function positionStatusRefreshMenu() {
     const trigger = qs("#strategies-refresh-trigger", document);
     const menu = qs("#strategies-refresh-menu", document);
@@ -795,9 +783,12 @@ function initStrategies(root) {
     }
     const strategyOption = event.target.closest("[data-select-strategy]");
     if (strategyOption instanceof HTMLElement) {
-      state.selectedStrategyId = strategyOption.dataset.selectStrategy || null;
-      setBrowserStrategyState(state.selectedStrategyId);
-      loadDashboard("manual").catch(() => null);
+      selectSavedStrategy(strategyOption.dataset.selectStrategy || "");
+      return;
+    }
+    const savedRow = event.target.closest("[data-saved-strategy-id]");
+    if (savedRow instanceof HTMLElement) {
+      selectSavedStrategy(savedRow.dataset.savedStrategyId || "");
       return;
     }
     const stateOption = event.target.closest("[data-strategy-state]");
@@ -828,6 +819,20 @@ function initStrategies(root) {
       state.createTimeframe = timeframe.dataset.createTimeframe || "1m";
       setText("[data-create-timeframe-current]", state.createTimeframe, root);
       return;
+    }
+  });
+
+  root.addEventListener("keydown", (event) => {
+    if (!(event.target instanceof HTMLElement)) {
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const savedRow = event.target.closest("[data-saved-strategy-id]");
+    if (savedRow instanceof HTMLElement) {
+      event.preventDefault();
+      selectSavedStrategy(savedRow.dataset.savedStrategyId || "");
     }
   });
 

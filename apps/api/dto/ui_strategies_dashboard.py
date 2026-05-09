@@ -209,25 +209,6 @@ class StrategySeriesPanelResponse(BaseModel):
     degradation_reason: str | None = None
 
 
-class StrategyDayResultResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    date: str
-    pnl_percent: float | None
-    formatted: str
-    direction: FinancialDirection
-
-
-class StrategyBestWorstDaysResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    source: str
-    state: PanelState
-    best_days: list[StrategyDayResultResponse]
-    worst_days: list[StrategyDayResultResponse]
-    degradation_reason: str | None = None
-
-
 class StrategyHourlyResultResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -340,7 +321,6 @@ class StrategyDashboardResponse(BaseModel):
     risk_execution: StrategyBreakdownPanelResponse
     drawdown: StrategySeriesPanelResponse
     equity_curve: StrategySeriesPanelResponse
-    best_worst_days: StrategyBestWorstDaysResponse
     hourly_results: StrategyHourlyResultsResponse
     trades: StrategyTradesResponse
     symbol_results: StrategySymbolResultsResponse

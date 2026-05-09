@@ -514,7 +514,7 @@ Settings является местом persistent preferences для theme, loca
 
 Route: `/strategies`. Канонический референс: `strategy_statistic.png`.
 
-Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии, chart со сделками/TP/SL или equity/trades, сводные метрики, месячная статистика, drawdown/equity, таблица сделок и разрезы по символам/часам. Live/status controls, manual refresh/autorefresh и список/переключатель стратегий добавляются только если они не ломают форму референса.
+Страница является selected-strategy analytics workstation, а не обычной библиотекой карточек. Она должна сохранять панельную структуру `strategy_statistic.png`: верхний summary выбранной стратегии с поиском/выбором сохраненной стратегии, chart со сделками/TP/SL и встроенными drawdown/equity mini-series, сводные метрики, месячная статистика, таблица сделок и разрезы по символам/часам. Live/status controls, manual refresh/autorefresh и список/переключатель стратегий добавляются только если они не ломают форму референса.
 
 Источники данных: strategy storage/run state, Redis realtime output/readers, planned strategy position/execution/equity read-models, market-data candles/reference и exchange account snapshots. Панели обязаны показывать freshness/lag для live-состояний.
 

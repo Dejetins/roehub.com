@@ -1485,8 +1485,7 @@ Frontend / panel inventory:
 - metrics grid;
 - saved strategies/variant/strategy selector, если присутствует в референсе;
 - monthly stats;
-- drawdown/equity panels;
-- best/worst days;
+- drawdown/equity folded into the chart workspace, not as separate full panels;
 - hourly results;
 - trades/events table;
 - symbol results/breakdowns.

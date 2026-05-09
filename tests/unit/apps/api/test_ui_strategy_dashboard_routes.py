@@ -84,7 +84,6 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         "risk_execution",
         "drawdown",
         "equity_curve",
-        "best_worst_days",
         "hourly_results",
         "trades",
         "symbol_results",

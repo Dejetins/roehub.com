@@ -359,8 +359,13 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert 'role="listbox"' in strategies_response.text
     assert 'data-strategy-control="branded dropdown"' in strategies_response.text
     assert 'data-saved-search' in strategies_response.text
+    assert 'data-strategy-saved-rows' in strategies_response.text
+    assert 'id="strategy-manage-trigger"' in strategies_response.text
     assert 'class="strategies-command"' not in strategies_response.text
     assert 'data-strategies-panel="command_status"' not in strategies_response.text
+    assert 'data-strategies-panel="best_worst_days"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-drawdown"' not in strategies_response.text
+    assert 'class="terminal-panel strategies-equity"' not in strategies_response.text
     for panel in [
         "selected_strategy",
         "chart_trades",
@@ -372,7 +377,6 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
         "stat_tiles",
         "drawdown",
         "equity_curve",
-        "best_worst_days",
         "hourly_results",
         "trades",
         "symbol_results",
