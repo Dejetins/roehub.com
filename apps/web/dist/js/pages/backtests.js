@@ -2,7 +2,6 @@ import { apiFetch } from "../core/api.js";
 import { qs, qsa, setText } from "../core/dom.js";
 import { t } from "../core/locale.js";
 import { createPoller } from "../core/poller.js";
-import { renderBacktestSeries } from "../charts/backtest_series.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const REFRESH_PRESETS = {
@@ -24,6 +23,8 @@ const state = {
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
   job_state: "",
+  job_exchange: "",
+  job_market_type: "",
   job_symbol: "",
   launched_from: "",
   launched_to: "",
@@ -38,9 +39,6 @@ const state = {
   selectedJobId: null,
   selectedVariantKey: null,
   resultSummary: null,
-  tradesPage: 1,
-  tradesHasNext: false,
-  chartKind: "equity",
 };
 
 let activeRequest = null;
@@ -138,6 +136,18 @@ function countRange(start, stop, step) {
 
 function formatDate(value) {
   return value ? String(value).slice(0, 10) : "--";
+}
+
+function formatDateTimeMinute(value) {
+  if (!value) {
+    return "--";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    return formatDate(value);
+  }
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function compactId(value) {
@@ -322,7 +332,7 @@ function updateOptionSelection(root, name, value, label) {
   if (current) {
     current.textContent = label || value || t("backtests.results.all");
   }
-  if (name === "job_state") {
+  if (["job_state", "job_exchange", "job_market_type"].includes(name)) {
     refreshWorkstation(root, "manual").catch(() => {});
   }
   if (name === "risk_mode") {
@@ -634,39 +644,130 @@ function renderJobs(root, table) {
   state.jobRows = rows;
   renderJobPicker(root, rows);
   if (!rows.length) {
-    target.innerHTML = `<tr><td colspan="15">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="11">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
     return;
   }
   target.innerHTML = rows
-    .map(
-      (row, index) => `
-        <tr data-job-id="${escapeHtml(row.job_id)}" tabindex="0">
-          <td>${state.selectedJobId === row.job_id ? "v" : ">"} ${index + 1}</td>
-          <td>${escapeHtml(row.strategy)}</td>
-          <td>${escapeHtml(formatDate(row.created_at))}</td>
-          <td>${escapeHtml(row.symbol || "--")}</td>
-          <td>${escapeHtml(row.indicator_summary)}</td>
-          <td>${escapeHtml(row.period)}</td>
-          <td>${escapeHtml(row.direction)}</td>
-          <td>${numberOrDash(row.combinations)}</td>
-          <td class="${financialClass(row.best_return_pct)}">${percent(row.best_return_pct)}</td>
-          <td class="${financialClass(row.best_sharpe)}">${numberOrDash(row.best_sharpe)}</td>
-          <td class="${financialClass(row.avg_drawdown_pct)}">${percent(row.avg_drawdown_pct)}</td>
-          <td>${numberOrDash(row.profit_factor)}</td>
-          <td>${percent(row.win_rate_pct)}</td>
-          <td>${numberOrDash(row.trades_count)}</td>
-          <td>
-            <div class="backtests-status-cell">
-              <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
-              ${row.actions?.can_cancel
-                ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
-                : ""}
-            </div>
-          </td>
-        </tr>
-      `
-    )
+    .map((row, index) => renderJobRow(root, row, index))
     .join("");
+}
+
+function renderJobRow(root, row, index) {
+  const selected = state.selectedJobId === row.job_id;
+  return `
+    <tr class="${selected ? "is-selected" : ""}" data-job-id="${escapeHtml(row.job_id)}" tabindex="0">
+      <td>
+        <button class="backtests-job-toggle" type="button" data-select-job="${escapeHtml(row.job_id)}" aria-expanded="${selected ? "true" : "false"}">
+          ${selected ? "v" : ">"} ${index + 1}
+        </button>
+      </td>
+      <td>${escapeHtml(row.strategy)}</td>
+      <td>${escapeHtml(formatDateTimeMinute(row.created_at))}</td>
+      <td>${escapeHtml(row.exchange || "--")}</td>
+      <td>${escapeHtml(row.market_type || "--")}</td>
+      <td>${escapeHtml(row.symbol || "--")}</td>
+      <td>${escapeHtml(row.indicator_summary)}</td>
+      <td>${escapeHtml(row.period)}</td>
+      <td>${escapeHtml(row.direction)}</td>
+      <td>${numberOrDash(row.combinations)}</td>
+      <td>
+        <div class="backtests-status-cell">
+          <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
+          ${row.actions?.can_cancel
+            ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
+            : ""}
+        </div>
+      </td>
+    </tr>
+    ${selected ? renderVariantExpansion(root, row) : ""}
+  `;
+}
+
+function renderVariantExpansion(root, row) {
+  const summary = state.resultSummary?.job?.job_id === row.job_id ? state.resultSummary : null;
+  const variants = summary?.top_variants?.items || [];
+  const title = t("backtests.variants.title", { job: compactId(row.job_id) });
+  const body = variants.length
+    ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
+    : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : t("backtests.variants.empty"))}</td></tr>`;
+  return `
+    <tr class="backtests-variant-expansion">
+      <td class="backtests-variant-cell" colspan="11">
+        <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
+          <header class="backtests-variant-panel__heading">
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(row.strategy)} · ${escapeHtml(row.symbol || "--")} · ${escapeHtml(formatDateTimeMinute(row.created_at))}</span>
+          </header>
+          <div class="backtests-table-wrap backtests-variant-table-wrap">
+            <table class="backtests-table backtests-table--variants">
+              <thead>
+                <tr>
+                  <th>${escapeHtml(t("backtests.variants.rank"))}</th>
+                  <th>${escapeHtml(t("backtests.variants.variant"))}</th>
+                  <th>${escapeHtml(t("backtests.variants.params"))}</th>
+                  <th>${escapeHtml(t("backtests.results.return"))}</th>
+                  <th>${escapeHtml(t("backtests.results.sharpe"))}</th>
+                  <th>${escapeHtml(t("backtests.results.drawdown"))}</th>
+                  <th>${escapeHtml(t("backtests.results.profit_factor"))}</th>
+                  <th>${escapeHtml(t("backtests.results.win_rate"))}</th>
+                  <th>${escapeHtml(t("backtests.results.trades"))}</th>
+                  <th>${escapeHtml(t("backtests.variants.csv"))}</th>
+                </tr>
+              </thead>
+              <tbody>${body}</tbody>
+            </table>
+          </div>
+        </section>
+      </td>
+    </tr>
+  `;
+}
+
+function renderVariantRow(root, jobId, variant) {
+  const metrics = variant?.summary_metrics || {};
+  const selected = state.selectedVariantKey === variant.variant_key;
+  const href = `${variantBaseEndpoint(root, jobId, variant.variant_key)}/trades.csv`;
+  return `
+    <tr class="${selected ? "is-selected" : ""}" data-result-variant-key="${escapeHtml(variant.variant_key)}" tabindex="0">
+      <td>#${numberOrDash(variant.rank)}</td>
+      <td>${escapeHtml(compactId(variant.variant_key))}</td>
+      <td class="backtests-variant-params">${escapeHtml(formatVariantParams(variant))}</td>
+      <td class="${financialClass(metrics.total_return_pct)}">${percent(metrics.total_return_pct)}</td>
+      <td class="${financialClass(metrics.sharpe)}">${numberOrDash(metrics.sharpe)}</td>
+      <td class="${financialClass(metrics.max_drawdown_pct)}">${percent(metrics.max_drawdown_pct)}</td>
+      <td>${numberOrDash(metrics.profit_factor)}</td>
+      <td>${percent(metrics.win_rate_pct)}</td>
+      <td>${numberOrDash(metrics.trade_count)}</td>
+      <td><a class="rh-button rh-button--secondary rh-button--compact" href="${escapeHtml(href)}">${escapeHtml(t("backtests.variants.csv"))}</a></td>
+    </tr>
+  `;
+}
+
+function formatVariantParams(variant) {
+  const params = variant?.readable_params || variant?.canonical_variant_params || {};
+  const entries = Object.entries(params)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .slice(0, 8)
+    .map(([key, value]) => `${key}: ${formatParamValue(value)}`);
+  if (variant?.best_tp_pct !== null && variant?.best_tp_pct !== undefined) {
+    entries.push(`tp: ${variant.best_tp_pct}`);
+  }
+  if (variant?.best_sl_pct !== null && variant?.best_sl_pct !== undefined) {
+    entries.push(`sl: ${variant.best_sl_pct}`);
+  }
+  return entries.join(" · ") || "--";
+}
+
+function formatParamValue(value) {
+  if (Array.isArray(value)) {
+    return value.join("/");
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, nested]) => `${key}=${nested}`)
+      .join(",");
+  }
+  return String(value);
 }
 
 function renderJobPicker(root, rows) {
@@ -693,97 +794,7 @@ function renderResultSummary(root, summary) {
   state.resultSummary = summary;
   const selectedKey = state.selectedVariantKey || summary?.selected_variant_key;
   state.selectedVariantKey = selectedKey;
-  const selectedVariant = (summary?.top_variants?.items || []).find(
-    (item) => item.variant_key === selectedKey
-  );
-  const resultState = qs("[data-result-state]", root);
-  if (resultState) {
-    resultState.hidden = !summary;
-  }
-  setText("[data-result-job]", compactId(summary?.job?.job_id), root);
-  setText("[data-result-variant]", compactId(selectedKey), root);
-  setText("[data-result-return]", percent(selectedVariant?.summary_metrics?.total_return_pct), root);
-  setText("[data-result-sharpe]", numberOrDash(selectedVariant?.summary_metrics?.sharpe), root);
-  const csv = qs("[data-result-csv]", root);
-  if (csv && summary?.job?.job_id && selectedKey) {
-    csv.href = `${variantBaseEndpoint(root, summary.job.job_id, selectedKey)}/trades.csv`;
-  }
-  renderVariantStrip(root, summary?.top_variants?.items || [], selectedKey);
-}
-
-function renderVariantStrip(root, variants, selectedKey) {
-  const target = qs("[data-result-variants]", root);
-  if (!target) {
-    return;
-  }
-  target.innerHTML = variants
-    .map(
-      (variant) => `
-        <button
-          class="rh-button ${variant.variant_key === selectedKey ? "rh-button--primary" : "rh-button--secondary"} rh-button--compact"
-          type="button"
-          data-result-variant-key="${escapeHtml(variant.variant_key)}"
-        >
-          #${variant.rank} ${escapeHtml(compactId(variant.variant_key))}
-        </button>
-      `
-    )
-    .join("");
-}
-
-function renderTrades(root, payload) {
-  const target = qs("[data-trades-rows]", root);
-  if (!target) {
-    return;
-  }
-  const rows = payload?.items || [];
-  target.innerHTML = rows.length
-    ? rows
-        .map(
-          (trade) => `
-            <tr>
-              <td>${numberOrDash(trade.trade_index)}</td>
-              <td>${escapeHtml(trade.side || trade.direction || "--")}</td>
-              <td>${escapeHtml(localTime(trade.exit_timestamp))}</td>
-              <td class="${financialClass(trade.net_pnl_quote)}">${numberOrDash(trade.net_pnl_quote)}</td>
-              <td class="${financialClass(trade.return_pct)}">${percent(trade.return_pct)}</td>
-            </tr>
-          `
-        )
-        .join("")
-    : `<tr><td colspan="5">${escapeHtml(t("backtests.results.empty"))}</td></tr>`;
-  const pagination = payload?.pagination || {};
-  state.tradesPage = Number(pagination.page || 1);
-  state.tradesHasNext = Boolean(pagination.has_next);
-  setText(
-    "[data-trades-page]",
-    `${numberOrDash(pagination.page)} / ${numberOrDash(Math.ceil((pagination.total || 0) / (pagination.page_size || 1)) || 1)}`,
-    root
-  );
-  const previous = qs("[data-trades-prev]", root);
-  const next = qs("[data-trades-next]", root);
-  if (previous) {
-    previous.disabled = !pagination.has_previous;
-  }
-  if (next) {
-    next.disabled = !pagination.has_next;
-  }
-}
-
-function renderChart(root, payload) {
-  const canvas = qs("[data-result-chart]", root);
-  qsa("[data-chart-kind]", root).forEach((button) => {
-    const active = button.dataset.chartKind === (payload?.kind || state.chartKind);
-    button.classList.toggle("rh-button--primary", active);
-    button.classList.toggle("rh-button--secondary", !active);
-  });
-  const result = renderBacktestSeries(canvas, payload?.points || [], { kind: payload?.kind });
-  canvas?.setAttribute("data-chart-nonblank", result.nonblank ? "true" : "false");
-  setText(
-    "[data-chart-status]",
-    `${payload?.kind || state.chartKind}: ${payload?.returned_points || 0}/${payload?.source_points || 0}`,
-    root
-  );
+  renderJobs(root, { items: state.jobRows });
 }
 
 function renderFooter(root, data) {
@@ -845,50 +856,23 @@ async function loadResultSummary(root, jobId) {
   return summary;
 }
 
-async function loadChart(root) {
-  if (!state.selectedJobId || !state.selectedVariantKey) {
-    return;
-  }
-  const endpoint = `${variantBaseEndpoint(root, state.selectedJobId, state.selectedVariantKey)}/${state.chartKind}?points=600`;
-  const payload = await apiFetch(endpoint);
-  renderChart(root, payload);
-}
-
-async function loadTrades(root, page = 1) {
-  if (!state.selectedJobId || !state.selectedVariantKey) {
-    return;
-  }
-  const endpoint = `${variantBaseEndpoint(root, state.selectedJobId, state.selectedVariantKey)}/trades?page=${page}&page_size=50`;
-  const payload = await apiFetch(endpoint);
-  renderTrades(root, payload);
-}
-
-async function loadSelectedResult(root, { includeChart = true, includeTrades = true } = {}) {
+async function loadSelectedResult(root) {
   if (!state.selectedJobId || activeResultRequest) {
     return activeResultRequest;
   }
-  activeResultRequest = loadResultSummary(root, state.selectedJobId)
-    .then(async () => {
-      if (includeChart) {
-        await loadChart(root);
-      }
-      if (includeTrades) {
-        await loadTrades(root, state.tradesPage);
-      }
-    })
-    .finally(() => {
-      activeResultRequest = null;
-    });
+  renderJobs(root, { items: state.jobRows });
+  activeResultRequest = loadResultSummary(root, state.selectedJobId).finally(() => {
+    activeResultRequest = null;
+  });
   return activeResultRequest;
 }
 
 function selectJob(root, jobId) {
   state.selectedJobId = jobId || null;
   state.selectedVariantKey = null;
-  state.tradesPage = 1;
   renderJobPicker(root, state.jobRows);
   loadSelectedResult(root).catch((error) => {
-    setText("[data-chart-status]", error?.message || t("backtests.status.failed"), root);
+    setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
   });
 }
 
@@ -901,6 +885,12 @@ async function refreshWorkstation(root, reason = "manual") {
   params.set("refresh", reason);
   if (state.job_state) {
     params.set("state", state.job_state);
+  }
+  if (state.job_exchange) {
+    params.set("exchange", state.job_exchange);
+  }
+  if (state.job_market_type) {
+    params.set("market_type", state.job_market_type);
   }
   if (state.cursor) {
     params.set("cursor", state.cursor);
@@ -921,7 +911,7 @@ async function refreshWorkstation(root, reason = "manual") {
     .then((data) => {
       renderWorkstation(root, data);
       if (state.selectedJobId && reason !== "initial") {
-        loadSelectedResult(root, { includeChart: false, includeTrades: false }).catch(() => {});
+        loadSelectedResult(root).catch(() => {});
       }
       return data;
     })
@@ -1053,6 +1043,13 @@ function bind(root) {
       cancelJob(root, cancelButton.dataset.cancelJobId || "").catch(() => {});
       return;
     }
+    const selectJobButton = event.target.closest("[data-select-job]");
+    if (selectJobButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      selectJob(root, selectJobButton.dataset.selectJob || null);
+      return;
+    }
     const clearSymbols = event.target.closest("[data-clear-symbols]");
     if (clearSymbols instanceof HTMLElement) {
       qsa("[data-symbol-checkbox]", root).forEach((checkbox) => {
@@ -1122,25 +1119,7 @@ function bind(root) {
     const variantButton = event.target.closest("[data-result-variant-key]");
     if (variantButton instanceof HTMLElement) {
       state.selectedVariantKey = variantButton.dataset.resultVariantKey || null;
-      state.tradesPage = 1;
-      renderResultSummary(root, state.resultSummary);
-      loadSelectedResult(root).catch(() => {});
-      return;
-    }
-    const chartButton = event.target.closest("[data-chart-kind]");
-    if (chartButton instanceof HTMLElement) {
-      state.chartKind = chartButton.dataset.chartKind || "equity";
-      loadChart(root).catch(() => {});
-      return;
-    }
-    const prevTrades = event.target.closest("[data-trades-prev]");
-    if (prevTrades instanceof HTMLElement && state.tradesPage > 1) {
-      loadTrades(root, state.tradesPage - 1).catch(() => {});
-      return;
-    }
-    const nextTrades = event.target.closest("[data-trades-next]");
-    if (nextTrades instanceof HTMLElement && state.tradesHasNext) {
-      loadTrades(root, state.tradesPage + 1).catch(() => {});
+      renderJobs(root, { items: state.jobRows });
       return;
     }
     const preset = event.target.closest("[data-backtests-refresh-preset]");

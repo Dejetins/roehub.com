@@ -117,6 +117,8 @@ class BacktestJobTableFiltersResponse(BaseModel):
     state: str | None
     cursor: str | None
     query: str
+    exchange: str | None
+    market_type: str | None
     symbol: str | None
     launched_from: str | None
     launched_to: str | None
@@ -130,6 +132,8 @@ class BacktestJobTableRowResponse(BaseModel):
     job_id: str
     state: str
     strategy: str
+    exchange: str
+    market_type: str
     symbol: str
     created_at: str
     indicator_summary: str

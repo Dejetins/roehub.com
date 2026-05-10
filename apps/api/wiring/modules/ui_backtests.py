@@ -129,6 +129,8 @@ class BacktestWorkstationQueryService:
         cursor: str | None,
         state: str | None,
         query: str,
+        exchange: str | None,
+        market_type: str | None,
         symbol: str | None,
         launched_from: str | None,
         launched_to: str | None,
@@ -146,6 +148,8 @@ class BacktestWorkstationQueryService:
             state=state,
             cursor=cursor,
             query=query,
+            exchange=exchange,
+            market_type=market_type,
             symbol=symbol,
             launched_from=launched_from,
             launched_to=launched_to,
@@ -220,6 +224,8 @@ class BacktestWorkstationQueryService:
         state: str | None,
         cursor: str | None,
         query: str,
+        exchange: str | None,
+        market_type: str | None,
         symbol: str | None,
         launched_from: str | None,
         launched_to: str | None,
@@ -228,6 +234,8 @@ class BacktestWorkstationQueryService:
             state=state,
             cursor=cursor,
             query=query,
+            exchange=exchange,
+            market_type=market_type,
             symbol=symbol,
             launched_from=launched_from,
             launched_to=launched_to,
@@ -259,6 +267,12 @@ class BacktestWorkstationQueryService:
                 if normalized_query in row.job_id.casefold()
                 or normalized_query in row.strategy.casefold()
                 or normalized_query in row.indicator_summary.casefold()
+            ]
+        if exchange:
+            rows = [row for row in rows if row.exchange.casefold() == exchange.casefold()]
+        if market_type:
+            rows = [
+                row for row in rows if row.market_type.casefold() == market_type.casefold()
             ]
         if symbol:
             rows = [row for row in rows if row.symbol.casefold() == symbol.casefold()]
@@ -522,6 +536,8 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
         job_id=str(item.get("job_id") or ""),
         state=str(item.get("state") or "unknown"),
         strategy=_DEFAULT_STRATEGY,
+        exchange=str(coordinates.get("exchange") or "--"),
+        market_type=str(coordinates.get("market_type") or "--"),
         symbol=str(coordinates.get("symbol") or "--"),
         created_at=str(item.get("created_at") or ""),
         indicator_summary=", ".join(

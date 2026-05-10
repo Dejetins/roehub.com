@@ -458,12 +458,14 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         'data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"'
         in response.text
     )
-    assert "data-result-state" in response.text
-    assert "data-result-chart" in response.text
-    assert "data-trades-rows" in response.text
+    assert "data-result-state" not in response.text
+    assert "data-result-chart" not in response.text
+    assert "data-trades-rows" not in response.text
     assert "data-indicator-add-menu" in response.text
     assert "data-risk-grid" in response.text
     assert "data-job-picker-menu" in response.text
+    assert "data-backtest-option=\"job_exchange\"" in response.text
+    assert "data-backtest-option=\"job_market_type\"" in response.text
     assert "data-job-launched-from" in response.text
     assert "data-job-symbol" in response.text
     assert "/assets/css/pages/backtests.css" in response.text
@@ -741,8 +743,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "hiddenTabPause" in backtests_js
     assert "manualRefreshRetrySeconds" in backtests_js
     assert "button.disabled = isRunning;" in backtests_js
-    assert "renderBacktestSeries" in backtests_js
-    assert "/trades?page=" in backtests_js
+    assert "renderBacktestSeries" not in backtests_js
+    assert "/trades?page=" not in backtests_js
     assert "trades.csv" in backtests_js
     assert "activeResultRequest" in backtests_js
     assert "backtest_ui.js" not in backtests_js

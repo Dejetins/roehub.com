@@ -79,12 +79,14 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["job_table"]["filters"]["state"] == "succeeded"
     assert payload["job_table"]["filters"]["query"] == "mean"
     assert payload["job_table"]["items"][0]["job_id"] == created.job.job_id
+    assert payload["job_table"]["items"][0]["exchange"] == "binance"
+    assert payload["job_table"]["items"][0]["market_type"] == "spot"
     assert payload["refresh_control"]["manual"] is True
     assert payload["refresh_control"]["default_preset"] == "15s"
     assert "trades" not in payload["job_table"]["items"][0]
 
 
-def test_get_backtest_workstation_filters_jobs_by_symbol_and_launched_date() -> None:
+def test_get_backtest_workstation_filters_jobs_by_exchange_market_symbol_date() -> None:
     repository = _FakeJobRepository()
     jobs_use_case = _build_jobs_use_case(repository=repository)
     client = _build_client(jobs_use_case=jobs_use_case)
@@ -108,13 +110,16 @@ def test_get_backtest_workstation_filters_jobs_by_symbol_and_launched_date() -> 
     response = client.get(
         (
             "/ui/backtests/workstation"
-            f"?symbol=ETHUSDT&launched_from={launched_date}&launched_to={launched_date}"
+            f"?exchange=binance&market_type=spot&symbol=ETHUSDT"
+            f"&launched_from={launched_date}&launched_to={launched_date}"
         ),
         headers={"x-user-id": str(_USER_ID)},
     )
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["job_table"]["filters"]["exchange"] == "binance"
+    assert payload["job_table"]["filters"]["market_type"] == "spot"
     assert payload["job_table"]["filters"]["symbol"] == "ETHUSDT"
     assert payload["job_table"]["filters"]["launched_from"] == launched_date
     assert payload["job_table"]["filters"]["launched_to"] == launched_date

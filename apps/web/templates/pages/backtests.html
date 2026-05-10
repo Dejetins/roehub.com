@@ -229,6 +229,46 @@
             <input class="backtests-input backtests-input--search" type="search" placeholder="{{ t('backtests.results.search') }}" data-job-search aria-label="{{ t('backtests.results.search') }}">
             <input class="backtests-input backtests-input--date" type="date" data-job-launched-from aria-label="{{ t('backtests.results.launched_from') }}">
             <input class="backtests-input backtests-input--date" type="date" data-job-launched-to aria-label="{{ t('backtests.results.launched_to') }}">
+            <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="backtest-job-exchange-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="backtest-job-exchange-menu"
+                data-rh-dropdown-trigger
+                data-backtest-control="branded dropdown"
+              >
+                {{ t("backtests.results.exchange") }}
+                <span class="rh-dropdown__value" data-current-value="job_exchange">{{ t("backtests.results.all") }}</span>
+              </button>
+              <span class="rh-popover" id="backtest-job-exchange-menu" role="listbox" hidden data-rh-dropdown-menu>
+                {% for value, label in [("", t("backtests.results.all")), ("binance", "Binance")] %}
+                  <button class="rh-menu-item" type="button" role="option" aria-selected="{{ 'true' if loop.first else 'false' }}" data-backtest-option="job_exchange" data-value="{{ value }}">{{ label }}</button>
+                {% endfor %}
+              </span>
+            </div>
+            <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="backtest-job-market-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="backtest-job-market-menu"
+                data-rh-dropdown-trigger
+                data-backtest-control="branded dropdown"
+              >
+                {{ t("backtests.results.market") }}
+                <span class="rh-dropdown__value" data-current-value="job_market_type">{{ t("backtests.results.all") }}</span>
+              </button>
+              <span class="rh-popover" id="backtest-job-market-menu" role="listbox" hidden data-rh-dropdown-menu>
+                {% for value, label in [("", t("backtests.results.all")), ("spot", "Spot")] %}
+                  <button class="rh-menu-item" type="button" role="option" aria-selected="{{ 'true' if loop.first else 'false' }}" data-backtest-option="job_market_type" data-value="{{ value }}">{{ label }}</button>
+                {% endfor %}
+              </span>
+            </div>
             <input class="backtests-input backtests-input--symbol" type="search" placeholder="{{ t('backtests.results.instrument') }}" data-job-symbol aria-label="{{ t('backtests.results.instrument') }}">
             <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
               <button
@@ -266,78 +306,18 @@
                 <th>#</th>
                 <th>{{ t("backtests.results.strategy") }}</th>
                 <th>{{ t("backtests.results.launched") }}</th>
+                <th>{{ t("backtests.results.exchange") }}</th>
+                <th>{{ t("backtests.results.market") }}</th>
                 <th>{{ t("backtests.results.instrument") }}</th>
                 <th>{{ t("backtests.results.indicators") }}</th>
                 <th>{{ t("backtests.results.period") }}</th>
                 <th>{{ t("backtests.results.direction") }}</th>
                 <th>{{ t("backtests.results.combinations") }}</th>
-                <th>{{ t("backtests.results.return") }}</th>
-                <th>{{ t("backtests.results.sharpe") }}</th>
-                <th>{{ t("backtests.results.drawdown") }}</th>
-                <th>{{ t("backtests.results.profit_factor") }}</th>
-                <th>{{ t("backtests.results.win_rate") }}</th>
-                <th>{{ t("backtests.results.trades") }}</th>
                 <th>{{ t("backtests.results.status") }}</th>
               </tr>
             </thead>
             <tbody data-job-rows></tbody>
           </table>
-        </div>
-        <div class="backtests-result-state" data-result-state hidden>
-          <div class="backtests-result-summary">
-            <div>
-              <span>{{ t("backtests.detail.selected_job") }}</span>
-              <strong data-result-job>--</strong>
-            </div>
-            <div>
-              <span>{{ t("backtests.detail.selected_variant") }}</span>
-              <strong data-result-variant>--</strong>
-            </div>
-            <div>
-              <span>{{ t("backtests.detail.return") }}</span>
-              <strong data-result-return>--</strong>
-            </div>
-            <div>
-              <span>{{ t("backtests.detail.sharpe") }}</span>
-              <strong data-result-sharpe>--</strong>
-            </div>
-            <a class="rh-button rh-button--secondary rh-button--compact" href="#" data-result-csv>{{ t("backtests.detail.csv") }}</a>
-          </div>
-          <div class="backtests-variant-strip" data-result-variants></div>
-          <div class="backtests-result-body">
-            <section class="backtests-chart-panel" aria-label="{{ t('backtests.detail.equity') }}">
-              <header class="backtests-chart-tabs">
-                <button class="rh-button rh-button--primary rh-button--compact" type="button" data-chart-kind="equity">{{ t("backtests.detail.equity") }}</button>
-                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-chart-kind="drawdown">{{ t("backtests.detail.drawdown") }}</button>
-                <output data-chart-status>{{ t("backtests.detail.loading") }}</output>
-              </header>
-              <canvas class="backtests-chart" width="640" height="220" data-result-chart></canvas>
-            </section>
-            <section class="backtests-trades-panel">
-              <header class="backtests-trades-header">
-                <h3>{{ t("backtests.detail.trades") }}</h3>
-                <div class="backtests-trades-actions">
-                  <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-prev>{{ t("pagination.previous") }}</button>
-                  <output data-trades-page>--</output>
-                  <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-next>{{ t("pagination.next") }}</button>
-                </div>
-              </header>
-              <div class="backtests-table-wrap backtests-table-wrap--trades">
-                <table class="backtests-table backtests-table--trades">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>{{ t("backtests.detail.side") }}</th>
-                      <th>{{ t("backtests.detail.exit") }}</th>
-                      <th>{{ t("backtests.detail.pnl") }}</th>
-                      <th>{{ t("backtests.detail.return") }}</th>
-                    </tr>
-                  </thead>
-                  <tbody data-trades-rows></tbody>
-                </table>
-              </div>
-            </section>
-          </div>
         </div>
       </section>
     </div>
