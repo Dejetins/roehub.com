@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import FastAPI
@@ -51,9 +52,24 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert "preset" not in payload["config_draft"]
     assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    assert payload["config_draft"]["time_range"]["end"].startswith(
+        (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    )
+    assert payload["config_draft"]["indicators"] == [
+        {
+            "indicator_id": "ma.dema",
+            "params": {"window": {"start": 5, "stop": 200, "step": 1}},
+            "window": {"start": 5, "stop": 200, "step": 1},
+            "sources": ["close"],
+        }
+    ]
     assert payload["indicator_catalog"]["items"]
     assert payload["indicator_catalog"]["items"][0]["family"]
     assert payload["indicator_catalog"]["items"][0]["param_specs"]["params"]
+    ma_ema = next(
+        row for row in payload["indicator_catalog"]["items"] if row["indicator_id"] == "ma.ema"
+    )
+    assert ma_ema["label"] == "EMA"
     trend_adx = next(
         row for row in payload["indicator_catalog"]["items"] if row["indicator_id"] == "trend.adx"
     )

@@ -348,13 +348,20 @@ def _source(
 
 def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfigDraftResponse:
     indicator_ids = list(runtime_defaults.get("supported_indicator_ids") or [])
+    indicator_sources = dict(runtime_defaults.get("indicator_sources") or {})
+    indicator_param_specs = dict(runtime_defaults.get("indicator_param_specs") or {})
     ranking_default = dict(runtime_defaults.get("ranking_default") or {})
     execution_defaults = dict(runtime_defaults.get("execution_defaults") or {})
+    default_end = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
     return BacktestConfigDraftResponse(
         coordinates={"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"},
         timeframe=_first(runtime_defaults.get("supported_timeframes"), default="15m"),
-        time_range={"start": "2023-01-01T00:00:00Z", "end": "2024-01-01T00:00:00Z"},
-        indicators=_default_indicator_grid(indicator_ids=indicator_ids),
+        time_range={"start": "2023-01-01T00:00:00Z", "end": f"{default_end}T00:00:00Z"},
+        indicators=_default_indicator_grid(
+            indicator_ids=indicator_ids,
+            indicator_sources=indicator_sources,
+            indicator_param_specs=indicator_param_specs,
+        ),
         risk={"mode": _first(runtime_defaults.get("risk_modes"), default="none")},
         execution={
             "direction_mode": _first(
@@ -541,29 +548,53 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
     )
 
 
-def _default_indicator_grid(*, indicator_ids: list[str]) -> list[dict[str, Any]]:
-    selected = indicator_ids[:2] or ["ma.dema"]
-    return [
-        {
+def _default_indicator_grid(
+    *,
+    indicator_ids: list[str],
+    indicator_sources: Mapping[str, Any],
+    indicator_param_specs: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    selected = ["ma.dema"] if "ma.dema" in indicator_ids else indicator_ids[:1] or ["ma.dema"]
+    rows: list[dict[str, Any]] = []
+    for indicator_id in selected:
+        spec = dict(indicator_param_specs.get(indicator_id) or {})
+        params = dict(spec.get("params") or {})
+        row: dict[str, Any] = {
             "indicator_id": indicator_id,
-            "sources": ["close"],
-            "window": {"start": 5 + index * 3, "stop": 30 + index * 5, "step": 2},
+            "params": {
+                name: _default_param_value(param_spec)
+                for name, param_spec in params.items()
+                if isinstance(param_spec, Mapping)
+            },
         }
-        for index, indicator_id in enumerate(selected)
-    ]
+        window = row["params"].get("window")
+        if isinstance(window, Mapping):
+            row["window"] = {
+                "start": window.get("start"),
+                "stop": window.get("stop"),
+                "step": window.get("step"),
+            }
+        sources = list(indicator_sources.get(indicator_id) or [])
+        if sources:
+            row["sources"] = [sources[0]]
+        rows.append(row)
+    return rows
+
+
+def _default_param_value(spec: Mapping[str, Any]) -> dict[str, Any] | int | float | str | None:
+    mode = spec.get("mode")
+    if mode == "range":
+        return {
+            "start": spec.get("start"),
+            "stop": spec.get("stop_incl"),
+            "step": spec.get("step"),
+        }
+    values = list(spec.get("values") or [])
+    return values[0] if values else None
 
 
 def _indicator_label(indicator_id: str) -> str:
-    labels = {
-        "rsi": "RSI",
-        "macd": "MACD",
-        "bbands": "Bollinger Bands",
-        "ma.ema": "EMA Cross",
-        "ma.dema": "DEMA",
-        "atr": "ATR",
-        "stoch": "Stochastic",
-    }
-    return labels.get(indicator_id, indicator_id.replace(".", " ").upper())
+    return indicator_id.rsplit(".", maxsplit=1)[-1].replace("_", " ").upper()
 
 
 def _first(value: Any, *, default: str) -> str:

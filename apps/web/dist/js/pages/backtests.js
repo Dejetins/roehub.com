@@ -33,6 +33,7 @@ const state = {
   selectedSymbols: new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]),
   selectedIndicators: [],
   indicatorCatalog: new Map(),
+  indicatorFamily: null,
   jobRows: [],
   selectedJobId: null,
   selectedVariantKey: null,
@@ -102,6 +103,22 @@ function labelForId(value) {
 
 function primaryWindowSpec(catalogItem) {
   return catalogItem?.param_specs?.params?.window || {};
+}
+
+function specMin(spec) {
+  if (spec?.mode === "explicit") {
+    const values = (spec.values || []).map(Number).filter(Number.isFinite);
+    return values.length ? Math.min(...values) : 1;
+  }
+  return rangeDefault(spec, "start", 1);
+}
+
+function specMax(spec) {
+  if (spec?.mode === "explicit") {
+    const values = (spec.values || []).map(Number).filter(Number.isFinite);
+    return values.length ? Math.max(...values) : 999;
+  }
+  return rangeDefault(spec, "stop_incl", 999);
 }
 
 function rangeDefault(spec, key, fallback) {
@@ -287,7 +304,36 @@ function renderRuntimeControls(root, data) {
     label: labelForId(value),
   })));
   seedRiskPanel(root, runtime.hit_times_grid || {});
+  seedConfigDraft(root, data?.config_draft || {});
   updateRiskPanel(root);
+}
+
+function seedConfigDraft(root, draft) {
+  const fieldValues = {
+    symbol: draft?.coordinates?.symbol,
+    start: String(draft?.time_range?.start || "").slice(0, 10),
+    end: String(draft?.time_range?.end || "").slice(0, 10),
+    capital: draft?.execution?.initial_cash_quote,
+    fee: Number(draft?.execution?.fee_rate || 0) * 100,
+    slippage: Number(draft?.execution?.slippage_rate || 0) * 100,
+  };
+  Object.entries(fieldValues).forEach(([name, value]) => {
+    const field = qs(`[data-config-field='${name}']`, root);
+    if (field && value !== undefined && value !== null && value !== "") {
+      field.value = String(value);
+    }
+  });
+  if (draft?.timeframe) {
+    updateOptionSelection(root, "timeframe", draft.timeframe, draft.timeframe);
+  }
+  if (draft?.risk?.mode) {
+    updateOptionSelection(
+      root,
+      "risk_mode",
+      draft.risk.mode,
+      draft.risk.mode === "tp_sl_grid" ? t("backtests.option.tp_sl_grid") : t("backtests.option.no_risk")
+    );
+  }
 }
 
 function seedRiskPanel(root, grid) {
@@ -358,13 +404,14 @@ function filterSymbols(root, query) {
 }
 
 function renderIndicators(root, catalog) {
-  state.indicatorCatalog = new Map((catalog?.items || []).map((item) => [item.indicator_id, item]));
+  const items = catalog?.items || Array.from(state.indicatorCatalog.values());
+  state.indicatorCatalog = new Map(items.map((item) => [item.indicator_id, item]));
   if (!state.selectedIndicators.length) {
     state.selectedIndicators = (state.runtimeDefaults?.config_draft?.indicators || [])
       .map((indicator) => indicatorStateFromDraft(indicator))
       .filter(Boolean);
   }
-  renderIndicatorAddMenu(root, catalog?.items || []);
+  renderIndicatorAddMenu(root, items);
   const target = qs("[data-indicator-rows]", root);
   if (target) {
     const rows = state.selectedIndicators;
@@ -376,9 +423,9 @@ function renderIndicators(root, catalog) {
                 <strong>${escapeHtml(row.label)}</strong>
                 <small>${escapeHtml(row.indicator_id)}</small>
               </td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.unitStep)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
               <td>
                 <div class="backtests-source-list">
                   ${row.availableSources.length
@@ -409,6 +456,10 @@ function indicatorStateFromDraft(draft) {
     return null;
   }
   const spec = primaryWindowSpec(catalogItem);
+  const draftWindow = draft?.window || draft?.params?.window || {};
+  const start = draftWindow.start ?? rangeDefault(spec, "start", 5);
+  const stop = draftWindow.stop ?? draftWindow.stop_incl ?? rangeDefault(spec, "stop_incl", 30);
+  const step = draftWindow.step ?? rangeDefault(spec, "step", 1);
   return {
     indicator_id: catalogItem.indicator_id,
     label: catalogItem.label,
@@ -416,9 +467,12 @@ function indicatorStateFromDraft(draft) {
     availableSources: catalogItem.sources || [],
     sources: draft.sources || (catalogItem.sources?.[0] ? [catalogItem.sources[0]] : []),
     window: {
-      start: draft.window?.start ?? rangeDefault(spec, "start", 5),
-      stop: draft.window?.stop ?? rangeDefault(spec, "stop_incl", 30),
-      step: draft.window?.step ?? rangeDefault(spec, "step", 1),
+      start,
+      stop,
+      step,
+      min: specMin(spec),
+      max: specMax(spec),
+      unitStep: rangeDefault(spec, "step", 1),
     },
   };
 }
@@ -442,18 +496,35 @@ function renderIndicatorAddMenu(root, items) {
     const family = item.family || "other";
     groups.set(family, [...(groups.get(family) || []), item]);
   });
-  target.innerHTML = Array.from(groups.entries())
-    .map(([family, familyItems]) => `
-      <span class="backtests-menu-group">${escapeHtml(family)}</span>
-      ${familyItems
+  const families = Array.from(groups.keys()).sort();
+  if (!state.indicatorFamily || !groups.has(state.indicatorFamily)) {
+    state.indicatorFamily = families[0] || null;
+  }
+  const activeItems = groups.get(state.indicatorFamily) || [];
+  target.innerHTML = `
+    <div class="backtests-indicator-family-tabs" role="tablist" aria-label="${escapeHtml(t("backtests.indicators.family_tabs"))}">
+      ${families
+        .map((family) => `
+          <button
+            class="backtests-family-tab ${family === state.indicatorFamily ? "is-active" : ""}"
+            type="button"
+            role="tab"
+            aria-selected="${family === state.indicatorFamily ? "true" : "false"}"
+            data-indicator-family-tab="${escapeHtml(family)}"
+          >${escapeHtml(family)}</button>
+        `)
+        .join("")}
+    </div>
+    <div class="backtests-indicator-family-list" role="group" aria-label="${escapeHtml(state.indicatorFamily || "")}">
+      ${activeItems
         .map((item) => `
           <button class="rh-menu-item" type="button" role="option" data-add-indicator="${escapeHtml(item.indicator_id)}">
-            ${escapeHtml(item.label)} <small>${escapeHtml(item.indicator_id)}</small>
+            <strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.indicator_id)}</small>
           </button>
         `)
         .join("")}
-    `)
-    .join("");
+    </div>
+  `;
 }
 
 function indicatorCombinationCount() {
@@ -482,6 +553,7 @@ function renderOptimization(root, overview) {
   setText("[data-completed]", overview?.completed_jobs ?? 0, root);
   setText("[data-running]", overview?.running_jobs ?? 0, root);
   setText("[data-queued]", overview?.queued_jobs ?? 0, root);
+  setText("[data-progress-units]", `${overview?.processed_units || 0}/${overview?.total_units || 0}`, root);
 }
 
 function renderJobs(root, table) {
@@ -870,6 +942,12 @@ function bind(root) {
     const addIndicatorButton = event.target.closest("[data-add-indicator]");
     if (addIndicatorButton instanceof HTMLElement) {
       addIndicator(root, addIndicatorButton.dataset.addIndicator || "");
+      return;
+    }
+    const indicatorFamilyTab = event.target.closest("[data-indicator-family-tab]");
+    if (indicatorFamilyTab instanceof HTMLElement) {
+      state.indicatorFamily = indicatorFamilyTab.dataset.indicatorFamilyTab || state.indicatorFamily;
+      renderIndicatorAddMenu(root, Array.from(state.indicatorCatalog.values()));
       return;
     }
     const removeIndicatorButton = event.target.closest("[data-remove-indicator]");

@@ -186,11 +186,17 @@
 
       <section class="terminal-panel backtests-optimization" data-backtests-panel="optimization">
         <header class="panel-heading"><h2>{{ t("backtests.optimization.title") }}</h2></header>
-        <div class="backtests-progress-line">
-          <span data-progress-label>{{ t("backtests.optimization.awaiting") }}</span>
-          <strong data-progress-percent>0%</strong>
+        <div class="backtests-optimization-shell">
+          <div class="backtests-progress-head">
+            <span data-progress-label>{{ t("backtests.optimization.awaiting") }}</span>
+            <strong data-progress-percent>0%</strong>
+          </div>
+          <div class="backtests-progress-track" aria-label="{{ t('backtests.optimization.progress') }}"><span data-progress-bar></span></div>
+          <div class="backtests-progress-meta">
+            <span>{{ t("backtests.optimization.units") }}</span>
+            <strong data-progress-units>0/0</strong>
+          </div>
         </div>
-        <div class="backtests-progress-track"><span data-progress-bar></span></div>
         <div class="backtests-summary-counters">
           <div><span>{{ t("backtests.optimization.remaining") }}</span><strong data-remaining>--</strong></div>
           <div><span>{{ t("backtests.optimization.completed") }}</span><strong data-completed>0</strong></div>

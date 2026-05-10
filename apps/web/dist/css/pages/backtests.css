@@ -9,6 +9,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-x: hidden;
   color: var(--rh-text);
   font-family: var(--rh-font-mono);
 }
@@ -34,15 +35,18 @@
 .backtests-grid {
   display: grid;
   grid-template-columns: minmax(245px, 0.95fr) minmax(330px, 1.55fr) minmax(260px, 1fr) minmax(280px, 1.25fr);
-  grid-template-rows: minmax(330px, 38vh) minmax(112px, auto) minmax(520px, 1fr);
+  grid-template-rows: minmax(330px, 42fr) minmax(112px, auto) minmax(0, 48fr);
   gap: 6px;
+  height: calc(var(--rh-workarea-height) - 10px);
   min-width: 0;
+  min-height: 0;
 }
 
 .terminal-panel {
   display: grid;
   align-content: start;
   gap: 7px;
+  min-height: 0;
   min-width: 0;
   padding: 8px;
 }
@@ -93,13 +97,16 @@
 .backtests-optimization {
   grid-column: 2 / 5;
   grid-row: 2;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(320px, 1fr);
+  align-items: start;
 }
 
 .backtests-results {
   grid-column: 1 / 5;
   grid-row: 3;
-  grid-template-rows: auto minmax(210px, 0.8fr) minmax(280px, 1fr);
-  min-height: 520px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .backtests-form-grid {
@@ -325,6 +332,7 @@
 }
 
 .backtests-table-wrap--results {
+  min-height: 0;
   max-height: none;
   overflow: auto;
 }
@@ -337,22 +345,41 @@
   justify-content: space-between;
 }
 
-.backtests-progress-line {
-  justify-content: flex-start;
+.backtests-optimization .panel-heading {
+  grid-column: 1 / -1;
+}
+
+.backtests-optimization-shell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.backtests-progress-head,
+.backtests-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 10px;
-  color: var(--rh-accent-2);
+  color: var(--rh-muted);
+}
+
+.backtests-progress-head strong,
+.backtests-progress-meta strong {
+  color: var(--rh-accent);
 }
 
 .backtests-progress-track {
   width: min(520px, 100%);
-  height: 18px;
+  height: 14px;
   border: 1px solid var(--rh-line-muted);
-  padding: 2px;
+  padding: 1px;
   background:
     repeating-linear-gradient(
       90deg,
-      color-mix(in srgb, var(--rh-accent) 18%, transparent) 0 8px,
-      transparent 8px 12px
+      color-mix(in srgb, var(--rh-accent) 12%, transparent) 0 7px,
+      transparent 7px 11px
     );
 }
 
@@ -372,14 +399,17 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
+  min-width: 0;
 }
 
 .backtests-summary-counters div {
-  display: grid;
-  gap: 2px;
-  padding: 5px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 7px;
   border: 1px solid var(--rh-divider);
-  text-align: center;
 }
 
 .backtests-summary-counters span {
@@ -410,8 +440,10 @@
 }
 
 .backtests-input--axis {
+  width: 58px;
   min-height: 22px;
   padding: 2px 4px;
+  text-align: right;
 }
 
 .backtests-job-picker {
@@ -419,7 +451,58 @@
 }
 
 .backtests-indicator-picker {
-  width: 155px;
+  width: 170px;
+}
+
+.backtests-indicator-picker .rh-popover {
+  width: min(360px, 40vw);
+  max-height: 310px;
+  overflow: hidden;
+}
+
+.backtests-indicator-family-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 5px;
+  border-bottom: 1px solid var(--rh-divider);
+  overflow-x: auto;
+}
+
+.backtests-family-tab {
+  flex: 0 0 auto;
+  min-height: 22px;
+  border: 1px solid var(--rh-line-muted);
+  background: transparent;
+  color: var(--rh-accent);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.backtests-family-tab.is-active {
+  border-color: var(--rh-accent);
+  background: var(--rh-accent);
+  color: var(--rh-bg);
+}
+
+.backtests-indicator-family-list {
+  display: grid;
+  max-height: 250px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.backtests-indicator-family-list .rh-menu-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  text-align: left;
+}
+
+.backtests-indicator-family-list small {
+  color: var(--rh-muted);
 }
 
 .backtests-menu-group {
@@ -534,7 +617,14 @@
 }
 
 .backtests-table--indicators td:first-child {
-  min-width: 105px;
+  width: 110px;
+  min-width: 110px;
+}
+
+.backtests-table--indicators td:nth-child(2),
+.backtests-table--indicators td:nth-child(3),
+.backtests-table--indicators td:nth-child(4) {
+  width: 66px;
 }
 
 .backtests-table--indicators small {
@@ -547,7 +637,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .backtests-source-chip {
@@ -588,6 +678,7 @@
   .backtests-grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    height: auto;
   }
 
   .backtests-config,
@@ -601,6 +692,10 @@
   }
 
   .backtests-field {
+    grid-template-columns: 1fr;
+  }
+
+  .backtests-optimization {
     grid-template-columns: 1fr;
   }
 
