@@ -32,6 +32,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     execution_defaults: dict[str, Any]
     supported_indicator_ids: list[str]
     indicator_sources: dict[str, list[str]]
+    indicator_param_specs: dict[str, Any]
     hit_times_grid: dict[str, Any]
     links: dict[str, Any]
 

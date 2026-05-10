@@ -58,10 +58,12 @@ class BacktestIndicatorCatalogRowResponse(BaseModel):
 
     indicator_id: str
     label: str
+    family: str
     min_value: float | int | None
     max_value: float | int | None
     step: float | int | None
     sources: list[str]
+    param_specs: dict[str, Any]
     status: Literal["available", "disabled"] = "available"
 
 
@@ -115,6 +117,9 @@ class BacktestJobTableFiltersResponse(BaseModel):
     state: str | None
     cursor: str | None
     query: str
+    symbol: str | None
+    launched_from: str | None
+    launched_to: str | None
     limit: int
     sort: Literal["created_desc"]
 
@@ -125,6 +130,8 @@ class BacktestJobTableRowResponse(BaseModel):
     job_id: str
     state: str
     strategy: str
+    symbol: str
+    created_at: str
     indicator_summary: str
     period: str
     direction: str

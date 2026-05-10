@@ -56,6 +56,12 @@ def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
     assert "total_return_pct" in payload["ranking_metrics"]
     assert payload["top_n_default"] == 100
     assert payload["guardrails"]["max_top_n"] == 100
+    assert payload["indicator_param_specs"]["ma.dema"]["params"]["window"] == {
+        "mode": "range",
+        "start": 5,
+        "stop_incl": 200,
+        "step": 1,
+    }
 
 
 def test_post_backtest_preflight_returns_normalized_result_without_job_creation() -> None:

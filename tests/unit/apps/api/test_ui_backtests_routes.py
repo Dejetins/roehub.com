@@ -52,6 +52,12 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
     assert payload["indicator_catalog"]["items"]
+    assert payload["indicator_catalog"]["items"][0]["family"]
+    assert payload["indicator_catalog"]["items"][0]["param_specs"]["params"]
+    trend_adx = next(
+        row for row in payload["indicator_catalog"]["items"] if row["indicator_id"] == "trend.adx"
+    )
+    assert trend_adx["sources"] == []
     assert payload["optimization_overview"]["completed_jobs"] == 1
     assert payload["recent_events"]["items"]
     assert payload["job_table"]["filters"]["state"] == "succeeded"
@@ -60,6 +66,45 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["refresh_control"]["manual"] is True
     assert payload["refresh_control"]["default_preset"] == "15s"
     assert "trades" not in payload["job_table"]["items"][0]
+
+
+def test_get_backtest_workstation_filters_jobs_by_symbol_and_launched_date() -> None:
+    repository = _FakeJobRepository()
+    jobs_use_case = _build_jobs_use_case(repository=repository)
+    client = _build_client(jobs_use_case=jobs_use_case)
+
+    btc = jobs_use_case.create(
+        user_id=_USER_ID,
+        payload=_valid_request(),
+        idempotency_key="workstation-btc",
+    )
+    _complete_job(repository=repository, job_id=UUID(btc.job.job_id))
+    eth_request = _valid_request()
+    eth_request["coordinates"]["symbol"] = "ETHUSDT"
+    eth = jobs_use_case.create(
+        user_id=_USER_ID,
+        payload=eth_request,
+        idempotency_key="workstation-eth",
+    )
+    _complete_job(repository=repository, job_id=UUID(eth.job.job_id))
+    launched_date = eth.job.created_at.date().isoformat()
+
+    response = client.get(
+        (
+            "/ui/backtests/workstation"
+            f"?symbol=ETHUSDT&launched_from={launched_date}&launched_to={launched_date}"
+        ),
+        headers={"x-user-id": str(_USER_ID)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job_table"]["filters"]["symbol"] == "ETHUSDT"
+    assert payload["job_table"]["filters"]["launched_from"] == launched_date
+    assert payload["job_table"]["filters"]["launched_to"] == launched_date
+    assert [row["job_id"] for row in payload["job_table"]["items"]] == [eth.job.job_id]
+    assert payload["job_table"]["items"][0]["symbol"] == "ETHUSDT"
+    assert payload["job_table"]["items"][0]["created_at"].startswith(launched_date)
 
 
 def test_get_backtest_workstation_manual_refresh_rate_limit() -> None:

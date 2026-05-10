@@ -30,7 +30,14 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     ArtifactCoordinatesV2,
     artifact_market_id_from_coordinates_v2,
 )
-from trading.contexts.indicators.domain.specifications.grid_param_spec import GridValue
+from trading.contexts.indicators.domain.specifications import (
+    ExplicitValuesSpec,
+    RangeValuesSpec,
+)
+from trading.contexts.indicators.domain.specifications.grid_param_spec import (
+    GridParamSpec,
+    GridValue,
+)
 
 SUPPORTED_BACKTEST_TIMEFRAMES_V1: tuple[str, ...] = ("15m",)
 BACKTEST_RISK_MODES_V1: tuple[str, ...] = ("none", "tp_sl_grid")
@@ -127,6 +134,13 @@ class BacktestRuntimeDefaultsService:
             execution_defaults=self.runtime_config.execution_defaults,
             supported_indicator_ids=supported_indicator_ids,
             indicator_sources=indicator_sources,
+            indicator_param_specs={
+                indicator_id: _indicator_param_specs(
+                    indicator_id=indicator_id,
+                    defaults_provider=self.defaults_provider,
+                )
+                for indicator_id in supported_indicator_ids
+            },
             hit_times_grid={
                 "timeframe": "15m",
                 "tp_levels_pct": self.runtime_config.hit_times_tp_levels_pct,
@@ -137,6 +151,39 @@ class BacktestRuntimeDefaultsService:
                 "jobs": "/backtests/jobs",
             },
         )
+
+
+def _indicator_param_specs(
+    *,
+    indicator_id: str,
+    defaults_provider: BacktestGridDefaultsProvider,
+) -> dict[str, Any]:
+    grid = defaults_provider.compute_defaults(indicator_id=indicator_id)
+    if grid is None:
+        return {"params": {}, "inputs": {}}
+    inputs: dict[str, Any] = {}
+    if grid.source is not None:
+        inputs["source"] = _grid_param_spec_as_mapping(spec=grid.source)
+    return {
+        "params": {
+            name: _grid_param_spec_as_mapping(spec=spec)
+            for name, spec in sorted(grid.params.items())
+        },
+        "inputs": inputs,
+    }
+
+
+def _grid_param_spec_as_mapping(*, spec: GridParamSpec) -> dict[str, Any]:
+    if isinstance(spec, RangeValuesSpec):
+        return {
+            "mode": "range",
+            "start": spec.start,
+            "stop_incl": spec.stop_inclusive,
+            "step": spec.step,
+        }
+    if isinstance(spec, ExplicitValuesSpec):
+        return {"mode": "explicit", "values": list(spec.values)}
+    return {"mode": "explicit", "values": list(spec.materialize())}
 
 
 @dataclass(frozen=True, slots=True)

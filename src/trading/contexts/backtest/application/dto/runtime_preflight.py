@@ -110,6 +110,7 @@ class BacktestRuntimeDefaults:
     execution_defaults: BacktestExecutionDefaults
     supported_indicator_ids: tuple[str, ...]
     indicator_sources: Mapping[str, tuple[str, ...]]
+    indicator_param_specs: JsonMapping
     hit_times_grid: JsonMapping
     links: JsonMapping
 
@@ -129,6 +130,7 @@ class BacktestRuntimeDefaults:
                 indicator_id: list(values)
                 for indicator_id, values in sorted(self.indicator_sources.items())
             },
+            "indicator_param_specs": dict(self.indicator_param_specs),
             "hit_times_grid": dict(self.hit_times_grid),
             "links": dict(self.links),
         }

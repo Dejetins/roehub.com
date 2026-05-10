@@ -19,6 +19,9 @@ class BacktestWorkstationService(Protocol):
         cursor: str | None,
         state: str | None,
         query: str,
+        symbol: str | None,
+        launched_from: str | None,
+        launched_to: str | None,
         refresh: Literal["initial", "auto", "manual"],
     ) -> BacktestWorkstationResponse:
         ...
@@ -53,17 +56,26 @@ def build_ui_backtests_router(
         cursor: str | None = Query(default=None),
         state: str | None = Query(default=None),
         query: str = Query(default=""),
+        symbol: str | None = Query(default=None),
+        launched_from: str | None = Query(default=None),
+        launched_to: str | None = Query(default=None),
         refresh: Literal["initial", "auto", "manual"] = Query(default="initial"),
         principal: CurrentUserPrincipal = Depends(require_backtest_workstation_user),
     ) -> BacktestWorkstationResponse:
         normalized_cursor = cursor.strip() if cursor else None
         normalized_state = state.strip() if state else None
         normalized_query = query.strip()
+        normalized_symbol = symbol.strip().upper() if symbol else None
+        normalized_launched_from = launched_from.strip() if launched_from else None
+        normalized_launched_to = launched_to.strip() if launched_to else None
         return workstation_service.get_workstation(
             principal=principal,
             cursor=normalized_cursor or None,
             state=normalized_state or None,
             query=normalized_query,
+            symbol=normalized_symbol or None,
+            launched_from=normalized_launched_from or None,
+            launched_to=normalized_launched_to or None,
             refresh=refresh,
         )
 

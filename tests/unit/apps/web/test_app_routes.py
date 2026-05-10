@@ -457,6 +457,11 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-result-state" in response.text
     assert "data-result-chart" in response.text
     assert "data-trades-rows" in response.text
+    assert "data-indicator-add-menu" in response.text
+    assert "data-risk-grid" in response.text
+    assert "data-job-picker-menu" in response.text
+    assert "data-job-launched-from" in response.text
+    assert "data-job-symbol" in response.text
     assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' not in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text

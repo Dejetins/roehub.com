@@ -129,6 +129,9 @@ class BacktestWorkstationQueryService:
         cursor: str | None,
         state: str | None,
         query: str,
+        symbol: str | None,
+        launched_from: str | None,
+        launched_to: str | None,
         refresh: Literal["initial", "auto", "manual"],
     ) -> BacktestWorkstationResponse:
         generated_at = datetime.now(UTC)
@@ -143,6 +146,9 @@ class BacktestWorkstationQueryService:
             state=state,
             cursor=cursor,
             query=query,
+            symbol=symbol,
+            launched_from=launched_from,
+            launched_to=launched_to,
         )
         optimization = _build_optimization_overview(job_table=job_table)
         sources = [
@@ -214,11 +220,17 @@ class BacktestWorkstationQueryService:
         state: str | None,
         cursor: str | None,
         query: str,
+        symbol: str | None,
+        launched_from: str | None,
+        launched_to: str | None,
     ) -> BacktestJobTableResponse:
         filters = BacktestJobTableFiltersResponse(
             state=state,
             cursor=cursor,
             query=query,
+            symbol=symbol,
+            launched_from=launched_from,
+            launched_to=launched_to,
             limit=_JOB_TABLE_LIMIT,
             sort="created_desc",
         )
@@ -248,6 +260,12 @@ class BacktestWorkstationQueryService:
                 or normalized_query in row.strategy.casefold()
                 or normalized_query in row.indicator_summary.casefold()
             ]
+        if symbol:
+            rows = [row for row in rows if row.symbol.casefold() == symbol.casefold()]
+        if launched_from:
+            rows = [row for row in rows if row.created_at[:10] >= launched_from]
+        if launched_to:
+            rows = [row for row in rows if row.created_at[:10] <= launched_to]
         return BacktestJobTableResponse(
             source=_JOB_SOURCE,
             state="ready" if rows else "empty",
@@ -389,23 +407,41 @@ def _build_indicator_catalog(
     runtime_defaults: Mapping[str, Any],
 ) -> BacktestIndicatorCatalogResponse:
     indicator_sources = dict(runtime_defaults.get("indicator_sources") or {})
+    indicator_param_specs = dict(runtime_defaults.get("indicator_param_specs") or {})
     indicator_ids = list(runtime_defaults.get("supported_indicator_ids") or [])
     rows = [
-        BacktestIndicatorCatalogRowResponse(
+        _build_indicator_catalog_row(
             indicator_id=indicator_id,
-            label=_indicator_label(indicator_id),
-            min_value=5 if index % 2 == 0 else 1.5,
-            max_value=50 if index % 2 == 0 else 3.0,
-            step=2 if index % 2 == 0 else 0.5,
-            sources=list(indicator_sources.get(indicator_id) or ["close"]),
+            sources=list(indicator_sources.get(indicator_id) or []),
+            param_specs=dict(indicator_param_specs.get(indicator_id) or {}),
         )
-        for index, indicator_id in enumerate(indicator_ids[:8])
+        for indicator_id in indicator_ids
     ]
     return BacktestIndicatorCatalogResponse(
         source="runtime_defaults",
         state="ready" if rows else "empty",
         items=rows,
         total_combinations_estimate=max(1, len(rows)) * 3600,
+    )
+
+
+def _build_indicator_catalog_row(
+    *,
+    indicator_id: str,
+    sources: list[str],
+    param_specs: Mapping[str, Any],
+) -> BacktestIndicatorCatalogRowResponse:
+    params = dict(param_specs.get("params") or {})
+    primary_spec = dict(params.get("window") or next(iter(params.values()), {}))
+    return BacktestIndicatorCatalogRowResponse(
+        indicator_id=indicator_id,
+        label=_indicator_label(indicator_id),
+        family=indicator_id.split(".", maxsplit=1)[0] if "." in indicator_id else "other",
+        min_value=primary_spec.get("start"),
+        max_value=primary_spec.get("stop_incl"),
+        step=primary_spec.get("step"),
+        sources=sources,
+        param_specs=dict(param_specs),
     )
 
 
@@ -468,6 +504,7 @@ def _build_recent_events(
 
 def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
     request = dict(item.get("request") or {})
+    coordinates = dict(request.get("coordinates") or {})
     execution = dict(request.get("execution") or {})
     indicators = list(request.get("indicators") or [])
     progress = dict(item.get("progress") or {})
@@ -478,6 +515,8 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
         job_id=str(item.get("job_id") or ""),
         state=str(item.get("state") or "unknown"),
         strategy=_DEFAULT_STRATEGY,
+        symbol=str(coordinates.get("symbol") or "--"),
+        created_at=str(item.get("created_at") or ""),
         indicator_summary=", ".join(
             _indicator_label(str(row.get("indicator_id") or "")) for row in indicators
         )

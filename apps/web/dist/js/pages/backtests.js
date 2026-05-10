@@ -24,9 +24,16 @@ const state = {
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
   job_state: "",
+  job_symbol: "",
+  launched_from: "",
+  launched_to: "",
   cursor: null,
   query: "",
   runtimeDefaults: null,
+  selectedSymbols: new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]),
+  selectedIndicators: [],
+  indicatorCatalog: new Map(),
+  jobRows: [],
   selectedJobId: null,
   selectedVariantKey: null,
   resultSummary: null,
@@ -86,6 +93,36 @@ function numberOrDash(value) {
   return String(value);
 }
 
+function labelForId(value) {
+  return String(value || "")
+    .replaceAll(".", " ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function primaryWindowSpec(catalogItem) {
+  return catalogItem?.param_specs?.params?.window || {};
+}
+
+function rangeDefault(spec, key, fallback) {
+  const value = spec?.[key];
+  return value === null || value === undefined ? fallback : value;
+}
+
+function countRange(start, stop, step) {
+  const from = Number(start);
+  const to = Number(stop);
+  const stride = Number(step);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(stride) || stride <= 0 || from > to) {
+    return 0;
+  }
+  return Math.floor((to - from) / stride) + 1;
+}
+
+function formatDate(value) {
+  return value ? String(value).slice(0, 10) : "--";
+}
+
 function compactId(value) {
   return value ? String(value).slice(0, 8) : "--";
 }
@@ -117,7 +154,10 @@ function financialClass(value) {
 
 function selectedSymbols(root) {
   const selected = qsa("[data-symbol-checkbox]:checked", root).map((item) => item.value);
-  return selected.length ? selected : [state.symbol || "BTCUSDT"];
+  if (selected.length) {
+    state.selectedSymbols = new Set(selected);
+  }
+  return selected.length ? selected : Array.from(state.selectedSymbols || [state.symbol || "BTCUSDT"]);
 }
 
 function buildRequestPayload(root) {
@@ -126,19 +166,42 @@ function buildRequestPayload(root) {
   const capital = Number(qs("[data-config-field='capital']", root)?.value || 10000);
   const feePercent = Number(qs("[data-config-field='fee']", root)?.value || 0.075);
   const slippagePercent = Number(qs("[data-config-field='slippage']", root)?.value || 0.01);
-  const indicators = (state.runtimeDefaults?.config_draft?.indicators || [
-    {
-      indicator_id: "ma.dema",
-      sources: ["close"],
-      window: { start: 5, stop: 30, step: 2 },
-    },
-  ]).slice(0, 4);
+  const indicators = state.selectedIndicators.length
+    ? state.selectedIndicators.map((indicator) => ({
+        indicator_id: indicator.indicator_id,
+        sources: indicator.sources.length ? indicator.sources : undefined,
+        window: {
+          start: Number(indicator.window.start),
+          stop: Number(indicator.window.stop),
+          step: Number(indicator.window.step),
+        },
+      }))
+    : (state.runtimeDefaults?.config_draft?.indicators || [
+        {
+          indicator_id: "ma.dema",
+          sources: ["close"],
+          window: { start: 5, stop: 30, step: 2 },
+        },
+      ]).slice(0, 4);
+  const risk = { mode: state.risk_mode };
+  if (state.risk_mode === "tp_sl_grid") {
+    risk.tp = {
+      start_pct: Number(qs("[data-risk-field='tp_start']", root)?.value || 0.5),
+      stop_pct: Number(qs("[data-risk-field='tp_stop']", root)?.value || 1),
+      step_pct: Number(qs("[data-risk-field='tp_step']", root)?.value || 0.5),
+    };
+    risk.sl = {
+      start_pct: Number(qs("[data-risk-field='sl_start']", root)?.value || 0.5),
+      stop_pct: Number(qs("[data-risk-field='sl_stop']", root)?.value || 1),
+      step_pct: Number(qs("[data-risk-field='sl_step']", root)?.value || 0.5),
+    };
+  }
 
   return {
     coordinates: {
       exchange: state.market,
       market_type: state.market_type,
-      symbol: selectedSymbols(root)[0],
+      symbol: selectedSymbols(root)[0] || state.symbol || "BTCUSDT",
     },
     timeframe: state.timeframe,
     time_range: {
@@ -146,7 +209,7 @@ function buildRequestPayload(root) {
       end: dateToIso(end, "2024-01-01T00:00:00Z"),
     },
     indicators,
-    risk: { mode: state.risk_mode },
+    risk,
     execution: {
       direction_mode: state.direction,
       fee_rate: feePercent / 100,
@@ -176,17 +239,95 @@ function updateOptionSelection(root, name, value, label) {
   if (name === "job_state") {
     refreshWorkstation(root, "manual").catch(() => {});
   }
+  if (name === "risk_mode") {
+    updateRiskPanel(root);
+  }
+}
+
+function renderDropdownOptions(root, name, options) {
+  const menu = qs(`#backtest-${name}-menu`, root);
+  if (!menu || !Array.isArray(options) || !options.length) {
+    return;
+  }
+  menu.innerHTML = options
+    .map((option, index) => `
+      <button
+        class="rh-menu-item"
+        type="button"
+        role="option"
+        aria-selected="${index === 0 ? "true" : "false"}"
+        data-backtest-option="${escapeHtml(name)}"
+        data-value="${escapeHtml(option.value)}"
+      >${escapeHtml(option.label || option.value)}</button>
+    `)
+    .join("");
+  if (!options.some((option) => option.value === state[name])) {
+    updateOptionSelection(root, name, options[0].value, options[0].label || options[0].value);
+  }
+}
+
+function renderRuntimeControls(root, data) {
+  const runtime = data?.runtime_defaults || {};
+  const universe = data?.instrument_universe || {};
+  renderDropdownOptions(root, "market", universe.markets || []);
+  renderDropdownOptions(root, "market_type", universe.market_types || []);
+  renderDropdownOptions(root, "timeframe", (universe.timeframes || runtime.supported_timeframes || []).map((item) => (
+    typeof item === "string" ? { value: item, label: item } : item
+  )));
+  renderDropdownOptions(root, "direction", (runtime.direction_modes || []).map((value) => ({
+    value,
+    label: value === "long_only" ? t("backtests.option.long_only") : t("backtests.option.long_short"),
+  })));
+  renderDropdownOptions(root, "risk_mode", (runtime.risk_modes || []).map((value) => ({
+    value,
+    label: value === "tp_sl_grid" ? t("backtests.option.tp_sl_grid") : t("backtests.option.no_risk"),
+  })));
+  renderDropdownOptions(root, "ranking_metric", (runtime.ranking_metrics || []).map((value) => ({
+    value,
+    label: labelForId(value),
+  })));
+  seedRiskPanel(root, runtime.hit_times_grid || {});
+  updateRiskPanel(root);
+}
+
+function seedRiskPanel(root, grid) {
+  const tp = grid.tp_levels_pct || [];
+  const sl = grid.sl_levels_pct || [];
+  const defaults = {
+    tp_start: tp[0] ?? 0.5,
+    tp_stop: tp[Math.min(1, Math.max(0, tp.length - 1))] ?? tp[0] ?? 1,
+    tp_step: tp.length > 1 ? Number(tp[1]) - Number(tp[0]) : tp[0] ?? 0.5,
+    sl_start: sl[0] ?? 0.5,
+    sl_stop: sl[Math.min(1, Math.max(0, sl.length - 1))] ?? sl[0] ?? 1,
+    sl_step: sl.length > 1 ? Number(sl[1]) - Number(sl[0]) : sl[0] ?? 0.5,
+  };
+  Object.entries(defaults).forEach(([key, value]) => {
+    const field = qs(`[data-risk-field='${key}']`, root);
+    if (field && !field.value) {
+      field.value = String(value);
+    }
+  });
+}
+
+function updateRiskPanel(root) {
+  const riskGrid = qs("[data-risk-grid]", root);
+  if (riskGrid) {
+    riskGrid.hidden = state.risk_mode !== "tp_sl_grid";
+  }
 }
 
 function renderSymbols(root, universe) {
   const target = qs("[data-symbol-list]", root);
   const selectedTarget = qs("[data-selected-symbols]", root);
   const symbols = universe?.symbols || [];
-  const selected = new Set(universe?.selected_symbols || ["BTCUSDT"]);
+  const selected = state.selectedSymbols?.size
+    ? state.selectedSymbols
+    : new Set(universe?.selected_symbols || ["BTCUSDT"]);
+  state.selectedSymbols = new Set(selected);
   if (target) {
     target.innerHTML = symbols
       .map((symbol) => `
-        <label class="backtests-symbol-row">
+        <label class="backtests-symbol-row" data-symbol-row data-symbol-label="${escapeHtml(symbol.label)}">
           <input type="checkbox" value="${escapeHtml(symbol.value)}" data-symbol-checkbox ${selected.has(symbol.value) ? "checked" : ""}>
           <span>${escapeHtml(symbol.label)}</span>
           <small>${escapeHtml(symbol.status)}</small>
@@ -194,33 +335,133 @@ function renderSymbols(root, universe) {
       `)
       .join("");
   }
+  renderSelectedSymbols(root);
+}
+
+function renderSelectedSymbols(root) {
+  const selectedTarget = qs("[data-selected-symbols]", root);
+  const selected = selectedSymbols(root);
   if (selectedTarget) {
-    selectedTarget.innerHTML = Array.from(selected)
+    selectedTarget.innerHTML = selected
       .map((symbol) => `<span class="backtests-chip">${escapeHtml(symbol)}</span>`)
       .join("");
   }
-  setText("[data-symbol-count]", t("backtests.instruments.count", { count: selected.size }), root);
+  setText("[data-symbol-count]", t("backtests.instruments.count", { count: selected.length }), root);
+}
+
+function filterSymbols(root, query) {
+  const normalized = String(query || "").trim().toLowerCase();
+  qsa("[data-symbol-row]", root).forEach((row) => {
+    const label = `${row.dataset.symbolLabel || ""} ${row.textContent || ""}`.toLowerCase();
+    row.hidden = normalized.length > 0 && !label.includes(normalized);
+  });
 }
 
 function renderIndicators(root, catalog) {
+  state.indicatorCatalog = new Map((catalog?.items || []).map((item) => [item.indicator_id, item]));
+  if (!state.selectedIndicators.length) {
+    state.selectedIndicators = (state.runtimeDefaults?.config_draft?.indicators || [])
+      .map((indicator) => indicatorStateFromDraft(indicator))
+      .filter(Boolean);
+  }
+  renderIndicatorAddMenu(root, catalog?.items || []);
   const target = qs("[data-indicator-rows]", root);
   if (target) {
-    const rows = catalog?.items || [];
+    const rows = state.selectedIndicators;
     target.innerHTML = rows.length
       ? rows
-          .map((row) => `
-            <tr>
-              <td>${escapeHtml(row.label)}</td>
-              <td>${numberOrDash(row.min_value)}</td>
-              <td>${numberOrDash(row.max_value)}</td>
-              <td>${numberOrDash(row.step)}</td>
-              <td>${escapeHtml((row.sources || []).join(", "))}</td>
+          .map((row, index) => `
+            <tr data-selected-indicator-index="${index}">
+              <td>
+                <strong>${escapeHtml(row.label)}</strong>
+                <small>${escapeHtml(row.indicator_id)}</small>
+              </td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
+              <td><input class="backtests-input backtests-input--axis" type="number" min="1" step="1" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
+              <td>
+                <div class="backtests-source-list">
+                  ${row.availableSources.length
+                    ? row.availableSources
+                        .map((source) => `
+                          <button
+                            class="backtests-source-chip ${row.sources.includes(source) ? "is-selected" : ""}"
+                            type="button"
+                            data-indicator-source="${escapeHtml(source)}"
+                          >${escapeHtml(source)}</button>
+                        `)
+                        .join("")
+                    : `<span class="backtests-muted">--</span>`}
+                </div>
+              </td>
+              <td><button class="rh-button rh-button--secondary rh-button--compact" type="button" data-remove-indicator>&times;</button></td>
             </tr>
           `)
           .join("")
-      : `<tr><td colspan="5">${escapeHtml(t("common.unavailable"))}</td></tr>`;
+      : `<tr><td colspan="6">${escapeHtml(t("common.unavailable"))}</td></tr>`;
   }
-  setText("[data-combinations-count]", catalog?.total_combinations_estimate ?? "--", root);
+  setText("[data-combinations-count]", indicatorCombinationCount(), root);
+}
+
+function indicatorStateFromDraft(draft) {
+  const catalogItem = state.indicatorCatalog.get(draft?.indicator_id);
+  if (!catalogItem) {
+    return null;
+  }
+  const spec = primaryWindowSpec(catalogItem);
+  return {
+    indicator_id: catalogItem.indicator_id,
+    label: catalogItem.label,
+    family: catalogItem.family,
+    availableSources: catalogItem.sources || [],
+    sources: draft.sources || (catalogItem.sources?.[0] ? [catalogItem.sources[0]] : []),
+    window: {
+      start: draft.window?.start ?? rangeDefault(spec, "start", 5),
+      stop: draft.window?.stop ?? rangeDefault(spec, "stop_incl", 30),
+      step: draft.window?.step ?? rangeDefault(spec, "step", 1),
+    },
+  };
+}
+
+function addIndicator(root, indicatorId) {
+  const catalogItem = state.indicatorCatalog.get(indicatorId);
+  if (!catalogItem) {
+    return;
+  }
+  state.selectedIndicators.push(indicatorStateFromDraft({ indicator_id: indicatorId }));
+  renderIndicators(root, { items: Array.from(state.indicatorCatalog.values()) });
+}
+
+function renderIndicatorAddMenu(root, items) {
+  const target = qs("[data-indicator-add-menu]", root);
+  if (!target) {
+    return;
+  }
+  const groups = new Map();
+  items.forEach((item) => {
+    const family = item.family || "other";
+    groups.set(family, [...(groups.get(family) || []), item]);
+  });
+  target.innerHTML = Array.from(groups.entries())
+    .map(([family, familyItems]) => `
+      <span class="backtests-menu-group">${escapeHtml(family)}</span>
+      ${familyItems
+        .map((item) => `
+          <button class="rh-menu-item" type="button" role="option" data-add-indicator="${escapeHtml(item.indicator_id)}">
+            ${escapeHtml(item.label)} <small>${escapeHtml(item.indicator_id)}</small>
+          </button>
+        `)
+        .join("")}
+    `)
+    .join("");
+}
+
+function indicatorCombinationCount() {
+  return state.selectedIndicators.reduce((total, indicator) => {
+    const windowCount = countRange(indicator.window.start, indicator.window.stop, indicator.window.step);
+    const sourceCount = Math.max(1, indicator.sources.length);
+    return total * Math.max(1, windowCount * sourceCount);
+  }, 1);
 }
 
 function renderOptimization(root, overview) {
@@ -249,16 +490,20 @@ function renderJobs(root, table) {
     return;
   }
   const rows = table?.items || [];
+  state.jobRows = rows;
+  renderJobPicker(root, rows);
   if (!rows.length) {
-    target.innerHTML = `<tr><td colspan="13">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="15">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
     return;
   }
   target.innerHTML = rows
     .map(
       (row, index) => `
         <tr data-job-id="${escapeHtml(row.job_id)}" tabindex="0">
-          <td>${index + 1}</td>
+          <td>${state.selectedJobId === row.job_id ? "v" : ">"} ${index + 1}</td>
           <td>${escapeHtml(row.strategy)}</td>
+          <td>${escapeHtml(formatDate(row.created_at))}</td>
+          <td>${escapeHtml(row.symbol || "--")}</td>
           <td>${escapeHtml(row.indicator_summary)}</td>
           <td>${escapeHtml(row.period)}</td>
           <td>${escapeHtml(row.direction)}</td>
@@ -274,6 +519,26 @@ function renderJobs(root, table) {
       `
     )
     .join("");
+}
+
+function renderJobPicker(root, rows) {
+  const target = qs("[data-job-picker-menu]", root);
+  if (target) {
+    target.innerHTML = rows.length
+      ? rows
+          .map((row) => `
+            <button class="rh-menu-item" type="button" role="option" data-pick-job-id="${escapeHtml(row.job_id)}">
+              ${escapeHtml(compactId(row.job_id))} · ${escapeHtml(row.symbol || "--")} · ${escapeHtml(row.state)}
+            </button>
+          `)
+          .join("")
+      : `<span class="backtests-menu-group">${escapeHtml(t("backtests.results.empty"))}</span>`;
+  }
+  setText(
+    "[data-current-job]",
+    state.selectedJobId ? compactId(state.selectedJobId) : t("backtests.results.select_job"),
+    root
+  );
 }
 
 function renderResultSummary(root, summary) {
@@ -359,6 +624,11 @@ function renderTrades(root, payload) {
 
 function renderChart(root, payload) {
   const canvas = qs("[data-result-chart]", root);
+  qsa("[data-chart-kind]", root).forEach((button) => {
+    const active = button.dataset.chartKind === (payload?.kind || state.chartKind);
+    button.classList.toggle("rh-button--primary", active);
+    button.classList.toggle("rh-button--secondary", !active);
+  });
   const result = renderBacktestSeries(canvas, payload?.points || [], { kind: payload?.kind });
   canvas?.setAttribute("data-chart-nonblank", result.nonblank ? "true" : "false");
   setText(
@@ -387,6 +657,7 @@ function renderFooter(root, data) {
 function renderWorkstation(root, data) {
   state.runtimeDefaults = data;
   manualRefreshRetrySeconds = Number(data?.retry_after_seconds || 0);
+  renderRuntimeControls(root, data);
   renderSymbols(root, data?.instrument_universe);
   renderIndicators(root, data?.indicator_catalog);
   renderOptimization(root, data?.optimization_overview);
@@ -449,6 +720,16 @@ async function loadSelectedResult(root, { includeChart = true, includeTrades = t
   return activeResultRequest;
 }
 
+function selectJob(root, jobId) {
+  state.selectedJobId = jobId || null;
+  state.selectedVariantKey = null;
+  state.tradesPage = 1;
+  renderJobPicker(root, state.jobRows);
+  loadSelectedResult(root).catch((error) => {
+    setText("[data-chart-status]", error?.message || t("backtests.status.failed"), root);
+  });
+}
+
 async function refreshWorkstation(root, reason = "manual") {
   if (activeRequest) {
     return activeRequest;
@@ -464,6 +745,15 @@ async function refreshWorkstation(root, reason = "manual") {
   }
   if (state.query) {
     params.set("query", state.query);
+  }
+  if (state.job_symbol) {
+    params.set("symbol", state.job_symbol);
+  }
+  if (state.launched_from) {
+    params.set("launched_from", state.launched_from);
+  }
+  if (state.launched_to) {
+    params.set("launched_to", state.launched_to);
   }
   activeRequest = apiFetch(`${endpoint}?${params.toString()}`)
     .then((data) => {
@@ -568,6 +858,48 @@ function bind(root) {
       });
       return;
     }
+    const clearSymbols = event.target.closest("[data-clear-symbols]");
+    if (clearSymbols instanceof HTMLElement) {
+      qsa("[data-symbol-checkbox]", root).forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      state.selectedSymbols = new Set();
+      renderSelectedSymbols(root);
+      return;
+    }
+    const addIndicatorButton = event.target.closest("[data-add-indicator]");
+    if (addIndicatorButton instanceof HTMLElement) {
+      addIndicator(root, addIndicatorButton.dataset.addIndicator || "");
+      return;
+    }
+    const removeIndicatorButton = event.target.closest("[data-remove-indicator]");
+    if (removeIndicatorButton instanceof HTMLElement) {
+      const row = removeIndicatorButton.closest("[data-selected-indicator-index]");
+      const index = Number(row?.dataset.selectedIndicatorIndex);
+      if (Number.isInteger(index)) {
+        state.selectedIndicators.splice(index, 1);
+        renderIndicators(root, { items: Array.from(state.indicatorCatalog.values()) });
+      }
+      return;
+    }
+    const sourceButton = event.target.closest("[data-indicator-source]");
+    if (sourceButton instanceof HTMLElement) {
+      const row = sourceButton.closest("[data-selected-indicator-index]");
+      const index = Number(row?.dataset.selectedIndicatorIndex);
+      const source = sourceButton.dataset.indicatorSource || "";
+      const indicator = state.selectedIndicators[index];
+      if (indicator) {
+        const selected = new Set(indicator.sources);
+        if (selected.has(source) && selected.size > 1) {
+          selected.delete(source);
+        } else {
+          selected.add(source);
+        }
+        indicator.sources = Array.from(selected);
+        renderIndicators(root, { items: Array.from(state.indicatorCatalog.values()) });
+      }
+      return;
+    }
     const refreshButton = event.target.closest("[data-backtests-refresh]");
     if (refreshButton instanceof HTMLElement) {
       if (manualRefreshRetrySeconds > 0) {
@@ -578,12 +910,12 @@ function bind(root) {
     }
     const jobRow = event.target.closest("[data-job-id]");
     if (jobRow instanceof HTMLElement) {
-      state.selectedJobId = jobRow.dataset.jobId || null;
-      state.selectedVariantKey = null;
-      state.tradesPage = 1;
-      loadSelectedResult(root).catch((error) => {
-        setText("[data-chart-status]", error?.message || t("backtests.status.failed"), root);
-      });
+      selectJob(root, jobRow.dataset.jobId || null);
+      return;
+    }
+    const jobPick = event.target.closest("[data-pick-job-id]");
+    if (jobPick instanceof HTMLElement) {
+      selectJob(root, jobPick.dataset.pickJobId || null);
       return;
     }
     const variantButton = event.target.closest("[data-result-variant-key]");
@@ -620,6 +952,38 @@ function bind(root) {
   qs("[data-job-search]", root)?.addEventListener("input", (event) => {
     state.query = event.target.value || "";
     refreshWorkstation(root, "manual").catch(() => {});
+  });
+  qs("[data-job-symbol]", root)?.addEventListener("input", (event) => {
+    state.job_symbol = (event.target.value || "").trim().toUpperCase();
+    refreshWorkstation(root, "manual").catch(() => {});
+  });
+  qs("[data-job-launched-from]", root)?.addEventListener("change", (event) => {
+    state.launched_from = event.target.value || "";
+    refreshWorkstation(root, "manual").catch(() => {});
+  });
+  qs("[data-job-launched-to]", root)?.addEventListener("change", (event) => {
+    state.launched_to = event.target.value || "";
+    refreshWorkstation(root, "manual").catch(() => {});
+  });
+  qs("[data-symbol-search]", root)?.addEventListener("input", (event) => {
+    filterSymbols(root, event.target.value || "");
+  });
+  root.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-symbol-checkbox]");
+    if (checkbox instanceof HTMLInputElement) {
+      renderSelectedSymbols(root);
+      return;
+    }
+    const axisInput = event.target.closest("[data-indicator-window]");
+    if (axisInput instanceof HTMLInputElement) {
+      const row = axisInput.closest("[data-selected-indicator-index]");
+      const index = Number(row?.dataset.selectedIndicatorIndex);
+      const indicator = state.selectedIndicators[index];
+      if (indicator) {
+        indicator.window[axisInput.dataset.indicatorWindow || "start"] = Number(axisInput.value);
+        setText("[data-combinations-count]", indicatorCombinationCount(), root);
+      }
+    }
   });
 }
 
