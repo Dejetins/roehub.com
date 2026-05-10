@@ -9,14 +9,22 @@ from apps.api.dto import (
     BacktestJobResponse,
     BacktestJobsListResponse,
     BacktestLazyTradesDetailResponse,
+    BacktestPaginatedTradesResponse,
     BacktestPreflightResponse,
+    BacktestResultSeriesResponse,
+    BacktestResultStatsResponse,
+    BacktestResultSummaryResponse,
     BacktestRuntimeDefaultsResponse,
     BacktestTopVariantResponse,
     BacktestTopVariantsResponse,
     build_backtest_job_response,
     build_backtest_jobs_list_response,
     build_backtest_lazy_trades_detail_response,
+    build_backtest_paginated_trades_response,
     build_backtest_preflight_response,
+    build_backtest_result_series_response,
+    build_backtest_result_stats_response,
+    build_backtest_result_summary_response,
     build_backtest_runtime_defaults_response,
     build_backtest_top_variant_response,
     build_backtest_top_variants_response,
@@ -157,6 +165,18 @@ def build_backtests_router(
         result = use_case.get(user_id=principal.user_id, job_id=job_id)
         return build_backtest_job_response(result=result)
 
+    @router.get(
+        "/backtests/jobs/{job_id}/summary",
+        response_model=BacktestResultSummaryResponse,
+    )
+    def get_backtest_job_summary(
+        job_id: UUID,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestResultSummaryResponse:
+        result = use_case.summary(user_id=principal.user_id, job_id=job_id)
+        return build_backtest_result_summary_response(result=result)
+
     @router.get("/backtests/jobs/{job_id}/top", response_model=BacktestTopVariantsResponse)
     def get_backtest_job_top(
         job_id: UUID,
@@ -199,6 +219,123 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         return build_backtest_lazy_trades_detail_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+        response_model=BacktestResultSeriesResponse,
+    )
+    def get_backtest_job_variant_equity(
+        job_id: UUID,
+        variant_key: str,
+        points: int = Query(default=600, ge=10, le=1500),
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestResultSeriesResponse:
+        result = use_case.variant_series(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+            kind="equity",
+            points=points,
+        )
+        return build_backtest_result_series_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+        response_model=BacktestResultSeriesResponse,
+    )
+    def get_backtest_job_variant_drawdown(
+        job_id: UUID,
+        variant_key: str,
+        points: int = Query(default=600, ge=10, le=1500),
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestResultSeriesResponse:
+        result = use_case.variant_series(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+            kind="drawdown",
+            points=points,
+        )
+        return build_backtest_result_series_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+        response_model=BacktestResultStatsResponse,
+    )
+    def get_backtest_job_variant_monthly_stats(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestResultStatsResponse:
+        result = use_case.monthly_stats(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return build_backtest_result_stats_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+        response_model=BacktestResultStatsResponse,
+    )
+    def get_backtest_job_variant_symbol_stats(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestResultStatsResponse:
+        result = use_case.symbol_stats(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return build_backtest_result_stats_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades",
+        response_model=BacktestPaginatedTradesResponse,
+    )
+    def get_backtest_job_variant_trades(
+        job_id: UUID,
+        variant_key: str,
+        page: int = Query(default=1, ge=1, le=10_000),
+        page_size: int = Query(default=50, ge=1, le=100),
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> BacktestPaginatedTradesResponse:
+        result = use_case.paginated_trades(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+            page=page,
+            page_size=page_size,
+        )
+        return build_backtest_paginated_trades_response(result=result)
+
+    @router.get("/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv")
+    def get_backtest_job_variant_trades_csv(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> Response:
+        content = use_case.trades_csv(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "content-disposition": (
+                    f'attachment; filename="backtest-{job_id}-{variant_key}-trades.csv"'
+                )
+            },
+        )
 
     @router.post("/backtests/jobs/{job_id}/cancel", response_model=BacktestJobResponse)
     def post_backtest_job_cancel(

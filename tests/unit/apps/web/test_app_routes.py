@@ -446,6 +446,17 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"' in response.text
     assert 'data-preflight-endpoint="/api/backtests/preflight"' in response.text
     assert 'data-jobs-endpoint="/api/backtests/jobs"' in response.text
+    assert (
+        'data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"'
+        in response.text
+    )
+    assert (
+        'data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"'
+        in response.text
+    )
+    assert "data-result-state" in response.text
+    assert "data-result-chart" in response.text
+    assert "data-trades-rows" in response.text
     assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' not in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
@@ -722,7 +733,10 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "hiddenTabPause" in backtests_js
     assert "manualRefreshRetrySeconds" in backtests_js
     assert "button.disabled = isRunning;" in backtests_js
-    assert "variants/{variant_key}/trades" not in backtests_js
+    assert "renderBacktestSeries" in backtests_js
+    assert "/trades?page=" in backtests_js
+    assert "trades.csv" in backtests_js
+    assert "activeResultRequest" in backtests_js
     assert "backtest_ui.js" not in backtests_js
     assert "grid-row: 1;" in backtests_css
     assert "--rh-financial-positive" in backtests_css

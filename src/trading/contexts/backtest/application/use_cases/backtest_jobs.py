@@ -26,9 +26,21 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestLazyTradesDetailService,
+    BacktestPaginatedTradesReadModel,
     BacktestPreflightRejected,
     BacktestPreflightService,
+    BacktestResultSeriesKind,
+    BacktestResultSeriesReadModel,
+    BacktestResultStatsReadModel,
+    BacktestResultSummaryReadModel,
     BacktestRuntimeConfig,
+    build_monthly_stats_read_model,
+    build_paginated_trades_read_model,
+    build_result_series_read_model,
+    build_result_summary_read_model,
+    build_symbol_stats_read_model,
+    build_trades_csv,
+    symbol_from_job_request,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
@@ -183,8 +195,13 @@ class BacktestJobsUseCase:
                 code=BACKTEST_ERROR_NOT_FOUND,
                 message="Backtest variant was not found",
                 details={"job_id": str(job_id), "variant_key": variant_key},
-            )
+        )
         return build_top_variant_read_model(job_id=str(job_id), row=row)
+
+    def summary(self, *, user_id: UserId, job_id: UUID) -> BacktestResultSummaryReadModel:
+        job = self.get(user_id=user_id, job_id=job_id)
+        top = self.top(user_id=user_id, job_id=job_id)
+        return build_result_summary_read_model(job=job, top_variants=top)
 
     def trades(
         self,
@@ -215,6 +232,72 @@ class BacktestJobsUseCase:
             row=row,
             public_variant_key=variant_key,
         )
+
+    def variant_series(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+        kind: BacktestResultSeriesKind,
+        points: int,
+    ) -> BacktestResultSeriesReadModel:
+        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        return build_result_series_read_model(
+            detail=detail,
+            kind=kind,
+            requested_points=points,
+        )
+
+    def monthly_stats(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestResultStatsReadModel:
+        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        return build_monthly_stats_read_model(detail=detail)
+
+    def symbol_stats(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestResultStatsReadModel:
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        return build_symbol_stats_read_model(
+            detail=detail,
+            symbol=symbol_from_job_request(job.request_json),
+        )
+
+    def paginated_trades(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+        page: int,
+        page_size: int,
+    ) -> BacktestPaginatedTradesReadModel:
+        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        return build_paginated_trades_read_model(
+            detail=detail,
+            page=page,
+            page_size=page_size,
+        )
+
+    def trades_csv(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> str:
+        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        return build_trades_csv(detail=detail)
 
     def cancel(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)

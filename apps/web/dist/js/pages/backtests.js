@@ -2,6 +2,7 @@ import { apiFetch } from "../core/api.js";
 import { qs, qsa, setText } from "../core/dom.js";
 import { t } from "../core/locale.js";
 import { createPoller } from "../core/poller.js";
+import { renderBacktestSeries } from "../charts/backtest_series.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const REFRESH_PRESETS = {
@@ -26,9 +27,16 @@ const state = {
   cursor: null,
   query: "",
   runtimeDefaults: null,
+  selectedJobId: null,
+  selectedVariantKey: null,
+  resultSummary: null,
+  tradesPage: 1,
+  tradesHasNext: false,
+  chartKind: "equity",
 };
 
 let activeRequest = null;
+let activeResultRequest = null;
 let poller = null;
 let manualRefreshRetrySeconds = 0;
 
@@ -76,6 +84,24 @@ function numberOrDash(value) {
     return "--";
   }
   return String(value);
+}
+
+function compactId(value) {
+  return value ? String(value).slice(0, 8) : "--";
+}
+
+function endpointFromTemplate(template, replacements) {
+  let endpoint = template;
+  Object.entries(replacements).forEach(([key, value]) => {
+    endpoint = endpoint.replaceAll(`{${key}}`, encodeURIComponent(String(value)));
+  });
+  return endpoint;
+}
+
+function variantBaseEndpoint(root, jobId, variantKey) {
+  const template =
+    root.dataset.variantEndpointTemplate || "/api/backtests/jobs/{job_id}/variants/{variant_key}";
+  return endpointFromTemplate(template, { job_id: jobId, variant_key: variantKey });
 }
 
 function financialClass(value) {
@@ -230,7 +256,7 @@ function renderJobs(root, table) {
   target.innerHTML = rows
     .map(
       (row, index) => `
-        <tr data-job-id="${escapeHtml(row.job_id)}">
+        <tr data-job-id="${escapeHtml(row.job_id)}" tabindex="0">
           <td>${index + 1}</td>
           <td>${escapeHtml(row.strategy)}</td>
           <td>${escapeHtml(row.indicator_summary)}</td>
@@ -248,6 +274,98 @@ function renderJobs(root, table) {
       `
     )
     .join("");
+}
+
+function renderResultSummary(root, summary) {
+  state.resultSummary = summary;
+  const selectedKey = state.selectedVariantKey || summary?.selected_variant_key;
+  state.selectedVariantKey = selectedKey;
+  const selectedVariant = (summary?.top_variants?.items || []).find(
+    (item) => item.variant_key === selectedKey
+  );
+  const resultState = qs("[data-result-state]", root);
+  if (resultState) {
+    resultState.hidden = !summary;
+  }
+  setText("[data-result-job]", compactId(summary?.job?.job_id), root);
+  setText("[data-result-variant]", compactId(selectedKey), root);
+  setText("[data-result-return]", percent(selectedVariant?.summary_metrics?.total_return_pct), root);
+  setText("[data-result-sharpe]", numberOrDash(selectedVariant?.summary_metrics?.sharpe), root);
+  const csv = qs("[data-result-csv]", root);
+  if (csv && summary?.job?.job_id && selectedKey) {
+    csv.href = `${variantBaseEndpoint(root, summary.job.job_id, selectedKey)}/trades.csv`;
+  }
+  renderVariantStrip(root, summary?.top_variants?.items || [], selectedKey);
+}
+
+function renderVariantStrip(root, variants, selectedKey) {
+  const target = qs("[data-result-variants]", root);
+  if (!target) {
+    return;
+  }
+  target.innerHTML = variants
+    .map(
+      (variant) => `
+        <button
+          class="rh-button ${variant.variant_key === selectedKey ? "rh-button--primary" : "rh-button--secondary"} rh-button--compact"
+          type="button"
+          data-result-variant-key="${escapeHtml(variant.variant_key)}"
+        >
+          #${variant.rank} ${escapeHtml(compactId(variant.variant_key))}
+        </button>
+      `
+    )
+    .join("");
+}
+
+function renderTrades(root, payload) {
+  const target = qs("[data-trades-rows]", root);
+  if (!target) {
+    return;
+  }
+  const rows = payload?.items || [];
+  target.innerHTML = rows.length
+    ? rows
+        .map(
+          (trade) => `
+            <tr>
+              <td>${numberOrDash(trade.trade_index)}</td>
+              <td>${escapeHtml(trade.side || trade.direction || "--")}</td>
+              <td>${escapeHtml(localTime(trade.exit_timestamp))}</td>
+              <td class="${financialClass(trade.net_pnl_quote)}">${numberOrDash(trade.net_pnl_quote)}</td>
+              <td class="${financialClass(trade.return_pct)}">${percent(trade.return_pct)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : `<tr><td colspan="5">${escapeHtml(t("backtests.results.empty"))}</td></tr>`;
+  const pagination = payload?.pagination || {};
+  state.tradesPage = Number(pagination.page || 1);
+  state.tradesHasNext = Boolean(pagination.has_next);
+  setText(
+    "[data-trades-page]",
+    `${numberOrDash(pagination.page)} / ${numberOrDash(Math.ceil((pagination.total || 0) / (pagination.page_size || 1)) || 1)}`,
+    root
+  );
+  const previous = qs("[data-trades-prev]", root);
+  const next = qs("[data-trades-next]", root);
+  if (previous) {
+    previous.disabled = !pagination.has_previous;
+  }
+  if (next) {
+    next.disabled = !pagination.has_next;
+  }
+}
+
+function renderChart(root, payload) {
+  const canvas = qs("[data-result-chart]", root);
+  const result = renderBacktestSeries(canvas, payload?.points || [], { kind: payload?.kind });
+  canvas?.setAttribute("data-chart-nonblank", result.nonblank ? "true" : "false");
+  setText(
+    "[data-chart-status]",
+    `${payload?.kind || state.chartKind}: ${payload?.returned_points || 0}/${payload?.source_points || 0}`,
+    root
+  );
 }
 
 function renderFooter(root, data) {
@@ -280,6 +398,57 @@ function renderWorkstation(root, data) {
   }
 }
 
+async function loadResultSummary(root, jobId) {
+  if (!jobId) {
+    return null;
+  }
+  const template = root.dataset.jobSummaryEndpointTemplate || "/api/backtests/jobs/{job_id}/summary";
+  const summary = await apiFetch(endpointFromTemplate(template, { job_id: jobId }));
+  state.selectedJobId = summary.job?.job_id || jobId;
+  if (!state.selectedVariantKey) {
+    state.selectedVariantKey = summary.selected_variant_key;
+  }
+  renderResultSummary(root, summary);
+  return summary;
+}
+
+async function loadChart(root) {
+  if (!state.selectedJobId || !state.selectedVariantKey) {
+    return;
+  }
+  const endpoint = `${variantBaseEndpoint(root, state.selectedJobId, state.selectedVariantKey)}/${state.chartKind}?points=600`;
+  const payload = await apiFetch(endpoint);
+  renderChart(root, payload);
+}
+
+async function loadTrades(root, page = 1) {
+  if (!state.selectedJobId || !state.selectedVariantKey) {
+    return;
+  }
+  const endpoint = `${variantBaseEndpoint(root, state.selectedJobId, state.selectedVariantKey)}/trades?page=${page}&page_size=50`;
+  const payload = await apiFetch(endpoint);
+  renderTrades(root, payload);
+}
+
+async function loadSelectedResult(root, { includeChart = true, includeTrades = true } = {}) {
+  if (!state.selectedJobId || activeResultRequest) {
+    return activeResultRequest;
+  }
+  activeResultRequest = loadResultSummary(root, state.selectedJobId)
+    .then(async () => {
+      if (includeChart) {
+        await loadChart(root);
+      }
+      if (includeTrades) {
+        await loadTrades(root, state.tradesPage);
+      }
+    })
+    .finally(() => {
+      activeResultRequest = null;
+    });
+  return activeResultRequest;
+}
+
 async function refreshWorkstation(root, reason = "manual") {
   if (activeRequest) {
     return activeRequest;
@@ -299,6 +468,9 @@ async function refreshWorkstation(root, reason = "manual") {
   activeRequest = apiFetch(`${endpoint}?${params.toString()}`)
     .then((data) => {
       renderWorkstation(root, data);
+      if (state.selectedJobId && reason !== "initial") {
+        loadSelectedResult(root, { includeChart: false, includeTrades: false }).catch(() => {});
+      }
       return data;
     })
     .finally(() => {
@@ -344,6 +516,8 @@ async function createJob(root) {
       body: JSON.stringify(payload),
     });
     setText("[data-create-status]", t("backtests.status.created", { job: created.job_id.slice(0, 8) }), root);
+    state.selectedJobId = created.job_id;
+    state.selectedVariantKey = null;
     await refreshWorkstation(root, "manual");
   } catch (error) {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
@@ -402,6 +576,40 @@ function bind(root) {
       refreshWorkstation(root, "manual").catch(() => {});
       return;
     }
+    const jobRow = event.target.closest("[data-job-id]");
+    if (jobRow instanceof HTMLElement) {
+      state.selectedJobId = jobRow.dataset.jobId || null;
+      state.selectedVariantKey = null;
+      state.tradesPage = 1;
+      loadSelectedResult(root).catch((error) => {
+        setText("[data-chart-status]", error?.message || t("backtests.status.failed"), root);
+      });
+      return;
+    }
+    const variantButton = event.target.closest("[data-result-variant-key]");
+    if (variantButton instanceof HTMLElement) {
+      state.selectedVariantKey = variantButton.dataset.resultVariantKey || null;
+      state.tradesPage = 1;
+      renderResultSummary(root, state.resultSummary);
+      loadSelectedResult(root).catch(() => {});
+      return;
+    }
+    const chartButton = event.target.closest("[data-chart-kind]");
+    if (chartButton instanceof HTMLElement) {
+      state.chartKind = chartButton.dataset.chartKind || "equity";
+      loadChart(root).catch(() => {});
+      return;
+    }
+    const prevTrades = event.target.closest("[data-trades-prev]");
+    if (prevTrades instanceof HTMLElement && state.tradesPage > 1) {
+      loadTrades(root, state.tradesPage - 1).catch(() => {});
+      return;
+    }
+    const nextTrades = event.target.closest("[data-trades-next]");
+    if (nextTrades instanceof HTMLElement && state.tradesHasNext) {
+      loadTrades(root, state.tradesPage + 1).catch(() => {});
+      return;
+    }
     const preset = event.target.closest("[data-backtests-refresh-preset]");
     if (preset instanceof HTMLElement) {
       setAutorefresh(root, preset.dataset.backtestsRefreshPreset || "off");
@@ -421,7 +629,13 @@ function init() {
     return;
   }
   bind(root);
-  refreshWorkstation(root, "initial").catch((error) => {
+  state.selectedJobId = root.dataset.initialJobId || null;
+  refreshWorkstation(root, "initial").then(() => {
+    if (state.selectedJobId) {
+      return loadSelectedResult(root);
+    }
+    return null;
+  }).catch((error) => {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
   });
   setAutorefresh(root, "15s");

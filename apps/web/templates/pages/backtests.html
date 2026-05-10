@@ -13,6 +13,8 @@
     data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"
     data-preflight-endpoint="/api/backtests/preflight"
     data-jobs-endpoint="/api/backtests/jobs"
+    data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"
+    data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"
     data-initial-mode="{{ backtest_initial_mode }}"
     data-initial-job-id="{{ backtest_initial_job_id }}"
     aria-label="{{ t('backtests.aria') }}"
@@ -225,6 +227,62 @@
             </thead>
             <tbody data-job-rows></tbody>
           </table>
+        </div>
+        <div class="backtests-result-state" data-result-state hidden>
+          <div class="backtests-result-summary">
+            <div>
+              <span>{{ t("backtests.detail.selected_job") }}</span>
+              <strong data-result-job>--</strong>
+            </div>
+            <div>
+              <span>{{ t("backtests.detail.selected_variant") }}</span>
+              <strong data-result-variant>--</strong>
+            </div>
+            <div>
+              <span>{{ t("backtests.detail.return") }}</span>
+              <strong data-result-return>--</strong>
+            </div>
+            <div>
+              <span>{{ t("backtests.detail.sharpe") }}</span>
+              <strong data-result-sharpe>--</strong>
+            </div>
+            <a class="rh-button rh-button--secondary rh-button--compact" href="#" data-result-csv>{{ t("backtests.detail.csv") }}</a>
+          </div>
+          <div class="backtests-variant-strip" data-result-variants></div>
+          <div class="backtests-result-body">
+            <section class="backtests-chart-panel" aria-label="{{ t('backtests.detail.equity') }}">
+              <header class="backtests-chart-tabs">
+                <button class="rh-button rh-button--primary rh-button--compact" type="button" data-chart-kind="equity">{{ t("backtests.detail.equity") }}</button>
+                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-chart-kind="drawdown">{{ t("backtests.detail.drawdown") }}</button>
+                <output data-chart-status>{{ t("backtests.detail.loading") }}</output>
+              </header>
+              <canvas class="backtests-chart" width="640" height="220" data-result-chart></canvas>
+            </section>
+            <section class="backtests-trades-panel">
+              <header class="backtests-trades-header">
+                <h3>{{ t("backtests.detail.trades") }}</h3>
+                <div class="backtests-trades-actions">
+                  <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-prev>{{ t("pagination.previous") }}</button>
+                  <output data-trades-page>--</output>
+                  <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-next>{{ t("pagination.next") }}</button>
+                </div>
+              </header>
+              <div class="backtests-table-wrap backtests-table-wrap--trades">
+                <table class="backtests-table backtests-table--trades">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>{{ t("backtests.detail.side") }}</th>
+                      <th>{{ t("backtests.detail.exit") }}</th>
+                      <th>{{ t("backtests.detail.pnl") }}</th>
+                      <th>{{ t("backtests.detail.return") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody data-trades-rows></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
     </div>

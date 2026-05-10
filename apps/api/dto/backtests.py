@@ -124,6 +124,50 @@ class BacktestLazyTradesDetailResponse(BaseModel):
     timing: dict[str, Any]
 
 
+class BacktestResultSummaryResponse(BaseModel):
+    job: BacktestJobResponse
+    top_variants: BacktestTopVariantsResponse
+    selected_variant_key: str | None
+    refresh_status: str
+    retry_after_seconds: int
+    links: dict[str, Any]
+
+
+class BacktestResultSeriesResponse(BaseModel):
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    kind: str
+    points: list[dict[str, Any]]
+    requested_points: int
+    returned_points: int
+    source_points: int
+    downsampled: bool
+    cache: dict[str, Any]
+    timing: dict[str, Any]
+
+
+class BacktestResultStatsResponse(BaseModel):
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    kind: str
+    items: list[dict[str, Any]]
+    cache: dict[str, Any]
+    timing: dict[str, Any]
+
+
+class BacktestPaginatedTradesResponse(BaseModel):
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    items: list[dict[str, Any]]
+    pagination: dict[str, Any]
+    summary_metrics: dict[str, Any]
+    cache: dict[str, Any]
+    timing: dict[str, Any]
+
+
 def build_backtest_runtime_defaults_response(
     *,
     defaults: BacktestRuntimeDefaults,
@@ -173,19 +217,46 @@ def build_backtest_lazy_trades_detail_response(
     return BacktestLazyTradesDetailResponse.model_validate(result.as_mapping())
 
 
+def build_backtest_result_summary_response(*, result: Any) -> BacktestResultSummaryResponse:
+    return BacktestResultSummaryResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_result_series_response(*, result: Any) -> BacktestResultSeriesResponse:
+    return BacktestResultSeriesResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_result_stats_response(*, result: Any) -> BacktestResultStatsResponse:
+    return BacktestResultStatsResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_paginated_trades_response(
+    *,
+    result: Any,
+) -> BacktestPaginatedTradesResponse:
+    return BacktestPaginatedTradesResponse.model_validate(result.as_mapping())
+
+
 __all__ = [
     "BacktestLazyTradesDetailResponse",
+    "BacktestPaginatedTradesResponse",
     "BacktestJobProgressResponse",
     "BacktestJobResponse",
     "BacktestJobsListResponse",
     "BacktestPreflightResponse",
+    "BacktestResultSeriesResponse",
+    "BacktestResultStatsResponse",
+    "BacktestResultSummaryResponse",
     "BacktestRuntimeDefaultsResponse",
     "BacktestTopVariantResponse",
     "BacktestTopVariantsResponse",
     "build_backtest_job_response",
     "build_backtest_lazy_trades_detail_response",
     "build_backtest_jobs_list_response",
+    "build_backtest_paginated_trades_response",
     "build_backtest_preflight_response",
+    "build_backtest_result_series_response",
+    "build_backtest_result_stats_response",
+    "build_backtest_result_summary_response",
     "build_backtest_runtime_defaults_response",
     "build_backtest_top_variant_response",
     "build_backtest_top_variants_response",
