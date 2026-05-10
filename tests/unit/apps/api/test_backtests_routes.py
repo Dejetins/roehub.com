@@ -147,6 +147,7 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert top_row["variant_key"].startswith("job_")
     assert len(top_row["variant_hash"]) == 64
     assert top_row["variant_key"] != top_row["variant_hash"]
+    assert "trades" not in top_row
     assert top_row["links"]["lazy_trades"].endswith("/trades")
     raw_hash_response = client.get(
         f"/backtests/jobs/{payload['job_id']}/variants/{top_row['variant_hash']}",

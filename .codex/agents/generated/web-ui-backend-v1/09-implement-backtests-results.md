@@ -21,10 +21,16 @@ context_sources:
   task_entrypoints:
     - path: apps/api/routes/backtests.py
       why: "current job/top/variant/trades routes"
+    - path: apps/api/routes/ui_backtests.py
+      why: "current `/api/ui/backtests/workstation` bounded workstation read model"
     - path: apps/api/dto/backtests.py
       why: "current response DTOs"
+    - path: apps/api/dto/ui_backtests.py
+      why: "current Stage 8 workstation DTOs; must remain bounded without full trades"
     - path: src/trading/contexts/backtest/application/use_cases/backtest_jobs.py
       why: "variant lookup and ownership"
+    - path: src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py
+      why: "current Stage 8.5 worker claim/execute/finish boundary"
     - path: apps/web/templates/pages/backtests.html
       why: "backtest workstation page target"
   conditional_bundles:
@@ -72,6 +78,8 @@ style_references:
   language_switch_required: true
 
 hard_requirements:
+  readiness_prerequisites_green_required: true
+  readiness_gates_include_ui_backtests: true
   selected_result_state_required: true
   no_full_trades_initial_payload: true
   server_pagination_trades_required: true
@@ -95,8 +103,8 @@ task_toggles:
 
 package_contract:
   depends_on:
-    - "08-backtests-workstation accepted"
-    - "08.5-backtest-runtime-hardening accepted or runtime blocker documented"
+    - "08-backtests-workstation accepted; current `/backtests`, `/backtests/new`, `/backtests/{job_id}` shell/alias readiness pinned by `tests/unit/apps/web/test_app_routes.py`"
+    - "08.5-backtest-runtime-hardening accepted; current queued create and `BacktestJobWorkerUseCase` readiness pinned by focused API/use-case tests"
   owns:
     - "apps/api/routes/backtests.py result endpoints only"
     - "apps/api/dto/backtests.py result DTO additions only"
@@ -158,6 +166,10 @@ required_literals:
   - "/api/backtests/jobs/{job_id}/summary"
   - "/api/backtests/jobs/{job_id}/variants/{variant_key}/equity"
   - "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades"
+  - "/api/ui/backtests/workstation"
+  - "BacktestJobWorkerUseCase"
+  - "background_auto"
+  - "execution_trigger"
   - "variant_key"
   - "variant_hash"
   - "summary-only"
@@ -186,9 +198,9 @@ final_report_format:
   - "Publish/deploy: direct-main publish-ci-deploy terminal state; if successful, include direct push to origin/main, main CI/deploy monitoring, local main sync, Mac Studio git pull, impacted service restart/reload, and smoke verification evidence; otherwise exact blocker or reason it was skipped"
 
 quality_gates:
-  - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/web/test_app_routes.py"
-    expect: "passes; add focused result endpoint tests"
-  - cmd: "uv run ruff check apps/api apps/web src/trading/contexts/backtest tests/unit/apps/api tests/unit/apps/web"
+  - cmd: "uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py"
+    expect: "passes; preserves Stage 8 workstation, Stage 8.5 queued runtime, public variant-key, lazy trades, and result endpoint coverage"
+  - cmd: "uv run ruff check apps/api apps/web src/trading/contexts/backtest tests/unit/apps/api tests/unit/apps/web tests/unit/contexts/backtest"
     expect: "passes for touched paths"
   - cmd: "uv run pyright"
     expect: "passes"
@@ -205,7 +217,9 @@ expected_primary_touches:
   - "apps/web/dist/js/charts/*"
   - "apps/web/dist/css/pages/backtests.css"
   - "tests/unit/apps/api/test_backtests_routes.py"
+  - "tests/unit/apps/api/test_ui_backtests_routes.py"
   - "tests/unit/apps/web/test_app_routes.py"
+  - "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py"
 
 possible_secondary_touches:
   - "src/trading/contexts/backtest/application/ports/lazy_trades_cache.py"
@@ -239,6 +253,9 @@ Done means:
 ## Context / Current State
 
 - Current API has job/top/variant and POST lazy trades endpoint.
+- Current `/api/ui/backtests/workstation` read model is the Stage 8 bounded workstation payload and must not be expanded with full trades by Stage 9 initial render.
+- Current create path is queued: `POST /api/backtests/jobs` returns `queued`/`background_auto` semantics and enqueues through `execution_trigger`; `BacktestJobWorkerUseCase` owns claim/execute/finish/fail.
+- Current public result-adjacent lookup uses readable public `variant_key`; raw storage `variant_hash` is not accepted as the public route key.
 - Summary top rows must stay lightweight.
 - Lazy trades details are separate from top variant persistence.
 
@@ -251,6 +268,7 @@ Done means:
 - Keep initial page payload bounded.
 - Manual refresh/autorefresh must not fetch all trades, must not trigger compute, and must respect `retry_after_seconds`.
 - Add tests for 404, pagination, downsampling bounds, CSV auth/ownership.
+- Preserve and run the readiness tests for Stage 8 workstation, Stage 8.5 queued runtime, public `variant_key` split, and lazy trades POST boundary before adding result-state behavior.
 - Run browser nonblank chart evidence.
 - Use `publish-ci-deploy` only after all gates pass.
 
@@ -301,6 +319,7 @@ Use front matter `context_sources`.
 - Multi-year series respects point limits.
 - Financial colors remain invariant.
 - Generic result cards or separate sixth page layout are not acceptable.
+- Existing readiness gates stay green: `/api/ui/backtests/workstation` remains bounded without full trades, `/backtests` aliases keep selected-job markers, queued create remains non-inline, worker success/failure remains covered, and raw `variant_hash` remains rejected as public route key.
 
 # Implementation constraints
 
@@ -366,8 +385,8 @@ Use front matter touched paths.
 # Quality gates (must run and pass)
 
 ```bash
-uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/web/test_app_routes.py
-uv run ruff check apps/api apps/web src/trading/contexts/backtest tests/unit/apps/api tests/unit/apps/web
+uv run pytest -q tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py
+uv run ruff check apps/api apps/web src/trading/contexts/backtest tests/unit/apps/api tests/unit/apps/web tests/unit/contexts/backtest
 uv run pyright
 python -m tools.docs.generate_docs_index --check
 ```
