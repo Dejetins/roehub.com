@@ -24,6 +24,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "backtest.idempotency_key_conflict": 409,
     "backtest.invalid_request": 422,
     "backtest.job_not_cancellable": 409,
+    "backtest.job_not_deletable": 409,
     "backtest.not_found": 404,
     "backtest.queue_saturated": 503,
     "backtest.rate_limited": 429,

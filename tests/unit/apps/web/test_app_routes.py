@@ -450,6 +450,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         'data-job-cancel-endpoint-template="/api/backtests/jobs/{job_id}/cancel"'
         in response.text
     )
+    assert 'data-job-delete-endpoint-template="/api/backtests/jobs/{job_id}"' in response.text
     assert (
         'data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"'
         in response.text
@@ -458,6 +459,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         'data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"'
         in response.text
     )
+    assert 'data-variant-open-delay-ms="140"' in response.text
     assert "data-result-state" not in response.text
     assert "data-result-chart" not in response.text
     assert "data-trades-rows" not in response.text
@@ -468,6 +470,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-backtest-option=\"job_market_type\"" in response.text
     assert "data-job-launched-from" in response.text
     assert "data-job-symbol" in response.text
+    assert "data-load-more-jobs" in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text
@@ -738,6 +741,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "request_hash" in backtests_js
     assert "refresh_status" in backtests_js
     assert "retry_after_seconds" in backtests_js
+    assert "data-delete-job-id" in backtests_js
+    assert "data-load-more-jobs" in backtests_js
+    assert "delayedVariantOpen" in backtests_js
     assert "createPoller" in backtests_js
     assert "activeRequest" in backtests_js
     assert "hiddenTabPause" in backtests_js

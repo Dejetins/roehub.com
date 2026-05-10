@@ -487,6 +487,56 @@ def test_post_backtest_job_cancel_terminal_job_is_idempotent() -> None:
     assert response.json()["state"] == "succeeded"
 
 
+def test_delete_backtest_job_removes_terminal_owner_job_and_variants() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000224"},
+        json=_valid_request(),
+    )
+    job_id = UUID(created.json()["job_id"])
+    _complete_job(repository=repository, job_id=job_id)
+    assert repository.list_top_variants(job_id=job_id)
+
+    response = client.delete(
+        f"/backtests/jobs/{job_id}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000224"},
+    )
+    missing = client.get(
+        f"/backtests/jobs/{job_id}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000224"},
+    )
+
+    assert response.status_code == 204
+    assert missing.status_code == 404
+    assert repository.list_top_variants(job_id=job_id) == ()
+
+
+def test_delete_backtest_job_rejects_active_and_foreign_jobs() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000225"},
+        json=_valid_request(),
+    )
+
+    active = client.delete(
+        f"/backtests/jobs/{created.json()['job_id']}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000225"},
+    )
+    foreign = client.delete(
+        f"/backtests/jobs/{created.json()['job_id']}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000226"},
+    )
+
+    assert active.status_code == 409
+    assert active.json()["error"]["code"] == "backtest.job_not_deletable"
+    assert foreign.status_code == 403
+    assert foreign.json()["error"]["code"] == "backtest.forbidden"
+
+
 def test_backtest_jobs_auth_failure_uses_auth_required_code() -> None:
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
 
@@ -883,6 +933,20 @@ class _FakeJobRepository:
         cancelled = job.request_cancel(changed_at=cancel_requested_at)
         self.jobs[job_id] = cancelled
         return cancelled
+
+    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+        assert self.jobs is not None
+        assert self.top_rows is not None
+        job = self.jobs.get(job_id)
+        if job is None or job.user_id != user_id or job.state not in {
+            "succeeded",
+            "failed",
+            "cancelled",
+        }:
+            return False
+        del self.jobs[job_id]
+        self.top_rows.pop(job_id, None)
+        return True
 
     def count_active_for_user(self, *, user_id: UserId) -> int:
         assert self.jobs is not None

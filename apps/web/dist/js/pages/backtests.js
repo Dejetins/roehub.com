@@ -4,6 +4,7 @@ import { t } from "../core/locale.js";
 import { createPoller } from "../core/poller.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
+const DEFAULT_VARIANT_OPEN_DELAY_MS = 140;
 const REFRESH_PRESETS = {
   off: 0,
   "10s": 10000,
@@ -29,6 +30,7 @@ const state = {
   launched_from: "",
   launched_to: "",
   cursor: null,
+  nextCursor: null,
   query: "",
   runtimeDefaults: null,
   selectedSymbols: new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]),
@@ -36,6 +38,7 @@ const state = {
   indicatorCatalog: new Map(),
   indicatorFamily: null,
   jobRows: [],
+  loadedAllJobs: false,
   selectedJobId: null,
   selectedVariantKey: null,
   resultSummary: null,
@@ -45,6 +48,7 @@ let activeRequest = null;
 let activeResultRequest = null;
 let poller = null;
 let manualRefreshRetrySeconds = 0;
+let delayedVariantOpen = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -642,7 +646,9 @@ function renderJobs(root, table) {
   }
   const rows = table?.items || [];
   state.jobRows = rows;
+  state.nextCursor = state.loadedAllJobs ? null : table?.next_cursor || null;
   renderJobPicker(root, rows);
+  renderJobPagination(root);
   if (!rows.length) {
     target.innerHTML = `<tr><td colspan="11">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
     return;
@@ -654,6 +660,7 @@ function renderJobs(root, table) {
 
 function renderJobRow(root, row, index) {
   const selected = state.selectedJobId === row.job_id;
+  const canDelete = row.actions?.can_delete;
   return `
     <tr class="${selected ? "is-selected" : ""}" data-job-id="${escapeHtml(row.job_id)}" tabindex="0">
       <td>
@@ -675,6 +682,9 @@ function renderJobRow(root, row, index) {
           <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
           ${row.actions?.can_cancel
             ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
+            : ""}
+          ${canDelete
+            ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action backtests-row-action--danger" type="button" data-delete-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.delete"))}</button>`
             : ""}
         </div>
       </td>
@@ -721,6 +731,19 @@ function renderVariantExpansion(root, row) {
       </td>
     </tr>
   `;
+}
+
+function renderJobPagination(root) {
+  setText(
+    "[data-job-page-status]",
+    t("backtests.results.page_status", { count: state.jobRows.length }),
+    root
+  );
+  const button = qs("[data-load-more-jobs]", root);
+  if (button instanceof HTMLButtonElement) {
+    button.hidden = !state.nextCursor;
+    button.disabled = Boolean(activeRequest);
+  }
 }
 
 function renderVariantRow(root, jobId, variant) {
@@ -827,19 +850,73 @@ function renderFooter(root, data) {
   setText("[data-backtests-refresh-status]", data?.refresh_status || t("refresh.idle"), document);
 }
 
-function renderWorkstation(root, data) {
+function renderWorkstation(root, data, { append = false, preserveLoadedRows = false } = {}) {
   state.runtimeDefaults = data;
   manualRefreshRetrySeconds = Number(data?.retry_after_seconds || 0);
+  const renderedData = append
+    ? mergeJobTableData(data)
+    : preserveLoadedRows
+      ? preserveLoadedJobTableData(data)
+      : data;
   renderRuntimeControls(root, data);
   renderSymbols(root, data?.instrument_universe);
   renderIndicators(root, data?.indicator_catalog);
   renderOptimization(root, data?.optimization_overview);
-  renderJobs(root, data?.job_table);
-  renderFooter(root, data);
+  renderJobs(root, renderedData?.job_table);
+  renderFooter(root, renderedData);
   const loading = qs("[data-backtests-loading]", root);
   if (loading) {
     loading.hidden = true;
   }
+}
+
+function mergeJobTableData(data) {
+  const nextRows = data?.job_table?.items || [];
+  const seen = new Set(state.jobRows.map((row) => row.job_id));
+  const mergedRows = [
+    ...state.jobRows,
+    ...nextRows.filter((row) => {
+      if (seen.has(row.job_id)) {
+        return false;
+      }
+      seen.add(row.job_id);
+      return true;
+    }),
+  ];
+  state.loadedAllJobs = !data?.job_table?.next_cursor;
+  return {
+    ...data,
+    job_table: {
+      ...(data?.job_table || {}),
+      items: mergedRows,
+    },
+  };
+}
+
+function preserveLoadedJobTableData(data) {
+  const freshRows = data?.job_table?.items || [];
+  if (!state.jobRows.length || state.jobRows.length <= freshRows.length) {
+    return data;
+  }
+  const seen = new Set(freshRows.map((row) => row.job_id));
+  const mergedRows = [
+    ...freshRows,
+    ...state.jobRows.filter((row) => {
+      if (seen.has(row.job_id)) {
+        return false;
+      }
+      seen.add(row.job_id);
+      return true;
+    }),
+  ];
+  return {
+    ...data,
+    job_table: {
+      ...(data?.job_table || {}),
+      items: mergedRows,
+      next_cursor: state.loadedAllJobs ? null : data?.job_table?.next_cursor || null,
+    },
+  };
 }
 
 async function loadResultSummary(root, jobId) {
@@ -867,7 +944,19 @@ async function loadSelectedResult(root) {
   return activeResultRequest;
 }
 
-function selectJob(root, jobId) {
+function clearDelayedVariantOpen() {
+  if (delayedVariantOpen) {
+    window.clearTimeout(delayedVariantOpen);
+    delayedVariantOpen = null;
+  }
+}
+
+function variantOpenDelayMs(root) {
+  const raw = Number(root.dataset.variantOpenDelayMs || DEFAULT_VARIANT_OPEN_DELAY_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_VARIANT_OPEN_DELAY_MS;
+}
+
+function openSelectedJob(root, jobId) {
   state.selectedJobId = jobId || null;
   state.selectedVariantKey = null;
   renderJobPicker(root, state.jobRows);
@@ -876,9 +965,25 @@ function selectJob(root, jobId) {
   });
 }
 
-async function refreshWorkstation(root, reason = "manual") {
+function selectJob(root, jobId, { delayed = true } = {}) {
+  clearDelayedVariantOpen();
+  if (!jobId || !delayed) {
+    openSelectedJob(root, jobId);
+    return;
+  }
+  setText("[data-create-status]", t("backtests.status.opening_job", { job: compactId(jobId) }), root);
+  delayedVariantOpen = window.setTimeout(() => {
+    delayedVariantOpen = null;
+    openSelectedJob(root, jobId);
+  }, variantOpenDelayMs(root));
+}
+
+async function refreshWorkstation(root, reason = "manual", { append = false } = {}) {
   if (activeRequest) {
     return activeRequest;
+  }
+  if (!append && reason !== "auto") {
+    state.loadedAllJobs = false;
   }
   const endpoint = root.dataset.workstationEndpoint || DEFAULT_ENDPOINT;
   const params = new URLSearchParams();
@@ -892,8 +997,8 @@ async function refreshWorkstation(root, reason = "manual") {
   if (state.job_market_type) {
     params.set("market_type", state.job_market_type);
   }
-  if (state.cursor) {
-    params.set("cursor", state.cursor);
+  if (append && state.nextCursor) {
+    params.set("cursor", state.nextCursor);
   }
   if (state.query) {
     params.set("query", state.query);
@@ -909,7 +1014,10 @@ async function refreshWorkstation(root, reason = "manual") {
   }
   activeRequest = apiFetch(`${endpoint}?${params.toString()}`)
     .then((data) => {
-      renderWorkstation(root, data);
+      renderWorkstation(root, data, {
+        append,
+        preserveLoadedRows: !append && reason === "auto" && state.jobRows.length > 0,
+      });
       if (state.selectedJobId && reason !== "initial") {
         loadSelectedResult(root).catch(() => {});
       }
@@ -917,6 +1025,7 @@ async function refreshWorkstation(root, reason = "manual") {
     })
     .finally(() => {
       activeRequest = null;
+      renderJobPagination(root);
     });
   return activeRequest;
 }
@@ -996,6 +1105,34 @@ async function cancelJob(root, jobId) {
   }
 }
 
+async function deleteJob(root, jobId) {
+  if (!jobId) {
+    return;
+  }
+  if (!window.confirm(t("backtests.confirm_delete", { job: compactId(jobId) }))) {
+    return;
+  }
+  const endpoint = endpointFromTemplate(
+    root.dataset.jobDeleteEndpointTemplate || "/api/backtests/jobs/{job_id}",
+    { job_id: jobId }
+  );
+  setText("[data-create-status]", t("backtests.status.deleting_job", { job: compactId(jobId) }), root);
+  try {
+    await apiFetch(endpoint, { method: "DELETE" });
+    setText("[data-create-status]", t("backtests.status.deleted_job", { job: compactId(jobId) }), root);
+    if (state.selectedJobId === jobId) {
+      state.selectedJobId = null;
+      state.selectedVariantKey = null;
+      state.resultSummary = null;
+    }
+    state.jobRows = state.jobRows.filter((row) => row.job_id !== jobId);
+    renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
+    await refreshWorkstation(root, "auto");
+  } catch (error) {
+    setText("[data-create-status]", describeApiError(error), root);
+  }
+}
+
 function setAutorefresh(root, presetKey) {
   const intervalMs = REFRESH_PRESETS[presetKey] ?? 0;
   if (poller) {
@@ -1041,6 +1178,13 @@ function bind(root) {
       event.preventDefault();
       event.stopPropagation();
       cancelJob(root, cancelButton.dataset.cancelJobId || "").catch(() => {});
+      return;
+    }
+    const deleteButton = event.target.closest("[data-delete-job-id]");
+    if (deleteButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteJob(root, deleteButton.dataset.deleteJobId || "").catch(() => {});
       return;
     }
     const selectJobButton = event.target.closest("[data-select-job]");
@@ -1104,6 +1248,11 @@ function bind(root) {
         setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }));
       }
       refreshWorkstation(root, "manual").catch(() => {});
+      return;
+    }
+    const loadMoreButton = event.target.closest("[data-load-more-jobs]");
+    if (loadMoreButton instanceof HTMLElement) {
+      refreshWorkstation(root, "auto", { append: true }).catch(() => {});
       return;
     }
     const jobRow = event.target.closest("[data-job-id]");

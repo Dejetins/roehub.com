@@ -918,6 +918,28 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
 
         return self.get(job_id=job_id, user_id=user_id)
 
+    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+        """
+        Hard-delete one owner terminal job row.
+
+        Dependent top-variant and shortlist rows are removed by schema cascade.
+        """
+        sql = f"""
+        DELETE FROM {self._jobs_table}
+        WHERE job_id = %(job_id)s
+          AND user_id = %(user_id)s
+          AND state IN ('succeeded', 'failed', 'cancelled')
+        RETURNING job_id
+        """
+        row = self._gateway.fetch_one(
+            query=sql,
+            parameters={
+                "job_id": str(job_id),
+                "user_id": str(user_id),
+            },
+        )
+        return row is not None
+
     def count_active_for_user(self, *, user_id: UserId) -> int:
         """
         Count active owner jobs (`queued + running`) for deterministic quota checks.

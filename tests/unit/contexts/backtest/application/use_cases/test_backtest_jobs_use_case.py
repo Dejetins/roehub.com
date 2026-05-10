@@ -325,6 +325,13 @@ class _Repository:
         self.job = self.job.request_cancel(changed_at=cancel_requested_at)
         return self.job
 
+    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+        return (
+            self.job.job_id == job_id
+            and self.job.user_id == user_id
+            and self.job.state in {"succeeded", "failed", "cancelled"}
+        )
+
     def count_active_for_user(self, *, user_id: UserId) -> int:
         _ = user_id
         return 0
@@ -408,6 +415,18 @@ class _CreateRepository:
         cancelled = job.request_cancel(changed_at=cancel_requested_at)
         self.jobs[job_id] = cancelled
         return cancelled
+
+    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+        job = self.jobs.get(job_id)
+        if job is None or job.user_id != user_id or job.state not in {
+            "succeeded",
+            "failed",
+            "cancelled",
+        }:
+            return False
+        del self.jobs[job_id]
+        self.top_rows.pop(job_id, None)
+        return True
 
     def create_with_top_variants(
         self,

@@ -339,6 +339,24 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
+    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+        """
+        Hard-delete one owner terminal job row and let dependent rows cascade.
+
+        Args:
+            job_id: Job identifier.
+            user_id: Job owner identifier.
+        Returns:
+            bool: True when a terminal owner job was deleted.
+        Assumptions:
+            Active jobs are never hard-deleted through this port; callers must cancel first.
+        Raises:
+            ValueError: If storage write fails.
+        Side Effects:
+            Deletes one row from `backtest_jobs`; dependent rows cascade by schema.
+        """
+        ...
+
     def count_active_for_user(self, *, user_id: UserId) -> int:
         """
         Count owner active jobs (`queued + running`) for per-user quota checks.

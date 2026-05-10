@@ -61,6 +61,7 @@ BACKTEST_ERROR_FORBIDDEN = "backtest.forbidden"
 BACKTEST_ERROR_NOT_FOUND = "backtest.not_found"
 BACKTEST_ERROR_IDEMPOTENCY_CONFLICT = "backtest.idempotency_key_conflict"
 BACKTEST_ERROR_JOB_NOT_CANCELLABLE = "backtest.job_not_cancellable"
+BACKTEST_ERROR_JOB_NOT_DELETABLE = "backtest.job_not_deletable"
 BACKTEST_ERROR_RATE_LIMITED = "backtest.rate_limited"
 BACKTEST_ERROR_QUEUE_SATURATED = "backtest.queue_saturated"
 
@@ -316,6 +317,22 @@ class BacktestJobsUseCase:
             )
         return build_backtest_job_read_model(job=cancelled)
 
+    def delete(self, *, user_id: UserId, job_id: UUID) -> None:
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        if job.state not in {"succeeded", "failed", "cancelled"}:
+            raise _error(
+                code=BACKTEST_ERROR_JOB_NOT_DELETABLE,
+                message="Backtest job must be terminal before it can be deleted",
+                details={"job_id": str(job_id), "state": job.state},
+            )
+        deleted = self.job_repository.delete_terminal(job_id=job_id, user_id=user_id)
+        if not deleted:
+            raise _error(
+                code=BACKTEST_ERROR_NOT_FOUND,
+                message="Backtest job was not found",
+                details={"job_id": str(job_id)},
+            )
+
     def _preflight(self, *, payload: Mapping[str, Any]) -> BacktestPreflightResult:
         try:
             return self.preflight_service.execute(payload)
@@ -495,6 +512,7 @@ __all__ = [
     "BACKTEST_ERROR_FORBIDDEN",
     "BACKTEST_ERROR_IDEMPOTENCY_CONFLICT",
     "BACKTEST_ERROR_JOB_NOT_CANCELLABLE",
+    "BACKTEST_ERROR_JOB_NOT_DELETABLE",
     "BACKTEST_ERROR_NOT_FOUND",
     "BACKTEST_ERROR_QUEUE_SATURATED",
     "BACKTEST_ERROR_RATE_LIMITED",

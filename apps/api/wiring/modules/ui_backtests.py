@@ -559,6 +559,7 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
         links=dict(item.get("links") or {}),
         actions={
             "can_cancel": str(item.get("state") or "") in {"queued", "running"},
+            "can_delete": str(item.get("state") or "") in {"succeeded", "failed", "cancelled"},
             "can_open_top": str(item.get("state") or "") == "succeeded",
         },
     )

@@ -346,6 +346,15 @@ def build_backtests_router(
         result = use_case.cancel(user_id=principal.user_id, job_id=job_id)
         return build_backtest_job_response(result=result)
 
+    @router.delete("/backtests/jobs/{job_id}", status_code=204, response_model=None)
+    def delete_backtest_job(
+        job_id: UUID,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> Response:
+        use_case.delete(user_id=principal.user_id, job_id=job_id)
+        return Response(status_code=204)
+
     return router
 
 
