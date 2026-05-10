@@ -57,6 +57,9 @@ from .market_data_reference import (
     build_market_data_instruments_response,
     build_market_data_markets_response,
 )
+from .ui_backtests import (
+    BacktestWorkstationResponse,
+)
 from .ui_dashboard import (
     DashboardAlertsResponse,
     DashboardEquityPnlSeriesResponse,
@@ -140,4 +143,5 @@ __all__ = [
     "DashboardStrategyListResponse",
     "DashboardSummaryResponse",
     "DashboardSymbolAllocationResponse",
+    "BacktestWorkstationResponse",
 ]

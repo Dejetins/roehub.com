@@ -431,6 +431,66 @@ def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> 
     assert "/assets/strategy_ui.js" not in detail_response.text
 
 
+def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> None:
+    client = _build_test_client()
+
+    response = client.get("/backtests")
+    main_html = response.text.split('<main id="main-content"', maxsplit=1)[1].split(
+        "</main>", maxsplit=1
+    )[0]
+
+    assert response.status_code == 200
+    assert 'data-page="backtests"' in response.text
+    assert 'data-backtests-root' in response.text
+    assert 'data-workstation-endpoint="/api/ui/backtests/workstation"' in response.text
+    assert 'data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"' in response.text
+    assert 'data-preflight-endpoint="/api/backtests/preflight"' in response.text
+    assert 'data-jobs-endpoint="/api/backtests/jobs"' in response.text
+    assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' in response.text
+    assert "/assets/css/pages/backtests.css" in response.text
+    assert "/assets/js/pages/backtests.js" in response.text
+    assert "/assets/backtest_ui.js" not in response.text
+    assert "<select" not in response.text
+    assert 'role="listbox"' in response.text
+    assert 'data-backtest-control="branded dropdown"' in response.text
+    assert "Protected workspace placeholder" not in main_html
+    assert "backtest_ui.js" not in main_html
+    for panel in [
+        "command_bar",
+        "config",
+        "ai_configurator",
+        "instruments",
+        "indicators",
+        "optimization",
+        "recent_events",
+        "jobs_variants",
+    ]:
+        assert f'data-backtests-panel="{panel}"' in response.text
+    assert main_html.index('data-backtests-panel="config"') < main_html.index(
+        'data-backtests-panel="ai_configurator"'
+    )
+    assert main_html.index('data-backtests-panel="instruments"') < main_html.index(
+        'data-backtests-panel="indicators"'
+    )
+    assert main_html.index('data-backtests-panel="optimization"') < main_html.index(
+        'data-backtests-panel="jobs_variants"'
+    )
+    assert 'data-backtests-refresh-preset' in response.text
+
+    new_response = client.get("/backtests/new")
+    assert new_response.status_code == 200
+    assert 'data-page="backtests"' in new_response.text
+    assert 'data-initial-mode="create"' in new_response.text
+    assert "/assets/backtest_ui.js" not in new_response.text
+
+    job_id = "00000000-0000-0000-0000-000000000234"
+    detail_response = client.get(f"/backtests/{job_id}")
+    assert detail_response.status_code == 200
+    assert 'data-page="backtests"' in detail_response.text
+    assert 'data-initial-mode="selected_job"' in detail_response.text
+    assert f'data-initial-job-id="{job_id}"' in detail_response.text
+
+
 def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     client = _build_test_client()
 
@@ -551,6 +611,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
         "dist/css/pages/dashboard.css",
         "dist/js/pages/strategies.js",
         "dist/css/pages/strategies.css",
+        "dist/js/pages/backtests.js",
+        "dist/css/pages/backtests.css",
         "dist/js/components/dropdown.js",
         "dist/js/components/listbox.js",
         "dist/js/components/combobox.js",
@@ -576,6 +638,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     dashboard_css = (_WEB_ROOT / "dist/css/pages/dashboard.css").read_text(encoding="utf-8")
     strategies_js = (_WEB_ROOT / "dist/js/pages/strategies.js").read_text(encoding="utf-8")
     strategies_css = (_WEB_ROOT / "dist/css/pages/strategies.css").read_text(encoding="utf-8")
+    backtests_js = (_WEB_ROOT / "dist/js/pages/backtests.js").read_text(encoding="utf-8")
+    backtests_css = (_WEB_ROOT / "dist/css/pages/backtests.css").read_text(encoding="utf-8")
 
     assert "--rh-financial-positive" in tokens_css
     assert "--rh-financial-negative" in tokens_css
@@ -637,6 +701,23 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "strategy_ui.js" not in strategies_js
     assert "--rh-financial-positive" in strategies_css
     assert "--rh-financial-negative" in strategies_css
+    assert "/api/ui/backtests/workstation" in backtests_js
+    assert "/api/backtests/preflight" in backtests_js
+    assert "/api/backtests/jobs" in backtests_js
+    assert "Idempotency-Key" in backtests_js
+    assert "request_hash" in backtests_js
+    assert "refresh_status" in backtests_js
+    assert "retry_after_seconds" in backtests_js
+    assert "createPoller" in backtests_js
+    assert "activeRequest" in backtests_js
+    assert "hiddenTabPause" in backtests_js
+    assert "manualRefreshRetrySeconds" in backtests_js
+    assert "button.disabled = isRunning;" in backtests_js
+    assert "variants/{variant_key}/trades" not in backtests_js
+    assert "backtest_ui.js" not in backtests_js
+    assert "grid-row: 1;" in backtests_css
+    assert "--rh-financial-positive" in backtests_css
+    assert "--rh-financial-negative" in backtests_css
     assert "activeRequest" in dashboard_js
     assert "hiddenTabPause" in dashboard_js
     for placeholder in ["metric_1", "metric_2", "metric_3", "metric_4"]:

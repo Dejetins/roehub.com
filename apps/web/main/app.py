@@ -363,27 +363,50 @@ def _register_routes(
 
     @app.get("/backtests", response_class=HTMLResponse)
     def get_backtests_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/backtests"],
+            page_path="/backtests",
+            active_path="/backtests",
+            page_title_key="page.backtests.title",
+            page_description_key="page.backtests.desc",
+            template_name="pages/backtests.html",
+            template_context={
+                "backtest_initial_mode": request.query_params.get("mode") or "workstation",
+                "backtest_initial_job_id": request.query_params.get("job_id") or "",
+            },
         )
 
     @app.get("/backtests/new", response_class=HTMLResponse)
     def get_new_backtest_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/backtests/new"],
+            page_path="/backtests",
+            active_path="/backtests",
+            page_title_key="page.backtests.title",
+            page_description_key="page.backtests.desc",
+            template_name="pages/backtests.html",
+            template_context={
+                "backtest_initial_mode": "create",
+                "backtest_initial_job_id": "",
+            },
         )
 
     @app.get("/backtests/{job_id}", response_class=HTMLResponse)
     def get_backtest_deep_link(request: Request, job_id: str) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/backtests"],
-            template_context={"job_id": job_id},
+            page_path="/backtests",
+            active_path="/backtests",
+            page_title_key="page.backtests.title",
+            page_description_key="page.backtests.desc",
+            template_name="pages/backtests.html",
+            template_context={
+                "backtest_initial_mode": "selected_job",
+                "backtest_initial_job_id": job_id,
+            },
         )
 
     @app.get("/monitoring", response_class=HTMLResponse)

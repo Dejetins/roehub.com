@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/backtests.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="backtests-workstation"
+    data-page="backtests"
+    data-backtests-root
+    data-workstation-endpoint="/api/ui/backtests/workstation"
+    data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"
+    data-preflight-endpoint="/api/backtests/preflight"
+    data-jobs-endpoint="/api/backtests/jobs"
+    data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"
+    data-initial-mode="{{ backtest_initial_mode }}"
+    data-initial-job-id="{{ backtest_initial_job_id }}"
+    aria-label="{{ t('backtests.aria') }}"
+  >
+    {% include "fragments/backtests/loading_state.html" %}
+
+    <header class="backtests-command" data-backtests-panel="command_bar">
+      <div class="backtests-command__title">
+        <span aria-hidden="true">&gt;_</span>
+        <strong>{{ t("backtests.command.title") }}</strong>
+      </div>
+      <div class="backtests-command__tools">
+        <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+          <button
+            class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+            type="button"
+            id="backtest-preset-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="backtest-preset-menu"
+            data-rh-dropdown-trigger
+            data-backtest-control="branded dropdown"
+          >
+            {{ t("backtests.config.preset") }}
+            <span class="rh-dropdown__value" data-preset-current>mean_rev_opt_v2</span>
+          </button>
+          <span class="rh-popover" id="backtest-preset-menu" role="listbox" hidden data-rh-dropdown-menu>
+            <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-backtest-option="preset" data-value="mean_rev_opt_v2">mean_rev_opt_v2</button>
+            <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-backtest-option="preset" data-value="fresh_draft">{{ t("backtests.config.fresh_draft") }}</button>
+          </span>
+        </div>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-preflight-button>
+          {{ t("backtests.actions.preflight") }}
+        </button>
+        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-create-button>
+          {{ t("backtests.actions.run") }}
+        </button>
+      </div>
+    </header>
+
+    <div class="backtests-grid">
+      <section class="terminal-panel backtests-config" data-backtests-panel="config">
+        <header class="panel-heading"><h2>{{ t("backtests.config.title") }}</h2></header>
+        <div class="backtests-form-grid">
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.strategy") }}</span>
+            <input class="backtests-input" type="text" value="mean_reversion.py" data-config-field="strategy" aria-label="{{ t('backtests.config.strategy') }}">
+          </label>
+
+          {% for control in [
+            ("market", "backtests.config.market", "backtests.option.binance", [("binance", "backtests.option.binance")]),
+            ("market_type", "backtests.config.market_type", "backtests.option.spot", [("spot", "backtests.option.spot")]),
+            ("timeframe", "backtests.config.timeframe", "backtests.option.15m", [("15m", "backtests.option.15m")]),
+            ("direction", "backtests.config.direction", "backtests.option.long_short", [("long_short_reversal", "backtests.option.long_short"), ("long_only", "backtests.option.long_only")]),
+            ("risk_mode", "backtests.config.risk_mode", "backtests.option.no_risk", [("none", "backtests.option.no_risk"), ("tp_sl_grid", "backtests.option.tp_sl_grid")]),
+            ("ranking_metric", "backtests.config.ranking_metric", "backtests.option.total_return", [("total_return_pct", "backtests.option.total_return"), ("sharpe", "backtests.option.sharpe")]),
+            ("ranking_order", "backtests.config.ranking_order", "backtests.option.desc", [("desc", "backtests.option.desc"), ("asc", "backtests.option.asc")])
+          ] %}
+            <div class="backtests-field backtests-field--dropdown">
+              <span>{{ t(control[1]) }}</span>
+              <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+                <button
+                  class="rh-button rh-button--secondary rh-dropdown__trigger"
+                  type="button"
+                  id="backtest-{{ control[0] }}-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="backtest-{{ control[0] }}-menu"
+                  data-rh-dropdown-trigger
+                  data-backtest-control="branded dropdown"
+                  data-backtest-trigger="{{ control[0] }}"
+                >
+                  <span class="rh-dropdown__value" data-current-value="{{ control[0] }}">{{ t(control[2]) }}</span>
+                </button>
+                <span class="rh-popover" id="backtest-{{ control[0] }}-menu" role="listbox" hidden data-rh-dropdown-menu>
+                  {% for value, label_key in control[3] %}
+                    <button
+                      class="rh-menu-item"
+                      type="button"
+                      role="option"
+                      aria-selected="{{ 'true' if loop.first else 'false' }}"
+                      data-backtest-option="{{ control[0] }}"
+                      data-value="{{ value }}"
+                    >{{ t(label_key) }}</button>
+                  {% endfor %}
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.symbol") }}</span>
+            <input class="backtests-input" type="text" value="BTCUSDT" data-config-field="symbol" aria-label="{{ t('backtests.config.symbol') }}">
+          </label>
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.start") }}</span>
+            <input class="backtests-input" type="date" value="2023-01-01" data-config-field="start" aria-label="{{ t('backtests.config.start') }}">
+          </label>
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.end") }}</span>
+            <input class="backtests-input" type="date" value="2024-01-01" data-config-field="end" aria-label="{{ t('backtests.config.end') }}">
+          </label>
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.capital") }}</span>
+            <input class="backtests-input" type="number" min="1" step="100" value="10000" data-config-field="capital" aria-label="{{ t('backtests.config.capital') }}">
+          </label>
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.fee") }}</span>
+            <input class="backtests-input" type="number" min="0" step="0.01" value="0.075" data-config-field="fee" aria-label="{{ t('backtests.config.fee') }}">
+          </label>
+          <label class="backtests-field">
+            <span>{{ t("backtests.config.slippage") }}</span>
+            <input class="backtests-input" type="number" min="0" step="0.01" value="0.01" data-config-field="slippage" aria-label="{{ t('backtests.config.slippage') }}">
+          </label>
+        </div>
+        <div class="backtests-action-stack">
+          <button class="backtests-wide-action backtests-wide-action--primary" type="button" data-create-button-secondary>
+            {{ t("backtests.actions.run") }}
+          </button>
+          <button class="backtests-wide-action" type="button" data-save-draft disabled>
+            {{ t("backtests.actions.save_project") }}
+          </button>
+        </div>
+        <output class="backtests-feedback" data-create-status aria-live="polite">{{ t("backtests.status.ready") }}</output>
+      </section>
+
+      <section class="terminal-panel backtests-ai" data-backtests-panel="ai_configurator">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("backtests.ai.title") }}</h2>
+          <span class="backtests-pill">{{ t("backtests.ai.beta") }}</span>
+        </header>
+        <div class="backtests-chat" data-ai-log>
+          <article><span>{{ t("backtests.ai.prompt") }}</span><time>12:17:31</time></article>
+          <article><span>{{ t("backtests.ai.response") }}</span><time>12:17:52</time></article>
+          <article><span>{{ t("backtests.ai.ready") }}</span><time>12:18:02</time></article>
+        </div>
+        <div class="backtests-chat-input">
+          <input class="backtests-input" type="text" value="" placeholder="{{ t('backtests.ai.placeholder') }}" aria-label="{{ t('backtests.ai.placeholder') }}" disabled>
+          <button class="rh-button rh-button--primary rh-button--compact" type="button" disabled>{{ t("backtests.actions.send") }}</button>
+        </div>
+      </section>
+
+      <section class="terminal-panel backtests-instruments" data-backtests-panel="instruments">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("backtests.instruments.title") }}</h2>
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-clear-symbols>{{ t("backtests.actions.clear") }}</button>
+        </header>
+        <input class="backtests-input" type="search" placeholder="{{ t('backtests.instruments.search') }}" data-symbol-search aria-label="{{ t('backtests.instruments.search') }}">
+        <div class="backtests-chip-row" data-selected-symbols>
+          <span class="backtests-chip">BTCUSDT</span>
+          <span class="backtests-chip">ETHUSDT</span>
+          <span class="backtests-chip">SOLUSDT</span>
+        </div>
+        <div class="backtests-symbol-list" data-symbol-list></div>
+        <small class="backtests-muted" data-symbol-count>{{ t("backtests.instruments.selected") }}</small>
+      </section>
+
+      <section class="terminal-panel backtests-indicators" data-backtests-panel="indicators">
+        <header class="panel-heading"><h2>{{ t("backtests.indicators.title") }}</h2></header>
+        <div class="backtests-table-wrap">
+          <table class="backtests-table backtests-table--indicators">
+            <thead>
+              <tr>
+                <th>{{ t("backtests.indicators.indicator") }}</th>
+                <th>{{ t("backtests.indicators.from") }}</th>
+                <th>{{ t("backtests.indicators.to") }}</th>
+                <th>{{ t("backtests.indicators.step") }}</th>
+                <th>{{ t("backtests.indicators.sources") }}</th>
+              </tr>
+            </thead>
+            <tbody data-indicator-rows></tbody>
+          </table>
+        </div>
+        <footer class="backtests-panel-footer">
+          <span>{{ t("backtests.indicators.combinations") }}</span>
+          <strong data-combinations-count>--</strong>
+        </footer>
+      </section>
+
+      <section class="terminal-panel backtests-optimization" data-backtests-panel="optimization">
+        <header class="panel-heading"><h2>{{ t("backtests.optimization.title") }}</h2></header>
+        <div class="backtests-progress-line">
+          <span data-progress-label>{{ t("backtests.optimization.awaiting") }}</span>
+          <strong data-progress-percent>0%</strong>
+        </div>
+        <div class="backtests-progress-track"><span data-progress-bar></span></div>
+        <div class="backtests-summary-counters">
+          <div><span>{{ t("backtests.optimization.remaining") }}</span><strong data-remaining>--</strong></div>
+          <div><span>{{ t("backtests.optimization.completed") }}</span><strong data-completed>0</strong></div>
+          <div><span>{{ t("backtests.optimization.running") }}</span><strong data-running>0</strong></div>
+          <div><span>{{ t("backtests.optimization.queued") }}</span><strong data-queued>0</strong></div>
+        </div>
+      </section>
+
+      <section class="terminal-panel backtests-events" data-backtests-panel="recent_events">
+        <header class="panel-heading"><h2>{{ t("backtests.events.title") }}</h2></header>
+        <ul class="backtests-events-list" data-event-list></ul>
+      </section>
+
+      <section class="terminal-panel backtests-results" data-backtests-panel="jobs_variants">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("backtests.results.title") }}</h2>
+          <div class="backtests-result-tools">
+            <input class="backtests-input backtests-input--search" type="search" placeholder="{{ t('backtests.results.search') }}" data-job-search aria-label="{{ t('backtests.results.search') }}">
+            <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+              <button
+                class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+                type="button"
+                id="backtest-state-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="backtest-state-menu"
+                data-rh-dropdown-trigger
+                data-backtest-control="branded dropdown"
+              >
+                {{ t("backtests.results.state") }}
+                <span class="rh-dropdown__value" data-current-value="job_state">{{ t("backtests.results.all") }}</span>
+              </button>
+              <span class="rh-popover" id="backtest-state-menu" role="listbox" hidden data-rh-dropdown-menu>
+                {% for value, label_key in [("", "backtests.results.all"), ("queued", "backtests.state.queued"), ("running", "backtests.state.running"), ("succeeded", "backtests.state.succeeded"), ("failed", "backtests.state.failed"), ("cancelled", "backtests.state.cancelled")] %}
+                  <button
+                    class="rh-menu-item"
+                    type="button"
+                    role="option"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}"
+                    data-backtest-option="job_state"
+                    data-value="{{ value }}"
+                  >{{ t(label_key) }}</button>
+                {% endfor %}
+              </span>
+            </div>
+          </div>
+        </header>
+        <div class="backtests-table-wrap backtests-table-wrap--results">
+          <table class="backtests-table backtests-table--results">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ t("backtests.results.strategy") }}</th>
+                <th>{{ t("backtests.results.indicators") }}</th>
+                <th>{{ t("backtests.results.period") }}</th>
+                <th>{{ t("backtests.results.direction") }}</th>
+                <th>{{ t("backtests.results.combinations") }}</th>
+                <th>{{ t("backtests.results.return") }}</th>
+                <th>{{ t("backtests.results.sharpe") }}</th>
+                <th>{{ t("backtests.results.drawdown") }}</th>
+                <th>{{ t("backtests.results.profit_factor") }}</th>
+                <th>{{ t("backtests.results.win_rate") }}</th>
+                <th>{{ t("backtests.results.trades") }}</th>
+                <th>{{ t("backtests.results.status") }}</th>
+                <th>{{ t("backtests.results.actions") }}</th>
+              </tr>
+            </thead>
+            <tbody data-job-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+{% endblock %}
+
+{% block status_bar %}
+  <footer class="shell-status-panel app-bottom-status shell-global-status backtests-status-line" data-backtests-status-bar>
+    <span>{{ t("dashboard.footer.api") }}: <strong data-footer-api>--</strong></span>
+    <span>{{ t("backtests.footer.worker") }}: <strong data-footer-worker>--</strong></span>
+    <span>{{ t("backtests.footer.queue") }}: <strong data-footer-queue>--</strong></span>
+    <span>{{ t("dashboard.footer.server_time") }}: <strong data-footer-time>--</strong></span>
+    <span class="backtests-status-actions" data-backtests-refresh-control>
+      <button class="rh-button rh-button--primary rh-button--compact" type="button" data-backtests-refresh>{{ t("refresh.manual") }}</button>
+      <span class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button
+          class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+          type="button"
+          id="backtests-refresh-trigger"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="backtests-refresh-menu"
+          data-rh-dropdown-trigger
+          data-backtest-control="branded dropdown"
+        >
+          {{ t("refresh.autorefresh") }}
+          <span class="rh-dropdown__value" data-backtests-refresh-current>15s</span>
+        </button>
+        <span class="rh-popover" id="backtests-refresh-menu" role="listbox" hidden data-rh-dropdown-menu>
+          {% for preset in refresh_presets %}
+            <button
+              class="rh-menu-item"
+              type="button"
+              role="option"
+              aria-selected="{{ 'true' if preset.key == '15s' else 'false' }}"
+              data-backtests-refresh-preset="{{ preset.key }}"
+            >{{ preset.label }}</button>
+          {% endfor %}
+        </span>
+      </span>
+      <output class="backtests-freshness" data-backtests-freshness aria-live="polite">{{ t("backtests.awaiting_data") }}</output>
+    </span>
+  </footer>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{{ asset_url('/assets/js/pages/backtests.js') }}"></script>
+{% endblock %}
