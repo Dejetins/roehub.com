@@ -94,7 +94,7 @@ task_toggles:
 
 package_contract:
   depends_on:
-    - "08-backtests-workstation accepted or job UI contract stable"
+    - "public backtest jobs API contract stable"
   owns:
     - "apps/api/wiring/modules/backtest.py"
     - "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
