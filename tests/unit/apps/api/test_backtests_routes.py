@@ -251,6 +251,26 @@ def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     assert conflict.json()["error"]["code"] == "backtest.idempotency_key_conflict"
 
 
+def test_post_backtest_job_invalid_request_does_not_create_job() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    request = _valid_request()
+    request["indicators"][0]["indicator_id"] = "ma.nope"
+
+    response = client.post(
+        "/backtests/jobs",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000218",
+            "Idempotency-Key": "invalid-request-key",
+        },
+        json=request,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.invalid_request"
+    assert repository.jobs == {}
+
+
 def test_get_backtest_job_foreign_owner_returns_forbidden_code() -> None:
     repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
