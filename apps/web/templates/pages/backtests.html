@@ -13,6 +13,7 @@
     data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"
     data-preflight-endpoint="/api/backtests/preflight"
     data-jobs-endpoint="/api/backtests/jobs"
+    data-job-cancel-endpoint-template="/api/backtests/jobs/{job_id}/cancel"
     data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"
     data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"
     data-initial-mode="{{ backtest_initial_mode }}"
@@ -344,12 +345,14 @@
 {% endblock %}
 
 {% block status_bar %}
-  <footer class="shell-status-panel app-bottom-status shell-global-status backtests-status-line" data-backtests-status-bar>
+  <footer class="shell-status-panel app-bottom-status shell-global-status strategies-status-line backtests-status-line" data-backtests-status-bar>
+    <span>{{ t("strategies.footer.connection") }}: <strong data-footer-connection>--</strong></span>
+    <span>{{ t("strategies.footer.data") }}: <strong data-footer-data>--</strong></span>
     <span>{{ t("dashboard.footer.api") }}: <strong data-footer-api>--</strong></span>
-    <span>{{ t("backtests.footer.worker") }}: <strong data-footer-worker>--</strong></span>
-    <span>{{ t("backtests.footer.queue") }}: <strong data-footer-queue>--</strong></span>
+    <span>{{ t("dashboard.footer.latency") }}: <strong data-footer-latency>--</strong></span>
+    <span>{{ t("strategies.footer.capital") }}: <strong data-footer-capital>--</strong></span>
     <span>{{ t("dashboard.footer.server_time") }}: <strong data-footer-time>--</strong></span>
-    <span class="backtests-status-actions" data-backtests-refresh-control>
+    <span class="strategies-status-actions backtests-status-actions" data-backtests-refresh-control>
       <button class="rh-button rh-button--primary rh-button--compact" type="button" data-backtests-refresh>{{ t("refresh.manual") }}</button>
       <span class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
         <button
@@ -377,7 +380,8 @@
           {% endfor %}
         </span>
       </span>
-      <output class="backtests-freshness" data-backtests-freshness aria-live="polite">{{ t("backtests.awaiting_data") }}</output>
+      <output class="strategies-freshness backtests-freshness" data-backtests-freshness aria-live="polite">{{ t("backtests.awaiting_data") }}</output>
+      <strong data-backtests-refresh-status>{{ t("refresh.idle") }}</strong>
     </span>
   </footer>
 {% endblock %}

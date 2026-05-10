@@ -447,6 +447,10 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-preflight-endpoint="/api/backtests/preflight"' in response.text
     assert 'data-jobs-endpoint="/api/backtests/jobs"' in response.text
     assert (
+        'data-job-cancel-endpoint-template="/api/backtests/jobs/{job_id}/cancel"'
+        in response.text
+    )
+    assert (
         'data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"'
         in response.text
     )
@@ -462,7 +466,6 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-job-picker-menu" in response.text
     assert "data-job-launched-from" in response.text
     assert "data-job-symbol" in response.text
-    assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' not in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text

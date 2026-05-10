@@ -211,6 +211,8 @@
   "backtests.state.running": "Running",
   "backtests.state.succeeded": "Succeeded",
   "backtests.status.created": "Job {job} created",
+  "backtests.status.cancelled_job": "Job {job} cancelled",
+  "backtests.status.cancelling": "Cancelling job {job}",
   "backtests.status.failed": "Request failed",
   "backtests.status.preflight": "Running preflight",
   "backtests.status.preflight_ok": "Preflight OK, request_hash {hash}",

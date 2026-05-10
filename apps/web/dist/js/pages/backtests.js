@@ -152,6 +152,75 @@ function endpointFromTemplate(template, replacements) {
   return endpoint;
 }
 
+function formatFieldErrors(errors) {
+  if (!errors) {
+    return "";
+  }
+  if (Array.isArray(errors)) {
+    return errors
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        const path = Array.isArray(item?.loc)
+          ? item.loc.join(".")
+          : item?.field || item?.path || item?.name || "";
+        const message = item?.msg || item?.message || item?.reason || item?.code || "";
+        return [path, message].filter(Boolean).join(": ");
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (typeof errors === "object") {
+    return Object.entries(errors)
+      .map(([field, message]) => `${field}: ${Array.isArray(message) ? message.join(", ") : String(message)}`)
+      .join("; ");
+  }
+  return String(errors);
+}
+
+function describeApiError(error) {
+  const envelope = error?.payload?.error;
+  const detail = error?.payload?.detail;
+  const parts = [];
+  if (envelope && typeof envelope === "object") {
+    if (typeof envelope.message === "string") {
+      parts.push(envelope.message);
+    }
+    const envelopeErrors = formatFieldErrors(envelope.details?.field_errors || envelope.details?.errors);
+    if (envelopeErrors) {
+      parts.push(envelopeErrors);
+    } else if (envelope.details?.reason) {
+      parts.push(String(envelope.details.reason));
+    } else if (envelope.code) {
+      parts.push(String(envelope.code));
+    }
+  }
+  if (typeof detail === "string") {
+    parts.push(detail);
+  } else if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") {
+      parts.push(detail.message);
+    }
+    if (typeof detail.detail === "string") {
+      parts.push(detail.detail);
+    }
+    const detailErrors = formatFieldErrors(detail.field_errors || detail.errors);
+    if (detailErrors) {
+      parts.push(detailErrors);
+    }
+  }
+  const payloadErrors = formatFieldErrors(error?.payload?.field_errors || error?.payload?.errors);
+  if (payloadErrors) {
+    parts.push(payloadErrors);
+  }
+  if (!parts.length && typeof error?.message === "string" && error.message !== "[object Object]") {
+    parts.push(error.message);
+  }
+  const body = parts.filter(Boolean).join("; ") || t("backtests.status.failed");
+  return error?.status ? `HTTP ${error.status}: ${body}` : body;
+}
+
 function variantBaseEndpoint(root, jobId, variantKey) {
   const template =
     root.dataset.variantEndpointTemplate || "/api/backtests/jobs/{job_id}/variants/{variant_key}";
@@ -586,7 +655,14 @@ function renderJobs(root, table) {
           <td>${numberOrDash(row.profit_factor)}</td>
           <td>${percent(row.win_rate_pct)}</td>
           <td>${numberOrDash(row.trades_count)}</td>
-          <td>${escapeHtml(row.state)} / ${row.progress_percent}%</td>
+          <td>
+            <div class="backtests-status-cell">
+              <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
+              ${row.actions?.can_cancel
+                ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
+                : ""}
+            </div>
+          </td>
         </tr>
       `
     )
@@ -711,9 +787,22 @@ function renderChart(root, payload) {
 }
 
 function renderFooter(root, data) {
+  const sources = data?.sources || [];
+  const availableSources = sources.filter((source) => source.status === "available").length;
+  const capital = data?.config_draft?.execution?.initial_cash_quote;
+  setText(
+    "[data-footer-connection]",
+    data?.footer_status?.api === "available" ? "connected" : data?.footer_status?.api || "--",
+    document
+  );
+  setText(
+    "[data-footer-data]",
+    `${availableSources}/${sources.length || 0} ${data?.footer_status?.data || "--"}`,
+    document
+  );
   setText("[data-footer-api]", data?.footer_status?.api || "--");
-  setText("[data-footer-worker]", data?.footer_status?.worker || "--");
-  setText("[data-footer-queue]", data?.footer_status?.queue || "--");
+  setText("[data-footer-latency]", "--", document);
+  setText("[data-footer-capital]", capital ? `${capital} USDT` : "--", document);
   setText("[data-footer-time]", localTime(data?.generated_at));
   setText(
     "[data-backtests-freshness]",
@@ -724,6 +813,7 @@ function renderFooter(root, data) {
           time: localTime(data?.generated_at),
         })
   );
+  setText("[data-backtests-refresh-status]", data?.refresh_status || t("refresh.idle"), document);
 }
 
 function renderWorkstation(root, data) {
@@ -882,11 +972,37 @@ async function createJob(root) {
     state.selectedVariantKey = null;
     await refreshWorkstation(root, "manual");
   } catch (error) {
-    setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
+    setText("[data-create-status]", describeApiError(error), root);
   } finally {
     buttons.forEach((button) => {
       button.disabled = false;
     });
+  }
+}
+
+async function cancelJob(root, jobId) {
+  if (!jobId) {
+    return;
+  }
+  const endpoint = endpointFromTemplate(
+    root.dataset.jobCancelEndpointTemplate || "/api/backtests/jobs/{job_id}/cancel",
+    { job_id: jobId }
+  );
+  setText("[data-create-status]", t("backtests.status.cancelling", { job: compactId(jobId) }), root);
+  try {
+    const result = await apiFetch(endpoint, { method: "POST" });
+    setText(
+      "[data-create-status]",
+      t("backtests.status.cancelled_job", { job: compactId(result?.job_id || jobId) }),
+      root
+    );
+    if (state.selectedJobId === jobId) {
+      state.selectedJobId = null;
+      state.selectedVariantKey = null;
+    }
+    await refreshWorkstation(root, "manual");
+  } catch (error) {
+    setText("[data-create-status]", describeApiError(error), root);
   }
 }
 
@@ -926,8 +1042,15 @@ function bind(root) {
     const preflightButton = event.target.closest("[data-preflight-button]");
     if (preflightButton instanceof HTMLElement) {
       preflight(root).catch((error) => {
-        setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
+        setText("[data-create-status]", describeApiError(error), root);
       });
+      return;
+    }
+    const cancelButton = event.target.closest("[data-cancel-job-id]");
+    if (cancelButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelJob(root, cancelButton.dataset.cancelJobId || "").catch(() => {});
       return;
     }
     const clearSymbols = event.target.closest("[data-clear-symbols]");
@@ -1078,7 +1201,7 @@ function init() {
     }
     return null;
   }).catch((error) => {
-    setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
+    setText("[data-create-status]", describeApiError(error), root);
   });
   setAutorefresh(root, "15s");
 }
