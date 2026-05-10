@@ -13,24 +13,12 @@
   font-family: var(--rh-font-mono);
 }
 
-.backtests-command,
 .backtests-status-line,
 .terminal-panel {
   border: 1px solid var(--rh-workstation-panel-border);
   background: var(--rh-workstation-panel-bg);
 }
 
-.backtests-command {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 32px;
-  padding: 5px 8px;
-}
-
-.backtests-command__title,
-.backtests-command__tools,
 .panel-heading,
 .backtests-result-tools,
 .backtests-status-actions,
@@ -43,21 +31,10 @@
   min-width: 0;
 }
 
-.backtests-command__title {
-  color: var(--rh-accent-2);
-  font-size: 13px;
-  text-transform: uppercase;
-}
-
-.backtests-command__tools {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 .backtests-grid {
   display: grid;
   grid-template-columns: minmax(245px, 0.95fr) minmax(330px, 1.55fr) minmax(260px, 1fr) minmax(280px, 1.25fr);
-  grid-template-rows: minmax(250px, 0.95fr) minmax(92px, 0.34fr) minmax(255px, 1fr);
+  grid-template-rows: minmax(330px, 1fr) minmax(92px, auto) 240px;
   gap: 6px;
   min-width: 0;
 }
@@ -114,12 +91,7 @@
 }
 
 .backtests-optimization {
-  grid-column: 2 / 4;
-  grid-row: 2;
-}
-
-.backtests-events {
-  grid-column: 4;
+  grid-column: 2 / 5;
   grid-row: 2;
 }
 
@@ -324,6 +296,7 @@
 }
 
 .backtests-table-wrap--results {
+  max-height: 188px;
   overflow: auto;
 }
 
@@ -373,8 +346,7 @@
   text-align: center;
 }
 
-.backtests-summary-counters span,
-.backtests-events-list {
+.backtests-summary-counters span {
   color: var(--rh-muted);
   font-size: 9px;
 }
@@ -382,20 +354,6 @@
 .backtests-summary-counters strong {
   color: var(--rh-text-strong);
   font-size: 12px;
-}
-
-.backtests-events-list {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.backtests-events-list li {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .backtests-result-tools {
@@ -418,7 +376,7 @@
 
 .backtests-loading {
   position: absolute;
-  inset: 44px auto auto 8px;
+  inset: 8px auto auto 8px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -435,15 +393,6 @@
 }
 
 @media (max-width: 980px) {
-  .backtests-command {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .backtests-command__tools {
-    justify-content: flex-start;
-  }
-
   .backtests-grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
@@ -454,7 +403,6 @@
   .backtests-instruments,
   .backtests-indicators,
   .backtests-optimization,
-  .backtests-events,
   .backtests-results {
     grid-column: 1;
     grid-row: auto;

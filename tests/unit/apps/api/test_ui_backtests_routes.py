@@ -48,7 +48,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert response.status_code == 200
     payload = response.json()
     assert payload["runtime_defaults"]["supported_timeframes"] == ["15m"]
-    assert payload["config_draft"]["preset"]["persisted"] is False
+    assert "preset" not in payload["config_draft"]
     assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
     assert payload["indicator_catalog"]["items"]

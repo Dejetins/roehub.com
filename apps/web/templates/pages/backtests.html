@@ -13,46 +13,11 @@
     data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"
     data-preflight-endpoint="/api/backtests/preflight"
     data-jobs-endpoint="/api/backtests/jobs"
-    data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"
     data-initial-mode="{{ backtest_initial_mode }}"
     data-initial-job-id="{{ backtest_initial_job_id }}"
     aria-label="{{ t('backtests.aria') }}"
   >
     {% include "fragments/backtests/loading_state.html" %}
-
-    <header class="backtests-command" data-backtests-panel="command_bar">
-      <div class="backtests-command__title">
-        <span aria-hidden="true">&gt;_</span>
-        <strong>{{ t("backtests.command.title") }}</strong>
-      </div>
-      <div class="backtests-command__tools">
-        <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-          <button
-            class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
-            type="button"
-            id="backtest-preset-trigger"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-controls="backtest-preset-menu"
-            data-rh-dropdown-trigger
-            data-backtest-control="branded dropdown"
-          >
-            {{ t("backtests.config.preset") }}
-            <span class="rh-dropdown__value" data-preset-current>mean_rev_opt_v2</span>
-          </button>
-          <span class="rh-popover" id="backtest-preset-menu" role="listbox" hidden data-rh-dropdown-menu>
-            <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-backtest-option="preset" data-value="mean_rev_opt_v2">mean_rev_opt_v2</button>
-            <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-backtest-option="preset" data-value="fresh_draft">{{ t("backtests.config.fresh_draft") }}</button>
-          </span>
-        </div>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-preflight-button>
-          {{ t("backtests.actions.preflight") }}
-        </button>
-        <button class="rh-button rh-button--primary rh-button--compact" type="button" data-create-button>
-          {{ t("backtests.actions.run") }}
-        </button>
-      </div>
-    </header>
 
     <div class="backtests-grid">
       <section class="terminal-panel backtests-config" data-backtests-panel="config">
@@ -130,11 +95,11 @@
           </label>
         </div>
         <div class="backtests-action-stack">
+          <button class="backtests-wide-action" type="button" data-preflight-button>
+            {{ t("backtests.actions.preflight") }}
+          </button>
           <button class="backtests-wide-action backtests-wide-action--primary" type="button" data-create-button-secondary>
             {{ t("backtests.actions.run") }}
-          </button>
-          <button class="backtests-wide-action" type="button" data-save-draft disabled>
-            {{ t("backtests.actions.save_project") }}
           </button>
         </div>
         <output class="backtests-feedback" data-create-status aria-live="polite">{{ t("backtests.status.ready") }}</output>
@@ -146,9 +111,6 @@
           <span class="backtests-pill">{{ t("backtests.ai.beta") }}</span>
         </header>
         <div class="backtests-chat" data-ai-log>
-          <article><span>{{ t("backtests.ai.prompt") }}</span><time>12:17:31</time></article>
-          <article><span>{{ t("backtests.ai.response") }}</span><time>12:17:52</time></article>
-          <article><span>{{ t("backtests.ai.ready") }}</span><time>12:18:02</time></article>
         </div>
         <div class="backtests-chat-input">
           <input class="backtests-input" type="text" value="" placeholder="{{ t('backtests.ai.placeholder') }}" aria-label="{{ t('backtests.ai.placeholder') }}" disabled>
@@ -208,11 +170,6 @@
         </div>
       </section>
 
-      <section class="terminal-panel backtests-events" data-backtests-panel="recent_events">
-        <header class="panel-heading"><h2>{{ t("backtests.events.title") }}</h2></header>
-        <ul class="backtests-events-list" data-event-list></ul>
-      </section>
-
       <section class="terminal-panel backtests-results" data-backtests-panel="jobs_variants">
         <header class="panel-heading panel-heading--with-tools">
           <h2>{{ t("backtests.results.title") }}</h2>
@@ -264,7 +221,6 @@
                 <th>{{ t("backtests.results.win_rate") }}</th>
                 <th>{{ t("backtests.results.trades") }}</th>
                 <th>{{ t("backtests.results.status") }}</th>
-                <th>{{ t("backtests.results.actions") }}</th>
               </tr>
             </thead>
             <tbody data-job-rows></tbody>

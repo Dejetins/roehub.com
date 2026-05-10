@@ -446,7 +446,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"' in response.text
     assert 'data-preflight-endpoint="/api/backtests/preflight"' in response.text
     assert 'data-jobs-endpoint="/api/backtests/jobs"' in response.text
-    assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' in response.text
+    assert 'data-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"' not in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text
@@ -456,16 +456,25 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "Protected workspace placeholder" not in main_html
     assert "backtest_ui.js" not in main_html
     for panel in [
-        "command_bar",
         "config",
         "ai_configurator",
         "instruments",
         "indicators",
         "optimization",
-        "recent_events",
         "jobs_variants",
     ]:
         assert f'data-backtests-panel="{panel}"' in response.text
+    for removed_fragment in [
+        'data-backtests-panel="command_bar"',
+        'data-backtests-panel="recent_events"',
+        "backtest-preset-trigger",
+        "mean_rev_opt_v2",
+        "backtests.results.actions",
+        "data-cancel-job",
+        "Added RSI",
+        "Configuration is ready",
+    ]:
+        assert removed_fragment not in response.text
     assert main_html.index('data-backtests-panel="config"') < main_html.index(
         'data-backtests-panel="ai_configurator"'
     )

@@ -22,7 +22,6 @@ const state = {
   risk_mode: "none",
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
-  preset: "mean_rev_opt_v2",
   job_state: "",
   cursor: null,
   query: "",
@@ -218,21 +217,6 @@ function renderOptimization(root, overview) {
   setText("[data-queued]", overview?.queued_jobs ?? 0, root);
 }
 
-function renderEvents(root, events) {
-  const target = qs("[data-event-list]", root);
-  if (!target) {
-    return;
-  }
-  target.innerHTML = (events?.items || [])
-    .map((event) => `
-      <li>
-        <time>${escapeHtml(localTime(event.timestamp))}</time>
-        <span>${escapeHtml(event.message)}</span>
-      </li>
-    `)
-    .join("");
-}
-
 function renderJobs(root, table) {
   const target = qs("[data-job-rows]", root);
   if (!target) {
@@ -240,13 +224,12 @@ function renderJobs(root, table) {
   }
   const rows = table?.items || [];
   if (!rows.length) {
-    target.innerHTML = `<tr><td colspan="14">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="13">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
     return;
   }
   target.innerHTML = rows
-    .map((row, index) => {
-      const canCancel = Boolean(row.actions?.can_cancel);
-      return `
+    .map(
+      (row, index) => `
         <tr data-job-id="${escapeHtml(row.job_id)}">
           <td>${index + 1}</td>
           <td>${escapeHtml(row.strategy)}</td>
@@ -261,14 +244,9 @@ function renderJobs(root, table) {
           <td>${percent(row.win_rate_pct)}</td>
           <td>${numberOrDash(row.trades_count)}</td>
           <td>${escapeHtml(row.state)} / ${row.progress_percent}%</td>
-          <td>
-            <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-cancel-job="${escapeHtml(row.job_id)}" ${canCancel ? "" : "disabled"}>
-              ${escapeHtml(t("backtests.actions.cancel"))}
-            </button>
-          </td>
         </tr>
-      `;
-    })
+      `
+    )
     .join("");
 }
 
@@ -294,7 +272,6 @@ function renderWorkstation(root, data) {
   renderSymbols(root, data?.instrument_universe);
   renderIndicators(root, data?.indicator_catalog);
   renderOptimization(root, data?.optimization_overview);
-  renderEvents(root, data?.recent_events);
   renderJobs(root, data?.job_table);
   renderFooter(root, data);
   const loading = qs("[data-backtests-loading]", root);
@@ -377,13 +354,6 @@ async function createJob(root) {
   }
 }
 
-async function cancelJob(root, jobId) {
-  const template = root.dataset.cancelPathTemplate || "/api/backtests/jobs/{job_id}/cancel";
-  const path = template.replace("{job_id}", encodeURIComponent(jobId));
-  await apiFetch(path, { method: "POST" });
-  await refreshWorkstation(root, "manual");
-}
-
 function setAutorefresh(root, presetKey) {
   const intervalMs = REFRESH_PRESETS[presetKey] ?? 0;
   if (poller) {
@@ -436,12 +406,6 @@ function bind(root) {
     if (preset instanceof HTMLElement) {
       setAutorefresh(root, preset.dataset.backtestsRefreshPreset || "off");
       return;
-    }
-    const cancel = event.target.closest("[data-cancel-job]");
-    if (cancel instanceof HTMLElement) {
-      cancelJob(root, cancel.dataset.cancelJob || "").catch((error) => {
-        setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
-      });
     }
   });
 

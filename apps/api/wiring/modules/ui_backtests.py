@@ -358,7 +358,6 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
             "direction": ranking_default.get("direction", "desc"),
         },
         top_n=int(runtime_defaults.get("top_n_default") or 100),
-        preset={"preset_id": "draft", "name": "mean_rev_opt_v2", "persisted": False},
     )
 
 

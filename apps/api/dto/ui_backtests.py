@@ -30,7 +30,6 @@ class BacktestConfigDraftResponse(BaseModel):
     execution: dict[str, Any]
     ranking: dict[str, Any]
     top_n: int
-    preset: dict[str, Any] | None = None
 
 
 class BacktestOptionResponse(BaseModel):
