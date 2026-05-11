@@ -95,15 +95,15 @@ DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES: Mapping[str, BacktestTierAdmissionPoli
                 min_autorefresh_seconds=15,
             ),
             "ultra": BacktestTierAdmissionPolicy(
-                max_active_full_jobs=50,
-                max_running_full_jobs=1,
-                max_full_job_creates_per_hour=240,
-                max_top_n=250,
-                max_indicator_arity=10,
+                max_active_full_jobs=1_000_000_000_000,
+                max_running_full_jobs=1_000_000_000_000,
+                max_full_job_creates_per_hour=1_000_000_000_000,
+                max_top_n=1_000_000_000,
+                max_indicator_arity=1_000_000_000_000,
                 max_range_days=None,
-                max_active_lazy_detail_tasks=50,
-                max_lazy_detail_creates_per_hour=500,
-                min_autorefresh_seconds=10,
+                max_active_lazy_detail_tasks=1_000_000_000_000,
+                max_lazy_detail_creates_per_hour=1_000_000_000_000,
+                min_autorefresh_seconds=1,
             ),
         }
     )

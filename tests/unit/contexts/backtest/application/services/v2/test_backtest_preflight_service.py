@@ -9,6 +9,7 @@ from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaults
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
+    BacktestRuntimeGuardrails,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BACKTEST_ERROR_INVALID_REQUEST,
@@ -41,7 +42,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
     ]
     assert "total_return_pct" in response["ranking_metrics"]
     assert response["top_n_default"] == 100
-    assert response["guardrails"]["max_candidate_combinations"] == 300_000_000_000
+    assert response["guardrails"]["max_candidate_combinations"] == 10_000_000_000_000
     assert "ma.dema" in response["supported_indicator_ids"]
 
 
@@ -197,8 +198,15 @@ def test_preflight_rejects_request_too_expensive() -> None:
         }
     ]
 
+    runtime_config = BacktestRuntimeConfig(
+        hit_times_tp_levels_pct=tuple(i / 2 for i in range(1, 101)),
+        hit_times_sl_levels_pct=tuple(i / 2 for i in range(1, 51)),
+        artifact_config_hash="a" * 64,
+        guardrails=BacktestRuntimeGuardrails(max_indicator_rows=1_000),
+    )
+
     with pytest.raises(BacktestPreflightRejected) as exc_info:
-        _service().execute(request)
+        _service(runtime_config=runtime_config).execute(request)
 
     assert exc_info.value.error_code == BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE
     assert exc_info.value.issues[0].code == "max_indicator_rows"
@@ -246,8 +254,15 @@ def test_preflight_rejects_tp_sl_grid_above_cell_guardrail() -> None:
         "sl": {"start_pct": 0.5, "stop_pct": 25.0, "step_pct": 0.5},
     }
 
+    runtime_config = BacktestRuntimeConfig(
+        hit_times_tp_levels_pct=tuple(i / 2 for i in range(1, 101)),
+        hit_times_sl_levels_pct=tuple(i / 2 for i in range(1, 51)),
+        artifact_config_hash="a" * 64,
+        guardrails=BacktestRuntimeGuardrails(max_tp_sl_cells=2_209),
+    )
+
     with pytest.raises(BacktestPreflightRejected) as exc_info:
-        _service().execute(request)
+        _service(runtime_config=runtime_config).execute(request)
 
     assert exc_info.value.error_code == BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE
     assert exc_info.value.issues[0].code == "max_tp_sl_cells"

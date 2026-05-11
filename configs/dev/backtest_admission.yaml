@@ -2,8 +2,8 @@ version: 1
 backtest_admission:
   retry_after_seconds: 60
   global:
-    max_active_full_jobs: 200
-    max_active_lazy_detail_tasks: 500
+    max_active_full_jobs: 1000000000000
+    max_active_lazy_detail_tasks: 1000000000000
   tiers:
     free:
       max_active_full_jobs: 2
@@ -36,12 +36,12 @@ backtest_admission:
       max_lazy_detail_creates_per_hour: 120
       min_autorefresh_seconds: 15
     ultra:
-      max_active_full_jobs: 50
-      max_running_full_jobs: 1
-      max_full_job_creates_per_hour: 240
-      max_top_n: 250
-      max_indicator_arity: 10
+      max_active_full_jobs: 1000000000000
+      max_running_full_jobs: 1000000000000
+      max_full_job_creates_per_hour: 1000000000000
+      max_top_n: 1000000000
+      max_indicator_arity: 1000000000000
       max_range_days: null
-      max_active_lazy_detail_tasks: 50
-      max_lazy_detail_creates_per_hour: 500
-      min_autorefresh_seconds: 10
+      max_active_lazy_detail_tasks: 1000000000000
+      max_lazy_detail_creates_per_hour: 1000000000000
+      min_autorefresh_seconds: 1

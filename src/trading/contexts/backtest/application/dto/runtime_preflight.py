@@ -37,14 +37,14 @@ class BacktestRuntimeGuardrails:
     Public preflight guardrails used by backtest runtime-defaults and validation.
     """
 
-    max_active_jobs_per_user: int = 1
-    max_queued_jobs_per_user: int = 3
-    max_active_jobs_global: int = 1
-    max_top_n: int = 100
-    max_indicator_arity: int = 10
-    max_indicator_rows: int = 1000
-    max_candidate_combinations: int = 300_000_000_000
-    max_tp_sl_cells: int = 2209
+    max_active_jobs_per_user: int = 1_000_000_000_000
+    max_queued_jobs_per_user: int = 1_000_000_000_000
+    max_active_jobs_global: int = 1_000_000_000_000
+    max_top_n: int = 1_000_000_000
+    max_indicator_arity: int = 1_000_000_000_000
+    max_indicator_rows: int = 1_000_000_000_000
+    max_candidate_combinations: int = 10_000_000_000_000
+    max_tp_sl_cells: int = 1_000_000_000_000
     lazy_trades_rate_limit: str = "30/10min"
     job_queue_timeout_seconds: int = 300
     job_wall_timeout_seconds: int = 900
