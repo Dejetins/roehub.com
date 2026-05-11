@@ -406,6 +406,69 @@ class PostgresBacktestAiConfigRepository(
         """
         self._gateway.execute(query=query, parameters=_llm_attempt_parameters(attempt=attempt))
 
+    def list_events(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+    ) -> tuple[BacktestAiConfigEvent, ...]:
+        query = f"""
+        SELECT
+            event_id,
+            job_id,
+            owner_user_id,
+            event_name,
+            message,
+            payload_json,
+            created_at
+        FROM {self._events_table}
+        WHERE job_id = %(job_id)s
+          AND owner_user_id = %(owner_user_id)s
+        ORDER BY event_seq ASC, created_at ASC, event_id ASC
+        """
+        rows = self._gateway.fetch_all(
+            query=query,
+            parameters={
+                "job_id": str(job_id),
+                "owner_user_id": str(owner_user_id),
+            },
+        )
+        return tuple(_map_event_row(row=row) for row in rows)
+
+    def record_feedback(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+        applied: bool,
+        feedback_json: Mapping[str, object],
+        now: datetime,
+    ) -> BacktestAiConfigJob | None:
+        query = f"""
+        UPDATE {self._jobs_table}
+        SET
+            applied_at = CASE WHEN %(applied)s THEN %(now)s ELSE applied_at END,
+            user_feedback_json = %(user_feedback_json)s::jsonb,
+            updated_at = %(now)s
+        WHERE job_id = %(job_id)s
+          AND owner_user_id = %(owner_user_id)s
+        RETURNING
+            {_AI_CONFIG_JOB_SELECT_COLUMNS}
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "job_id": str(job_id),
+                "owner_user_id": str(owner_user_id),
+                "applied": applied,
+                "now": now,
+                "user_feedback_json": _json_dumps(feedback_json),
+            },
+        )
+        if row is None:
+            return None
+        return _map_job_row(row=row)
+
     def count_quota_events(
         self,
         *,
@@ -819,6 +882,21 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestAiConfigJob:
         raise BacktestStorageError("Cannot map backtest AI config job row") from error
 
 
+def _map_event_row(*, row: Mapping[str, Any]) -> BacktestAiConfigEvent:
+    try:
+        return BacktestAiConfigEvent(
+            event_id=UUID(str(row["event_id"])),
+            job_id=UUID(str(row["job_id"])),
+            owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+            event_name=cast(Any, str(row["event_name"])),
+            message=str(row["message"]),
+            payload_json=_json_mapping_required(row["payload_json"]),
+            created_at=_datetime(row["created_at"]),
+        )
+    except Exception as error:  # noqa: BLE001
+        raise BacktestStorageError("Cannot map backtest AI config event row") from error
+
+
 def _job_state(value: Any) -> BacktestAiConfigJobState:
     normalized = str(value).strip().lower()
     if normalized not in _ACTIVE_STATES and normalized not in _TERMINAL_STATES:
@@ -851,6 +929,13 @@ def _json_mapping(value: Any) -> Mapping[str, Any] | None:
     if not isinstance(value, Mapping):
         raise BacktestStorageError("Expected JSON object column")
     return dict(value)
+
+
+def _json_mapping_required(value: Any) -> Mapping[str, Any]:
+    result = _json_mapping(value)
+    if result is None:
+        raise BacktestStorageError("Expected required JSON object column")
+    return result
 
 
 def _json_tuple(value: Any) -> tuple[Mapping[str, Any], ...]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from typing import Mapping
 from uuid import UUID
 
 import pytest
@@ -310,6 +311,39 @@ class _Repository:
 
     def record_llm_attempt(self, *, attempt: BacktestAiConfigLlmAttempt) -> None:
         self.llm_attempts.append(attempt)
+
+    def list_events(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+    ) -> tuple[BacktestAiConfigEvent, ...]:
+        return tuple(
+            event
+            for event in self.events
+            if event.job_id == job_id and event.owner_user_id == owner_user_id
+        )
+
+    def record_feedback(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+        applied: bool,
+        feedback_json: Mapping[str, object],
+        now: datetime,
+    ) -> BacktestAiConfigJob | None:
+        job = self.get(job_id=job_id, owner_user_id=owner_user_id)
+        if job is None:
+            return None
+        updated = replace(
+            job,
+            applied_at=now if applied else job.applied_at,
+            user_feedback_json=dict(feedback_json),
+            updated_at=now,
+        )
+        self.jobs[job_id] = updated
+        return updated
 
     def count_quota_events(
         self,

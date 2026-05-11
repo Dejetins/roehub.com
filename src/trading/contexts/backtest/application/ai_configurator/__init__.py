@@ -16,6 +16,7 @@ from .dto import (
     BacktestAiQuotaSnapshot,
     JsonMapping,
 )
+from .fake_worker import BacktestAiConfigFakeWorkerUseCase
 from .jobs import (
     BACKTEST_AI_CONFIG_ERROR_FORBIDDEN,
     BACKTEST_AI_CONFIG_ERROR_IDEMPOTENCY_CONFLICT,
@@ -46,6 +47,7 @@ __all__ = [
     "BacktestAiConfigCreateResult",
     "BacktestAiConfigEvent",
     "BacktestAiConfigEventName",
+    "BacktestAiConfigFakeWorkerUseCase",
     "BacktestAiConfigJob",
     "BacktestAiConfigJobState",
     "BacktestAiConfigJobsUseCase",

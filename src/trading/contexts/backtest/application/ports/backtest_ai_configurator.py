@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
 from uuid import UUID
 
 from trading.shared_kernel.primitives import UserId
@@ -66,6 +66,31 @@ class BacktestAiConfigJobRepository(Protocol):
     def record_llm_attempt(self, *, attempt: BacktestAiConfigLlmAttempt) -> None:
         """
         Persist raw generate/repair attempt audit data for later scrubbed export.
+        """
+        ...
+
+    def list_events(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+    ) -> tuple[BacktestAiConfigEvent, ...]:
+        """
+        Return owner-scoped observable events for SSE replay.
+        """
+        ...
+
+    def record_feedback(
+        self,
+        *,
+        job_id: UUID,
+        owner_user_id: UserId,
+        applied: bool,
+        feedback_json: Mapping[str, object],
+        now: datetime,
+    ) -> BacktestAiConfigJob | None:
+        """
+        Record additive apply feedback without mutating validated config.
         """
         ...
 

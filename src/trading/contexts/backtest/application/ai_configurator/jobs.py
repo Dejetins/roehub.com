@@ -45,6 +45,7 @@ _VALID_MODES = {"create", "edit", "explain", "repair", "suggest_safer"}
 _VALID_LOCALES = {"ru", "en"}
 _MAX_IDEMPOTENCY_KEY_LENGTH = 128
 _MAX_USER_PROMPT_CHARS = 16_000
+_MAX_FEEDBACK_MESSAGE_CHARS = 4_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,6 +228,61 @@ class BacktestAiConfigJobsUseCase:
             )
         return job
 
+    def get_owned(self, *, user_id: UserId, job_id: UUID) -> BacktestAiConfigJob:
+        job = self._get_by_id_or_not_found(job_id=job_id)
+        if job.owner_user_id != user_id:
+            raise RoehubError(
+                code=BACKTEST_AI_CONFIG_ERROR_FORBIDDEN,
+                message="AI configurator job belongs to another owner",
+                details={"job_id": str(job_id)},
+            )
+        return job
+
+    def list_events(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+    ) -> tuple[BacktestAiConfigEvent, ...]:
+        self.get_owned(user_id=user_id, job_id=job_id)
+        return self.repository.list_events(job_id=job_id, owner_user_id=user_id)
+
+    def record_feedback(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        applied: bool,
+        feedback: Mapping[str, Any] | None = None,
+    ) -> BacktestAiConfigJob:
+        self.get_owned(user_id=user_id, job_id=job_id)
+        now = datetime.now(UTC)
+        feedback_json = _feedback_payload(applied=applied, feedback=feedback, now=now)
+        updated = self.repository.record_feedback(
+            job_id=job_id,
+            owner_user_id=user_id,
+            applied=applied,
+            feedback_json=feedback_json,
+            now=now,
+        )
+        if updated is None:
+            raise RoehubError(
+                code=BACKTEST_AI_CONFIG_ERROR_NOT_FOUND,
+                message="AI configurator job was not found",
+                details={"job_id": str(job_id)},
+            )
+        return updated
+
+    def _get_by_id_or_not_found(self, *, job_id: UUID) -> BacktestAiConfigJob:
+        job = self.repository.get(job_id=job_id, owner_user_id=None)
+        if job is None:
+            raise RoehubError(
+                code=BACKTEST_AI_CONFIG_ERROR_NOT_FOUND,
+                message="AI configurator job was not found",
+                details={"job_id": str(job_id)},
+            )
+        return job
+
 
 def _normalize_mode(*, mode: str) -> BacktestAiConfigMode:
     normalized = mode.strip().lower()
@@ -287,6 +343,55 @@ def _normalize_idempotency_key(*, idempotency_key: str | None) -> str | None:
             },
         )
     return normalized
+
+
+def _feedback_payload(
+    *,
+    applied: bool,
+    feedback: Mapping[str, Any] | None,
+    now: datetime,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "applied": applied,
+        "recorded_at": now.isoformat(),
+    }
+    if feedback is None:
+        return payload
+    raw_message = feedback.get("message")
+    if raw_message is not None:
+        message = str(raw_message).strip()
+        if len(message) > _MAX_FEEDBACK_MESSAGE_CHARS:
+            raise RoehubError(
+                code=BACKTEST_AI_CONFIG_ERROR_INVALID_REQUEST,
+                message="AI configurator feedback message is too large",
+                details={
+                    "path": "message",
+                    "max_chars": _MAX_FEEDBACK_MESSAGE_CHARS,
+                    "actual_chars": len(message),
+                },
+            )
+        if message:
+            payload["message"] = message
+    raw_reason = feedback.get("reason")
+    if raw_reason is not None:
+        reason = str(raw_reason).strip()
+        if reason:
+            payload["reason"] = reason[:128]
+    raw_context = feedback.get("client_context")
+    if isinstance(raw_context, Mapping):
+        client_context: dict[str, object] = {}
+        for key, value in raw_context.items():
+            normalized_value = _feedback_scalar(value)
+            if normalized_value is not None:
+                client_context[str(key)] = normalized_value
+        payload["client_context"] = client_context
+    return payload
+
+
+def _feedback_scalar(value: Any) -> object | None:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
 
 
 def _runtime_defaults_hash(*, ui_context: Mapping[str, Any] | None) -> str:
