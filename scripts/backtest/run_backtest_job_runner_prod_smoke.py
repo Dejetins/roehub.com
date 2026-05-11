@@ -511,6 +511,9 @@ def _run_lazy_detail_smoke(
             "expected lazy detail cache miss to return HTTP 202 after cache purge, "
             f"got {first.get('_status')} with cache={first.get('cache')}"
         )
+    first_cache = dict(first.get("cache", {}))
+    if first_cache.get("status") != "miss":
+        raise RuntimeError(f"expected first lazy detail read cache miss, got {first_cache}")
     task_id = str(dict(first["materialization"])["task_id"])
     statuses = [str(first.get("status"))]
     deadline = time.monotonic() + timeout_seconds
@@ -532,6 +535,12 @@ def _run_lazy_detail_smoke(
                 "status": status,
                 "status_path": " -> ".join(statuses),
                 "cache_key": cache_key,
+                "initial_detail_read": {
+                    "status": first.get("_status"),
+                    "cache_status": first_cache.get("status"),
+                    "materialization_status": first.get("status"),
+                    "task_id": task_id,
+                },
                 "items_returned": len(_require_list(detail.get("items"), "trades.items")),
                 "cache_status": dict(detail.get("cache", {})).get("status"),
             }
