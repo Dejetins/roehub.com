@@ -133,7 +133,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-base", default=_DEFAULT_API_BASE)
     parser.add_argument("--cookie-name", default=_DEFAULT_COOKIE_NAME)
     parser.add_argument("--timeout-seconds", type=int, default=3600)
-    parser.add_argument("--poll-interval-seconds", type=float, default=2.0)
+    parser.add_argument("--poll-interval-seconds", type=float, default=0.05)
     parser.add_argument("--session-ttl-seconds", type=int, default=3600)
     parser.add_argument("--status-burst-requests", type=int, default=20)
     parser.add_argument(
@@ -362,6 +362,7 @@ def _wait_for_job_success(
         if state == "running":
             running_samples.append(_running_sample(row=db_row))
         if state in {"succeeded", "failed", "cancelled"}:
+            api_payload = client.request_json("GET", f"/backtests/jobs/{job_id}")
             terminal = {
                 "state": state,
                 "api_state": api_payload.get("state"),
