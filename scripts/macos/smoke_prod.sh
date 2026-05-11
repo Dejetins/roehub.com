@@ -26,6 +26,9 @@ curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics >/tmp/roehub-metrics-9201.txt
 curl -fsS http://127.0.0.1:9202/metrics >/tmp/roehub-metrics-9202.txt
+curl -fsS http://127.0.0.1:9204/metrics >/tmp/roehub-metrics-9204.txt
+grep -q 'backtest_runner_tasks_claimed_total' /tmp/roehub-metrics-9204.txt
+grep -q 'backtest_runner_last_success_unixtime' /tmp/roehub-metrics-9204.txt
 
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING
