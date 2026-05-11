@@ -6,6 +6,8 @@
 ## Канонические документы
 
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` — канонический implementation source и целевой contract нового artifact-backed backtest service.
+- `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md` — целевой production-план для повторного ввода `backtest-job-runner`, lazy trades materialization, tier limits, Mac Studio service, metrics и smoke evidence.
+- `docs/architecture/backtest/backtest-ai-configurator-mlx-v1.md` — целевая production-архитектура AI configurator для `/backtests` на локальных MLX-моделях, Mac Studio inference host, очереди, валидации, лимитах и SSE UX.
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — companion/reference copy; если расходится с русским документом, для реализации побеждает `.ru.md`.
 - `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md` — executable prompt pack для Iteration 0/1 реализации.
 - `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.
@@ -20,6 +22,10 @@
   kernels/scorers/shortlists, old backtest use-cases, API routes, web pages/assets и
   `backtest-job-runner` могут оставаться в репозитории только как residual,
   compatibility-only или obsolete code до явной классификации.
+- Новый `backtest-job-runner` может вернуться в trusted active runtime path только
+  через `backtest-job-runner-production-plan-v1.md`: standalone Mac Studio process,
+  queued full jobs, async lazy trades materialization, tier quotas и production smoke
+  на реальных artifacts.
 - Новый backtest service проектируется поверх artifact publisher/precompute как входного слоя
   данных, без восстановления legacy runtime path.
 

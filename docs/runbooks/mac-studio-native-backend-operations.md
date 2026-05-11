@@ -146,6 +146,13 @@ GitHub Actions workflow `deploy-backend` должен использовать �
 входят в production reload baseline.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
 
+Целевой возврат `backtest-job-runner` в production baseline описан отдельно:
+`docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. До выполнения
+этого плана отсутствие `com.roehub.backtest-job-runner` в `launchctl` является текущим
+baseline, но публичный Web UI backtest rollout не считается завершенным без dedicated
+worker smoke: controlled job `queued -> running -> succeeded`, lazy trades materialization
+cache miss/hit, metrics endpoint и Prometheus target.
+
 Schema bootstrap (identity SQL + Alembic):
 
 ```bash

@@ -25,6 +25,21 @@
 - `market-data-ws-worker` (`127.0.0.1:9201/metrics`)
 - `market-data-scheduler` (`127.0.0.1:9202/metrics`)
 
+## Планируемый target после backtest runner rollout
+
+`backtest-job-runner` пока не входит в текущий monitoring baseline. Его возврат
+планируется через
+`docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`.
+
+После реализации runner rollout в `prometheus.prod.yml` должен появиться отдельный
+job:
+
+- `backtest-job-runner` (`127.0.0.1:9204/metrics`)
+
+До этого момента отсутствие target `backtest-job-runner` не является drift для
+текущего production monitoring, но является blocker для публичного `/backtests`
+runtime rollout.
+
 ## Monit service supervision
 
 Текущий Monit baseline (control-plane process supervision):

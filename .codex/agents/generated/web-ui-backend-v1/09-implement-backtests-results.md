@@ -2,7 +2,7 @@
 prompt_name: web_ui_backend_v1_09_backtests_results
 repo: roehub.com
 branch: main
-scope: "Этап 9: backtest result API/state внутри /backtests workstation, summary/chart/stat endpoints, paginated trades, CSV export."
+scope: "Этап 9: harden/complete existing backtest result API/state внутри /backtests workstation, without duplicating already implemented summary/chart/stat/trades endpoints."
 
 language:
   implementation: python_fastapi_jinja_css_js
@@ -16,6 +16,8 @@ context_sources:
       why: "Этап 9 source of truth"
     - path: docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
       why: "jobs, variant_key, lazy trades, summary-only contract"
+    - path: docs/architecture/backtest/backtest-job-runner-production-plan-v1.md
+      why: "production lazy trades materialization and no heavy API cache-miss recompute contract"
     - path: docs/architecture/apps/web/web-ui-design-manifest-v1.md
       why: "result/statistics visual rules"
   task_entrypoints:
@@ -80,6 +82,9 @@ style_references:
 hard_requirements:
   readiness_prerequisites_green_required: true
   readiness_gates_include_ui_backtests: true
+  inventory_current_result_methods_first: true
+  do_not_reimplement_existing_result_routes: true
+  harden_existing_result_methods_before_ui_expansion: true
   selected_result_state_required: true
   no_full_trades_initial_payload: true
   server_pagination_trades_required: true
@@ -94,11 +99,12 @@ hard_requirements:
   reject_generic_result_cards: true
 
 task_toggles:
-  implement_summary_endpoints: true
-  implement_chart_endpoints: true
-  implement_paginated_trades_get: true
-  implement_csv_export: true
-  implement_result_state_in_backtests_page: true
+  verify_existing_summary_endpoints: true
+  verify_existing_chart_stat_trades_endpoints: true
+  implement_missing_result_endpoints_only_if_absent: true
+  harden_lazy_materialization_status_contract: true
+  keep_current_summary_only_ui_until_runner_ready: true
+  implement_result_ui_expansion_only_after_materialization_ready: true
   publish_after_success: true
 
 package_contract:
@@ -164,8 +170,14 @@ required_literals:
   - "/backtests?job_id="
   - "stategy_backtest.png"
   - "/api/backtests/jobs/{job_id}/summary"
+  - "/api/backtests/jobs/{job_id}/variants/{variant_key}"
+  - "POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades"
   - "/api/backtests/jobs/{job_id}/variants/{variant_key}/equity"
-  - "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades"
+  - "/api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown"
+  - "/api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats"
+  - "/api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats"
+  - "GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page="
+  - "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv"
   - "/api/ui/backtests/workstation"
   - "BacktestJobWorkerUseCase"
   - "background_auto"
@@ -175,8 +187,11 @@ required_literals:
   - "summary-only"
   - "retry_after_seconds"
   - "refresh_status"
+  - "backtest_lazy_trades_materializations"
+  - "renderBacktestSeries"
 
 non_goals:
+  - "Do not duplicate or rewrite already existing result routes just because older prompt text says implement them."
   - "Do not change canonical request hash."
   - "Do not store full trades in top variant rows."
   - "Do not accept raw storage SHA as public route key."
@@ -235,41 +250,60 @@ safety_notes:
 
 # Task
 
-Implement Stage 9 backtest result state and bounded result APIs inside `/backtests`.
+Harden and complete Stage 9 backtest result state and bounded result APIs inside
+`/backtests`, starting from the current code rather than the older greenfield prompt
+assumption.
 
 Done means:
 
 - `/backtests` can open selected job/result state, normally via query/deep-link such as `/backtests?job_id=...`;
 - `/backtests/{job_id}`, if preserved, redirects/aliases to the same workstation state;
 - page body remains reference-shaped against `stategy_backtest.png`;
-- result state loads summary and one selected variant without all trades;
-- chart endpoints are bounded/downsampled;
-- trades table uses server pagination;
-- CSV export is separate;
+- current result routes are inventoried before edits, and already implemented routes are hardened rather than duplicated;
+- result state loads summary and one selected job/variant without all trades;
+- existing chart/stat/trades endpoints are bounded/downsampled/paginated and safe under cache/materialization behavior;
+- CSV export remains separate, owner-scoped and bounded by cache/materialization policy;
 - manual refresh/autorefresh for selected result state is bounded and respects server retry windows;
 - charts are nonblank in browser evidence;
 - variant lookup uses public `variant_key`.
 
 ## Context / Current State
 
-- Current API has job/top/variant and POST lazy trades endpoint.
-- Current `/api/ui/backtests/workstation` read model is the Stage 8 bounded workstation payload and must not be expanded with full trades by Stage 9 initial render.
+- Current API already has job/top/variant, POST lazy trades, result summary, equity,
+  drawdown, monthly stats, symbol stats, paginated GET trades and CSV endpoints in
+  `apps/api/routes/backtests.py`.
+- Current result DTOs already exist in `apps/api/dto/backtests.py` and
+  `src/trading/contexts/backtest/application/services/v2/result_series.py`.
+- Current `/api/ui/backtests/workstation` read model is the Stage 8 bounded workstation
+  payload and must not be expanded with full trades by Stage 9 initial render.
 - Current create path is queued: `POST /api/backtests/jobs` returns `queued`/`background_auto` semantics and enqueues through `execution_trigger`; `BacktestJobWorkerUseCase` owns claim/execute/finish/fail.
 - Current public result-adjacent lookup uses readable public `variant_key`; raw storage `variant_hash` is not accepted as the public route key.
+- Current Web UI consumes only `GET /api/backtests/jobs/{job_id}/summary` for variant
+  expansion and renders CSV links. It intentionally does not call `/equity`,
+  `/drawdown`, `/monthly-stats`, `/symbol-stats`, or `GET /trades?page=...`; tests
+  assert `renderBacktestSeries` and `/trades?page=` are absent from current JS.
 - Summary top rows must stay lightweight.
 - Lazy trades details are separate from top variant persistence.
+- Cache-miss lazy trades/result methods must align with
+  `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`: no heavy
+  sync cache-miss recompute in the production API request path.
 
 ## Requirements (Must)
 
 - Keep result UI inside `/backtests`; do not add a separate `backtests_result.html` page.
 - Preserve `/backtests` reference shape from `stategy_backtest.png` while adding selected job/result state.
-- Add result summary, equity, drawdown, monthly, symbol stats, paginated trades and CSV endpoints as compatible additions.
+- Verify existing result summary, equity, drawdown, monthly, symbol stats, paginated
+  trades and CSV endpoints before coding. Implement only endpoints that are truly absent.
+- Harden existing result/stat/trades methods so cache miss returns materialization/status
+  behavior instead of blocking API on heavy lazy recompute in production.
 - Preserve public/storage identity split.
 - Keep initial page payload bounded.
-- Manual refresh/autorefresh must not fetch all trades, must not trigger compute, and must respect `retry_after_seconds`.
+- Manual refresh/autorefresh must not fetch all trades, must not trigger full compute,
+  and must respect `retry_after_seconds`.
 - Add tests for 404, pagination, downsampling bounds, CSV auth/ownership.
 - Preserve and run the readiness tests for Stage 8 workstation, Stage 8.5 queued runtime, public `variant_key` split, and lazy trades POST boundary before adding result-state behavior.
-- Run browser nonblank chart evidence.
+- Run browser nonblank chart evidence only if this prompt actually connects charts into
+  the current UI; otherwise report charts as backend-only and not browser-visible in this pass.
 - Use `publish-ci-deploy` only after all gates pass.
 
 ## Requirements (Should)
@@ -297,25 +331,26 @@ Use front matter `context_sources`.
 
 # Work plan (agent should follow)
 
-1. Re-open `stategy_backtest.png` and confirm where selected result state fits inside the workstation.
-2. Specify result endpoint DTOs and pagination.
-3. Implement backend services/routes/tests.
-4. Implement `/backtests` result state, JS charts/table, CSV action without separate page layout.
-5. Add nonblank chart/browser QA.
-6. Run performance smoke for heavy endpoints where feasible.
-7. Run gates.
-8. Use `publish-ci-deploy` only after complete success.
+1. Re-open `stategy_backtest.png` and confirm the current `/backtests` workstation must not be rewritten.
+2. Inventory current result endpoints/methods/tests before edits: summary, variant, equity, drawdown, monthly stats, symbol stats, paginated trades, CSV, POST lazy trades.
+3. Compare current Web UI expectations: summary endpoint template, variant endpoint template, CSV links, no `renderBacktestSeries`, no `/trades?page=` JS call.
+4. Harden backend services/routes/tests around materialization/cache-status, pagination, downsampling, owner scope and public `variant_key`; implement missing endpoints only if absent.
+5. Connect additional UI panels/charts/tables only if materialization/status contract is ready and acceptance evidence can be collected without drifting the workstation.
+6. Add nonblank chart/browser QA only for actually connected browser-visible charts.
+7. Run performance smoke for heavy endpoints where feasible.
+8. Run gates.
+9. Use `publish-ci-deploy` only after complete success.
 
 # Acceptance criteria (Definition of Done)
 
 - `/backtests?job_id=...` opens result state; `/backtests/{job_id}`, if kept, aliases to it.
 - `/backtests` remains reference-shaped against `stategy_backtest.png`.
 - Loading/result state does not fetch all trades.
-- Variant switch fetches one variant's summary/chart endpoints.
+- Current variant expansion fetches bounded summary; future chart/stat expansion fetches one selected variant only after materialization/status readiness.
 - Manual refresh/autorefresh refreshes one selected job/variant state without overlapping requests.
-- Trades table uses server pagination.
-- CSV export is separate from table paging.
-- Canvas/SVG charts are nonblank.
+- Trades table uses server pagination if connected in this pass.
+- CSV export is separate from table paging and owner-scoped.
+- Canvas/SVG charts are nonblank if connected in this pass.
 - Multi-year series respects point limits.
 - Financial colors remain invariant.
 - Generic result cards or separate sixth page layout are not acceptable.

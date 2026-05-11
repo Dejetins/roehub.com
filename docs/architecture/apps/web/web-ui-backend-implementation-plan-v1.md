@@ -11,6 +11,14 @@
 - обновление 2026-05-04: функциональные страницы привязаны к canonical PNG-референсам через жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются кандидатом на откат/замену, если не повторяют назначенный reference layout.
 - обновление 2026-05-05: login реализуется как branded modal, registration остается отдельной страницей, все dropdown/listbox/menu controls должны быть фирменными, а live-data страницы получают explicit data-source/refresh/autorefresh/rate-limit contracts.
 - обновление 2026-05-08: фактическая реализация ушла вперед от старого "предлагаемого" плана; в `main` уже присутствуют Stage 0-5 surfaces, а `/strategies`, `/backtests`, Stage 8.5 runtime hardening, AI, hardening и load validation остаются неисполненными этапами.
+- обновление 2026-05-11: текущая реализация уже содержит `/strategies` и `/backtests`
+  workstation baseline, а также backend result/statistics endpoints для backtest jobs.
+  Текущий `/backtests` Web UI ожидает только bounded workstation payload,
+  `GET /api/backtests/jobs/{job_id}/summary`, variant expansion и CSV links; он
+  намеренно не вызывает chart/stat/trades-table endpoints (`/equity`, `/drawdown`,
+  `/monthly-stats`, `/symbol-stats`, `GET /trades?page=...`). Эти endpoints уже
+  существуют как backend contract, но перед расширением UI должны быть hardened под
+  async lazy trades materialization из `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`.
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
 
 ## Фактический checkpoint реализации на 2026-05-08
@@ -26,15 +34,19 @@
 | 04 | `04-implement-dashboard.md` | Реализовано частично как current baseline: `/dashboard` рендерит `pages/dashboard.html`; есть `GET /api/ui/dashboard/summary`, DTO, wiring, tests, manual refresh limiter, degraded source inventory. Полные portfolio/positions/fills/equity/symbol allocation storage sources еще отсутствуют и возвращаются как typed unavailable/degraded panels. | Не переделывать как generic cards. Следующие live-data этапы должны заменить degraded panels реальными read-models. |
 | 05 | `05-implement-settings-account.md` | Реализовано как current baseline: `/settings`, account fragments, `settings.css/js`, `GET/PUT /api/ui/account/*`, additive `migrations/postgres/0006_identity_account_settings_v1.sql`, identity account settings use case/ports/adapters, route tests. | Stage 5 дорабатывать только если QA найдет drift от `personal_settings.png` или bug в account persistence. |
 | 06 | `06-implement-strategy-library-detail.md` | Реализовано как current baseline: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; есть bounded `GET /api/ui/strategies/dashboard`, DTO/wiring/tests, old `strategy_ui.js` не подключается. Текущая компоновка - пять рабочих блоков: слева Statistics Workspace над более широким Visual Workspace, справа Strategy Control над Saved Strategies той же ширины, снизу Trades History на всю ширину. Create UI и ручная `Load statistics` кнопка исключены из workstation: статистика подгружается сразу для выбранной строки стратегии. | Следующие этапы должны добавлять реальные read-model/projections для unavailable panels, не возвращая generic card grid. |
-| 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. Dashboard использует bounded polling summary, но не полноценный strategy live SSE bridge. | Выполнять после Stage 6 или совместно с ним только при стабильном DTO handoff. |
-| 08 | `08-implement-backtests-history-configurator.md` | Не реализовано: `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас placeholder; old top-level `backtests.html` и `backtest_ui.js` не являются целевым workstation implementation. | Выполнять после Stage 6/7 или отдельным агентом при сохранении shared UI contracts. |
-| 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Не реализовано в рамках Web UI pack checkpoint; публичный backtest UI пока не должен полагаться на отсутствие `sync_inline` без отдельной проверки runtime wiring. | Выполнить до публичного запуска real `/backtests` create/results flow. |
-| 09 | `09-implement-backtests-results.md` | Не реализовано: selected result state внутри `/backtests` отсутствует. | Выполнять только после Stage 8 и 8.5. |
+| 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. `/strategies` и `/dashboard` используют bounded polling/read-models, но не полноценный strategy live SSE bridge. | Выполнять как backend/live bridge для текущего UI, не переписывая текущие `/strategies` и `/dashboard`. |
+| 08 | `08-implement-backtests-history-configurator.md` | Реализовано как current baseline: `/backtests`, `/backtests/new`, `/backtests/{job_id}` рендерят `pages/backtests.html`; есть reference-shaped workstation, branded dropdowns, config/preflight/create/history/job filters, delete/cancel markers, `GET /api/ui/backtests/workstation`, route/API/web tests, old `backtest_ui.js` не подключается. | Дальше только bugfix/read-model hardening; не возвращать generic history cards или native selects. |
+| 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Частично реализовано на уровне API boundary: create path возвращает queued/background semantics и использует execution trigger/worker use-case seam. Production `backtest-job-runner` service на Mac Studio и lazy trades materialization queue еще не реализованы; это вынесено в `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. | Выполнить отдельный runner prompt pack до публичной нагрузки `/backtests` create/results и до UI, который активно вызывает heavy result/stat endpoints. |
+| 09 | `09-implement-backtests-results.md` | Частично реализовано: backend endpoints `summary`, `equity`, `drawdown`, `monthly-stats`, `symbol-stats`, paginated `GET /trades` и `trades.csv` уже есть и покрыты API tests. Текущий Web UI потребляет только `summary` для variant expansion и CSV links; chart helpers, paginated trades table и stat panels не подключены и тестом зафиксированы как отсутствующие. | Следующий шаг - не повторная реализация endpoints, а hardening этих методов под async materialization/cache-status и затем UI-интеграция только после runner readiness. |
 | 10 | `10-implement-ai-backtest-configurator.md` | Не реализовано. | Требует отдельного AI backend design decision перед реализацией. |
 | 11 | `11-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 11. | Выполнять после завершения всех browser-visible страниц. |
 | 12 | `12-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 11 или перед публичным запуском live/autorefresh-heavy surfaces. |
 
-Практический resume point: если нужно продолжать Web UI v1 по этому plan/prompt-pack, стартовать с `06-implement-strategy-library-detail.md`, предварительно сверив, что Stage 4-5 текущего дерева остаются green.
+Практический resume point: если нужно продолжать Web UI v1 по этому plan/prompt-pack,
+стартовать не со старого Stage 6, а с production runner/materialization пакета для
+backtest runtime либо с backend-only live bridge Stage 7. Для `/backtests` текущий UI
+считать source of truth; Stage 9 должен быть hardening/completion pass поверх уже
+существующих backend endpoints.
 
 ## Цель
 
@@ -55,8 +67,11 @@
 - `apps/web` - FastAPI SSR/Jinja2-приложение с login gate через `/api/auth/current-user`, защищенными страницами и static mount `/assets`.
 - Целевой shell уже находится в `apps/web/templates/base.html`, `apps/web/templates/pages/*`, `apps/web/templates/fragments/*`, `apps/web/templates/macros/ui.html`; top-level `landing.html`, `backtests.html`, `strategies_list.html`, `strategy_builder.html`, `strategy_details.html`, `site.css`, `strategy_ui.js`, `backtest_ui.js` остаются legacy/compatibility artifacts, если не подключены активными routes.
 - `base.html` уже использует self-hosted `apps/web/dist/vendor/htmx.min.js`, модальный login fragment и внешние JS assets. Внешний CDN для shell не является текущим behavior.
-- Активно реализованные browser-visible страницы: `/`, `/dashboard`, `/settings`, `/login` как modal pre-open state, `/logout`, `/register`.
-- Активные placeholders: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests`, `/backtests/new`, `/backtests/{job_id}`, `/monitoring`.
+- Активно реализованные browser-visible страницы: `/`, `/dashboard`, `/settings`,
+  `/strategies`, `/strategies/new`, `/strategies/{strategy_id}`, `/backtests`,
+  `/backtests/new`, `/backtests/{job_id}`, `/login` как modal pre-open state,
+  `/logout`, `/register`.
+- Активные placeholders: `/monitoring`.
 - Production routing должен оставаться same-origin на edge: HTML/assets идут в web, `/api/*` идет напрямую в backend. Встроенный web-proxy `/api/*` остается local/dev parity-путем, а не production-целью.
 - Backend уже предоставляет auth/current-user, exchange keys, account UI routes, dashboard summary UI route, strategy CRUD/run/stop, справочники market-data, indicators и backtest jobs API.
 - Backtest jobs API уже использует терминологию `jobs`, публично читаемый `variant_key`, summary-only top rows и lazy trades endpoint.
@@ -892,7 +907,15 @@ Endpoint map freeze:
 | `GET /api/backtests/jobs/{job_id}/top` | `GET /backtests/jobs/{job_id}/top` | Existing top variants summary; stages 8/9 reuse. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | `GET /backtests/jobs/{job_id}/variants/{variant_key}` | Existing variant details; этап 9 переиспользует. |
 | `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | `POST /backtests/jobs/{job_id}/variants/{variant_key}/trades` | Existing lazy trades detail; этап 9 переиспользует, не хранит full trades в top rows. |
+| `GET /api/backtests/jobs/{job_id}/summary` | `GET /backtests/jobs/{job_id}/summary` | Existing bounded result summary; current Web UI uses it for selected job variant expansion. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/equity` | Existing backend result series; current Web UI does not call it yet. Must be hardened to avoid sync lazy recompute on cache miss before visual chart integration. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/drawdown` | Existing backend result series; same materialization/cache-status constraint as equity. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Existing backend stat method; current Web UI does not call it yet. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Existing backend stat method; current Web UI does not call it yet. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/trades` | Existing backend paginated trades method; current Web UI intentionally does not call it yet. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | `GET /backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Existing CSV export; current Web UI renders CSV links in variant expansion. Must remain owner-scoped and bounded by cache/materialization policy. |
 | `POST /api/backtests/jobs/{job_id}/cancel` | `POST /backtests/jobs/{job_id}/cancel` | Existing cancel action; этап 8 переиспользует. |
+| `DELETE /api/backtests/jobs/{job_id}` | `DELETE /backtests/jobs/{job_id}` | Existing terminal job delete action; current Web UI exposes delete markers for terminal jobs. |
 | New `/api/ui/*` | New `/ui/*` | Additive endpoints only in owning stages; no duplicate backend `/api` prefix. |
 | New `/api/stream/*` | New `/stream/*` | Additive SSE endpoints only in owning stages; edge/proxy contract unchanged. |
 
@@ -1633,9 +1656,19 @@ Playwright CLI:
 
 ## Этап 8 - история и конфигуратор backtest-задач
 
-Статус 2026-05-08: не реализовано. Активные web routes `/backtests`, `/backtests/new`, `/backtests/{job_id}` сейчас используют `pages/placeholder.html`; old `backtests.html`/`backtest_ui.js` не являются целевым Stage 8 workstation.
+Статус 2026-05-11: реализовано как current baseline. Активные web routes
+`/backtests`, `/backtests/new`, `/backtests/{job_id}` используют
+`apps/web/templates/pages/backtests.html`, scoped `backtests.css/js`,
+`GET /api/ui/backtests/workstation`, branded controls, jobs filters, create/preflight
+flow, job cancel/delete markers и selected-job expansion. Old top-level
+`backtests.html` и `backtest_ui.js` не являются активной основой.
 
-Цель: реализовать `/backtests` как единую reference-shaped backtest workstation строго по `stategy_backtest.png`: конфигурация, AI/config zone, instruments, indicators, optimization progress/status, recent events и таблица variants/results в одной плотной рабочей поверхности. Не делить UX на generic history cards и отдельный `/backtests/new`, если это не требуется совместимостью.
+Цель baseline уже выполнена: `/backtests` является единой reference-shaped backtest
+workstation строго по `stategy_backtest.png`: конфигурация, AI/config zone,
+instruments, indicators, optimization progress/status и таблица jobs/variants в
+одной плотной рабочей поверхности. Дальнейшие Stage 8 изменения должны быть только
+bugfix/read-model hardening поверх текущей UI модели; не делить UX на generic history
+cards и отдельный `/backtests/new`, если это не требуется совместимостью.
 
 Канонический референс:
 
@@ -1656,18 +1689,23 @@ Playwright CLI:
 - `GET /api/backtests/jobs/{job_id}`;
 - `GET /api/backtests/jobs/{job_id}/top`;
 - `POST /api/backtests/jobs/{job_id}/cancel`;
+- `DELETE /api/backtests/jobs/{job_id}`;
 - `GET /api/market-data/markets`;
 - `GET /api/market-data/instruments`;
 - `GET /api/indicators`.
 
 Backend/API-добавления:
 
+- `GET /api/ui/backtests/workstation?cursor=&state=&query=` уже реализован;
 - `GET /api/ui/backtest-presets`;
 - `POST /api/ui/backtest-presets`;
 - `DELETE /api/ui/backtest-presets/{preset_id}`;
-- `GET /api/ui/backtests/workstation?cursor=&state=&query=`;
 - опционально `GET /api/ui/backtests/counters`;
 - опционально `GET /api/backtests/jobs/{job_id}/events` SSE, если job progress доступен вне polling.
+
+Presets/counters/events остаются будущими additive расширениями. Их отсутствие не
+ломает текущую workstation baseline, если `config_draft`, filters, job table,
+manual refresh и autorefresh работают через `GET /api/ui/backtests/workstation`.
 
 Поведение backend:
 
@@ -1762,6 +1800,13 @@ Playwright CLI:
 
 Статус 2026-05-08: не реализовано в рамках Web UI v1 checkpoint. Перед публичным `/backtests` create/results flow нужно заново проверить текущую wiring-семантику и убрать/ограничить `sync_inline` path, если он все еще достижим из API request path.
 
+Обновление 2026-05-11: production runner target вынесен в
+`docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. Этот этап не
+должен ограничиваться косметическим запретом `sync_inline`: перед публичным rollout
+нужно реализовать или явно заблокировать весь compute boundary, включая standalone
+`backtest-job-runner`, tier quotas, очередь full jobs и async lazy trades
+materialization для detail view Web UI.
+
 Цель: убрать архитектурный риск `sync_inline` execution в API process как публичный путь для configurator/results. Browser contract уже должен быть job-based, но фактическое выполнение нужно привести к queued/background semantics до того, как results/configurator станут основной пользовательской поверхностью.
 
 Наблюдаемое основание:
@@ -1797,6 +1842,12 @@ Backend/API:
 - `POST /api/backtests/jobs` сохраняет idempotent persisted job и возвращает быстро;
 - `cancel` остается idempotent;
 - API process не выполняет long-running compute в request path;
+- API process не выполняет тяжелый lazy trades cache-miss recompute в production
+  request path; cache miss переводится в bounded materialization task по
+  `backtest-job-runner-production-plan-v1.md`;
+- create/preflight/detail запросы применяют tier quotas для `free|base|pro|ultra`,
+  включая active/queued jobs, creates/hour, `top_n`, arity, date range, active lazy
+  detail tasks, lazy detail/hour и минимальный autorefresh interval;
 - если полноценный worker queue еще не готов, этап должен явно зафиксировать transitional adapter, timeout guard и запрет public rollout для high-load create;
 - job event SSE может быть добавлен как read-only progress bridge, но polling fallback остается обязательным.
 
@@ -1805,6 +1856,9 @@ Backend/API:
 - проверить/изменить `apps/api/wiring/modules/backtest.py`;
 - проверить/изменить `src/trading/contexts/backtest/application/use_cases/backtest_jobs.py`;
 - добавить/изменить worker trigger/port/adapters в `src/trading/contexts/backtest/**` или существующем worker package;
+- для production runner prompt pack ожидаемые новые surfaces: `apps/worker/backtest_job_runner/**`,
+  storage/ports для `backtest_lazy_trades_materializations`, Mac Studio launchd
+  plist, Prometheus target `127.0.0.1:9204/metrics` и dedicated runner smoke;
 - обновить `apps/api/routes/backtests.py` только если меняется external behavior/status;
 - добавить tests:
   - create возвращает `queued/accepted` response без inline compute;
@@ -1816,6 +1870,10 @@ Backend/API:
 Критерии приемки:
 
 - API create path ограничен validation/persistence/enqueue, а не full compute;
+- cache miss lazy trades detail не блокирует API и возвращает queued/running/status
+  contract вместо sync recompute;
+- quota/admission behavior покрывает `free|base|pro|ultra` и возвращает
+  `429/422/503` с typed retry/limit metadata;
 - UI может всегда показывать `queued/running/succeeded|failed|cancelled`;
 - current job states не меняются на persisted `created`/`completed`;
 - no full result/trades payload stored in job top rows;
@@ -1825,6 +1883,8 @@ Backend/API:
 Нагрузочная проверка:
 
 - controlled low-rate create/preflight scenario показывает, что API process не уходит в CPU saturation;
+- controlled lazy detail cache miss/hit scenario показывает, что cache miss не
+  блокирует API process и не starvation-ит full jobs;
 - dashboard/auth lightweight endpoints остаются responsive во время queued job create burst;
 - если используется transitional inline fallback, capacity report обязан классифицировать риск как `yellow` или `red`.
 
@@ -1834,13 +1894,28 @@ Backend/API:
 - runtime workflow: `compatible-change` или `breaking-change`, если фактическая sync semantics была externally relied upon;
 - request hash/cache identity: `none`;
 - performance risk: `unknown` до capacity/benchmark evidence;
-- persisted schema: `none` или `compatible-change`, если добавляется queue metadata.
+- persisted schema: `compatible-change`, если добавляется
+  `backtest_lazy_trades_materializations`, quota indexes или queue metadata.
 
 ## Этап 9 - backtest result API/state внутри workstation
 
-Статус 2026-05-08: не реализовано. Selected result state отсутствует, потому что Stage 8 workstation еще не заменил placeholder route.
+Статус 2026-05-11: частично реализовано. Backend endpoints для result/statistics
+уже присутствуют в `apps/api/routes/backtests.py`, `apps/api/dto/backtests.py`,
+`src/trading/contexts/backtest/application/services/v2/result_series.py` и
+`BacktestJobsUseCase`. Текущий Web UI ожидает только selected summary flow:
+`pages/backtests.html` содержит `data-job-summary-endpoint-template`, а
+`backtests.js` вызывает `GET /api/backtests/jobs/{job_id}/summary` для variant
+expansion и строит CSV links. UI не вызывает `/equity`, `/drawdown`,
+`/monthly-stats`, `/symbol-stats` или `GET /trades?page=...`; это намеренно
+зафиксировано тестами как текущая модель.
 
-Цель: добавить bounded result/statistics endpoints и selected job/result state для `/backtests` workstation без создания отдельной шестой функциональной страницы. `strategy_statistic.png` закреплен за `/strategies`, поэтому Stage 9 не владеет отдельным page layout и не создает `backtests_result.html`.
+Цель следующего pass: не повторно реализовывать существующие endpoints, а привести
+все result/statistics методы к production-safe contract под current Web UI и будущие
+detail panels: bounded payloads, owner scope, public `variant_key`, no full trades in
+top rows, no heavy lazy trades cache-miss recompute in API process, status/cache
+metadata для materialization, затем аккуратно подключить новые UI panels только после
+runner readiness. `strategy_statistic.png` закреплен за `/strategies`, поэтому Stage
+9 не владеет отдельным page layout и не создает `backtests_result.html`.
 
 Маршрут страницы:
 
@@ -1852,10 +1927,7 @@ Backend/API:
 - `GET /api/backtests/jobs/{job_id}`;
 - `GET /api/backtests/jobs/{job_id}/top`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}`;
-- `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades`.
-
-Backend/API-добавления:
-
+- `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades`;
 - `GET /api/backtests/jobs/{job_id}/summary`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=1200`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=1200`;
@@ -1864,48 +1936,92 @@ Backend/API-добавления:
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=50`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv`.
 
+Backend/API-добавления:
+
+- `backtest_lazy_trades_materializations` status/read model для cache-miss detail
+  tasks, если runner plan еще не реализован;
+- typed `202`/status DTO для cache miss на `POST /trades` и совместимый cache/status
+  envelope для `GET /trades`, `/equity`, `/drawdown`, `/monthly-stats`,
+  `/symbol-stats`, `trades.csv`;
+- quota/rate-limit metadata для detail/stat endpoints, связанная с
+  `free|base|pro|ultra` policy из runner production plan.
+
 Поведение backend:
 
-- `POST /trades` может остаться lazy materialization/cache warm path;
-- `GET /trades` возвращает только paginated rows;
+- `POST /trades` остается lazy detail entrypoint: cache hit возвращает `200`, cache
+  miss возвращает `202` materialization status и не выполняет тяжелый recompute в API
+  process;
+- `GET /trades` возвращает только paginated rows, cache/status/degraded state или
+  retry metadata, но не запускает повторный full compute;
 - chart endpoints возвращают downsampled series, максимум 600-1500 points;
 - неизвестный публичный `variant_key` возвращает 404;
 - storage identity остается разделенной: публичный `variant_key`, стабильный `variant_hash`.
 
 Frontend integration:
 
-- Stage 9 добавляет result/detail state в `pages/backtests.html` и `apps/web/dist/js/pages/backtests.js`;
+- Текущий Stage 9 baseline уже добавил selected summary state в
+  `pages/backtests.html` и `apps/web/dist/js/pages/backtests.js`;
 - не меняет canonical visual reference `/backtests`: `stategy_backtest.png`;
 - full trades и тяжелые series не загружаются на first paint workstation;
-- selected variant/job panels используют bounded endpoints и degraded/loading states внутри существующей backtest workstation.
+- текущий Web UI использует `summary` для раскрытия top variants и CSV links, но не
+  использует chart/stat/trades-table endpoints;
+- будущие selected variant/job panels должны использовать bounded endpoints и
+  degraded/loading/materialization states внутри существующей backtest workstation.
 - result/progress refresh использует same-page `/backtests` state, no-overlap polling/autorefresh и не запускает повторный compute.
 
 Файлы:
 
-- расширить `apps/api/routes/backtests.py` и `apps/api/dto/backtests.py`;
-- добавить result summary/series/trades pagination services в `src/trading/contexts/backtest/application/services/v2/`;
-- расширить lazy trades cache/read model при необходимости, не сохраняя полные trades в top variant rows;
-- изменить `apps/web/templates/pages/backtests.html` result/detail state только в рамках backtest workstation;
-- изменить `apps/web/dist/js/pages/backtests.js` result/detail integration;
-- добавить chart helpers в `apps/web/dist/js/charts/*`;
+- не переписывать заново уже существующие `apps/api/routes/backtests.py`,
+  `apps/api/dto/backtests.py` и
+  `src/trading/contexts/backtest/application/services/v2/result_series.py`;
+- harden result summary/series/trades pagination services в
+  `src/trading/contexts/backtest/application/services/v2/`;
+- расширить lazy trades cache/read model и status DTO под materialization queue из
+  `backtest-job-runner-production-plan-v1.md`, не сохраняя полные trades в top
+  variant rows;
+- изменять `apps/web/templates/pages/backtests.html` result/detail state только в
+  рамках текущей backtest workstation;
+- изменять `apps/web/dist/js/pages/backtests.js` result/detail integration только
+  если backend materialization/status contract готов;
+- добавить chart helpers в `apps/web/dist/js/charts/*` только для фактически
+  подключенных charts; current baseline deliberately has no `renderBacktestSeries`;
 - тесты:
   - `tests/unit/apps/api/test_backtests_routes.py`;
   - focused tests для pagination/downsampling/404;
-  - web route smoke test.
+  - `tests/unit/apps/api/test_ui_backtests_routes.py`;
+  - `tests/unit/apps/web/test_app_routes.py`.
 
 Критерии приемки:
 
 - `/backtests` остается reference-shaped относительно `stategy_backtest.png`;
 - `/backtests/{job_id}`, если сохранен, открывает тот же workstation selected job/result state;
 - loading/result state не загружает все trades;
-- variant switch запрашивает summary/chart endpoints для одного варианта;
+- current UI variant expansion запрашивает только summary для одного job; будущий
+  chart/stat UI может запрашивать chart endpoints только после materialization/status
+  contract readiness;
 - manual refresh/autorefresh для selected result state не загружает heavy payload и уважает `retry_after_seconds`;
-- trades table использует server pagination;
-- CSV export отделен от table paging;
-- canvas/SVG charts nonblank;
+- cache-miss detail view показывает materialization status, не блокирует UI/API и
+  не повторяет одну и ту же materialization без idempotent key/cache key;
+- если trades table подключается в UI, она использует server pagination;
+- CSV export отделен от table paging и остается owner-scoped;
+- если charts подключаются в UI, canvas/SVG charts nonblank;
 - multi-year series ограничен points limit;
 - все значения доходности и процентных изменений используют фиксированные финансовые цвета независимо от выбранной темы;
 - generic result cards или отдельная шестая page layout считаются introduced failure.
+
+### Матрица backend result/statistics methods на 2026-05-11
+
+| Browser-visible method/path | Current backend status | Current Web UI expectation | Gap / next action |
+|---|---|---|---|
+| `GET /api/backtests/jobs/{job_id}/summary` | Реализован и тестируется; bounded, не вызывает lazy trades service. | Используется `backtests.js` через `data-job-summary-endpoint-template` для раскрытия variants. | Сохранить как primary selected-job summary contract. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | Реализован и owner/public-key scoped. | Endpoint template есть в DOM, но текущий UI не делает отдельный detail fetch. | Оставить stable handoff для будущего detail panel. |
+| `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | Реализован как lazy trades detail; сейчас cache miss может вычисляться в API use case. | Текущий UI не вызывает POST напрямую. | Перевести cache miss на `202` materialization task до публичного detail UI. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | Реализован и тестируется на point bounds/raw hash rejection. | Текущий UI не вызывает; `renderBacktestSeries` отсутствует намеренно. | Harden: не запускать sync lazy recompute на cache miss; вернуть status/degraded или materialized data. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | Реализован аналогично equity. | Текущий UI не вызывает. | Те же materialization/cache-status требования. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется. | Текущий UI не вызывает. | Те же materialization/cache-status требования; DTO остается bounded. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Реализован и тестируется. | Текущий UI не вызывает. | Те же materialization/cache-status требования; source symbol берется из job request. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination. | Текущий UI не вызывает; `/trades?page=` отсутствует в JS. | Перед UI table убедиться, что pagination читает materialized/cache data без повторного full recompute. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Реализован, owner-scoped, текущий UI рендерит CSV links. | Используется как link в variant expansion. | Зафиксировать export bounds/cache policy; для больших payloads рассмотреть async export или cache-only response. |
 
 Playwright CLI:
 
@@ -1919,8 +2035,11 @@ Playwright CLI:
 
 - public API contract: `compatible-change`;
 - DTO schema: `compatible-change`;
-- persisted schema: ожидается `none`, если cache metadata не переносится в DB;
-- request hash/cache identity: `none`; cache keys могут быть additive, но должны сохранять существующую lazy trades semantics;
+- persisted schema: `compatible-change`, если Stage 9 зависит от
+  `backtest_lazy_trades_materializations` или cache metadata в DB;
+- request hash/cache identity: `none`; cache keys могут быть additive, но должны
+  сохранять существующую lazy trades semantics и включать materialization metadata
+  без смены public `variant_key`;
 - performance risk: chart/trades endpoints должны оставаться bounded.
 
 ## Этап 10 - AI-конфигуратор backtest-задач
