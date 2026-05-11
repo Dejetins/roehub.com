@@ -17,6 +17,7 @@ from .backtest_admission_runtime_config import (
     resolve_backtest_admission_config_path,
 )
 from .backtest_ai_configurator_runtime_config import (
+    BacktestAiConfiguratorModelRuntimeConfig,
     BacktestAiConfiguratorQueueRuntimeConfig,
     BacktestAiConfiguratorRuntimeConfig,
     load_backtest_ai_configurator_runtime_config,
@@ -24,6 +25,7 @@ from .backtest_ai_configurator_runtime_config import (
 )
 
 __all__ = [
+    "BacktestAiConfiguratorModelRuntimeConfig",
     "BacktestAiConfiguratorQueueRuntimeConfig",
     "BacktestAiConfiguratorRuntimeConfig",
     "BacktestArtifactHitTimesGridRuntimeConfig",

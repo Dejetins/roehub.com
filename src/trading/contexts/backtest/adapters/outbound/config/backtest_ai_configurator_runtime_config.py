@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import yaml
 
@@ -15,6 +17,11 @@ _ENV_NAME_KEY = "ROEHUB_ENV"
 _ALLOWED_ENVS = ("dev", "prod", "test")
 _CONFIG_PATH_KEY = "ROEHUB_BACKTEST_AI_CONFIGURATOR_CONFIG"
 _CONFIG_VERSION = 1
+_DEFAULT_MODEL_ID = "gemma-4-e2b-it-4bit"
+_DEFAULT_MODEL_PATH = (
+    "/Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit"
+)
+_DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,9 +51,52 @@ class BacktestAiConfiguratorQueueRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestAiConfiguratorModelRuntimeConfig:
+    model_id: str
+    model_path: Path
+    context_window_tokens: int
+    max_input_tokens: int
+    max_output_tokens: int
+    temperature: float
+    top_p: float
+    base_url: str
+    request_timeout_seconds: float
+    active_generations: int = 1
+
+    def __post_init__(self) -> None:
+        if not self.model_id.strip():
+            raise ValueError("model_id must be non-empty")
+        if not str(self.model_path).strip():
+            raise ValueError("model_path must be non-empty")
+        for field_name, value in (
+            ("context_window_tokens", self.context_window_tokens),
+            ("max_input_tokens", self.max_input_tokens),
+            ("max_output_tokens", self.max_output_tokens),
+            ("active_generations", self.active_generations),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+        if self.max_input_tokens + self.max_output_tokens > self.context_window_tokens:
+            raise ValueError(
+                "max_input_tokens + max_output_tokens must fit context_window_tokens"
+            )
+        for field_name, value in (
+            ("temperature", self.temperature),
+            ("top_p", self.top_p),
+            ("request_timeout_seconds", self.request_timeout_seconds),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive number")
+        if not 0 < self.top_p <= 1:
+            raise ValueError("top_p must be in (0, 1]")
+        _validate_loopback_base_url(self.base_url)
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestAiConfiguratorRuntimeConfig:
     enabled: bool
     queue: BacktestAiConfiguratorQueueRuntimeConfig
+    model: BacktestAiConfiguratorModelRuntimeConfig
     tier_quotas: Mapping[str, BacktestAiTierQuota]
 
     def to_quota_config(self) -> BacktestAiQuotaConfig:
@@ -87,6 +137,7 @@ def load_backtest_ai_configurator_runtime_config(
     return BacktestAiConfiguratorRuntimeConfig(
         enabled=_required_bool(root, "enabled"),
         queue=queue,
+        model=_model_config(_optional_mapping(root, "model")),
         tier_quotas=_tier_quotas(quotas_payload),
     )
 
@@ -111,6 +162,29 @@ def _queue_config(payload: Mapping[str, Any]) -> BacktestAiConfiguratorQueueRunt
     )
 
 
+def _model_config(payload: Mapping[str, Any]) -> BacktestAiConfiguratorModelRuntimeConfig:
+    return BacktestAiConfiguratorModelRuntimeConfig(
+        model_id=_optional_str(payload, "model_id", default=_DEFAULT_MODEL_ID),
+        model_path=Path(_optional_str(payload, "model_path", default=_DEFAULT_MODEL_PATH)),
+        context_window_tokens=_optional_int(
+            payload,
+            "context_window_tokens",
+            default=8192,
+        ),
+        max_input_tokens=_optional_int(payload, "max_input_tokens", default=6144),
+        max_output_tokens=_optional_int(payload, "max_output_tokens", default=1024),
+        temperature=_optional_float(payload, "temperature", default=0.2),
+        top_p=_optional_float(payload, "top_p", default=0.9),
+        base_url=_optional_str(payload, "base_url", default=_DEFAULT_BASE_URL),
+        request_timeout_seconds=_optional_float(
+            payload,
+            "request_timeout_seconds",
+            default=90.0,
+        ),
+        active_generations=_optional_int(payload, "active_generations", default=1),
+    )
+
+
 def _tier_quotas(payload: Mapping[str, Any]) -> Mapping[str, BacktestAiTierQuota]:
     quotas: dict[str, BacktestAiTierQuota] = {}
     for tier in ("free", "base", "pro", "ultra"):
@@ -126,6 +200,13 @@ def _tier_quotas(payload: Mapping[str, Any]) -> Mapping[str, BacktestAiTierQuota
 
 def _required_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     value = payload.get(key)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"backtest AI configurator config field {key!r} must be mapping")
+    return value
+
+
+def _optional_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+    value = payload.get(key, {})
     if not isinstance(value, Mapping):
         raise ValueError(f"backtest AI configurator config field {key!r} must be mapping")
     return value
@@ -152,7 +233,43 @@ def _optional_int(payload: Mapping[str, Any], key: str, *, default: int) -> int:
     return value
 
 
+def _optional_float(payload: Mapping[str, Any], key: str, *, default: float) -> float:
+    value = payload.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"backtest AI configurator config field {key!r} must be numeric")
+    return float(value)
+
+
+def _optional_str(payload: Mapping[str, Any], key: str, *, default: str) -> str:
+    value = payload.get(key, default)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            f"backtest AI configurator config field {key!r} must be non-empty string"
+        )
+    return value.strip()
+
+
+def _validate_loopback_base_url(value: str) -> None:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("backtest AI configurator model base_url must be http(s)")
+    if not parsed.hostname:
+        raise ValueError("backtest AI configurator model base_url must include host")
+    hostname = parsed.hostname.strip().lower()
+    if hostname == "localhost":
+        return
+    try:
+        if ip_address(hostname).is_loopback:
+            return
+    except ValueError as error:
+        raise ValueError(
+            "backtest AI configurator model base_url must be loopback-only"
+        ) from error
+    raise ValueError("backtest AI configurator model base_url must be loopback-only")
+
+
 __all__ = [
+    "BacktestAiConfiguratorModelRuntimeConfig",
     "BacktestAiConfiguratorQueueRuntimeConfig",
     "BacktestAiConfiguratorRuntimeConfig",
     "load_backtest_ai_configurator_runtime_config",

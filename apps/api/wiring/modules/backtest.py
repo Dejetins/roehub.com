@@ -40,6 +40,9 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiOutputGate,
     BacktestAiQuotaService,
 )
+from trading.contexts.backtest.application.ai_configurator.ports import (
+    BacktestConfigLLMGateway,
+)
 from trading.contexts.backtest.application.ports import BacktestAiConfigLeaseRepository
 from trading.contexts.backtest.application.services.v2 import (
     BacktestAdmissionService,
@@ -183,6 +186,7 @@ def _build_jobs_use_case(
 def build_backtest_ai_configurator_use_cases(
     *,
     environ: Mapping[str, str],
+    llm_gateway: BacktestConfigLLMGateway | None = None,
 ) -> BacktestAiConfiguratorUseCases | None:
     """
     Build Stage 1 Backtest AI configurator storage/use-case boundary without API routes.
@@ -243,7 +247,7 @@ def build_backtest_ai_configurator_use_cases(
                 output_gate=BacktestAiOutputGate(),
             ),
             input_gate=BacktestAiInputGate(),
-            llm_gateway=DeterministicBacktestConfigLLMGateway(),
+            llm_gateway=llm_gateway or DeterministicBacktestConfigLLMGateway(),
         ),
     )
 

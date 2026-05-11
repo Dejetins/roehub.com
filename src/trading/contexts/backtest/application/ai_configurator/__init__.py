@@ -65,6 +65,11 @@ from .services import (
     build_generate_prompt_envelope,
     build_repair_prompt_envelope,
 )
+from .worker import (
+    BacktestAiConfigGenerationLimiter,
+    BacktestAiConfigWorkerResult,
+    BacktestAiConfigWorkerUseCase,
+)
 
 __all__ = [
     "BACKTEST_AI_CONFIG_ERROR_FORBIDDEN",
@@ -81,6 +86,7 @@ __all__ = [
     "BacktestAiConfigEvent",
     "BacktestAiConfigEventName",
     "BacktestAiConfigFakeWorkerUseCase",
+    "BacktestAiConfigGenerationLimiter",
     "BacktestAiConfigJob",
     "BacktestAiConfigJobState",
     "BacktestAiConfigJobsUseCase",
@@ -93,6 +99,8 @@ __all__ = [
     "BacktestAiConfigTerminalState",
     "BacktestAiConfigValidationOutcome",
     "BacktestAiConfigValidator",
+    "BacktestAiConfigWorkerResult",
+    "BacktestAiConfigWorkerUseCase",
     "BacktestAiIndicatorCatalogItem",
     "BacktestAiInputGate",
     "BacktestAiInputGateResult",

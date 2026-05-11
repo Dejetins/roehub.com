@@ -5,6 +5,7 @@ from .artifacts_fs import (
 )
 from .cache_fs import DEFAULT_LAZY_TRADES_CACHE_ROOT, LocalFileBacktestLazyTradesCache
 from .config import (
+    BacktestAiConfiguratorModelRuntimeConfig,
     BacktestAiConfiguratorQueueRuntimeConfig,
     BacktestAiConfiguratorRuntimeConfig,
     BacktestArtifactHitTimesGridRuntimeConfig,
@@ -24,7 +25,7 @@ from .config import (
     resolve_backtest_artifacts_config_path,
 )
 from .defaults import YamlBacktestGridDefaultsProvider
-from .llm import DeterministicBacktestConfigLLMGateway
+from .llm import DeterministicBacktestConfigLLMGateway, MLXOpenAICompatibleAdapter
 from .persistence import (
     BacktestPostgresGateway,
     PostgresBacktestAiConfigRepository,
@@ -38,6 +39,7 @@ from .queue import DatabaseBacktestJobExecutionTrigger
 __all__ = [
     "AtomicArtifactCurrentPointerWriterV2",
     "BacktestAiConfiguratorQueueRuntimeConfig",
+    "BacktestAiConfiguratorModelRuntimeConfig",
     "BacktestAiConfiguratorRuntimeConfig",
     "BacktestArtifactHitTimesGridRuntimeConfig",
     "BacktestArtifactLookbackPolicyRuntimeConfig",
@@ -55,6 +57,7 @@ __all__ = [
     "DeterministicBacktestConfigLLMGateway",
     "FilesystemBacktestArtifactContextResolver",
     "LocalFileBacktestLazyTradesCache",
+    "MLXOpenAICompatibleAdapter",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",

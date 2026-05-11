@@ -566,6 +566,7 @@ class PostgresBacktestAiConfigRepository(
             SELECT job_id
             FROM {self._jobs_table}
             WHERE state = 'queued'
+              AND source_page = 'backtests'
               AND attempt < %(max_attempts)s
             ORDER BY queued_at ASC, job_id ASC
             LIMIT 1
@@ -575,6 +576,7 @@ class PostgresBacktestAiConfigRepository(
             SELECT job_id
             FROM {self._jobs_table}
             WHERE state IN ('running', 'repairing')
+              AND source_page = 'backtests'
               AND lease_expires_at <= %(now)s
               AND attempt < %(max_attempts)s
             ORDER BY lease_expires_at ASC, queued_at ASC, job_id ASC

@@ -426,23 +426,22 @@ Config sketch:
 
 ```yaml
 backtest_ai_configurator:
-  enabled: true
+  enabled: false
   queue:
     max_queue_size: 50
     lease_seconds: 120
     job_timeout_seconds: 90
     repair_attempts: 1
   model:
-    model_id: gemma_4_e2b_it_4bit_local
-    provider: mlx
-    runtime: mlx_lm_server
+    model_id: gemma-4-e2b-it-4bit
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
-    base_url: http://127.0.0.1:8081/v1
-    context_window: 8192
-    max_input_tokens: 5500
-    max_output_tokens: 900
-    temperature: 0.0
+    base_url: http://127.0.0.1:8080
+    context_window_tokens: 8192
+    max_input_tokens: 6144
+    max_output_tokens: 1024
+    temperature: 0.2
     top_p: 0.9
+    request_timeout_seconds: 90
     active_generations: 1
   ux:
     sse_heartbeat_seconds: 15
@@ -451,6 +450,20 @@ backtest_ai_configurator:
 
 Machine-specific `model_path` можно держать в prod/local config или env override,
 но schema должна поддерживать простой folder path.
+
+Iteration 05 implementation note:
+
+- `MLXOpenAICompatibleAdapter` вызывает `base_url + /v1/chat/completions`;
+- `base_url` валидируется как loopback-only (`127.0.0.1`, `localhost`, `::1`);
+- `apps.worker.backtest_ai_configurator` запускает claim loop без launchd/Monit;
+- локальный smoke при наличии runtime/model:
+
+```bash
+python -m apps.worker.backtest_ai_configurator.main.main --once
+```
+
+Команда выше не стартует `mlx_lm.server`; модель должна быть уже поднята на
+сконфигурированном loopback `base_url`.
 
 ### 7) Model registry и reload
 
@@ -462,18 +475,20 @@ models:
     provider: mlx
     runtime: mlx_lm_server
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
-    base_url: http://127.0.0.1:8081/v1
-    context_window: 8192
-    max_output_tokens: 900
+    base_url: http://127.0.0.1:8081
+    context_window_tokens: 8192
+    max_input_tokens: 6144
+    max_output_tokens: 1024
     active_generations: 1
 
   backtest_config_candidate:
     provider: mlx
     runtime: mlx_lm_server
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/<other-model>
-    base_url: http://127.0.0.1:8082/v1
-    context_window: 8192
-    max_output_tokens: 900
+    base_url: http://127.0.0.1:8082
+    context_window_tokens: 8192
+    max_input_tokens: 6144
+    max_output_tokens: 1024
     active_generations: 1
     enabled: false
 ```
