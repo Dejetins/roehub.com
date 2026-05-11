@@ -530,7 +530,7 @@ def _run_lazy_detail_smoke(
             "GET",
             f"/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=5",
         )
-        if detail.get("_status") == 200:
+        if detail.get("_status") == 200 and status == "completed":
             completed = {
                 "task_id": task_id,
                 "status": status,
