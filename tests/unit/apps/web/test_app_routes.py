@@ -460,7 +460,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         in response.text
     )
     assert 'data-variant-open-delay-ms="140"' in response.text
-    assert 'data-variant-open-duration-ms="220"' in response.text
+    assert 'data-variant-open-duration-ms="400"' in response.text
     assert 'data-variant-preview-limit="5"' in response.text
     assert "data-result-state" not in response.text
     assert "data-result-chart" not in response.text
@@ -749,6 +749,11 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "top_limit" in backtests_js
     assert "variantPreviewLimit" in backtests_js
     assert "queueVariantPanelAnimation" in backtests_js
+    assert "bindStatusBar" in backtests_js
+    assert "backtests-variant-frame--static" in backtests_js
+    assert "signedDrawdownPercent" in backtests_js
+    assert "integerOrDash" in backtests_js
+    assert "backtests-download-button" in backtests_js
     assert "createPoller" in backtests_js
     assert "activeRequest" in backtests_js
     assert "hiddenTabPause" in backtests_js

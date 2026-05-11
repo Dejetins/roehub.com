@@ -180,7 +180,7 @@
   "backtests.results.all": "Все",
   "backtests.results.combinations": "Комбинации",
   "backtests.results.direction": "Направление",
-  "backtests.results.drawdown": "Avg DD",
+  "backtests.results.drawdown": "MDD",
   "backtests.results.empty": "Нет backtest jobs",
   "backtests.results.exchange": "Биржа",
   "backtests.results.indicators": "Индикаторы",

@@ -180,7 +180,7 @@
   "backtests.results.all": "All",
   "backtests.results.combinations": "Combinations",
   "backtests.results.direction": "Direction",
-  "backtests.results.drawdown": "Avg DD",
+  "backtests.results.drawdown": "MDD",
   "backtests.results.empty": "No backtest jobs",
   "backtests.results.exchange": "Exchange",
   "backtests.results.indicators": "Indicators",

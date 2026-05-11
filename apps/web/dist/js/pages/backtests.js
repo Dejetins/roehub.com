@@ -5,7 +5,7 @@ import { createPoller } from "../core/poller.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 140;
-const DEFAULT_VARIANT_OPEN_DURATION_MS = 220;
+const DEFAULT_VARIANT_OPEN_DURATION_MS = 400;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
 const REFRESH_PRESETS = {
   off: 0,
@@ -44,6 +44,7 @@ const state = {
   selectedJobId: null,
   selectedVariantKey: null,
   resultSummary: null,
+  animateVariantJobId: null,
 };
 
 let activeRequest = null;
@@ -84,12 +85,39 @@ function dateToIso(value, fallback) {
   return `${value}T00:00:00Z`;
 }
 
-function percent(value) {
+function percent(value, fractionDigits = 1) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return "--";
   }
-  return `${number.toFixed(1)}%`;
+  return `${number.toFixed(fractionDigits)}%`;
+}
+
+function signedDrawdownPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  const signed = number === 0 ? 0 : -Math.abs(number);
+  return percent(signed, 2);
+}
+
+function decimalOrDash(value, fractionDigits) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  return number.toFixed(fractionDigits);
+}
+
+function integerOrDash(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  const rounded = Math.trunc(number);
+  const sign = rounded < 0 ? "-" : "";
+  return `${sign}${String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
 }
 
 function numberOrDash(value) {
@@ -653,7 +681,7 @@ function renderJobs(root, table) {
   renderJobPicker(root, rows);
   renderJobPagination(root);
   if (!rows.length) {
-    target.innerHTML = `<tr><td colspan="11">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="9">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
     return;
   }
   target.innerHTML = rows
@@ -677,10 +705,8 @@ function renderJobRow(root, row, index) {
       <td>${escapeHtml(row.exchange || "--")}</td>
       <td>${escapeHtml(row.market_type || "--")}</td>
       <td>${escapeHtml(row.symbol || "--")}</td>
-      <td>${escapeHtml(row.indicator_summary)}</td>
       <td>${escapeHtml(row.period)}</td>
       <td>${escapeHtml(row.direction)}</td>
-      <td>${numberOrDash(row.combinations)}</td>
       <td>
         <div class="backtests-status-cell">
           <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
@@ -701,13 +727,17 @@ function renderVariantExpansion(root, row) {
   const summary = state.resultSummary?.job?.job_id === row.job_id ? state.resultSummary : null;
   const variants = (summary?.top_variants?.items || []).slice(0, variantPreviewLimit(root));
   const title = t("backtests.variants.title", { job: compactId(row.job_id) });
+  const shouldAnimate = state.animateVariantJobId === row.job_id;
+  const frameClass = shouldAnimate
+    ? "backtests-variant-frame"
+    : "backtests-variant-frame backtests-variant-frame--static is-open";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
     : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : t("backtests.variants.empty"))}</td></tr>`;
   return `
     <tr class="backtests-variant-expansion">
-      <td class="backtests-variant-cell" colspan="11">
-        <div class="backtests-variant-frame" data-variant-frame>
+      <td class="backtests-variant-cell" colspan="9">
+        <div class="${frameClass}" data-variant-frame ${shouldAnimate ? 'data-variant-animate="true"' : ""}>
           <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
             <header class="backtests-variant-panel__heading">
               <strong>${escapeHtml(title)}</strong>
@@ -743,15 +773,18 @@ function queueVariantPanelAnimation(root) {
   if (variantAnimationFrame) {
     window.cancelAnimationFrame(variantAnimationFrame);
   }
-  const frame = qs("[data-variant-frame]", root);
+  const frame = qs("[data-variant-frame][data-variant-animate='true']", root);
   if (!frame) {
     variantAnimationFrame = null;
+    state.animateVariantJobId = null;
     return;
   }
   frame.style.setProperty("--backtests-variant-open-duration", `${variantOpenDurationMs(root)}ms`);
   variantAnimationFrame = window.requestAnimationFrame(() => {
     frame.style.setProperty("--backtests-variant-height", `${frame.scrollHeight}px`);
     frame.classList.add("is-open");
+    frame.removeAttribute("data-variant-animate");
+    state.animateVariantJobId = null;
     variantAnimationFrame = null;
   });
 }
@@ -773,6 +806,8 @@ function renderVariantRow(root, jobId, variant) {
   const metrics = variant?.summary_metrics || {};
   const selected = state.selectedVariantKey === variant.variant_key;
   const href = `${variantBaseEndpoint(root, jobId, variant.variant_key)}/trades.csv`;
+  const maxDrawdown = metrics.max_drawdown_pct ?? metrics.avg_drawdown_pct;
+  const trades = metrics.trade_count ?? metrics.trades_count;
   return `
     <tr class="${selected ? "is-selected" : ""}" data-result-variant-key="${escapeHtml(variant.variant_key)}" tabindex="0">
       <td>#${numberOrDash(variant.rank)}</td>
@@ -780,11 +815,11 @@ function renderVariantRow(root, jobId, variant) {
       <td class="backtests-variant-params">${escapeHtml(formatVariantParams(variant))}</td>
       <td class="${financialClass(metrics.total_return_pct)}">${percent(metrics.total_return_pct)}</td>
       <td class="${financialClass(metrics.sharpe)}">${numberOrDash(metrics.sharpe)}</td>
-      <td class="${financialClass(metrics.max_drawdown_pct)}">${percent(metrics.max_drawdown_pct)}</td>
-      <td>${numberOrDash(metrics.profit_factor)}</td>
-      <td>${percent(metrics.win_rate_pct)}</td>
-      <td>${numberOrDash(metrics.trade_count)}</td>
-      <td><a class="rh-button rh-button--secondary rh-button--compact" href="${escapeHtml(href)}">${escapeHtml(t("backtests.variants.csv"))}</a></td>
+      <td class="rh-financial--negative">${signedDrawdownPercent(maxDrawdown)}</td>
+      <td>${decimalOrDash(metrics.profit_factor, 3)}</td>
+      <td>${percent(metrics.win_rate_pct, 2)}</td>
+      <td>${integerOrDash(trades)}</td>
+      <td><a class="rh-button rh-button--secondary rh-button--compact backtests-download-button" href="${escapeHtml(href)}" aria-label="${escapeHtml(t("backtests.variants.csv"))}" title="${escapeHtml(t("backtests.variants.csv"))}">↓</a></td>
     </tr>
   `;
 }
@@ -997,6 +1032,7 @@ async function openSelectedJob(root, jobId) {
     state.selectedJobId = null;
     state.selectedVariantKey = null;
     state.resultSummary = null;
+    state.animateVariantJobId = null;
     renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
     return;
   }
@@ -1007,6 +1043,7 @@ async function openSelectedJob(root, jobId) {
     const summary = await activeResultRequest;
     state.selectedJobId = summary.job?.job_id || jobId;
     state.selectedVariantKey = summary.selected_variant_key;
+    state.animateVariantJobId = state.selectedJobId;
     renderResultSummary(root, summary);
   } catch (error) {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
@@ -1198,10 +1235,62 @@ function setAutorefresh(root, presetKey) {
     });
     poller.start();
   }
-  setText("[data-backtests-refresh-current]", presetKey, root);
+  setText("[data-backtests-refresh-current]", presetKey, document);
+}
+
+function closeStatusRefreshMenu(statusBar) {
+  const dropdown = qs("[data-rh-dropdown]", statusBar);
+  const trigger = qs("[data-rh-dropdown-trigger]", statusBar);
+  const menu = qs("[data-rh-dropdown-menu]", statusBar);
+  if (dropdown instanceof HTMLElement) {
+    dropdown.dataset.open = "false";
+  }
+  if (trigger instanceof HTMLElement) {
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  if (menu instanceof HTMLElement) {
+    menu.hidden = true;
+  }
+}
+
+function updateRefreshPresetSelection(statusBar, presetKey) {
+  qsa("[data-backtests-refresh-preset]", statusBar).forEach((button) => {
+    button.setAttribute("aria-selected", button.dataset.backtestsRefreshPreset === presetKey ? "true" : "false");
+  });
+}
+
+function bindStatusBar(root) {
+  const statusBar = qs("[data-backtests-status-bar]", document);
+  if (!statusBar || statusBar.dataset.backtestsBound === "true") {
+    return;
+  }
+  statusBar.dataset.backtestsBound = "true";
+  statusBar.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    const refreshButton = event.target.closest("[data-backtests-refresh]");
+    if (refreshButton instanceof HTMLElement) {
+      event.preventDefault();
+      if (manualRefreshRetrySeconds > 0) {
+        setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }), document);
+      }
+      refreshWorkstation(root, "manual").catch(() => {});
+      return;
+    }
+    const preset = event.target.closest("[data-backtests-refresh-preset]");
+    if (preset instanceof HTMLElement) {
+      event.preventDefault();
+      const presetKey = preset.dataset.backtestsRefreshPreset || "off";
+      updateRefreshPresetSelection(statusBar, presetKey);
+      setAutorefresh(root, presetKey);
+      closeStatusRefreshMenu(statusBar);
+    }
+  });
 }
 
 function bind(root) {
+  bindStatusBar(root);
   root.addEventListener("click", (event) => {
     const option = event.target.closest("[data-backtest-option]");
     if (option instanceof HTMLElement) {

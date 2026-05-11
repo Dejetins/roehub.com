@@ -602,7 +602,7 @@
   opacity: 0;
   transform: translateY(-4px);
   transition:
-    max-height var(--backtests-variant-open-duration, 220ms) ease,
+    max-height var(--backtests-variant-open-duration, 400ms) ease,
     opacity 140ms ease-out,
     transform 180ms ease-out;
 }
@@ -611,6 +611,13 @@
   max-height: var(--backtests-variant-height, 240px);
   opacity: 1;
   transform: translateY(0);
+}
+
+.backtests-variant-frame--static {
+  max-height: none;
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 .backtests-variant-panel {
@@ -662,6 +669,14 @@
 
 .backtests-table--variants tr.is-selected > td {
   background: color-mix(in srgb, var(--rh-accent) 12%, transparent);
+}
+
+.backtests-download-button {
+  width: 24px;
+  min-width: 24px;
+  padding-inline: 0;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .backtests-variant-params {
