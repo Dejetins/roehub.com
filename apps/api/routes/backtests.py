@@ -36,6 +36,10 @@ from trading.contexts.backtest.application.dto import (
     BacktestLazyTradesMaterializationReadModel,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    DEFAULT_BACKTEST_RESULT_POINTS,
+    DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS,
+    MAX_BACKTEST_RESULT_POINTS,
+    MAX_BACKTEST_TRADES_CSV_MAX_ROWS,
     BacktestPreflightRejected,
     BacktestPreflightService,
     BacktestRuntimeDefaultsService,
@@ -237,16 +241,18 @@ def build_backtests_router(
         response: Response,
         job_id: UUID,
         variant_key: str,
-        points: int = Query(default=600, ge=10, le=1500),
+        points: int | None = Query(default=None, ge=10, le=MAX_BACKTEST_RESULT_POINTS),
+        max_points: int | None = Query(default=None, ge=10, le=MAX_BACKTEST_RESULT_POINTS),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
     ) -> BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse:
+        resolved_points = _resolve_result_points(points=points, max_points=max_points)
         result = use_case.variant_series(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
             kind="equity",
-            points=points,
+            points=resolved_points,
         )
         _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_series_response(result=result)
@@ -259,16 +265,18 @@ def build_backtests_router(
         response: Response,
         job_id: UUID,
         variant_key: str,
-        points: int = Query(default=600, ge=10, le=1500),
+        points: int | None = Query(default=None, ge=10, le=MAX_BACKTEST_RESULT_POINTS),
+        max_points: int | None = Query(default=None, ge=10, le=MAX_BACKTEST_RESULT_POINTS),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
     ) -> BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse:
+        resolved_points = _resolve_result_points(points=points, max_points=max_points)
         result = use_case.variant_series(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
             kind="drawdown",
-            points=points,
+            points=resolved_points,
         )
         _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_series_response(result=result)
@@ -338,6 +346,11 @@ def build_backtests_router(
     def get_backtest_job_variant_trades_csv(
         job_id: UUID,
         variant_key: str,
+        max_rows: int = Query(
+            default=DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS,
+            ge=1,
+            le=MAX_BACKTEST_TRADES_CSV_MAX_ROWS,
+        ),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
     ) -> Response:
@@ -345,6 +358,7 @@ def build_backtests_router(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
+            max_rows=max_rows,
         )
         if isinstance(content, BacktestLazyTradesMaterializationReadModel):
             return JSONResponse(
@@ -354,12 +368,18 @@ def build_backtests_router(
                 ).model_dump(mode="json"),
             )
         return Response(
-            content=content,
+            content=content.content,
             media_type="text/csv; charset=utf-8",
             headers={
                 "content-disposition": (
                     f'attachment; filename="backtest-{job_id}-{variant_key}-trades.csv"'
-                )
+                ),
+                "x-roehub-trades-row-count": str(content.row_count),
+                "x-roehub-trades-total-rows": str(content.total_rows),
+                "x-roehub-trades-max-rows": str(content.max_rows),
+                "x-roehub-trades-truncated": str(content.truncated).lower(),
+                "x-roehub-trades-sort": content.sort,
+                "x-roehub-cache-status": str(content.cache.get("status", "unknown")),
             },
         )
 
@@ -387,6 +407,16 @@ def build_backtests_router(
 def _apply_materialization_status_code(*, response: Response, result: Any) -> None:
     if isinstance(result, BacktestLazyTradesMaterializationReadModel):
         response.status_code = 202
+
+
+def _resolve_result_points(*, points: int | None, max_points: int | None) -> int:
+    if points is not None and max_points is not None and points != max_points:
+        raise RoehubError(
+            code="backtest.invalid_request",
+            message="Use either points or max_points for result series, not conflicting values",
+            details={"points": points, "max_points": max_points},
+        )
+    return max_points if max_points is not None else points or DEFAULT_BACKTEST_RESULT_POINTS
 
 
 __all__ = ["build_backtests_router"]

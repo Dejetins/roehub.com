@@ -38,6 +38,7 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestResultStatsReadModel,
     BacktestResultSummaryReadModel,
     BacktestRuntimeConfig,
+    BacktestTradesCsvReadModel,
     build_monthly_stats_read_model,
     build_paginated_trades_read_model,
     build_result_series_read_model,
@@ -361,11 +362,12 @@ class BacktestJobsUseCase:
         user_id: UserId,
         job_id: UUID,
         variant_key: str,
-    ) -> str | BacktestLazyTradesMaterializationReadModel:
+        max_rows: int | None = None,
+    ) -> BacktestTradesCsvReadModel | BacktestLazyTradesMaterializationReadModel:
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
-        return build_trades_csv(detail=detail)
+        return build_trades_csv(detail=detail, max_rows=max_rows)
 
     def cancel(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)

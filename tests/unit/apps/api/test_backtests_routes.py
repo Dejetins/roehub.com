@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
@@ -403,6 +404,8 @@ def test_get_backtest_result_series_downsamples_and_rejects_raw_hash() -> None:
     assert bounded.status_code == 200
     payload = bounded.json()
     assert payload["kind"] == "equity"
+    assert payload["requested_points"] == 10
+    assert payload["max_points"] == 10
     assert payload["returned_points"] <= 10
     assert payload["source_points"] == 12
     assert payload["downsampled"] is True
@@ -411,12 +414,83 @@ def test_get_backtest_result_series_downsamples_and_rejects_raw_hash() -> None:
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
 
 
+def test_get_backtest_result_series_accepts_max_points_alias_and_rejects_conflict() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(reverse_trades=True),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000230"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000230"},
+    ).json()["items"][0]
+
+    drawdown = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/drawdown?max_points=10",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000230"},
+    )
+    conflict = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/drawdown?points=10&max_points=11",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000230"},
+    )
+
+    assert drawdown.status_code == 200
+    payload = drawdown.json()
+    assert payload["kind"] == "drawdown"
+    assert payload["requested_points"] == 10
+    assert payload["max_points"] == 10
+    assert payload["source_points"] == 12
+    assert payload["points"][0]["trade_index"] == 0
+    assert conflict.status_code == 422
+    assert conflict.json()["error"]["code"] == "backtest.invalid_request"
+
+
+def test_get_backtest_result_series_with_missing_equity_returns_empty_points() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(include_equity=False),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000231"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000231"},
+    ).json()["items"][0]
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/equity",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000231"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["points"] == []
+    assert payload["source_points"] == 0
+    assert payload["returned_points"] == 0
+    assert payload["downsampled"] is False
+
+
 def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> None:
     repository = _FakeJobRepository()
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(
             repository=repository,
-            lazy_trades_service=_FakeLazyTradesService(),
+            lazy_trades_service=_FakeLazyTradesService(reverse_trades=True),
         )
     )
     created = client.post(
@@ -438,6 +512,10 @@ def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> N
         f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades.csv",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000221"},
     )
+    bounded_csv_response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades.csv?max_rows=5",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000221"},
+    )
     foreign_csv = client.get(
         f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades.csv",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000222"},
@@ -446,8 +524,10 @@ def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> N
     assert page.status_code == 200
     payload = page.json()
     assert payload["pagination"] == {
+        "mode": "page",
         "page": 2,
         "page_size": 2,
+        "max_page_size": 100,
         "total": 12,
         "has_next": True,
         "has_previous": True,
@@ -458,7 +538,17 @@ def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> N
     assert [item["trade_index"] for item in payload["items"]] == [2, 3]
     assert csv_response.status_code == 200
     assert csv_response.headers["content-type"].startswith("text/csv")
+    assert csv_response.headers["x-roehub-trades-row-count"] == "12"
+    assert csv_response.headers["x-roehub-trades-total-rows"] == "12"
+    assert csv_response.headers["x-roehub-trades-max-rows"] == "10000"
+    assert csv_response.headers["x-roehub-trades-truncated"] == "false"
     assert "trade_index,entry_timestamp" in csv_response.text
+    assert bounded_csv_response.status_code == 200
+    assert bounded_csv_response.headers["x-roehub-trades-row-count"] == "5"
+    assert bounded_csv_response.headers["x-roehub-trades-total-rows"] == "12"
+    assert bounded_csv_response.headers["x-roehub-trades-max-rows"] == "5"
+    assert bounded_csv_response.headers["x-roehub-trades-truncated"] == "true"
+    assert len(bounded_csv_response.text.splitlines()) == 6
     assert foreign_csv.status_code == 403
     assert foreign_csv.json()["error"]["code"] == "backtest.forbidden"
 
@@ -494,8 +584,22 @@ def test_get_backtest_variant_stats_are_bounded_by_selected_variant() -> None:
     assert monthly.status_code == 200
     assert monthly.json()["kind"] == "monthly"
     assert monthly.json()["items"][0]["month"] == "2026-01"
+    assert monthly.json()["bounds"] == {
+        "max_items": 600,
+        "returned_items": 9,
+        "source_items": 9,
+        "truncated": False,
+        "sort": "month_asc",
+    }
     assert symbol.status_code == 200
     assert symbol.json()["kind"] == "symbol"
+    assert symbol.json()["bounds"] == {
+        "max_items": 1,
+        "returned_items": 1,
+        "source_items": 1,
+        "truncated": False,
+        "sort": "symbol_asc",
+    }
     assert symbol.json()["items"] == [
         {
             "symbol": "BTCUSDT",
@@ -535,6 +639,235 @@ def test_post_backtest_variant_trades_foreign_owner_returns_forbidden() -> None:
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "backtest.forbidden"
+
+
+def test_get_backtest_result_summary_empty_top_is_typed_missing_data() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000232"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]), top_count=0)
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/summary",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000232"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selected_variant_key"] is None
+    assert payload["top_variants"]["items"] == []
+    assert "selected_variant" not in payload["links"]
+    assert lazy_service.requests == ()
+
+
+@pytest.mark.parametrize(
+    "path_template",
+    [
+        "/backtests/jobs/{job_id}/summary",
+        "/backtests/jobs/{job_id}/variants/{variant_key}",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=2",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
+    ],
+)
+def test_get_backtest_result_endpoint_matrix_invalid_job_returns_not_found(
+    path_template: str,
+) -> None:
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=_FakeJobRepository(),
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    missing_job_id = "00000000-0000-0000-0000-000000009999"
+
+    response = client.get(
+        path_template.format(job_id=missing_job_id, variant_key="job_missing_rank_001"),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000233"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "backtest.not_found"
+
+
+@pytest.mark.parametrize(
+    "path_template",
+    [
+        "/backtests/jobs/{job_id}/summary",
+        "/backtests/jobs/{job_id}/variants/{variant_key}",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=2",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
+    ],
+)
+def test_get_backtest_result_endpoint_matrix_enforces_owner_scope(
+    path_template: str,
+) -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000234"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000234"},
+    ).json()["items"][0]
+
+    response = client.get(
+        path_template.format(
+            job_id=created.json()["job_id"],
+            variant_key=top["variant_key"],
+        ),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000235"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "backtest.forbidden"
+
+
+@pytest.mark.parametrize(
+    "path_template",
+    [
+        "/backtests/jobs/{job_id}/variants/{variant_key}",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=2",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
+    ],
+)
+def test_get_backtest_result_endpoint_matrix_rejects_invalid_variant(
+    path_template: str,
+) -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000236"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+
+    response = client.get(
+        path_template.format(
+            job_id=created.json()["job_id"],
+            variant_key="job_missing_rank_999",
+        ),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000236"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "backtest.not_found"
+
+
+@pytest.mark.parametrize(
+    "path_template",
+    [
+        "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=2",
+        "/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
+    ],
+)
+def test_get_backtest_result_endpoint_matrix_returns_materialization_status_on_cache_miss(
+    path_template: str,
+) -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService(cache_hit=False)
+    materializations = _FakeMaterializationRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+            materialization_repository=materializations,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000237"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000237"},
+    ).json()["items"][0]
+
+    response = client.get(
+        path_template.format(
+            job_id=created.json()["job_id"],
+            variant_key=top["variant_key"],
+        ),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000237"},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["cache"]["status"] == "miss"
+    assert payload["pagination"] == {"mode": "none"}
+    assert lazy_service.execute_calls == 0
+    assert len(materializations.tasks) == 1
+
+
+def test_get_backtest_variant_trades_rejects_page_size_above_bound() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000238"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000238"},
+    ).json()["items"][0]
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades?page=1&page_size=101",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000238"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
 
 
 def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
@@ -867,6 +1200,9 @@ def _complete_job(
 @dataclass
 class _FakeLazyTradesService:
     cache_hit: bool = True
+    include_equity: bool = True
+    reverse_trades: bool = False
+    trade_count: int = 12
     requests: tuple[tuple[str, str], ...] = ()
     execute_calls: int = 0
 
@@ -879,6 +1215,9 @@ class _FakeLazyTradesService:
     ) -> "_Probe":
         variant_hash = str(row.payload_json["variant_hash"])
         self.requests = (*self.requests, (public_variant_key, variant_hash))
+        trade_range = range(self.trade_count)
+        if self.reverse_trades:
+            trade_range = range(self.trade_count - 1, -1, -1)
         detail = BacktestLazyTradesDetailReadModel(
             job_id=str(job.job_id),
             variant_key=public_variant_key,
@@ -889,7 +1228,10 @@ class _FakeLazyTradesService:
             summary_metrics=dict(row.summary_metrics_json),
             canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
             readable_params=dict(row.payload_json["readable_params"]),
-            trades=tuple(_fake_trade(index) for index in range(12)),
+            trades=tuple(
+                _fake_trade(index, include_equity=self.include_equity)
+                for index in trade_range
+            ),
             chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
             cache={"status": "hit" if self.cache_hit else "miss"},
             timing={"lazy_trades_cache_hit": 0.001} if self.cache_hit else {},
@@ -982,10 +1324,10 @@ class _FakeMaterializationRepository:
         return task
 
 
-def _fake_trade(index: int) -> dict[str, Any]:
+def _fake_trade(index: int, *, include_equity: bool = True) -> dict[str, Any]:
     pnl = 1.0 if index % 3 != 2 else -1.0
     side = "long" if index % 2 == 0 else "short"
-    return {
+    trade = {
         "trade_index": index,
         "entry_timestamp": f"2026-{(index % 9) + 1:02d}-01T00:00:00Z",
         "exit_timestamp": f"2026-{(index % 9) + 1:02d}-01T00:15:00Z",
@@ -1003,10 +1345,12 @@ def _fake_trade(index: int) -> dict[str, Any]:
         "fee_quote": 0.0,
         "slippage_quote": 0.0,
         "exit_reason": "signal" if index == 0 else "take_profit" if pnl > 0 else "stop_loss",
-        "equity_after": 10000.0 + index + pnl,
         "safe_quote_after": 0.0,
         "timeframe": "15m",
     }
+    if include_equity:
+        trade["equity_after"] = 10000.0 + index + pnl
+    return trade
 
 
 @dataclass

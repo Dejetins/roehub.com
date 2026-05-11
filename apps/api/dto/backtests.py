@@ -160,6 +160,7 @@ class BacktestResultSeriesResponse(BaseModel):
     kind: str
     points: list[dict[str, Any]]
     requested_points: int
+    max_points: int
     returned_points: int
     source_points: int
     downsampled: bool
@@ -173,6 +174,7 @@ class BacktestResultStatsResponse(BaseModel):
     variant_hash: str
     kind: str
     items: list[dict[str, Any]]
+    bounds: dict[str, Any]
     cache: dict[str, Any]
     timing: dict[str, Any]
 

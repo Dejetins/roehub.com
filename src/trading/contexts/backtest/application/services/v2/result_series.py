@@ -16,6 +16,10 @@ DEFAULT_BACKTEST_RESULT_POINTS = 600
 MAX_BACKTEST_RESULT_POINTS = 1500
 DEFAULT_BACKTEST_TRADES_PAGE_SIZE = 50
 MAX_BACKTEST_TRADES_PAGE_SIZE = 100
+DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS = 10_000
+MAX_BACKTEST_TRADES_CSV_MAX_ROWS = 100_000
+MAX_BACKTEST_MONTHLY_STATS_ITEMS = 600
+MAX_BACKTEST_SYMBOL_STATS_ITEMS = 1
 
 BacktestResultSeriesKind = Literal["equity", "drawdown"]
 
@@ -48,6 +52,7 @@ class BacktestResultSeriesReadModel:
     kind: BacktestResultSeriesKind
     points: tuple[Mapping[str, Any], ...]
     requested_points: int
+    max_points: int
     returned_points: int
     source_points: int
     downsampled: bool
@@ -62,6 +67,7 @@ class BacktestResultSeriesReadModel:
             "kind": self.kind,
             "points": [dict(point) for point in self.points],
             "requested_points": self.requested_points,
+            "max_points": self.max_points,
             "returned_points": self.returned_points,
             "source_points": self.source_points,
             "downsampled": self.downsampled,
@@ -77,6 +83,7 @@ class BacktestResultStatsReadModel:
     variant_hash: str
     kind: Literal["monthly", "symbol"]
     items: tuple[Mapping[str, Any], ...]
+    bounds: Mapping[str, Any]
     cache: Mapping[str, Any]
     timing: Mapping[str, Any]
 
@@ -87,6 +94,7 @@ class BacktestResultStatsReadModel:
             "variant_hash": self.variant_hash,
             "kind": self.kind,
             "items": [dict(item) for item in self.items],
+            "bounds": dict(self.bounds),
             "cache": dict(self.cache),
             "timing": dict(self.timing),
         }
@@ -114,6 +122,18 @@ class BacktestPaginatedTradesReadModel:
             "cache": dict(self.cache),
             "timing": dict(self.timing),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestTradesCsvReadModel:
+    content: str
+    row_count: int
+    total_rows: int
+    max_rows: int
+    truncated: bool
+    sort: str
+    cache: Mapping[str, Any]
+    timing: Mapping[str, Any]
 
 
 def build_result_summary_read_model(
@@ -158,6 +178,7 @@ def build_result_series_read_model(
         kind=kind,
         points=tuple(sampled),
         requested_points=requested_points,
+        max_points=limit,
         returned_points=len(sampled),
         source_points=len(full_points),
         downsampled=len(sampled) < len(full_points),
@@ -192,13 +213,21 @@ def build_monthly_stats_read_model(
             bucket["wins"] += 1
         elif pnl < 0:
             bucket["losses"] += 1
-    items = tuple(_with_win_rate(item) for _, item in sorted(buckets.items()))
+    source_items = tuple(_with_win_rate(item) for _, item in sorted(buckets.items()))
+    items = source_items[:MAX_BACKTEST_MONTHLY_STATS_ITEMS]
     return BacktestResultStatsReadModel(
         job_id=detail.job_id,
         variant_key=detail.variant_key,
         variant_hash=detail.variant_hash,
         kind="monthly",
         items=items,
+        bounds={
+            "max_items": MAX_BACKTEST_MONTHLY_STATS_ITEMS,
+            "returned_items": len(items),
+            "source_items": len(source_items),
+            "truncated": len(items) < len(source_items),
+            "sort": "month_asc",
+        },
         cache=detail.cache,
         timing=detail.timing,
     )
@@ -223,6 +252,13 @@ def build_symbol_stats_read_model(
         variant_hash=detail.variant_hash,
         kind="symbol",
         items=(_with_win_rate(item),),
+        bounds={
+            "max_items": MAX_BACKTEST_SYMBOL_STATS_ITEMS,
+            "returned_items": 1,
+            "source_items": 1,
+            "truncated": False,
+            "sort": "symbol_asc",
+        },
         cache=detail.cache,
         timing=detail.timing,
     )
@@ -236,13 +272,16 @@ def build_paginated_trades_read_model(
 ) -> BacktestPaginatedTradesReadModel:
     effective_page = max(1, page)
     effective_page_size = min(max(1, page_size), MAX_BACKTEST_TRADES_PAGE_SIZE)
-    total = len(detail.trades)
+    ordered_trades = _ordered_trades(trades=detail.trades)
+    total = len(ordered_trades)
     offset = (effective_page - 1) * effective_page_size
-    items = tuple(dict(item) for item in detail.trades[offset : offset + effective_page_size])
+    items = tuple(dict(item) for item in ordered_trades[offset : offset + effective_page_size])
     has_next = offset + effective_page_size < total
     pagination = {
+        "mode": "page",
         "page": effective_page,
         "page_size": effective_page_size,
+        "max_page_size": MAX_BACKTEST_TRADES_PAGE_SIZE,
         "total": total,
         "has_next": has_next,
         "has_previous": effective_page > 1,
@@ -262,7 +301,12 @@ def build_paginated_trades_read_model(
     )
 
 
-def build_trades_csv(*, detail: BacktestLazyTradesDetailReadModel) -> str:
+def build_trades_csv(
+    *,
+    detail: BacktestLazyTradesDetailReadModel,
+    max_rows: int | None = None,
+) -> BacktestTradesCsvReadModel:
+    effective_max_rows = normalize_csv_max_rows(max_rows)
     fields = (
         "trade_index",
         "entry_timestamp",
@@ -285,9 +329,19 @@ def build_trades_csv(*, detail: BacktestLazyTradesDetailReadModel) -> str:
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
     writer.writeheader()
-    for trade in detail.trades:
+    ordered_trades = _ordered_trades(trades=detail.trades)
+    for trade in ordered_trades[:effective_max_rows]:
         writer.writerow({field: trade.get(field) for field in fields})
-    return output.getvalue()
+    return BacktestTradesCsvReadModel(
+        content=output.getvalue(),
+        row_count=min(len(ordered_trades), effective_max_rows),
+        total_rows=len(ordered_trades),
+        max_rows=effective_max_rows,
+        truncated=len(ordered_trades) > effective_max_rows,
+        sort="trade_index_asc",
+        cache=detail.cache,
+        timing=detail.timing,
+    )
 
 
 def normalize_chart_points(value: int | None) -> int:
@@ -296,9 +350,15 @@ def normalize_chart_points(value: int | None) -> int:
     return min(max(10, int(value)), MAX_BACKTEST_RESULT_POINTS)
 
 
+def normalize_csv_max_rows(value: int | None) -> int:
+    if value is None:
+        return DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS
+    return min(max(1, int(value)), MAX_BACKTEST_TRADES_CSV_MAX_ROWS)
+
+
 def _equity_points(*, detail: BacktestLazyTradesDetailReadModel) -> list[dict[str, Any]]:
     points: list[dict[str, Any]] = []
-    for trade in detail.trades:
+    for trade in _ordered_trades(trades=detail.trades):
         equity = _float_or_none(trade.get("equity_after"))
         if equity is None:
             continue
@@ -329,6 +389,28 @@ def _drawdown_points(*, points: Sequence[Mapping[str, Any]]) -> list[dict[str, A
             }
         )
     return result
+
+
+def _ordered_trades(*, trades: Sequence[Mapping[str, Any]]) -> tuple[Mapping[str, Any], ...]:
+    return tuple(
+        trade
+        for _, trade in sorted(
+            enumerate(trades),
+            key=lambda item: _trade_sort_key(index=item[0], trade=item[1]),
+        )
+    )
+
+
+def _trade_sort_key(*, index: int, trade: Mapping[str, Any]) -> tuple[int, float, str, str, int]:
+    trade_index = _float_or_none(trade.get("trade_index"))
+    trade_index_missing = 1 if trade_index is None else 0
+    return (
+        trade_index_missing,
+        trade_index if trade_index is not None else float(index),
+        str(trade.get("exit_timestamp") or ""),
+        str(trade.get("entry_timestamp") or ""),
+        index,
+    )
 
 
 def _downsample(*, points: Sequence[Mapping[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -387,14 +469,19 @@ def symbol_from_job_request(request: Mapping[str, Any]) -> str | None:
 
 __all__ = [
     "DEFAULT_BACKTEST_RESULT_POINTS",
+    "DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS",
     "DEFAULT_BACKTEST_TRADES_PAGE_SIZE",
+    "MAX_BACKTEST_MONTHLY_STATS_ITEMS",
     "MAX_BACKTEST_RESULT_POINTS",
+    "MAX_BACKTEST_SYMBOL_STATS_ITEMS",
+    "MAX_BACKTEST_TRADES_CSV_MAX_ROWS",
     "MAX_BACKTEST_TRADES_PAGE_SIZE",
     "BacktestPaginatedTradesReadModel",
     "BacktestResultSeriesKind",
     "BacktestResultSeriesReadModel",
     "BacktestResultStatsReadModel",
     "BacktestResultSummaryReadModel",
+    "BacktestTradesCsvReadModel",
     "build_monthly_stats_read_model",
     "build_paginated_trades_read_model",
     "build_result_series_read_model",
@@ -402,5 +489,6 @@ __all__ = [
     "build_symbol_stats_read_model",
     "build_trades_csv",
     "normalize_chart_points",
+    "normalize_csv_max_rows",
     "symbol_from_job_request",
 ]
