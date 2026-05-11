@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
 
 mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/state/backups /opt/roehub/clickhouse
+mkdir -p /opt/roehub/state/backtest_ai_configurator
 mkdir -p /opt/roehub/state/backtest_artifacts/v2
 mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clickhouse/logs /opt/roehub/clickhouse/backups /opt/roehub/clickhouse/access
 mkdir -p /Users/daniildegtyarev/.config/roehub /Users/daniildegtyarev/.local/bin /Users/daniildegtyarev/Library/Logs/roehub "$LAUNCH_AGENTS_DIR"
@@ -19,10 +20,12 @@ install -m 0755 "$REPO_ROOT/infra/scripts/monit/launchctl_service_control.sh" /o
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt/homebrew/etc/monit.d/roehub-market-data.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-job-runner.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-ai-configurator.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-ai-configurator.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
 
 for plist in \
   com.roehub.api.plist \
+  com.roehub.backtest-ai-configurator-worker.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \

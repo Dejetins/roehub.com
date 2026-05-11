@@ -56,6 +56,7 @@ Production:
 - `com.roehub.tailscale-runtime` (`launchd`, periodic one-shot reconnection/check + serve sync)
 - `com.roehub.keycloak` (`launchd`, auth provider, `127.0.0.1:18080`, ready-check `127.0.0.1:19000/health/ready`)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
+- `com.roehub.backtest-ai-configurator-worker` (`launchd`, health `127.0.0.1:9205/health/ready`, metrics `127.0.0.1:9205/metrics`)
 - `com.roehub.backtest-job-runner` (`launchd`, metrics `127.0.0.1:9204`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
@@ -110,6 +111,8 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_job_runner
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status roehub_backtest_ai_configurator_worker
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_backtest_ai_configurator_worker
 ```
 
 Monit launchd wrapper semantics:
@@ -135,8 +138,9 @@ Keycloak auth operations (realm/client/OTP/local setup):
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
-В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc` и
-`infra/scripts/monit/roehub-backtest-job-runner.monitrc`.
+В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc`,
+`infra/scripts/monit/roehub-backtest-job-runner.monitrc` и
+`infra/scripts/monit/roehub-backtest-ai-configurator.monitrc`.
 `reload_launchd_services.sh` сначала выгружает текущие static services и legacy
 numbered `backtest-job-runner.*` plists, затем bootstrap-ит static services для profile.
 Exact labels `com.roehub.backtest-job-runner` and
@@ -150,7 +154,8 @@ GitHub Actions workflow `deploy-backend` должен использовать �
 сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
 `bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest теперь
 возвращается в production reload baseline только через standalone
-`com.roehub.backtest-job-runner`; отдельный detail-runner process не запускается.
+`com.roehub.backtest-ai-configurator-worker` и `com.roehub.backtest-job-runner`;
+отдельный detail-runner process не запускается.
 Automatic `backtest-artifact-publisher` launchd bootstrap по-прежнему не входит в
 production reload baseline.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
@@ -162,6 +167,28 @@ R4 отсутствие `com.roehub.backtest-job-runner` в `launchctl` было
 `127.0.0.1:9204` и Prometheus target. Публичный Web UI backtest rollout не считается
 завершенным без R5 dedicated worker smoke: controlled job `queued -> running -> succeeded`,
 lazy trades materialization cache miss/hit, metrics endpoint и Prometheus target.
+
+Backtest AI Configurator worker проверяется отдельно от public `/backtests` UI:
+
+```bash
+launchctl print gui/$(id -u)/com.roehub.backtest-ai-configurator-worker | grep -E 'state =|pid =|last exit code ='
+curl -fsS http://127.0.0.1:9205/health/live
+curl -fsS http://127.0.0.1:9205/health/ready
+curl -fsS http://127.0.0.1:9205/metrics | rg 'backtest_ai_config_|process_resident_memory_bytes'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_ai_configurator_worker
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_backtest_ai_configurator_worker
+```
+
+Training export is an internal ops/admin command only; it writes scrubbed JSONL and
+must not be exposed through the public API:
+
+```bash
+cd /opt/roehub/app
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+/opt/roehub/app/.venv/bin/python -m apps.worker.backtest_ai_configurator.main.export_training --limit 100 --output /opt/roehub/state/backtest_ai_configurator/training-export.jsonl
+```
 
 Schema bootstrap (identity SQL + Alembic):
 

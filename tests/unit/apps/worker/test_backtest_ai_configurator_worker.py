@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import threading
+import urllib.request
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from time import sleep
+from types import SimpleNamespace
 from typing import Any, Mapping, cast
 from uuid import UUID
 
+from prometheus_client import generate_latest
+
+from apps.worker.backtest_ai_configurator.wiring.observability import (
+    BacktestAiConfiguratorHealthState,
+    BacktestAiConfiguratorMetrics,
+    start_backtest_ai_configurator_http_server,
+)
 from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigEvent,
     BacktestAiConfigGenerationLimiter,
@@ -16,6 +25,8 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigTerminalState,
     BacktestAiConfigWorkerUseCase,
     BacktestAiQuotaEvent,
+    BacktestAiTrainingExportRecord,
+    BacktestAiTrainingExportUseCase,
     backtest_ai_prompt_profile_for_mode,
 )
 from trading.shared_kernel.primitives import UserId
@@ -52,6 +63,7 @@ def test_backtest_ai_configurator_worker_processes_queued_job_to_ready() -> None
         "validating_business",
         "ready",
     ]
+    assert len(result.llm_attempts) == 0
 
 
 def test_backtest_ai_configurator_worker_heartbeats_during_generation() -> None:
@@ -80,7 +92,11 @@ def test_backtest_ai_configurator_worker_heartbeats_during_generation() -> None:
 
 
 def test_generation_limiter_serializes_active_generations_default_one() -> None:
-    limiter = BacktestAiConfigGenerationLimiter(active_generations=1)
+    active_transitions: list[bool] = []
+    limiter = BacktestAiConfigGenerationLimiter(
+        active_generations=1,
+        active_callback=active_transitions.append,
+    )
     lock = threading.Lock()
     active_ref = {"value": 0}
     max_ref = {"value": 0}
@@ -95,6 +111,8 @@ def test_generation_limiter_serializes_active_generations_default_one() -> None:
         thread.join()
 
     assert max_ref["value"] == 1
+    assert active_transitions.count(True) == 2
+    assert active_transitions.count(False) == 2
 
 
 def test_worker_skips_non_backtests_source_page_without_running_pipeline() -> None:
@@ -119,6 +137,126 @@ def test_worker_skips_non_backtests_source_page_without_running_pipeline() -> No
     assert result.job.state == "failed"
     assert result.job.last_error == "unsupported_source_page"
     assert pipeline.calls == 0
+
+
+def test_worker_metrics_expose_required_names_after_fake_job() -> None:
+    job = replace(
+        _job(),
+        state="ready",
+        started_at=datetime.now(UTC) - timedelta(seconds=2),
+        finished_at=datetime.now(UTC),
+        model_id="gemma-4-e2b-it-4bit",
+        validation_errors_json=(
+            {"path": "config.symbol", "code": "unsupported_symbol", "message": "bad"},
+        ),
+    )
+    metrics = BacktestAiConfiguratorMetrics()
+
+    metrics.observe_result(
+        result=cast(
+            Any,
+            SimpleNamespace(claimed=True, lease_lost=False, job=job),
+        ),
+        duration_seconds=0.5,
+    )
+    metrics.set_queue_depth(queued=3, running=1, repairing=0)
+    metrics.set_model_metadata(
+        model_id="gemma-4-e2b-it-4bit",
+        loaded=True,
+        runtime="mlx",
+        quantization="4bit",
+    )
+    payload = generate_latest(metrics.registry).decode("utf-8")
+
+    assert "backtest_ai_config_jobs_total" in payload
+    assert "backtest_ai_config_jobs_inflight" in payload
+    assert "backtest_ai_config_queue_depth" in payload
+    assert "backtest_ai_config_active_generations" in payload
+    assert "backtest_ai_config_stage_duration_seconds_bucket" in payload
+    assert "backtest_ai_config_llm_latency_seconds_bucket" in payload
+    assert "backtest_ai_config_total_latency_seconds_bucket" in payload
+    assert "backtest_ai_config_validation_failures_total" in payload
+    assert "backtest_ai_config_repair_attempts_total" in payload
+    assert "backtest_ai_config_security_decisions_total" in payload
+    assert "backtest_ai_config_quota_rejections_total" in payload
+    assert "backtest_ai_config_capacity_rejections_total" in payload
+    assert "backtest_ai_config_applied_total" in payload
+    assert "backtest_ai_config_model_reload_total" in payload
+    assert "process_resident_memory_bytes" in payload
+
+
+def test_training_export_redacts_private_fields_and_labels_rows() -> None:
+    repository = _Repository()
+    job = replace(
+        _job(),
+        state="ready",
+        user_prompt_text=(
+            "Собери BTC config password=secret with "
+            "http://127.0.0.1:8080 and /opt/roehub/app/debug"
+        ),
+        assistant_message="Ready from /Users/daniildegtyarev/private",
+        validated_config_json={
+            "symbol": "BTCUSDT",
+            "base_url": "http://127.0.0.1:8080",
+            "token": "sk-123456789012345678901234",
+        },
+        applied_at=datetime.now(UTC),
+        model_id="gemma-4-e2b-it-4bit",
+        model_path_hash="hash-only",
+    )
+    repository.training_records = (
+        BacktestAiTrainingExportRecord(job=job, attempts=()),
+    )
+
+    rows = BacktestAiTrainingExportUseCase(source=repository).export_rows()
+
+    assert rows[0]["quality_label"] == "applied"
+    serialized = str(rows[0])
+    assert "password=secret" not in serialized
+    assert "127.0.0.1" not in serialized
+    assert "/opt/roehub" not in serialized
+    assert "/Users/daniildegtyarev" not in serialized
+    assert "base_url" not in serialized
+    assert "token" not in serialized
+    assert rows[0]["model_path_hash"] == "hash-only"
+
+
+def test_ops_http_server_exposes_health_ready_and_metrics() -> None:
+    metrics = BacktestAiConfiguratorMetrics()
+    health = BacktestAiConfiguratorHealthState(
+        config_loaded=True,
+        model_id="gemma-4-e2b-it-4bit",
+        model_path="/tmp/model",
+        drain_mode=False,
+        readiness_checks=(lambda: (True, "model_path"),),
+    )
+    health.mark_loop_started()
+    server = start_backtest_ai_configurator_http_server(
+        host="127.0.0.1",
+        port=0,
+        metrics=metrics,
+        health=health,
+    )
+    port = cast(tuple[str, int], server.server_address)[1]
+    try:
+        live = urllib.request.urlopen(  # noqa: S310
+            f"http://127.0.0.1:{port}/health/live",
+            timeout=2,
+        ).read()
+        ready = urllib.request.urlopen(  # noqa: S310
+            f"http://127.0.0.1:{port}/health/ready",
+            timeout=2,
+        ).read()
+        exported_metrics = urllib.request.urlopen(  # noqa: S310
+            f"http://127.0.0.1:{port}/metrics",
+            timeout=2,
+        ).read()
+    finally:
+        server.shutdown()
+
+    assert b'"status": "live"' in live
+    assert b'"status": "ready"' in ready
+    assert b"backtest_ai_config_jobs_total" in exported_metrics
 
 
 def _tracked_work(
@@ -177,6 +315,7 @@ class _Repository:
     llm_attempts: list[BacktestAiConfigLlmAttempt] = field(default_factory=list)
     heartbeat_calls: int = 0
     heartbeat_event: threading.Event | None = None
+    training_records: tuple[BacktestAiTrainingExportRecord, ...] = ()
 
     def append_event(self, *, event: BacktestAiConfigEvent) -> None:
         self.events.append(event)
@@ -346,6 +485,18 @@ class _Repository:
 
     def count_active_global(self) -> int:
         return 0
+
+    def count_jobs_by_state(self, *, state: str) -> int:
+        return sum(1 for job in self.jobs.values() if job.state == state)
+
+    def list_training_export_records(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> tuple[BacktestAiTrainingExportRecord, ...]:
+        if limit is None:
+            return self.training_records
+        return self.training_records[:limit]
 
 
 def _job(*, source_page: str = "backtests") -> BacktestAiConfigJob:

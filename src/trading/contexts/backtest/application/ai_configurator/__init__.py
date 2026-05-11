@@ -65,6 +65,12 @@ from .services import (
     build_generate_prompt_envelope,
     build_repair_prompt_envelope,
 )
+from .training_export import (
+    BacktestAiTrainingExportRecord,
+    BacktestAiTrainingExportSource,
+    BacktestAiTrainingExportUseCase,
+    BacktestAiTrainingQualityLabel,
+)
 from .worker import (
     BacktestAiConfigGenerationLimiter,
     BacktestAiConfigWorkerResult,
@@ -118,6 +124,10 @@ __all__ = [
     "BacktestAiSecurityDecision",
     "BacktestAiSecurityIssue",
     "BacktestAiTierQuota",
+    "BacktestAiTrainingExportRecord",
+    "BacktestAiTrainingExportSource",
+    "BacktestAiTrainingExportUseCase",
+    "BacktestAiTrainingQualityLabel",
     "BacktestAiValidationStatus",
     "BacktestConfigLLMGateway",
     "BacktestConfigLLMRepairRequest",

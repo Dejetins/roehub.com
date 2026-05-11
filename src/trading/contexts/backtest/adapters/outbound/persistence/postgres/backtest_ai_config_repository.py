@@ -15,6 +15,7 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigLlmAttempt,
     BacktestAiConfigTerminalState,
     BacktestAiQuotaEvent,
+    BacktestAiTrainingExportRecord,
 )
 from trading.contexts.backtest.application.ports import (
     BacktestAiConfigJobRepository,
@@ -523,6 +524,86 @@ class PostgresBacktestAiConfigRepository(
             parameters={"states": list(_ACTIVE_STATES)},
         )
 
+    def count_jobs_by_state(self, *, state: BacktestAiConfigJobState) -> int:
+        return self._count_jobs(
+            where_clause="state = %(state)s",
+            parameters={"state": state},
+        )
+
+    def list_training_export_records(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> tuple[BacktestAiTrainingExportRecord, ...]:
+        if limit is not None and limit <= 0:
+            raise BacktestStorageError("training export limit must be > 0")
+        limit_clause = "" if limit is None else "LIMIT %(limit)s"
+        parameters: dict[str, Any] = {
+            "states": [
+                "ready",
+                "needs_clarification",
+                "blocked_by_policy",
+                "security_review",
+                "failed",
+            ]
+        }
+        if limit is not None:
+            parameters["limit"] = limit
+        jobs_query = f"""
+        SELECT
+            {_AI_CONFIG_JOB_SELECT_COLUMNS}
+        FROM {self._jobs_table}
+        WHERE state = ANY(%(states)s)
+        ORDER BY finished_at ASC NULLS LAST, queued_at ASC, job_id ASC
+        {limit_clause}
+        """
+        job_rows = self._gateway.fetch_all(query=jobs_query, parameters=parameters)
+        jobs = tuple(_map_job_row(row=row) for row in job_rows)
+        if not jobs:
+            return ()
+        attempt_rows = self._gateway.fetch_all(
+            query=f"""
+            SELECT
+                attempt_id,
+                job_id,
+                owner_user_id,
+                attempt_no,
+                attempt_kind,
+                prompt_profile,
+                system_prompt_version,
+                system_prompt_hash,
+                user_prompt_text,
+                catalog_subset_json,
+                raw_model_response,
+                parsed_json_draft,
+                validation_errors_json,
+                input_tokens_estimate,
+                output_tokens_estimate,
+                latency_ms,
+                finish_reason,
+                success,
+                failure_reason,
+                created_at
+            FROM {self._llm_attempts_table}
+            WHERE job_id = ANY(%(job_ids)s)
+            ORDER BY job_id ASC, attempt_no ASC, created_at ASC
+            """,
+            parameters={"job_ids": [str(job.job_id) for job in jobs]},
+        )
+        attempts_by_job: dict[UUID, list[BacktestAiConfigLlmAttempt]] = {
+            job.job_id: [] for job in jobs
+        }
+        for row in attempt_rows:
+            attempt = _map_llm_attempt_row(row=row)
+            attempts_by_job.setdefault(attempt.job_id, []).append(attempt)
+        return tuple(
+            BacktestAiTrainingExportRecord(
+                job=job,
+                attempts=tuple(attempts_by_job.get(job.job_id, ())),
+            )
+            for job in jobs
+        )
+
     def claim_next(
         self,
         *,
@@ -910,6 +991,34 @@ def _map_event_row(*, row: Mapping[str, Any]) -> BacktestAiConfigEvent:
         raise BacktestStorageError("Cannot map backtest AI config event row") from error
 
 
+def _map_llm_attempt_row(*, row: Mapping[str, Any]) -> BacktestAiConfigLlmAttempt:
+    try:
+        return BacktestAiConfigLlmAttempt(
+            attempt_id=UUID(str(row["attempt_id"])),
+            job_id=UUID(str(row["job_id"])),
+            owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+            attempt_no=int(row["attempt_no"]),
+            attempt_kind=cast(Any, str(row["attempt_kind"])),
+            prompt_profile=str(row["prompt_profile"]),
+            system_prompt_version=str(row["system_prompt_version"]),
+            system_prompt_hash=str(row["system_prompt_hash"]),
+            user_prompt_text=str(row["user_prompt_text"]),
+            catalog_subset_json=_json_mapping_required(row["catalog_subset_json"]),
+            raw_model_response=_optional_str(row["raw_model_response"]),
+            parsed_json_draft=_json_mapping(row["parsed_json_draft"]),
+            validation_errors_json=_json_tuple(row["validation_errors_json"]),
+            input_tokens_estimate=_optional_int(row["input_tokens_estimate"]),
+            output_tokens_estimate=_optional_int(row["output_tokens_estimate"]),
+            latency_ms=_optional_int(row["latency_ms"]),
+            finish_reason=_optional_str(row["finish_reason"]),
+            success=bool(row["success"]),
+            failure_reason=_optional_str(row["failure_reason"]),
+            created_at=_datetime(row["created_at"]),
+        )
+    except Exception as error:  # noqa: BLE001
+        raise BacktestStorageError("Cannot map backtest AI config LLM attempt row") from error
+
+
 def _job_state(value: Any) -> BacktestAiConfigJobState:
     normalized = str(value).strip().lower()
     if normalized not in _ACTIVE_STATES and normalized not in _TERMINAL_STATES:
@@ -968,6 +1077,12 @@ def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    return int(value)
 
 
 def _datetime(value: Any) -> datetime:

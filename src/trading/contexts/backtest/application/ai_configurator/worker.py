@@ -13,7 +13,12 @@ from trading.contexts.backtest.application.ports.backtest_ai_configurator import
     BacktestAiConfigLeaseRepository,
 )
 
-from .dto import BacktestAiConfigEvent, BacktestAiConfigEventName, BacktestAiConfigJob
+from .dto import (
+    BacktestAiConfigEvent,
+    BacktestAiConfigEventName,
+    BacktestAiConfigJob,
+    BacktestAiConfigLlmAttempt,
+)
 from .jobs import BACKTEST_AI_CONFIG_SOURCE_PAGE
 from .services import BacktestAiConfigPipeline
 
@@ -36,18 +41,31 @@ class BacktestAiConfigWorkerResult:
     claimed: bool
     lease_lost: bool = False
     skipped_source_page: bool = False
+    llm_attempts: tuple[BacktestAiConfigLlmAttempt, ...] = ()
 
 
 class BacktestAiConfigGenerationLimiter:
-    def __init__(self, *, active_generations: int = 1) -> None:
+    def __init__(
+        self,
+        *,
+        active_generations: int = 1,
+        active_callback: Callable[[bool], None] | None = None,
+    ) -> None:
         if active_generations <= 0:
             raise ValueError("active_generations must be > 0")
         self.active_generations = active_generations
+        self._active_callback = active_callback
         self._semaphore = threading.BoundedSemaphore(value=active_generations)
 
     def run_locked(self, callback: Callable[[], _T]) -> _T:
         with self._semaphore:
-            return callback()
+            if self._active_callback is not None:
+                self._active_callback(True)
+            try:
+                return callback()
+            finally:
+                if self._active_callback is not None:
+                    self._active_callback(False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +192,7 @@ class BacktestAiConfigWorkerUseCase:
                 job=finished,
                 claimed=True,
                 lease_lost=heartbeat.lease_lost or finished is None,
+                llm_attempts=pipeline_result.llm_attempts,
             )
         except Exception as error:  # noqa: BLE001
             failed = self.lease_repository.finish(

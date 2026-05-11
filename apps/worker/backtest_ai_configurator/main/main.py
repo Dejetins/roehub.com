@@ -26,6 +26,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Process at most one claimed job, then exit",
     )
+    parser.add_argument(
+        "--metrics-port",
+        type=int,
+        default=None,
+        help="Health and Prometheus metrics HTTP port",
+    )
     return parser
 
 
@@ -42,7 +48,7 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
             signal.signal(sig, lambda *_args: _mark_stop())
 
 
-async def _run_async(*, once: bool) -> int:
+async def _run_async(*, once: bool, metrics_port: int | None) -> int:
     runtime_config = load_backtest_ai_configurator_worker_runtime_config(
         environ=os.environ
     )
@@ -58,12 +64,17 @@ async def _run_async(*, once: bool) -> int:
             empty_backoff_seconds=runtime_config.empty_backoff_seconds,
             heartbeat_interval_seconds=runtime_config.heartbeat_interval_seconds,
             max_jobs_per_process=1,
+            metrics_port=runtime_config.metrics_port,
+            drain_mode=runtime_config.drain_mode,
         )
+    if metrics_port is not None and metrics_port <= 0:
+        raise ValueError("--metrics-port must be > 0 when provided")
     stop_event = asyncio.Event()
     _install_signal_handlers(stop_event)
     app = build_backtest_ai_configurator_worker_app(
         environ=os.environ,
         runtime_config=runtime_config,
+        metrics_port=metrics_port or runtime_config.metrics_port,
     )
     await app.run(stop_event)
     return 0
@@ -73,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging()
     args = _build_parser().parse_args(argv)
     try:
-        return asyncio.run(_run_async(once=args.once))
+        return asyncio.run(_run_async(once=args.once, metrics_port=args.metrics_port))
     except Exception:  # noqa: BLE001
         logging.getLogger(__name__).exception("backtest-ai-configurator-worker failed")
         return 1
