@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import socket
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from time import monotonic
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -33,6 +35,7 @@ class BacktestJobExecutor(Protocol):
 class BacktestJobWorkerResult:
     job: BacktestJob | None
     claimed: bool
+    lease_lost: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +45,7 @@ class BacktestJobWorkerUseCase:
     preflight_service: BacktestPreflightService
     executor: BacktestJobExecutor
     lease_seconds: int
+    heartbeat_interval_seconds: float = 30.0
     locked_by: str | None = None
 
     def run_next(self) -> BacktestJobWorkerResult:
@@ -65,11 +69,18 @@ class BacktestJobWorkerUseCase:
         )
         try:
             preflight = self.preflight_service.execute(dict(job.request_json))
-            execution_result = self.executor.execute(
+            with _LeaseHeartbeat(
+                lease_repository=self.lease_repository,
                 job_id=job.job_id,
-                preflight=preflight,
-                updated_at=datetime.now(UTC),
-            )
+                locked_by=owner,
+                lease_seconds=self.lease_seconds,
+                interval_seconds=self.heartbeat_interval_seconds,
+            ) as heartbeat:
+                execution_result = self.executor.execute(
+                    job_id=job.job_id,
+                    preflight=preflight,
+                    updated_at=datetime.now(UTC),
+                )
             finished = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
                 user_id=job.user_id,
@@ -78,7 +89,11 @@ class BacktestJobWorkerUseCase:
                 next_state="succeeded",
                 top_variants=tuple(execution_result.top_variants),
             )
-            return BacktestJobWorkerResult(job=finished, claimed=True)
+            return BacktestJobWorkerResult(
+                job=finished,
+                claimed=True,
+                lease_lost=heartbeat.lease_lost or finished is None,
+            )
         except Exception as error:  # noqa: BLE001
             failed = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
@@ -94,12 +109,64 @@ class BacktestJobWorkerUseCase:
                     details={"reason": str(error)},
                 ),
             )
-            return BacktestJobWorkerResult(job=failed, claimed=True)
+            return BacktestJobWorkerResult(job=failed, claimed=True, lease_lost=failed is None)
 
     def _locked_by(self) -> str:
         if self.locked_by is not None and self.locked_by.strip():
             return self.locked_by.strip()
         return f"backtest-worker:{socket.gethostname()}"
+
+
+class _LeaseHeartbeat:
+    def __init__(
+        self,
+        *,
+        lease_repository: BacktestJobLeaseRepository,
+        job_id: UUID,
+        locked_by: str,
+        lease_seconds: int,
+        interval_seconds: float,
+    ) -> None:
+        if interval_seconds <= 0:
+            raise ValueError("heartbeat_interval_seconds must be > 0")
+        self._lease_repository = lease_repository
+        self._job_id = job_id
+        self._locked_by = locked_by
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop = threading.Event()
+        self._lease_lost = False
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"backtest-job-heartbeat-{job_id}",
+            daemon=True,
+        )
+
+    @property
+    def lease_lost(self) -> bool:
+        return self._lease_lost
+
+    def __enter__(self) -> "_LeaseHeartbeat":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_exc_info: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=max(self._interval_seconds, 1.0))
+
+    def _run(self) -> None:
+        next_heartbeat = monotonic() + self._interval_seconds
+        while not self._stop.wait(max(next_heartbeat - monotonic(), 0.0)):
+            updated = self._lease_repository.heartbeat(
+                job_id=self._job_id,
+                now=datetime.now(UTC),
+                locked_by=self._locked_by,
+                lease_seconds=self._lease_seconds,
+            )
+            if updated is None:
+                self._lease_lost = True
+                return
+            next_heartbeat = monotonic() + self._interval_seconds
 
 
 __all__ = [

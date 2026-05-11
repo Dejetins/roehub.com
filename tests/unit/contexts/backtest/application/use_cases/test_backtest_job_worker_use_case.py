@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -78,10 +80,37 @@ def test_worker_persists_failed_state_when_executor_raises() -> None:
     assert result.job.last_error_json.code == "unexpected_error"
 
 
+def test_worker_heartbeats_active_lease_while_executor_runs() -> None:
+    job = _queued_job()
+    repository = _Repository(job=job)
+    lease_repository = _LeaseRepository(repository=repository)
+    heartbeat_seen = threading.Event()
+    executor = _BlockingExecutor(heartbeat_seen=heartbeat_seen)
+    use_case = BacktestJobWorkerUseCase(
+        lease_repository=lease_repository,
+        job_repository=cast(BacktestJobRepository, repository),
+        preflight_service=cast(BacktestPreflightService, _PreflightService()),
+        executor=executor,
+        lease_seconds=60,
+        heartbeat_interval_seconds=0.001,
+        locked_by="test-worker",
+    )
+
+    result = use_case.run_next()
+
+    assert result.claimed is True
+    assert result.lease_lost is False
+    assert result.job is not None
+    assert result.job.state == "succeeded"
+    assert lease_repository.heartbeat_calls >= 1
+
+
 @dataclass
 class _LeaseRepository:
     repository: "_Repository"
     progress_updates: tuple[tuple[BacktestJobStage, int, int], ...] = ()
+    heartbeat_calls: int = 0
+    heartbeat_event: threading.Event | None = None
 
     def claim_next(
         self,
@@ -109,6 +138,9 @@ class _LeaseRepository:
         lease_seconds: int,
     ) -> BacktestJob | None:
         _ = job_id, now, locked_by, lease_seconds
+        self.heartbeat_calls += 1
+        if self.heartbeat_event is not None:
+            self.heartbeat_event.set()
         return self.repository.job
 
     def update_progress(
@@ -249,6 +281,42 @@ class _FailingExecutor:
     ) -> BacktestJobExecutionResult:
         _ = job_id, preflight, updated_at
         raise RuntimeError("boom")
+
+
+@dataclass
+class _BlockingExecutor:
+    heartbeat_seen: threading.Event
+
+    def execute(
+        self,
+        *,
+        job_id: UUID,
+        preflight: BacktestPreflightResult,
+        updated_at: datetime,
+    ) -> BacktestJobExecutionResult:
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if self.heartbeat_seen.wait(timeout=0.001):
+                break
+        top_result = BacktestNoRiskTopResult(
+            rank=1,
+            score=12.5,
+            indicator_rows={"ma.dema": 7},
+            metrics={"total_return_pct": 12.5},
+            metadata={"ma.dema.source": "close", "ma.dema.window": 5},
+        )
+        assembly = BacktestTopResultAssemblyService().assemble(
+            job_id=job_id,
+            normalized_request=preflight.normalized_request,
+            top_results=(top_result,),
+            updated_at=updated_at,
+        )
+        return BacktestJobExecutionResult(
+            top_variants=assembly.top_variants,
+            stage_timings=assembly.stage_timings,
+            summary_hash=assembly.summary_hash,
+            cleanup_evidence={"result_contains_heavy_references": False},
+        )
 
 
 class _PreflightService:
