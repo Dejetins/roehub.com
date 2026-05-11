@@ -16,8 +16,10 @@ from .config import (
     BacktestArtifactValidationBudgetsRuntimeConfig,
     BacktestArtifactValidationPlanRuntimeConfig,
     build_backtest_artifacts_runtime_config_hash,
+    load_backtest_admission_config,
     load_backtest_ai_configurator_runtime_config,
     load_backtest_artifacts_runtime_config,
+    resolve_backtest_admission_config_path,
     resolve_backtest_ai_configurator_config_path,
     resolve_backtest_artifacts_config_path,
 )
@@ -58,7 +60,9 @@ __all__ = [
     "YamlBacktestGridDefaultsProvider",
     "build_backtest_artifacts_runtime_config_hash",
     "load_backtest_ai_configurator_runtime_config",
+    "load_backtest_admission_config",
     "load_backtest_artifacts_runtime_config",
+    "resolve_backtest_admission_config_path",
     "resolve_backtest_ai_configurator_config_path",
     "resolve_backtest_artifacts_config_path",
 ]

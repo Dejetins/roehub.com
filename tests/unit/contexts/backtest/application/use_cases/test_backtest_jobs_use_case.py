@@ -23,6 +23,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestAdmissionService,
     BacktestPreflightService,
     BacktestRuntimeConfig,
     BacktestTopResultAssemblyService,
@@ -37,7 +38,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import PaidLevel, UserId
 
 
 def test_trades_resolves_public_variant_key_only() -> None:
@@ -191,6 +192,126 @@ def test_create_idempotency_replay_does_not_enqueue_duplicate_work() -> None:
     assert exc_info.value.code == "backtest.idempotency_key_conflict"
 
 
+def test_create_idempotency_replay_does_not_consume_quota_slot() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000311")
+    repository = _CreateRepository()
+    trigger = _Trigger()
+    use_case = _create_use_case(
+        repository=repository,
+        trigger=trigger,
+        admission_service=BacktestAdmissionService(),
+    )
+    request = _request()
+    request["top_n"] = 20
+
+    first = use_case.create(
+        user_id=user_id,
+        paid_level=PaidLevel.free(),
+        payload=request,
+        idempotency_key="stable-key",
+    )
+    replay = use_case.create(
+        user_id=user_id,
+        paid_level=PaidLevel.free(),
+        payload=request,
+        idempotency_key="stable-key",
+    )
+
+    assert replay.idempotent_replay is True
+    assert replay.job.job_id == first.job.job_id
+    assert len(repository.jobs) == 1
+    assert trigger.calls == ((next(iter(repository.jobs.values())).job_id, "d" * 64),)
+
+
+def test_create_rejects_free_request_above_tier_top_n() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000312")
+    use_case = _create_use_case(
+        repository=_CreateRepository(),
+        trigger=_Trigger(),
+        admission_service=BacktestAdmissionService(),
+    )
+
+    with pytest.raises(RoehubError) as exc_info:
+        use_case.create(
+            user_id=user_id,
+            paid_level=PaidLevel.free(),
+            payload=_request(),
+            idempotency_key=None,
+        )
+
+    assert exc_info.value.code == "backtest.request_too_expensive"
+    details = exc_info.value.details
+    assert isinstance(details, dict)
+    assert details["paid_level"] == "free"
+    assert details["limit_scope"] == "full_jobs.top_n"
+
+
+def test_create_rejects_free_active_quota_with_retry_details() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000313")
+    repository = _CreateRepository()
+    trigger = _Trigger()
+    use_case = _create_use_case(
+        repository=repository,
+        trigger=trigger,
+        admission_service=BacktestAdmissionService(),
+    )
+    request = _request()
+    request["top_n"] = 20
+    for index in range(2):
+        use_case.create(
+            user_id=user_id,
+            paid_level=PaidLevel.free(),
+            payload=request,
+            idempotency_key=f"key-{index}",
+        )
+
+    with pytest.raises(RoehubError) as exc_info:
+        use_case.create(
+            user_id=user_id,
+            paid_level=PaidLevel.free(),
+            payload=request,
+            idempotency_key="key-over-limit",
+        )
+
+    assert exc_info.value.code == "backtest.rate_limited"
+    details = exc_info.value.details
+    assert isinstance(details, dict)
+    assert details["paid_level"] == "free"
+    assert details["limit_scope"] == "full_jobs.active"
+    assert details["retry_after_seconds"] == 60
+
+
+def test_lazy_detail_quota_replay_does_not_consume_new_slot() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000314")
+    job, row = _job_and_row(user_id=user_id)
+    materializations = _MaterializationRepository()
+    use_case = _use_case(
+        repository=_Repository(job=job, top_rows=(row,)),
+        lazy_service=_LazyService(cache_hit=False),
+        materialization_repository=materializations,
+        admission_service=BacktestAdmissionService(),
+    )
+    public_key = str(row.payload_json["public_variant_key"])
+
+    first = use_case.trades(
+        user_id=user_id,
+        paid_level=PaidLevel.free(),
+        job_id=job.job_id,
+        variant_key=public_key,
+    )
+    replay = use_case.trades(
+        user_id=user_id,
+        paid_level=PaidLevel.free(),
+        job_id=job.job_id,
+        variant_key=public_key,
+    )
+
+    assert isinstance(first, BacktestLazyTradesMaterializationReadModel)
+    assert isinstance(replay, BacktestLazyTradesMaterializationReadModel)
+    assert replay.materialization["task_id"] == first.materialization["task_id"]
+    assert len(materializations.tasks) == 1
+
+
 def test_cancel_is_deterministic_for_queued_running_and_terminal_jobs() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000000307")
     queued, _ = _job_and_row(user_id=user_id)
@@ -223,6 +344,7 @@ def _use_case(
     repository: "_Repository",
     lazy_service: Any | None = None,
     materialization_repository: Any | None = None,
+    admission_service: BacktestAdmissionService | None = None,
 ) -> BacktestJobsUseCase:
     runtime_config = _runtime_config()
     return BacktestJobsUseCase(
@@ -235,6 +357,7 @@ def _use_case(
         runtime_config=runtime_config,
         lazy_trades_service=cast(Any, lazy_service or _LazyService()),
         lazy_trades_materialization_repository=materialization_repository,
+        admission_service=admission_service,
     )
 
 
@@ -242,6 +365,7 @@ def _create_use_case(
     *,
     repository: "_CreateRepository",
     trigger: "_Trigger",
+    admission_service: BacktestAdmissionService | None = None,
 ) -> BacktestJobsUseCase:
     runtime_config = _runtime_config()
     return BacktestJobsUseCase(
@@ -249,6 +373,7 @@ def _create_use_case(
         preflight_service=cast(BacktestPreflightService, _PreflightService()),
         runtime_config=runtime_config,
         execution_trigger=trigger,
+        admission_service=admission_service,
     )
 
 
@@ -376,6 +501,38 @@ class _MaterializationRepository:
         self.tasks[key] = task
         return task
 
+    def find_by_identity(
+        self,
+        *,
+        owner_user_id: UserId,
+        job_id: UUID,
+        public_variant_key: str,
+        cache_key: str,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        return self.tasks.get((str(owner_user_id), job_id, public_variant_key, cache_key))
+
+    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+        return sum(
+            1
+            for task in self.tasks.values()
+            if task.owner_user_id == owner_user_id and task.status in {"queued", "running"}
+        )
+
+    def count_created_for_user_since(
+        self,
+        *,
+        owner_user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        return sum(
+            1
+            for task in self.tasks.values()
+            if task.owner_user_id == owner_user_id and task.created_at >= created_after
+        )
+
+    def count_active_global(self) -> int:
+        return sum(1 for task in self.tasks.values() if task.status in {"queued", "running"})
+
 
 @dataclass
 class _Repository:
@@ -496,6 +653,15 @@ class _Repository:
 
     def count_active_for_user(self, *, user_id: UserId) -> int:
         _ = user_id
+        return 0
+
+    def count_created_for_user_since(
+        self,
+        *,
+        user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        _ = user_id, created_after
         return 0
 
     def count_active_global(self) -> int:
@@ -634,6 +800,18 @@ class _CreateRepository:
 
     def count_active_for_user(self, *, user_id: UserId) -> int:
         return sum(1 for job in self.jobs.values() if job.user_id == user_id and job.is_active())
+
+    def count_created_for_user_since(
+        self,
+        *,
+        user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        return sum(
+            1
+            for job in self.jobs.values()
+            if job.user_id == user_id and job.created_at >= created_after
+        )
 
     def count_active_global(self) -> int:
         return sum(1 for job in self.jobs.values() if job.is_active())

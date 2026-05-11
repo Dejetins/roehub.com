@@ -24,6 +24,8 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestAdmissionConfig,
+    BacktestAdmissionService,
     BacktestJobExecutionResult,
     BacktestPreflightService,
     BacktestRuntimeConfig,
@@ -120,6 +122,25 @@ def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() ->
     assert response.json()["error"]["details"]["retryable"] is True
 
 
+def test_post_backtest_preflight_applies_tier_request_limits() -> None:
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
+
+    response = client.post(
+        "/backtests/preflight",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000239",
+            "x-paid-level": "free",
+        },
+        json=_valid_request(),
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["error"]["code"] == "backtest.request_too_expensive"
+    assert payload["error"]["details"]["paid_level"] == "free"
+    assert payload["error"]["details"]["limit_scope"] == "full_jobs.top_n"
+
+
 def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> None:
     repository = _FakeJobRepository()
     trigger = _FakeExecutionTrigger()
@@ -164,6 +185,86 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     )
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
+
+
+def test_post_backtest_job_free_active_quota_returns_429_with_retry_details() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000000240",
+        "x-paid-level": "free",
+    }
+    request = _valid_request()
+    request["top_n"] = 20
+    request["time_range"] = {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-02-01T00:00:00Z",
+    }
+
+    first = client.post(
+        "/backtests/jobs",
+        headers={**headers, "Idempotency-Key": "a"},
+        json=request,
+    )
+    second = client.post(
+        "/backtests/jobs",
+        headers={**headers, "Idempotency-Key": "b"},
+        json=request,
+    )
+    limited = client.post(
+        "/backtests/jobs",
+        headers={**headers, "Idempotency-Key": "c"},
+        json=request,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert limited.status_code == 429
+    payload = limited.json()
+    assert payload["error"]["code"] == "backtest.rate_limited"
+    assert payload["error"]["details"]["paid_level"] == "free"
+    assert payload["error"]["details"]["limit_scope"] == "full_jobs.active"
+    assert payload["error"]["details"]["retry_after_seconds"] == 60
+
+
+def test_post_backtest_job_global_queue_saturated_returns_503() -> None:
+    admission = BacktestAdmissionService(
+        config=BacktestAdmissionConfig(max_active_full_jobs_global=1)
+    )
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            admission_service=admission,
+        )
+    )
+    request = _valid_request()
+
+    first = client.post(
+        "/backtests/jobs",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000241",
+            "x-paid-level": "pro",
+            "Idempotency-Key": "global-a",
+        },
+        json=request,
+    )
+    saturated = client.post(
+        "/backtests/jobs",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000242",
+            "x-paid-level": "pro",
+            "Idempotency-Key": "global-b",
+        },
+        json=request,
+    )
+
+    assert first.status_code == 201
+    assert saturated.status_code == 503
+    payload = saturated.json()
+    assert payload["error"]["code"] == "backtest.queue_saturated"
+    assert payload["error"]["details"]["limit_scope"] == "global.full_jobs.active"
+    assert payload["error"]["details"]["retry_after_seconds"] == 60
 
 
 def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> None:
@@ -1026,7 +1127,7 @@ class _HeaderCurrentUserDependency:
             )
         return CurrentUserPrincipal(
             user_id=UserId.from_string(raw_user_id),
-            paid_level=PaidLevel.free(),
+            paid_level=PaidLevel(request.headers.get("x-paid-level", "pro")),
         )
 
 
@@ -1090,6 +1191,7 @@ def _build_jobs_use_case(
     execution_trigger: Any | None = None,
     lazy_trades_service: Any | None = None,
     materialization_repository: Any | None = None,
+    admission_service: BacktestAdmissionService | None = None,
 ) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -1107,6 +1209,7 @@ def _build_jobs_use_case(
             runtime_config=runtime_config,
         ),
         runtime_config=runtime_config,
+        admission_service=admission_service or BacktestAdmissionService(),
         execution_trigger=execution_trigger,
         lazy_trades_service=lazy_trades_service,
         lazy_trades_materialization_repository=materialization_repository,
@@ -1323,6 +1426,38 @@ class _FakeMaterializationRepository:
         self.tasks[key] = task
         return task
 
+    def find_by_identity(
+        self,
+        *,
+        owner_user_id: UserId,
+        job_id: UUID,
+        public_variant_key: str,
+        cache_key: str,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        return self.tasks.get((str(owner_user_id), job_id, public_variant_key, cache_key))
+
+    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+        return sum(
+            1
+            for task in self.tasks.values()
+            if task.owner_user_id == owner_user_id and task.status in {"queued", "running"}
+        )
+
+    def count_created_for_user_since(
+        self,
+        *,
+        owner_user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        return sum(
+            1
+            for task in self.tasks.values()
+            if task.owner_user_id == owner_user_id and task.created_at >= created_after
+        )
+
+    def count_active_global(self) -> int:
+        return sum(1 for task in self.tasks.values() if task.status in {"queued", "running"})
+
 
 def _fake_trade(index: int, *, include_equity: bool = True) -> dict[str, Any]:
     pnl = 1.0 if index % 3 != 2 else -1.0
@@ -1533,6 +1668,19 @@ class _FakeJobRepository:
     def count_active_for_user(self, *, user_id: UserId) -> int:
         assert self.jobs is not None
         return sum(1 for job in self.jobs.values() if job.user_id == user_id and job.is_active())
+
+    def count_created_for_user_since(
+        self,
+        *,
+        user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        assert self.jobs is not None
+        return sum(
+            1
+            for job in self.jobs.values()
+            if job.user_id == user_id and job.created_at >= created_after
+        )
 
     def count_active_global(self) -> int:
         assert self.jobs is not None

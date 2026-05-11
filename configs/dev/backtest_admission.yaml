@@ -1,0 +1,47 @@
+version: 1
+backtest_admission:
+  retry_after_seconds: 60
+  global:
+    max_active_full_jobs: 200
+    max_active_lazy_detail_tasks: 500
+  tiers:
+    free:
+      max_active_full_jobs: 2
+      max_running_full_jobs: 1
+      max_full_job_creates_per_hour: 5
+      max_top_n: 20
+      max_indicator_arity: 2
+      max_range_days: 365
+      max_active_lazy_detail_tasks: 2
+      max_lazy_detail_creates_per_hour: 10
+      min_autorefresh_seconds: 60
+    base:
+      max_active_full_jobs: 5
+      max_running_full_jobs: 1
+      max_full_job_creates_per_hour: 15
+      max_top_n: 50
+      max_indicator_arity: 3
+      max_range_days: 730
+      max_active_lazy_detail_tasks: 5
+      max_lazy_detail_creates_per_hour: 30
+      min_autorefresh_seconds: 30
+    pro:
+      max_active_full_jobs: 20
+      max_running_full_jobs: 1
+      max_full_job_creates_per_hour: 60
+      max_top_n: 100
+      max_indicator_arity: 7
+      max_range_days: null
+      max_active_lazy_detail_tasks: 20
+      max_lazy_detail_creates_per_hour: 120
+      min_autorefresh_seconds: 15
+    ultra:
+      max_active_full_jobs: 50
+      max_running_full_jobs: 1
+      max_full_job_creates_per_hour: 240
+      max_top_n: 250
+      max_indicator_arity: 10
+      max_range_days: null
+      max_active_lazy_detail_tasks: 50
+      max_lazy_detail_creates_per_hour: 500
+      min_autorefresh_seconds: 10

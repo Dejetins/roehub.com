@@ -62,6 +62,22 @@ class BacktestLazyTradesMaterializationTask:
 
 
 class BacktestLazyTradesMaterializationRepository(Protocol):
+    def find_by_identity(
+        self,
+        *,
+        owner_user_id: UserId,
+        job_id: UUID,
+        public_variant_key: str,
+        cache_key: str,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        """
+        Find an existing owner-scoped task before quota evaluation.
+
+        Replays for the same owner/job/public variant/cache identity must not consume
+        a new lazy-detail quota slot.
+        """
+        ...
+
     def request_materialization(
         self,
         *,
@@ -71,6 +87,29 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         Create or replay one owner-scoped lazy trades materialization task.
 
         The operation is idempotent for the same owner/job/public variant/cache identity.
+        """
+        ...
+
+    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+        """
+        Count owner active lazy detail tasks (`queued + running`) for admission.
+        """
+        ...
+
+    def count_created_for_user_since(
+        self,
+        *,
+        owner_user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        """
+        Count owner lazy detail materialization creates inside one admission-rate window.
+        """
+        ...
+
+    def count_active_global(self) -> int:
+        """
+        Count all active lazy detail tasks (`queued + running`) for global saturation.
         """
         ...
 

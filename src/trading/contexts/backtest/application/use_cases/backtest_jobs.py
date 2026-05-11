@@ -29,6 +29,9 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestAdmissionService,
+    BacktestFullJobQuotaSnapshot,
+    BacktestLazyDetailQuotaSnapshot,
     BacktestLazyTradesDetailService,
     BacktestPaginatedTradesReadModel,
     BacktestPreflightRejected,
@@ -59,7 +62,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     artifact_market_id_from_coordinates_v2,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import PaidLevel, UserId
 
 BACKTEST_ERROR_AUTH_REQUIRED = "auth.required"
 BACKTEST_ERROR_FORBIDDEN = "backtest.forbidden"
@@ -82,16 +85,34 @@ class BacktestJobsUseCase:
     lazy_trades_materialization_repository: (
         BacktestLazyTradesMaterializationRepository | None
     ) = None
+    admission_service: BacktestAdmissionService | None = None
     idempotency_ttl_seconds: int = 86_400
+
+    def preflight(
+        self,
+        *,
+        user_id: UserId,
+        paid_level: PaidLevel,
+        payload: Mapping[str, Any],
+    ) -> BacktestPreflightResult:
+        preflight = self._preflight(payload=payload, paid_level=paid_level)
+        self._enforce_full_job_admission(
+            user_id=user_id,
+            paid_level=paid_level,
+            preflight=preflight,
+            now=datetime.now(UTC),
+        )
+        return preflight
 
     def create(
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         payload: Mapping[str, Any],
         idempotency_key: str | None,
     ) -> BacktestJobCreateResult:
-        preflight = self._preflight(payload=payload)
+        preflight = self._preflight(payload=payload, paid_level=paid_level)
         key_hash = _idempotency_key_hash(idempotency_key=idempotency_key)
         now = datetime.now(UTC)
         if key_hash is not None:
@@ -112,7 +133,12 @@ class BacktestJobsUseCase:
                     idempotent_replay=True,
                 )
 
-        self._enforce_guardrails(user_id=user_id)
+        self._enforce_full_job_admission(
+            user_id=user_id,
+            paid_level=paid_level,
+            preflight=preflight,
+            now=now,
+        )
         job_id = uuid4()
         queued_job = BacktestJob.create_queued(
             job_id=job_id,
@@ -236,6 +262,7 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
     ) -> BacktestLazyTradesResultReadModel:
@@ -271,6 +298,40 @@ class BacktestJobsUseCase:
                 message="Backtest lazy trades materialization queue is not configured",
                 details={"reason": "lazy_trades_materialization_repository_unavailable"},
             )
+        existing_task = None
+        if self.admission_service is not None and paid_level is not None:
+            existing_task = self.lazy_trades_materialization_repository.find_by_identity(
+                owner_user_id=user_id,
+                job_id=job_id,
+                public_variant_key=variant_key,
+                cache_key=probe.cache_key.digest,
+            )
+            if existing_task is not None:
+                return _materialization_read_model(
+                    task=existing_task,
+                    cache_warning=probe.cache_warning,
+                    cache_lookup_s=probe.cache_lookup_s,
+                )
+            now = datetime.now(UTC)
+            self.admission_service.ensure_lazy_detail_quota_allowed(
+                paid_level=paid_level,
+                snapshot=BacktestLazyDetailQuotaSnapshot(
+                    active_lazy_detail_tasks_for_user=(
+                        self.lazy_trades_materialization_repository.count_active_for_user(
+                            owner_user_id=user_id,
+                        )
+                    ),
+                    lazy_detail_creates_in_window=(
+                        self.lazy_trades_materialization_repository.count_created_for_user_since(
+                            owner_user_id=user_id,
+                            created_after=now - timedelta(hours=1),
+                        )
+                    ),
+                    active_lazy_detail_tasks_global=(
+                        self.lazy_trades_materialization_repository.count_active_global()
+                    ),
+                ),
+            )
         task = self.lazy_trades_materialization_repository.request_materialization(
             request=BacktestLazyTradesMaterializationRequest(
                 owner_user_id=user_id,
@@ -296,12 +357,18 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
         kind: BacktestResultSeriesKind,
         points: int,
     ) -> BacktestResultSeriesReadModel | BacktestLazyTradesMaterializationReadModel:
-        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        detail = self.trades(
+            user_id=user_id,
+            paid_level=paid_level,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
         return build_result_series_read_model(
@@ -314,10 +381,16 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
     ) -> BacktestResultStatsReadModel | BacktestLazyTradesMaterializationReadModel:
-        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        detail = self.trades(
+            user_id=user_id,
+            paid_level=paid_level,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
         return build_monthly_stats_read_model(detail=detail)
@@ -326,11 +399,17 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
     ) -> BacktestResultStatsReadModel | BacktestLazyTradesMaterializationReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
-        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        detail = self.trades(
+            user_id=user_id,
+            paid_level=paid_level,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
         return build_symbol_stats_read_model(
@@ -342,12 +421,18 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
         page: int,
         page_size: int,
     ) -> BacktestPaginatedTradesReadModel | BacktestLazyTradesMaterializationReadModel:
-        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        detail = self.trades(
+            user_id=user_id,
+            paid_level=paid_level,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
         return build_paginated_trades_read_model(
@@ -360,11 +445,17 @@ class BacktestJobsUseCase:
         self,
         *,
         user_id: UserId,
+        paid_level: PaidLevel | None = None,
         job_id: UUID,
         variant_key: str,
         max_rows: int | None = None,
     ) -> BacktestTradesCsvReadModel | BacktestLazyTradesMaterializationReadModel:
-        detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        detail = self.trades(
+            user_id=user_id,
+            paid_level=paid_level,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
         if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
             return detail
         return build_trades_csv(detail=detail, max_rows=max_rows)
@@ -402,8 +493,26 @@ class BacktestJobsUseCase:
                 details={"job_id": str(job_id)},
             )
 
-    def _preflight(self, *, payload: Mapping[str, Any]) -> BacktestPreflightResult:
+    def _preflight(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        paid_level: PaidLevel | None = None,
+    ) -> BacktestPreflightResult:
         try:
+            if (
+                self.admission_service is not None
+                and paid_level is not None
+                and isinstance(self.preflight_service, BacktestPreflightService)
+            ):
+                return self.preflight_service.execute(
+                    payload,
+                    validation_guardrails=(
+                        self.admission_service.preflight_validation_guardrails(
+                            base_guardrails=self.runtime_config.guardrails,
+                        )
+                    ),
+                )
             return self.preflight_service.execute(payload)
         except BacktestPreflightRejected as error:
             raise _error(
@@ -412,7 +521,38 @@ class BacktestJobsUseCase:
                 details=error.details(),
             ) from error
 
-    def _enforce_guardrails(self, *, user_id: UserId) -> None:
+    def _enforce_full_job_admission(
+        self,
+        *,
+        user_id: UserId,
+        paid_level: PaidLevel | None,
+        preflight: BacktestPreflightResult,
+        now: datetime,
+    ) -> None:
+        if self.admission_service is not None:
+            if paid_level is None:
+                return
+            self.admission_service.ensure_full_job_request_allowed(
+                paid_level=paid_level,
+                preflight=preflight,
+            )
+            self.admission_service.ensure_full_job_quota_allowed(
+                paid_level=paid_level,
+                snapshot=BacktestFullJobQuotaSnapshot(
+                    active_full_jobs_for_user=(
+                        self.job_repository.count_active_for_user(user_id=user_id)
+                    ),
+                    full_job_creates_in_window=(
+                        self.job_repository.count_created_for_user_since(
+                            user_id=user_id,
+                            created_after=now - timedelta(hours=1),
+                        )
+                    ),
+                    active_full_jobs_global=self.job_repository.count_active_global(),
+                ),
+            )
+            return
+
         guardrails = self.runtime_config.guardrails
         active_for_user = self.job_repository.count_active_for_user(user_id=user_id)
         user_active_limit = (

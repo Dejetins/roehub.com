@@ -986,6 +986,40 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 "PostgresBacktestJobRepository.count_active_for_user invalid count row"
             ) from error
 
+    def count_created_for_user_since(
+        self,
+        *,
+        user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        """
+        Count owner job rows created inside the admission-rate window.
+        """
+        sql = f"""
+        SELECT
+            COUNT(*) AS created_total
+        FROM {self._jobs_table}
+        WHERE user_id = %(user_id)s
+          AND created_at >= %(created_after)s
+        """
+        row = self._gateway.fetch_one(
+            query=sql,
+            parameters={
+                "user_id": str(user_id),
+                "created_after": created_after,
+            },
+        )
+        if row is None:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_created_for_user_since returned no row"
+            )
+        try:
+            return int(row["created_total"])
+        except Exception as error:  # noqa: BLE001
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_created_for_user_since invalid count row"
+            ) from error
+
     def count_active_global(self) -> int:
         """
         Count all active jobs (`queued + running`) for service-wide guardrails.

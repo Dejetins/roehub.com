@@ -196,7 +196,13 @@ class BacktestPreflightService:
     artifact_context_resolver: BacktestArtifactContextResolver
     runtime_config: BacktestRuntimeConfig
 
-    def execute(self, payload: Mapping[str, Any]) -> BacktestPreflightResult:
+    def execute(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        validation_guardrails: BacktestRuntimeGuardrails | None = None,
+    ) -> BacktestPreflightResult:
+        guardrails = validation_guardrails or self.runtime_config.guardrails
         if not isinstance(payload, Mapping):
             raise BacktestPreflightRejected(
                 error_code=BACKTEST_ERROR_INVALID_REQUEST,
@@ -214,12 +220,13 @@ class BacktestPreflightService:
         timeframe = self._normalize_timeframe(payload=payload)
         time_range = self._normalize_time_range(payload=payload)
         indicators, indicator_rows, candidate_combinations = self._normalize_indicators(
-            payload=payload
+            payload=payload,
+            guardrails=guardrails,
         )
         execution = self._normalize_execution(payload=payload)
         ranking = self._normalize_ranking(payload=payload)
         top_n = self._normalize_top_n(payload=payload)
-        risk, tp_sl_cells = self._normalize_risk(payload=payload)
+        risk, tp_sl_cells = self._normalize_risk(payload=payload, guardrails=guardrails)
 
         too_expensive_issues = self._cost_guardrail_issues(
             indicators=indicators,
@@ -227,6 +234,7 @@ class BacktestPreflightService:
             candidate_combinations=candidate_combinations,
             tp_sl_cells=tp_sl_cells,
             top_n=top_n,
+            guardrails=guardrails,
         )
         if too_expensive_issues:
             raise BacktestPreflightRejected(
@@ -254,7 +262,10 @@ class BacktestPreflightService:
             tp_sl_cells=tp_sl_cells,
             cost_class=_cost_class(candidate_combinations=candidate_combinations),
         )
-        warnings = self._guardrail_warnings(cost_estimate=cost_estimate)
+        warnings = self._guardrail_warnings(
+            cost_estimate=cost_estimate,
+            guardrails=guardrails,
+        )
         return BacktestPreflightResult(
             normalized_request=normalized_request,
             request_hash=request_hash,
@@ -347,6 +358,7 @@ class BacktestPreflightService:
         self,
         *,
         payload: Mapping[str, Any],
+        guardrails: BacktestRuntimeGuardrails,
     ) -> tuple[list[dict[str, Any]], int, int]:
         raw_indicators = payload.get("indicators")
         if not isinstance(raw_indicators, Sequence) or isinstance(
@@ -364,7 +376,7 @@ class BacktestPreflightService:
                 code="empty",
                 message="indicators must contain at least one item",
             )
-        if len(raw_indicators) > self.runtime_config.guardrails.max_indicator_arity:
+        if len(raw_indicators) > guardrails.max_indicator_arity:
             raise BacktestPreflightRejected(
                 error_code=BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE,
                 message="Backtest request exceeds indicator arity guardrail",
@@ -373,8 +385,7 @@ class BacktestPreflightService:
                         path="indicators",
                         code="max_indicator_arity",
                         message=(
-                            "indicator arity must be <= "
-                            f"{self.runtime_config.guardrails.max_indicator_arity}"
+                            f"indicator arity must be <= {guardrails.max_indicator_arity}"
                         ),
                     ),
                 ),
@@ -624,7 +635,12 @@ class BacktestPreflightService:
         raw_top_n = payload.get("top_n", DEFAULT_BACKTEST_TOP_N_V1)
         return _positive_int(raw_top_n, path="top_n")
 
-    def _normalize_risk(self, *, payload: Mapping[str, Any]) -> tuple[dict[str, Any], int]:
+    def _normalize_risk(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        guardrails: BacktestRuntimeGuardrails,
+    ) -> tuple[dict[str, Any], int]:
         raw_risk = payload.get("risk")
         if not isinstance(raw_risk, Mapping):
             raise _invalid_request(
@@ -643,7 +659,7 @@ class BacktestPreflightService:
         tp_levels = _normalize_percent_levels(raw_risk.get("tp"), path="risk.tp")
         sl_levels = _normalize_percent_levels(raw_risk.get("sl"), path="risk.sl")
         cells = len(tp_levels) * len(sl_levels)
-        if cells > self.runtime_config.guardrails.max_tp_sl_cells:
+        if cells > guardrails.max_tp_sl_cells:
             raise BacktestPreflightRejected(
                 error_code=BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE,
                 message="Backtest TP/SL grid exceeds configured cell guardrail",
@@ -651,10 +667,7 @@ class BacktestPreflightService:
                     BacktestValidationIssue(
                         path="risk",
                         code="max_tp_sl_cells",
-                        message=(
-                            "tp/sl cells must be <= "
-                            f"{self.runtime_config.guardrails.max_tp_sl_cells}"
-                        ),
+                        message=f"tp/sl cells must be <= {guardrails.max_tp_sl_cells}",
                     ),
                 ),
             )
@@ -696,8 +709,8 @@ class BacktestPreflightService:
         candidate_combinations: int,
         tp_sl_cells: int,
         top_n: int,
+        guardrails: BacktestRuntimeGuardrails,
     ) -> tuple[BacktestValidationIssue, ...]:
-        guardrails = self.runtime_config.guardrails
         issues: list[BacktestValidationIssue] = []
         if len(indicators) > guardrails.max_indicator_arity:
             issues.append(
@@ -748,8 +761,8 @@ class BacktestPreflightService:
         self,
         *,
         cost_estimate: BacktestCostEstimate,
+        guardrails: BacktestRuntimeGuardrails,
     ) -> tuple[BacktestValidationIssue, ...]:
-        guardrails = self.runtime_config.guardrails
         warnings: list[BacktestValidationIssue] = []
         if cost_estimate.indicator_rows >= int(guardrails.max_indicator_rows * 0.8):
             warnings.append(

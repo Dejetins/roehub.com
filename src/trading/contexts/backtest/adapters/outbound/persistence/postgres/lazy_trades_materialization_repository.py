@@ -67,6 +67,37 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         self._gateway = gateway
         self._table = normalized_table
 
+    def find_by_identity(
+        self,
+        *,
+        owner_user_id: UserId,
+        job_id: UUID,
+        public_variant_key: str,
+        cache_key: str,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        query = f"""
+        SELECT
+            {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
+        FROM {self._table}
+        WHERE owner_user_id = %(owner_user_id)s
+          AND job_id = %(job_id)s
+          AND public_variant_key = %(public_variant_key)s
+          AND cache_key = %(cache_key)s
+        LIMIT 1
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "owner_user_id": str(owner_user_id),
+                "job_id": str(job_id),
+                "public_variant_key": public_variant_key,
+                "cache_key": cache_key,
+            },
+        )
+        if row is None:
+            return None
+        return _map_materialization_row(row=row)
+
     def request_materialization(
         self,
         *,
@@ -160,6 +191,52 @@ class PostgresBacktestLazyTradesMaterializationRepository(
             )
         return _map_materialization_row(row=row)
 
+    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+        query = f"""
+        SELECT
+            COUNT(*) AS active_total
+        FROM {self._table}
+        WHERE owner_user_id = %(owner_user_id)s
+          AND status IN ('queued', 'running')
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={"owner_user_id": str(owner_user_id)},
+        )
+        return _count_from_row(row=row, field_name="active_total")
+
+    def count_created_for_user_since(
+        self,
+        *,
+        owner_user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        query = f"""
+        SELECT
+            COUNT(*) AS created_total
+        FROM {self._table}
+        WHERE owner_user_id = %(owner_user_id)s
+          AND created_at >= %(created_after)s
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "owner_user_id": str(owner_user_id),
+                "created_after": created_after,
+            },
+        )
+        return _count_from_row(row=row, field_name="created_total")
+
+    def count_active_global(self) -> int:
+        query = f"""
+        SELECT
+            COUNT(*) AS active_total
+        FROM {self._table}
+        WHERE status IN ('queued', 'running')
+        """
+        row = self._gateway.fetch_one(query=query, parameters={})
+        return _count_from_row(row=row, field_name="active_total")
+
 
 def _map_materialization_row(
     *,
@@ -230,6 +307,19 @@ def _json_mapping(value: Any) -> Mapping[str, Any] | None:
         if isinstance(loaded, Mapping):
             return dict(loaded)
     raise BacktestStorageError("Expected JSON object column")
+
+
+def _count_from_row(*, row: Mapping[str, Any] | None, field_name: str) -> int:
+    if row is None:
+        raise BacktestStorageError(
+            "PostgresBacktestLazyTradesMaterializationRepository count returned no row"
+        )
+    try:
+        return int(row[field_name])
+    except Exception as error:  # noqa: BLE001
+        raise BacktestStorageError(
+            "PostgresBacktestLazyTradesMaterializationRepository count invalid row"
+        ) from error
 
 
 __all__ = ["PostgresBacktestLazyTradesMaterializationRepository"]

@@ -101,8 +101,29 @@ def build_backtests_router(
     @router.post("/backtests/preflight", response_model=BacktestPreflightResponse)
     def post_backtest_preflight(
         payload: Any = Body(...),
-        _principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
     ) -> BacktestPreflightResponse:
+        if jobs_use_case is not None:
+            if not isinstance(payload, Mapping):
+                raise RoehubError(
+                    code="backtest.invalid_request",
+                    message="Backtest preflight request must be a JSON object",
+                    details={
+                        "errors": [
+                            {
+                                "path": "body",
+                                "code": "invalid_type",
+                                "message": "Request body must be a JSON object",
+                            }
+                        ]
+                    },
+                )
+            result = jobs_use_case.preflight(
+                user_id=principal.user_id,
+                paid_level=principal.paid_level,
+                payload=payload,
+            )
+            return build_backtest_preflight_response(result=result)
         try:
             result = preflight_service.execute(payload)
         except BacktestPreflightRejected as error:
@@ -141,6 +162,7 @@ def build_backtests_router(
             )
         result = use_case.create(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             payload=payload,
             idempotency_key=idempotency_key,
         )
@@ -227,6 +249,7 @@ def build_backtests_router(
     ) -> BacktestLazyTradesResponse:
         result = use_case.trades(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
         )
@@ -249,6 +272,7 @@ def build_backtests_router(
         resolved_points = _resolve_result_points(points=points, max_points=max_points)
         result = use_case.variant_series(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
             kind="equity",
@@ -273,6 +297,7 @@ def build_backtests_router(
         resolved_points = _resolve_result_points(points=points, max_points=max_points)
         result = use_case.variant_series(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
             kind="drawdown",
@@ -294,6 +319,7 @@ def build_backtests_router(
     ) -> BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.monthly_stats(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
         )
@@ -313,6 +339,7 @@ def build_backtests_router(
     ) -> BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.symbol_stats(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
         )
@@ -334,6 +361,7 @@ def build_backtests_router(
     ) -> BacktestPaginatedTradesResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.paginated_trades(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
             page=page,
@@ -356,6 +384,7 @@ def build_backtests_router(
     ) -> Response:
         content = use_case.trades_csv(
             user_id=principal.user_id,
+            paid_level=principal.paid_level,
             job_id=job_id,
             variant_key=variant_key,
             max_rows=max_rows,

@@ -380,6 +380,29 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
+    def count_created_for_user_since(
+        self,
+        *,
+        user_id: UserId,
+        created_after: datetime,
+    ) -> int:
+        """
+        Count owner job creates inside one admission-rate window.
+
+        Args:
+            user_id: Job owner identifier.
+            created_after: Inclusive lower bound for the create window.
+        Returns:
+            int: Number of jobs created by this owner in the window.
+        Assumptions:
+            Idempotency replays do not create new rows, so row count matches new admits.
+        Raises:
+            ValueError: If storage read fails.
+        Side Effects:
+            Reads aggregate count from `backtest_jobs`.
+        """
+        ...
+
     def count_active_global(self) -> int:
         """
         Count all active jobs (`queued + running`) for service-wide guardrails.
