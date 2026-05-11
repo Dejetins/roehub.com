@@ -636,7 +636,7 @@ class PostgresBacktestAiConfigRepository(
                 last_error = COALESCE(last_error, 'lease_attempt_limit_exceeded'),
                 last_error_json = COALESCE(
                     last_error_json,
-                    '{"code":"lease_attempt_limit_exceeded"}'::jsonb
+                    %(lease_attempt_limit_exceeded_json)s::jsonb
                 )
             WHERE state IN ('running', 'repairing')
               AND lease_expires_at <= %(now)s
@@ -701,6 +701,9 @@ class PostgresBacktestAiConfigRepository(
                 "locked_by": owner,
                 "lease_expires_at": lease_expires_at,
                 "max_attempts": max_attempts,
+                "lease_attempt_limit_exceeded_json": json.dumps(
+                    {"code": "lease_attempt_limit_exceeded"}
+                ),
             },
         )
         if row is None:
