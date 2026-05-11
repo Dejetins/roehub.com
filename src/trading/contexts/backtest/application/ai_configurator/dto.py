@@ -79,6 +79,7 @@ class BacktestAiConfigJob:
     user_prompt_text: str
     user_prompt_hash: str
     system_prompt_version: str
+    system_prompt_hash: str
     catalog_snapshot_hash: str
     runtime_defaults_hash: str
     queued_at: datetime
@@ -183,6 +184,8 @@ class BacktestAiConfigLlmAttempt:
     attempt_no: int
     attempt_kind: BacktestAiConfigLlmAttemptKind
     prompt_profile: str
+    system_prompt_version: str
+    system_prompt_hash: str
     user_prompt_text: str
     catalog_subset_json: JsonMapping
     raw_model_response: str | None

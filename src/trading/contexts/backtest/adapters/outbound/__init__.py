@@ -24,6 +24,7 @@ from .config import (
     resolve_backtest_artifacts_config_path,
 )
 from .defaults import YamlBacktestGridDefaultsProvider
+from .llm import DeterministicBacktestConfigLLMGateway
 from .persistence import (
     BacktestPostgresGateway,
     PostgresBacktestAiConfigRepository,
@@ -51,6 +52,7 @@ __all__ = [
     "PostgresBacktestAiConfigRepository",
     "DEFAULT_LAZY_TRADES_CACHE_ROOT",
     "DatabaseBacktestJobExecutionTrigger",
+    "DeterministicBacktestConfigLLMGateway",
     "FilesystemBacktestArtifactContextResolver",
     "LocalFileBacktestLazyTradesCache",
     "PostgresBacktestJobLeaseRepository",

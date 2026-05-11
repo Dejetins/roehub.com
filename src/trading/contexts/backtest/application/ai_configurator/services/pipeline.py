@@ -1,46 +1,33 @@
 from __future__ import annotations
 
 import json
-import re
+import time
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping
+from datetime import UTC, datetime
+from typing import Any, Literal
+from uuid import uuid4
 
-from trading.contexts.backtest.application.ai_configurator.dto import BacktestAiConfigJob
+from trading.contexts.backtest.application.ai_configurator.dto import (
+    BacktestAiConfigJob,
+    BacktestAiConfigLlmAttempt,
+)
+from trading.contexts.backtest.application.ai_configurator.ports import (
+    BacktestConfigLLMGateway,
+    BacktestConfigLLMRepairRequest,
+    BacktestConfigLLMRequest,
+    BacktestConfigLLMResponse,
+)
 
-from .catalog import BacktestAiAllowedCatalog, BacktestAiCatalogResolver
+from .catalog import BacktestAiCatalogResolver
+from .prompt_profiles import (
+    build_generate_prompt_envelope,
+    build_repair_prompt_envelope,
+)
+from .repair import BacktestAiRepairController
 from .security import BacktestAiInputGate
 from .validator import BacktestAiConfigValidationOutcome, BacktestAiConfigValidator
 
 BacktestAiPipelineStage = Literal["input_gate", "validation"]
-
-_FAKE_MODEL_ID = "deterministic-catalog-validator-v1"
-_SYMBOL_ALIASES: tuple[tuple[str, str], ...] = (
-    ("биток", "BTCUSDT"),
-    ("биткоин", "BTCUSDT"),
-    ("bitcoin", "BTCUSDT"),
-    ("btc", "BTCUSDT"),
-    ("эфир", "ETHUSDT"),
-    ("ethereum", "ETHUSDT"),
-    ("eth", "ETHUSDT"),
-    ("солана", "SOLUSDT"),
-    ("solana", "SOLUSDT"),
-    ("sol", "SOLUSDT"),
-    ("doge", "DOGEUSDT"),
-)
-_INDICATOR_ALIASES: tuple[tuple[str, str], ...] = (
-    ("rsi", "momentum.rsi"),
-    ("ema", "ma.ema"),
-    ("sma", "ma.sma"),
-    ("dema", "ma.dema"),
-    ("atr", "volatility.atr"),
-)
-_UNSUPPORTED_INDICATOR_TERMS = ("bollinger", "bbands", "боллиндж")
-_UNSUPPORTED_TIMEFRAME_PATTERNS = (
-    re.compile(r"\b(?:1h|4h|1d|1w|hourly|daily)\b", re.I),
-    re.compile(r"\bчасов(?:ик|ой|ая)?\b", re.I),
-    re.compile(r"\bдневн(?:ой|ая)?\b", re.I),
-)
-_DIRECT_SYMBOL_RE = re.compile(r"\b[A-Z0-9]{2,12}USDT\b", re.I)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,28 +46,36 @@ class BacktestAiConfigPipelineResult:
     warnings: tuple[dict[str, Any], ...] = ()
     suggestions: tuple[dict[str, Any], ...] = ()
     validation_errors: tuple[dict[str, Any], ...] = ()
-    model_id: str = _FAKE_MODEL_ID
+    model_id: str | None = None
+    model_path_hash: str | None = None
     last_error: str | None = None
     last_error_json: dict[str, Any] | None = None
+    llm_attempts: tuple[BacktestAiConfigLlmAttempt, ...] = ()
 
     @classmethod
     def from_validation(
         cls,
         *,
         outcome: BacktestAiConfigValidationOutcome,
-        catalog: BacktestAiAllowedCatalog,
+        catalog_snapshot_hash: str,
+        model_id: str | None,
+        model_path_hash: str | None,
+        llm_attempts: tuple[BacktestAiConfigLlmAttempt, ...],
     ) -> BacktestAiConfigPipelineResult:
         return cls(
             status=outcome.status,
             assistant_message=outcome.assistant_message,
-            catalog_snapshot_hash=catalog.snapshot_hash,
+            catalog_snapshot_hash=catalog_snapshot_hash,
             stage="validation",
             validated_config=outcome.validated_config,
             warnings=outcome.warnings,
             suggestions=outcome.suggestions,
             validation_errors=outcome.validation_errors,
+            model_id=model_id,
+            model_path_hash=model_path_hash,
             last_error=outcome.last_error,
             last_error_json=outcome.last_error_json,
+            llm_attempts=llm_attempts,
         )
 
 
@@ -88,7 +83,9 @@ class BacktestAiConfigPipelineResult:
 class BacktestAiConfigPipeline:
     catalog_resolver: BacktestAiCatalogResolver
     validator: BacktestAiConfigValidator
+    llm_gateway: BacktestConfigLLMGateway
     input_gate: BacktestAiInputGate = BacktestAiInputGate()
+    repair_controller: BacktestAiRepairController = BacktestAiRepairController()
 
     def run(self, *, job: BacktestAiConfigJob) -> BacktestAiConfigPipelineResult:
         catalog = self.catalog_resolver.resolve()
@@ -119,247 +116,165 @@ class BacktestAiConfigPipeline:
                 },
             )
 
-        draft = _deterministic_model_output(job=job, catalog=catalog)
-        raw_output = json.dumps(
-            draft,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
+        generate_envelope = build_generate_prompt_envelope(job=job, catalog=catalog)
+        generate_response = _timed_generate(
+            gateway=self.llm_gateway,
+            request=BacktestConfigLLMRequest(
+                job=job,
+                catalog=catalog,
+                prompt_profile=generate_envelope.profile,
+                prompt_text=generate_envelope.prompt_text,
+                catalog_subset_json=generate_envelope.catalog_subset,
+                output_schema_json=generate_envelope.output_schema,
+            ),
         )
         outcome = self.validator.validate_model_output(
-            raw_output=raw_output,
+            raw_output=generate_response.raw_output,
             catalog=catalog,
         )
+        attempts = (
+            _audit_attempt(
+                job=job,
+                attempt_no=1,
+                attempt_kind="generate",
+                profile=generate_envelope.profile,
+                envelope_catalog=generate_envelope.catalog_subset,
+                response=generate_response,
+                outcome=outcome,
+            ),
+        )
+        final_response = generate_response
+
+        if self.repair_controller.should_repair(outcome=outcome, repairs_used=0):
+            repair_envelope = build_repair_prompt_envelope(
+                job=job,
+                catalog=catalog,
+                failed_raw_output=generate_response.raw_output,
+                parsed_draft=outcome.parsed_draft,
+                validation_errors=outcome.validation_errors,
+            )
+            repair_response = _timed_repair(
+                gateway=self.llm_gateway,
+                request=BacktestConfigLLMRepairRequest(
+                    job=job,
+                    catalog=catalog,
+                    prompt_profile=repair_envelope.profile,
+                    prompt_text=repair_envelope.prompt_text,
+                    catalog_subset_json=repair_envelope.catalog_subset,
+                    output_schema_json=repair_envelope.output_schema,
+                    failed_raw_output=generate_response.raw_output,
+                    parsed_draft_json=outcome.parsed_draft,
+                    validation_errors_json=outcome.validation_errors,
+                ),
+            )
+            repair_outcome = self.validator.validate_model_output(
+                raw_output=repair_response.raw_output,
+                catalog=catalog,
+            )
+            attempts = attempts + (
+                _audit_attempt(
+                    job=job,
+                    attempt_no=2,
+                    attempt_kind="repair",
+                    profile=repair_envelope.profile,
+                    envelope_catalog=repair_envelope.catalog_subset,
+                    response=repair_response,
+                    outcome=repair_outcome,
+                ),
+            )
+            outcome = repair_outcome
+            final_response = repair_response
+
         return BacktestAiConfigPipelineResult.from_validation(
             outcome=outcome,
-            catalog=catalog,
+            catalog_snapshot_hash=catalog.snapshot_hash,
+            model_id=final_response.model_id,
+            model_path_hash=final_response.model_path_hash,
+            llm_attempts=attempts,
         )
 
 
-def _deterministic_model_output(
+def _timed_generate(
     *,
-    job: BacktestAiConfigJob,
-    catalog: BacktestAiAllowedCatalog,
-) -> dict[str, Any]:
-    message = job.user_prompt_text
-    lowered = message.casefold()
-    symbols = _extract_symbols(message=message, catalog=catalog)
-    unsupported_symbols = tuple(symbol for symbol in symbols if symbol not in catalog.symbols)
-    supported_symbols = tuple(symbol for symbol in symbols if symbol in catalog.symbols)
-    config = catalog.default_config()
-    if unsupported_symbols:
-        config["coordinates"]["symbol"] = unsupported_symbols[0]
-        return _config_ready_output(
-            job=job,
-            config=config,
-            assistant_message=(
-                "I could not find supported symbol "
-                f"{unsupported_symbols[0]} in the current /backtests catalog."
-            ),
-            warnings=[],
-            suggestions=[f"Use one of the supported symbols: {', '.join(catalog.symbols[:5])}"],
-        )
+    gateway: BacktestConfigLLMGateway,
+    request: BacktestConfigLLMRequest,
+) -> BacktestConfigLLMResponse:
+    started = time.perf_counter()
+    response = gateway.generate_config(request)
+    return _with_latency(response=response, started=started)
 
-    if any(term in lowered for term in _UNSUPPORTED_INDICATOR_TERMS):
-        config["indicators"][0]["indicator_id"] = "volatility.bollinger"
-        return _config_ready_output(
-            job=job,
-            config=config,
-            assistant_message=(
-                "I could not find Bollinger Bands in the supported indicator catalog. "
-                "Choose a supported indicator such as momentum.rsi, ma.ema or volatility.atr."
-            ),
-            warnings=[],
-            suggestions=["Try RSI, EMA or ATR with timeframe 15m."],
-        )
 
-    primary_symbol = (
-        supported_symbols[0]
-        if supported_symbols
-        else _current_or_default_symbol(job=job, catalog=catalog)
-    )
-    config["coordinates"]["symbol"] = primary_symbol
-    indicator_id = _select_indicator_id(message=message, catalog=catalog)
-    config["indicators"] = [_indicator_config(indicator_id=indicator_id, catalog=catalog)]
+def _timed_repair(
+    *,
+    gateway: BacktestConfigLLMGateway,
+    request: BacktestConfigLLMRepairRequest,
+) -> BacktestConfigLLMResponse:
+    started = time.perf_counter()
+    response = gateway.repair_config(request)
+    return _with_latency(response=response, started=started)
 
-    warnings: list[str] = []
-    suggestions: list[str] = []
-    if _requested_unsupported_timeframe(message):
-        config["timeframe"] = "15m"
-        warnings.append("Requested timeframe is not supported; using 15m.")
-    if len(supported_symbols) > 1:
-        suggestions.append(
-            f"Single-symbol MVP loaded {primary_symbol}; "
-            f"request another config for {', '.join(supported_symbols[1:])}."
-        )
-    if _requests_tp_sl_grid(lowered):
-        config["risk"] = _default_tp_sl_grid(catalog=catalog)
-    else:
-        suggestions.append("Add tp_sl_grid if you want stop loss / take profit validation.")
-    if "2024" in message:
-        config["time_range"] = {
-            "start": "2024-01-01T00:00:00Z",
-            "end": "2025-01-01T00:00:00Z",
-        }
 
-    return _config_ready_output(
-        job=job,
-        config=config,
-        assistant_message=_ready_message(symbol=primary_symbol, locale=job.locale),
-        warnings=warnings,
-        suggestions=suggestions,
+def _with_latency(
+    *,
+    response: BacktestConfigLLMResponse,
+    started: float,
+) -> BacktestConfigLLMResponse:
+    if response.latency_ms is not None:
+        return response
+    latency_ms = max(0, round((time.perf_counter() - started) * 1000))
+    return BacktestConfigLLMResponse(
+        raw_output=response.raw_output,
+        model_id=response.model_id,
+        model_path_hash=response.model_path_hash,
+        input_tokens_estimate=response.input_tokens_estimate,
+        output_tokens_estimate=response.output_tokens_estimate,
+        latency_ms=latency_ms,
+        finish_reason=response.finish_reason,
     )
 
 
-def _config_ready_output(
+def _audit_attempt(
     *,
     job: BacktestAiConfigJob,
-    config: dict[str, Any],
-    assistant_message: str,
-    warnings: list[str],
-    suggestions: list[str],
-) -> dict[str, Any]:
-    return {
-        "schema_version": 1,
-        "mode": job.mode,
-        "status": "config_ready",
-        "assistant_message": assistant_message,
-        "assumptions": [
-            "Default execution settings come from current /backtests runtime defaults."
-        ],
-        "warnings": warnings,
-        "config": config,
-        "suggestions": suggestions,
-    }
-
-
-def _extract_symbols(
-    *,
-    message: str,
-    catalog: BacktestAiAllowedCatalog,
-) -> tuple[str, ...]:
-    found: list[str] = []
-    seen: set[str] = set()
-    for match in _DIRECT_SYMBOL_RE.finditer(message):
-        symbol = match.group(0).upper()
-        if symbol not in seen:
-            seen.add(symbol)
-            found.append(symbol)
-    lowered = message.casefold()
-    for alias, symbol in _SYMBOL_ALIASES:
-        if alias in lowered and symbol not in seen:
-            seen.add(symbol)
-            found.append(symbol)
-    return tuple(found)
-
-
-def _current_or_default_symbol(
-    *,
-    job: BacktestAiConfigJob,
-    catalog: BacktestAiAllowedCatalog,
-) -> str:
-    current = job.current_config_json
-    if isinstance(current, Mapping):
-        coordinates = current.get("coordinates")
-        if isinstance(coordinates, Mapping):
-            raw_symbol = coordinates.get("symbol")
-            if isinstance(raw_symbol, str):
-                symbol = raw_symbol.strip().upper()
-                if symbol in catalog.symbols:
-                    return symbol
-    return catalog.symbols[0]
-
-
-def _select_indicator_id(
-    *,
-    message: str,
-    catalog: BacktestAiAllowedCatalog,
-) -> str:
-    lowered = message.casefold()
-    for alias, indicator_id in _INDICATOR_ALIASES:
-        if alias in lowered and indicator_id in catalog.indicator_ids:
-            return indicator_id
-    if "momentum.rsi" in catalog.indicator_ids:
-        return "momentum.rsi"
-    return catalog.indicator_ids[0]
-
-
-def _indicator_config(
-    *,
-    indicator_id: str,
-    catalog: BacktestAiAllowedCatalog,
-) -> dict[str, Any]:
-    item = catalog.indicator_by_id(indicator_id)
-    if item is None:
-        item = catalog.indicators[0]
-    params = dict(item.param_specs.get("params") or {})
-    window_spec = dict(params.get("window") or {})
-    values = window_spec.get("values")
-    if isinstance(values, list) and values:
-        start = int(values[0])
-        stop = int(values[min(1, len(values) - 1)])
-        step = max(1, stop - start) if stop > start else 1
-    else:
-        start = int(window_spec.get("start") or 7)
-        stop = min(int(window_spec.get("stop_incl") or 28), max(start, 28))
-        step = int(window_spec.get("step") or 7)
-    return {
-        "indicator_id": item.indicator_id,
-        "sources": list(item.sources[:1]),
-        "window": {"start": start, "stop": stop, "step": step},
-    }
-
-
-def _requested_unsupported_timeframe(message: str) -> bool:
-    return any(pattern.search(message) is not None for pattern in _UNSUPPORTED_TIMEFRAME_PATTERNS)
-
-
-def _requests_tp_sl_grid(lowered: str) -> bool:
-    return any(
-        term in lowered
-        for term in (
-            "tp_sl_grid",
-            "stop loss",
-            "take profit",
-            "sl/tp",
-            "tp/sl",
-            "стоп",
-            "тейк",
-            "безопас",
-            "safer",
-        )
+    attempt_no: int,
+    attempt_kind: Literal["generate", "repair"],
+    profile: Any,
+    envelope_catalog: Any,
+    response: BacktestConfigLLMResponse,
+    outcome: BacktestAiConfigValidationOutcome,
+) -> BacktestAiConfigLlmAttempt:
+    return BacktestAiConfigLlmAttempt(
+        attempt_id=uuid4(),
+        job_id=job.job_id,
+        owner_user_id=job.owner_user_id,
+        attempt_no=attempt_no,
+        attempt_kind=attempt_kind,
+        prompt_profile=profile.name,
+        system_prompt_version=profile.system_prompt_version,
+        system_prompt_hash=profile.system_prompt_hash,
+        user_prompt_text=job.user_prompt_text,
+        catalog_subset_json=dict(envelope_catalog),
+        raw_model_response=response.raw_output,
+        parsed_json_draft=outcome.parsed_draft,
+        validation_errors_json=outcome.validation_errors,
+        input_tokens_estimate=response.input_tokens_estimate,
+        output_tokens_estimate=response.output_tokens_estimate,
+        latency_ms=response.latency_ms,
+        finish_reason=response.finish_reason,
+        success=outcome.loadable,
+        failure_reason=None if outcome.loadable else outcome.last_error or outcome.status,
+        created_at=datetime.now(UTC),
     )
 
 
-def _default_tp_sl_grid(*, catalog: BacktestAiAllowedCatalog) -> dict[str, Any]:
-    hit_times = dict(catalog.hit_times_grid)
-    tp_levels = _levels(hit_times.get("tp_levels_pct"), fallback=(1.0, 1.5))
-    sl_levels = _levels(hit_times.get("sl_levels_pct"), fallback=(1.0, 1.5))
-    return {
-        "mode": "tp_sl_grid",
-        "tp": {"start_pct": tp_levels[0], "stop_pct": tp_levels[-1], "step_pct": _step(tp_levels)},
-        "sl": {"start_pct": sl_levels[0], "stop_pct": sl_levels[-1], "step_pct": _step(sl_levels)},
-    }
-
-
-def _levels(value: Any, *, fallback: tuple[float, float]) -> tuple[float, ...]:
-    if isinstance(value, list | tuple):
-        levels = tuple(float(item) for item in value[:2])
-        if levels:
-            return levels
-    return fallback
-
-
-def _step(levels: tuple[float, ...]) -> float:
-    if len(levels) < 2:
-        return 1.0
-    return round(levels[1] - levels[0], 10)
-
-
-def _ready_message(*, symbol: str, locale: str) -> str:
-    if locale == "ru":
-        return f"Я собрал валидный конфиг для {symbol} на 15m."
-    return f"I prepared a valid {symbol} configuration on 15m."
+def parse_llm_json_object_for_audit(raw_output: str) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(raw_output)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
 
 
 __all__ = [

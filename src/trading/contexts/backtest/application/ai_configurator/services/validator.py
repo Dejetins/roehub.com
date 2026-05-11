@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
@@ -140,6 +141,7 @@ class BacktestAiConfigValidationOutcome:
     status: BacktestAiValidationStatus
     assistant_message: str
     validated_config: dict[str, Any] | None = None
+    parsed_draft: dict[str, Any] | None = None
     warnings: tuple[dict[str, Any], ...] = ()
     suggestions: tuple[dict[str, Any], ...] = ()
     validation_errors: tuple[dict[str, Any], ...] = ()
@@ -190,6 +192,7 @@ class BacktestAiConfigValidator:
                         )
                     ),
                     issues=issues,
+                    parsed_draft=parsed_result,
                     last_error="output_catalog_validation_failed",
                 )
             return BacktestAiConfigValidationOutcome(
@@ -198,6 +201,7 @@ class BacktestAiConfigValidator:
                     "The generated response did not pass safety checks. "
                     "Please rephrase the backtest request."
                 ),
+                parsed_draft=parsed_result,
                 validation_errors=issues,
                 last_error="output_gate_rejected",
                 last_error_json={"issues": list(issues)},
@@ -210,12 +214,14 @@ class BacktestAiConfigValidator:
             return _needs_clarification(
                 assistant_message="The generated configuration did not match the required schema.",
                 issues=schema_errors,
+                parsed_draft=parsed_result,
             )
 
         if parsed_result["status"] == "needs_clarification":
             return BacktestAiConfigValidationOutcome(
                 status="needs_clarification",
                 assistant_message=str(parsed_result["assistant_message"]),
+                parsed_draft=parsed_result,
                 warnings=_warning_items(parsed_result),
                 suggestions=_suggestion_items(parsed_result),
                 validation_errors=(),
@@ -234,6 +240,7 @@ class BacktestAiConfigValidator:
                         "message": "config is required for config_ready status",
                     },
                 ),
+                parsed_draft=parsed_result,
             )
 
         catalog_issues = _catalog_issues(config=config, catalog=catalog)
@@ -241,6 +248,7 @@ class BacktestAiConfigValidator:
             return _needs_clarification(
                 assistant_message=str(parsed_result["assistant_message"]),
                 issues=catalog_issues,
+                parsed_draft=parsed_result,
                 warnings=_warning_items(parsed_result),
                 suggestions=_suggestion_items(parsed_result),
                 last_error="catalog_validation_failed",
@@ -253,6 +261,7 @@ class BacktestAiConfigValidator:
             return _needs_clarification(
                 assistant_message=str(parsed_result["assistant_message"]),
                 issues=issues,
+                parsed_draft=parsed_result,
                 warnings=_warning_items(parsed_result),
                 suggestions=_suggestion_items(parsed_result),
                 last_error=error.error_code,
@@ -267,6 +276,7 @@ class BacktestAiConfigValidator:
             status="ready",
             assistant_message=str(parsed_result["assistant_message"]),
             validated_config=normalized,
+            parsed_draft=parsed_result,
             warnings=warnings,
             suggestions=_suggestion_items(parsed_result),
             validation_errors=(),
@@ -461,6 +471,7 @@ def _needs_clarification(
     *,
     assistant_message: str,
     issues: tuple[dict[str, str], ...],
+    parsed_draft: dict[str, Any] | None = None,
     warnings: tuple[dict[str, Any], ...] = (),
     suggestions: tuple[dict[str, Any], ...] = (),
     last_error: str = "validation_failed",
@@ -469,12 +480,17 @@ def _needs_clarification(
     return BacktestAiConfigValidationOutcome(
         status="needs_clarification",
         assistant_message=assistant_message,
+        parsed_draft=parsed_draft,
         warnings=warnings,
         suggestions=suggestions,
         validation_errors=issues,
         last_error=last_error,
         last_error_json=last_error_json or {"issues": list(issues)},
     )
+
+
+def backtest_ai_model_output_schema() -> dict[str, Any]:
+    return deepcopy(_MODEL_OUTPUT_SCHEMA)
 
 
 def _warning_items(payload: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -505,4 +521,5 @@ __all__ = [
     "BacktestAiConfigValidationOutcome",
     "BacktestAiConfigValidator",
     "BacktestAiValidationStatus",
+    "backtest_ai_model_output_schema",
 ]

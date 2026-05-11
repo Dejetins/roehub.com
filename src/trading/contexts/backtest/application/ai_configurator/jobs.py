@@ -24,6 +24,10 @@ from .dto import (
     BacktestAiQuotaSnapshot,
 )
 from .quota import BacktestAiQuotaService
+from .services.prompt_profiles import (
+    BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION,
+    backtest_ai_prompt_profile_for_mode,
+)
 
 BACKTEST_AI_CONFIG_ERROR_IDEMPOTENCY_CONFLICT = (
     "backtest.ai_config.idempotency_key_conflict"
@@ -33,7 +37,6 @@ BACKTEST_AI_CONFIG_ERROR_NOT_FOUND = "backtest.ai_config.not_found"
 BACKTEST_AI_CONFIG_ERROR_FORBIDDEN = "backtest.ai_config.forbidden"
 
 BACKTEST_AI_CONFIG_SOURCE_PAGE = "backtests"
-BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION = "backtest_ai_configurator_mlx_v1"
 PENDING_CATALOG_SNAPSHOT_HASH = hashlib.sha256(
     b"backtest-ai-configurator-pending-catalog-v1"
 ).hexdigest()
@@ -75,6 +78,7 @@ class BacktestAiConfigJobsUseCase:
         )
         current_config_hash = _optional_canonical_hash(current_config)
         prompt_hash = _sha256_text(normalized_prompt)
+        prompt_profile = backtest_ai_prompt_profile_for_mode(normalized_mode)
         runtime_defaults_hash = _runtime_defaults_hash(ui_context=ui_context)
         now = datetime.now(UTC)
 
@@ -170,6 +174,7 @@ class BacktestAiConfigJobsUseCase:
             current_config_hash=current_config_hash,
             current_config_json=current_config,
             system_prompt_version=system_prompt_version,
+            system_prompt_hash=prompt_profile.system_prompt_hash,
             catalog_snapshot_hash=catalog_snapshot_hash,
             runtime_defaults_hash=runtime_defaults_hash,
             queued_at=now,

@@ -72,6 +72,19 @@ class BacktestAiConfigFakeWorkerUseCase:
                         created_at=effective_now,
                     )
                 )
+            if any(attempt.attempt_kind == "repair" for attempt in pipeline_result.llm_attempts):
+                self.job_repository.append_event(
+                    event=_event(
+                        job=claimed,
+                        event_name="repairing",
+                        message="Repairing configuration draft from validation errors.",
+                        progress=90,
+                        created_at=effective_now,
+                    )
+                )
+
+        for attempt in pipeline_result.llm_attempts:
+            self.job_repository.record_llm_attempt(attempt=attempt)
 
         finished = self.lease_repository.finish(
             job_id=claimed.job_id,
@@ -83,7 +96,7 @@ class BacktestAiConfigFakeWorkerUseCase:
             suggestions_json=pipeline_result.warnings + pipeline_result.suggestions,
             validation_errors_json=pipeline_result.validation_errors,
             model_id=pipeline_result.model_id,
-            model_path_hash=None,
+            model_path_hash=pipeline_result.model_path_hash,
             last_error=pipeline_result.last_error,
             last_error_json=pipeline_result.last_error_json,
         )

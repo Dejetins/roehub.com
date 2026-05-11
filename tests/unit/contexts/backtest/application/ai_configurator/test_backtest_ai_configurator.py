@@ -19,6 +19,7 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiQuotaEvent,
     BacktestAiQuotaService,
     BacktestAiTierQuota,
+    backtest_ai_prompt_profile_for_mode,
 )
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -45,6 +46,11 @@ def test_create_persists_queued_job_event_and_single_quota_charge() -> None:
     assert result.job.source_page == "backtests"
     assert result.job.idempotency_key == "client-request-1"
     assert result.job.current_config_hash is not None
+    assert result.job.system_prompt_version == "backtest-ai-configurator-v1"
+    assert (
+        result.job.system_prompt_hash
+        == backtest_ai_prompt_profile_for_mode("create").system_prompt_hash
+    )
     assert result.job.runtime_defaults_hash == "a" * 64
     assert result.job.quota_charged is True
     assert result.quota_charged is True

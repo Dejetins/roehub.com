@@ -28,6 +28,12 @@ from .jobs import (
     PENDING_RUNTIME_DEFAULTS_HASH,
     BacktestAiConfigJobsUseCase,
 )
+from .ports import (
+    BacktestConfigLLMGateway,
+    BacktestConfigLLMRepairRequest,
+    BacktestConfigLLMRequest,
+    BacktestConfigLLMResponse,
+)
 from .quota import (
     DEFAULT_AI_TIER_QUOTAS,
     BacktestAiQuotaConfig,
@@ -47,9 +53,17 @@ from .services import (
     BacktestAiOutputGate,
     BacktestAiOutputGateResult,
     BacktestAiPipelineStage,
+    BacktestAiPromptEnvelope,
+    BacktestAiPromptProfile,
+    BacktestAiRepairController,
     BacktestAiSecurityDecision,
     BacktestAiSecurityIssue,
     BacktestAiValidationStatus,
+    backtest_ai_model_output_schema,
+    backtest_ai_prompt_profile_for_mode,
+    backtest_ai_repair_prompt_profile,
+    build_generate_prompt_envelope,
+    build_repair_prompt_envelope,
 )
 
 __all__ = [
@@ -85,6 +99,9 @@ __all__ = [
     "BacktestAiOutputGate",
     "BacktestAiOutputGateResult",
     "BacktestAiPipelineStage",
+    "BacktestAiPromptEnvelope",
+    "BacktestAiPromptProfile",
+    "BacktestAiRepairController",
     "BacktestAiQuotaAction",
     "BacktestAiQuotaConfig",
     "BacktestAiQuotaEvent",
@@ -94,8 +111,17 @@ __all__ = [
     "BacktestAiSecurityIssue",
     "BacktestAiTierQuota",
     "BacktestAiValidationStatus",
+    "BacktestConfigLLMGateway",
+    "BacktestConfigLLMRepairRequest",
+    "BacktestConfigLLMRequest",
+    "BacktestConfigLLMResponse",
     "DEFAULT_AI_TIER_QUOTAS",
     "JsonMapping",
     "PENDING_CATALOG_SNAPSHOT_HASH",
     "PENDING_RUNTIME_DEFAULTS_HASH",
+    "backtest_ai_model_output_schema",
+    "backtest_ai_prompt_profile_for_mode",
+    "backtest_ai_repair_prompt_profile",
+    "build_generate_prompt_envelope",
+    "build_repair_prompt_envelope",
 ]

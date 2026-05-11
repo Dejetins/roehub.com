@@ -12,6 +12,7 @@ from trading.contexts.backtest.adapters.outbound import (
     BacktestAiConfiguratorRuntimeConfig,
     BacktestArtifactPathBuilderV2,
     DatabaseBacktestJobExecutionTrigger,
+    DeterministicBacktestConfigLLMGateway,
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestAiConfigRepository,
@@ -242,6 +243,7 @@ def build_backtest_ai_configurator_use_cases(
                 output_gate=BacktestAiOutputGate(),
             ),
             input_gate=BacktestAiInputGate(),
+            llm_gateway=DeterministicBacktestConfigLLMGateway(),
         ),
     )
 
