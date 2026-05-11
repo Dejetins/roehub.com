@@ -248,8 +248,14 @@ class _Repository:
                 return row
         return None
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
-        return self.top_rows if self.job.job_id == job_id else ()
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
+        rows = self.top_rows if self.job.job_id == job_id else ()
+        return rows if limit is None else rows[:limit]
 
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
         return BacktestJobListPage(items=(self.job,), next_cursor=None)
@@ -386,8 +392,14 @@ class _CreateRepository:
             return None
         return job
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
-        return self.top_rows.get(job_id, ())
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
+        rows = self.top_rows.get(job_id, ())
+        return rows if limit is None else rows[:limit]
 
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
         items = tuple(job for job in self.jobs.values() if job.user_id == query.user_id)

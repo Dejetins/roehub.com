@@ -460,6 +460,8 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         in response.text
     )
     assert 'data-variant-open-delay-ms="140"' in response.text
+    assert 'data-variant-open-duration-ms="220"' in response.text
+    assert 'data-variant-preview-limit="5"' in response.text
     assert "data-result-state" not in response.text
     assert "data-result-chart" not in response.text
     assert "data-trades-rows" not in response.text
@@ -744,6 +746,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "data-delete-job-id" in backtests_js
     assert "data-load-more-jobs" in backtests_js
     assert "delayedVariantOpen" in backtests_js
+    assert "top_limit" in backtests_js
+    assert "variantPreviewLimit" in backtests_js
+    assert "queueVariantPanelAnimation" in backtests_js
     assert "createPoller" in backtests_js
     assert "activeRequest" in backtests_js
     assert "hiddenTabPause" in backtests_js
@@ -755,6 +760,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "activeResultRequest" in backtests_js
     assert "backtest_ui.js" not in backtests_js
     assert "grid-row: 1;" in backtests_css
+    assert ".backtests-variant-frame" in backtests_css
+    assert "max-height var(--backtests-variant-open-duration" in backtests_css
     assert "--rh-financial-positive" in backtests_css
     assert "--rh-financial-negative" in backtests_css
     assert "activeRequest" in dashboard_js

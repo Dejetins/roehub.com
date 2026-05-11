@@ -171,10 +171,11 @@ def build_backtests_router(
     )
     def get_backtest_job_summary(
         job_id: UUID,
+        top_limit: int | None = Query(default=None, ge=1, le=20),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
     ) -> BacktestResultSummaryResponse:
-        result = use_case.summary(user_id=principal.user_id, job_id=job_id)
+        result = use_case.summary(user_id=principal.user_id, job_id=job_id, top_limit=top_limit)
         return build_backtest_result_summary_response(result=result)
 
     @router.get("/backtests/jobs/{job_id}/top", response_model=BacktestTopVariantsResponse)

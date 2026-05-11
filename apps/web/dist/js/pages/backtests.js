@@ -5,6 +5,8 @@ import { createPoller } from "../core/poller.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 140;
+const DEFAULT_VARIANT_OPEN_DURATION_MS = 220;
+const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
 const REFRESH_PRESETS = {
   off: 0,
   "10s": 10000,
@@ -49,6 +51,7 @@ let activeResultRequest = null;
 let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
+let variantAnimationFrame = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -656,6 +659,7 @@ function renderJobs(root, table) {
   target.innerHTML = rows
     .map((row, index) => renderJobRow(root, row, index))
     .join("");
+  queueVariantPanelAnimation(root);
 }
 
 function renderJobRow(root, row, index) {
@@ -695,7 +699,7 @@ function renderJobRow(root, row, index) {
 
 function renderVariantExpansion(root, row) {
   const summary = state.resultSummary?.job?.job_id === row.job_id ? state.resultSummary : null;
-  const variants = summary?.top_variants?.items || [];
+  const variants = (summary?.top_variants?.items || []).slice(0, variantPreviewLimit(root));
   const title = t("backtests.variants.title", { job: compactId(row.job_id) });
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
@@ -703,34 +707,53 @@ function renderVariantExpansion(root, row) {
   return `
     <tr class="backtests-variant-expansion">
       <td class="backtests-variant-cell" colspan="11">
-        <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
-          <header class="backtests-variant-panel__heading">
-            <strong>${escapeHtml(title)}</strong>
-            <span>${escapeHtml(row.strategy)} · ${escapeHtml(row.symbol || "--")} · ${escapeHtml(formatDateTimeMinute(row.created_at))}</span>
-          </header>
-          <div class="backtests-table-wrap backtests-variant-table-wrap">
-            <table class="backtests-table backtests-table--variants">
-              <thead>
-                <tr>
-                  <th>${escapeHtml(t("backtests.variants.rank"))}</th>
-                  <th>${escapeHtml(t("backtests.variants.variant"))}</th>
-                  <th>${escapeHtml(t("backtests.variants.params"))}</th>
-                  <th>${escapeHtml(t("backtests.results.return"))}</th>
-                  <th>${escapeHtml(t("backtests.results.sharpe"))}</th>
-                  <th>${escapeHtml(t("backtests.results.drawdown"))}</th>
-                  <th>${escapeHtml(t("backtests.results.profit_factor"))}</th>
-                  <th>${escapeHtml(t("backtests.results.win_rate"))}</th>
-                  <th>${escapeHtml(t("backtests.results.trades"))}</th>
-                  <th>${escapeHtml(t("backtests.variants.csv"))}</th>
-                </tr>
-              </thead>
-              <tbody>${body}</tbody>
-            </table>
-          </div>
-        </section>
+        <div class="backtests-variant-frame" data-variant-frame>
+          <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
+            <header class="backtests-variant-panel__heading">
+              <strong>${escapeHtml(title)}</strong>
+              <span>${escapeHtml(row.strategy)} · ${escapeHtml(row.symbol || "--")} · ${escapeHtml(formatDateTimeMinute(row.created_at))}</span>
+            </header>
+            <div class="backtests-table-wrap backtests-variant-table-wrap">
+              <table class="backtests-table backtests-table--variants">
+                <thead>
+                  <tr>
+                    <th>${escapeHtml(t("backtests.variants.rank"))}</th>
+                    <th>${escapeHtml(t("backtests.variants.variant"))}</th>
+                    <th>${escapeHtml(t("backtests.variants.params"))}</th>
+                    <th>${escapeHtml(t("backtests.results.return"))}</th>
+                    <th>${escapeHtml(t("backtests.results.sharpe"))}</th>
+                    <th>${escapeHtml(t("backtests.results.drawdown"))}</th>
+                    <th>${escapeHtml(t("backtests.results.profit_factor"))}</th>
+                    <th>${escapeHtml(t("backtests.results.win_rate"))}</th>
+                    <th>${escapeHtml(t("backtests.results.trades"))}</th>
+                    <th>${escapeHtml(t("backtests.variants.csv"))}</th>
+                  </tr>
+                </thead>
+                <tbody>${body}</tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </td>
     </tr>
   `;
+}
+
+function queueVariantPanelAnimation(root) {
+  if (variantAnimationFrame) {
+    window.cancelAnimationFrame(variantAnimationFrame);
+  }
+  const frame = qs("[data-variant-frame]", root);
+  if (!frame) {
+    variantAnimationFrame = null;
+    return;
+  }
+  frame.style.setProperty("--backtests-variant-open-duration", `${variantOpenDurationMs(root)}ms`);
+  variantAnimationFrame = window.requestAnimationFrame(() => {
+    frame.style.setProperty("--backtests-variant-height", `${frame.scrollHeight}px`);
+    frame.classList.add("is-open");
+    variantAnimationFrame = null;
+  });
 }
 
 function renderJobPagination(root) {
@@ -919,17 +942,21 @@ function preserveLoadedJobTableData(data) {
   };
 }
 
-async function loadResultSummary(root, jobId) {
+async function loadResultSummary(root, jobId, { render = true } = {}) {
   if (!jobId) {
     return null;
   }
   const template = root.dataset.jobSummaryEndpointTemplate || "/api/backtests/jobs/{job_id}/summary";
-  const summary = await apiFetch(endpointFromTemplate(template, { job_id: jobId }));
+  const endpoint = new URL(endpointFromTemplate(template, { job_id: jobId }), window.location.origin);
+  endpoint.searchParams.set("top_limit", String(variantPreviewLimit(root)));
+  const summary = await apiFetch(`${endpoint.pathname}${endpoint.search}`);
   state.selectedJobId = summary.job?.job_id || jobId;
   if (!state.selectedVariantKey) {
     state.selectedVariantKey = summary.selected_variant_key;
   }
-  renderResultSummary(root, summary);
+  if (render) {
+    renderResultSummary(root, summary);
+  }
   return summary;
 }
 
@@ -937,7 +964,6 @@ async function loadSelectedResult(root) {
   if (!state.selectedJobId || activeResultRequest) {
     return activeResultRequest;
   }
-  renderJobs(root, { items: state.jobRows });
   activeResultRequest = loadResultSummary(root, state.selectedJobId).finally(() => {
     activeResultRequest = null;
   });
@@ -956,13 +982,37 @@ function variantOpenDelayMs(root) {
   return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_VARIANT_OPEN_DELAY_MS;
 }
 
-function openSelectedJob(root, jobId) {
-  state.selectedJobId = jobId || null;
+function variantOpenDurationMs(root) {
+  const raw = Number(root.dataset.variantOpenDurationMs || DEFAULT_VARIANT_OPEN_DURATION_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_VARIANT_OPEN_DURATION_MS;
+}
+
+function variantPreviewLimit(root) {
+  const raw = Number(root.dataset.variantPreviewLimit || DEFAULT_VARIANT_PREVIEW_LIMIT);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_VARIANT_PREVIEW_LIMIT;
+}
+
+async function openSelectedJob(root, jobId) {
+  if (!jobId) {
+    state.selectedJobId = null;
+    state.selectedVariantKey = null;
+    state.resultSummary = null;
+    renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
+    return;
+  }
   state.selectedVariantKey = null;
   renderJobPicker(root, state.jobRows);
-  loadSelectedResult(root).catch((error) => {
+  try {
+    activeResultRequest = loadResultSummary(root, jobId, { render: false });
+    const summary = await activeResultRequest;
+    state.selectedJobId = summary.job?.job_id || jobId;
+    state.selectedVariantKey = summary.selected_variant_key;
+    renderResultSummary(root, summary);
+  } catch (error) {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
-  });
+  } finally {
+    activeResultRequest = null;
+  }
 }
 
 function selectJob(root, jobId, { delayed = true } = {}) {
@@ -974,7 +1024,9 @@ function selectJob(root, jobId, { delayed = true } = {}) {
   setText("[data-create-status]", t("backtests.status.opening_job", { job: compactId(jobId) }), root);
   delayedVariantOpen = window.setTimeout(() => {
     delayedVariantOpen = null;
-    openSelectedJob(root, jobId);
+    openSelectedJob(root, jobId).catch((error) => {
+      setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
+    });
   }, variantOpenDelayMs(root));
 }
 

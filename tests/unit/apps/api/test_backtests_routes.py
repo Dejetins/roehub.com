@@ -217,7 +217,7 @@ def test_get_backtest_result_summary_is_bounded_without_trades() -> None:
         headers={"x-user-id": "00000000-0000-0000-0000-000000000219"},
         json=_valid_request(),
     )
-    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]), top_count=6)
 
     response = client.get(
         f"/backtests/jobs/{created.json()['job_id']}/summary",
@@ -230,6 +230,30 @@ def test_get_backtest_result_summary_is_bounded_without_trades() -> None:
     assert payload["top_variants"]["items"]
     assert "trades" not in payload["top_variants"]["items"][0]
     assert lazy_service.requests == ()
+
+
+def test_get_backtest_result_summary_accepts_top_limit() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000219"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]), top_count=6)
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/summary?top_limit=5",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000219"},
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["top_variants"]["items"]) == 5
 
 
 def test_get_backtest_result_series_downsamples_and_rejects_raw_hash() -> None:
@@ -678,7 +702,12 @@ class _FakeExecutor:
         )
 
 
-def _complete_job(*, repository: "_FakeJobRepository", job_id: UUID) -> None:
+def _complete_job(
+    *,
+    repository: "_FakeJobRepository",
+    job_id: UUID,
+    top_count: int = 1,
+) -> None:
     assert repository.jobs is not None
     job = repository.jobs[job_id]
     locked_by = "test-worker"
@@ -691,22 +720,25 @@ def _complete_job(*, repository: "_FakeJobRepository", job_id: UUID) -> None:
         lease_expires_at=now + timedelta(seconds=60),
     )
     assert running is not None
-    top_result = BacktestNoRiskTopResult(
-        rank=1,
-        score=12.5,
-        indicator_rows={"ma.dema": 7},
-        metrics={"total_return_pct": 12.5, "trade_count": 2.0},
-        metadata={
-            "ma.dema.source": "close",
-            "ma.dema.window": 5,
-            "confirm_count": 1,
-            "proxy_score": 0.25,
-        },
+    top_results = tuple(
+        BacktestNoRiskTopResult(
+            rank=index,
+            score=12.5 - index,
+            indicator_rows={"ma.dema": 6 + index},
+            metrics={"total_return_pct": 12.5 - index, "trade_count": 2.0 + index},
+            metadata={
+                "ma.dema.source": "close",
+                "ma.dema.window": 4 + index,
+                "confirm_count": 1,
+                "proxy_score": 0.25,
+            },
+        )
+        for index in range(1, top_count + 1)
     )
     assembly = BacktestTopResultAssemblyService().assemble(
         job_id=job_id,
         normalized_request=dict(job.request_json),
-        top_results=(top_result,),
+        top_results=top_results,
         updated_at=now,
     )
     finished = repository.finish_with_top_variants(
@@ -904,9 +936,15 @@ class _FakeJobRepository:
         items.sort(key=lambda item: (item.created_at, str(item.job_id)), reverse=True)
         return BacktestJobListPage(items=tuple(items[: query.limit]), next_cursor=None)
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
         assert self.top_rows is not None
-        return self.top_rows.get(job_id, ())
+        rows = self.top_rows.get(job_id, ())
+        return rows if limit is None else rows[:limit]
 
     def get_top_variant_by_public_key(
         self,

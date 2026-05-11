@@ -256,12 +256,18 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
         """
         List persisted summary-only top rows for one job ordered by rank.
 
         Args:
             job_id: Parent job identifier.
+            limit: Optional positive cap for preview reads.
         Returns:
             tuple[BacktestJobTopVariant, ...]: Rows sorted by `rank ASC`.
         Assumptions:

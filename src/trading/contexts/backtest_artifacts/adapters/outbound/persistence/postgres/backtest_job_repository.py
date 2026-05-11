@@ -751,20 +751,32 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             return None
         return _map_job_row(row=row)
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
         """
         List persisted top rows ordered by public rank.
         """
+        if limit is not None and limit <= 0:
+            raise BacktestStorageError("Backtest top variants limit must be positive")
+        limit_clause = "" if limit is None else "LIMIT %(limit)s"
+        parameters: dict[str, Any] = {"job_id": str(job_id)}
+        if limit is not None:
+            parameters["limit"] = int(limit)
         query = f"""
         SELECT
             {_BACKTEST_TOP_VARIANT_SELECT_COLUMNS}
         FROM {self._top_variants_table}
         WHERE job_id = %(job_id)s
         ORDER BY rank ASC, variant_key ASC
+        {limit_clause}
         """
         rows = self._gateway.fetch_all(
             query=query,
-            parameters={"job_id": str(job_id)},
+            parameters=parameters,
         )
         return tuple(_map_top_variant_row(row=row) for row in rows)
 

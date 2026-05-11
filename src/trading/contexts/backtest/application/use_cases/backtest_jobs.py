@@ -60,6 +60,7 @@ BACKTEST_ERROR_AUTH_REQUIRED = "auth.required"
 BACKTEST_ERROR_FORBIDDEN = "backtest.forbidden"
 BACKTEST_ERROR_NOT_FOUND = "backtest.not_found"
 BACKTEST_ERROR_IDEMPOTENCY_CONFLICT = "backtest.idempotency_key_conflict"
+BACKTEST_ERROR_INVALID_REQUEST = "backtest.invalid_request"
 BACKTEST_ERROR_JOB_NOT_CANCELLABLE = "backtest.job_not_cancellable"
 BACKTEST_ERROR_JOB_NOT_DELETABLE = "backtest.job_not_deletable"
 BACKTEST_ERROR_RATE_LIMITED = "backtest.rate_limited"
@@ -169,9 +170,21 @@ class BacktestJobsUseCase:
         next_cursor = _encode_cursor(cursor=page.next_cursor)
         return BacktestJobListResult(items=items, next_cursor=next_cursor)
 
-    def top(self, *, user_id: UserId, job_id: UUID) -> BacktestJobTopResult:
+    def top(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        limit: int | None = None,
+    ) -> BacktestJobTopResult:
         self._require_visible_job(user_id=user_id, job_id=job_id)
-        rows = self.job_repository.list_top_variants(job_id=job_id)
+        if limit is not None and limit <= 0:
+            raise _error(
+                code=BACKTEST_ERROR_INVALID_REQUEST,
+                message="Backtest top variants limit must be positive",
+                details={"limit": limit},
+            )
+        rows = self.job_repository.list_top_variants(job_id=job_id, limit=limit)
         return BacktestJobTopResult(
             items=tuple(
                 build_top_variant_read_model(job_id=str(job_id), row=row)
@@ -199,9 +212,15 @@ class BacktestJobsUseCase:
         )
         return build_top_variant_read_model(job_id=str(job_id), row=row)
 
-    def summary(self, *, user_id: UserId, job_id: UUID) -> BacktestResultSummaryReadModel:
+    def summary(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        top_limit: int | None = None,
+    ) -> BacktestResultSummaryReadModel:
         job = self.get(user_id=user_id, job_id=job_id)
-        top = self.top(user_id=user_id, job_id=job_id)
+        top = self.top(user_id=user_id, job_id=job_id, limit=top_limit)
         return build_result_summary_read_model(job=job, top_variants=top)
 
     def trades(
@@ -511,6 +530,7 @@ __all__ = [
     "BACKTEST_ERROR_AUTH_REQUIRED",
     "BACKTEST_ERROR_FORBIDDEN",
     "BACKTEST_ERROR_IDEMPOTENCY_CONFLICT",
+    "BACKTEST_ERROR_INVALID_REQUEST",
     "BACKTEST_ERROR_JOB_NOT_CANCELLABLE",
     "BACKTEST_ERROR_JOB_NOT_DELETABLE",
     "BACKTEST_ERROR_NOT_FOUND",
