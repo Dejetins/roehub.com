@@ -7,15 +7,19 @@ import socket
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Mapping
+from pathlib import Path
+from typing import Any, Mapping
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, start_http_server
 
 from trading.contexts.backtest.adapters.outbound import (
+    DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
     FilesystemBacktestArtifactContextResolver,
+    LocalFileBacktestLazyTradesCache,
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
+    PostgresBacktestLazyTradesMaterializationRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
@@ -27,6 +31,7 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestComboPlanningService,
+    BacktestLazyTradesDetailService,
     BacktestNoRiskExactScoringService,
     BacktestPreflightService,
     BacktestPreparePoolsService,
@@ -38,6 +43,8 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.use_cases import (
     BacktestJobWorkerResult,
     BacktestJobWorkerUseCase,
+    BacktestLazyTradesMaterializationWorkerResult,
+    BacktestLazyTradesMaterializationWorkerUseCase,
 )
 from trading.contexts.backtest.domain.entities import BacktestJob
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
@@ -48,6 +55,7 @@ log = logging.getLogger(__name__)
 
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _TASK_KIND_FULL_JOB = "full_job"
+_TASK_KIND_LAZY_DETAIL = "lazy_detail"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,10 +68,11 @@ class BacktestJobRunnerRuntimeConfig:
     heartbeat_interval_seconds: float
     max_jobs_per_process: int
     metrics_port: int
+    lazy_detail_anti_starvation_limit: int = 5
 
     def __post_init__(self) -> None:
         if self.concurrency != 1:
-            raise ValueError("ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required for R2")
+            raise ValueError("ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required for R3")
         if self.poll_interval_seconds <= 0:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_POLL_INTERVAL_SECONDS must be > 0")
         if self.empty_backoff_seconds <= 0:
@@ -81,6 +90,51 @@ class BacktestJobRunnerRuntimeConfig:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS must be > 0")
         if self.metrics_port <= 0:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_METRICS_PORT must be > 0")
+        if self.lazy_detail_anti_starvation_limit <= 0:
+            raise ValueError(
+                "ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT must be > 0"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRunnerTaskResult:
+    task_kind: str
+    claimed: bool
+    status: str = "empty"
+    paid_level: str = "unknown"
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    lease_lost: bool = False
+    cache_status: str | None = None
+
+
+@dataclass(slots=True)
+class BacktestRunnerTaskScheduler:
+    full_job_worker: BacktestJobWorkerUseCase
+    lazy_detail_worker: BacktestLazyTradesMaterializationWorkerUseCase
+    lazy_detail_anti_starvation_limit: int = 5
+    _lazy_detail_streak: int = 0
+
+    def run_next(self) -> BacktestRunnerTaskResult:
+        if self._lazy_detail_streak >= self.lazy_detail_anti_starvation_limit:
+            full_result = _full_job_task_result(self.full_job_worker.run_next())
+            if full_result.claimed:
+                self._lazy_detail_streak = 0
+                return full_result
+            lazy_result = _lazy_detail_task_result(self.lazy_detail_worker.run_next())
+            if lazy_result.claimed:
+                self._lazy_detail_streak += 1
+            return lazy_result
+
+        lazy_result = _lazy_detail_task_result(self.lazy_detail_worker.run_next())
+        if lazy_result.claimed:
+            self._lazy_detail_streak += 1
+            return lazy_result
+
+        full_result = _full_job_task_result(self.full_job_worker.run_next())
+        if full_result.claimed:
+            self._lazy_detail_streak = 0
+        return full_result
 
 
 class BacktestJobRunnerMetrics:
@@ -130,39 +184,53 @@ class BacktestJobRunnerMetrics:
             ("task_kind",),
             registry=self.registry,
         )
+        self.lazy_trades_cache_total = Counter(
+            "backtest_lazy_trades_cache_total",
+            "Backtest lazy trades cache outcomes observed by runner",
+            ("status",),
+            registry=self.registry,
+        )
         self.active.labels(task_kind=_TASK_KIND_FULL_JOB).set(0)
+        self.active.labels(task_kind=_TASK_KIND_LAZY_DETAIL).set(0)
         self.last_success_unixtime.labels(task_kind=_TASK_KIND_FULL_JOB).set(0)
+        self.last_success_unixtime.labels(task_kind=_TASK_KIND_LAZY_DETAIL).set(0)
 
     def observe_result(
         self,
         *,
-        result: BacktestJobWorkerResult,
+        result: BacktestRunnerTaskResult | BacktestJobWorkerResult,
         duration_seconds: float,
     ) -> None:
-        if not result.claimed:
+        normalized = _coerce_task_result(result=result)
+        if not normalized.claimed:
             return
-        job = result.job
-        paid_level = _paid_level_from_job(job=job)
-        status = "lease_lost" if result.lease_lost or job is None else job.state
+        status = "lease_lost" if normalized.lease_lost else normalized.status
         self.tasks_claimed_total.labels(
-            task_kind=_TASK_KIND_FULL_JOB,
-            paid_level=paid_level,
+            task_kind=normalized.task_kind,
+            paid_level=normalized.paid_level,
         ).inc()
-        self.tasks_finished_total.labels(task_kind=_TASK_KIND_FULL_JOB, status=status).inc()
+        self.tasks_finished_total.labels(
+            task_kind=normalized.task_kind,
+            status=status,
+        ).inc()
         self.task_duration_seconds.labels(
-            task_kind=_TASK_KIND_FULL_JOB,
+            task_kind=normalized.task_kind,
             status=status,
         ).observe(max(duration_seconds, 0.0))
-        if job is not None and job.started_at is not None:
-            queue_wait_seconds = (job.started_at - job.created_at).total_seconds()
+        if normalized.created_at is not None and normalized.started_at is not None:
+            queue_wait_seconds = (
+                normalized.started_at - normalized.created_at
+            ).total_seconds()
             self.queue_wait_seconds.labels(
-                task_kind=_TASK_KIND_FULL_JOB,
-                paid_level=paid_level,
+                task_kind=normalized.task_kind,
+                paid_level=normalized.paid_level,
             ).observe(max(queue_wait_seconds, 0.0))
-        if result.lease_lost:
-            self.lease_lost_total.labels(task_kind=_TASK_KIND_FULL_JOB).inc()
-        if job is not None and job.state == "succeeded":
-            self.last_success_unixtime.labels(task_kind=_TASK_KIND_FULL_JOB).set(
+        if normalized.lease_lost:
+            self.lease_lost_total.labels(task_kind=normalized.task_kind).inc()
+        if normalized.cache_status is not None:
+            self.lazy_trades_cache_total.labels(status=normalized.cache_status).inc()
+        if normalized.status in {"succeeded", "completed"}:
+            self.last_success_unixtime.labels(task_kind=normalized.task_kind).set(
                 datetime.now(UTC).timestamp()
             )
 
@@ -170,7 +238,7 @@ class BacktestJobRunnerMetrics:
 @dataclass(frozen=True, slots=True)
 class BacktestJobRunnerApp:
     runtime_config: BacktestJobRunnerRuntimeConfig
-    worker: BacktestJobWorkerUseCase
+    worker: Any
     metrics: BacktestJobRunnerMetrics
     metrics_port: int
 
@@ -179,33 +247,45 @@ class BacktestJobRunnerApp:
         log.info("backtest-job-runner metrics server started on port %s", self.metrics_port)
         processed_jobs = 0
         while not stop_event.is_set():
-            self.metrics.active.labels(task_kind=_TASK_KIND_FULL_JOB).set(1)
             started = time.perf_counter()
+            active_task_kind = _TASK_KIND_FULL_JOB
             try:
                 result = self.worker.run_next()
+                normalized_result = _coerce_task_result(result=result)
+                active_task_kind = normalized_result.task_kind
             except Exception:  # noqa: BLE001
+                active_task_kind = _TASK_KIND_FULL_JOB
                 self.metrics.tasks_finished_total.labels(
                     task_kind=_TASK_KIND_FULL_JOB,
                     status="runner_error",
                 ).inc()
                 log.exception("backtest-job-runner iteration failed")
-                result = BacktestJobWorkerResult(job=None, claimed=False)
+                normalized_result = BacktestRunnerTaskResult(
+                    task_kind=_TASK_KIND_FULL_JOB,
+                    claimed=False,
+                )
+            self.metrics.active.labels(task_kind=active_task_kind).set(1)
+            try:
+                duration_seconds = time.perf_counter() - started
+                self.metrics.observe_result(
+                    result=normalized_result,
+                    duration_seconds=duration_seconds,
+                )
             finally:
-                self.metrics.active.labels(task_kind=_TASK_KIND_FULL_JOB).set(0)
-
-            duration_seconds = time.perf_counter() - started
-            self.metrics.observe_result(result=result, duration_seconds=duration_seconds)
-            if result.claimed:
+                self.metrics.active.labels(task_kind=active_task_kind).set(0)
+            if normalized_result.claimed:
                 processed_jobs += 1
                 log.info(
-                    "backtest job processed: claimed=%s state=%s lease_lost=%s",
-                    result.claimed,
-                    None if result.job is None else result.job.state,
-                    result.lease_lost,
+                    "backtest runner task processed: kind=%s claimed=%s status=%s "
+                    "lease_lost=%s",
+                    normalized_result.task_kind,
+                    normalized_result.claimed,
+                    normalized_result.status,
+                    normalized_result.lease_lost,
                 )
                 if processed_jobs >= self.runtime_config.max_jobs_per_process:
                     log.info(
-                        "backtest-job-runner reached max jobs per process: %s",
+                        "backtest-job-runner reached max tasks per process: %s",
                         self.runtime_config.max_jobs_per_process,
                     )
                     return
@@ -264,6 +344,11 @@ def load_backtest_job_runner_runtime_config(
             key="ROEHUB_BACKTEST_RUNNER_METRICS_PORT",
             default=9204,
         ),
+        lazy_detail_anti_starvation_limit=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT",
+            default=5,
+        ),
     )
 
 
@@ -307,6 +392,9 @@ def build_backtest_job_runner_app(
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     job_repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
     lease_repository = PostgresBacktestJobLeaseRepository(gateway=postgres_gateway)
+    materialization_repository = PostgresBacktestLazyTradesMaterializationRepository(
+        gateway=postgres_gateway
+    )
     preflight_service = BacktestPreflightService(
         defaults_provider=defaults_provider,
         artifact_context_resolver=artifact_context_resolver,
@@ -326,7 +414,7 @@ def build_backtest_job_runner_app(
         tp_sl_exact=BacktestTpSlExactScoringService(),
         artifact_array_loader=artifact_array_loader,
     )
-    worker = BacktestJobWorkerUseCase(
+    full_job_worker = BacktestJobWorkerUseCase(
         lease_repository=lease_repository,
         job_repository=job_repository,
         preflight_service=preflight_service,
@@ -335,9 +423,38 @@ def build_backtest_job_runner_app(
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
     )
+    lazy_trades_service = BacktestLazyTradesDetailService(
+        prepare_pools=prepare_pools,
+        tp_sl_hit_times=BacktestTpSlHitTimesService(
+            artifact_array_loader=artifact_array_loader
+        ),
+        cache=LocalFileBacktestLazyTradesCache(
+            root=Path(
+                effective_environ.get(
+                    "ROEHUB_BACKTEST_TRADES_CACHE_ROOT",
+                    str(DEFAULT_LAZY_TRADES_CACHE_ROOT),
+                )
+            )
+        ),
+    )
+    lazy_detail_worker = BacktestLazyTradesMaterializationWorkerUseCase(
+        materialization_repository=materialization_repository,
+        job_repository=job_repository,
+        lazy_trades_service=lazy_trades_service,
+        lease_seconds=effective_runtime_config.lease_seconds,
+        heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
+        locked_by=_build_locked_by(),
+    )
+    scheduler = BacktestRunnerTaskScheduler(
+        full_job_worker=full_job_worker,
+        lazy_detail_worker=lazy_detail_worker,
+        lazy_detail_anti_starvation_limit=(
+            effective_runtime_config.lazy_detail_anti_starvation_limit
+        ),
+    )
     return BacktestJobRunnerApp(
         runtime_config=effective_runtime_config,
-        worker=worker,
+        worker=scheduler,
         metrics=BacktestJobRunnerMetrics(),
         metrics_port=metrics_port or effective_runtime_config.metrics_port,
     )
@@ -368,6 +485,44 @@ def _paid_level_from_job(*, job: BacktestJob | None) -> str:
     if isinstance(paid_level, str) and paid_level.strip():
         return paid_level.strip()
     return "unknown"
+
+
+def _coerce_task_result(
+    *,
+    result: BacktestRunnerTaskResult | BacktestJobWorkerResult,
+) -> BacktestRunnerTaskResult:
+    if isinstance(result, BacktestRunnerTaskResult):
+        return result
+    return _full_job_task_result(result)
+
+
+def _full_job_task_result(result: BacktestJobWorkerResult) -> BacktestRunnerTaskResult:
+    job = result.job
+    return BacktestRunnerTaskResult(
+        task_kind=_TASK_KIND_FULL_JOB,
+        claimed=result.claimed,
+        status="lease_lost" if result.lease_lost or job is None else job.state,
+        paid_level=_paid_level_from_job(job=job),
+        created_at=None if job is None else job.created_at,
+        started_at=None if job is None else job.started_at,
+        lease_lost=result.lease_lost,
+    )
+
+
+def _lazy_detail_task_result(
+    result: BacktestLazyTradesMaterializationWorkerResult,
+) -> BacktestRunnerTaskResult:
+    task = result.task
+    return BacktestRunnerTaskResult(
+        task_kind=_TASK_KIND_LAZY_DETAIL,
+        claimed=result.claimed,
+        status="lease_lost" if result.lease_lost or task is None else task.status,
+        paid_level="unknown",
+        created_at=None if task is None else task.created_at,
+        started_at=None if task is None else task.started_at,
+        lease_lost=result.lease_lost,
+        cache_status=result.cache_status,
+    )
 
 
 def _env_bool(*, environ: Mapping[str, str], key: str, default: bool) -> bool:
@@ -408,6 +563,8 @@ __all__ = [
     "BacktestJobRunnerApp",
     "BacktestJobRunnerMetrics",
     "BacktestJobRunnerRuntimeConfig",
+    "BacktestRunnerTaskResult",
+    "BacktestRunnerTaskScheduler",
     "build_backtest_job_runner_app",
     "load_backtest_job_runner_runtime_config",
 ]

@@ -15,11 +15,17 @@ from .errors import (
     map_backtest_exception,
     validation_error,
 )
+from .lazy_trades_materialization_worker import (
+    BacktestLazyTradesMaterializationWorkerResult,
+    BacktestLazyTradesMaterializationWorkerUseCase,
+)
 
 __all__ = [
     "BacktestJobExecutor",
     "BacktestJobWorkerResult",
     "BacktestJobWorkerUseCase",
+    "BacktestLazyTradesMaterializationWorkerResult",
+    "BacktestLazyTradesMaterializationWorkerUseCase",
     "BacktestJobsUseCase",
     "backtest_conflict",
     "backtest_forbidden",

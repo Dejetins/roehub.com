@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Mapping, cast
 from uuid import UUID, uuid4
 
@@ -237,6 +237,213 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         row = self._gateway.fetch_one(query=query, parameters={})
         return _count_from_row(row=row, field_name="active_total")
 
+    def claim_next(
+        self,
+        *,
+        now: datetime,
+        locked_by: str,
+        lease_seconds: int,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        normalized_owner = _normalize_locked_by(value=locked_by)
+        validated_lease_seconds = _validate_lease_seconds(lease_seconds=lease_seconds)
+        lease_expires_at = now + timedelta(seconds=validated_lease_seconds)
+        claimed_columns = _qualify_select_columns(relation_alias="tasks")
+        final_columns = _qualify_select_columns(relation_alias="claimed")
+        query = f"""
+        WITH queued_candidate AS (
+            SELECT
+                task_id
+            FROM {self._table}
+            WHERE status = 'queued'
+            ORDER BY created_at ASC, task_id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        ),
+        reclaim_candidate AS (
+            SELECT
+                task_id
+            FROM {self._table}
+            WHERE status = 'running'
+              AND lease_expires_at <= %(now)s
+            ORDER BY lease_expires_at ASC, created_at ASC, task_id ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        ),
+        candidate AS (
+            SELECT task_id, 1 AS priority FROM queued_candidate
+            UNION ALL
+            SELECT task_id, 2 AS priority FROM reclaim_candidate
+            ORDER BY priority ASC
+            LIMIT 1
+        ),
+        claimed AS (
+            UPDATE {self._table} AS tasks
+            SET
+                status = 'running',
+                started_at = CASE
+                    WHEN tasks.started_at IS NULL THEN %(now)s
+                    ELSE tasks.started_at
+                END,
+                updated_at = %(now)s,
+                locked_by = %(locked_by)s,
+                locked_at = %(now)s,
+                lease_expires_at = %(lease_expires_at)s,
+                heartbeat_at = %(now)s,
+                attempt = tasks.attempt + 1
+            FROM candidate
+            WHERE tasks.task_id = candidate.task_id
+            RETURNING
+                {claimed_columns}
+        )
+        SELECT
+            {final_columns}
+        FROM claimed
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "now": now,
+                "locked_by": normalized_owner,
+                "lease_expires_at": lease_expires_at,
+            },
+        )
+        if row is None:
+            return None
+        return _map_materialization_row(row=row)
+
+    def heartbeat(
+        self,
+        *,
+        task_id: UUID,
+        now: datetime,
+        locked_by: str,
+        lease_seconds: int,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        normalized_owner = _normalize_locked_by(value=locked_by)
+        validated_lease_seconds = _validate_lease_seconds(lease_seconds=lease_seconds)
+        lease_expires_at = now + timedelta(seconds=validated_lease_seconds)
+        query = f"""
+        UPDATE {self._table}
+        SET
+            updated_at = %(now)s,
+            heartbeat_at = %(now)s,
+            lease_expires_at = %(lease_expires_at)s
+        WHERE task_id = %(task_id)s
+          AND status = 'running'
+          AND locked_by = %(locked_by)s
+        RETURNING
+            {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "task_id": str(task_id),
+                "now": now,
+                "locked_by": normalized_owner,
+                "lease_expires_at": lease_expires_at,
+            },
+        )
+        if row is None:
+            return None
+        return _map_materialization_row(row=row)
+
+    def finish_completed(
+        self,
+        *,
+        task_id: UUID,
+        owner_user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        cache_status: str,
+        cache_path: str | None,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        query = f"""
+        UPDATE {self._table}
+        SET
+            status = 'completed',
+            updated_at = %(now)s,
+            finished_at = %(now)s,
+            locked_by = NULL,
+            locked_at = NULL,
+            lease_expires_at = NULL,
+            heartbeat_at = NULL,
+            last_error = NULL,
+            last_error_json = NULL,
+            cache_status = %(cache_status)s,
+            cache_path = %(cache_path)s
+        WHERE task_id = %(task_id)s
+          AND owner_user_id = %(owner_user_id)s
+          AND status = 'running'
+          AND locked_by = %(locked_by)s
+          AND lease_expires_at > %(now)s
+        RETURNING
+            {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "task_id": str(task_id),
+                "owner_user_id": str(owner_user_id),
+                "now": now,
+                "locked_by": _normalize_locked_by(value=locked_by),
+                "cache_status": _normalize_cache_status(value=cache_status),
+                "cache_path": cache_path,
+            },
+        )
+        if row is None:
+            return None
+        return _map_materialization_row(row=row)
+
+    def finish_failed(
+        self,
+        *,
+        task_id: UUID,
+        owner_user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        last_error: str,
+        last_error_json: Mapping[str, Any],
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        query = f"""
+        UPDATE {self._table}
+        SET
+            status = 'failed',
+            updated_at = %(now)s,
+            finished_at = %(now)s,
+            locked_by = NULL,
+            locked_at = NULL,
+            lease_expires_at = NULL,
+            heartbeat_at = NULL,
+            last_error = %(last_error)s,
+            last_error_json = %(last_error_json)s::jsonb
+        WHERE task_id = %(task_id)s
+          AND owner_user_id = %(owner_user_id)s
+          AND status = 'running'
+          AND locked_by = %(locked_by)s
+          AND lease_expires_at > %(now)s
+        RETURNING
+            {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "task_id": str(task_id),
+                "owner_user_id": str(owner_user_id),
+                "now": now,
+                "locked_by": _normalize_locked_by(value=locked_by),
+                "last_error": last_error[:2000],
+                "last_error_json": json.dumps(
+                    dict(last_error_json),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ),
+            },
+        )
+        if row is None:
+            return None
+        return _map_materialization_row(row=row)
+
 
 def _map_materialization_row(
     *,
@@ -320,6 +527,39 @@ def _count_from_row(*, row: Mapping[str, Any] | None, field_name: str) -> int:
         raise BacktestStorageError(
             "PostgresBacktestLazyTradesMaterializationRepository count invalid row"
         ) from error
+
+
+def _qualify_select_columns(*, relation_alias: str) -> str:
+    columns = [
+        column.strip()
+        for column in _BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS.split(",")
+        if column.strip()
+    ]
+    return ",\n    ".join(f"{relation_alias}.{column}" for column in columns)
+
+
+def _normalize_locked_by(*, value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("locked_by must be non-empty")
+    if len(normalized) > 256:
+        raise ValueError("locked_by must be <= 256 chars")
+    return normalized
+
+
+def _validate_lease_seconds(*, lease_seconds: int) -> int:
+    if lease_seconds <= 0:
+        raise ValueError("lease_seconds must be > 0")
+    return lease_seconds
+
+
+def _normalize_cache_status(*, value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("cache_status must be non-empty")
+    if len(normalized) > 64:
+        raise ValueError("cache_status must be <= 64 chars")
+    return normalized
 
 
 __all__ = ["PostgresBacktestLazyTradesMaterializationRepository"]

@@ -113,6 +113,64 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         """
         ...
 
+    def claim_next(
+        self,
+        *,
+        now: datetime,
+        locked_by: str,
+        lease_seconds: int,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        """
+        Claim one queued or expired owner-scoped lazy detail task for worker execution.
+
+        FIFO order is `created_at ASC, task_id ASC`; expired running tasks are reclaimed
+        only after queued work has no immediately claimable row.
+        """
+        ...
+
+    def heartbeat(
+        self,
+        *,
+        task_id: UUID,
+        now: datetime,
+        locked_by: str,
+        lease_seconds: int,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        """
+        Extend the lease for one running lazy detail task owned by this worker.
+        """
+        ...
+
+    def finish_completed(
+        self,
+        *,
+        task_id: UUID,
+        owner_user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        cache_status: str,
+        cache_path: str | None,
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        """
+        Mark a running lazy detail task completed after cache materialization.
+        """
+        ...
+
+    def finish_failed(
+        self,
+        *,
+        task_id: UUID,
+        owner_user_id: UserId,
+        now: datetime,
+        locked_by: str,
+        last_error: str,
+        last_error_json: Mapping[str, Any],
+    ) -> BacktestLazyTradesMaterializationTask | None:
+        """
+        Mark a running lazy detail task failed with a bounded JSON error payload.
+        """
+        ...
+
 
 __all__ = [
     "BacktestLazyTradesMaterializationRepository",

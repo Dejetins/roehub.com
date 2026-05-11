@@ -11,9 +11,14 @@ from apps.worker.backtest_job_runner.wiring.modules import (
     BacktestJobRunnerApp,
     BacktestJobRunnerMetrics,
     BacktestJobRunnerRuntimeConfig,
+    BacktestRunnerTaskResult,
+    BacktestRunnerTaskScheduler,
     load_backtest_job_runner_runtime_config,
 )
-from trading.contexts.backtest.application.use_cases import BacktestJobWorkerResult
+from trading.contexts.backtest.application.use_cases import (
+    BacktestJobWorkerResult,
+    BacktestLazyTradesMaterializationWorkerResult,
+)
 
 backtest_job_runner_main = importlib.import_module(
     "apps.worker.backtest_job_runner.main.main"
@@ -151,6 +156,74 @@ def test_runner_app_starts_metrics_and_exits_after_max_jobs(monkeypatch) -> None
     assert metrics.last_success_unixtime.labels(task_kind="full_job")._value.get() > 0
 
 
+def test_runner_metrics_records_lazy_detail_cache_status() -> None:
+    metrics = BacktestJobRunnerMetrics()
+    result = BacktestRunnerTaskResult(
+        task_kind="lazy_detail",
+        claimed=True,
+        status="completed",
+        created_at=datetime.now(UTC) - timedelta(seconds=5),
+        started_at=datetime.now(UTC) - timedelta(seconds=1),
+        cache_status="miss",
+    )
+
+    metrics.observe_result(result=result, duration_seconds=0.25)
+
+    assert metrics.tasks_claimed_total.labels(
+        task_kind="lazy_detail",
+        paid_level="unknown",
+    )._value.get() == 1
+    assert metrics.tasks_finished_total.labels(
+        task_kind="lazy_detail",
+        status="completed",
+    )._value.get() == 1
+    assert metrics.lazy_trades_cache_total.labels(status="miss")._value.get() == 1
+
+
+def test_task_scheduler_forces_full_job_after_lazy_detail_streak() -> None:
+    lazy_worker = _TaskWorker(
+        results=[
+            BacktestLazyTradesMaterializationWorkerResult(
+                task=cast(Any, _lazy_task()),
+                claimed=True,
+            ),
+            BacktestLazyTradesMaterializationWorkerResult(
+                task=cast(Any, _lazy_task()),
+                claimed=True,
+            ),
+            BacktestLazyTradesMaterializationWorkerResult(
+                task=cast(Any, _lazy_task()),
+                claimed=True,
+            ),
+        ]
+    )
+    full_worker = _TaskWorker(
+        results=[
+            BacktestJobWorkerResult(
+                job=cast(Any, _job(state="succeeded")),
+                claimed=True,
+            )
+        ]
+    )
+    scheduler = BacktestRunnerTaskScheduler(
+        full_job_worker=cast(Any, full_worker),
+        lazy_detail_worker=cast(Any, lazy_worker),
+        lazy_detail_anti_starvation_limit=2,
+    )
+
+    first = scheduler.run_next()
+    second = scheduler.run_next()
+    third = scheduler.run_next()
+
+    assert [first.task_kind, second.task_kind, third.task_kind] == [
+        "lazy_detail",
+        "lazy_detail",
+        "full_job",
+    ]
+    assert lazy_worker.calls == 2
+    assert full_worker.calls == 1
+
+
 class _Worker:
     def __init__(self, *, results: list[BacktestJobWorkerResult]) -> None:
         self._results = list(results)
@@ -161,3 +234,32 @@ class _Worker:
         if not self._results:
             return BacktestJobWorkerResult(job=None, claimed=False)
         return self._results.pop(0)
+
+
+class _TaskWorker:
+    def __init__(self, *, results: list[Any]) -> None:
+        self._results = list(results)
+        self.calls = 0
+
+    def run_next(self) -> Any:
+        self.calls += 1
+        if not self._results:
+            return BacktestLazyTradesMaterializationWorkerResult(task=None, claimed=False)
+        return self._results.pop(0)
+
+
+def _lazy_task() -> SimpleNamespace:
+    return SimpleNamespace(
+        status="completed",
+        created_at=datetime.now(UTC) - timedelta(seconds=5),
+        started_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+
+def _job(*, state: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        state=state,
+        request_json={"admission": {"paid_level": "pro"}},
+        created_at=datetime.now(UTC) - timedelta(seconds=5),
+        started_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
