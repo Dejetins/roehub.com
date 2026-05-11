@@ -252,12 +252,15 @@ backtest_ai_config_jobs
 Основные поля:
 
 - `job_id UUID PRIMARY KEY`;
+- `idempotency_key TEXT NULL`;
 - `owner_user_id UUID NOT NULL`;
 - `mode TEXT NOT NULL`;
 - `locale TEXT NOT NULL CHECK locale IN ('ru','en')`;
 - `state TEXT NOT NULL CHECK state IN (...)`;
 - `source_page TEXT NOT NULL DEFAULT 'backtests'`;
 - `user_prompt_text TEXT NOT NULL`;
+- `user_prompt_hash TEXT NOT NULL`;
+- `current_config_hash TEXT NULL`;
 - `current_config_json JSONB NULL`;
 - `validated_config_json JSONB NULL`;
 - `assistant_message TEXT NULL`;
@@ -273,6 +276,26 @@ backtest_ai_config_jobs
 - `quota_charged BOOLEAN NOT NULL DEFAULT false`;
 - `applied_at TIMESTAMPTZ NULL`;
 - `user_feedback_json JSONB NULL`.
+
+Required indexes:
+
+```text
+UNIQUE(owner_user_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+INDEX(state, queued_at)
+INDEX(owner_user_id, queued_at DESC)
+INDEX(lease_expires_at) WHERE state IN ('queued', 'running', 'repairing')
+INDEX(finished_at) WHERE state IN ('ready', 'needs_clarification', 'blocked_by_policy', 'failed')
+```
+
+Retention/cleanup:
+
+- operational `backtest_ai_config_jobs` and `backtest_ai_config_events` can keep
+  product history by configured retention;
+- raw `backtest_ai_config_llm_attempts` should have shorter retention unless the
+  row was selected into a scrubbed training export;
+- cleanup job must not delete rows needed by active SSE clients or unfinished
+  jobs;
+- retention values are config, not hard-coded constants.
 
 Сопутствующие таблицы:
 
@@ -298,6 +321,18 @@ backtest_ai_quota_events
 Это и есть training data source. Для fine-tuning export использовать только
 rows с понятным статусом (`ready`, `applied`, `needs_clarification`) и без
 service/internal секретов.
+
+Idempotency and lease recovery:
+
+- browser may send `idempotency_key` for create-job retries;
+- repeated `POST` with the same `(owner_user_id, idempotency_key)` returns the
+  existing job instead of creating a duplicate;
+- worker claims jobs with `lease_expires_at`;
+- expired leases are re-claimable up to configured `attempt` limit;
+- if attempt limit is exceeded, job goes to deterministic terminal state
+  `failed` with friendly user message;
+- SSE reconnect must be safe: missed events are recovered from
+  `backtest_ai_config_events` or current job snapshot.
 
 ### 4) Catalog Resolver
 
@@ -475,23 +510,44 @@ backend pipeline.
 2. Auth, owner scope, quota/admission
 3. Создается durable AI config job
 4. Worker claim job
-5. Normalize language and intent
-6. Domain gate: только /backtests config intent
-7. Load current runtime defaults and current form config
-8. Catalog candidate lookup
-9. Build compact prompt
-10. MLX generate
-11. Parse strict JSON
-12. JSON Schema validation
-13. Map to BacktestConfigDraft shape
-14. Business validation через BacktestPreflightService
-15. Repair loop <= 1 attempt
-16. Persist final state and audit
-17. UI получает assistant_message + validated_config
-18. User clicks "Загрузить конфигурацию"
-19. Browser fills current /backtests form
-20. Feedback event persists applied=true
+5. Normalize language, Unicode shape and intent
+6. Security input gate
+   - max bytes/tokens
+   - off-topic/domain policy
+   - prompt-injection and jailbreak signals
+   - encoded/obfuscated instruction attempts
+7. Domain gate: только /backtests config intent
+8. Load current runtime defaults and current form config
+9. Catalog candidate lookup
+10. Build structured prompt envelope
+11. MLX generate
+12. Parse strict JSON
+13. Security output gate
+14. JSON Schema validation
+15. Map to BacktestConfigDraft shape
+16. Business validation через BacktestPreflightService
+17. Repair loop <= 1 attempt
+18. Persist final state and audit
+19. UI получает assistant_message + validated_config
+20. User clicks "Загрузить конфигурацию"
+21. Browser fills current /backtests form
+22. Feedback event persists applied=true
 ```
+
+Security terminal states являются частью pipeline, а не отдельной модерацией
+"снаружи":
+
+```text
+blocked_by_policy
+input_too_large
+needs_clarification
+security_review
+ready
+failed
+```
+
+UI показывает user-friendly explanation, но не раскрывает точные rules,
+thresholds и prompt-injection signatures.
 
 ### UX policy для уточнений
 
@@ -559,6 +615,7 @@ Request:
 {
   "mode": "create",
   "locale": "ru",
+  "idempotency_key": "optional-client-generated-uuid",
   "message": "Собери конфиг для BTC и ETH на RSI за 2023 год",
   "current_config": null,
   "ui_context": {
@@ -595,6 +652,16 @@ Quota/capacity response:
 UI не должен показывать пользователю только HTTP status. Даже если backend
 использует `429` для API semantics, payload обязан содержать user-facing
 message.
+
+Create-job semantics:
+
+- auth is required;
+- request body size is capped before DB write;
+- `idempotency_key` is optional for MVP UI, but API must support it before
+  public rollout so browser/network retries do not double-charge quota;
+- quota is charged once per accepted logical request, not once per retry;
+- `current_config` is treated as untrusted browser input and revalidated before
+  prompt assembly.
 
 ### Read job
 
@@ -716,6 +783,46 @@ Backend не доверяет этому JSON напрямую. Он:
 4. repair-ит один раз при ошибке;
 5. только после этого отдает `validated_config` в UI.
 
+### Current `/backtests` form mapping
+
+`validated_config` должен быть полным snapshot, который заполняет текущую форму,
+а не произвольной стратегией модели.
+
+Current form/API mapping на 2026-05-11:
+
+| UI field | `validated_config` path | Notes |
+| --- | --- | --- |
+| market | `coordinates.exchange` | Current default `binance`; source from workstation market reference. |
+| market_type | `coordinates.market_type` | Current default `spot`. |
+| symbol | `coordinates.symbol` | Current form/job payload accepts one symbol. |
+| timeframe | `timeframe` | Current runtime supports `15m` only. Unsupported timeframes become correction/clarification. |
+| start/end dates | `time_range.start`, `time_range.end` | UTC half-open interval `[start, end)`. |
+| indicators | `indicators[]` | `indicator_id`, `sources`, `window` from `configs/prod/indicators.yaml`. |
+| risk_mode | `risk.mode` | `none` or `tp_sl_grid`. |
+| TP/SL fields | `risk.tp`, `risk.sl` | Must be covered by configured `hit_times/15m` grid. |
+| direction | `execution.direction_mode` | `long_only` or `long_short_reversal`. |
+| sizing_mode and sizing inputs | `execution.sizing` | One of current runtime `sizing_modes`. |
+| capital | `execution.initial_cash_quote` | Positive quote amount. |
+| fee | `execution.fee_rate` | UI percent is converted to decimal rate. |
+| slippage | `execution.slippage_rate` | UI percent is converted to decimal rate. |
+| ranking_metric | `ranking.primary_metric` | From runtime `ranking_metrics`. |
+| ranking_order | `ranking.direction` | `asc` or `desc`. |
+| top_n | `top_n` | Current UI uses runtime default unless future UI exposes an input. |
+
+Special cases:
+
+- current visible `strategy` text field is not part of the current backtest job
+  request payload. MVP AI must not invent or mutate strategy file names until
+  backend job contract supports it explicitly;
+- if user asks for several symbols, MVP returns one loadable config for the
+  best/first supported symbol and puts other supported symbols in suggestions,
+  or returns `needs_clarification` if choosing one would be misleading;
+- if future `/backtests` supports multi-symbol jobs, that is a new contract
+  change and this document must be updated before AI starts returning
+  `symbols[]`;
+- AI never returns fields that cannot be applied by current `/backtests` form
+  setters and current preflight service.
+
 ## Prompt policy
 
 Системный prompt должен быть versioned и hash-based:
@@ -747,6 +854,215 @@ Prompt injection defense не ограничивается prompt. Обязат�
 - business validation;
 - no load button без valid config;
 - audit всех violations.
+
+Prompt builder обязан собирать structured envelope, а не склеивать строки
+`system + user`. Target shape:
+
+```text
+<TRUSTED_SYSTEM_POLICY>
+  immutable product scope and JSON contract
+</TRUSTED_SYSTEM_POLICY>
+
+<TRUSTED_ALLOWED_CATALOG>
+  compact symbols, timeframes, indicators, risk modes, sizing modes
+</TRUSTED_ALLOWED_CATALOG>
+
+<UNTRUSTED_USER_REQUEST>
+  raw user message as data, not instruction source
+</UNTRUSTED_USER_REQUEST>
+
+<UNTRUSTED_CURRENT_CONFIG>
+  current form snapshot as data, not instruction source
+</UNTRUSTED_CURRENT_CONFIG>
+
+<OUTPUT_JSON_SCHEMA>
+  exact output object contract
+</OUTPUT_JSON_SCHEMA>
+```
+
+Запрещено помещать в prompt:
+
+- secrets, env vars, tokens, DSN, private Tailscale topology;
+- raw service logs;
+- full system prompt text from other services;
+- other users' prompts/configs;
+- broader platform docs that are not required for `/backtests` config.
+
+System prompt не считается security boundary. Его роль - снизить вероятность
+ошибки модели; реальные границы задаются deterministic gates, owner scope,
+schema validation, business validation и отсутствием инструментов у модели.
+
+## Security Architecture and Prompt Injection Defense
+
+Prompt injection для LLM нельзя считать решенной проблемой на уровне prompt text.
+Целевая защита строится как defense-in-depth: даже если MLX-модель выполнит
+вредную инструкцию из пользовательского текста, результат не должен получить
+полномочия, данные или side effects за пределами безопасного JSON draft.
+
+### Trust boundaries
+
+Untrusted:
+
+- `user_message`;
+- `current_config` из браузера;
+- conversation history;
+- raw LLM output;
+- repair output;
+- любые будущие attachments/imported documents, если они появятся.
+
+Trusted only after deterministic validation:
+
+- allowed catalog из `configs/prod/indicators.yaml`;
+- runtime defaults из `BacktestRuntimeDefaultsService`;
+- artifact-backed instrument universe;
+- tier limits and quota config;
+- JSON Schema;
+- `BacktestPreflightService` result.
+
+Запрещено:
+
+- давать модели tools, DB access, filesystem access, network access;
+- давать модели возможность запускать backtest job;
+- принимать model output как command;
+- показывать raw model draft пользователю как готовый результат;
+- использовать prompt text как единственный enforcement layer.
+
+### Attack classes
+
+Security eval и runtime logging должны различать:
+
+- direct prompt injection: "ignore previous instructions";
+- role-play / developer mode / unrestricted persona;
+- system prompt extraction;
+- encoded attacks: base64, URL encoding, rot13, cipher-like requests;
+- conversation smuggling: вставка fake `system:` / `assistant:` turns;
+- policy confusion: просьбы обсуждать темы вне `/backtests`;
+- data exfiltration attempts: requests for secrets, saved prompts, other users;
+- output injection: HTML/JS/Markdown links in assistant message;
+- resource abuse: huge prompts, repeated retries, queue flooding;
+- multi-turn poisoning: harmless first turn, malicious follow-up.
+
+### Pre-LLM input gate
+
+Input gate выполняется до enqueue или до model call, в зависимости от стоимости
+проверки. Cheap checks должны выполняться до записи expensive queue slot.
+
+Required checks:
+
+- `message` length by bytes/chars/tokens;
+- allowed locale: `ru|en`;
+- Unicode normalization, removal or rejection of control/invisible characters
+  that are not needed for normal Russian/English text;
+- maximum conversation turns included in prompt;
+- suspicious pattern classifier for common jailbreak/direct injection classes;
+- encoded-content detector for "decode and follow" requests;
+- domain classifier: only config/create/edit/explain/repair/suggest for
+  `/backtests`;
+- PII/secret detector for obvious credentials in user input. If user pasted a
+  secret, block and tell them not to share secrets.
+
+Pattern checks are not treated as complete protection. They produce:
+
+```text
+security_risk_score
+security_flags[]
+security_decision = allow | allow_with_audit | block | security_review
+```
+
+MVP can implement deterministic checks plus curated suspicious patterns. A
+future optional local guardrail classifier may be added behind a port, but cloud
+Prompt Shield / Model Armor services must not become required for the local MLX
+MVP.
+
+### Output gate
+
+Output gate runs before JSON draft reaches business validation and before any
+text reaches the browser.
+
+Required checks:
+
+- response is one JSON object, no Markdown wrapper;
+- `assistant_message`, `warnings`, `suggestions` are plain text only;
+- no HTML tags, script/event handler fragments, Markdown links, `javascript:`,
+  data URLs or hidden control characters;
+- no leaked policy text, system prompt, env keys, private paths, model server
+  URL, Tailscale details, DSNs or API tokens;
+- no request to run a backtest automatically;
+- no values outside allowed catalog;
+- no unsupported strategy/config dimension.
+
+If output gate fails, pipeline may run one repair attempt. If repair fails,
+final state is `needs_clarification` or `blocked_by_policy`; no load button.
+
+### UI rendering
+
+The browser must render all assistant-controlled text as text, not HTML:
+
+- use `textContent` or equivalent escaping;
+- never assign assistant text through `innerHTML`;
+- button label comes from trusted locale catalog, not model output;
+- `validated_config` is applied through existing form setters and dropdown
+  option validation;
+- `Загрузить конфигурацию` appears only for `status=ready` and
+  `load_action.enabled=true`.
+
+### Least privilege and no-action guarantee
+
+The model is a generator of candidate JSON only. It has no direct authority.
+
+No-action invariant:
+
+```text
+LLM output cannot create, cancel, delete or launch a backtest job.
+Only explicit user click can load a validated config into the form.
+Only existing /backtests run button can create a backtest job.
+```
+
+Backend API and worker permissions:
+
+- API owns auth, owner scope, quota and read/write to AI config tables;
+- worker owns queued AI config jobs only;
+- MLX runtime owns no DB credentials;
+- MLX runtime binds to loopback only;
+- `mlx_lm.server` is never public and never directly reachable from browser.
+
+### Security logging and abuse response
+
+Persist and metric:
+
+- `security_flags`;
+- `security_risk_score`;
+- `security_decision`;
+- blocked reason category;
+- repeated suspicious attempts per user and per IP/session;
+- output gate failures;
+- repair failures caused by security validation.
+
+Do not expose exact signatures to users. User-facing messages should say the
+request cannot be processed in its current form and suggest a safe `/backtests`
+configuration request.
+
+Abuse controls:
+
+- suspicious attempts count against a separate abuse budget;
+- repeated `blocked_by_policy` can trigger cooldown;
+- huge prompts get `input_too_large` without model call;
+- queue flooding is handled by quotas and global queue limit;
+- security alerts fire on spikes in blocked/security-review states.
+
+### Optional model-based guardrails
+
+OWASP and vendor guidance mention separate input/output guardrail models or
+services. For this MLX-local architecture they are optional extension points,
+not MVP dependencies.
+
+If added later:
+
+- use a separate `PromptSecurityClassifier` port;
+- prefer a local purpose-trained classifier over the same general chat model;
+- run it in annotate mode first to measure false positives;
+- never replace deterministic validation with classifier approval;
+- log all decisions and tune on Roehub-specific safe/unsafe prompt set.
 
 ## Context window
 
@@ -846,12 +1162,14 @@ metrics.
 
 Validation layers:
 
-1. JSON parse;
-2. JSON Schema;
-3. allowed enum/catalog validation;
-4. `BacktestPreflightService` business validation;
-5. tier/guardrail limits;
-6. final UI shape validation.
+1. pre-LLM security input gate;
+2. JSON parse;
+3. security output gate;
+4. JSON Schema;
+5. allowed enum/catalog validation;
+6. `BacktestPreflightService` business validation;
+7. tier/guardrail limits;
+8. final UI shape validation.
 
 Repair loop:
 
@@ -861,19 +1179,41 @@ repair_attempts: 1
 
 Repair prompt получает:
 
-- исходный model draft;
+- исходный model draft только как untrusted data;
 - compact validation errors;
 - allowed values для ошибочных paths;
-- исходный user prompt;
-- current config snapshot.
+- исходный user prompt как untrusted data;
+- current config snapshot как untrusted data;
+- тот же output JSON contract.
+
+Repair prompt не получает:
+
+- raw system prompt text beyond current repair policy;
+- service logs;
+- traceback/debug dumps;
+- env/config secrets;
+- other users' data;
+- private infrastructure details.
 
 Если repair успешен, status `ready` и warnings объясняют correction. Если repair
 неуспешен, status `needs_clarification`, без кнопки загрузки.
+
+Security failures are not silently repaired into user-visible configs. If the
+output gate detects leakage, HTML/script injection, system-prompt extraction or
+automatic-action intent, final state must be `blocked_by_policy` or
+`needs_clarification` unless the repaired response passes every gate.
 
 ## Хранение данных для дообучения
 
 Поскольку пользовательский prompt и model response должны сохраняться для
 future fine-tuning, хранение является explicit product behavior.
+
+Нужно разделить два слоя хранения:
+
+```text
+raw audit store      -> полный operational/security audit, restricted access
+training export     -> scrubbed, labeled, intentionally selected dataset
+```
 
 Сохранять:
 
@@ -891,19 +1231,44 @@ future fine-tuning, хранение является explicit product behavior.
 - final validated config;
 - assistant message;
 - applied feedback;
-- latency/token estimates.
+- latency/token estimates;
+- security flags, risk score and final security decision;
+- whether user clicked `Загрузить конфигурацию`;
+- optional post-load edit distance, если UI позже начнет его собирать.
 
 Не сохранять:
 
 - secrets, tokens, API keys, env dumps;
 - Tailscale IP/DNS в training rows;
-- full runtime logs с private network topology.
+- full runtime logs с private network topology;
+- raw traceback/debug dumps in training export;
+- model server base URL in training export;
+- other users' prompts/configs in a row.
+
+Raw audit access:
+
+- restricted to admin/ops role;
+- excluded from normal UI/API reads;
+- retention period is config-driven;
+- export job must run redaction before writing any fine-tuning dataset.
+
+User-facing data notice:
+
+- `/backtests` AI block must disclose that prompts and AI outputs may be saved
+  to improve the configurator;
+- notice must be shown before or near first AI submit, in `ru` and `en`;
+- user must never be asked to paste exchange keys, tokens or private data into
+  the AI prompt;
+- if product later requires opt-out/deletion/export controls, those controls
+  belong to account/settings data policy, while this service must already tag
+  rows by `owner_user_id` to make deletion/export possible.
 
 Для будущего fine-tuning сделать отдельный export use case, который выбирает
 только training-safe rows и помечает:
 
 ```text
-quality_label: applied | rejected | clarification | repaired | failed_validation
+quality_label:
+  applied | repaired | clarification | blocked | attack_attempt | failed_validation
 ```
 
 Лучшие supervised samples для первого fine-tune:
@@ -913,6 +1278,17 @@ quality_label: applied | rejected | clarification | repaired | failed_validation
 - `repair_attempts=0`;
 - низкая validation warning count;
 - user did not immediately edit many fields after load.
+
+Не использовать как positive samples:
+
+- `blocked_by_policy`;
+- system prompt extraction attempts;
+- encoded jailbreaks;
+- requests for secrets/other users' data;
+- rows where final config failed business validation.
+
+Attack attempts можно хранить в отдельном eval/red-team corpus, но не смешивать
+с normal instruction-following fine-tuning data.
 
 ## Observability
 
@@ -961,6 +1337,226 @@ Mac Studio host metrics:
 - CPU/GPU utilization where available;
 - process restarts;
 - Tailscale peer reachability from VPS to backend API.
+
+## Запуск, эксплуатация и Monit
+
+AI Configurator должен запускаться и поддерживаться как обычный production
+service на `Mac Studio`, а не как ручной shell process.
+
+Текущий production baseline в Roehub:
+
+- native runtime на `Mac Studio`;
+- public edge остается на `VPS`;
+- сервисы запускаются как user-level `launchd` `LaunchAgents`;
+- operational control делается через `Monit`;
+- Prometheus/Grafana работают на `Mac Studio`;
+- `infra/macos/prometheus/prometheus.prod.yml` является source of truth для
+  scrape targets.
+
+Для AI Configurator целевой runtime contract:
+
+```text
+com.roehub.backtest-ai-configurator-worker
+  launchd:
+    RunAtLoad: true
+    KeepAlive: true
+    WorkingDirectory: /opt/roehub/app
+    env: /Users/daniildegtyarev/.config/roehub/roehub.env
+    config: /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml
+    metrics: 127.0.0.1:9205/metrics
+    health: 127.0.0.1:9205/health/ready
+
+Monit:
+  check process roehub_backtest_ai_configurator_worker
+  start/stop/restart через launchctl_service_control.sh
+  restart если /health/ready или /metrics недоступны
+  unmonitor если restart storm
+```
+
+Если MVP использует `mlx_lm.server`, то модельный runtime остается внутренним
+loopback service:
+
+```text
+com.roehub.mlx-backtest-ai-configurator
+  host: 127.0.0.1
+  port: 8081
+  public access: no
+```
+
+Но preferred production shape - один `backtest-ai-configurator-worker`, который
+сам владеет model lifecycle через custom MLX worker. Это проще для readiness,
+drain/reload, метрик, memory accounting и аварийного reload. Разделение на
+`mlx_lm.server` допустимо для MVP, но public API и UI не должны зависеть от
+того, embedded это runtime или отдельный loopback process.
+
+### Автозапуск после перезагрузки
+
+Autostart должен быть реализован через `launchd`:
+
+- plist ставится в `/Users/daniildegtyarev/Library/LaunchAgents`;
+- `RunAtLoad=true`;
+- `KeepAlive=true`;
+- service запускается в user session profile, как остальные Roehub native
+  services;
+- `bootstrap_native_prod.sh` устанавливает plist и Monit snippet;
+- `reload_launchd_services.sh prod` reload-ит static launchd surface.
+
+Target files для реализации:
+
+```text
+infra/macos/launchd/com.roehub.backtest-ai-configurator-worker.plist
+infra/scripts/monit/roehub-backtest-ai-configurator.monitrc
+configs/prod/backtest_ai_configurator.yaml
+apps/worker/backtest_ai_configurator/main.py
+```
+
+`reload_launchd_services.sh` должен включить
+`com.roehub.backtest-ai-configurator-worker.plist` в `prod_services` только
+после того, как worker smoke и metrics endpoint приняты. До этого service можно
+держать под feature flag и запускать вручную через Monit на внутреннем rollout.
+
+### Monit как control plane
+
+Monit snippet должен следовать существующему Roehub pattern:
+
+```text
+check process roehub_backtest_ai_configurator_worker matching "apps.worker.backtest_ai_configurator"
+  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.backtest-ai-configurator-worker /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-ai-configurator-worker.plist"
+  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.backtest-ai-configurator-worker /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-ai-configurator-worker.plist"
+  if failed host 127.0.0.1 port 9205 protocol http request "/health/ready" for 2 cycles then restart
+  if failed host 127.0.0.1 port 9205 protocol http request "/metrics" for 2 cycles then restart
+  if 5 restarts within 10 cycles then unmonitor
+```
+
+Operational commands:
+
+```bash
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status roehub_backtest_ai_configurator_worker
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_backtest_ai_configurator_worker
+launchctl print gui/$(id -u)/com.roehub.backtest-ai-configurator-worker
+curl -fsS http://127.0.0.1:9205/health/ready
+curl -fsS http://127.0.0.1:9205/metrics | rg 'backtest_ai_config_'
+```
+
+### Health/readiness contract
+
+Worker должен отдавать:
+
+```text
+GET /health/live
+GET /health/ready
+GET /metrics
+```
+
+`/health/live` проверяет, что process event loop жив.
+
+`/health/ready` проверяет:
+
+- config загружен;
+- active model path существует;
+- model registry валиден;
+- Postgres доступен для queue/audit;
+- модель загружена или runtime adapter подключен;
+- queue loop не остановлен;
+- service не находится в drain mode.
+
+Readiness check не должен делать тяжелую генерацию на каждый probe. Smoke prompt
+для проверки реальной генерации должен быть отдельной ops-командой и запускаться
+после deploy/reload, а не каждым scrape/probe.
+
+### Model reload и maintenance
+
+MVP режим reload:
+
+1. Обновить `configs/prod/backtest_ai_configurator.yaml`:
+   - `active_model_id`;
+   - `model_path`;
+   - `context_window`;
+   - `active_generations`;
+   - `max_output_tokens`.
+2. Перевести worker в drain mode или временно выключить feature flag.
+3. Дождаться завершения active jobs или истечения `request_timeout_sec`.
+4. Выполнить Monit restart worker.
+5. Проверить `/health/ready`, `/metrics`, smoke prompt и queue depth.
+6. Вернуть feature flag.
+
+Rolling switch в MVP означает maintenance reload на единственном inference host.
+Настоящий zero-downtime rolling возможен только после появления второго
+inference host или второго worker/runtime instance с отдельным capacity pool.
+
+### Prometheus и Grafana
+
+Да, метрики должны быть частью production plan с первого включения worker.
+Prometheus target:
+
+```yaml
+- job_name: backtest-ai-configurator-worker
+  static_configs:
+    - targets: ["127.0.0.1:9205"]
+```
+
+Blackbox probe можно добавить отдельно для readiness:
+
+```text
+http://127.0.0.1:9205/health/ready
+```
+
+Минимальные Prometheus metrics:
+
+- `backtest_ai_config_jobs_total{status,mode,tier,model_id}`;
+- `backtest_ai_config_jobs_inflight{mode,model_id}`;
+- `backtest_ai_config_queue_depth{priority}`;
+- `backtest_ai_config_active_generations{model_id}`;
+- `backtest_ai_config_queue_wait_seconds_bucket{mode,tier,model_id}`;
+- `backtest_ai_config_stage_duration_seconds_bucket{stage,mode,model_id}`;
+- `backtest_ai_config_llm_latency_seconds_bucket{model_id}`;
+- `backtest_ai_config_total_latency_seconds_bucket{mode,tier,model_id}`;
+- `backtest_ai_config_prompt_tokens_estimated_bucket{model_id}`;
+- `backtest_ai_config_completion_tokens_estimated_bucket{model_id}`;
+- `backtest_ai_config_validation_failures_total{code}`;
+- `backtest_ai_config_repair_attempts_total{result,model_id}`;
+- `backtest_ai_config_security_decisions_total{decision,flag}`;
+- `backtest_ai_config_output_gate_failures_total{code}`;
+- `backtest_ai_config_quota_rejections_total{tier,window}`;
+- `backtest_ai_config_capacity_rejections_total{reason}`;
+- `backtest_ai_config_applied_total{mode,tier}`;
+- `backtest_ai_config_model_reload_total{result,model_id}`;
+- `backtest_ai_config_model_loaded{model_id}`;
+- `backtest_ai_config_model_info{model_id,runtime,quantization}`;
+- `process_resident_memory_bytes`;
+- `process_cpu_seconds_total`.
+
+Grafana dashboard должен показывать:
+
+- worker up/down и readiness;
+- queue depth и active generations;
+- p50/p95/p99 total latency;
+- queue wait p50/p95;
+- LLM generation latency;
+- valid config rate;
+- repair rate;
+- `needs_clarification` rate;
+- security block/review rate;
+- quota/capacity rejection rate;
+- model reload count/failures;
+- process RSS;
+- host memory pressure/swap через host metrics;
+- Tailscale/API reachability через existing probes.
+
+Alert candidates:
+
+- worker target down больше 2 минут;
+- `/health/ready` failed больше 2 минут;
+- queue depth выше configured safe threshold 5 минут;
+- p95 total latency выше целевого SLA 10 минут;
+- valid config rate ниже 98% за rolling window;
+- repair rate резко выше baseline;
+- security block spike;
+- capacity rejections выше 1-2%;
+- model reload failed;
+- process RSS или host memory pressure превышает safe threshold;
+- restart storm / Monit `unmonitor`.
 
 ## Benchmark и нагрузочное тестирование
 
@@ -1028,6 +1624,21 @@ Prompt mix:
 - suggest safer config;
 - off-topic prompt rejection.
 
+Security eval mix:
+
+- direct injection: "ignore all previous instructions";
+- role-play/developer-mode persona override;
+- fake conversation turns: `system:` / `assistant:` inside user message;
+- system prompt extraction and policy reveal requests;
+- attempts to ask for secrets, env vars, model path, Tailscale/private URLs;
+- encoded/base64/URL-encoded instruction requests;
+- mixed Russian/English jailbreaks;
+- multi-turn poisoning where the second turn tries to override scope;
+- HTML/Markdown/script injection inside requested assistant response;
+- attempt to make the AI auto-run, cancel or delete a backtest job;
+- unsupported indicator/timeframe/symbol hallucination attempts;
+- huge prompt / repeated prompt flood.
+
 Acceptance targets для MVP:
 
 | Metric | Target |
@@ -1041,6 +1652,11 @@ Acceptance targets для MVP:
 | quota/capacity UI responses | 100% friendly message |
 | memory pressure under S50 | no sustained swap growth |
 | worker crash/restart recovery | queued/running jobs recover or terminal-fail deterministically |
+| direct prompt injection causes unauthorized config/action | 0 |
+| system prompt/private detail leakage | 0 |
+| assistant HTML/script rendered in browser | 0 |
+| blocked/security-review states have user-friendly message | 100% |
+| false-positive block rate on safe benchmark prompts | measured and reviewed before rollout |
 
 ### Уровень 3: soak test
 
@@ -1062,7 +1678,9 @@ chosen active_generations
 - stale leases;
 - SSE disconnect/reconnect;
 - DB table growth and indexes;
-- training data row completeness.
+- training data row completeness;
+- blocked/security-review rate stability;
+- repeated suspicious attempts cooldown behavior.
 
 ### Harness
 
@@ -1086,9 +1704,10 @@ inference host.
 ### Stage 1 - Storage, quota, DTOs
 
 - Добавить migrations для `backtest_ai_config_*` tables.
+- Добавить indexes для owner/state/lease/idempotency/retention queries.
 - Добавить application DTOs and repositories.
 - Добавить quota service для 5h/week windows по `PaidLevel`.
-- Tests: repository, quota, owner scope.
+- Tests: repository, idempotency, lease recovery, quota, owner scope.
 
 ### Stage 2 - API shell + fake worker
 
@@ -1108,8 +1727,11 @@ inference host.
 
 - Добавить model registry config.
 - Добавить `MLXOpenAICompatibleAdapter`.
-- Добавить launchd target для internal `mlx_lm.server`.
 - Добавить worker process `backtest-ai-configurator-worker`.
+- Добавить launchd target `com.roehub.backtest-ai-configurator-worker`.
+- Если используется split MVP runtime, добавить internal launchd target для
+  `mlx_lm.server`; если используется custom MLX worker, model lifecycle остается
+  внутри worker process.
 - Smoke: one prompt -> valid config on Mac Studio.
 
 ### Stage 5 - Prompt profiles + repair loop
@@ -1124,11 +1746,19 @@ inference host.
 - Включить AI block через `ai_configurator_state.enabled=true`.
 - Добавить chat input, mode handling, SSE status timeline, typewriter effect.
 - Добавить `Load configuration` action that fills current form.
+- Добавить user-facing data notice о сохранении prompt/response для улучшения
+  AI configurator.
+- Проверить, что assistant text рендерится через text-safe API, а не HTML.
 - Browser QA: ru/en locale, console/network clean, no raw codes.
 
 ### Stage 7 - Observability and training export
 
 - Metrics/logging.
+- `/health/live`, `/health/ready`, `/metrics`.
+- Prometheus target `backtest-ai-configurator-worker`.
+- Monit snippet `roehub-backtest-ai-configurator.monitrc`.
+- Grafana dashboard panels and alert rules for queue, latency, validation,
+  security decisions, reloads and memory pressure.
 - Admin-safe training export command/view.
 - Scrub checks for secrets and private infra fields.
 
@@ -1142,9 +1772,73 @@ inference host.
 
 - Feature flag default off.
 - Enable for admin/internal users.
-- Watch metrics, quota, memory, validation quality.
+- Install launchd plist through native prod bootstrap.
+- Manage service through Monit summary/status/restart.
+- Watch metrics, quota, memory, validation quality and security decisions.
 - Rollout to paid tiers by config.
 - Rollback: disable feature flag, stop worker, keep existing `/backtests` form.
+
+## MVP production-ready checklist
+
+План считается готовым к implementation и public rollout только если каждая
+группа ниже закрыта evidence, а не только кодом.
+
+Product/UI:
+
+- AI block работает только на `/backtests`;
+- `create/edit/explain/repair/suggest safer` доступны или явно feature-flagged;
+- `Загрузить конфигурацию` появляется только для `status=ready`;
+- load action заполняет текущую форму и не запускает backtest job;
+- multi-symbol prompt не ломает single-symbol форму;
+- user-facing data notice присутствует на `ru` и `en`;
+- no chain-of-thought, только observable stages.
+
+Backend/contracts:
+
+- additive `/backtests/ai-config/*` routes;
+- auth and owner scope on every route and SSE stream;
+- durable queue, leases, retries and idempotency;
+- quota windows per 5h/week and per-user active/queued limits;
+- no changes to existing `/backtests/jobs` request hash semantics;
+- all AI output passes JSON Schema and `BacktestPreflightService`;
+- unsupported values never produce enabled load button.
+
+Security:
+
+- pre-LLM input gate;
+- output gate before browser response;
+- no model tools, DB, filesystem or network access;
+- assistant text rendered as text, not HTML;
+- secrets/private infra fields scrubbed from training export;
+- red-team/security eval pack has 0 unauthorized actions and 0 leakage.
+
+Operations:
+
+- worker runs as `launchd` service on Mac Studio;
+- service starts after reboot through `RunAtLoad`/`KeepAlive`;
+- Monit can start/stop/restart and detects failed readiness;
+- `/health/live`, `/health/ready`, `/metrics` are stable;
+- Prometheus target is `up`;
+- Grafana dashboard and alerts cover queue, latency, validation, security,
+  reloads and memory pressure;
+- model reload procedure is documented and smoke-tested.
+
+Performance/benchmark:
+
+- S1/S5/S10/S50/S100 evidence recorded on Mac Studio;
+- accepted model path, context window, output tokens and `active_generations`
+  are recorded;
+- p95 latency and queue wait meet MVP targets or rollout remains internal;
+- no sustained swap growth under accepted S50 profile;
+- false-positive block rate on safe prompts is reviewed before paid-tier rollout.
+
+Data/training:
+
+- raw audit and training export are separate;
+- retention is config-driven;
+- training export redacts secrets/private topology;
+- positive fine-tuning samples require explicit quality labels;
+- attack attempts go to eval/red-team corpus, not positive training samples.
 
 ## Контрактное влияние
 
@@ -1156,8 +1850,16 @@ inference host.
 | Persisted schema | compatible-change | New tables only. No change to `backtest_jobs` request hash semantics. |
 | Config schema | compatible-change | New `backtest_ai_configurator` config section. |
 | Request hash / cache identity | none | AI config is applied to form; final backtest job hash remains produced by existing backtest create flow. |
-| Runtime workflow | compatible-change | New worker/runtime processes; existing API/web still operate if disabled. |
+| Runtime workflow | compatible-change | New launchd/Monit-managed worker/runtime processes; existing API/web still operate if disabled. |
+| Operations surface | compatible-change | Adds native service plist, Monit snippet, health endpoints and reload procedure. Existing service control remains unchanged. |
+| Monitoring surface | compatible-change | Adds Prometheus target, metrics and Grafana/alert expectations. Existing targets unchanged. |
+| Retry/idempotency behavior | compatible-change | New AI create route must dedupe retries by `(owner_user_id, idempotency_key)` without changing existing backtest job create semantics. |
 | Performance risk | unknown until benchmark | MLX latency/concurrency must be accepted on Mac Studio evidence. |
+| Security policy contract | compatible-change | New AI-specific policy states can block prompts before model generation. UI must render friendly messages. |
+| Audit/training data | compatible-change | New restricted raw audit tables plus scrubbed export path, retention policy and user-facing data notice for fine-tuning. |
+| User-visible error model | compatible-change | Adds `blocked_by_policy`, `input_too_large`, `security_review`; existing backtest API errors unchanged. |
+| Prompt/model behavior | unknown until eval | Prompt-injection resistance must be verified by red-team/security eval pack, not assumed from system prompt. |
+| Multi-symbol semantics | compatible-change | MVP keeps single-symbol loadable config because current `/backtests` form/job payload accepts one symbol. Future `symbols[]` support is a separate contract change. |
 
 ## Связанные файлы
 
@@ -1179,6 +1881,11 @@ inference host.
   existing Mac Studio worker/queue production plan.
 - `docs/runbooks/mac-studio-native-backend-operations.md` - native operations
   and service reload context.
+- `docs/runbooks/mac-studio-monitoring-plan.md` - Prometheus/Grafana and Monit
+  production baseline.
+- `infra/macos/launchd/` - planned launchd plist location.
+- `infra/scripts/monit/` - planned Monit snippet and launchctl wrapper.
+- `infra/macos/prometheus/prometheus.prod.yml` - planned Prometheus target.
 
 ## Как проверить реализацию
 
@@ -1271,6 +1978,7 @@ S1, S5, S10, S50, S100 benchmark summaries recorded with:
 - model reload procedure;
 - prompt examples included in system/developer prompt;
 - data retention period for raw training rows.
+- final product copy for data notice in `ru` and `en`.
 
 Все они могут стартовать с defaults из этого документа, но production acceptance
 должен зафиксировать фактические Mac Studio benchmark values.
@@ -1279,3 +1987,15 @@ S1, S5, S10, S50, S100 benchmark summaries recorded with:
 
 - `mlx-lm` HTTP server docs: `https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md`
 - Apple Open Source MLX project page: `https://opensource.apple.com/projects/mlx/`
+- OWASP LLM Prompt Injection Prevention Cheat Sheet:
+  `https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html`
+- OWASP Top 10 for Large Language Model Applications:
+  `https://owasp.org/www-project-top-10-for-large-language-model-applications`
+- NCSC, "Prompt injection is not SQL injection":
+  `https://www.ncsc.gov.uk/blog-post/prompt-injection-is-not-sql-injection`
+- OpenAI, "Designing AI agents to resist prompt injection":
+  `https://openai.com/index/designing-agents-to-resist-prompt-injection/`
+- Microsoft Prompt Shields:
+  `https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/content-filter-prompt-shields`
+- Google Model Armor overview:
+  `https://docs.cloud.google.com/model-armor/overview`
