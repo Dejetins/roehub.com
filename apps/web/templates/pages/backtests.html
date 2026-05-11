@@ -61,7 +61,7 @@
                 >
                   <span class="rh-dropdown__value" data-current-value="{{ control[0] }}">{{ t(control[2]) }}</span>
                 </button>
-                <span class="rh-popover" id="backtest-{{ control[0] }}-menu" role="listbox" hidden data-rh-dropdown-menu>
+                <span class="rh-popover" id="backtest-{{ control[0] }}-menu" role="listbox" hidden data-rh-dropdown-menu data-backtest-menu="{{ control[0] }}">
                   {% for value, label_key in control[3] %}
                     <button
                       class="rh-menu-item"
@@ -158,18 +158,51 @@
       </section>
 
       <section class="terminal-panel backtests-instruments" data-backtests-panel="instruments">
-        <header class="panel-heading panel-heading--with-tools">
+        <header class="panel-heading">
           <h2>{{ t("backtests.instruments.title") }}</h2>
-          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-clear-symbols>{{ t("backtests.actions.clear") }}</button>
         </header>
-        <input class="backtests-input" type="search" placeholder="{{ t('backtests.instruments.search') }}" data-symbol-search aria-label="{{ t('backtests.instruments.search') }}">
-        <div class="backtests-chip-row" data-selected-symbols>
-          <span class="backtests-chip">BTCUSDT</span>
-          <span class="backtests-chip">ETHUSDT</span>
-          <span class="backtests-chip">SOLUSDT</span>
+        <div class="backtests-instrument-controls">
+          <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+            <button
+              class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+              type="button"
+              id="backtest-instrument-market-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="backtest-instrument-market-menu"
+              data-rh-dropdown-trigger
+              data-backtest-control="branded dropdown"
+              data-backtest-trigger="market"
+            >
+              <span>{{ t("backtests.config.market") }}</span>
+              <span class="rh-dropdown__value" data-current-value="market">{{ t("backtests.option.binance") }}</span>
+            </button>
+            <span class="rh-popover" id="backtest-instrument-market-menu" role="listbox" hidden data-rh-dropdown-menu data-backtest-menu="market">
+              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-backtest-option="market" data-value="binance">{{ t("backtests.option.binance") }}</button>
+            </span>
+          </div>
+          <div class="rh-dropdown backtests-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+            <button
+              class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger"
+              type="button"
+              id="backtest-instrument-market-type-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="backtest-instrument-market-type-menu"
+              data-rh-dropdown-trigger
+              data-backtest-control="branded dropdown"
+              data-backtest-trigger="market_type"
+            >
+              <span>{{ t("backtests.config.market_type") }}</span>
+              <span class="rh-dropdown__value" data-current-value="market_type">{{ t("backtests.option.spot") }}</span>
+            </button>
+            <span class="rh-popover" id="backtest-instrument-market-type-menu" role="listbox" hidden data-rh-dropdown-menu data-backtest-menu="market_type">
+              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-backtest-option="market_type" data-value="spot">{{ t("backtests.option.spot") }}</button>
+            </span>
+          </div>
         </div>
+        <input class="backtests-input" type="search" placeholder="{{ t('backtests.instruments.search') }}" data-symbol-search aria-label="{{ t('backtests.instruments.search') }}">
         <div class="backtests-symbol-list" data-symbol-list></div>
-        <small class="backtests-muted" data-symbol-count>{{ t("backtests.instruments.selected") }}</small>
       </section>
 
       <section class="terminal-panel backtests-indicators" data-backtests-panel="indicators">

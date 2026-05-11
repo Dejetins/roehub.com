@@ -36,7 +36,7 @@ const state = {
   nextCursor: null,
   query: "",
   runtimeDefaults: null,
-  selectedSymbols: new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]),
+  selectedSymbols: new Set(["BTCUSDT"]),
   selectedIndicators: [],
   indicatorCatalog: new Map(),
   indicatorFamily: null,
@@ -46,6 +46,7 @@ const state = {
   selectedVariantKey: null,
   resultSummary: null,
   animateVariantJobId: null,
+  configSeeded: false,
 };
 
 let activeRequest = null;
@@ -445,10 +446,9 @@ function updateOptionSelection(root, name, value, label) {
   qsa(`[data-backtest-option='${name}']`, root).forEach((option) => {
     option.setAttribute("aria-selected", option.dataset.value === value ? "true" : "false");
   });
-  const current = qs(`[data-current-value='${name}']`, root);
-  if (current) {
+  qsa(`[data-current-value='${name}']`, root).forEach((current) => {
     current.textContent = label || value || t("backtests.results.all");
-  }
+  });
   if (["job_state", "job_exchange", "job_market_type"].includes(name)) {
     refreshWorkstation(root, "manual").catch(() => {});
   }
@@ -461,24 +461,37 @@ function updateOptionSelection(root, name, value, label) {
 }
 
 function renderDropdownOptions(root, name, options) {
-  const menu = qs(`#backtest-${name}-menu`, root);
-  if (!menu || !Array.isArray(options) || !options.length) {
+  const menus = qsa(`[data-backtest-menu='${name}']`, root);
+  const fallback = qs(`#backtest-${name}-menu`, root);
+  const targets = menus.length ? menus : fallback ? [fallback] : [];
+  if (!targets.length || !Array.isArray(options) || !options.length) {
     return;
   }
-  menu.innerHTML = options
-    .map((option, index) => `
+  const selectedValue = options.some((option) => option.value === state[name])
+    ? state[name]
+    : options[0].value;
+  const selectedLabel = options.find((option) => option.value === selectedValue)?.label || selectedValue;
+  const markup = options
+    .map((option) => `
       <button
         class="rh-menu-item"
         type="button"
         role="option"
-        aria-selected="${index === 0 ? "true" : "false"}"
+        aria-selected="${option.value === selectedValue ? "true" : "false"}"
         data-backtest-option="${escapeHtml(name)}"
         data-value="${escapeHtml(option.value)}"
       >${escapeHtml(option.label || option.value)}</button>
     `)
     .join("");
-  if (!options.some((option) => option.value === state[name])) {
-    updateOptionSelection(root, name, options[0].value, options[0].label || options[0].value);
+  targets.forEach((menu) => {
+    menu.innerHTML = markup;
+  });
+  if (selectedValue !== state[name]) {
+    updateOptionSelection(root, name, selectedValue, selectedLabel);
+  } else {
+    qsa(`[data-current-value='${name}']`, root).forEach((current) => {
+      current.textContent = selectedLabel || selectedValue || t("backtests.results.all");
+    });
   }
 }
 
@@ -507,7 +520,10 @@ function renderRuntimeControls(root, data) {
     label: labelForId(value),
   })));
   seedRiskPanel(root, runtime.hit_times_grid || {});
-  seedConfigDraft(root, data?.config_draft || {});
+  if (!state.configSeeded) {
+    seedConfigDraft(root, data?.config_draft || {});
+    state.configSeeded = true;
+  }
   updateRiskPanel(root);
   updateSizingPanel(root);
 }
@@ -607,7 +623,6 @@ function updateSizingPanel(root) {
 
 function renderSymbols(root, universe) {
   const target = qs("[data-symbol-list]", root);
-  const selectedTarget = qs("[data-selected-symbols]", root);
   const symbols = universe?.symbols || [];
   const firstUniverseSymbol = symbols[0]?.value || "BTCUSDT";
   const requestedSelected =
@@ -629,7 +644,6 @@ function renderSymbols(root, universe) {
       .map((symbol) => `
         <button class="backtests-symbol-row ${selected.has(symbol.value) ? "is-selected" : ""}" type="button" data-symbol-row data-symbol-select="${escapeHtml(symbol.value)}" data-symbol-label="${escapeHtml(symbol.label)}" aria-pressed="${selected.has(symbol.value) ? "true" : "false"}">
           <span>${escapeHtml(symbol.label)}</span>
-          <small>${escapeHtml(symbol.status)}</small>
         </button>
       `)
       .join("");
@@ -645,7 +659,6 @@ function renderSelectedSymbols(root) {
       .map((symbol) => `<span class="backtests-chip">${escapeHtml(symbol)}</span>`)
       .join("");
   }
-  setText("[data-symbol-count]", t("backtests.instruments.count", { count: selected.length }), root);
 }
 
 function filterSymbols(root, query) {
@@ -1513,15 +1526,6 @@ function bind(root) {
       event.preventDefault();
       event.stopPropagation();
       selectJob(root, selectJobButton.dataset.selectJob || null);
-      return;
-    }
-    const clearSymbols = event.target.closest("[data-clear-symbols]");
-    if (clearSymbols instanceof HTMLElement) {
-      const firstSymbol = qs("[data-symbol-select]", root)?.dataset.symbolSelect || "BTCUSDT";
-      state.symbol = firstSymbol;
-      state.selectedSymbols = new Set([firstSymbol]);
-      renderSelectedSymbols(root);
-      renderSymbols(root, state.runtimeDefaults?.instrument_universe);
       return;
     }
     const symbolButton = event.target.closest("[data-symbol-select]");

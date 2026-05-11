@@ -468,6 +468,10 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-indicator-add-menu" in response.text
     assert "data-risk-grid" in response.text
     assert 'data-current-value="sizing_mode"' in response.text
+    assert 'data-backtest-menu="market"' in response.text
+    assert 'data-backtest-menu="market_type"' in response.text
+    assert 'id="backtest-instrument-market-trigger"' in response.text
+    assert 'id="backtest-instrument-market-type-trigger"' in response.text
     assert 'data-sizing-field="equity_pct"' in response.text
     assert 'data-sizing-field="quote_amount"' in response.text
     assert 'data-sizing-bounds-row' in response.text
@@ -475,6 +479,9 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-job-picker-menu" in response.text
     assert "data-backtest-option=\"job_exchange\"" in response.text
     assert "data-backtest-option=\"job_market_type\"" in response.text
+    assert "data-clear-symbols" not in response.text
+    assert "data-symbol-count" not in response.text
+    assert "data-selected-symbols" not in response.text
     assert "data-job-launched-from" in response.text
     assert "data-job-symbol" in response.text
     assert "data-load-more-jobs" in response.text
@@ -767,9 +774,12 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "activeRequest" in backtests_js
     assert "hiddenTabPause" in backtests_js
     assert "manualRefreshRetrySeconds" in backtests_js
+    assert "configSeeded" in backtests_js
+    assert "[data-backtest-menu='" in backtests_js
     assert "buildSizingPayload" in backtests_js
     assert "toggleStatusRefreshMenu" in backtests_js
     assert "data-symbol-select" in backtests_js
+    assert "<small>${escapeHtml(symbol.status)}</small>" not in backtests_js
     assert "button.disabled = isRunning;" in backtests_js
     assert "renderBacktestSeries" not in backtests_js
     assert "/trades?page=" not in backtests_js
@@ -777,6 +787,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "activeResultRequest" in backtests_js
     assert "backtest_ui.js" not in backtests_js
     assert "grid-row: 1;" in backtests_css
+    assert "height: var(--rh-workarea-height);" in backtests_css
+    assert ".backtests-instrument-controls" in backtests_css
     assert ".backtests-field-pair--dates" in backtests_css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in backtests_css
     assert ".backtests-icon-button" in backtests_css
