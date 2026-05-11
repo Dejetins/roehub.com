@@ -96,6 +96,48 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert "trades" not in payload["job_table"]["items"][0]
 
 
+def test_get_backtest_workstation_can_enable_ai_configurator_state() -> None:
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()),
+        ai_configurator_state={
+            "state": "ready",
+            "enabled": True,
+            "stage": "Iteration 06",
+            "suggested_strategy": "mean_reversion.py",
+            "modes": [
+                {"value": "create"},
+                {"value": "edit_current"},
+                {"value": "explain_current"},
+            ],
+            "endpoints": {
+                "jobs": "/api/backtests/ai-config/jobs",
+                "job": "/api/backtests/ai-config/jobs/{job_id}",
+                "events": "/api/backtests/ai-config/jobs/{job_id}/events",
+                "feedback": "/api/backtests/ai-config/jobs/{job_id}/feedback",
+            },
+            "degradation_reason": None,
+        },
+    )
+
+    response = client.get(
+        "/ui/backtests/workstation",
+        headers={"x-user-id": str(_USER_ID)},
+    )
+
+    assert response.status_code == 200
+    state = response.json()["ai_configurator_state"]
+    assert state["enabled"] is True
+    assert state["state"] == "ready"
+    assert state["stage"] == "Iteration 06"
+    assert state["endpoints"]["jobs"] == "/api/backtests/ai-config/jobs"
+    assert state["endpoints"]["events"] == "/api/backtests/ai-config/jobs/{job_id}/events"
+    assert [mode["value"] for mode in state["modes"]] == [
+        "create",
+        "edit_current",
+        "explain_current",
+    ]
+
+
 def test_get_backtest_workstation_filters_jobs_by_exchange_market_symbol_date() -> None:
     repository = _FakeJobRepository()
     jobs_use_case = _build_jobs_use_case(repository=repository)
@@ -198,6 +240,7 @@ def _build_client(
     *,
     jobs_use_case=None,
     refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
+    ai_configurator_state: dict[str, object] | None = None,
 ) -> TestClient:
     app = FastAPI()
     register_api_error_handlers(app=app)
@@ -211,6 +254,7 @@ def _build_client(
                 search_enabled_tradable_instruments_use_case=(
                     _FakeSearchEnabledTradableInstrumentsUseCase()
                 ),
+                ai_configurator_state=ai_configurator_state,
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
         )

@@ -1,6 +1,6 @@
 import { apiFetch } from "../core/api.js";
 import { qs, qsa, setText } from "../core/dom.js";
-import { t } from "../core/locale.js";
+import { getCurrentLocale, t } from "../core/locale.js";
 import { createPoller } from "../core/poller.js";
 import { renderBacktestSeries } from "../charts/backtest_series.js";
 
@@ -17,6 +17,21 @@ const REFRESH_PRESETS = {
   "30s": 30000,
   "1m": 60000,
   "5m": 300000,
+};
+const AI_DEFAULT_MODE = "create";
+const AI_STATUS_STAGES = ["queued", "preparing_catalog", "generating", "validating", "repairing", "ready"];
+const AI_TERMINAL_STATUSES = new Set([
+  "ready",
+  "needs_clarification",
+  "blocked_by_policy",
+  "input_too_large",
+  "security_review",
+  "failed",
+]);
+const AI_STATUS_ALIASES = {
+  running: "generating",
+  validating_business: "validating",
+  validating_schema: "validating",
 };
 
 const state = {
@@ -53,12 +68,26 @@ const state = {
   tradesPage: 1,
   animateVariantJobId: null,
   configSeeded: false,
+  ai: {
+    enabled: false,
+    mode: AI_DEFAULT_MODE,
+    activeJobId: null,
+    activeToken: 0,
+    readyJob: null,
+    appliedJobId: null,
+    status: "",
+    isBusy: false,
+    typewriterTimer: null,
+  },
 };
 
 let activeRequest = null;
 let activeResultRequest = null;
 let activeVariantResultRequest = null;
 let activeVariantResultKey = "";
+let activeAiStatusRequest = null;
+let aiEventSource = null;
+let aiPoller = null;
 let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
@@ -304,6 +333,209 @@ function endpointFromTemplate(template, replacements) {
   return endpoint;
 }
 
+function aiConfigEndpoint(root, kind, jobId) {
+  const templates = {
+    job: root.dataset.aiConfigJobEndpointTemplate || "/api/backtests/ai-config/jobs/{job_id}",
+    events: root.dataset.aiConfigEventsEndpointTemplate || "/api/backtests/ai-config/jobs/{job_id}/events",
+    feedback: root.dataset.aiConfigFeedbackEndpointTemplate || "/api/backtests/ai-config/jobs/{job_id}/feedback",
+  };
+  return endpointFromTemplate(templates[kind], { job_id: jobId });
+}
+
+function normalizeAiStatus(value) {
+  const normalized = String(value || "").trim();
+  return AI_STATUS_ALIASES[normalized] || normalized;
+}
+
+function isAiTerminalStatus(value) {
+  return AI_TERMINAL_STATUSES.has(normalizeAiStatus(value));
+}
+
+function stopAiJobUpdates() {
+  if (aiEventSource) {
+    aiEventSource.close();
+    aiEventSource = null;
+  }
+  if (aiPoller) {
+    aiPoller.stop();
+    aiPoller = null;
+  }
+}
+
+function clearAiTypewriter() {
+  if (state.ai.typewriterTimer) {
+    window.clearTimeout(state.ai.typewriterTimer);
+    state.ai.typewriterTimer = null;
+  }
+}
+
+function generateIdempotencyKey(prefix = "ai-config") {
+  return window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function setAiControls(root) {
+  const disabled = !state.ai.enabled || state.ai.isBusy;
+  qsa("[data-ai-mode]", root).forEach((button) => {
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = disabled;
+    }
+  });
+  const prompt = qs("[data-ai-prompt]", root);
+  if (prompt instanceof HTMLInputElement) {
+    prompt.disabled = disabled;
+  }
+  const submit = qs("[data-ai-submit]", root);
+  if (submit instanceof HTMLButtonElement) {
+    submit.disabled = disabled;
+  }
+}
+
+function setAiBusy(root, isBusy) {
+  state.ai.isBusy = isBusy;
+  setAiControls(root);
+}
+
+function selectAiMode(root, mode) {
+  const nextMode = mode || AI_DEFAULT_MODE;
+  state.ai.mode = nextMode;
+  qsa("[data-ai-mode]", root).forEach((button) => {
+    const isActive = button.dataset.aiMode === nextMode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-checked", isActive ? "true" : "false");
+  });
+}
+
+function renderAiTimeline(root, currentStatus = "") {
+  const timeline = qs("[data-ai-timeline]", root);
+  if (!timeline) {
+    return;
+  }
+  const normalized = normalizeAiStatus(currentStatus);
+  const statuses = AI_STATUS_STAGES.includes(normalized)
+    ? AI_STATUS_STAGES
+    : normalized
+      ? [...AI_STATUS_STAGES, normalized]
+      : AI_STATUS_STAGES;
+  const activeIndex = statuses.indexOf(normalized);
+  const items = statuses.map((status, index) => {
+    const item = document.createElement("li");
+    item.dataset.aiStage = status;
+    item.textContent = status;
+    item.classList.toggle("is-active", status === normalized);
+    item.classList.toggle(
+      "is-complete",
+      activeIndex >= 0 && index < activeIndex && AI_STATUS_STAGES.includes(status)
+    );
+    return item;
+  });
+  timeline.replaceChildren(...items);
+}
+
+function setAiStatus(root, status, message = "") {
+  const normalized = normalizeAiStatus(status);
+  state.ai.status = normalized;
+  renderAiTimeline(root, normalized);
+  setText(
+    "[data-ai-status]",
+    message || (normalized
+      ? t("backtests.ai.status.active", { job: compactId(state.ai.activeJobId), status: normalized })
+      : t("backtests.status.ready")),
+    root
+  );
+}
+
+function appendAiMessage(root, role, text) {
+  const log = qs("[data-ai-log]", root);
+  if (!log) {
+    return null;
+  }
+  const article = document.createElement("article");
+  article.dataset.aiMessageRole = role;
+
+  const message = document.createElement("div");
+  message.className = "backtests-ai-message";
+  message.textContent = String(text || "");
+
+  const time = document.createElement("time");
+  time.dateTime = new Date().toISOString();
+  time.textContent = localTime(time.dateTime);
+
+  article.append(message, time);
+  log.append(article);
+  log.scrollTop = log.scrollHeight;
+  return message;
+}
+
+function appendAiAssistantResult(root, job) {
+  clearAiTypewriter();
+  const message = appendAiMessage(root, "assistant", "");
+  if (!message) {
+    return;
+  }
+  const finalText = String(job?.assistant_message || job?.message || "");
+  let index = 0;
+  const step = () => {
+    message.textContent = finalText.slice(0, index);
+    index += Math.max(1, Math.ceil(finalText.length / 48));
+    if (index <= finalText.length) {
+      state.ai.typewriterTimer = window.setTimeout(step, 24);
+      return;
+    }
+    message.textContent = finalText;
+    state.ai.typewriterTimer = null;
+    renderAiLoadAction(root, message.closest("article"), job);
+  };
+  step();
+}
+
+function renderAiLoadAction(root, article, job) {
+  if (
+    !article ||
+    normalizeAiStatus(job?.status) !== "ready" ||
+    job?.load_action?.enabled !== true ||
+    !job?.validated_config
+  ) {
+    return;
+  }
+  const actions = document.createElement("div");
+  actions.className = "backtests-ai-actions";
+  const button = document.createElement("button");
+  button.className = "rh-button rh-button--primary rh-button--compact backtests-ai-load";
+  button.type = "button";
+  button.dataset.aiLoadConfiguration = job.job_id;
+  button.textContent = t("backtests.ai.load_configuration");
+  actions.append(button);
+  article.append(actions);
+}
+
+function renderAiConfiguratorState(root, aiState) {
+  state.ai.enabled = Boolean(aiState?.enabled);
+  const stateLabel = qs("[data-ai-state-label]", root);
+  if (stateLabel) {
+    stateLabel.textContent = state.ai.enabled ? t("backtests.ai.beta") : String(aiState?.state || "disabled");
+  }
+  const modes = new Set((aiState?.modes || []).map((mode) => mode?.value).filter(Boolean));
+  qsa("[data-ai-mode]", root).forEach((button) => {
+    button.hidden = modes.size > 0 && !modes.has(button.dataset.aiMode || "");
+  });
+  if (!modes.has(state.ai.mode)) {
+    selectAiMode(root, modes.has(AI_DEFAULT_MODE) || !modes.size ? AI_DEFAULT_MODE : Array.from(modes)[0]);
+  } else {
+    selectAiMode(root, state.ai.mode);
+  }
+  setAiControls(root);
+  if (!state.ai.enabled && !state.ai.isBusy) {
+    setText(
+      "[data-ai-status]",
+      aiState?.degradation_reason || t("backtests.ai.disabled"),
+      root
+    );
+    renderAiTimeline(root, "");
+  }
+}
+
 function formatFieldErrors(errors) {
   if (!errors) {
     return "";
@@ -541,7 +773,30 @@ function buildSizingPayload(root) {
   };
 }
 
-function updateOptionSelection(root, name, value, label) {
+function optionLabelForValue(root, name, value) {
+  const option = qsa(`[data-backtest-option='${name}']`, root)
+    .find((item) => item.dataset.value === value);
+  return (option?.textContent || "").trim() || value || t("backtests.results.all");
+}
+
+function hasDropdownOption(root, name, value) {
+  return qsa(`[data-backtest-option='${name}']`, root)
+    .some((option) => option.dataset.value === value);
+}
+
+function setDropdownValue(root, name, value, { label = "", validateOptions = false, refresh = false } = {}) {
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
+  const normalized = String(value);
+  if (validateOptions && !hasDropdownOption(root, name, normalized)) {
+    return false;
+  }
+  updateOptionSelection(root, name, normalized, label || optionLabelForValue(root, name, normalized), { refresh });
+  return true;
+}
+
+function updateOptionSelection(root, name, value, label, { refresh = true } = {}) {
   state[name] = value;
   qsa(`[data-backtest-option='${name}']`, root).forEach((option) => {
     option.setAttribute("aria-selected", option.dataset.value === value ? "true" : "false");
@@ -549,10 +804,10 @@ function updateOptionSelection(root, name, value, label) {
   qsa(`[data-current-value='${name}']`, root).forEach((current) => {
     current.textContent = label || value || t("backtests.results.all");
   });
-  if (["job_state", "job_exchange", "job_market_type"].includes(name)) {
+  if (refresh && ["job_state", "job_exchange", "job_market_type"].includes(name)) {
     refreshWorkstation(root, "manual").catch(() => {});
   }
-  if (["market", "market_type"].includes(name)) {
+  if (refresh && ["market", "market_type"].includes(name)) {
     state.symbol = "";
     state.selectedSymbols = new Set();
     refreshWorkstation(root, "auto").catch(() => {});
@@ -633,7 +888,7 @@ function renderRuntimeControls(root, data) {
   updateSizingPanel(root);
 }
 
-function seedConfigDraft(root, draft) {
+function seedConfigDraft(root, draft, { validateOptions = false, includeIndicators = false } = {}) {
   const sizing = draft?.execution?.sizing || {};
   const fieldValues = {
     symbol: draft?.coordinates?.symbol,
@@ -649,6 +904,10 @@ function seedConfigDraft(root, draft) {
       field.value = String(value);
     }
   });
+  if (draft?.coordinates?.symbol) {
+    state.symbol = String(draft.coordinates.symbol).toUpperCase();
+    state.selectedSymbols = new Set([state.symbol]);
+  }
   const sizingValues = {
     quote_amount: sizing.quote_amount ?? 1000,
     equity_pct: sizing.equity_pct ?? 10,
@@ -661,20 +920,49 @@ function seedConfigDraft(root, draft) {
       field.value = String(value);
     }
   });
-  if (sizing?.mode) {
-    updateOptionSelection(root, "sizing_mode", sizing.mode, sizingModeLabel(sizing.mode));
+  setDropdownValue(root, "market", draft?.coordinates?.exchange, { validateOptions });
+  setDropdownValue(root, "market_type", draft?.coordinates?.market_type, { validateOptions });
+  setDropdownValue(root, "timeframe", draft?.timeframe, {
+    label: draft?.timeframe,
+    validateOptions,
+  });
+  setDropdownValue(root, "direction", draft?.execution?.direction_mode, { validateOptions });
+  setDropdownValue(root, "sizing_mode", sizing?.mode, {
+    label: sizing?.mode ? sizingModeLabel(sizing.mode) : "",
+    validateOptions,
+  });
+  setDropdownValue(root, "ranking_metric", draft?.ranking?.primary_metric, { validateOptions });
+  setDropdownValue(root, "ranking_order", draft?.ranking?.direction, { validateOptions });
+  if (setDropdownValue(root, "risk_mode", draft?.risk?.mode, {
+    label: draft?.risk?.mode === "tp_sl_grid" ? t("backtests.option.tp_sl_grid") : t("backtests.option.no_risk"),
+    validateOptions,
+  })) {
+    const tp = draft?.risk?.tp || {};
+    const sl = draft?.risk?.sl || {};
+    const riskValues = {
+      tp_start: tp.start_pct,
+      tp_stop: tp.stop_pct,
+      tp_step: tp.step_pct,
+      sl_start: sl.start_pct,
+      sl_stop: sl.stop_pct,
+      sl_step: sl.step_pct,
+    };
+    Object.entries(riskValues).forEach(([name, value]) => {
+      const field = qs(`[data-risk-field='${name}']`, root);
+      if (field && value !== undefined && value !== null && value !== "") {
+        field.value = String(value);
+      }
+    });
   }
-  if (draft?.timeframe) {
-    updateOptionSelection(root, "timeframe", draft.timeframe, draft.timeframe);
+  if (includeIndicators && Array.isArray(draft?.indicators)) {
+    state.selectedIndicators = draft.indicators
+      .map((indicator) => indicatorStateFromDraft(indicator))
+      .filter(Boolean);
+    renderIndicators(root, { items: Array.from(state.indicatorCatalog.values()) });
   }
-  if (draft?.risk?.mode) {
-    updateOptionSelection(
-      root,
-      "risk_mode",
-      draft.risk.mode,
-      draft.risk.mode === "tp_sl_grid" ? t("backtests.option.tp_sl_grid") : t("backtests.option.no_risk")
-    );
-  }
+  renderSelectedSymbols(root);
+  updateRiskPanel(root);
+  updateSizingPanel(root);
 }
 
 function seedRiskPanel(root, grid) {
@@ -1491,6 +1779,7 @@ function renderWorkstation(root, data, { append = false, preserveLoadedRows = fa
       ? preserveLoadedJobTableData(data)
       : data;
   renderRuntimeControls(root, data);
+  renderAiConfiguratorState(root, data?.ai_configurator_state || {});
   renderSymbols(root, data?.instrument_universe);
   renderIndicators(root, data?.indicator_catalog);
   renderOptimization(root, data?.optimization_overview);
@@ -1702,6 +1991,234 @@ async function refreshWorkstation(root, reason = "manual", { append = false } = 
   return activeRequest;
 }
 
+function currentAiPayload(root, message, idempotencyKey) {
+  return {
+    mode: state.ai.mode || AI_DEFAULT_MODE,
+    locale: getCurrentLocale(),
+    message,
+    idempotency_key: idempotencyKey,
+    current_config: buildRequestPayload(root),
+    ui_context: {
+      source_page: "backtests",
+      submitted_at: new Date().toISOString(),
+      workstation_generated_at: state.runtimeDefaults?.generated_at || null,
+      refresh_status: state.runtimeDefaults?.refresh_status || null,
+    },
+  };
+}
+
+function handleAiEventPayload(root, payload, token) {
+  if (token !== state.ai.activeToken) {
+    return;
+  }
+  const status = normalizeAiStatus(payload?.status || payload?.event || payload?.state);
+  if (status) {
+    setAiStatus(root, status, payload?.message || "");
+  }
+  if (isAiTerminalStatus(status)) {
+    loadAiJobSnapshot(root, state.ai.activeJobId, token).catch((error) => {
+      setAiStatus(root, "failed", describeApiError(error));
+      setAiBusy(root, false);
+    });
+  }
+}
+
+function handleAiJobSnapshot(root, job, token) {
+  if (token !== state.ai.activeToken || !job) {
+    return;
+  }
+  const status = normalizeAiStatus(job.status);
+  setAiStatus(root, status, job.message || job.assistant_message || "");
+  if (!isAiTerminalStatus(status)) {
+    return;
+  }
+  stopAiJobUpdates();
+  setAiBusy(root, false);
+  if (status === "ready" && job.load_action?.enabled === true && job.validated_config) {
+    state.ai.readyJob = job;
+    state.ai.appliedJobId = null;
+    setText("[data-ai-status]", t("backtests.ai.status.ready"), root);
+    appendAiAssistantResult(root, job);
+    return;
+  }
+  state.ai.readyJob = null;
+  appendAiMessage(root, "assistant", job.assistant_message || status || t("backtests.ai.status.error"));
+}
+
+async function loadAiJobSnapshot(root, jobId, token = state.ai.activeToken) {
+  if (!jobId || activeAiStatusRequest) {
+    return activeAiStatusRequest;
+  }
+  const endpoint = aiConfigEndpoint(root, "job", jobId);
+  activeAiStatusRequest = apiFetch(endpoint)
+    .then((job) => {
+      handleAiJobSnapshot(root, job, token);
+      return job;
+    })
+    .finally(() => {
+      activeAiStatusRequest = null;
+    });
+  return activeAiStatusRequest;
+}
+
+function startAiPolling(root, jobId, token) {
+  if (aiPoller) {
+    aiPoller.stop();
+  }
+  aiPoller = createPoller(
+    () => loadAiJobSnapshot(root, jobId, token),
+    { intervalMs: 1500, hiddenTabPause: false }
+  );
+  aiPoller.start();
+}
+
+function parseAiSseEvent(event) {
+  try {
+    return JSON.parse(event.data || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function startAiJobUpdates(root, jobId, token, eventsUrl = "") {
+  stopAiJobUpdates();
+  const eventEndpoint = eventsUrl || aiConfigEndpoint(root, "events", jobId);
+  if (!("EventSource" in window)) {
+    startAiPolling(root, jobId, token);
+    return;
+  }
+  let opened = false;
+  try {
+    aiEventSource = new EventSource(eventEndpoint, { withCredentials: true });
+    const eventNames = new Set([
+      ...AI_STATUS_STAGES,
+      ...AI_TERMINAL_STATUSES,
+      ...Object.keys(AI_STATUS_ALIASES),
+      "capacity_delayed",
+    ]);
+    eventNames.forEach((eventName) => {
+      aiEventSource.addEventListener(eventName, (event) => {
+        opened = true;
+        handleAiEventPayload(root, parseAiSseEvent(event), token);
+      });
+    });
+    aiEventSource.onmessage = (event) => {
+      opened = true;
+      handleAiEventPayload(root, parseAiSseEvent(event), token);
+    };
+    aiEventSource.onerror = () => {
+      if (token !== state.ai.activeToken || isAiTerminalStatus(state.ai.status)) {
+        stopAiJobUpdates();
+        return;
+      }
+      if (aiEventSource) {
+        aiEventSource.close();
+        aiEventSource = null;
+      }
+      if (!opened) {
+        setAiStatus(root, state.ai.status || "queued");
+      }
+      startAiPolling(root, jobId, token);
+    };
+  } catch {
+    startAiPolling(root, jobId, token);
+  }
+}
+
+async function submitAiPrompt(root) {
+  if (!state.ai.enabled || state.ai.isBusy) {
+    return;
+  }
+  const prompt = qs("[data-ai-prompt]", root);
+  const message = prompt instanceof HTMLInputElement ? prompt.value.trim() : "";
+  if (!message) {
+    return;
+  }
+  const token = state.ai.activeToken + 1;
+  const idempotencyKey = generateIdempotencyKey();
+  state.ai.activeToken = token;
+  state.ai.activeJobId = null;
+  state.ai.readyJob = null;
+  state.ai.appliedJobId = null;
+  clearAiTypewriter();
+  stopAiJobUpdates();
+  renderAiTimeline(root, "queued");
+  setAiBusy(root, true);
+  setText("[data-ai-feedback-status]", "", root);
+  appendAiMessage(root, "user", message);
+  if (prompt instanceof HTMLInputElement) {
+    prompt.value = "";
+  }
+  try {
+    const created = await apiFetch(root.dataset.aiConfigJobsEndpoint || "/api/backtests/ai-config/jobs", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(currentAiPayload(root, message, idempotencyKey)),
+    });
+    if (token !== state.ai.activeToken) {
+      return;
+    }
+    if (!created?.job_id) {
+      setAiBusy(root, false);
+      setAiStatus(root, created?.status || "capacity_delayed", created?.message || "");
+      appendAiMessage(root, "assistant", created?.message || t("backtests.ai.status.error"));
+      return;
+    }
+    state.ai.activeJobId = created.job_id;
+    setAiStatus(root, created.status || "queued", created.message || "");
+    startAiJobUpdates(root, created.job_id, token, created.events_url || "");
+    loadAiJobSnapshot(root, created.job_id, token).catch(() => {});
+  } catch (error) {
+    if (token !== state.ai.activeToken) {
+      return;
+    }
+    setAiBusy(root, false);
+    setAiStatus(root, "failed", describeApiError(error));
+    appendAiMessage(root, "system", describeApiError(error));
+  }
+}
+
+async function recordAiFeedback(root, jobId, applied) {
+  const endpoint = aiConfigEndpoint(root, "feedback", jobId);
+  return apiFetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      applied,
+      reason: applied ? "loaded_configuration" : "replaced",
+      client_context: {
+        surface: "backtests",
+        mode: state.ai.mode,
+      },
+    }),
+  });
+}
+
+async function applyAiConfiguration(root, jobId) {
+  const job = state.ai.readyJob;
+  if (
+    !job ||
+    job.job_id !== jobId ||
+    normalizeAiStatus(job.status) !== "ready" ||
+    job.load_action?.enabled !== true ||
+    !job.validated_config
+  ) {
+    return;
+  }
+  seedConfigDraft(root, job.validated_config, { validateOptions: true, includeIndicators: true });
+  setText("[data-ai-status]", t("backtests.ai.status.loaded"), root);
+  try {
+    await recordAiFeedback(root, jobId, true);
+    state.ai.appliedJobId = jobId;
+    setText("[data-ai-feedback-status]", t("backtests.ai.feedback.applied"), root);
+  } catch {
+    setText("[data-ai-feedback-status]", t("backtests.ai.feedback.failed"), root);
+  }
+}
+
 async function preflight(root) {
   const payload = buildRequestPayload(root);
   const endpoint = root.dataset.preflightEndpoint || "/api/backtests/preflight";
@@ -1911,6 +2428,23 @@ function bindStatusBar(root) {
 function bind(root) {
   bindStatusBar(root);
   root.addEventListener("click", (event) => {
+    const aiMode = event.target.closest("[data-ai-mode]");
+    if (aiMode instanceof HTMLElement) {
+      selectAiMode(root, aiMode.dataset.aiMode || AI_DEFAULT_MODE);
+      return;
+    }
+    const aiSubmit = event.target.closest("[data-ai-submit]");
+    if (aiSubmit instanceof HTMLElement) {
+      submitAiPrompt(root).catch(() => {});
+      return;
+    }
+    const aiLoad = event.target.closest("[data-ai-load-configuration]");
+    if (aiLoad instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyAiConfiguration(root, aiLoad.dataset.aiLoadConfiguration || "").catch(() => {});
+      return;
+    }
     const option = event.target.closest("[data-backtest-option]");
     if (option instanceof HTMLElement) {
       updateOptionSelection(
@@ -2102,6 +2636,12 @@ function bind(root) {
   qs("[data-symbol-search]", root)?.addEventListener("input", (event) => {
     state.symbolQuery = event.target.value || "";
     filterSymbols(root, state.symbolQuery);
+  });
+  qs("[data-ai-prompt]", root)?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submitAiPrompt(root).catch(() => {});
+    }
   });
   root.addEventListener("change", (event) => {
     const checkbox = event.target.closest("[data-symbol-checkbox]");

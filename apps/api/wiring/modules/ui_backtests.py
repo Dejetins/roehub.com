@@ -39,7 +39,9 @@ from trading.contexts.backtest.adapters.outbound import (
     FilesystemBacktestArtifactContextResolver,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
+    load_backtest_ai_configurator_runtime_config,
     load_backtest_artifacts_runtime_config,
+    resolve_backtest_ai_configurator_config_path,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
@@ -70,6 +72,14 @@ _EVENT_SOURCE = "backtest_job_events"
 _JOB_SOURCE = "backtest_jobs"
 _MARKET_REFERENCE_SOURCE = "market_data_reference"
 _DEFAULT_STRATEGY = "mean_reversion.py"
+_AI_CONFIGURATOR_STAGE = "Iteration 06"
+_AI_CONFIGURATOR_MODES = (
+    "create",
+    "edit_current",
+    "explain_current",
+    "repair_invalid",
+    "suggest_safer",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +161,7 @@ class BacktestWorkstationQueryService:
             _SearchEnabledTradableInstrumentsService | None
         ) = None,
         refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
+        ai_configurator_state: Mapping[str, Any] | None = None,
     ) -> None:
         self._runtime_defaults_service = runtime_defaults_service
         self._jobs_use_case = jobs_use_case
@@ -160,6 +171,14 @@ class BacktestWorkstationQueryService:
             search_enabled_tradable_instruments_use_case
         )
         self._refresh_limiter = refresh_limiter or BacktestWorkstationManualRefreshLimiter()
+        self._ai_configurator_state = dict(
+            ai_configurator_state
+            or _build_ai_configurator_state_payload(
+                enabled=False,
+                state="unavailable",
+                degradation_reason="AI configurator state is not configured",
+            )
+        )
 
     def get_workstation(
         self,
@@ -236,12 +255,7 @@ class BacktestWorkstationQueryService:
             sources=sources,
             runtime_defaults=runtime_defaults,
             config_draft=_build_config_draft(runtime_defaults=runtime_defaults),
-            ai_configurator_state={
-                "state": "placeholder",
-                "enabled": False,
-                "stage": "Stage 10",
-                "suggested_strategy": _DEFAULT_STRATEGY,
-            },
+            ai_configurator_state=dict(self._ai_configurator_state),
             instrument_universe=instrument_universe.universe,
             indicator_catalog=_build_indicator_catalog(runtime_defaults=runtime_defaults),
             optimization_overview=optimization,
@@ -480,9 +494,63 @@ def build_ui_backtests_router(
             search_enabled_tradable_instruments_use_case=(
                 market_data_reference_use_cases.search_enabled_tradable_instruments
             ),
+            ai_configurator_state=_build_ai_configurator_state(environ=effective_environ),
         ),
         current_user_dependency=current_user_dependency,
     )
+
+
+def _build_ai_configurator_state(*, environ: Mapping[str, str]) -> dict[str, Any]:
+    storage_available = bool(environ.get("STRATEGY_PG_DSN", "").strip())
+    try:
+        runtime_config = load_backtest_ai_configurator_runtime_config(
+            resolve_backtest_ai_configurator_config_path(environ=environ)
+        )
+    except Exception as error:
+        return _build_ai_configurator_state_payload(
+            enabled=False,
+            state="unavailable",
+            degradation_reason=f"AI configurator config unavailable: {error}",
+        )
+    if not runtime_config.enabled:
+        return _build_ai_configurator_state_payload(
+            enabled=False,
+            state="disabled",
+            degradation_reason="AI configurator feature flag is disabled",
+        )
+    if not storage_available:
+        return _build_ai_configurator_state_payload(
+            enabled=False,
+            state="unavailable",
+            degradation_reason="STRATEGY_PG_DSN is not configured for AI jobs",
+        )
+    return _build_ai_configurator_state_payload(
+        enabled=True,
+        state="ready",
+        degradation_reason=None,
+    )
+
+
+def _build_ai_configurator_state_payload(
+    *,
+    enabled: bool,
+    state: str,
+    degradation_reason: str | None,
+) -> dict[str, Any]:
+    return {
+        "state": state,
+        "enabled": enabled,
+        "stage": _AI_CONFIGURATOR_STAGE,
+        "suggested_strategy": _DEFAULT_STRATEGY,
+        "modes": [{"value": mode} for mode in _AI_CONFIGURATOR_MODES],
+        "endpoints": {
+            "jobs": "/api/backtests/ai-config/jobs",
+            "job": "/api/backtests/ai-config/jobs/{job_id}",
+            "events": "/api/backtests/ai-config/jobs/{job_id}/events",
+            "feedback": "/api/backtests/ai-config/jobs/{job_id}/feedback",
+        },
+        "degradation_reason": degradation_reason,
+    }
 
 
 def _source(
