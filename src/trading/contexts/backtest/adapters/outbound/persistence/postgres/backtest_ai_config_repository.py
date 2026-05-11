@@ -61,6 +61,10 @@ _AI_CONFIG_JOB_SELECT_COLUMNS = """
     last_error,
     last_error_json
 """
+_AI_CONFIG_JOB_RETURNING_COLUMNS_FOR_JOBS_ALIAS = "\n".join(
+    f"    jobs.{column.strip()}"
+    for column in _AI_CONFIG_JOB_SELECT_COLUMNS.strip().splitlines()
+)
 
 _ACTIVE_STATES = ("queued", "running", "repairing")
 _OWNER_ACTIVE_STATES = ("running", "repairing")
@@ -688,7 +692,7 @@ class PostgresBacktestAiConfigRepository(
             FROM candidate
             WHERE jobs.job_id = candidate.job_id
             RETURNING
-                {_AI_CONFIG_JOB_SELECT_COLUMNS}
+                {_AI_CONFIG_JOB_RETURNING_COLUMNS_FOR_JOBS_ALIAS}
         )
         SELECT
             {_AI_CONFIG_JOB_SELECT_COLUMNS}
