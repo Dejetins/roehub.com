@@ -24,7 +24,8 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.contexts.market_data.application.dto.reference_api import EnabledMarketReference
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UserId
 
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000000901")
 
@@ -51,7 +52,15 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["runtime_defaults"]["supported_timeframes"] == ["15m"]
     assert "preset" not in payload["config_draft"]
     assert payload["ai_configurator_state"]["enabled"] is False
-    assert payload["instrument_universe"]["source"] == "artifact_manifests"
+    assert payload["instrument_universe"]["source"] == "market_data_reference"
+    assert payload["instrument_universe"]["markets"] == [
+        {"value": "binance", "label": "Binance", "status": "available"},
+        {"value": "bybit", "label": "Bybit", "status": "available"},
+    ]
+    assert payload["instrument_universe"]["market_types"] == [
+        {"value": "spot", "label": "Spot", "status": "available"},
+        {"value": "futures", "label": "Futures", "status": "available"},
+    ]
     assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT"]
     assert payload["config_draft"]["time_range"]["end"].startswith(
         (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
@@ -129,10 +138,33 @@ def test_get_backtest_workstation_filters_jobs_by_exchange_market_symbol_date() 
     assert payload["job_table"]["items"][0]["created_at"].startswith(launched_date)
 
 
+def test_get_backtest_workstation_filters_instruments_by_reference_market() -> None:
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
+
+    response = client.get(
+        (
+            "/ui/backtests/workstation"
+            "?instrument_exchange=bybit&instrument_market_type=futures"
+        ),
+        headers={"x-user-id": str(_USER_ID)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["instrument_universe"]["source"] == "market_data_reference"
+    assert payload["instrument_universe"]["market_types"] == [
+        {"value": "futures", "label": "Futures", "status": "available"}
+    ]
+    assert [row["value"] for row in payload["instrument_universe"]["symbols"]] == [
+        "BTCUSDT",
+        "ETHUSDT",
+    ]
+
+
 def test_get_backtest_workstation_manual_refresh_rate_limit() -> None:
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()),
-        refresh_limiter=BacktestWorkstationManualRefreshLimiter(interval_seconds=30)
+        refresh_limiter=BacktestWorkstationManualRefreshLimiter(interval_seconds=30),
     )
     headers = {"x-user-id": str(_USER_ID)}
 
@@ -175,11 +207,58 @@ def _build_client(
                 runtime_defaults_service=_runtime_defaults_service(),
                 jobs_use_case=jobs_use_case,
                 refresh_limiter=refresh_limiter,
+                list_enabled_markets_use_case=_FakeListEnabledMarketsUseCase(),
+                search_enabled_tradable_instruments_use_case=(
+                    _FakeSearchEnabledTradableInstrumentsUseCase()
+                ),
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
         )
     )
     return TestClient(app)
+
+
+class _FakeListEnabledMarketsUseCase:
+    def execute(self) -> tuple[EnabledMarketReference, ...]:
+        return (
+            EnabledMarketReference(
+                market_id=MarketId(1),
+                exchange_name="binance",
+                market_type="spot",
+                market_code="binance_spot",
+            ),
+            EnabledMarketReference(
+                market_id=MarketId(2),
+                exchange_name="binance",
+                market_type="futures",
+                market_code="binance_futures",
+            ),
+            EnabledMarketReference(
+                market_id=MarketId(3),
+                exchange_name="bybit",
+                market_type="futures",
+                market_code="bybit_futures",
+            ),
+        )
+
+
+class _FakeSearchEnabledTradableInstrumentsUseCase:
+    def execute(
+        self,
+        *,
+        market_id: MarketId,
+        q: str | None = None,
+        limit: int | None = None,
+    ) -> tuple[InstrumentId, ...]:
+        symbols_by_market = {
+            1: ("BTCUSDT", "ETHUSDT", "SOLUSDT"),
+            2: ("BNBUSDT",),
+            3: ("BTCUSDT", "ETHUSDT"),
+        }
+        return tuple(
+            InstrumentId(market_id=market_id, symbol=Symbol(symbol))
+            for symbol in symbols_by_market.get(int(market_id.value), ())
+        )
 
 
 def _runtime_defaults_service() -> BacktestRuntimeDefaultsService:

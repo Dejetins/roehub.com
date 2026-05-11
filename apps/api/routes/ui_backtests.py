@@ -21,6 +21,8 @@ class BacktestWorkstationService(Protocol):
         query: str,
         exchange: str | None,
         market_type: str | None,
+        instrument_exchange: str | None,
+        instrument_market_type: str | None,
         symbol: str | None,
         launched_from: str | None,
         launched_to: str | None,
@@ -60,6 +62,8 @@ def build_ui_backtests_router(
         query: str = Query(default=""),
         exchange: str | None = Query(default=None),
         market_type: str | None = Query(default=None),
+        instrument_exchange: str | None = Query(default=None),
+        instrument_market_type: str | None = Query(default=None),
         symbol: str | None = Query(default=None),
         launched_from: str | None = Query(default=None),
         launched_to: str | None = Query(default=None),
@@ -71,6 +75,12 @@ def build_ui_backtests_router(
         normalized_query = query.strip()
         normalized_exchange = exchange.strip().casefold() if exchange else None
         normalized_market_type = market_type.strip().casefold() if market_type else None
+        normalized_instrument_exchange = (
+            instrument_exchange.strip().casefold() if instrument_exchange else None
+        )
+        normalized_instrument_market_type = (
+            instrument_market_type.strip().casefold() if instrument_market_type else None
+        )
         normalized_symbol = symbol.strip().upper() if symbol else None
         normalized_launched_from = launched_from.strip() if launched_from else None
         normalized_launched_to = launched_to.strip() if launched_to else None
@@ -81,6 +91,8 @@ def build_ui_backtests_router(
             query=normalized_query,
             exchange=normalized_exchange or None,
             market_type=normalized_market_type or None,
+            instrument_exchange=normalized_instrument_exchange or None,
+            instrument_market_type=normalized_instrument_market_type or None,
             symbol=normalized_symbol or None,
             launched_from=normalized_launched_from or None,
             launched_to=normalized_launched_to or None,

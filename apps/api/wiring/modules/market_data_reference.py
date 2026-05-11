@@ -7,6 +7,7 @@ Docs:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Mapping
 
 from fastapi import APIRouter
@@ -25,6 +26,36 @@ from trading.contexts.market_data.application.use_cases import (
     ListEnabledMarketsUseCase,
     SearchEnabledTradableInstrumentsUseCase,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class MarketDataReferenceUseCases:
+    list_enabled_markets: ListEnabledMarketsUseCase
+    search_enabled_tradable_instruments: SearchEnabledTradableInstrumentsUseCase
+
+
+def build_market_data_reference_use_cases(
+    *, environ: Mapping[str, str]
+) -> MarketDataReferenceUseCases:
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
+        client_factory=lambda: _clickhouse_client(clickhouse_settings)
+    )
+
+    return MarketDataReferenceUseCases(
+        list_enabled_markets=ListEnabledMarketsUseCase(
+            reader=ClickHouseEnabledMarketReader(
+                gateway=clickhouse_gateway,
+                database=clickhouse_settings.database,
+            )
+        ),
+        search_enabled_tradable_instruments=SearchEnabledTradableInstrumentsUseCase(
+            reader=ClickHouseEnabledTradableInstrumentSearchReader(
+                gateway=clickhouse_gateway,
+                database=clickhouse_settings.database,
+            )
+        ),
+    )
 
 
 def build_market_data_reference_router(
@@ -57,29 +88,17 @@ def build_market_data_reference_router(
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_market_data_reference_router requires current_user_dependency")
 
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
-
-    list_enabled_markets_use_case = ListEnabledMarketsUseCase(
-        reader=ClickHouseEnabledMarketReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
-        )
-    )
-    search_enabled_tradable_instruments_use_case = SearchEnabledTradableInstrumentsUseCase(
-        reader=ClickHouseEnabledTradableInstrumentSearchReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
-        )
-    )
+    use_cases = build_market_data_reference_use_cases(environ=environ)
 
     return build_market_data_reference_api_router(
-        list_enabled_markets_use_case=list_enabled_markets_use_case,
-        search_enabled_tradable_instruments_use_case=search_enabled_tradable_instruments_use_case,
+        list_enabled_markets_use_case=use_cases.list_enabled_markets,
+        search_enabled_tradable_instruments_use_case=use_cases.search_enabled_tradable_instruments,
         current_user_dependency=current_user_dependency,
     )
 
 
-__all__ = ["build_market_data_reference_router"]
+__all__ = [
+    "MarketDataReferenceUseCases",
+    "build_market_data_reference_router",
+    "build_market_data_reference_use_cases",
+]

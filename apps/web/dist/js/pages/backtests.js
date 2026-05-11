@@ -452,6 +452,11 @@ function updateOptionSelection(root, name, value, label) {
   if (["job_state", "job_exchange", "job_market_type"].includes(name)) {
     refreshWorkstation(root, "manual").catch(() => {});
   }
+  if (["market", "market_type"].includes(name)) {
+    state.symbol = "";
+    state.selectedSymbols = new Set();
+    refreshWorkstation(root, "auto").catch(() => {});
+  }
   if (name === "risk_mode") {
     updateRiskPanel(root);
   }
@@ -1243,6 +1248,12 @@ async function refreshWorkstation(root, reason = "manual", { append = false } = 
   }
   if (state.job_market_type) {
     params.set("market_type", state.job_market_type);
+  }
+  if (state.market) {
+    params.set("instrument_exchange", state.market);
+  }
+  if (state.market_type) {
+    params.set("instrument_market_type", state.market_type);
   }
   if (append && state.nextCursor) {
     params.set("cursor", state.nextCursor);

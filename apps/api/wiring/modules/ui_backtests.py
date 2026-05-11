@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from math import ceil
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Protocol
 
 from fastapi import APIRouter
 
@@ -31,6 +31,9 @@ from apps.api.wiring.modules.backtest import (
     _build_jobs_use_case,
     _with_local_dev_default,
 )
+from apps.api.wiring.modules.market_data_reference import (
+    build_market_data_reference_use_cases,
+)
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
     FilesystemBacktestArtifactContextResolver,
@@ -53,15 +56,19 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.market_data.application.dto.reference_api import EnabledMarketReference
+from trading.contexts.market_data.application.use_cases import (
+    MAX_INSTRUMENT_SEARCH_LIMIT,
+)
+from trading.shared_kernel.primitives import InstrumentId, MarketId
 
 _DEFAULT_REFRESH_INTERVAL_SECONDS = 15
 _MINIMUM_MANUAL_REFRESH_SECONDS = 10
 _JOB_TABLE_LIMIT = 50
 _INSTRUMENT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT")
-_MARKETS = (("binance", "Binance"),)
-_MARKET_TYPES = (("spot", "Spot"),)
 _EVENT_SOURCE = "backtest_job_events"
 _JOB_SOURCE = "backtest_jobs"
+_MARKET_REFERENCE_SOURCE = "market_data_reference"
 _DEFAULT_STRATEGY = "mean_reversion.py"
 
 
@@ -70,6 +77,28 @@ class _RefreshDecision:
     status: Literal["fresh", "rate_limited"]
     next_allowed_refresh_at: datetime | None
     retry_after_seconds: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class _InstrumentUniverseReadModel:
+    universe: BacktestInstrumentUniverseResponse
+    source: BacktestWorkstationSourceResponse
+
+
+class _ListEnabledMarketsService(Protocol):
+    def execute(self) -> tuple[EnabledMarketReference, ...]:
+        ...
+
+
+class _SearchEnabledTradableInstrumentsService(Protocol):
+    def execute(
+        self,
+        *,
+        market_id: MarketId,
+        q: str | None = None,
+        limit: int | None = None,
+    ) -> tuple[InstrumentId, ...]:
+        ...
 
 
 class BacktestWorkstationManualRefreshLimiter:
@@ -117,11 +146,19 @@ class BacktestWorkstationQueryService:
         runtime_defaults_service: BacktestRuntimeDefaultsService,
         jobs_use_case: BacktestJobsUseCase | None,
         instrument_symbols: tuple[str, ...] = _INSTRUMENT_SYMBOLS,
+        list_enabled_markets_use_case: _ListEnabledMarketsService | None = None,
+        search_enabled_tradable_instruments_use_case: (
+            _SearchEnabledTradableInstrumentsService | None
+        ) = None,
         refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
     ) -> None:
         self._runtime_defaults_service = runtime_defaults_service
         self._jobs_use_case = jobs_use_case
         self._instrument_symbols = instrument_symbols or _INSTRUMENT_SYMBOLS
+        self._list_enabled_markets_use_case = list_enabled_markets_use_case
+        self._search_enabled_tradable_instruments_use_case = (
+            search_enabled_tradable_instruments_use_case
+        )
         self._refresh_limiter = refresh_limiter or BacktestWorkstationManualRefreshLimiter()
 
     def get_workstation(
@@ -133,6 +170,8 @@ class BacktestWorkstationQueryService:
         query: str,
         exchange: str | None,
         market_type: str | None,
+        instrument_exchange: str | None,
+        instrument_market_type: str | None,
         symbol: str | None,
         launched_from: str | None,
         launched_to: str | None,
@@ -145,6 +184,12 @@ class BacktestWorkstationQueryService:
             refresh=refresh,
         )
         runtime_defaults = self._runtime_defaults_service.execute().as_mapping()
+        instrument_universe = self._build_instrument_universe(
+            runtime_defaults=runtime_defaults,
+            exchange=instrument_exchange,
+            market_type=instrument_market_type,
+            generated_at=generated_at,
+        )
         job_table = self._build_job_table(
             principal=principal,
             state=state,
@@ -173,6 +218,7 @@ class BacktestWorkstationQueryService:
                 generated_at,
                 detail="recent events are derived from bounded job history in Stage 8",
             ),
+            instrument_universe.source,
         ]
         refresh_status: Literal["fresh", "degraded", "rate_limited"] = (
             "rate_limited"
@@ -196,10 +242,7 @@ class BacktestWorkstationQueryService:
                 "stage": "Stage 10",
                 "suggested_strategy": _DEFAULT_STRATEGY,
             },
-            instrument_universe=_build_instrument_universe(
-                runtime_defaults=runtime_defaults,
-                instrument_symbols=self._instrument_symbols,
-            ),
+            instrument_universe=instrument_universe.universe,
             indicator_catalog=_build_indicator_catalog(runtime_defaults=runtime_defaults),
             optimization_overview=optimization,
             recent_events=_build_recent_events(job_table=job_table, generated_at=generated_at),
@@ -221,6 +264,90 @@ class BacktestWorkstationQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
             ),
         )
+
+    def _build_instrument_universe(
+        self,
+        *,
+        runtime_defaults: Mapping[str, Any],
+        exchange: str | None,
+        market_type: str | None,
+        generated_at: datetime,
+    ) -> _InstrumentUniverseReadModel:
+        if (
+            self._list_enabled_markets_use_case is None
+            or self._search_enabled_tradable_instruments_use_case is None
+        ):
+            return _build_fallback_instrument_universe(
+                runtime_defaults=runtime_defaults,
+                instrument_symbols=self._instrument_symbols,
+                generated_at=generated_at,
+                detail="market-data reference use cases are not configured",
+            )
+        try:
+            markets = tuple(self._list_enabled_markets_use_case.execute())
+            if not markets:
+                return _build_fallback_instrument_universe(
+                    runtime_defaults=runtime_defaults,
+                    instrument_symbols=self._instrument_symbols,
+                    generated_at=generated_at,
+                    detail="market-data reference returned no enabled markets",
+                )
+            selected_market = _resolve_selected_market(
+                markets=markets,
+                exchange=exchange,
+                market_type=market_type,
+            )
+            symbols = self._search_enabled_tradable_instruments_use_case.execute(
+                market_id=selected_market.market_id,
+                limit=MAX_INSTRUMENT_SEARCH_LIMIT,
+            )
+            symbol_options = [
+                BacktestOptionResponse(value=str(instrument.symbol), label=str(instrument.symbol))
+                for instrument in symbols
+            ]
+            if not symbol_options:
+                symbol_options = [
+                    BacktestOptionResponse(value=symbol, label=symbol)
+                    for symbol in self._instrument_symbols
+                ]
+            return _InstrumentUniverseReadModel(
+                universe=BacktestInstrumentUniverseResponse(
+                    source=_MARKET_REFERENCE_SOURCE,
+                    state="ready" if symbols else "degraded",
+                    markets=[
+                        BacktestOptionResponse(value=value, label=_option_label(value))
+                        for value in _unique_market_values(
+                            markets=markets,
+                            attr="exchange_name",
+                        )
+                    ],
+                    market_types=[
+                        BacktestOptionResponse(value=value, label=_option_label(value))
+                        for value in _unique_market_values(
+                            markets=markets,
+                            attr="market_type",
+                            exchange=selected_market.exchange_name,
+                        )
+                    ],
+                    symbols=symbol_options,
+                    timeframes=[
+                        BacktestOptionResponse(value=value, label=value)
+                        for value in list(runtime_defaults.get("supported_timeframes") or ["15m"])
+                    ],
+                    selected_symbols=[symbol_options[0].value],
+                    degradation_reason=None
+                    if symbols
+                    else "selected market returned no enabled tradable instruments",
+                ),
+                source=_source(_MARKET_REFERENCE_SOURCE, "available", generated_at),
+            )
+        except Exception as error:
+            return _build_fallback_instrument_universe(
+                runtime_defaults=runtime_defaults,
+                instrument_symbols=self._instrument_symbols,
+                generated_at=generated_at,
+                detail=f"market-data reference unavailable: {error}",
+            )
 
     def _build_job_table(
         self,
@@ -341,11 +468,18 @@ def build_ui_backtests_router(
         preflight_service=preflight_service,
         runtime_config=runtime_config,
     )
+    market_data_reference_use_cases = build_market_data_reference_use_cases(
+        environ=effective_environ
+    )
     return build_ui_backtests_api_router(
         workstation_service=BacktestWorkstationQueryService(
             runtime_defaults_service=runtime_defaults_service,
             jobs_use_case=jobs_use_case,
             instrument_symbols=_discover_artifact_symbols(artifact_config=artifact_config),
+            list_enabled_markets_use_case=market_data_reference_use_cases.list_enabled_markets,
+            search_enabled_tradable_instruments_use_case=(
+                market_data_reference_use_cases.search_enabled_tradable_instruments
+            ),
         ),
         current_user_dependency=current_user_dependency,
     )
@@ -406,43 +540,100 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
     )
 
 
-def _build_instrument_universe(
+def _build_fallback_instrument_universe(
     *,
     runtime_defaults: Mapping[str, Any],
     instrument_symbols: tuple[str, ...],
-) -> BacktestInstrumentUniverseResponse:
+    generated_at: datetime,
+    detail: str,
+) -> _InstrumentUniverseReadModel:
     selected_symbol = _first(instrument_symbols, default="BTCUSDT")
-    return BacktestInstrumentUniverseResponse(
-        source="artifact_manifests",
-        state="ready",
-        markets=[BacktestOptionResponse(value=value, label=label) for value, label in _MARKETS],
-        market_types=[
-            BacktestOptionResponse(value=value, label=label) for value, label in _MARKET_TYPES
-        ],
-        symbols=[
-            BacktestOptionResponse(value=symbol, label=symbol)
-            for symbol in instrument_symbols
-        ],
-        timeframes=[
-            BacktestOptionResponse(value=value, label=value)
-            for value in list(runtime_defaults.get("supported_timeframes") or ["15m"])
-        ],
-        selected_symbols=[selected_symbol],
+    return _InstrumentUniverseReadModel(
+        universe=BacktestInstrumentUniverseResponse(
+            source="artifact_manifests",
+            state="degraded",
+            markets=[BacktestOptionResponse(value="binance", label="Binance")],
+            market_types=[BacktestOptionResponse(value="spot", label="Spot")],
+            symbols=[
+                BacktestOptionResponse(value=symbol, label=symbol)
+                for symbol in instrument_symbols
+            ],
+            timeframes=[
+                BacktestOptionResponse(value=value, label=value)
+                for value in list(runtime_defaults.get("supported_timeframes") or ["15m"])
+            ],
+            selected_symbols=[selected_symbol],
+            degradation_reason=detail,
+        ),
+        source=_source(_MARKET_REFERENCE_SOURCE, "degraded", generated_at, detail=detail),
     )
 
 
 def _discover_artifact_symbols(*, artifact_config: Any) -> tuple[str, ...]:
     root = artifact_config.artifact_root_path()
     discovered: set[str] = set()
-    for exchange, _label in _MARKETS:
-        for market_type, _market_label in _MARKET_TYPES:
-            symbol_root = root / exchange / market_type
-            if not symbol_root.exists() or not symbol_root.is_dir():
+    if not root.exists() or not root.is_dir():
+        return _INSTRUMENT_SYMBOLS
+    for exchange_root in root.iterdir():
+        if not exchange_root.is_dir():
+            continue
+        for market_type_root in exchange_root.iterdir():
+            if not market_type_root.is_dir():
                 continue
-            for child in symbol_root.iterdir():
+            for child in market_type_root.iterdir():
                 if child.is_dir() and (child / "current.yaml").exists():
                     discovered.add(child.name.upper())
     return tuple(sorted(discovered)) or _INSTRUMENT_SYMBOLS
+
+
+def _resolve_selected_market(
+    *,
+    markets: tuple[EnabledMarketReference, ...],
+    exchange: str | None,
+    market_type: str | None,
+) -> EnabledMarketReference:
+    normalized_exchange = exchange.casefold() if exchange else None
+    normalized_market_type = market_type.casefold() if market_type else None
+    for market in markets:
+        if (
+            (normalized_exchange is None or market.exchange_name.casefold() == normalized_exchange)
+            and (
+                normalized_market_type is None
+                or market.market_type.casefold() == normalized_market_type
+            )
+        ):
+            return market
+    if normalized_exchange is not None:
+        for market in markets:
+            if market.exchange_name.casefold() == normalized_exchange:
+                return market
+    return markets[0]
+
+
+def _unique_market_values(
+    *,
+    markets: tuple[EnabledMarketReference, ...],
+    attr: Literal["exchange_name", "market_type"],
+    exchange: str | None = None,
+) -> tuple[str, ...]:
+    normalized_exchange = exchange.casefold() if exchange else None
+    values: list[str] = []
+    seen: set[str] = set()
+    for market in markets:
+        if (
+            normalized_exchange is not None
+            and market.exchange_name.casefold() != normalized_exchange
+        ):
+            continue
+        value = getattr(market, attr).strip().casefold()
+        if value and value not in seen:
+            seen.add(value)
+            values.append(value)
+    return tuple(values)
+
+
+def _option_label(value: str) -> str:
+    return value.replace("_", " ").title()
 
 
 def _build_indicator_catalog(
