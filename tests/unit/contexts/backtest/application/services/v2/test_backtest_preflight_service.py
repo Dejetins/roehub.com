@@ -41,7 +41,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
         "fixed_equity_pct_max_quote",
     ]
     assert "total_return_pct" in response["ranking_metrics"]
-    assert response["top_n_default"] == 100
+    assert response["top_n_default"] == 50
     assert response["guardrails"]["max_candidate_combinations"] == 10_000_000_000_000
     assert "ma.dema" in response["supported_indicator_ids"]
 
@@ -354,5 +354,5 @@ def _valid_request() -> dict[str, Any]:
             "primary_metric": "total_return_pct",
             "direction": "desc",
         },
-        "top_n": 100,
+        "top_n": 50,
     }

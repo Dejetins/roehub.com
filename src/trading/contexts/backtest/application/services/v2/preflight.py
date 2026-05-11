@@ -56,7 +56,7 @@ DEFAULT_BACKTEST_RANKING_V1: Mapping[str, str] = {
     "primary_metric": "total_return_pct",
     "direction": "desc",
 }
-DEFAULT_BACKTEST_TOP_N_V1 = 100
+DEFAULT_BACKTEST_TOP_N_V1 = 50
 
 BACKTEST_ERROR_INVALID_REQUEST = "backtest.invalid_request"
 BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED = "backtest.tp_sl_grid_not_covered"

@@ -172,7 +172,7 @@ class BacktestAiCatalogResolver:
                 fallback="total_return_pct",
             ),
             ranking_default=dict(runtime_defaults.get("ranking_default") or {}),
-            top_n_default=int(runtime_defaults.get("top_n_default") or 100),
+            top_n_default=int(runtime_defaults.get("top_n_default") or 50),
             guardrails=dict(runtime_defaults.get("guardrails") or {}),
             execution_defaults=dict(runtime_defaults.get("execution_defaults") or {}),
             hit_times_grid=dict(runtime_defaults.get("hit_times_grid") or {}),

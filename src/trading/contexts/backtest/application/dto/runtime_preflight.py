@@ -40,7 +40,7 @@ class BacktestRuntimeGuardrails:
     max_active_jobs_per_user: int = 1_000_000_000_000
     max_queued_jobs_per_user: int = 1_000_000_000_000
     max_active_jobs_global: int = 1_000_000_000_000
-    max_top_n: int = 1_000_000_000
+    max_top_n: int = 50
     max_indicator_arity: int = 1_000_000_000_000
     max_indicator_rows: int = 1_000_000_000_000
     max_candidate_combinations: int = 10_000_000_000_000

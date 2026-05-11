@@ -20,7 +20,7 @@ class BacktestNoRiskExactConfig:
     """
 
     benchmark_top_k: int = 5
-    default_request_top_n: int = 100
+    default_request_top_n: int = 50
     run_self_check: bool = False
     self_check_sample_size: int = 2
     self_check_return_tolerance: float = 1e-4

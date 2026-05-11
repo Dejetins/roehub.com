@@ -59,8 +59,8 @@ def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
     assert payload["direction_modes"] == ["long_only", "long_short_reversal"]
     assert "fixed_equity_pct_max_quote" in payload["sizing_modes"]
     assert "total_return_pct" in payload["ranking_metrics"]
-    assert payload["top_n_default"] == 100
-    assert payload["guardrails"]["max_top_n"] == 1_000_000_000
+    assert payload["top_n_default"] == 50
+    assert payload["guardrails"]["max_top_n"] == 50
     assert payload["indicator_param_specs"]["ma.dema"]["params"]["window"] == {
         "mode": "range",
         "start": 5,
@@ -985,7 +985,7 @@ def test_post_backtest_job_idempotency_replay_and_conflict() -> None:
     first = client.post("/backtests/jobs", headers=headers, json=_valid_request())
     replay = client.post("/backtests/jobs", headers=headers, json=_valid_request())
     changed_request = _valid_request()
-    changed_request["top_n"] = 50
+    changed_request["top_n"] = 49
     conflict = client.post("/backtests/jobs", headers=headers, json=changed_request)
 
     assert first.status_code == 201
@@ -1731,5 +1731,5 @@ def _valid_request() -> dict[str, Any]:
             "primary_metric": "total_return_pct",
             "direction": "desc",
         },
-        "top_n": 100,
+        "top_n": 50,
     }
