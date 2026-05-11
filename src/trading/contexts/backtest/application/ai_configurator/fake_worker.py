@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import cast
 from uuid import uuid4
 
 from trading.contexts.backtest.application.ports.backtest_ai_configurator import (
@@ -11,14 +11,16 @@ from trading.contexts.backtest.application.ports.backtest_ai_configurator import
 )
 
 from .dto import BacktestAiConfigEvent, BacktestAiConfigEventName, BacktestAiConfigJob
+from .services import BacktestAiConfigPipeline
 
 _FAKE_WORKER_ID = "backtest-ai-config-fake-worker"
-_FAKE_MODEL_ID = "deterministic-fake-worker-v1"
-_FAKE_STAGE_EVENTS: tuple[tuple[str, str, int], ...] = (
+_PRE_INPUT_GATE_EVENTS: tuple[tuple[str, str, int], ...] = (
     ("preparing_catalog", "Preparing the current /backtests catalog.", 20),
-    ("assembling_prompt", "Assembling a deterministic placeholder request.", 35),
-    ("generating", "Generating a placeholder configuration.", 55),
-    ("validating_json", "Checking placeholder JSON shape.", 70),
+)
+_VALIDATION_STAGE_EVENTS: tuple[tuple[str, str, int], ...] = (
+    ("assembling_prompt", "Assembling deterministic catalog-bound request.", 35),
+    ("generating", "Generating deterministic configuration draft.", 55),
+    ("validating_json", "Checking JSON shape and output safety.", 70),
     ("validating_business", "Checking /backtests business rules.", 85),
 )
 
@@ -31,6 +33,7 @@ class BacktestAiConfigFakeWorkerUseCase:
 
     job_repository: BacktestAiConfigJobRepository
     lease_repository: BacktestAiConfigLeaseRepository
+    pipeline: BacktestAiConfigPipeline
     lease_seconds: int = 60
     max_attempts: int = 1
     locked_by: str = _FAKE_WORKER_ID
@@ -46,7 +49,7 @@ class BacktestAiConfigFakeWorkerUseCase:
         if claimed is None:
             return None
 
-        for event_name, message, progress in _FAKE_STAGE_EVENTS:
+        for event_name, message, progress in _PRE_INPUT_GATE_EVENTS:
             self.job_repository.append_event(
                 event=_event(
                     job=claimed,
@@ -57,22 +60,32 @@ class BacktestAiConfigFakeWorkerUseCase:
                 )
             )
 
+        pipeline_result = self.pipeline.run(job=claimed)
+        if pipeline_result.stage == "validation":
+            for event_name, message, progress in _VALIDATION_STAGE_EVENTS:
+                self.job_repository.append_event(
+                    event=_event(
+                        job=claimed,
+                        event_name=event_name,
+                        message=message,
+                        progress=progress,
+                        created_at=effective_now,
+                    )
+                )
+
         finished = self.lease_repository.finish(
             job_id=claimed.job_id,
             now=effective_now,
             locked_by=self.locked_by,
-            next_state="ready",
-            assistant_message=(
-                "Я собрал тестовую конфигурацию для BTCUSDT на 15m. "
-                "Это deterministic fake response без MLX runtime."
-            ),
-            validated_config_json=_placeholder_config(),
-            suggestions_json=(
-                {"message": "Добавить stop loss / take profit grid"},
-            ),
-            validation_errors_json=(),
-            model_id=_FAKE_MODEL_ID,
+            next_state=pipeline_result.status,
+            assistant_message=pipeline_result.assistant_message,
+            validated_config_json=pipeline_result.validated_config,
+            suggestions_json=pipeline_result.warnings + pipeline_result.suggestions,
+            validation_errors_json=pipeline_result.validation_errors,
+            model_id=pipeline_result.model_id,
             model_path_hash=None,
+            last_error=pipeline_result.last_error,
+            last_error_json=pipeline_result.last_error_json,
         )
         if finished is None:
             return None
@@ -80,9 +93,9 @@ class BacktestAiConfigFakeWorkerUseCase:
         self.job_repository.append_event(
             event=_event(
                 job=finished,
-                event_name="ready",
-                message="Configuration is ready to load.",
-                progress=100,
+                event_name=pipeline_result.status,
+                message=pipeline_result.assistant_message,
+                progress=100 if pipeline_result.status == "ready" else 95,
                 created_at=effective_now,
             )
         )
@@ -111,40 +124,5 @@ def _event(
         },
         created_at=created_at,
     )
-
-
-def _placeholder_config() -> dict[str, Any]:
-    return {
-        "coordinates": {
-            "exchange": "binance",
-            "market_type": "spot",
-            "symbol": "BTCUSDT",
-        },
-        "timeframe": "15m",
-        "time_range": {
-            "start": "2023-01-01T00:00:00Z",
-            "end": "2024-01-01T00:00:00Z",
-        },
-        "indicators": [
-            {
-                "indicator_id": "momentum.rsi",
-                "sources": ["close"],
-                "window": {"start": 7, "stop": 28, "step": 7},
-            }
-        ],
-        "risk": {"mode": "none"},
-        "execution": {
-            "direction_mode": "long_short_reversal",
-            "fee_rate": 0.00075,
-            "slippage_rate": 0.0001,
-            "initial_cash_quote": 10000,
-            "sizing": {"mode": "fixed_equity_pct", "equity_pct": 10},
-            "profit_lock": {"enabled": False},
-            "close_on_end": True,
-        },
-        "ranking": {"primary_metric": "total_return_pct", "direction": "desc"},
-        "top_n": 100,
-    }
-
 
 __all__ = ["BacktestAiConfigFakeWorkerUseCase"]

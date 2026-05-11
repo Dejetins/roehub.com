@@ -103,7 +103,7 @@ def build_backtest_ai_config_job_response(
         assistant_message=_optional_str(snapshot["assistant_message"]),
         validated_config=validated_config if isinstance(validated_config, dict) else None,
         load_action=load_action,
-        warnings=[],
+        warnings=_warning_list(snapshot["suggestions"]),
         suggestions=_dict_list(snapshot["suggestions"]),
         validation_errors=_dict_list(snapshot["validation_errors"]),
         quota_charged=bool(snapshot["quota_charged"]),
@@ -145,6 +145,14 @@ def _dict_list(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [dict(item) for item in value if isinstance(item, dict)]
+
+
+def _warning_list(value: Any) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in _dict_list(value)
+        if str(item.get("kind") or "").casefold() == "warning"
+    ]
 
 
 def _optional_str(value: Any) -> str | None:
