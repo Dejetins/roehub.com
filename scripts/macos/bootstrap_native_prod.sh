@@ -17,11 +17,13 @@ install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/config.xml" /opt/roehub/confi
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/users.d/roehub.xml" /opt/roehub/config/clickhouse.users.roehub.xml
 install -m 0755 "$REPO_ROOT/infra/scripts/monit/launchctl_service_control.sh" /opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt/homebrew/etc/monit.d/roehub-market-data.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-job-runner.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
 
 for plist in \
   com.roehub.api.plist \
+  com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \
   com.roehub.backtest-artifact-publisher.plist \

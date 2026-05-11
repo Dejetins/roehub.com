@@ -56,6 +56,7 @@ Production:
 - `com.roehub.tailscale-runtime` (`launchd`, periodic one-shot reconnection/check + serve sync)
 - `com.roehub.keycloak` (`launchd`, auth provider, `127.0.0.1:18080`, ready-check `127.0.0.1:19000/health/ready`)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
+- `com.roehub.backtest-job-runner` (`launchd`, metrics `127.0.0.1:9204`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
 - `com.roehub.backtest-artifact-publisher` (`launchd`, metrics `127.0.0.1:9203`, daily `03:05 Europe/Moscow`)
@@ -69,6 +70,7 @@ Test:
 - `com.roehub.test.prometheus` (`127.0.0.1:19090`)
 - `com.roehub.test.blackbox-exporter` (`127.0.0.1:19115`)
 - `com.roehub.test.api` (`127.0.0.1:18000`)
+- `com.roehub.test.backtest-job-runner` (metrics `127.0.0.1:19204`)
 - `com.roehub.test.market-data-ws-worker` (metrics `127.0.0.1:19201`)
 - `com.roehub.test.market-data-scheduler` (metrics `127.0.0.1:19202`)
 - `com.roehub.test.backtest-artifact-publisher` (metrics `127.0.0.1:19203`, daily `03:05 Europe/Moscow`)
@@ -107,6 +109,7 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -t -c /opt/homebrew/etc/monitrc
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_job_runner
 ```
 
 Monit launchd wrapper semantics:
@@ -132,26 +135,33 @@ Keycloak auth operations (realm/client/OTP/local setup):
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
-В production baseline сюда входит `infra/scripts/monit/roehub-keycloak.monitrc`.
+В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc` и
+`infra/scripts/monit/roehub-backtest-job-runner.monitrc`.
 `reload_launchd_services.sh` сначала выгружает текущие static services и legacy
-`backtest-job-runner` plists, затем bootstrap-ит только static services для profile.
+numbered `backtest-job-runner.*` plists, затем bootstrap-ит static services для profile.
+Exact labels `com.roehub.backtest-job-runner` and
+`com.roehub.test.backtest-job-runner` are static services and must not be removed by
+the legacy cleanup step.
 `backtest-artifact-publisher` временно исключён из automatic reload/deploy path:
 его единственная operational control point — Monit wrapper, который явно делает
 `launchctl enable/bootstrap/kickstart` на `start` и `launchctl disable/bootout` на `stop`.
 
 GitHub Actions workflow `deploy-backend` должен использовать этот же install/reload path:
 сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
-`bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest,
-`backtest-job-runner` и automatic `backtest-artifact-publisher` launchd bootstrap больше не
-входят в production reload baseline.
+`bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest теперь
+возвращается в production reload baseline только через standalone
+`com.roehub.backtest-job-runner`; отдельный detail-runner process не запускается.
+Automatic `backtest-artifact-publisher` launchd bootstrap по-прежнему не входит в
+production reload baseline.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
 
-Целевой возврат `backtest-job-runner` в production baseline описан отдельно:
+Возврат `backtest-job-runner` в production baseline описан отдельно:
 `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. До выполнения
-этого плана отсутствие `com.roehub.backtest-job-runner` в `launchctl` является текущим
-baseline, но публичный Web UI backtest rollout не считается завершенным без dedicated
-worker smoke: controlled job `queued -> running -> succeeded`, lazy trades materialization
-cache miss/hit, metrics endpoint и Prometheus target.
+R4 отсутствие `com.roehub.backtest-job-runner` в `launchctl` было baseline. После R4
+операционная проверка service layer включает `launchctl print`, metrics endpoint
+`127.0.0.1:9204` и Prometheus target. Публичный Web UI backtest rollout не считается
+завершенным без R5 dedicated worker smoke: controlled job `queued -> running -> succeeded`,
+lazy trades materialization cache miss/hit, metrics endpoint и Prometheus target.
 
 Schema bootstrap (identity SQL + Alembic):
 

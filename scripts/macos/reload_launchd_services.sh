@@ -15,6 +15,7 @@ prod_services=(
   com.roehub.redis-exporter.plist
   com.roehub.clickhouse-exporter.plist
   com.roehub.api.plist
+  com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist
   com.roehub.market-data-scheduler.plist
 )
@@ -27,6 +28,7 @@ test_services=(
   com.roehub.test.prometheus.plist
   com.roehub.test.blackbox-exporter.plist
   com.roehub.test.api.plist
+  com.roehub.test.backtest-job-runner.plist
   com.roehub.test.market-data-ws-worker.plist
   com.roehub.test.market-data-scheduler.plist
   com.roehub.test.backtest-artifact-publisher.plist

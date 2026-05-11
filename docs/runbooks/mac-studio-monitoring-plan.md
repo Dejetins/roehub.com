@@ -24,21 +24,22 @@
 - `blackbox-tcp` (через `127.0.0.1:9115/probe`)
 - `market-data-ws-worker` (`127.0.0.1:9201/metrics`)
 - `market-data-scheduler` (`127.0.0.1:9202/metrics`)
+- `backtest-artifact-publisher` (`127.0.0.1:9203/metrics`)
+- `backtest-job-runner` (`127.0.0.1:9204/metrics`)
 
-## Планируемый target после backtest runner rollout
+## Backtest runner target
 
-`backtest-job-runner` пока не входит в текущий monitoring baseline. Его возврат
-планируется через
+`backtest-job-runner` входит в production monitoring baseline после R4
+`backtest-job-runner` rollout из
 `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`.
 
-После реализации runner rollout в `prometheus.prod.yml` должен появиться отдельный
-job:
+Prometheus scrape job:
 
 - `backtest-job-runner` (`127.0.0.1:9204/metrics`)
 
-До этого момента отсутствие target `backtest-job-runner` не является drift для
-текущего production monitoring, но является blocker для публичного `/backtests`
-runtime rollout.
+R4 done state проверяет service/metrics/target health. Controlled production job
+execution and lazy trades cache miss/hit smoke остаются R5 acceptance и не заменяются
+обычным `smoke_prod.sh`.
 
 ## Monit service supervision
 
@@ -46,6 +47,7 @@ runtime rollout.
 
 - `roehub_market_data_ws_worker`
 - `roehub_market_data_scheduler`
+- `roehub_backtest_job_runner`
 - `roehub_backtest_artifact_publisher`
 - `roehub_keycloak` (`127.0.0.1:19000/health/ready`)
 
@@ -64,7 +66,7 @@ TCP probes:
 
 - `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
 - `node_exporter` — `brew services`
-- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*` — user `launchd` services
+- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner` — user `launchd` services
 
 ## Install and bootstrap commands
 
@@ -82,8 +84,10 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/macos/launchd/com.roehub.postgres-exporter.plist`
 - `infra/macos/launchd/com.roehub.redis-exporter.plist`
 - `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
+- `infra/macos/launchd/com.roehub.backtest-job-runner.plist`
 - `infra/scripts/monit/launchctl_service_control.sh`
 - `infra/scripts/monit/roehub-market-data.monitrc`
+- `infra/scripts/monit/roehub-backtest-job-runner.monitrc`
 - `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
 - `infra/scripts/monit/roehub-keycloak.monitrc`
 - `scripts/macos/install_native_backend_prereqs.sh`
@@ -100,6 +104,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - Redis метрики (`redis_*`)
 - ClickHouse exporter метрики (`clickhouse_*`)
 - market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
+- backtest runner metrics (`backtest_runner_*`, `backtest_lazy_trades_cache_total`, `backtest_quota_rejections_total`)
 - API auth path health (`http_requests_total`, `http_request_duration_seconds`)
 - Prometheus self metrics
 
@@ -112,6 +117,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - ClickHouse exporter: `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}`
 - market-data worker: `ws_connected`, `ws_messages_total`, `ws_errors_total`, `insert_errors_total`, `ws_closed_to_insert_done_seconds`
 - market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
+- backtest job runner: `backtest_runner_tasks_claimed_total`, `backtest_runner_tasks_finished_total`, `backtest_runner_task_duration_seconds`, `backtest_runner_queue_wait_seconds`, `backtest_runner_active`, `backtest_runner_lease_lost_total`, `backtest_lazy_trades_cache_total`, `backtest_runner_last_success_unixtime`
 - auth API (через `http://127.0.0.1:8000/metrics`): `http_requests_total{path=~"/auth/(login|callback|logout|current-user)",status_code=~"5.."}`, `http_request_duration_seconds_count{path=~"/auth/(login|callback|logout|current-user)"}`.
 
 ## Вне scope
@@ -154,13 +160,15 @@ curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 ```bash
 curl -fsS http://127.0.0.1:9201/metrics | rg 'ws_|insert_|rest_fill_|redis_publish_'
 curl -fsS http://127.0.0.1:9202/metrics | rg 'scheduler_(job_|tasks_|startup_scan_|rest_catchup_)'
+curl -fsS http://127.0.0.1:9204/metrics | rg 'backtest_runner_|backtest_lazy_trades_cache_total|backtest_quota_rejections_total'
 ```
 
 ## 5) Проверка сервисов хоста
 
 ```bash
 brew services list
-launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data)'
+launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner)'
+launchctl print gui/$(id -u)/com.roehub.backtest-job-runner | grep -E 'state =|pid =|last exit code ='
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
 curl -I http://127.0.0.1:9100
@@ -170,7 +178,7 @@ curl -I http://127.0.0.1:9121
 curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:19000/health/ready
-/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_artifact)'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|backtest_artifact)'
 ```
 
 ## Minimum done state
@@ -181,7 +189,9 @@ Monitoring считается в рабочем состоянии, когда �
 - `probe_success` не сигнализирует массовых падений probes
 - `node-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter` отдают метрики
 - `market-data-ws-worker` и `market-data-scheduler` метрики доступны
+- `backtest-job-runner` target `127.0.0.1:9204` в `up` и endpoint `/metrics` отвечает
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
+- Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)
 

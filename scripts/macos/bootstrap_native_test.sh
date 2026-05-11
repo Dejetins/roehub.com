@@ -27,6 +27,7 @@ for plist in \
   com.roehub.test.prometheus.plist \
   com.roehub.test.blackbox-exporter.plist \
   com.roehub.test.api.plist \
+  com.roehub.test.backtest-job-runner.plist \
   com.roehub.test.market-data-ws-worker.plist \
   com.roehub.test.market-data-scheduler.plist \
   com.roehub.test.backtest-artifact-publisher.plist
