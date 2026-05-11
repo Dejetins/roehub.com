@@ -684,7 +684,7 @@
   transform: translateY(0);
 }
 
-.backtests-variant-frame--static {
+.backtests-variant-frame.backtests-variant-frame--static {
   max-height: none;
   opacity: 1;
   transform: none;

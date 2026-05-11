@@ -995,7 +995,7 @@ function renderVariantExpansion(root, row) {
   const shouldAnimate = state.animateVariantJobId === row.job_id;
   const frameClass = shouldAnimate
     ? "backtests-variant-frame"
-    : "backtests-variant-frame backtests-variant-frame--static is-open";
+    : "backtests-variant-frame backtests-variant-frame--static";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
     : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : t("backtests.variants.empty"))}</td></tr>`;

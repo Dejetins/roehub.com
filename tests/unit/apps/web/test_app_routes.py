@@ -794,6 +794,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "&times;" not in backtests_js
     assert "bindStatusBar" in backtests_js
     assert "backtests-variant-frame--static" in backtests_js
+    assert '"backtests-variant-frame backtests-variant-frame--static is-open"' not in backtests_js
     assert "signedDrawdownPercent" in backtests_js
     assert "integerOrDash" in backtests_js
     assert "backtests-download-button" in backtests_js
@@ -828,6 +829,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert ".backtests-icon-button" in backtests_css
     assert ".backtests-variant-frame" in backtests_css
     assert "max-height var(--backtests-variant-open-duration" in backtests_css
+    assert ".backtests-variant-frame.backtests-variant-frame--static" in backtests_css
     assert "--rh-financial-positive" in backtests_css
     assert "--rh-financial-negative" in backtests_css
     assert "activeRequest" in dashboard_js
