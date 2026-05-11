@@ -28,12 +28,18 @@ operations.
   `claim_next -> update_progress -> executor -> finish_with_top_variants`.
 - `DatabaseBacktestJobExecutionTrigger` сейчас является explicit no-op trigger:
   API сохраняет row в БД, но не запускает process сам.
+- `backtest_lazy_trades_materializations` уже существует как request-side queue
+  boundary: миграция, порт и Postgres adapter умеют создать/replay task.
+  Текущий storage/API literal: `status` в
+  `queued|running|completed|failed|cancelled`, а не отдельное поле `state`.
 - В production на Mac Studio нет активного `backtest-job-runner` service.
 - `reload_launchd_services.sh prod` сейчас удаляет legacy
   `backtest-job-runner.*` plists и не поднимает новый runner.
 - `BacktestLazyTradesDetailService` умеет deterministic recompute/cache для одного
-  `variant_key`, но текущий API path может выполнить cache-miss recompute внутри
-  API process. Для Web UI это тот же класс риска, что и старый `sync_inline`.
+  `variant_key`. Public jobs API сейчас на cache miss создает materialization task
+  и возвращает typed `202`, но runner еще не умеет claim/execute/finish этих
+  tasks. Любой production fallback к sync recompute внутри API process остается тем
+  же классом риска, что и старый `sync_inline`.
 
 ## Охват
 
@@ -135,7 +141,7 @@ sequenceDiagram
         API-->>UI: 202 status=queued + detail_task_id + retry_after_seconds
         W->>DB: claim detail task
         W->>C: recompute one variant + atomic cache write
-        W->>DB: succeeded/failed
+        W->>DB: completed/failed
         UI->>API: GET trades/status or GET trades?page=...
         API->>C: cache read
         API-->>UI: 200 detail/trades payload or queued/running status
@@ -158,7 +164,7 @@ backtest_lazy_trades_materializations
 - `request_hash TEXT NOT NULL`;
 - `artifact_manifest_hash TEXT NOT NULL`;
 - `cache_key TEXT NOT NULL`;
-- `state TEXT NOT NULL CHECK state IN ('queued','running','succeeded','failed','cancelled')`;
+- `status TEXT NOT NULL CHECK status IN ('queued','running','completed','failed','cancelled')`;
 - `priority_class TEXT NOT NULL`;
 - `created_at`, `updated_at`, `started_at`, `finished_at`;
 - `locked_by`, `locked_at`, `lease_expires_at`, `heartbeat_at`, `attempt`;
@@ -169,7 +175,7 @@ backtest_lazy_trades_materializations
 
 - unique active key: `(owner_user_id, job_id, public_variant_key, cache_key)` для
   non-terminal или свежей successful materialization;
-- повторный POST при уже queued/running task возвращает тот же task state;
+- повторный POST при уже queued/running task возвращает тот же task status;
 - cache hit возвращает payload без создания task.
 
 API compatibility:
@@ -355,7 +361,7 @@ smoke:
 5. observe terminal `succeeded` with `top_variants > 0`;
 6. open one top `variant_key`;
 7. call lazy detail endpoint;
-8. on cache miss observe materialization `queued/running/succeeded`;
+8. on cache miss observe materialization `queued/running/completed`;
 9. verify cached second read;
 10. verify metrics endpoint and Prometheus target health;
 11. verify logs contain no secrets/full payloads.
@@ -364,10 +370,10 @@ Missing artifacts/config is a blocker for production acceptance. A separate
 negative test may prove graceful `backtest.artifacts_unavailable`, but it does not
 replace successful runner smoke.
 
-Existing queued jobs, including manually observed stuck jobs, should not be the
-primary acceptance smoke. Rollout must first create a controlled smoke job; after
-that, backlog can be released, cancelled, or processed by explicit operator
-decision.
+Existing queued work, including full jobs and lazy detail materialization tasks,
+must not be the primary acceptance smoke. Rollout must first create a controlled
+smoke job/detail task pair; after that, backlog can be released, cancelled, or
+processed by explicit operator decision.
 
 ## Узкие места и mitigations
 
@@ -424,7 +430,9 @@ Acceptance:
 
 ### Этап R3 - lazy trades materialization queue
 
-- Добавить storage/port/use case для `backtest_lazy_trades_materializations`.
+- Расширить существующие storage/port/use case для
+  `backtest_lazy_trades_materializations`: claim, heartbeat, terminal
+  completed/failed/cancelled и worker execution.
 - Изменить production cache-miss behavior: `POST /trades` returns queued/running task
   instead of blocking on recompute.
 - Runner обрабатывает detail tasks and writes cache atomically.
@@ -462,7 +470,7 @@ Acceptance:
 Acceptance:
 
 - controlled job reaches `succeeded`;
-- one lazy materialization reaches `succeeded`;
+- one lazy materialization reaches `completed`;
 - second detail read is cache hit;
 - API/auth/dashboard endpoints remain responsive;
 - rollback path documented.
