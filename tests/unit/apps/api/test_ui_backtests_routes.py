@@ -51,7 +51,8 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["runtime_defaults"]["supported_timeframes"] == ["15m"]
     assert "preset" not in payload["config_draft"]
     assert payload["ai_configurator_state"]["enabled"] is False
-    assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    assert payload["instrument_universe"]["source"] == "artifact_manifests"
+    assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT"]
     assert payload["config_draft"]["time_range"]["end"].startswith(
         (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
     )

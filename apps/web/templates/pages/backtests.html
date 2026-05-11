@@ -41,6 +41,7 @@
             ("timeframe", "backtests.config.timeframe", "backtests.option.15m", [("15m", "backtests.option.15m")]),
             ("direction", "backtests.config.direction", "backtests.option.long_short", [("long_short_reversal", "backtests.option.long_short"), ("long_only", "backtests.option.long_only")]),
             ("risk_mode", "backtests.config.risk_mode", "backtests.option.no_risk", [("none", "backtests.option.no_risk"), ("tp_sl_grid", "backtests.option.tp_sl_grid")]),
+            ("sizing_mode", "backtests.config.sizing_mode", "backtests.option.fixed_equity_pct", [("all_in", "backtests.option.all_in"), ("fixed_quote", "backtests.option.fixed_quote"), ("fixed_equity_pct", "backtests.option.fixed_equity_pct"), ("fixed_equity_pct_min_quote", "backtests.option.fixed_equity_pct_min_quote"), ("fixed_equity_pct_max_quote", "backtests.option.fixed_equity_pct_max_quote")]),
             ("ranking_metric", "backtests.config.ranking_metric", "backtests.option.total_return", [("total_return_pct", "backtests.option.total_return"), ("sharpe", "backtests.option.sharpe")]),
             ("ranking_order", "backtests.config.ranking_order", "backtests.option.desc", [("desc", "backtests.option.desc"), ("asc", "backtests.option.asc")])
           ] %}
@@ -80,18 +81,38 @@
             <span>{{ t("backtests.config.symbol") }}</span>
             <input class="backtests-input" type="text" value="BTCUSDT" data-config-field="symbol" aria-label="{{ t('backtests.config.symbol') }}">
           </label>
-          <label class="backtests-field">
-            <span>{{ t("backtests.config.start") }}</span>
-            <input class="backtests-input" type="date" value="2023-01-01" data-config-field="start" aria-label="{{ t('backtests.config.start') }}">
-          </label>
-          <label class="backtests-field">
-            <span>{{ t("backtests.config.end") }}</span>
-            <input class="backtests-input" type="date" value="2024-01-01" data-config-field="end" aria-label="{{ t('backtests.config.end') }}">
-          </label>
+          <div class="backtests-field-pair">
+            <label class="backtests-field">
+              <span>{{ t("backtests.config.start") }}</span>
+              <input class="backtests-input" type="date" value="2023-01-01" data-config-field="start" aria-label="{{ t('backtests.config.start') }}">
+            </label>
+            <label class="backtests-field">
+              <span>{{ t("backtests.config.end") }}</span>
+              <input class="backtests-input" type="date" value="2024-01-01" data-config-field="end" aria-label="{{ t('backtests.config.end') }}">
+            </label>
+          </div>
           <label class="backtests-field">
             <span>{{ t("backtests.config.capital") }}</span>
             <input class="backtests-input" type="number" min="1" step="100" value="10000" data-config-field="capital" aria-label="{{ t('backtests.config.capital') }}">
           </label>
+          <label class="backtests-field" data-sizing-field-row="quote_amount" hidden>
+            <span>{{ t("backtests.config.quote_amount") }}</span>
+            <input class="backtests-input" type="number" min="1" step="10" value="1000" data-sizing-field="quote_amount" aria-label="{{ t('backtests.config.quote_amount') }}">
+          </label>
+          <label class="backtests-field" data-sizing-field-row="equity_pct">
+            <span>{{ t("backtests.config.equity_pct") }}</span>
+            <input class="backtests-input" type="number" min="0.01" max="100" step="0.1" value="10" data-sizing-field="equity_pct" aria-label="{{ t('backtests.config.equity_pct') }}">
+          </label>
+          <div class="backtests-field-pair" data-sizing-bounds-row hidden>
+            <label class="backtests-field" data-sizing-field-row="min_quote" hidden>
+              <span>{{ t("backtests.config.min_quote") }}</span>
+              <input class="backtests-input" type="number" min="1" step="10" value="100" data-sizing-field="min_quote" aria-label="{{ t('backtests.config.min_quote') }}">
+            </label>
+            <label class="backtests-field" data-sizing-field-row="max_quote" hidden>
+              <span>{{ t("backtests.config.max_quote") }}</span>
+              <input class="backtests-input" type="number" min="1" step="10" value="1000" data-sizing-field="max_quote" aria-label="{{ t('backtests.config.max_quote') }}">
+            </label>
+          </div>
           <label class="backtests-field">
             <span>{{ t("backtests.config.fee") }}</span>
             <input class="backtests-input" type="number" min="0" step="0.01" value="0.075" data-config-field="fee" aria-label="{{ t('backtests.config.fee') }}">
@@ -336,7 +357,6 @@
     <span>{{ t("strategies.footer.data") }}: <strong data-footer-data>--</strong></span>
     <span>{{ t("dashboard.footer.api") }}: <strong data-footer-api>--</strong></span>
     <span>{{ t("dashboard.footer.latency") }}: <strong data-footer-latency>--</strong></span>
-    <span>{{ t("strategies.footer.capital") }}: <strong data-footer-capital>--</strong></span>
     <span>{{ t("dashboard.footer.server_time") }}: <strong data-footer-time>--</strong></span>
     <span class="strategies-status-actions backtests-status-actions" data-backtests-refresh-control>
       <button class="rh-button rh-button--primary rh-button--compact" type="button" data-backtests-refresh>{{ t("refresh.manual") }}</button>

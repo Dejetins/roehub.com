@@ -23,6 +23,7 @@ const state = {
   timeframe: "15m",
   direction: "long_short_reversal",
   risk_mode: "none",
+  sizing_mode: "fixed_equity_pct",
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
   job_state: "",
@@ -132,6 +133,17 @@ function labelForId(value) {
     .replaceAll(".", " ")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function sizingModeLabel(value) {
+  const labels = {
+    all_in: t("backtests.option.all_in"),
+    fixed_quote: t("backtests.option.fixed_quote"),
+    fixed_equity_pct: t("backtests.option.fixed_equity_pct"),
+    fixed_equity_pct_min_quote: t("backtests.option.fixed_equity_pct_min_quote"),
+    fixed_equity_pct_max_quote: t("backtests.option.fixed_equity_pct_max_quote"),
+  };
+  return labels[value] || labelForId(value);
 }
 
 function primaryWindowSpec(catalogItem) {
@@ -284,11 +296,8 @@ function financialClass(value) {
 }
 
 function selectedSymbols(root) {
-  const selected = qsa("[data-symbol-checkbox]:checked", root).map((item) => item.value);
-  if (selected.length) {
-    state.selectedSymbols = new Set(selected);
-  }
-  return selected.length ? selected : Array.from(state.selectedSymbols || [state.symbol || "BTCUSDT"]);
+  const selected = Array.from(state.selectedSymbols || []);
+  return selected.length ? selected.slice(0, 1) : [state.symbol || "BTCUSDT"];
 }
 
 function buildRequestPayload(root) {
@@ -297,6 +306,7 @@ function buildRequestPayload(root) {
   const capital = Number(qs("[data-config-field='capital']", root)?.value || 10000);
   const feePercent = Number(qs("[data-config-field='fee']", root)?.value || 0.075);
   const slippagePercent = Number(qs("[data-config-field='slippage']", root)?.value || 0.01);
+  const sizing = buildSizingPayload(root);
   const indicators = state.selectedIndicators.length
     ? state.selectedIndicators.map((indicator) => ({
         indicator_id: indicator.indicator_id,
@@ -346,7 +356,7 @@ function buildRequestPayload(root) {
       fee_rate: feePercent / 100,
       slippage_rate: slippagePercent / 100,
       initial_cash_quote: capital,
-      sizing: { mode: "fixed_equity_pct", equity_pct: 10.0 },
+      sizing,
       profit_lock: { enabled: false },
       close_on_end: true,
     },
@@ -355,6 +365,43 @@ function buildRequestPayload(root) {
       direction: state.ranking_order,
     },
     top_n: Number(state.runtimeDefaults?.runtime_defaults?.top_n_default || 100),
+  };
+}
+
+function positiveSizingNumber(root, name, fallback) {
+  const value = Number(qs(`[data-sizing-field='${name}']`, root)?.value || fallback);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function buildSizingPayload(root) {
+  const mode = state.sizing_mode || "fixed_equity_pct";
+  if (mode === "all_in") {
+    return { mode };
+  }
+  if (mode === "fixed_quote") {
+    return {
+      mode,
+      quote_amount: positiveSizingNumber(root, "quote_amount", 1000),
+    };
+  }
+  const equityPct = positiveSizingNumber(root, "equity_pct", 10);
+  if (mode === "fixed_equity_pct_min_quote") {
+    return {
+      mode,
+      equity_pct: equityPct,
+      min_quote: positiveSizingNumber(root, "min_quote", 100),
+    };
+  }
+  if (mode === "fixed_equity_pct_max_quote") {
+    return {
+      mode,
+      equity_pct: equityPct,
+      max_quote: positiveSizingNumber(root, "max_quote", 1000),
+    };
+  }
+  return {
+    mode: "fixed_equity_pct",
+    equity_pct: equityPct,
   };
 }
 
@@ -372,6 +419,9 @@ function updateOptionSelection(root, name, value, label) {
   }
   if (name === "risk_mode") {
     updateRiskPanel(root);
+  }
+  if (name === "sizing_mode") {
+    updateSizingPanel(root);
   }
 }
 
@@ -413,6 +463,10 @@ function renderRuntimeControls(root, data) {
     value,
     label: value === "tp_sl_grid" ? t("backtests.option.tp_sl_grid") : t("backtests.option.no_risk"),
   })));
+  renderDropdownOptions(root, "sizing_mode", (runtime.sizing_modes || []).map((value) => ({
+    value,
+    label: sizingModeLabel(value),
+  })));
   renderDropdownOptions(root, "ranking_metric", (runtime.ranking_metrics || []).map((value) => ({
     value,
     label: labelForId(value),
@@ -420,9 +474,11 @@ function renderRuntimeControls(root, data) {
   seedRiskPanel(root, runtime.hit_times_grid || {});
   seedConfigDraft(root, data?.config_draft || {});
   updateRiskPanel(root);
+  updateSizingPanel(root);
 }
 
 function seedConfigDraft(root, draft) {
+  const sizing = draft?.execution?.sizing || {};
   const fieldValues = {
     symbol: draft?.coordinates?.symbol,
     start: String(draft?.time_range?.start || "").slice(0, 10),
@@ -437,6 +493,21 @@ function seedConfigDraft(root, draft) {
       field.value = String(value);
     }
   });
+  const sizingValues = {
+    quote_amount: sizing.quote_amount ?? 1000,
+    equity_pct: sizing.equity_pct ?? 10,
+    min_quote: sizing.min_quote ?? 100,
+    max_quote: sizing.max_quote ?? 1000,
+  };
+  Object.entries(sizingValues).forEach(([name, value]) => {
+    const field = qs(`[data-sizing-field='${name}']`, root);
+    if (field && value !== undefined && value !== null && value !== "") {
+      field.value = String(value);
+    }
+  });
+  if (sizing?.mode) {
+    updateOptionSelection(root, "sizing_mode", sizing.mode, sizingModeLabel(sizing.mode));
+  }
   if (draft?.timeframe) {
     updateOptionSelection(root, "timeframe", draft.timeframe, draft.timeframe);
   }
@@ -476,22 +547,55 @@ function updateRiskPanel(root) {
   }
 }
 
+function updateSizingPanel(root) {
+  const mode = state.sizing_mode || "fixed_equity_pct";
+  const visibleFields = new Set();
+  if (mode === "fixed_quote") {
+    visibleFields.add("quote_amount");
+  } else if (mode === "fixed_equity_pct") {
+    visibleFields.add("equity_pct");
+  } else if (mode === "fixed_equity_pct_min_quote") {
+    visibleFields.add("equity_pct");
+    visibleFields.add("min_quote");
+  } else if (mode === "fixed_equity_pct_max_quote") {
+    visibleFields.add("equity_pct");
+    visibleFields.add("max_quote");
+  }
+  qsa("[data-sizing-field-row]", root).forEach((row) => {
+    row.hidden = !visibleFields.has(row.dataset.sizingFieldRow || "");
+  });
+  const boundsRow = qs("[data-sizing-bounds-row]", root);
+  if (boundsRow) {
+    boundsRow.hidden = !visibleFields.has("min_quote") && !visibleFields.has("max_quote");
+  }
+}
+
 function renderSymbols(root, universe) {
   const target = qs("[data-symbol-list]", root);
   const selectedTarget = qs("[data-selected-symbols]", root);
   const symbols = universe?.symbols || [];
-  const selected = state.selectedSymbols?.size
-    ? state.selectedSymbols
-    : new Set(universe?.selected_symbols || ["BTCUSDT"]);
-  state.selectedSymbols = new Set(selected);
+  const firstUniverseSymbol = symbols[0]?.value || "BTCUSDT";
+  const requestedSelected =
+    Array.from(state.selectedSymbols || [])[0] ||
+    universe?.selected_symbols?.[0] ||
+    state.symbol ||
+    firstUniverseSymbol;
+  const availableValues = new Set(symbols.map((symbol) => symbol.value));
+  const selectedValue = availableValues.has(requestedSelected) ? requestedSelected : firstUniverseSymbol;
+  const selected = new Set([selectedValue]);
+  state.symbol = selectedValue;
+  state.selectedSymbols = selected;
+  const symbolField = qs("[data-config-field='symbol']", root);
+  if (symbolField instanceof HTMLInputElement) {
+    symbolField.value = selectedValue;
+  }
   if (target) {
     target.innerHTML = symbols
       .map((symbol) => `
-        <label class="backtests-symbol-row" data-symbol-row data-symbol-label="${escapeHtml(symbol.label)}">
-          <input type="checkbox" value="${escapeHtml(symbol.value)}" data-symbol-checkbox ${selected.has(symbol.value) ? "checked" : ""}>
+        <button class="backtests-symbol-row ${selected.has(symbol.value) ? "is-selected" : ""}" type="button" data-symbol-row data-symbol-select="${escapeHtml(symbol.value)}" data-symbol-label="${escapeHtml(symbol.label)}" aria-pressed="${selected.has(symbol.value) ? "true" : "false"}">
           <span>${escapeHtml(symbol.label)}</span>
           <small>${escapeHtml(symbol.status)}</small>
-        </label>
+        </button>
       `)
       .join("");
   }
@@ -881,7 +985,6 @@ function renderResultSummary(root, summary) {
 function renderFooter(root, data) {
   const sources = data?.sources || [];
   const availableSources = sources.filter((source) => source.status === "available").length;
-  const capital = data?.config_draft?.execution?.initial_cash_quote;
   setText(
     "[data-footer-connection]",
     data?.footer_status?.api === "available" ? "connected" : data?.footer_status?.api || "--",
@@ -894,7 +997,6 @@ function renderFooter(root, data) {
   );
   setText("[data-footer-api]", data?.footer_status?.api || "--");
   setText("[data-footer-latency]", "--", document);
-  setText("[data-footer-capital]", capital ? `${capital} USDT` : "--", document);
   setText("[data-footer-time]", localTime(data?.generated_at));
   setText(
     "[data-backtests-freshness]",
@@ -1236,6 +1338,7 @@ function setAutorefresh(root, presetKey) {
     poller.start();
   }
   setText("[data-backtests-refresh-current]", presetKey, document);
+  setText("[data-backtests-refresh-status]", intervalMs > 0 ? presetKey : t("refresh.idle"), document);
 }
 
 function closeStatusRefreshMenu(statusBar) {
@@ -1250,6 +1353,30 @@ function closeStatusRefreshMenu(statusBar) {
   }
   if (menu instanceof HTMLElement) {
     menu.hidden = true;
+  }
+}
+
+function openStatusRefreshMenu(statusBar) {
+  const dropdown = qs("[data-rh-dropdown]", statusBar);
+  const trigger = qs("[data-rh-dropdown-trigger]", statusBar);
+  const menu = qs("[data-rh-dropdown-menu]", statusBar);
+  if (dropdown instanceof HTMLElement) {
+    dropdown.dataset.open = "true";
+  }
+  if (trigger instanceof HTMLElement) {
+    trigger.setAttribute("aria-expanded", "true");
+  }
+  if (menu instanceof HTMLElement) {
+    menu.hidden = false;
+  }
+}
+
+function toggleStatusRefreshMenu(statusBar) {
+  const dropdown = qs("[data-rh-dropdown]", statusBar);
+  if (dropdown?.dataset.open === "true") {
+    closeStatusRefreshMenu(statusBar);
+  } else {
+    openStatusRefreshMenu(statusBar);
   }
 }
 
@@ -1269,9 +1396,18 @@ function bindStatusBar(root) {
     if (!(event.target instanceof Element)) {
       return;
     }
+    const refreshTrigger = event.target.closest("#backtests-refresh-trigger");
+    if (refreshTrigger instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleStatusRefreshMenu(statusBar);
+      return;
+    }
     const refreshButton = event.target.closest("[data-backtests-refresh]");
     if (refreshButton instanceof HTMLElement) {
       event.preventDefault();
+      event.stopPropagation();
+      setText("[data-backtests-refresh-status]", t("refresh.manual"), document);
       if (manualRefreshRetrySeconds > 0) {
         setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }), document);
       }
@@ -1281,6 +1417,7 @@ function bindStatusBar(root) {
     const preset = event.target.closest("[data-backtests-refresh-preset]");
     if (preset instanceof HTMLElement) {
       event.preventDefault();
+      event.stopPropagation();
       const presetKey = preset.dataset.backtestsRefreshPreset || "off";
       updateRefreshPresetSelection(statusBar, presetKey);
       setAutorefresh(root, presetKey);
@@ -1337,11 +1474,21 @@ function bind(root) {
     }
     const clearSymbols = event.target.closest("[data-clear-symbols]");
     if (clearSymbols instanceof HTMLElement) {
-      qsa("[data-symbol-checkbox]", root).forEach((checkbox) => {
-        checkbox.checked = false;
-      });
-      state.selectedSymbols = new Set();
+      const firstSymbol = qs("[data-symbol-select]", root)?.dataset.symbolSelect || "BTCUSDT";
+      state.symbol = firstSymbol;
+      state.selectedSymbols = new Set([firstSymbol]);
       renderSelectedSymbols(root);
+      renderSymbols(root, state.runtimeDefaults?.instrument_universe);
+      return;
+    }
+    const symbolButton = event.target.closest("[data-symbol-select]");
+    if (symbolButton instanceof HTMLElement) {
+      const symbol = symbolButton.dataset.symbolSelect || "";
+      if (symbol) {
+        state.symbol = symbol;
+        state.selectedSymbols = new Set([symbol]);
+        renderSymbols(root, state.runtimeDefaults?.instrument_universe);
+      }
       return;
     }
     const addIndicatorButton = event.target.closest("[data-add-indicator]");
@@ -1351,8 +1498,22 @@ function bind(root) {
     }
     const indicatorFamilyTab = event.target.closest("[data-indicator-family-tab]");
     if (indicatorFamilyTab instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dropdown = indicatorFamilyTab.closest("[data-rh-dropdown]");
       state.indicatorFamily = indicatorFamilyTab.dataset.indicatorFamilyTab || state.indicatorFamily;
       renderIndicatorAddMenu(root, Array.from(state.indicatorCatalog.values()));
+      if (dropdown instanceof HTMLElement) {
+        dropdown.dataset.open = "true";
+        const trigger = qs("[data-rh-dropdown-trigger]", dropdown);
+        const menu = qs("[data-rh-dropdown-menu]", dropdown);
+        if (trigger instanceof HTMLElement) {
+          trigger.setAttribute("aria-expanded", "true");
+        }
+        if (menu instanceof HTMLElement) {
+          menu.hidden = false;
+        }
+      }
       return;
     }
     const removeIndicatorButton = event.target.closest("[data-remove-indicator]");

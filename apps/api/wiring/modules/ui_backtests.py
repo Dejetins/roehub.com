@@ -116,10 +116,12 @@ class BacktestWorkstationQueryService:
         *,
         runtime_defaults_service: BacktestRuntimeDefaultsService,
         jobs_use_case: BacktestJobsUseCase | None,
+        instrument_symbols: tuple[str, ...] = _INSTRUMENT_SYMBOLS,
         refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
     ) -> None:
         self._runtime_defaults_service = runtime_defaults_service
         self._jobs_use_case = jobs_use_case
+        self._instrument_symbols = instrument_symbols or _INSTRUMENT_SYMBOLS
         self._refresh_limiter = refresh_limiter or BacktestWorkstationManualRefreshLimiter()
 
     def get_workstation(
@@ -194,7 +196,10 @@ class BacktestWorkstationQueryService:
                 "stage": "Stage 10",
                 "suggested_strategy": _DEFAULT_STRATEGY,
             },
-            instrument_universe=_build_instrument_universe(runtime_defaults=runtime_defaults),
+            instrument_universe=_build_instrument_universe(
+                runtime_defaults=runtime_defaults,
+                instrument_symbols=self._instrument_symbols,
+            ),
             indicator_catalog=_build_indicator_catalog(runtime_defaults=runtime_defaults),
             optimization_overview=optimization,
             recent_events=_build_recent_events(job_table=job_table, generated_at=generated_at),
@@ -340,6 +345,7 @@ def build_ui_backtests_router(
         workstation_service=BacktestWorkstationQueryService(
             runtime_defaults_service=runtime_defaults_service,
             jobs_use_case=jobs_use_case,
+            instrument_symbols=_discover_artifact_symbols(artifact_config=artifact_config),
         ),
         current_user_dependency=current_user_dependency,
     )
@@ -403,9 +409,11 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
 def _build_instrument_universe(
     *,
     runtime_defaults: Mapping[str, Any],
+    instrument_symbols: tuple[str, ...],
 ) -> BacktestInstrumentUniverseResponse:
+    selected_symbol = _first(instrument_symbols, default="BTCUSDT")
     return BacktestInstrumentUniverseResponse(
-        source="runtime_defaults",
+        source="artifact_manifests",
         state="ready",
         markets=[BacktestOptionResponse(value=value, label=label) for value, label in _MARKETS],
         market_types=[
@@ -413,14 +421,28 @@ def _build_instrument_universe(
         ],
         symbols=[
             BacktestOptionResponse(value=symbol, label=symbol)
-            for symbol in _INSTRUMENT_SYMBOLS
+            for symbol in instrument_symbols
         ],
         timeframes=[
             BacktestOptionResponse(value=value, label=value)
             for value in list(runtime_defaults.get("supported_timeframes") or ["15m"])
         ],
-        selected_symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        selected_symbols=[selected_symbol],
     )
+
+
+def _discover_artifact_symbols(*, artifact_config: Any) -> tuple[str, ...]:
+    root = artifact_config.artifact_root_path()
+    discovered: set[str] = set()
+    for exchange, _label in _MARKETS:
+        for market_type, _market_label in _MARKET_TYPES:
+            symbol_root = root / exchange / market_type
+            if not symbol_root.exists() or not symbol_root.is_dir():
+                continue
+            for child in symbol_root.iterdir():
+                if child.is_dir() and (child / "current.yaml").exists():
+                    discovered.add(child.name.upper())
+    return tuple(sorted(discovered)) or _INSTRUMENT_SYMBOLS
 
 
 def _build_indicator_catalog(
