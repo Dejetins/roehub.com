@@ -13,6 +13,7 @@ from trading.contexts.backtest.adapters.outbound import (
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestJobRepository,
+    PostgresBacktestLazyTradesMaterializationRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
@@ -115,9 +116,8 @@ def _build_jobs_use_case(
     postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not postgres_dsn:
         return None
-    job_repository = PostgresBacktestJobRepository(
-        gateway=PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
-    )
+    postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
+    job_repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
     prepare_pools = BacktestPreparePoolsService(
         artifact_array_loader=artifact_array_loader,
         defaults_provider=defaults_provider,
@@ -130,6 +130,9 @@ def _build_jobs_use_case(
         preflight_service=preflight_service,
         runtime_config=runtime_config,
         execution_trigger=DatabaseBacktestJobExecutionTrigger(),
+        lazy_trades_materialization_repository=(
+            PostgresBacktestLazyTradesMaterializationRepository(gateway=postgres_gateway)
+        ),
         lazy_trades_service=BacktestLazyTradesDetailService(
             prepare_pools=prepare_pools,
             tp_sl_hit_times=tp_sl_hit_times,

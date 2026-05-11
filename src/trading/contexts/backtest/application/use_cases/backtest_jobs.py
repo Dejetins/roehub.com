@@ -14,7 +14,8 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobReadModel,
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
-    BacktestLazyTradesDetailReadModel,
+    BacktestLazyTradesMaterializationReadModel,
+    BacktestLazyTradesResultReadModel,
     BacktestPreflightResult,
     build_backtest_job_read_model,
     build_top_variant_read_model,
@@ -23,6 +24,9 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobExecutionTrigger,
     BacktestJobListQuery,
     BacktestJobRepository,
+    BacktestLazyTradesMaterializationRepository,
+    BacktestLazyTradesMaterializationRequest,
+    BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestLazyTradesDetailService,
@@ -74,6 +78,9 @@ class BacktestJobsUseCase:
     runtime_config: BacktestRuntimeConfig
     execution_trigger: BacktestJobExecutionTrigger | None = None
     lazy_trades_service: BacktestLazyTradesDetailService | None = None
+    lazy_trades_materialization_repository: (
+        BacktestLazyTradesMaterializationRepository | None
+    ) = None
     idempotency_ttl_seconds: int = 86_400
 
     def create(
@@ -199,6 +206,7 @@ class BacktestJobsUseCase:
         job_id: UUID,
         variant_key: str,
     ) -> BacktestJobTopVariantReadModel:
+        variant_key = _validate_public_variant_key(variant_key=variant_key)
         self._require_visible_job(user_id=user_id, job_id=job_id)
         row = self.job_repository.get_top_variant_by_public_key(
             job_id=job_id,
@@ -229,7 +237,8 @@ class BacktestJobsUseCase:
         user_id: UserId,
         job_id: UUID,
         variant_key: str,
-    ) -> BacktestLazyTradesDetailReadModel:
+    ) -> BacktestLazyTradesResultReadModel:
+        variant_key = _validate_public_variant_key(variant_key=variant_key)
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
         row = self.job_repository.get_top_variant_by_public_key(
             job_id=job_id,
@@ -247,10 +256,39 @@ class BacktestJobsUseCase:
                 message="Backtest lazy trades service is not configured",
                 details={"reason": "lazy_trades_service_unavailable"},
             )
-        return self.lazy_trades_service.execute(
+        probe = self.lazy_trades_service.read_cached(
             job=job,
             row=row,
             public_variant_key=variant_key,
+        )
+        if probe.detail is not None:
+            return probe.detail
+
+        if self.lazy_trades_materialization_repository is None:
+            raise _error(
+                code=BACKTEST_ERROR_QUEUE_SATURATED,
+                message="Backtest lazy trades materialization queue is not configured",
+                details={"reason": "lazy_trades_materialization_repository_unavailable"},
+            )
+        task = self.lazy_trades_materialization_repository.request_materialization(
+            request=BacktestLazyTradesMaterializationRequest(
+                owner_user_id=user_id,
+                job_id=job_id,
+                public_variant_key=variant_key,
+                variant_hash=row.variant_key,
+                request_hash=job.request_hash,
+                engine_params_hash=probe.cache_key.engine_params_hash,
+                artifact_manifest_hash=probe.cache_key.artifact_manifest_hash,
+                cache_key=probe.cache_key.digest,
+                cache_status=probe.cache_status,
+                ttl_seconds=probe.ttl_seconds,
+                requested_at=datetime.now(UTC),
+            )
+        )
+        return _materialization_read_model(
+            task=task,
+            cache_warning=probe.cache_warning,
+            cache_lookup_s=probe.cache_lookup_s,
         )
 
     def variant_series(
@@ -261,8 +299,10 @@ class BacktestJobsUseCase:
         variant_key: str,
         kind: BacktestResultSeriesKind,
         points: int,
-    ) -> BacktestResultSeriesReadModel:
+    ) -> BacktestResultSeriesReadModel | BacktestLazyTradesMaterializationReadModel:
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
+            return detail
         return build_result_series_read_model(
             detail=detail,
             kind=kind,
@@ -275,8 +315,10 @@ class BacktestJobsUseCase:
         user_id: UserId,
         job_id: UUID,
         variant_key: str,
-    ) -> BacktestResultStatsReadModel:
+    ) -> BacktestResultStatsReadModel | BacktestLazyTradesMaterializationReadModel:
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
+            return detail
         return build_monthly_stats_read_model(detail=detail)
 
     def symbol_stats(
@@ -285,9 +327,11 @@ class BacktestJobsUseCase:
         user_id: UserId,
         job_id: UUID,
         variant_key: str,
-    ) -> BacktestResultStatsReadModel:
+    ) -> BacktestResultStatsReadModel | BacktestLazyTradesMaterializationReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
+            return detail
         return build_symbol_stats_read_model(
             detail=detail,
             symbol=symbol_from_job_request(job.request_json),
@@ -301,8 +345,10 @@ class BacktestJobsUseCase:
         variant_key: str,
         page: int,
         page_size: int,
-    ) -> BacktestPaginatedTradesReadModel:
+    ) -> BacktestPaginatedTradesReadModel | BacktestLazyTradesMaterializationReadModel:
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
+            return detail
         return build_paginated_trades_read_model(
             detail=detail,
             page=page,
@@ -315,8 +361,10 @@ class BacktestJobsUseCase:
         user_id: UserId,
         job_id: UUID,
         variant_key: str,
-    ) -> str:
+    ) -> str | BacktestLazyTradesMaterializationReadModel:
         detail = self.trades(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        if isinstance(detail, BacktestLazyTradesMaterializationReadModel):
+            return detail
         return build_trades_csv(detail=detail)
 
     def cancel(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
@@ -403,6 +451,93 @@ class BacktestJobsUseCase:
                 details={"job_id": str(job_id)},
             )
         return job
+
+
+def _materialization_read_model(
+    *,
+    task: BacktestLazyTradesMaterializationTask,
+    cache_warning: str | None,
+    cache_lookup_s: float,
+) -> BacktestLazyTradesMaterializationReadModel:
+    retry_after_seconds = _materialization_retry_after_seconds(status=task.status)
+    cache: dict[str, Any] = {
+        "status": task.cache_status,
+        "cache_key": task.cache_key,
+        "cache_path": task.cache_path,
+        "ttl_seconds": task.ttl_seconds,
+    }
+    if cache_warning is not None:
+        cache["warning"] = cache_warning
+    materialization = {
+        "task_id": str(task.task_id),
+        "correlation_id": str(task.task_id),
+        "status": task.status,
+        "retryable": _materialization_retryable(task=task),
+        "retry_after_seconds": retry_after_seconds,
+        "priority_class": task.priority_class,
+        "created_at": _format_datetime(task.created_at),
+        "updated_at": _format_datetime(task.updated_at),
+        "started_at": _format_datetime(task.started_at),
+        "finished_at": _format_datetime(task.finished_at),
+        "attempt": task.attempt,
+        "last_error": task.last_error,
+        "last_error_json": dict(task.last_error_json) if task.last_error_json else None,
+        "request_identity": {
+            "request_hash": task.request_hash,
+            "cache_key": task.cache_key,
+        },
+    }
+    return BacktestLazyTradesMaterializationReadModel(
+        job_id=str(task.job_id),
+        variant_key=task.public_variant_key,
+        variant_hash=task.variant_hash,
+        request_hash=task.request_hash,
+        status=task.status,
+        materialization=materialization,
+        cache=cache,
+        timing={"cache_lookup_s": cache_lookup_s},
+        pagination={"mode": "none"},
+    )
+
+
+def _materialization_retry_after_seconds(*, status: str) -> int:
+    if status == "queued":
+        return 2
+    if status == "running":
+        return 5
+    return 30
+
+
+def _materialization_retryable(*, task: BacktestLazyTradesMaterializationTask) -> bool:
+    if task.status in {"queued", "running"}:
+        return True
+    if task.status != "failed" or task.last_error_json is None:
+        return False
+    details = task.last_error_json.get("details")
+    return isinstance(details, Mapping) and details.get("retryable") is True
+
+
+def _validate_public_variant_key(*, variant_key: str) -> str:
+    normalized = variant_key.strip()
+    if not normalized:
+        raise _error(
+            code=BACKTEST_ERROR_INVALID_REQUEST,
+            message="Backtest variant_key must be non-empty",
+            details={"variant_key": variant_key},
+        )
+    if len(normalized) > 256:
+        raise _error(
+            code=BACKTEST_ERROR_INVALID_REQUEST,
+            message="Backtest variant_key is too long",
+            details={"max_length": 256},
+        )
+    return normalized
+
+
+def _format_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _job_request_json(

@@ -188,6 +188,47 @@ class BacktestLazyTradesDetailReadModel:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestLazyTradesMaterializationReadModel:
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    request_hash: str
+    status: str
+    materialization: Mapping[str, Any]
+    cache: Mapping[str, Any]
+    timing: Mapping[str, Any]
+    pagination: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "materialization",
+            MappingProxyType(dict(self.materialization)),
+        )
+        object.__setattr__(self, "cache", MappingProxyType(dict(self.cache)))
+        object.__setattr__(self, "timing", MappingProxyType(dict(self.timing)))
+        object.__setattr__(self, "pagination", MappingProxyType(dict(self.pagination)))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "job_id": self.job_id,
+            "variant_key": self.variant_key,
+            "variant_hash": self.variant_hash,
+            "request_hash": self.request_hash,
+            "status": self.status,
+            "materialization": dict(self.materialization),
+            "cache": dict(self.cache),
+            "timing": dict(self.timing),
+            "pagination": dict(self.pagination),
+        }
+
+
+BacktestLazyTradesResultReadModel = (
+    BacktestLazyTradesDetailReadModel | BacktestLazyTradesMaterializationReadModel
+)
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJobCreateResult:
     job: BacktestJobReadModel
     idempotent_replay: bool
@@ -411,6 +452,8 @@ __all__ = [
     "BacktestJobCreateResult",
     "BacktestJobListResult",
     "BacktestLazyTradesDetailReadModel",
+    "BacktestLazyTradesMaterializationReadModel",
+    "BacktestLazyTradesResultReadModel",
     "BacktestJobProgressReadModel",
     "BacktestJobReadModel",
     "BacktestJobTopResult",

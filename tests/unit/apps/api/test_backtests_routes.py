@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -19,6 +19,8 @@ from trading.contexts.backtest.application.ports import (
     BacktestArtifactContextUnavailable,
     BacktestJobListPage,
     BacktestJobListQuery,
+    BacktestLazyTradesMaterializationRequest,
+    BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestJobExecutionResult,
@@ -196,11 +198,119 @@ def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> No
     payload = response.json()
     assert payload["variant_key"] == top["variant_key"]
     assert payload["variant_hash"] == top["variant_hash"]
-    assert payload["cache"]["status"] == "miss"
+    assert payload["cache"]["status"] == "hit"
     assert payload["trades"][0]["exit_reason"] == "signal"
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
     assert lazy_service.requests == ((top["variant_key"], top["variant_hash"]),)
+
+
+def test_post_backtest_variant_trades_cache_miss_returns_202_materialization_status() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService(cache_hit=False)
+    materializations = _FakeMaterializationRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+            materialization_repository=materializations,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000227"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000227"},
+    ).json()["items"][0]
+
+    response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000227"},
+    )
+    replay = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000227"},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["variant_key"] == top["variant_key"]
+    assert payload["variant_hash"] == top["variant_hash"]
+    assert payload["request_hash"] == created.json()["request_hash"]
+    assert payload["cache"]["status"] == "miss"
+    assert payload["cache"]["cache_key"] == "f" * 64
+    assert payload["materialization"]["status"] == "queued"
+    assert payload["materialization"]["correlation_id"] == payload["materialization"]["task_id"]
+    assert payload["materialization"]["request_identity"]["request_hash"] == (
+        created.json()["request_hash"]
+    )
+    assert payload["materialization"]["retry_after_seconds"] == 2
+    assert payload["pagination"] == {"mode": "none"}
+    assert replay.status_code == 202
+    assert replay.json()["materialization"]["task_id"] == payload["materialization"]["task_id"]
+    assert len(materializations.tasks) == 1
+    assert lazy_service.execute_calls == 0
+
+
+def test_get_backtest_variant_result_endpoints_return_status_without_cache_miss_compute() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService(cache_hit=False)
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+            materialization_repository=_FakeMaterializationRepository(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000228"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000228"},
+    ).json()["items"][0]
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/equity",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000228"},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "queued"
+    assert response.json()["cache"]["status"] == "miss"
+    assert lazy_service.execute_calls == 0
+
+
+def test_post_backtest_variant_trades_rejects_oversized_variant_key() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=_FakeLazyTradesService(cache_hit=False),
+            materialization_repository=_FakeMaterializationRepository(),
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000229"},
+        json=_valid_request(),
+    )
+
+    response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{'x' * 257}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000229"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.invalid_request"
 
 
 def test_get_backtest_result_summary_is_bounded_without_trades() -> None:
@@ -646,6 +756,7 @@ def _build_jobs_use_case(
     repository: "_FakeJobRepository",
     execution_trigger: Any | None = None,
     lazy_trades_service: Any | None = None,
+    materialization_repository: Any | None = None,
 ) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -665,6 +776,7 @@ def _build_jobs_use_case(
         runtime_config=runtime_config,
         execution_trigger=execution_trigger,
         lazy_trades_service=lazy_trades_service,
+        lazy_trades_materialization_repository=materialization_repository,
     )
 
 
@@ -754,18 +866,20 @@ def _complete_job(
 
 @dataclass
 class _FakeLazyTradesService:
+    cache_hit: bool = True
     requests: tuple[tuple[str, str], ...] = ()
+    execute_calls: int = 0
 
-    def execute(
+    def read_cached(
         self,
         *,
         job: BacktestJob,
         row: BacktestJobTopVariant,
         public_variant_key: str,
-    ) -> BacktestLazyTradesDetailReadModel:
+    ) -> "_Probe":
         variant_hash = str(row.payload_json["variant_hash"])
         self.requests = (*self.requests, (public_variant_key, variant_hash))
-        return BacktestLazyTradesDetailReadModel(
+        detail = BacktestLazyTradesDetailReadModel(
             job_id=str(job.job_id),
             variant_key=public_variant_key,
             variant_hash=variant_hash,
@@ -777,9 +891,95 @@ class _FakeLazyTradesService:
             readable_params=dict(row.payload_json["readable_params"]),
             trades=tuple(_fake_trade(index) for index in range(12)),
             chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
-            cache={"status": "miss"},
-            timing={"lazy_trades_compute": 0.001},
+            cache={"status": "hit" if self.cache_hit else "miss"},
+            timing={"lazy_trades_cache_hit": 0.001} if self.cache_hit else {},
         )
+        return _Probe(
+            detail=detail if self.cache_hit else None,
+            cache_status="hit" if self.cache_hit else "miss",
+        )
+
+    def execute(
+        self,
+        *,
+        job: BacktestJob,
+        row: BacktestJobTopVariant,
+        public_variant_key: str,
+    ) -> BacktestLazyTradesDetailReadModel:
+        self.execute_calls += 1
+        return self.read_cached(
+            job=job,
+            row=row,
+            public_variant_key=public_variant_key,
+        ).detail  # type: ignore[return-value]
+
+
+@dataclass(frozen=True)
+class _CacheKey:
+    engine_params_hash: str = "e" * 64
+    artifact_manifest_hash: str = "a" * 64
+    digest: str = "f" * 64
+
+
+@dataclass(frozen=True)
+class _Probe:
+    detail: BacktestLazyTradesDetailReadModel | None
+    cache_status: str
+    cache_key: _CacheKey = _CacheKey()
+    cache_warning: str | None = None
+    ttl_seconds: int = 172_800
+    cache_lookup_s: float = 0.0
+
+
+@dataclass
+class _FakeMaterializationRepository:
+    tasks: dict[tuple[str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
+        default_factory=dict
+    )
+
+    def request_materialization(
+        self,
+        *,
+        request: BacktestLazyTradesMaterializationRequest,
+    ) -> BacktestLazyTradesMaterializationTask:
+        key = (
+            str(request.owner_user_id),
+            request.job_id,
+            request.public_variant_key,
+            request.cache_key,
+        )
+        existing = self.tasks.get(key)
+        if existing is not None:
+            return existing
+        task = BacktestLazyTradesMaterializationTask(
+            task_id=UUID(f"00000000-0000-0000-0000-{len(self.tasks) + 1:012d}"),
+            owner_user_id=request.owner_user_id,
+            job_id=request.job_id,
+            public_variant_key=request.public_variant_key,
+            variant_hash=request.variant_hash,
+            request_hash=request.request_hash,
+            engine_params_hash=request.engine_params_hash,
+            artifact_manifest_hash=request.artifact_manifest_hash,
+            cache_key=request.cache_key,
+            status="queued",
+            priority_class=request.priority_class,
+            created_at=request.requested_at,
+            updated_at=request.requested_at,
+            started_at=None,
+            finished_at=None,
+            locked_by=None,
+            locked_at=None,
+            lease_expires_at=None,
+            heartbeat_at=None,
+            attempt=0,
+            last_error=None,
+            last_error_json=None,
+            cache_status=request.cache_status,
+            cache_path=None,
+            ttl_seconds=request.ttl_seconds,
+        )
+        self.tasks[key] = task
+        return task
 
 
 def _fake_trade(index: int) -> dict[str, Any]:

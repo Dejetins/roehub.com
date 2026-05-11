@@ -8,6 +8,8 @@ from .backtest_jobs import (
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
     BacktestLazyTradesDetailReadModel,
+    BacktestLazyTradesMaterializationReadModel,
+    BacktestLazyTradesResultReadModel,
     build_backtest_job_read_model,
     build_top_variant_read_model,
 )
@@ -82,6 +84,8 @@ __all__ = [
     "BacktestJobCreateResult",
     "BacktestJobListResult",
     "BacktestLazyTradesDetailReadModel",
+    "BacktestLazyTradesMaterializationReadModel",
+    "BacktestLazyTradesResultReadModel",
     "BacktestJobProgressReadModel",
     "BacktestJobReadModel",
     "BacktestJobTopResult",

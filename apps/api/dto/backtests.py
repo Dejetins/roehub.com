@@ -11,6 +11,8 @@ from trading.contexts.backtest.application.dto import (
     BacktestJobTopResult,
     BacktestJobTopVariantReadModel,
     BacktestLazyTradesDetailReadModel,
+    BacktestLazyTradesMaterializationReadModel,
+    BacktestLazyTradesResultReadModel,
     BacktestPreflightResult,
     BacktestRuntimeDefaults,
 )
@@ -125,6 +127,23 @@ class BacktestLazyTradesDetailResponse(BaseModel):
     timing: dict[str, Any]
 
 
+class BacktestLazyTradesMaterializationResponse(BaseModel):
+    job_id: str
+    variant_key: str
+    variant_hash: str
+    request_hash: str
+    status: str
+    materialization: dict[str, Any]
+    cache: dict[str, Any]
+    timing: dict[str, Any]
+    pagination: dict[str, Any]
+
+
+BacktestLazyTradesResponse = (
+    BacktestLazyTradesDetailResponse | BacktestLazyTradesMaterializationResponse
+)
+
+
 class BacktestResultSummaryResponse(BaseModel):
     job: BacktestJobResponse
     top_variants: BacktestTopVariantsResponse
@@ -218,27 +237,57 @@ def build_backtest_lazy_trades_detail_response(
     return BacktestLazyTradesDetailResponse.model_validate(result.as_mapping())
 
 
+def build_backtest_lazy_trades_response(
+    *,
+    result: BacktestLazyTradesResultReadModel,
+) -> BacktestLazyTradesResponse:
+    if isinstance(result, BacktestLazyTradesMaterializationReadModel):
+        return BacktestLazyTradesMaterializationResponse.model_validate(result.as_mapping())
+    return BacktestLazyTradesDetailResponse.model_validate(result.as_mapping())
+
+
+def build_backtest_lazy_trades_materialization_response(
+    *,
+    result: BacktestLazyTradesMaterializationReadModel,
+) -> BacktestLazyTradesMaterializationResponse:
+    return BacktestLazyTradesMaterializationResponse.model_validate(result.as_mapping())
+
+
 def build_backtest_result_summary_response(*, result: Any) -> BacktestResultSummaryResponse:
     return BacktestResultSummaryResponse.model_validate(result.as_mapping())
 
 
-def build_backtest_result_series_response(*, result: Any) -> BacktestResultSeriesResponse:
+def build_backtest_result_series_response(
+    *,
+    result: Any,
+) -> BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse:
+    if isinstance(result, BacktestLazyTradesMaterializationReadModel):
+        return build_backtest_lazy_trades_materialization_response(result=result)
     return BacktestResultSeriesResponse.model_validate(result.as_mapping())
 
 
-def build_backtest_result_stats_response(*, result: Any) -> BacktestResultStatsResponse:
+def build_backtest_result_stats_response(
+    *,
+    result: Any,
+) -> BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse:
+    if isinstance(result, BacktestLazyTradesMaterializationReadModel):
+        return build_backtest_lazy_trades_materialization_response(result=result)
     return BacktestResultStatsResponse.model_validate(result.as_mapping())
 
 
 def build_backtest_paginated_trades_response(
     *,
     result: Any,
-) -> BacktestPaginatedTradesResponse:
+) -> BacktestPaginatedTradesResponse | BacktestLazyTradesMaterializationResponse:
+    if isinstance(result, BacktestLazyTradesMaterializationReadModel):
+        return build_backtest_lazy_trades_materialization_response(result=result)
     return BacktestPaginatedTradesResponse.model_validate(result.as_mapping())
 
 
 __all__ = [
     "BacktestLazyTradesDetailResponse",
+    "BacktestLazyTradesMaterializationResponse",
+    "BacktestLazyTradesResponse",
     "BacktestPaginatedTradesResponse",
     "BacktestJobProgressResponse",
     "BacktestJobResponse",
@@ -252,6 +301,8 @@ __all__ = [
     "BacktestTopVariantsResponse",
     "build_backtest_job_response",
     "build_backtest_lazy_trades_detail_response",
+    "build_backtest_lazy_trades_materialization_response",
+    "build_backtest_lazy_trades_response",
     "build_backtest_jobs_list_response",
     "build_backtest_paginated_trades_response",
     "build_backtest_preflight_response",

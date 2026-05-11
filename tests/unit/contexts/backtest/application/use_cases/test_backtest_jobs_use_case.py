@@ -12,12 +12,15 @@ from trading.contexts.backtest.application.dto import (
     BacktestCoordinates,
     BacktestCostEstimate,
     BacktestLazyTradesDetailReadModel,
+    BacktestLazyTradesMaterializationReadModel,
     BacktestNoRiskTopResult,
     BacktestPreflightResult,
 )
 from trading.contexts.backtest.application.ports import (
     BacktestJobListPage,
     BacktestJobListQuery,
+    BacktestLazyTradesMaterializationRequest,
+    BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestPreflightService,
@@ -55,6 +58,56 @@ def test_trades_resolves_public_variant_key_only() -> None:
     assert lazy_service.requests == ((row.payload_json["public_variant_key"], row.variant_key),)
 
 
+def test_trades_cache_miss_enqueues_materialization_without_lazy_compute() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000308")
+    job, row = _job_and_row(user_id=user_id)
+    repository = _Repository(job=job, top_rows=(row,))
+    materializations = _MaterializationRepository()
+    lazy_service = _LazyService(cache_hit=False)
+    use_case = _use_case(
+        repository=repository,
+        lazy_service=lazy_service,
+        materialization_repository=materializations,
+    )
+
+    result = use_case.trades(
+        user_id=user_id,
+        job_id=job.job_id,
+        variant_key=str(row.payload_json["public_variant_key"]),
+    )
+
+    assert isinstance(result, BacktestLazyTradesMaterializationReadModel)
+    assert result.status == "queued"
+    assert result.variant_key == row.payload_json["public_variant_key"]
+    assert result.variant_hash == row.variant_key
+    assert result.materialization["retry_after_seconds"] == 2
+    assert result.materialization["correlation_id"] == result.materialization["task_id"]
+    assert result.cache["status"] == "miss"
+    assert result.pagination == {"mode": "none"}
+    assert lazy_service.execute_calls == 0
+    assert len(materializations.tasks) == 1
+
+
+def test_trades_cache_miss_materialization_is_idempotent_by_request_identity() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000309")
+    job, row = _job_and_row(user_id=user_id)
+    materializations = _MaterializationRepository()
+    use_case = _use_case(
+        repository=_Repository(job=job, top_rows=(row,)),
+        lazy_service=_LazyService(cache_hit=False),
+        materialization_repository=materializations,
+    )
+    public_key = str(row.payload_json["public_variant_key"])
+
+    first = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+    replay = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+
+    assert isinstance(first, BacktestLazyTradesMaterializationReadModel)
+    assert isinstance(replay, BacktestLazyTradesMaterializationReadModel)
+    assert replay.materialization["task_id"] == first.materialization["task_id"]
+    assert len(materializations.tasks) == 1
+
+
 def test_trades_does_not_resolve_raw_storage_sha_as_public_key() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000000302")
     job, row = _job_and_row(user_id=user_id)
@@ -64,6 +117,19 @@ def test_trades_does_not_resolve_raw_storage_sha_as_public_key() -> None:
         use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=row.variant_key)
 
     assert exc_info.value.code == "backtest.not_found"
+
+
+def test_trades_rejects_oversized_public_variant_key_before_lookup() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000310")
+    job, row = _job_and_row(user_id=user_id)
+    repository = _Repository(job=job, top_rows=(row,))
+    use_case = _use_case(repository=repository)
+
+    with pytest.raises(RoehubError) as exc_info:
+        use_case.trades(user_id=user_id, job_id=job.job_id, variant_key="x" * 257)
+
+    assert exc_info.value.code == "backtest.invalid_request"
+    assert repository.public_variant_lookups == ()
 
 
 def test_trades_enforces_ownership_before_variant_lookup() -> None:
@@ -156,6 +222,7 @@ def _use_case(
     *,
     repository: "_Repository",
     lazy_service: Any | None = None,
+    materialization_repository: Any | None = None,
 ) -> BacktestJobsUseCase:
     runtime_config = _runtime_config()
     return BacktestJobsUseCase(
@@ -167,6 +234,7 @@ def _use_case(
         ),
         runtime_config=runtime_config,
         lazy_trades_service=cast(Any, lazy_service or _LazyService()),
+        lazy_trades_materialization_repository=materialization_repository,
     )
 
 
@@ -194,17 +262,19 @@ def _runtime_config() -> BacktestRuntimeConfig:
 
 @dataclass
 class _LazyService:
+    cache_hit: bool = True
     requests: tuple[tuple[str, str], ...] = ()
+    execute_calls: int = 0
 
-    def execute(
+    def read_cached(
         self,
         *,
         job: BacktestJob,
         row: BacktestJobTopVariant,
         public_variant_key: str,
-    ) -> BacktestLazyTradesDetailReadModel:
+    ) -> "_Probe":
         self.requests = (*self.requests, (public_variant_key, row.variant_key))
-        return BacktestLazyTradesDetailReadModel(
+        detail = BacktestLazyTradesDetailReadModel(
             job_id=str(job.job_id),
             variant_key=public_variant_key,
             variant_hash=row.variant_key,
@@ -216,9 +286,95 @@ class _LazyService:
             readable_params=dict(row.payload_json["readable_params"]),
             trades=(),
             chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
-            cache={"status": "miss"},
-            timing={"lazy_trades_compute": 0.0},
+            cache={"status": "hit" if self.cache_hit else "miss"},
+            timing={"lazy_trades_cache_hit": 0.0} if self.cache_hit else {},
         )
+        return _Probe(
+            detail=detail if self.cache_hit else None,
+            cache_status="hit" if self.cache_hit else "miss",
+        )
+
+    def execute(
+        self,
+        *,
+        job: BacktestJob,
+        row: BacktestJobTopVariant,
+        public_variant_key: str,
+    ) -> BacktestLazyTradesDetailReadModel:
+        self.execute_calls += 1
+        return self.read_cached(
+            job=job,
+            row=row,
+            public_variant_key=public_variant_key,
+        ).detail  # type: ignore[return-value]
+
+
+@dataclass(frozen=True)
+class _CacheKey:
+    engine_params_hash: str = "e" * 64
+    artifact_manifest_hash: str = "a" * 64
+    digest: str = "f" * 64
+
+
+@dataclass(frozen=True)
+class _Probe:
+    detail: BacktestLazyTradesDetailReadModel | None
+    cache_status: str
+    cache_key: _CacheKey = _CacheKey()
+    cache_warning: str | None = None
+    ttl_seconds: int = 172_800
+    cache_lookup_s: float = 0.0
+
+
+@dataclass
+class _MaterializationRepository:
+    tasks: dict[tuple[str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
+        default_factory=dict
+    )
+
+    def request_materialization(
+        self,
+        *,
+        request: BacktestLazyTradesMaterializationRequest,
+    ) -> BacktestLazyTradesMaterializationTask:
+        key = (
+            str(request.owner_user_id),
+            request.job_id,
+            request.public_variant_key,
+            request.cache_key,
+        )
+        existing = self.tasks.get(key)
+        if existing is not None:
+            return existing
+        task = BacktestLazyTradesMaterializationTask(
+            task_id=uuid4(),
+            owner_user_id=request.owner_user_id,
+            job_id=request.job_id,
+            public_variant_key=request.public_variant_key,
+            variant_hash=request.variant_hash,
+            request_hash=request.request_hash,
+            engine_params_hash=request.engine_params_hash,
+            artifact_manifest_hash=request.artifact_manifest_hash,
+            cache_key=request.cache_key,
+            status="queued",
+            priority_class=request.priority_class,
+            created_at=request.requested_at,
+            updated_at=request.requested_at,
+            started_at=None,
+            finished_at=None,
+            locked_by=None,
+            locked_at=None,
+            lease_expires_at=None,
+            heartbeat_at=None,
+            attempt=0,
+            last_error=None,
+            last_error_json=None,
+            cache_status=request.cache_status,
+            cache_path=None,
+            ttl_seconds=request.ttl_seconds,
+        )
+        self.tasks[key] = task
+        return task
 
 
 @dataclass

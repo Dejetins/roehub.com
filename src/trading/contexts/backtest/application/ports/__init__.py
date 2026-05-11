@@ -19,6 +19,12 @@ from .lazy_trades_cache import (
     canonical_json_sha256,
     normalize_json_payload,
 )
+from .lazy_trades_materializations import (
+    BacktestLazyTradesMaterializationRepository,
+    BacktestLazyTradesMaterializationRequest,
+    BacktestLazyTradesMaterializationStatus,
+    BacktestLazyTradesMaterializationTask,
+)
 from .staged_runner import BacktestGridDefaultsProvider
 
 __all__ = [
@@ -34,6 +40,10 @@ __all__ = [
     "BacktestLazyTradesCacheKey",
     "BacktestLazyTradesCacheReadResult",
     "BacktestLazyTradesCacheStatus",
+    "BacktestLazyTradesMaterializationRepository",
+    "BacktestLazyTradesMaterializationRequest",
+    "BacktestLazyTradesMaterializationStatus",
+    "BacktestLazyTradesMaterializationTask",
     "CurrentUser",
     "build_lazy_trades_cache_key",
     "canonical_json_sha256",

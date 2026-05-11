@@ -54,11 +54,82 @@ class BacktestLazyTradesDetailConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestLazyTradesCacheProbeResult:
+    detail: BacktestLazyTradesDetailReadModel | None
+    cache_key: BacktestLazyTradesCacheKey
+    cache_status: str
+    cache_warning: str | None
+    ttl_seconds: int
+    cache_lookup_s: float
+
+    @property
+    def is_hit(self) -> bool:
+        return self.detail is not None
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestLazyTradesDetailService:
     prepare_pools: BacktestPreparePoolsService
     tp_sl_hit_times: BacktestTpSlHitTimesService
     cache: BacktestLazyTradesCache
     config: BacktestLazyTradesDetailConfig = BacktestLazyTradesDetailConfig()
+
+    def read_cached(
+        self,
+        *,
+        job: BacktestJob,
+        row: BacktestJobTopVariant,
+        public_variant_key: str,
+        now: datetime | None = None,
+    ) -> BacktestLazyTradesCacheProbeResult:
+        checked = _checked_variant_identity(row=row, public_variant_key=public_variant_key)
+        reference_now = (now or datetime.now(UTC)).astimezone(UTC)
+        artifact_metadata = _artifact_metadata_from_job(job=job)
+        cache_key = build_lazy_trades_cache_key(
+            job_id=str(job.job_id),
+            variant_key=checked.public_variant_key,
+            variant_hash=checked.variant_hash,
+            request_hash=job.request_hash,
+            engine_params_hash=_engine_params_hash(job=job),
+            artifact_manifest_hash=artifact_metadata.artifact_manifest_hash,
+        )
+
+        lookup_start = time.perf_counter()
+        cache_read = self.cache.read(
+            cache_key=cache_key,
+            now=reference_now,
+            ttl_seconds=self.config.cache_ttl_seconds,
+        )
+        cache_lookup_s = time.perf_counter() - lookup_start
+        if cache_read.is_hit and cache_read.payload is not None:
+            payload = dict(cache_read.payload)
+            timing = dict(_mapping(payload.get("timing")))
+            timing["cache_lookup_s"] = cache_lookup_s
+            timing[LAZY_TRADES_CACHE_HIT_STAGE_NAME] = cache_lookup_s
+            payload["timing"] = timing
+            payload["cache"] = _cache_payload(
+                status="hit",
+                cache_key=cache_key,
+                ttl_seconds=self.config.cache_ttl_seconds,
+                warning=cache_read.warning,
+            )
+            return BacktestLazyTradesCacheProbeResult(
+                detail=_read_model_from_payload(payload=payload),
+                cache_key=cache_key,
+                cache_status=cache_read.status,
+                cache_warning=cache_read.warning,
+                ttl_seconds=self.config.cache_ttl_seconds,
+                cache_lookup_s=cache_lookup_s,
+            )
+
+        return BacktestLazyTradesCacheProbeResult(
+            detail=None,
+            cache_key=cache_key,
+            cache_status=cache_read.status,
+            cache_warning=cache_read.warning,
+            ttl_seconds=self.config.cache_ttl_seconds,
+            cache_lookup_s=cache_lookup_s,
+        )
 
     def execute(
         self,
@@ -941,4 +1012,5 @@ __all__ = [
     "LAZY_TRADES_COMPUTE_STAGE_NAME",
     "BacktestLazyTradesDetailConfig",
     "BacktestLazyTradesDetailService",
+    "BacktestLazyTradesCacheProbeResult",
 ]

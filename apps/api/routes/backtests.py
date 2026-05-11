@@ -4,11 +4,13 @@ from typing import Any, Callable, Mapping
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 
 from apps.api.dto import (
     BacktestJobResponse,
     BacktestJobsListResponse,
-    BacktestLazyTradesDetailResponse,
+    BacktestLazyTradesMaterializationResponse,
+    BacktestLazyTradesResponse,
     BacktestPaginatedTradesResponse,
     BacktestPreflightResponse,
     BacktestResultSeriesResponse,
@@ -19,7 +21,8 @@ from apps.api.dto import (
     BacktestTopVariantsResponse,
     build_backtest_job_response,
     build_backtest_jobs_list_response,
-    build_backtest_lazy_trades_detail_response,
+    build_backtest_lazy_trades_materialization_response,
+    build_backtest_lazy_trades_response,
     build_backtest_paginated_trades_response,
     build_backtest_preflight_response,
     build_backtest_result_series_response,
@@ -28,6 +31,9 @@ from apps.api.dto import (
     build_backtest_runtime_defaults_response,
     build_backtest_top_variant_response,
     build_backtest_top_variants_response,
+)
+from trading.contexts.backtest.application.dto import (
+    BacktestLazyTradesMaterializationReadModel,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestPreflightRejected,
@@ -206,32 +212,35 @@ def build_backtests_router(
 
     @router.post(
         "/backtests/jobs/{job_id}/variants/{variant_key}/trades",
-        response_model=BacktestLazyTradesDetailResponse,
+        response_model=BacktestLazyTradesResponse,
     )
     def post_backtest_job_variant_trades(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestLazyTradesDetailResponse:
+    ) -> BacktestLazyTradesResponse:
         result = use_case.trades(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
         )
-        return build_backtest_lazy_trades_detail_response(result=result)
+        _apply_materialization_status_code(response=response, result=result)
+        return build_backtest_lazy_trades_response(result=result)
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/equity",
-        response_model=BacktestResultSeriesResponse,
+        response_model=BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse,
     )
     def get_backtest_job_variant_equity(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         points: int = Query(default=600, ge=10, le=1500),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestResultSeriesResponse:
+    ) -> BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.variant_series(
             user_id=principal.user_id,
             job_id=job_id,
@@ -239,19 +248,21 @@ def build_backtests_router(
             kind="equity",
             points=points,
         )
+        _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_series_response(result=result)
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
-        response_model=BacktestResultSeriesResponse,
+        response_model=BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse,
     )
     def get_backtest_job_variant_drawdown(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         points: int = Query(default=600, ge=10, le=1500),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestResultSeriesResponse:
+    ) -> BacktestResultSeriesResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.variant_series(
             user_id=principal.user_id,
             job_id=job_id,
@@ -259,54 +270,60 @@ def build_backtests_router(
             kind="drawdown",
             points=points,
         )
+        _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_series_response(result=result)
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
-        response_model=BacktestResultStatsResponse,
+        response_model=BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse,
     )
     def get_backtest_job_variant_monthly_stats(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestResultStatsResponse:
+    ) -> BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.monthly_stats(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
         )
+        _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_stats_response(result=result)
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
-        response_model=BacktestResultStatsResponse,
+        response_model=BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse,
     )
     def get_backtest_job_variant_symbol_stats(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestResultStatsResponse:
+    ) -> BacktestResultStatsResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.symbol_stats(
             user_id=principal.user_id,
             job_id=job_id,
             variant_key=variant_key,
         )
+        _apply_materialization_status_code(response=response, result=result)
         return build_backtest_result_stats_response(result=result)
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/trades",
-        response_model=BacktestPaginatedTradesResponse,
+        response_model=BacktestPaginatedTradesResponse | BacktestLazyTradesMaterializationResponse,
     )
     def get_backtest_job_variant_trades(
+        response: Response,
         job_id: UUID,
         variant_key: str,
         page: int = Query(default=1, ge=1, le=10_000),
         page_size: int = Query(default=50, ge=1, le=100),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
-    ) -> BacktestPaginatedTradesResponse:
+    ) -> BacktestPaginatedTradesResponse | BacktestLazyTradesMaterializationResponse:
         result = use_case.paginated_trades(
             user_id=principal.user_id,
             job_id=job_id,
@@ -314,6 +331,7 @@ def build_backtests_router(
             page=page,
             page_size=page_size,
         )
+        _apply_materialization_status_code(response=response, result=result)
         return build_backtest_paginated_trades_response(result=result)
 
     @router.get("/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv")
@@ -328,6 +346,13 @@ def build_backtests_router(
             job_id=job_id,
             variant_key=variant_key,
         )
+        if isinstance(content, BacktestLazyTradesMaterializationReadModel):
+            return JSONResponse(
+                status_code=202,
+                content=build_backtest_lazy_trades_materialization_response(
+                    result=content
+                ).model_dump(mode="json"),
+            )
         return Response(
             content=content,
             media_type="text/csv; charset=utf-8",
@@ -357,6 +382,11 @@ def build_backtests_router(
         return Response(status_code=204)
 
     return router
+
+
+def _apply_materialization_status_code(*, response: Response, result: Any) -> None:
+    if isinstance(result, BacktestLazyTradesMaterializationReadModel):
+        response.status_code = 202
 
 
 __all__ = ["build_backtests_router"]
