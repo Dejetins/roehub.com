@@ -79,6 +79,7 @@ jobs:
               src/*|\
               tests/*|\
               tools/*|\
+              scripts/*|\
               configs/*|\
               alembic/*|\
               migrations/*)
