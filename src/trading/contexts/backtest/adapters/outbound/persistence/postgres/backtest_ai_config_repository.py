@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
-from typing import Any, Mapping, cast
+from typing import Any, cast
 from uuid import UUID
 
 from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway import (
@@ -1041,13 +1042,30 @@ def _normalize_locked_by(*, value: str) -> str:
 
 
 def _json_dumps(payload: Any) -> str:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return json.dumps(
+        _json_serializable(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
 
 
 def _json_dumps_optional(payload: Any | None) -> str | None:
     if payload is None:
         return None
     return _json_dumps(payload)
+
+
+def _json_serializable(payload: Any) -> Any:
+    if isinstance(payload, Mapping):
+        return {str(key): _json_serializable(value) for key, value in payload.items()}
+    if isinstance(payload, tuple):
+        return [_json_serializable(value) for value in payload]
+    if isinstance(payload, list):
+        return [_json_serializable(value) for value in payload]
+    if isinstance(payload, Sequence) and not isinstance(payload, str | bytes | bytearray):
+        return [_json_serializable(value) for value in payload]
+    return payload
 
 
 def _json_mapping(value: Any) -> Mapping[str, Any] | None:
