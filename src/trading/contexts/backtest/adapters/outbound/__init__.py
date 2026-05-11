@@ -5,6 +5,8 @@ from .artifacts_fs import (
 )
 from .cache_fs import DEFAULT_LAZY_TRADES_CACHE_ROOT, LocalFileBacktestLazyTradesCache
 from .config import (
+    BacktestAiConfiguratorQueueRuntimeConfig,
+    BacktestAiConfiguratorRuntimeConfig,
     BacktestArtifactHitTimesGridRuntimeConfig,
     BacktestArtifactLookbackPolicyRuntimeConfig,
     BacktestArtifactPublishScheduleRuntimeConfig,
@@ -14,12 +16,15 @@ from .config import (
     BacktestArtifactValidationBudgetsRuntimeConfig,
     BacktestArtifactValidationPlanRuntimeConfig,
     build_backtest_artifacts_runtime_config_hash,
+    load_backtest_ai_configurator_runtime_config,
     load_backtest_artifacts_runtime_config,
+    resolve_backtest_ai_configurator_config_path,
     resolve_backtest_artifacts_config_path,
 )
 from .defaults import YamlBacktestGridDefaultsProvider
 from .persistence import (
     BacktestPostgresGateway,
+    PostgresBacktestAiConfigRepository,
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
@@ -29,6 +34,8 @@ from .queue import DatabaseBacktestJobExecutionTrigger
 
 __all__ = [
     "AtomicArtifactCurrentPointerWriterV2",
+    "BacktestAiConfiguratorQueueRuntimeConfig",
+    "BacktestAiConfiguratorRuntimeConfig",
     "BacktestArtifactHitTimesGridRuntimeConfig",
     "BacktestArtifactLookbackPolicyRuntimeConfig",
     "BacktestArtifactPathBuilderV2",
@@ -39,6 +46,7 @@ __all__ = [
     "BacktestArtifactValidationPlanRuntimeConfig",
     "BacktestArtifactsRuntimeConfig",
     "BacktestPostgresGateway",
+    "PostgresBacktestAiConfigRepository",
     "DEFAULT_LAZY_TRADES_CACHE_ROOT",
     "DatabaseBacktestJobExecutionTrigger",
     "FilesystemBacktestArtifactContextResolver",
@@ -49,6 +57,8 @@ __all__ = [
     "PsycopgBacktestPostgresGateway",
     "YamlBacktestGridDefaultsProvider",
     "build_backtest_artifacts_runtime_config_hash",
+    "load_backtest_ai_configurator_runtime_config",
     "load_backtest_artifacts_runtime_config",
+    "resolve_backtest_ai_configurator_config_path",
     "resolve_backtest_artifacts_config_path",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -8,21 +9,30 @@ from fastapi import APIRouter
 from apps.api.routes import build_backtests_router as build_backtests_api_router
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
+    BacktestAiConfiguratorRuntimeConfig,
     BacktestArtifactPathBuilderV2,
     DatabaseBacktestJobExecutionTrigger,
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
+    PostgresBacktestAiConfigRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
+    load_backtest_ai_configurator_runtime_config,
     load_backtest_artifacts_runtime_config,
+    resolve_backtest_ai_configurator_config_path,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
+from trading.contexts.backtest.application.ai_configurator import (
+    BacktestAiConfigJobsUseCase,
+    BacktestAiQuotaService,
+)
+from trading.contexts.backtest.application.ports import BacktestAiConfigLeaseRepository
 from trading.contexts.backtest.application.services.v2 import (
     BacktestLazyTradesDetailService,
     BacktestPreflightService,
@@ -36,6 +46,13 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConfiguratorUseCases:
+    jobs: BacktestAiConfigJobsUseCase
+    lease_repository: BacktestAiConfigLeaseRepository
+    runtime_config: BacktestAiConfiguratorRuntimeConfig
 
 
 def build_backtests_router(
@@ -148,4 +165,35 @@ def _build_jobs_use_case(
     )
 
 
-__all__ = ["build_backtests_router"]
+def build_backtest_ai_configurator_use_cases(
+    *,
+    environ: Mapping[str, str],
+) -> BacktestAiConfiguratorUseCases | None:
+    """
+    Build Stage 1 Backtest AI configurator storage/use-case boundary without API routes.
+    """
+    effective_environ = _with_local_dev_default(environ=environ)
+    config_path = resolve_backtest_ai_configurator_config_path(environ=effective_environ)
+    runtime_config = load_backtest_ai_configurator_runtime_config(config_path)
+    postgres_dsn = effective_environ.get("STRATEGY_PG_DSN", "").strip()
+    if not postgres_dsn:
+        return None
+    postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
+    repository = PostgresBacktestAiConfigRepository(gateway=postgres_gateway)
+    return BacktestAiConfiguratorUseCases(
+        jobs=BacktestAiConfigJobsUseCase(
+            repository=repository,
+            quota_service=BacktestAiQuotaService(
+                config=runtime_config.to_quota_config(),
+            ),
+        ),
+        lease_repository=repository,
+        runtime_config=runtime_config,
+    )
+
+
+__all__ = [
+    "BacktestAiConfiguratorUseCases",
+    "build_backtest_ai_configurator_use_cases",
+    "build_backtests_router",
+]

@@ -1,5 +1,6 @@
 from .postgres import (
     BacktestPostgresGateway,
+    PostgresBacktestAiConfigRepository,
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
@@ -8,6 +9,7 @@ from .postgres import (
 
 __all__ = [
     "BacktestPostgresGateway",
+    "PostgresBacktestAiConfigRepository",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",

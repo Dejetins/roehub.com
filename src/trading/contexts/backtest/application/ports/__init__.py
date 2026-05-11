@@ -2,6 +2,10 @@ from .artifact_context import (
     BacktestArtifactContextResolver,
     BacktestArtifactContextUnavailable,
 )
+from .backtest_ai_configurator import (
+    BacktestAiConfigJobRepository,
+    BacktestAiConfigLeaseRepository,
+)
 from .backtest_job_repositories import (
     BacktestJobLeaseRepository,
     BacktestJobListPage,
@@ -31,6 +35,8 @@ __all__ = [
     "BacktestArtifactContextResolver",
     "BacktestArtifactContextUnavailable",
     "BacktestGridDefaultsProvider",
+    "BacktestAiConfigJobRepository",
+    "BacktestAiConfigLeaseRepository",
     "BacktestJobLeaseRepository",
     "BacktestJobExecutionTrigger",
     "BacktestJobListPage",

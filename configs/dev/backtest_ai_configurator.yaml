@@ -1,0 +1,33 @@
+version: 1
+backtest_ai_configurator:
+  enabled: false
+  queue:
+    max_queue_size: 50
+    lease_seconds: 120
+    job_timeout_seconds: 90
+    repair_attempts: 1
+    max_active_generations: 1
+    request_timeout_sec: 90
+    queue_timeout_sec: 180
+    estimated_wait_seconds: 8
+  quotas:
+    free:
+      requests_per_5h: 3
+      requests_per_week: 10
+      max_queued_per_user: 1
+      max_active_user_jobs: 1
+    base:
+      requests_per_5h: 6
+      requests_per_week: 25
+      max_queued_per_user: 2
+      max_active_user_jobs: 1
+    pro:
+      requests_per_5h: 15
+      requests_per_week: 75
+      max_queued_per_user: 3
+      max_active_user_jobs: 1
+    ultra:
+      requests_per_5h: 40
+      requests_per_week: 200
+      max_queued_per_user: 5
+      max_active_user_jobs: 1
