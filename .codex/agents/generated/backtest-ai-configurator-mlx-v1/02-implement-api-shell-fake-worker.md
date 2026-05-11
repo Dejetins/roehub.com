@@ -67,6 +67,9 @@ hard_requirements:
   sse_required: true
   no_mlx_runtime: true
   friendly_capacity_payloads: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_api_routes: true
@@ -90,10 +93,16 @@ skill_routing:
     use_when: "auth/SSE/repository tests fail unexpectedly"
     timing: "if blocker"
     reason: "reproduce and localize route failures"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - unit-tests
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "POST /api/backtests/ai-config/jobs"
@@ -116,6 +125,7 @@ final_report_format:
     - "Что реализовано"
     - "API контракт"
     - "Проверки"
+    - "Доставка и Mac Studio"
     - "Остаточные риски"
     - "Следующая итерация"
 
@@ -262,6 +272,8 @@ Skill routing for this task:
 - SSE stream emits observable status events and never chain-of-thought.
 - Existing backtest route tests still pass.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Determinism & ordering
@@ -313,6 +325,8 @@ Possible secondary touches:
 
 If a gate cannot run, classify it as introduced, required-path pre-existing, unrelated pre-existing, environmental, or flaky.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -320,5 +334,6 @@ Report in Russian with:
 - `Что реализовано`: routes, DTOs, fake worker, events, feedback.
 - `API контракт`: request/response/status behavior and compatibility classification.
 - `Проверки`: exact commands and results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Остаточные риски`: missing real catalog/model/security gates.
 - `Следующая итерация`: catalog resolver, validation and deterministic security gates.

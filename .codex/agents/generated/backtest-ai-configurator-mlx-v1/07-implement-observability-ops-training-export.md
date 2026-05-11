@@ -68,6 +68,9 @@ hard_requirements:
   launchd_autostart_required: true
   training_export_redaction_required: true
   no_public_model_runtime: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_metrics: true
@@ -91,11 +94,17 @@ skill_routing:
     use_when: "before final report for Monit/launchd/training-data risk"
     timing: "before ship"
     reason: "production service and privacy risk"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - unit-tests
   - mac-studio-prod-after-deploy
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "com.roehub.backtest-ai-configurator-worker"
@@ -119,6 +128,7 @@ final_report_format:
     - "Ops/monitoring contract"
     - "Training export"
     - "Проверки"
+    - "Доставка и Mac Studio"
     - "Следующая итерация"
 
 quality_gates:
@@ -270,6 +280,8 @@ Skill routing for this task:
 - Prometheus target is added without removing existing targets.
 - Runbooks include commands for Monit summary/status/restart, launchctl print, curl health/metrics.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Determinism & ordering
@@ -324,6 +336,8 @@ Possible secondary touches:
 
 If production service install is not run, state that clearly. Do not imply Mac Studio service is live.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -332,4 +346,5 @@ Report in Russian with:
 - `Ops/monitoring contract`: ports, labels, Monit/launchd/Prometheus changes.
 - `Training export`: what is included/excluded and tests.
 - `Проверки`: exact commands and results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Следующая итерация`: benchmark/load/security evidence.

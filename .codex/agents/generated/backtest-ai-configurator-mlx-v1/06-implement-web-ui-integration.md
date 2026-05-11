@@ -69,6 +69,9 @@ hard_requirements:
   safe_text_rendering: true
   browser_qa_required: true
   ru_en_required: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_ui: true
@@ -96,11 +99,17 @@ skill_routing:
     use_when: "capturing browser evidence if Browser plugin is unavailable"
     timing: "during verification"
     reason: "automated browser QA fallback"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - browser
   - unit-tests
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "/api/backtests/ai-config/jobs"
@@ -128,6 +137,7 @@ final_report_format:
     - "Browser-visible contract"
     - "Проверки"
     - "Browser QA evidence"
+    - "Доставка и Mac Studio"
     - "Следующая итерация"
 
 quality_gates:
@@ -282,6 +292,8 @@ Skill routing for this task:
 - RU and EN notice exists.
 - Browser QA evidence includes console/network check.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Determinism & ordering
@@ -335,6 +347,8 @@ Possible secondary touches:
 
 If browser QA cannot run, state the exact blocker and do not claim browser-visible behavior works.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -342,5 +356,6 @@ Report in Russian with:
 - `Что реализовано`: UI controls, job flow, load action, feedback, notice.
 - `Browser-visible contract`: status rendering, no auto-run, safe rendering.
 - `Проверки`: exact commands and results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Browser QA evidence`: browser target, steps, console/network result.
 - `Следующая итерация`: observability, training export and ops.

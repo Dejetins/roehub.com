@@ -66,6 +66,9 @@ hard_requirements:
   security_eval_required: true
   no_load_generator_on_macstudio: true
   model_concurrency_evidence_required: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_load_harness: true
@@ -87,11 +90,17 @@ skill_routing:
     use_when: "before final report if benchmark suggests production rollout"
     timing: "before ship"
     reason: "capacity/security rollout risk"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - mac-studio
   - external-load-generator
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "S1"
@@ -119,6 +128,7 @@ final_report_format:
     - "Accepted runtime settings"
     - "Security eval"
     - "Блокеры rollout"
+    - "Доставка и Mac Studio"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/scripts/test_backtest_ai_config_load_harness.py tests/unit/contexts/backtest/application/ai_configurator"
@@ -262,6 +272,8 @@ Skill routing for this task:
 - Accepted settings are evidence-backed.
 - Missing Mac Studio evidence is reported as blocker, not success.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Measurement
@@ -311,6 +323,8 @@ Possible secondary touches:
 
 Mac Studio benchmark commands and results must be included when run. If not run, state exact blocker and do not mark production acceptance complete.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -320,3 +334,4 @@ Report in Russian with:
 - `Accepted runtime settings`: model/concurrency/context/tokens/queue.
 - `Security eval`: pass/fail and false-positive notes.
 - `Блокеры rollout`: anything preventing public rollout.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.

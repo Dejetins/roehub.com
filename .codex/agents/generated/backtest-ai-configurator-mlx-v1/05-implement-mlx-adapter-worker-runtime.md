@@ -66,6 +66,9 @@ hard_requirements:
   configurable_model_path: true
   active_generations_default_one: true
   no_browser_ui_enablement: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_mlx_http_adapter: true
@@ -89,11 +92,17 @@ skill_routing:
     use_when: "MLX HTTP, worker loop or config smoke fails"
     timing: "if blocker"
     reason: "localize runtime integration failures"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - unit-tests
   - mac-studio-optional-smoke
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "MLXOpenAICompatibleAdapter"
@@ -116,6 +125,7 @@ final_report_format:
     - "Runtime/config contract"
     - "Проверки"
     - "Mac Studio smoke"
+    - "Доставка и Mac Studio"
     - "Следующая итерация"
 
 quality_gates:
@@ -261,6 +271,8 @@ Skill routing for this task:
 - No tests require real MLX.
 - Optional Mac Studio smoke result is reported separately from unit acceptance.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Determinism & ordering
@@ -312,6 +324,8 @@ Possible secondary touches:
 
 If Mac Studio smoke is attempted, report exact command, model id/path hash, result and whether it is acceptance or optional evidence.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -319,5 +333,6 @@ Report in Russian with:
 - `Что реализовано`: adapter, config, worker.
 - `Runtime/config contract`: model path, loopback, concurrency, timeouts.
 - `Проверки`: exact commands and results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Mac Studio smoke`: run/skipped/blocker with reason.
 - `Следующая итерация`: Web UI integration.

@@ -2,7 +2,7 @@
 prompt_name: backtest_ai_configurator_mlx_v1_09_production_rollout_readiness
 repo: roehub.com
 branch: main
-scope: "Iteration 09: perform final production readiness review, gated rollout, deploy/sync through Mac Studio if approved, and verify /backtests AI configurator end to end."
+scope: "Iteration 09: perform final production readiness review, gated rollout, required deploy/sync through Mac Studio, and verify /backtests AI configurator end to end."
 
 language:
   implementation: release_ops
@@ -67,15 +67,18 @@ hard_requirements:
   security_eval_required: true
   feature_flag_rollout_required: true
   rollback_path_required: true
-  publish_only_if_requested: true
+  publish_to_main_required: true
   no_public_rollout_on_unknowns: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   perform_readiness_review: true
   verify_local_gates: true
   verify_browser: true
   verify_macstudio: true
-  publish_ci_deploy_if_requested: true
+  publish_ci_deploy_required: true
   enable_paid_tiers: false
 
 skill_routing:
@@ -96,9 +99,9 @@ skill_routing:
     timing: "during verification"
     reason: "browser-visible acceptance"
   - skill: publish-ci-deploy
-    use_when: "user explicitly asks to publish/deploy/merge/sync after readiness passes"
-    timing: "before ship"
-    reason: "end-to-end Roehub delivery chain"
+    use_when: "after readiness passes, deliver the final iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
@@ -127,6 +130,7 @@ final_report_format:
     - "Evidence checked"
     - "Rollout/deploy status"
     - "Verification"
+    - "Доставка и Mac Studio"
     - "Residual risks and rollback"
 
 quality_gates:
@@ -154,13 +158,13 @@ possible_secondary_touches:
 
 safety_notes:
   - "This is a gate/rollout prompt. If evidence is missing, do not ship; report blocker."
-  - "If publishing, use publish-ci-deploy and continue through CI/deploy/Mac Studio smoke."
+  - "Publishing through publish-ci-deploy is required after readiness passes; continue through CI/deploy/Mac Studio smoke."
   - "Mac Studio checkout and /opt/roehub/app deployed runtime are different surfaces."
 ---
 
 # Task
 
-Execute Iteration 09: final production readiness review and gated rollout for the `/backtests` AI Configurator. Verify all prior iteration evidence, local gates, browser behavior, Mac Studio service health, Prometheus/Monit metrics, and benchmark/security acceptance. If and only if the user explicitly asked for publish/deploy and readiness passes, use `publish-ci-deploy` to complete the delivery chain.
+Execute Iteration 09: final production readiness review and gated rollout for the `/backtests` AI Configurator. Verify all prior iteration evidence, local gates, browser behavior, Mac Studio service health, Prometheus/Monit metrics, and benchmark/security acceptance. After readiness passes, use `publish-ci-deploy` to complete the delivery chain to `main` and Mac Studio.
 
 Done means:
 
@@ -170,7 +174,7 @@ Done means:
 - `/backtests` browser flow works without auto-running jobs;
 - worker is managed by launchd/Monit and metrics are scrapeable;
 - rollback path is tested or operationally clear;
-- if deployed, Mac Studio repo/runtime verification and smoke are complete.
+- Mac Studio repo/runtime verification and smoke are complete, or exact deploy blocker is recorded.
 
 ## Context / Current State
 
@@ -201,7 +205,7 @@ Context ledger:
 - Confirm Monit can status/restart worker and Prometheus target is up after deploy if deploy is in scope.
 - Confirm browser QA for `/backtests`, RU/EN data notice, status events, load config and no auto-run.
 - If evidence is missing, report blocker and do not ship.
-- If user explicitly asked for publish/deploy and gates pass, use `publish-ci-deploy` and continue through CI, deploy, Mac Studio sync/reload/smoke.
+- When gates pass, use `publish-ci-deploy` and continue through CI, deploy to `main`, Mac Studio sync/reload/smoke.
 
 ## Requirements (Should)
 
@@ -256,14 +260,14 @@ Skill routing for this task:
 - `production-risk-review`: use before ship; owns security/contracts/ops risk.
 - `backend-performance-evidence`: use before ship; owns benchmark evidence review.
 - `browser-qa-evidence`: use during verification; owns browser-visible acceptance.
-- `publish-ci-deploy`: use only if user explicitly asked to publish/deploy and readiness passes.
+- `publish-ci-deploy`: required after readiness passes; continue until `deployed`, `green-pr`, or `blocked`.
 
 1. Inspect current diff/scope and verify prior iteration artifacts.
 2. Check MVP production-ready checklist item by item.
 3. Verify local gates and docs index.
 4. Verify benchmark/security evidence identity and accepted runtime settings.
 5. Run browser QA locally or against deployed target depending on current stage.
-6. If publish/deploy is requested and readiness passes, run full publish-ci-deploy flow.
+6. If readiness passes, run full publish-ci-deploy flow to `main` and Mac Studio.
 7. Verify Mac Studio service: Monit summary/status, launchctl, health/metrics, Prometheus target, smoke prompt if available.
 8. Report verdict, evidence and rollback.
 
@@ -272,14 +276,16 @@ Skill routing for this task:
 - Final verdict is explicit and evidence-backed.
 - No missing benchmark/security/ops/browser gate is hidden.
 - If not ready, blocker list is actionable and ordered.
-- If deployed, CI/deploy/Mac Studio smoke evidence is included.
+- CI/deploy/Mac Studio smoke evidence is included, or exact `green-pr`/`blocked` state is recorded.
 - Rollback path is concrete.
+
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
 
 # Implementation constraints
 
 ## Release safety
 
-- Do not publish/deploy unless user explicitly asked for it in the active request or thread.
+- This prompt pack explicitly requests publish/deploy; stop only for a concrete `publish-ci-deploy` `green-pr` or `blocked` terminal state.
 - Do not enable paid tiers by default.
 - Do not paper over missing Mac Studio evidence with local tests.
 
@@ -323,9 +329,11 @@ Possible secondary touches:
 - `python -m tools.docs.generate_docs_index --check`
 - `git diff --check`
 - Browser QA on `/backtests`
-- Mac Studio service/metrics/smoke checks if deploy/runtime verification is in scope
+- Mac Studio service/metrics/smoke checks through `publish-ci-deploy`
 
 If a gate cannot run, classify it and do not mark production readiness complete unless the missing gate is explicitly non-blocking for an internal-only rollout.
+
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
 
 # Final output: report format (strict)
 
@@ -333,6 +341,7 @@ Report in Russian with:
 
 - `Readiness verdict`: ready/internal-only/not ready and why.
 - `Evidence checked`: benchmark/security/browser/ops/local gates.
-- `Rollout/deploy status`: not requested/skipped/deployed with exact evidence.
+- `Rollout/deploy status`: deployed/green-pr/blocked with exact evidence.
 - `Verification`: commands, targets, results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Residual risks and rollback`: ordered risks and exact rollback steps.

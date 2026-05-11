@@ -63,6 +63,9 @@ hard_requirements:
   business_validation_required: true
   unsupported_values_never_loadable: true
   single_symbol_mvp: true
+  publish_ci_deploy_required: true
+  main_branch_deployment_required: true
+  macstudio_sync_required: true
 
 task_toggles:
   implement_catalog_resolver: true
@@ -86,10 +89,16 @@ skill_routing:
     use_when: "before final report if security or unsupported-value behavior changed"
     timing: "before ship"
     reason: "trust boundary and user-content risk review"
+  - skill: publish-ci-deploy
+    use_when: "after implementation and local gates pass, deliver this iteration to main, sync Mac Studio, and run post-deploy verification"
+    timing: "final delivery step"
+    reason: "required end-to-end Roehub GitHub CI, main deployment, Mac Studio sync and smoke"
 
 target_envs:
   - local-dev
   - unit-tests
+  - github-actions
+  - mac-studio-prod
 
 required_literals:
   - "BacktestPreflightService"
@@ -114,6 +123,7 @@ final_report_format:
     - "Validation/security behavior"
     - "Контрактное влияние"
     - "Проверки"
+    - "Доставка и Mac Studio"
     - "Следующая итерация"
 
 quality_gates:
@@ -272,6 +282,8 @@ Skill routing for this task:
 - Output injection/private leakage samples fail output gate.
 - `BacktestPreflightService` is the final business validator.
 
+- `publish-ci-deploy` terminal state is `deployed`, or `green-pr`/`blocked` is reported with exact blocker evidence.
+
 # Implementation constraints
 
 ## Determinism & ordering
@@ -323,6 +335,8 @@ Possible secondary touches:
 
 If a gate cannot run, classify it as introduced, required-path pre-existing, unrelated pre-existing, environmental, or flaky.
 
+Required delivery step: after the quality gates above pass, invoke `publish-ci-deploy` as the final step. The expected terminal state for this prompt is `deployed`: intended files committed and pushed, GitHub Actions green, revision shipped to `main`, `/opt/roehub/app` on `macstudio` pulled to that revision, the relevant production services reloaded through the repository runbook, and `bash scripts/macos/smoke_prod.sh` passed. If the skill reaches `green-pr` because a human merge/approval is required, or `blocked` because of missing auth, unrelated dirty scope, external CI, Mac Studio access, or production verification failure, report that exact state and do not claim deployment.
+
 # Final output: report format (strict)
 
 Report in Russian with:
@@ -331,4 +345,5 @@ Report in Russian with:
 - `Validation/security behavior`: safe/unsupported/malicious behavior summary.
 - `Контрактное влияние`: current form mapping, single-symbol, statuses.
 - `Проверки`: exact commands and results.
+- `Доставка и Mac Studio`: publish-ci-deploy terminal state, main/PR SHA, CI result, Mac Studio pull/reload/smoke evidence, or exact blocker.
 - `Следующая итерация`: prompt profiles, repair loop and LLM gateway.
