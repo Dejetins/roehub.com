@@ -2,11 +2,14 @@ import { apiFetch } from "../core/api.js";
 import { qs, qsa, setText } from "../core/dom.js";
 import { t } from "../core/locale.js";
 import { createPoller } from "../core/poller.js";
+import { renderBacktestSeries } from "../charts/backtest_series.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 140;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 400;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
+const DEFAULT_RESULT_POINTS = 600;
+const DEFAULT_TRADES_PAGE_SIZE = 50;
 const REFRESH_PRESETS = {
   off: 0,
   "10s": 10000,
@@ -45,12 +48,16 @@ const state = {
   selectedJobId: null,
   selectedVariantKey: null,
   resultSummary: null,
+  resultDetails: null,
+  tradesPage: 1,
   animateVariantJobId: null,
   configSeeded: false,
 };
 
 let activeRequest = null;
 let activeResultRequest = null;
+let activeVariantResultRequest = null;
+let activeVariantResultKey = "";
 let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
@@ -135,6 +142,14 @@ function integerOrDash(value) {
   return `${sign}${String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
 }
 
+function moneyOrDash(value, fractionDigits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  return number.toFixed(fractionDigits);
+}
+
 function compactMagnitude(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -162,6 +177,49 @@ function numberOrDash(value) {
     return "--";
   }
   return String(value);
+}
+
+function materializationStatus(payload) {
+  return payload?.materialization?.status || payload?.status || "";
+}
+
+function isMaterializationPayload(payload) {
+  return Boolean(payload?.materialization && materializationStatus(payload));
+}
+
+function resultPayloadState(payload) {
+  if (!payload) {
+    return "pending";
+  }
+  if (isMaterializationPayload(payload)) {
+    const status = materializationStatus(payload);
+    if (["queued", "running", "materializing"].includes(status)) {
+      return "materializing";
+    }
+    return status || "materializing";
+  }
+  if (payload.cache?.status && payload.cache.status !== "hit") {
+    return payload.cache.status === "miss" ? "materializing" : "degraded";
+  }
+  return "available";
+}
+
+function resultStatusText(payload, fallback = "pending") {
+  if (!payload) {
+    return fallback;
+  }
+  if (isMaterializationPayload(payload)) {
+    const status = materializationStatus(payload) || "materializing";
+    const retryAfter = Number(payload.materialization?.retry_after_seconds || 0);
+    return retryAfter > 0 ? `${status}; retry ${retryAfter}s` : status;
+  }
+  if (payload.cache?.warning) {
+    return `degraded: ${payload.cache.warning}`;
+  }
+  if (payload.cache?.status) {
+    return `cache ${payload.cache.status}`;
+  }
+  return "available";
 }
 
 function labelForId(value) {
@@ -318,6 +376,47 @@ function variantBaseEndpoint(root, jobId, variantKey) {
   const template =
     root.dataset.variantEndpointTemplate || "/api/backtests/jobs/{job_id}/variants/{variant_key}";
   return endpointFromTemplate(template, { job_id: jobId, variant_key: variantKey });
+}
+
+function variantEndpoint(root, kind, jobId, variantKey, params = {}) {
+  const templates = {
+    variant:
+      root.dataset.variantEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}",
+    equity:
+      root.dataset.variantEquityEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/equity",
+    drawdown:
+      root.dataset.variantDrawdownEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown",
+    monthly:
+      root.dataset.variantMonthlyEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats",
+    symbol:
+      root.dataset.variantSymbolEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats",
+    trades:
+      root.dataset.variantTradesEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page={page}&page_size={page_size}",
+    csv:
+      root.dataset.variantTradesCsvEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
+  };
+  return endpointFromTemplate(templates[kind], {
+    job_id: jobId,
+    variant_key: variantKey,
+    ...params,
+  });
+}
+
+function appendSearchParams(path, params = {}) {
+  const url = new URL(path, window.location.origin);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+  return `${url.pathname}${url.search}`;
 }
 
 function financialClass(value) {
@@ -852,6 +951,7 @@ function renderJobs(root, table) {
   target.innerHTML = rows
     .map((row, index) => renderJobRow(root, row, index))
     .join("");
+  renderResultCanvases(root);
   queueVariantPanelAnimation(root);
 }
 
@@ -927,6 +1027,7 @@ function renderVariantExpansion(root, row) {
                 <tbody>${body}</tbody>
               </table>
             </div>
+            ${renderSelectedVariantDetail(root, row.job_id, variants)}
           </section>
         </div>
       </td>
@@ -948,6 +1049,7 @@ function queueVariantPanelAnimation(root) {
   variantAnimationFrame = window.requestAnimationFrame(() => {
     frame.style.setProperty("--backtests-variant-height", `${frame.scrollHeight}px`);
     frame.classList.add("is-open");
+    renderResultCanvases(root);
     frame.removeAttribute("data-variant-animate");
     state.animateVariantJobId = null;
     variantAnimationFrame = null;
@@ -987,6 +1089,202 @@ function renderVariantRow(root, jobId, variant) {
       <td><a class="rh-button rh-button--secondary rh-button--compact backtests-download-button" href="${escapeHtml(href)}" aria-label="${escapeHtml(t("backtests.variants.csv"))}" title="${escapeHtml(t("backtests.variants.csv"))}">↓</a></td>
     </tr>
   `;
+}
+
+function selectedVariant(summaryVariants) {
+  if (!state.selectedVariantKey && summaryVariants.length) {
+    state.selectedVariantKey = summaryVariants[0].variant_key;
+  }
+  return summaryVariants.find((variant) => variant.variant_key === state.selectedVariantKey) || summaryVariants[0] || null;
+}
+
+function renderSelectedVariantDetail(root, jobId, summaryVariants) {
+  const variant = selectedVariant(summaryVariants);
+  const variantKey = variant?.variant_key || state.selectedVariantKey;
+  if (!variantKey) {
+    return `
+      <section class="backtests-result-detail" data-result-state="unavailable">
+        <div class="backtests-result-state">${escapeHtml(t("backtests.results.unavailable"))}</div>
+      </section>
+    `;
+  }
+  const details =
+    state.resultDetails?.jobId === jobId && state.resultDetails?.variantKey === variantKey
+      ? state.resultDetails
+      : null;
+  const stateName = details?.state || "pending";
+  const csvHref = variantEndpoint(root, "csv", jobId, variantKey);
+  return `
+    <section class="backtests-result-detail" data-result-state="${escapeHtml(stateName)}" data-selected-result-variant="${escapeHtml(variantKey)}">
+      <header class="backtests-result-detail__heading">
+        <div>
+          <strong>${escapeHtml(t("backtests.result_detail.title", { variant: compactId(variantKey) }))}</strong>
+          <span>${escapeHtml(resultDetailStatus(details))}</span>
+        </div>
+        <div class="backtests-result-actions">
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-result-refresh>${escapeHtml(t("refresh.manual"))}</button>
+          <a class="rh-button rh-button--secondary rh-button--compact backtests-download-button" href="${escapeHtml(csvHref)}" data-result-csv>${escapeHtml(t("backtests.variants.csv"))}</a>
+        </div>
+      </header>
+      <div class="backtests-result-metrics">
+        ${renderResultMetric(t("backtests.results.return"), percent(variant?.summary_metrics?.total_return_pct), financialClass(variant?.summary_metrics?.total_return_pct))}
+        ${renderResultMetric(t("backtests.results.sharpe"), numberOrDash(variant?.summary_metrics?.sharpe), financialClass(variant?.summary_metrics?.sharpe))}
+        ${renderResultMetric(t("backtests.results.drawdown"), signedDrawdownPercent(variant?.summary_metrics?.max_drawdown_pct ?? variant?.summary_metrics?.avg_drawdown_pct), "rh-financial--negative")}
+        ${renderResultMetric(t("backtests.results.trades"), integerOrDash(variant?.summary_metrics?.trade_count ?? variant?.summary_metrics?.trades_count), "")}
+      </div>
+      <div class="backtests-result-body">
+        <div class="backtests-result-charts">
+          ${renderChartShell("equity", t("backtests.result_detail.equity"), details?.equity)}
+          ${renderChartShell("drawdown", t("backtests.result_detail.drawdown"), details?.drawdown)}
+        </div>
+        <div class="backtests-result-stat-tables">
+          ${renderStatsTable("monthly", t("backtests.result_detail.monthly"), details?.monthly)}
+          ${renderStatsTable("symbol", t("backtests.result_detail.symbol"), details?.symbol)}
+        </div>
+        ${renderTradesPanel(details)}
+      </div>
+    </section>
+  `;
+}
+
+function renderResultMetric(label, value, className) {
+  return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong class="${escapeHtml(className)}">${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function resultDetailStatus(details) {
+  if (!details) {
+    return t("backtests.result_detail.pending");
+  }
+  if (details.message) {
+    return details.message;
+  }
+  return details.state || "available";
+}
+
+function renderChartShell(kind, label, payload) {
+  const stateName = resultPayloadState(payload);
+  const points = Array.isArray(payload?.points) ? payload.points.length : 0;
+  const unavailable = !payload || isMaterializationPayload(payload) || points === 0;
+  return `
+    <section class="backtests-result-chart-panel" data-result-chart-panel="${escapeHtml(kind)}" data-result-state="${escapeHtml(stateName)}">
+      <header>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(unavailable ? resultStatusText(payload, t("backtests.result_detail.pending")) : `${points} pts`)}</span>
+      </header>
+      <canvas class="backtests-result-chart" data-result-chart="${escapeHtml(kind)}" width="420" height="170"></canvas>
+    </section>
+  `;
+}
+
+function renderStatsTable(kind, label, payload) {
+  const items = Array.isArray(payload?.items) ? payload.items.slice(0, 6) : [];
+  const body = items.length
+    ? items.map((item) => renderStatsRow(kind, item)).join("")
+    : `<tr><td colspan="4">${escapeHtml(resultStatusText(payload, t("backtests.results.unavailable")))}</td></tr>`;
+  return `
+    <section class="backtests-result-stats" data-result-stats="${escapeHtml(kind)}" data-result-state="${escapeHtml(resultPayloadState(payload))}">
+      <header>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(resultStatusText(payload, t("backtests.result_detail.pending")))}</span>
+      </header>
+      <div class="backtests-table-wrap backtests-result-stats-wrap">
+        <table class="backtests-table backtests-table--result-stats">
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderStatsRow(kind, item) {
+  if (kind === "monthly") {
+    return `
+      <tr>
+        <td>${escapeHtml(item.month || item.period || "--")}</td>
+        <td class="${financialClass(item.total_pnl ?? item.pnl)}">${escapeHtml(moneyOrDash(item.total_pnl ?? item.pnl))}</td>
+        <td>${escapeHtml(integerOrDash(item.trades_count ?? item.trade_count))}</td>
+        <td>${escapeHtml(percent(item.win_rate_pct, 1))}</td>
+      </tr>
+    `;
+  }
+  return `
+    <tr>
+      <td>${escapeHtml(item.symbol || "--")}</td>
+      <td class="${financialClass(item.total_pnl ?? item.pnl)}">${escapeHtml(moneyOrDash(item.total_pnl ?? item.pnl))}</td>
+      <td>${escapeHtml(integerOrDash(item.trades_count ?? item.trade_count))}</td>
+      <td>${escapeHtml(percent(item.win_rate_pct, 1))}</td>
+    </tr>
+  `;
+}
+
+function renderTradesPanel(details) {
+  const payload = details?.trades;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const pagination = payload?.pagination || {};
+  const page = Number(pagination.page || state.tradesPage || 1);
+  const totalPages = Number(pagination.total_pages || 1);
+  const body = items.length
+    ? items.map((item) => renderTradeRow(item)).join("")
+    : `<tr><td colspan="6">${escapeHtml(resultStatusText(payload, t("backtests.results.unavailable")))}</td></tr>`;
+  return `
+    <section class="backtests-result-trades" data-result-trades data-result-state="${escapeHtml(resultPayloadState(payload))}">
+      <header>
+        <strong>${escapeHtml(t("backtests.result_detail.trades"))}</strong>
+        <span>${escapeHtml(t("backtests.result_detail.page", { page, total: totalPages }))}</span>
+      </header>
+      <div class="backtests-table-wrap backtests-result-trades-wrap">
+        <table class="backtests-table backtests-table--result-trades">
+          <thead>
+            <tr>
+              <th>${escapeHtml(t("backtests.result_detail.entry"))}</th>
+              <th>${escapeHtml(t("backtests.result_detail.exit"))}</th>
+              <th>${escapeHtml(t("backtests.result_detail.side"))}</th>
+              <th>${escapeHtml(t("backtests.result_detail.qty"))}</th>
+              <th>${escapeHtml(t("backtests.result_detail.pnl"))}</th>
+              <th>${escapeHtml(t("backtests.result_detail.reason"))}</th>
+            </tr>
+          </thead>
+          <tbody data-trades-rows>${body}</tbody>
+        </table>
+      </div>
+      <footer class="backtests-result-pagination">
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-page="prev" ${page <= 1 ? "disabled" : ""}>${escapeHtml(t("pagination.previous"))}</button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-page="next" ${page >= totalPages ? "disabled" : ""}>${escapeHtml(t("pagination.next"))}</button>
+      </footer>
+    </section>
+  `;
+}
+
+function renderTradeRow(item) {
+  return `
+    <tr>
+      <td>${escapeHtml(formatDateTimeMinute(item.entry_time || item.opened_at || item.timestamp))}</td>
+      <td>${escapeHtml(formatDateTimeMinute(item.exit_time || item.closed_at))}</td>
+      <td>${escapeHtml(item.side || item.direction || "--")}</td>
+      <td>${escapeHtml(decimalOrDash(item.qty ?? item.quantity ?? item.size, 4))}</td>
+      <td class="${financialClass(item.pnl ?? item.pnl_quote)}">${escapeHtml(moneyOrDash(item.pnl ?? item.pnl_quote))}</td>
+      <td>${escapeHtml(item.exit_reason || item.reason || "--")}</td>
+    </tr>
+  `;
+}
+
+function renderResultCanvases(root) {
+  const details = state.resultDetails;
+  if (!details) {
+    return;
+  }
+  qsa("[data-result-chart]", root).forEach((canvas) => {
+    const kind = canvas.dataset.resultChart;
+    const payload = kind === "drawdown" ? details.drawdown : details.equity;
+    const result = renderBacktestSeries(canvas, payload?.points || [], { kind });
+    canvas.dataset.nonblank = result.nonblank ? "true" : "false";
+    canvas.dataset.pointCount = String(result.points || 0);
+  });
 }
 
 function formatVariantParams(variant) {
@@ -1041,6 +1339,117 @@ function renderResultSummary(root, summary) {
   const selectedKey = state.selectedVariantKey || summary?.selected_variant_key;
   state.selectedVariantKey = selectedKey;
   renderJobs(root, { items: state.jobRows });
+}
+
+function updateResultRetryHint(payloads) {
+  const retryAfter = payloads
+    .map((payload) => Number(payload?.materialization?.retry_after_seconds || payload?.retry_after_seconds || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (retryAfter.length) {
+    manualRefreshRetrySeconds = Math.max(manualRefreshRetrySeconds, ...retryAfter);
+  }
+}
+
+function summarizeResultState(payloads, rejectedCount) {
+  const fulfilled = payloads.filter(Boolean);
+  if (!fulfilled.length && rejectedCount > 0) {
+    return {
+      state: "unavailable",
+      message: t("backtests.result_detail.unavailable"),
+    };
+  }
+  const states = fulfilled.map(resultPayloadState);
+  if (states.includes("materializing")) {
+    return {
+      state: "materializing",
+      message: t("backtests.result_detail.materializing"),
+    };
+  }
+  if (rejectedCount > 0 || states.includes("degraded")) {
+    return {
+      state: "degraded",
+      message: t("backtests.result_detail.degraded"),
+    };
+  }
+  if (states.every((item) => item === "pending")) {
+    return {
+      state: "pending",
+      message: t("backtests.result_detail.pending"),
+    };
+  }
+  return {
+    state: "available",
+    message: t("backtests.result_detail.available"),
+  };
+}
+
+async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1 } = {}) {
+  const jobId = state.selectedJobId;
+  const variantKey = state.selectedVariantKey;
+  if (!jobId || !variantKey) {
+    return null;
+  }
+  const requestKey = `${jobId}:${variantKey}:${page}`;
+  if (activeVariantResultRequest && activeVariantResultKey === requestKey) {
+    return activeVariantResultRequest;
+  }
+  state.resultDetails = {
+    jobId,
+    variantKey,
+    state: "pending",
+    message: t("backtests.result_detail.pending"),
+  };
+  renderJobs(root, { items: state.jobRows });
+  const tradesPath = variantEndpoint(root, "trades", jobId, variantKey, {
+    page,
+    page_size: DEFAULT_TRADES_PAGE_SIZE,
+  });
+  const requests = {
+    variant: apiFetch(variantEndpoint(root, "variant", jobId, variantKey)),
+    equity: apiFetch(appendSearchParams(variantEndpoint(root, "equity", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
+    drawdown: apiFetch(appendSearchParams(variantEndpoint(root, "drawdown", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
+    monthly: apiFetch(variantEndpoint(root, "monthly", jobId, variantKey)),
+    symbol: apiFetch(variantEndpoint(root, "symbol", jobId, variantKey)),
+    trades: apiFetch(tradesPath),
+  };
+  const request = Promise.allSettled(Object.values(requests))
+    .then((results) => {
+      if (state.selectedJobId !== jobId || state.selectedVariantKey !== variantKey) {
+        return state.resultDetails;
+      }
+      const keys = Object.keys(requests);
+      const detail = { jobId, variantKey };
+      let rejectedCount = 0;
+      results.forEach((result, index) => {
+        const key = keys[index];
+        if (result.status === "fulfilled") {
+          detail[key] = result.value;
+        } else {
+          rejectedCount += 1;
+          detail[`${key}Error`] = result.reason;
+        }
+      });
+      const fulfilledPayloads = keys.map((key) => detail[key]).filter(Boolean);
+      updateResultRetryHint(fulfilledPayloads);
+      const summary = summarizeResultState(fulfilledPayloads, rejectedCount);
+      state.resultDetails = {
+        ...detail,
+        state: summary.state,
+        message: summary.message,
+      };
+      state.tradesPage = page;
+      renderJobs(root, { items: state.jobRows });
+      return state.resultDetails;
+    })
+    .finally(() => {
+      if (activeVariantResultRequest === request) {
+        activeVariantResultRequest = null;
+        activeVariantResultKey = "";
+      }
+    });
+  activeVariantResultRequest = request;
+  activeVariantResultKey = requestKey;
+  return activeVariantResultRequest;
 }
 
 function renderFooter(root, data) {
@@ -1162,9 +1571,11 @@ async function loadSelectedResult(root) {
   if (!state.selectedJobId || activeResultRequest) {
     return activeResultRequest;
   }
-  activeResultRequest = loadResultSummary(root, state.selectedJobId).finally(() => {
-    activeResultRequest = null;
-  });
+  activeResultRequest = loadResultSummary(root, state.selectedJobId)
+    .then(() => loadSelectedVariantDetails(root))
+    .finally(() => {
+      activeResultRequest = null;
+    });
   return activeResultRequest;
 }
 
@@ -1208,6 +1619,7 @@ async function openSelectedJob(root, jobId) {
     state.selectedVariantKey = summary.selected_variant_key;
     state.animateVariantJobId = state.selectedJobId;
     renderResultSummary(root, summary);
+    await loadSelectedVariantDetails(root, { page: 1 });
   } catch (error) {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
   } finally {
@@ -1477,6 +1889,7 @@ function bindStatusBar(root) {
       setText("[data-backtests-refresh-status]", t("refresh.manual"), document);
       if (manualRefreshRetrySeconds > 0) {
         setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }), document);
+        return;
       }
       refreshWorkstation(root, "manual").catch(() => {});
       return;
@@ -1606,6 +2019,7 @@ function bind(root) {
     if (refreshButton instanceof HTMLElement) {
       if (manualRefreshRetrySeconds > 0) {
         setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }));
+        return;
       }
       refreshWorkstation(root, "manual").catch(() => {});
       return;
@@ -1628,7 +2042,36 @@ function bind(root) {
     const variantButton = event.target.closest("[data-result-variant-key]");
     if (variantButton instanceof HTMLElement) {
       state.selectedVariantKey = variantButton.dataset.resultVariantKey || null;
+      state.tradesPage = 1;
+      state.resultDetails = null;
       renderJobs(root, { items: state.jobRows });
+      loadSelectedVariantDetails(root, { page: 1 }).catch(() => {});
+      return;
+    }
+    const resultRefresh = event.target.closest("[data-result-refresh]");
+    if (resultRefresh instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (manualRefreshRetrySeconds > 0) {
+        setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }));
+        return;
+      }
+      loadSelectedVariantDetails(root, { page: state.tradesPage || 1 }).catch(() => {});
+      return;
+    }
+    const tradesPage = event.target.closest("[data-trades-page]");
+    if (tradesPage instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      const pagination = state.resultDetails?.trades?.pagination || {};
+      const current = Number(pagination.page || state.tradesPage || 1);
+      const total = Number(pagination.total_pages || 1);
+      const nextPage = tradesPage.dataset.tradesPage === "next"
+        ? Math.min(total, current + 1)
+        : Math.max(1, current - 1);
+      if (nextPage !== current) {
+        loadSelectedVariantDetails(root, { page: nextPage }).catch(() => {});
+      }
       return;
     }
     const preset = event.target.closest("[data-backtests-refresh-preset]");
