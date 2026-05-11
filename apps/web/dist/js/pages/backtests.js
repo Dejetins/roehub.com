@@ -38,6 +38,7 @@ const state = {
   cursor: null,
   nextCursor: null,
   query: "",
+  symbolQuery: "",
   runtimeDefaults: null,
   selectedSymbols: new Set(["BTCUSDT"]),
   selectedIndicators: [],
@@ -751,6 +752,7 @@ function renderSymbols(root, universe) {
         </button>
       `)
       .join("");
+    filterSymbols(root, state.symbolQuery);
   }
   renderSelectedSymbols(root);
 }
@@ -2098,7 +2100,8 @@ function bind(root) {
     refreshWorkstation(root, "manual").catch(() => {});
   });
   qs("[data-symbol-search]", root)?.addEventListener("input", (event) => {
-    filterSymbols(root, event.target.value || "");
+    state.symbolQuery = event.target.value || "";
+    filterSymbols(root, state.symbolQuery);
   });
   root.addEventListener("change", (event) => {
     const checkbox = event.target.closest("[data-symbol-checkbox]");

@@ -803,10 +803,13 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "hiddenTabPause" in backtests_js
     assert "manualRefreshRetrySeconds" in backtests_js
     assert "configSeeded" in backtests_js
+    assert "symbolQuery" in backtests_js
     assert "[data-backtest-menu='" in backtests_js
     assert "buildSizingPayload" in backtests_js
     assert "toggleStatusRefreshMenu" in backtests_js
     assert "data-symbol-select" in backtests_js
+    assert "filterSymbols(root, state.symbolQuery);" in backtests_js
+    assert "state.symbolQuery = event.target.value || \"\";" in backtests_js
     assert "<small>${escapeHtml(symbol.status)}</small>" not in backtests_js
     assert "button.disabled = isRunning;" in backtests_js
     assert "renderBacktestSeries" in backtests_js
