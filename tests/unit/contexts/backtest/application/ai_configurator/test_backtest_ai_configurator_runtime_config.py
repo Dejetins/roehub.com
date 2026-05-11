@@ -18,7 +18,9 @@ def test_ai_configurator_runtime_config_loads_mlx_model_registry() -> None:
     assert config.model.model_path.name == "gemma-4-e2b-it-4bit"
     assert config.model.base_url == "http://127.0.0.1:8080"
     assert config.model.active_generations == 1
-    assert config.model.max_output_tokens == 1024
+    assert config.model.max_output_tokens == 256
+    assert config.model.request_timeout_seconds == 240
+    assert config.queue.lease_seconds == 300
 
 
 def test_ai_configurator_runtime_config_rejects_public_mlx_base_url(
