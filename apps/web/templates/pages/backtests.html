@@ -75,13 +75,24 @@
                 </span>
               </div>
             </div>
+            {% if control[0] == "risk_mode" %}
+              <fieldset class="backtests-risk-grid" data-risk-grid hidden>
+                <legend>{{ t("backtests.risk.title") }}</legend>
+                {% for key, label_key in [("tp_start", "backtests.risk.tp_from"), ("tp_stop", "backtests.risk.tp_to"), ("tp_step", "backtests.risk.tp_step"), ("sl_start", "backtests.risk.sl_from"), ("sl_stop", "backtests.risk.sl_to"), ("sl_step", "backtests.risk.sl_step")] %}
+                  <label>
+                    <span>{{ t(label_key) }}</span>
+                    <input class="backtests-input" type="number" min="0.01" step="0.5" data-risk-field="{{ key }}" aria-label="{{ t(label_key) }}">
+                  </label>
+                {% endfor %}
+              </fieldset>
+            {% endif %}
           {% endfor %}
 
           <label class="backtests-field">
             <span>{{ t("backtests.config.symbol") }}</span>
             <input class="backtests-input" type="text" value="BTCUSDT" data-config-field="symbol" aria-label="{{ t('backtests.config.symbol') }}">
           </label>
-          <div class="backtests-field-pair">
+          <div class="backtests-field-pair backtests-field-pair--dates">
             <label class="backtests-field">
               <span>{{ t("backtests.config.start") }}</span>
               <input class="backtests-input" type="date" value="2023-01-01" data-config-field="start" aria-label="{{ t('backtests.config.start') }}">
@@ -121,15 +132,6 @@
             <span>{{ t("backtests.config.slippage") }}</span>
             <input class="backtests-input" type="number" min="0" step="0.01" value="0.01" data-config-field="slippage" aria-label="{{ t('backtests.config.slippage') }}">
           </label>
-          <fieldset class="backtests-risk-grid" data-risk-grid hidden>
-            <legend>{{ t("backtests.risk.title") }}</legend>
-            {% for key, label_key in [("tp_start", "backtests.risk.tp_from"), ("tp_stop", "backtests.risk.tp_to"), ("tp_step", "backtests.risk.tp_step"), ("sl_start", "backtests.risk.sl_from"), ("sl_stop", "backtests.risk.sl_to"), ("sl_step", "backtests.risk.sl_step")] %}
-              <label>
-                <span>{{ t(label_key) }}</span>
-                <input class="backtests-input" type="number" min="0.01" step="0.5" data-risk-field="{{ key }}" aria-label="{{ t(label_key) }}">
-              </label>
-            {% endfor %}
-          </fieldset>
         </div>
         <div class="backtests-action-stack">
           <button class="backtests-wide-action" type="button" data-preflight-button>

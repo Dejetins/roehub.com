@@ -64,6 +64,19 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function trashIcon(label) {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 6h18"></path>
+      <path d="M8 6V4h8v2"></path>
+      <path d="M6 6l1 15h10l1-15"></path>
+      <path d="M10 11v6"></path>
+      <path d="M14 11v6"></path>
+    </svg>
+    <span class="backtests-visually-hidden">${escapeHtml(label)}</span>
+  `;
+}
+
 function localTime(value) {
   if (!value) {
     return "--";
@@ -119,6 +132,28 @@ function integerOrDash(value) {
   const rounded = Math.trunc(number);
   const sign = rounded < 0 ? "-" : "";
   return `${sign}${String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}`;
+}
+
+function compactMagnitude(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  const sign = number < 0 ? "-" : "";
+  const abs = Math.abs(number);
+  const units = [
+    [1_000_000_000_000, "t"],
+    [1_000_000_000, "b"],
+    [1_000_000, "m"],
+    [1_000, "k"],
+  ];
+  const unit = units.find(([limit]) => abs >= limit);
+  if (!unit) {
+    return `${sign}${Math.trunc(abs)}`;
+  }
+  const scaled = abs / unit[0];
+  const digits = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+  return `${sign}${scaled.toFixed(digits).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1")}${unit[1]}`;
 }
 
 function numberOrDash(value) {
@@ -659,13 +694,21 @@ function renderIndicators(root, catalog) {
                     : `<span class="backtests-muted">--</span>`}
                 </div>
               </td>
-              <td><button class="rh-button rh-button--secondary rh-button--compact" type="button" data-remove-indicator>&times;</button></td>
+              <td>
+                <button
+                  class="rh-button rh-button--secondary rh-button--compact backtests-icon-button"
+                  type="button"
+                  data-remove-indicator
+                  aria-label="${escapeHtml(t("backtests.actions.delete"))}"
+                  title="${escapeHtml(t("backtests.actions.delete"))}"
+                >${trashIcon(t("backtests.actions.delete"))}</button>
+              </td>
             </tr>
           `)
           .join("")
       : `<tr><td colspan="6">${escapeHtml(t("common.unavailable"))}</td></tr>`;
   }
-  setText("[data-combinations-count]", indicatorCombinationCount(), root);
+  setText("[data-combinations-count]", compactMagnitude(indicatorCombinationCount()), root);
 }
 
 function indicatorStateFromDraft(draft) {
@@ -818,7 +861,7 @@ function renderJobRow(root, row, index) {
             ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
             : ""}
           ${canDelete
-            ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action backtests-row-action--danger" type="button" data-delete-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.delete"))}</button>`
+            ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action backtests-row-action--danger backtests-icon-button" type="button" data-delete-job-id="${escapeHtml(row.job_id)}" aria-label="${escapeHtml(t("backtests.actions.delete"))}" title="${escapeHtml(t("backtests.actions.delete"))}">${trashIcon(t("backtests.actions.delete"))}</button>`
             : ""}
         </div>
       </td>
@@ -1612,7 +1655,7 @@ function bind(root) {
       const indicator = state.selectedIndicators[index];
       if (indicator) {
         indicator.window[axisInput.dataset.indicatorWindow || "start"] = Number(axisInput.value);
-        setText("[data-combinations-count]", indicatorCombinationCount(), root);
+        setText("[data-combinations-count]", compactMagnitude(indicatorCombinationCount()), root);
       }
     }
   });

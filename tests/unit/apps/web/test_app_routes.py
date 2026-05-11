@@ -471,6 +471,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-sizing-field="equity_pct"' in response.text
     assert 'data-sizing-field="quote_amount"' in response.text
     assert 'data-sizing-bounds-row' in response.text
+    assert "backtests-field-pair--dates" in response.text
     assert "data-job-picker-menu" in response.text
     assert "data-backtest-option=\"job_exchange\"" in response.text
     assert "data-backtest-option=\"job_market_type\"" in response.text
@@ -754,6 +755,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "top_limit" in backtests_js
     assert "variantPreviewLimit" in backtests_js
     assert "queueVariantPanelAnimation" in backtests_js
+    assert "compactMagnitude(indicatorCombinationCount())" in backtests_js
+    assert "trashIcon(t(\"backtests.actions.delete\"))" in backtests_js
+    assert "&times;" not in backtests_js
     assert "bindStatusBar" in backtests_js
     assert "backtests-variant-frame--static" in backtests_js
     assert "signedDrawdownPercent" in backtests_js
@@ -773,6 +777,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "activeResultRequest" in backtests_js
     assert "backtest_ui.js" not in backtests_js
     assert "grid-row: 1;" in backtests_css
+    assert ".backtests-field-pair--dates" in backtests_css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in backtests_css
+    assert ".backtests-icon-button" in backtests_css
     assert ".backtests-variant-frame" in backtests_css
     assert "max-height var(--backtests-variant-open-duration" in backtests_css
     assert "--rh-financial-positive" in backtests_css
