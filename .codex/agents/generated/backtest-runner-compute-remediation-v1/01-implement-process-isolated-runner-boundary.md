@@ -73,6 +73,15 @@ hard_requirements:
   api_must_remain_enqueue_only: true
   runner_parent_must_stay_responsive_during_compute: true
   child_process_per_full_job_required: true
+  child_process_must_exit_after_one_full_job: true
+  full_job_memory_release_boundary_required: true
+  replace_parent_in_process_executor_required: true
+  parent_must_not_construct_full_compute_graph_in_production_wiring: true
+  old_sync_runner_loop_must_be_replaced_or_narrowed: true
+  active_docs_must_remove_parent_in_process_compute_claims: true
+  docs_cleanup_required_for_replaced_runner_paths: true
+  parent_must_remain_terminal_commit_owner: true
+  child_must_not_write_terminal_job_state: true
   scheduler_classifies_full_jobs_before_compute: true
   preflight_must_classify_obvious_heavy_jobs: true
   preflight_conservative_upper_bound_required: true
@@ -125,6 +134,17 @@ required_literals:
   - "backtest_runner_tasks_claimed_total"
   - "backtest_runner_last_success_unixtime"
   - "child process"
+  - "disposable"
+  - "RSS"
+  - "retained_rss_delta"
+  - "BacktestJobWorkerUseCase.run_next"
+  - "BacktestRunnerTaskScheduler.run_next"
+  - "build_backtest_job_runner_app"
+  - "BacktestRuntimeJobOrchestrationService"
+  - "docs cleanup"
+  - "sync_inline"
+  - "terminal owner"
+  - "finish_with_top_variants"
   - "at-most-one terminal commit"
   - "scheduling_class"
   - "light_candidate"
@@ -142,12 +162,16 @@ non_goals:
   - "Do not run light jobs concurrently with an active heavy job until a separate benchmark proves safe host sharing."
   - "Do not change public jobs API DTO vocabulary unless a blocker proves it necessary."
   - "Do not run final Mac Studio benchmark acceptance; that belongs to the benchmark prompt."
+  - "Do not implement lazy trades cache-miss child execution or cache-hit bounded readers here; that belongs to prompt 03."
 
 final_report_format:
   language: ru
   sections:
     - "Intent"
     - "Process boundary"
+    - "Removed/replaced paths"
+    - "Terminal ownership"
+    - "Docs cleanup"
     - "Runner/Monit behavior"
     - "Tests"
     - "Contract impact"
@@ -178,6 +202,9 @@ possible_secondary_touches:
   - "scripts/macos/bootstrap_native_prod.sh"
   - "infra/macos/prometheus/prometheus.prod.yml"
   - "docs/runbooks/mac-studio-native-backend-operations.md"
+  - "docs/runbooks/mac-studio-monitoring-plan.md"
+  - "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md"
+  - "docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md"
   - "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py"
 
 safety_notes:
@@ -195,6 +222,7 @@ Done means:
 - `POST /api/backtests/jobs` still only creates a queued job and does not execute full compute.
 - the runner parent owns claim, heartbeat, progress, metrics, child supervision, and terminal commit coordination;
 - full compute runs in a separate child process for the claimed job;
+- every full-job child process is disposable and exits after exactly one full job;
 - the runner parent enforces a two-lane scheduler: bounded parallel `light` jobs and FIFO/exclusive `heavy` jobs;
 - parent metrics at `127.0.0.1:9204/metrics` remain responsive while a child is busy;
 - Monit no longer restarts live compute because the metrics endpoint temporarily blocks;
@@ -207,6 +235,69 @@ The current API create boundary is already mostly correct: it creates a queued j
 Observed production failure mode: a heavy job can consume the process enough that `/metrics` times out; Monit then restarts `backtest-job-runner` even though compute is alive. This creates lease/reclaim churn and makes CPU/load behavior look broken from the UI.
 
 This prompt does not optimize the numerical algorithm. It creates the process boundary needed so the later hot-path and benchmark prompts can run safely on Mac Studio.
+
+This prompt owns full-job disposable compute only. Lazy trades cache-miss disposable compute and memory-bounded cache-hit reads are handled by prompt 03.
+
+## Method-level replacement / cleanup map
+
+This prompt must replace the old production execution path, not build a second path beside it.
+
+Required current-method decisions:
+
+- `apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py::build_backtest_job_runner_app`
+  - Replace production parent wiring that constructs `BacktestRuntimeJobOrchestrationService` directly in the runner parent.
+  - The parent may construct repositories, preflight, lease, metrics, scheduler, and child supervisor only.
+  - Full compute service graph construction belongs in the child entrypoint/wiring.
+  - A direct in-process executor may remain only in focused tests or explicitly named local-dev diagnostic code, never in production service composition.
+- `src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py::BacktestJobWorkerUseCase.run_next`
+  - Keep claim/heartbeat/progress/terminal semantics.
+  - Replace the parent-side call to an in-process compute executor with a child-supervision executor contract.
+  - Do not let this method call `BacktestRuntimeJobOrchestrationService.execute` in the parent.
+  - Keep the parent as the terminal owner: parent calls `finish_with_top_variants` after child success/failure is interpreted.
+  - Child must not directly write `succeeded`/`failed` terminal job state.
+- `apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py::BacktestRunnerTaskScheduler.run_next`
+  - Replace or narrow the synchronous “claim one task and block until complete” loop if it prevents light-job concurrency.
+  - The parent must be able to launch/reap children and keep metrics responsive while children run.
+  - If a blocking helper remains, it must not be the production scheduling loop for full jobs.
+- `apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py::BacktestJobRunnerApp.run`
+  - Replace active-task accounting that is updated only after a blocking `worker.run_next()` returns.
+  - Parent metrics must reflect active child state while children are running, and `/metrics` must remain responsive.
+- `src/trading/contexts/backtest/application/services/v2/job_orchestration.py::BacktestRuntimeJobOrchestrationService.execute`
+  - Keep as the child-only canonical compute service unless a narrower child service is introduced.
+  - Child output must be bounded structured result data for parent terminalization, not direct production terminal writes.
+  - Update misleading cleanup metadata: `worker_recycle_required: False` must not remain as production evidence that process recycle is unnecessary.
+  - Any `gc.collect()` cleanup may remain as best-effort child-local cleanup, but acceptance must not rely on it for parent memory release.
+- Exports/imports in `apps/worker/backtest_job_runner/wiring/modules/__init__.py` and service `__all__`
+  - Remove or narrow exports that make obsolete parent in-process runner APIs look like active production entrypoints.
+
+Definition of “removed” for this prompt:
+
+- The old in-process full compute path must be absent from production runner wiring.
+- It is acceptable to keep canonical compute classes as child-only implementation, unit-test helpers, or direct benchmark baselines if their module/docstring/name makes that boundary explicit.
+- It is not acceptable to leave both old parent in-process execution and new child execution selectable by accident through production defaults.
+
+## Documentation cleanup / drift map
+
+Docs must be updated in the same change when code paths are replaced. Do not leave active docs that describe the removed parent in-process runner path as current behavior.
+
+Required doc decisions:
+
+- `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`
+  - Replace statements that frame v1 memory growth mitigation as `MAX_JOBS_PER_PROCESS`/launchd restart only.
+  - Describe the new parent/child disposable full-job process boundary and parent-owned metrics/lease behavior.
+  - Update sequence diagrams or flow text if they imply `backtest-job-runner` executes full compute inside the parent process.
+- `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md`
+  - Remove or rewrite active TODO/status text that says `sync_inline` or `BacktestRuntimeJobOrchestrationService` remains the production API/runner path after this remediation lands.
+  - Historical notes may remain only if clearly marked historical and not current acceptance criteria.
+- `docs/runbooks/mac-studio-native-backend-operations.md` and `docs/runbooks/mac-studio-monitoring-plan.md`
+  - Update operations/runbook text if service behavior, restart expectations, active child process observation, or memory-release evidence changes.
+- `docs/architecture/backtest/README.md` or architecture index files
+  - Update status only if they still classify the old runner path as residual/untrusted after successful delivery.
+
+Required docs verification:
+
+- Run `rg -n "sync_inline|BacktestRuntimeJobOrchestrationService|MAX_JOBS_PER_PROCESS|in-process|parent process" docs/architecture docs/runbooks` and classify every remaining hit as historical, child-only, direct-benchmark-only, or updated current-state text.
+- Run `uv run python -m tools.docs.generate_docs_index --check` if any Markdown docs change.
 
 Target Mac Studio v1 scheduling policy:
 
@@ -228,6 +319,9 @@ Target Mac Studio v1 scheduling policy:
 - Preserve public jobs API behavior and DTO vocabulary unless a blocker proves a compatible additive change is required.
 - Keep `BacktestJobWorkerUseCase` semantics equivalent at the application boundary: claim, heartbeat, progress, execute, terminal write.
 - Add a child compute entrypoint that can execute one full job by `job_id` under the same production config and artifact context as the current in-process runner.
+- Ensure the full-job child exits after one job regardless of success or failure, so OS memory release is tied to process exit rather than Python `gc.collect()`.
+- Remove the old production parent wiring that directly composes and runs `BacktestRuntimeJobOrchestrationService`.
+- Update active architecture/runbook docs so they no longer describe parent in-process compute or `MAX_JOBS_PER_PROCESS` as the primary memory-release strategy.
 - Add or reuse a scheduling classification field/metadata for full jobs. If persistence is needed, make it additive and contract-classified.
 - Persist or expose the preflight scheduling decision so the runner can route obvious heavy jobs without running prepare first.
 - Treat preflight `heavy` as final for v1 scheduling; do not auto-demote it after prepare unless a later prompt explicitly adds safe reclassification evidence.
@@ -239,13 +333,14 @@ Target Mac Studio v1 scheduling policy:
 - Ensure light jobs cannot starve queued heavy jobs.
 - Ensure only the parent exposes the runner metrics endpoint.
 - Ensure child exit success/failure is translated into the same terminal job behavior as the current worker path.
+- Ensure parent remains the only terminal state owner for full jobs. Child may compute and return bounded result payload, but must not independently call `finish_with_top_variants`.
 - Guard terminal write by the existing lease/lock semantics or an equally strict ownership token.
 - Update Monit/service configuration so metrics scrape failure does not kill an active compute child.
 - Add focused tests for parent/child success, child failure, child timeout/exit, and lease ownership behavior.
 
 ## Requirements (Should)
 
-- Prefer a simple `subprocess`-based child model over a complex pool.
+- Prefer a simple `subprocess`-based child model over a complex pool; do not introduce a long-lived compute worker pool for full jobs in this prompt.
 - Keep IPC boring: pass `job_id` and config through argv/env, write structured child result or rely on guarded DB terminalization.
 - Keep scheduling policy explicit and config-driven; avoid hard-coding commercial tier names into the runner loop.
 - Add structured logs for child start, child exit, duration, and error class without high-cardinality metrics labels.
@@ -309,7 +404,7 @@ Skill routing for this task:
 1. Verify current API create remains enqueue-only.
 2. Design the minimal parent/child process contract and record assumptions in code comments or nearby docs only where useful.
 3. Define the minimal preflight scheduling decision: `heavy` for conservative upper-bound overflow, `light_candidate` only for bounded small jobs. Unknown cost must classify as `heavy`.
-4. Implement a child compute entrypoint for one full job and a parent runner path that supervises it.
+4. Implement a disposable child compute entrypoint for one full job and a parent runner path that supervises it.
 5. Implement post-prepare refinement: confirm `light_candidate` as `light`, or promote/requeue it to `heavy` before exact scoring.
 6. Implement parent-side slot accounting: light concurrency default `2`, heavy concurrency `1`, no heavy-heavy parallelism, and no light-heavy overlap in v1 unless benchmarked.
 7. Keep metrics and heartbeat in the parent process and make active-child state visible without job/user labels.
@@ -324,6 +419,7 @@ Skill routing for this task:
 - Preflight classifies possible light jobs as `light_candidate`, not final `light`.
 - Post-prepare refinement confirms `light_candidate` as `light` or promotes/requeues it to `heavy` before exact scoring.
 - Parent runner can claim a queued job and launch exactly one child for that job.
+- The full-job child process exits after one job, and parent evidence distinguishes parent retained memory from child peak memory.
 - Parent runner can run two light children concurrently by default, while respecting configured cap.
 - Parent runner never runs more than one heavy child on Mac Studio v1.
 - Parent runner does not overlap light children with an active heavy child unless a separate benchmark-gated flag enables it.
@@ -331,9 +427,13 @@ Skill routing for this task:
 - A stream of new light jobs cannot indefinitely starve an older queued heavy job.
 - Child success reaches `succeeded` through the existing terminal persistence path.
 - Child failure reaches `failed` with bounded error data and no secret/full payload logging.
+- Full-job terminal writes happen in the parent only; child does not write terminal job state.
 - Parent metrics endpoint is independent from child compute path.
 - Monit config no longer restarts active compute solely because `/metrics` scrape times out.
 - Tests cover child success, child failure, lease ownership, and no compute in API.
+- Tests or static assertions prove production runner wiring does not construct the full compute service graph in the parent.
+- Grep/static check proves `BacktestRuntimeJobOrchestrationService` is reachable from child entrypoint/direct benchmark/test code only, not from production parent service composition.
+- Docs cleanup evidence proves active docs no longer describe the removed parent in-process compute path as current production behavior.
 
 # Implementation constraints
 

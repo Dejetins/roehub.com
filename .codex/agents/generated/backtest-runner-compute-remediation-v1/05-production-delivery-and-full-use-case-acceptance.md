@@ -1,5 +1,5 @@
 ---
-prompt_name: backtest_runner_compute_remediation_v1_04_production_delivery_and_full_use_case_acceptance
+prompt_name: backtest_runner_compute_remediation_v1_05_production_delivery_and_full_use_case_acceptance
 repo: roehub.com
 branch: main
 scope: "P0: deliver the remediated API/runner compute path to production and prove the UI-created backtest use case on Mac Studio."
@@ -30,12 +30,12 @@ context_sources:
       inspect_symbols:
         - backtest-job-runner
     - path: scripts/backtest/run_api_runner_benchmark_parity.py
-      why: "new API-runner benchmark acceptance script"
+      why: "new API-runner benchmark and memory acceptance script"
       inspect_symbols:
         - main
   conditional_bundles:
     latest_benchmark_evidence:
-      read_when: "before delivery; identify the new accepted benchmark folder from prompt 03"
+      read_when: "before delivery; identify the new accepted benchmark folder from prompt 04"
       paths:
         - docs/architecture/backtest/benchmark_iterations
     api_and_ui_smoke:
@@ -73,8 +73,15 @@ hard_requirements:
   launchd_runner_loaded_required: true
   monit_must_not_kill_compute_required: true
   benchmark_acceptance_required: true
+  heaviest_140s_job_excluded_from_required_benchmarks: true
+  all_other_reference_jobs_required: true
   controlled_ui_like_job_required: true
   lazy_detail_cache_miss_and_hit_required: true
+  full_job_child_memory_release_required: true
+  lazy_cache_miss_child_memory_release_required: true
+  api_cache_hit_bounded_memory_required: true
+  parent_retained_rss_delta_required: true
+  vmmap_physical_footprint_required: true
   metrics_smoke_required: true
   mixed_light_heavy_scheduler_smoke_required: true
   preflight_heavy_classification_required: true
@@ -133,6 +140,7 @@ required_literals:
   - "git pull --ff-only"
   - "benchmark_results.json"
   - "benchmark_summary.md"
+  - "exclude_heaviest_140s_job"
   - "scheduling_class"
   - "light_candidate"
   - "light"
@@ -140,12 +148,24 @@ required_literals:
   - "estimated_combinations_upper_bound"
   - "ROEHUB_BACKTEST_LIGHT_CONCURRENCY"
   - "ROEHUB_BACKTEST_HEAVY_CONCURRENCY"
+  - "lazy_trades_compute"
+  - "lazy_trades_cache_hit"
+  - "retained_rss_delta"
+  - "vmmap"
+  - "physical footprint"
+  - "legacy path absence"
+  - "dead code audit"
+  - "docs drift audit"
 
 non_goals:
   - "Do not claim deploy success before Mac Studio benchmark and smoke evidence."
   - "Do not use old queued jobs as primary acceptance."
   - "Do not accept failed/missing-artifact jobs as success."
+  - "Do not run or require the single heaviest 140+ second reference job in production benchmark/smoke acceptance."
   - "Do not claim scheduler safety without mixed light/heavy smoke evidence."
+  - "Do not claim memory release from `gc.collect()` alone; require child exit and retained-memory evidence."
+  - "Do not claim production acceptance if old in-process/full-detail production paths remain reachable."
+  - "Do not claim production acceptance if active docs still describe removed paths as current behavior."
   - "Do not broaden into new UI design or indicator features."
   - "Do not silently skip browser-visible verification if the UI flow is available."
 
@@ -160,6 +180,11 @@ final_report_format:
     - "Benchmark acceptance"
     - "UI/API production smoke"
     - "Performance"
+    - "Memory release"
+    - "Lazy cache-hit memory"
+    - "Legacy path absence"
+    - "Dead code audit"
+    - "Docs drift audit"
     - "Contract impact"
     - "Risks"
     - "Handoff"
@@ -208,18 +233,24 @@ Done means:
 - `com.roehub.backtest-job-runner` is loaded/running under launchd;
 - Monit does not kill live compute because of metrics scrape behavior;
 - final benchmark acceptance exists in the new benchmark folder;
+- final benchmark acceptance excludes only the single heaviest 140+ second reference job and includes all other reference jobs;
 - controlled UI/API-like `BTCUSDT 15m` job reaches `queued -> running -> succeeded`;
 - obvious heavy requests are classified as `heavy` by preflight before compute;
 - `light_candidate` requests are refined after prepare before exact scoring;
 - mixed scheduler smoke proves bounded `light` parallelism and FIFO `heavy` processing;
 - one lazy detail cache miss materializes and second read is cache hit;
+- full-job child process memory is released after child exit within accepted retained-memory thresholds;
+- lazy cache-miss child process memory is released after child exit within accepted retained-memory thresholds;
+- lazy cache-hit API reads are memory-bounded and do not load the full trades detail payload into API memory;
 - metrics and logs are verified.
 
 ## Context / Current State
 
-This is the final delivery prompt. It assumes the preceding implementation prompts have already created the process-isolated runner boundary, hot-path compute remediation, and API-runner benchmark evidence. If those prerequisites are absent, stop and report the blocker rather than doing a partial production claim.
+This is the final delivery prompt. It assumes the preceding implementation prompts have already created the process-isolated runner boundary, hot-path compute remediation, disposable lazy trades/cache-hit memory remediation, and API-runner benchmark evidence. If those prerequisites are absent, stop and report the blocker rather than doing a partial production claim.
 
 Acceptance is Mac Studio evidence, not local tests alone. Old queued jobs can be inspected, but they are not primary acceptance. Primary acceptance must create a controlled job and record exact evidence.
+
+Benchmark acceptance must use the same May 2 benchmark family, but the single heaviest reference job that runs 140+ seconds is intentionally excluded from every required benchmark, smoke, and acceptance check. All other May 2 reference jobs remain required. The excluded job must be named in the benchmark artifacts and final report with the exclusion reason.
 
 ## Requirements (Must)
 
@@ -234,6 +265,8 @@ Acceptance is Mac Studio evidence, not local tests alone. Old queued jobs can be
 - Verify `launchctl print` for `com.roehub.backtest-job-runner`.
 - Verify `curl http://127.0.0.1:9204/metrics` and required metrics names.
 - Run or verify the new API-runner benchmark folder with `benchmark_results.json`, `benchmark_summary.md`, and accounting validation.
+- Verify the benchmark artifacts explicitly record `exclude_heaviest_140s_job` and do not run the excluded 140+ second job.
+- Verify all other reference benchmark jobs are included.
 - Create a controlled `BTCUSDT 15m` UI/API-like job and observe `queued -> running -> succeeded`.
 - Verify `top_variants > 0` and expected top-N behavior.
 - Run a mixed scheduler smoke: multiple controlled light jobs plus multiple controlled heavy jobs.
@@ -244,12 +277,19 @@ Acceptance is Mac Studio evidence, not local tests alone. Old queued jobs can be
 - Verify light jobs do not starve an older queued heavy job.
 - Verify production does not overlap light jobs with an active heavy job unless the benchmark explicitly accepted that mode.
 - Trigger lazy detail cache miss and verify materialization then cache hit.
+- Capture full-job child process lifecycle and memory release: child pid, exit status, peak RSS if available, parent RSS before/after, retained RSS delta, and `vmmap`/physical footprint if available.
+- Capture lazy cache-miss child process lifecycle and memory release with the same evidence categories.
+- Capture API cache-hit retained-memory evidence for detail/page/stat/CSV paths and prove the API does not load the full trades detail payload into memory.
+- Verify legacy-path absence evidence from prompt 04: production parent does not construct full compute graph, public API cache-hit endpoints do not use full-detail cache loading, and large-grid production routing does not use Python `itertools.product`.
+- Verify the dead-code audit classifies retained old helpers as child-only, test-only, direct-benchmark-only, migration-only, or removed.
+- Verify docs drift audit from prompt 04: active architecture/runbook/UI docs do not describe removed paths as current production behavior.
 - Verify API/auth/dashboard remain responsive during or after compute.
 - Verify logs contain no secrets, full request payloads, or full trades payloads.
 
 ## Requirements (Should)
 
 - Capture process/thread CPU evidence and RSS before/during/after the controlled job.
+- Capture repeated-run parent retained-memory trend across more than one full job and more than one lazy cache miss when runtime budget allows.
 - Capture Prometheus target state for `backtest-job-runner`.
 - Capture active child counts and metrics by scheduling class if available.
 - Capture browser-visible `/backtests` evidence if the UI route is available and credentials are known.
@@ -257,7 +297,7 @@ Acceptance is Mac Studio evidence, not local tests alone. Old queued jobs can be
 
 ## Requirements (Nice-to-have)
 
-- Run a secondary heavy-load smoke for 5 indicators if the primary acceptance passes and runtime budget allows.
+- Run secondary load smoke only if it does not include the excluded 140+ second heaviest benchmark job and runtime budget allows.
 - Attach concise browser screenshot references if Browser/Playwright evidence is gathered.
 
 # Context acquisition protocol
@@ -317,10 +357,11 @@ Skill routing for this task:
 4. Publish via `publish-ci-deploy`, watch CI/deploy, and fix introduced blockers.
 5. Sync Mac Studio and verify deployed runtime identity.
 6. Reload services and verify launchd/Monit/Prometheus state.
-7. Run final benchmark acceptance and controlled UI/API production smoke.
-8. Run mixed scheduler smoke for light parallelism and heavy FIFO.
-9. Verify lazy detail cache miss/hit, metrics, logs, and API responsiveness.
-10. Produce final Russian report with exact evidence and residual risks.
+7. Run final benchmark acceptance with the 140+ second heaviest job excluded and all other reference jobs included.
+8. Run controlled UI/API production smoke.
+9. Run mixed scheduler smoke for light parallelism and heavy FIFO.
+10. Verify full-job child memory release, lazy cache-miss child memory release, cache-hit bounded API memory, metrics, logs, and API responsiveness.
+11. Produce final Russian report with exact evidence and residual risks.
 
 # Acceptance criteria (Definition of Done)
 
@@ -330,11 +371,17 @@ Skill routing for this task:
 - Runner service is loaded/running.
 - Metrics endpoint and Prometheus target are healthy.
 - New benchmark folder is present and accepted.
+- Benchmark artifacts exclude only the named 140+ second heaviest job and include all other required reference jobs.
 - Controlled `BTCUSDT 15m` job reaches `succeeded`.
 - Preflight heavy classification is verified for an obvious heavy request.
 - Light-candidate refinement is verified before exact scoring.
 - Mixed scheduler smoke passes: bounded light concurrency, heavy FIFO, no heavy-heavy parallelism, no heavy starvation.
 - Lazy detail cache miss and hit are verified.
+- Full-job child memory release is verified on Mac Studio after child exit.
+- Lazy cache-miss child memory release is verified on Mac Studio after child exit.
+- API cache-hit memory remains bounded and does not load full trades detail.
+- Legacy production path absence and dead-code audit are verified before production acceptance.
+- Docs drift audit is verified before production acceptance.
 - CPU/RSS evidence demonstrates the host is used as expected for the accepted workload.
 - Final report includes rollback/handoff and contract impact.
 
@@ -344,6 +391,7 @@ Skill routing for this task:
 
 - Do not process old queued jobs as primary acceptance.
 - Do not change benchmark output after the fact without rerunning or labeling the correction.
+- Do not run the excluded 140+ second heaviest reference job as part of required acceptance.
 - Do not enable `light=3` in production unless benchmark evidence explicitly accepts it.
 
 ## API / contracts
@@ -377,6 +425,9 @@ Possible secondary touches:
 - Do not add new product features.
 - Do not redesign the UI.
 - Do not skip benchmark acceptance.
+- Do not run the excluded 140+ second heaviest reference job as part of required production acceptance.
+- Do not claim memory release from `gc.collect()` alone.
+- Do not ship with active docs that still describe removed paths as current production behavior.
 - Do not use local-only evidence as production acceptance.
 
 # Quality gates (must run and pass)
@@ -399,6 +450,8 @@ Write the final report in Russian with these sections:
 - `Benchmark acceptance`
 - `UI/API production smoke`
 - `Performance`
+- `Memory release`
+- `Lazy cache-hit memory`
 - `Contract impact`
 - `Risks`
 - `Handoff`

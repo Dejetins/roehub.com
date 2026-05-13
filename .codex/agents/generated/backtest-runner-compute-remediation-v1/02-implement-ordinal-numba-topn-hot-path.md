@@ -88,6 +88,12 @@ hard_requirements:
   heavy_jobs_must_keep_full_host_budget: true
   preserve_canonical_result_semantics: true
   macstudio_benchmark_required_before_claiming_performance: true
+  optional_benchmarks_must_exclude_heaviest_140s_job: true
+  remove_large_product_from_production_path_required: true
+  old_cartesian_iterator_test_only_or_small_helper_only: true
+  no_double_pass_for_passthrough_combo_planning_required: true
+  active_docs_must_remove_large_cartesian_as_current_production_path: true
+  docs_cleanup_required_for_hot_path_replacement: true
 
 task_toggles:
   implementation_changes_allowed: true
@@ -143,6 +149,14 @@ required_literals:
   - "heavy"
   - "estimated_combinations_upper_bound"
   - "estimated_combinations"
+  - "exclude_heaviest_140s_job"
+  - "iter_combo_chunks"
+  - "BacktestComboPlanningService.execute"
+  - "BacktestNoRiskExactScoringService.execute"
+  - "_iter_selected_candidate_batches"
+  - "BacktestPreflightService.execute"
+  - "docs cleanup"
+  - "Cartesian chunk planning"
   - "ordinal chunking"
   - "exact_scoring"
   - "heap_update"
@@ -153,6 +167,7 @@ non_goals:
   - "Do not claim acceptance from local benchmarks."
   - "Do not broaden indicators catalog or UI work."
   - "Do not use random sampling to replace exact top-N computation."
+  - "Do not run the single heaviest 140+ second benchmark job in any optional local or Mac Studio check from this prompt."
 
 final_report_format:
   language: ru
@@ -161,6 +176,8 @@ final_report_format:
     - "Hot path changes"
     - "Top N / contracts"
     - "Numba / CPU"
+    - "Removed/replaced paths"
+    - "Docs cleanup"
     - "Local gates"
     - "Performance evidence"
     - "Contract impact"
@@ -190,6 +207,9 @@ possible_secondary_touches:
   - "src/trading/contexts/backtest/adapters/outbound/config/backtest_admission_runtime_config.py"
   - "apps/worker/backtest_job_runner/**"
   - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md"
+  - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.md"
+  - "docs/architecture/backtest/benchmark_iterations/README.md"
+  - "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md"
 
 safety_notes:
   - "Algorithmic parity is more important than speed. Stop on unexplained result drift."
@@ -211,7 +231,7 @@ Done means:
 - preflight exposes deterministic conservative upper-bound estimates needed by the runner scheduler;
 - obvious heavy jobs are classified as `heavy` during preflight, before prepare/exact compute;
 - possible light jobs are initially classified as `light_candidate` and confirmed after prepare/basic stages;
-- local parity tests pass and Mac Studio benchmark acceptance is deferred to the dedicated benchmark prompt.
+- local parity tests pass and Mac Studio benchmark acceptance is deferred to prompt 04, where the single heaviest 140+ second benchmark job is excluded and all other reference jobs remain required.
 
 ## Context / Current State
 
@@ -228,11 +248,68 @@ Current risk points:
 
 This prompt must preserve the canonical scoring algorithm. The goal is to change how combinations are generated, streamed, scored, and reported, not to change what a combination means.
 
+## Method-level replacement / cleanup map
+
+This prompt must replace the old large-grid production hot path, not add ordinal code beside an active Python Cartesian path.
+
+Required current-method decisions:
+
+- `src/trading/contexts/backtest/application/services/v2/combo_planning.py::iter_combo_chunks`
+  - Remove from large/full production path or narrow to small-test/small-helper usage only.
+  - If retained, guard it with explicit thresholds and documentation that it is not used for large full jobs.
+  - Tests must prove large grids do not call the Python `itertools.product` implementation.
+- `src/trading/contexts/backtest/application/services/v2/combo_planning.py::BacktestComboPlanningService.execute`
+  - Replace full Cartesian pre-pass when proxy filtering is pass-through.
+  - For pass-through, return a compact ordinal/range plan or equivalent stream descriptor instead of materialized combo batches.
+  - Preserve telemetry fields, but distinguish estimated/streamed totals from materialized totals.
+- `src/trading/contexts/backtest/application/services/v2/no_risk_exact.py::BacktestNoRiskExactScoringService.execute`
+  - Replace selected-candidate iteration that depends on materialized Cartesian batches with ordinal streaming.
+  - Heap capacity must come from production `request.top_n` (`top_n=50`) and not from `benchmark_top_k=5`.
+  - Keep deterministic ordering and tie-breaking equivalent to the old small-pool reference.
+- `src/trading/contexts/backtest/application/services/v2/no_risk_exact.py::_iter_selected_candidate_batches`
+  - Replace for production scoring with ordinal decoded batches.
+  - If the old helper remains, make it small-test/reference-only and verify it is not used for large production jobs.
+- `src/trading/contexts/backtest/application/services/v2/tp_sl_exact.py`
+  - If risk-on exact scoring shares the same candidate batch contract, update it to consume the new ordinal/range plan rather than old materialized combo batches.
+- `src/trading/contexts/backtest/application/services/v2/preflight.py::BacktestPreflightService.execute`
+  - Add conservative upper-bound scheduling metadata before prepare/exact compute.
+  - Do not rely on prepare/basic stages to classify obvious heavy requests such as `196^5`.
+- DTO/config modules for preflight/admission/runtime config
+  - Add only compatible fields/config keys needed for `estimated_combinations_upper_bound`, `scheduling_class`, and per-class thread budgets.
+  - Remove or rename stale benchmark-only top-k config if it can still cap production result capacity.
+
+Definition of “removed” for this prompt:
+
+- The old Python Cartesian iterator can remain as a small reference path only if production routing cannot reach it for large jobs.
+- Pass-through combo planning must not still traverse the full Cartesian space before exact scoring.
+- A static or runtime test must fail if a large `196^5` request enters `itertools.product`-based generation.
+
+## Documentation cleanup / drift map
+
+Docs must be updated when the hot path changes. Do not leave active architecture docs saying the current production algorithm is deterministic Python Cartesian chunk planning for large jobs.
+
+Required doc decisions:
+
+- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` and `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md`
+  - Replace active descriptions of `combo_iteration` as Python Cartesian chunk generation for production large jobs.
+  - Describe ordinal/range streaming, Numba decode, pass-through no-prepass behavior, and `top_n=50` production capacity.
+  - Keep historical benchmark iteration descriptions only if they are clearly historical snapshots.
+- `docs/architecture/backtest/benchmark_iterations/README.md`
+  - Update benchmark template fields if new evidence includes ordinal streaming, excluded heaviest job, legacy-path absence, or memory release.
+- `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`
+  - Update scheduler/cost-estimate text if new `scheduling_class`, `estimated_combinations_upper_bound`, or per-class Numba thread budgets become active.
+
+Required docs verification:
+
+- Run `rg -n "itertools.product|Cartesian chunk|Cartesian chunk planning|combo_iteration|benchmark_top_k|top_k=5" docs/architecture/backtest` and classify every remaining hit as historical reference, test/reference helper, or updated current-state text.
+- Run `uv run python -m tools.docs.generate_docs_index --check` if Markdown docs change.
+
 ## Requirements (Must)
 
 - Read context using the protocol below and stop early once sufficient.
 - Preserve canonical result semantics, ranking, request hash, artifact identity, and deterministic ordering.
 - Replace large Cartesian generation with ordinal chunking suitable for N-arity pools.
+- Remove or isolate the old `itertools.product` implementation from large production jobs instead of leaving both paths active.
 - Move ordinal decode into Numba or another compiled numeric path for hot loops.
 - Avoid a full combo planning pass when proxy filtering is effectively pass-through.
 - Ensure exact scoring streams chunks and updates heap without materializing the full combination set.
@@ -249,6 +326,7 @@ This prompt must preserve the canonical scoring algorithm. The goal is to change
 - Add tests proving preflight heavy classification is deterministic and conservative.
 - Add tests proving `light_candidate` is promoted to `heavy` after prepare if actual combinations exceed thresholds.
 - Add or expose backtest-specific Numba thread config and log/telemetry evidence.
+- Update active runtime/benchmark docs so they no longer describe the replaced Python Cartesian large-job path or benchmark-only `top_k=5` as production behavior.
 
 ## Requirements (Should)
 
@@ -326,8 +404,11 @@ Skill routing for this task:
 # Acceptance criteria (Definition of Done)
 
 - Small-pool ordinal chunks produce the same ordered combinations as the legacy iterator.
+- Large-grid tests prove the legacy Python Cartesian iterator is not called in production routing.
+- Pass-through combo planning tests prove there is no complete Cartesian pre-pass before exact scoring.
 - Large full-job paths do not call Python `itertools.product`.
 - Pass-through proxy filter does not force a full pre-scan of the Cartesian space.
+- Docs cleanup evidence proves active architecture docs no longer describe large production jobs as Python Cartesian chunk planning.
 - Exact scoring can stream selected chunks and update heap without full materialization.
 - `top_n=50` is honored in production result capacity.
 - Preflight cost estimate includes `estimated_combinations_upper_bound` and enough request metadata to classify obvious heavy jobs before compute.
