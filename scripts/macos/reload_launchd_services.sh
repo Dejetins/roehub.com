@@ -65,6 +65,20 @@ service_is_loaded() {
   launchctl print "gui/${UID_VALUE}/${label}" >/dev/null 2>&1
 }
 
+wait_until_unloaded() {
+  local label="$1"
+  local attempts="${2:-10}"
+  local attempt=0
+  while service_is_loaded "$label"; do
+    attempt=$((attempt + 1))
+    if (( attempt >= attempts )); then
+      echo "service ${label} is still loaded after bootout" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
 bootout_service() {
   local service="$1"
   local plist_path="${LAUNCH_AGENTS_DIR}/${service}"
@@ -76,10 +90,12 @@ bootout_service() {
   fi
   echo "bootout ${label}"
   if launchctl bootout "gui/${UID_VALUE}" "${plist_path}"; then
+    wait_until_unloaded "$label"
     return 0
   fi
   echo "bootout path failed for ${label}; retrying by service target" >&2
   launchctl bootout "gui/${UID_VALUE}/${label}"
+  wait_until_unloaded "$label"
 }
 
 bootstrap_service() {
@@ -93,6 +109,7 @@ bootstrap_service() {
   if service_is_loaded "$label"; then
     echo "bootstrap preflight ${label}: service still loaded, forcing service-target bootout"
     launchctl bootout "gui/${UID_VALUE}/${label}" || true
+    wait_until_unloaded "$label"
   fi
   echo "bootstrap ${label}"
   launchctl bootstrap "gui/${UID_VALUE}" "${plist_path}"
