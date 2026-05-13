@@ -72,6 +72,8 @@ hard_requirements:
   autostart_after_reboot_required: true
   monit_control_required: true
   loaded_model_readiness_required: true
+  port_conflict_preflight_required: true
+  config_driven_lmstudio_port_required: true
   no_dead_mlx_runtime_service: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
@@ -114,6 +116,8 @@ required_literals:
   - "lms daemon up"
   - "lms server start --port 8080 --bind 127.0.0.1"
   - "lms load gemma-4-e2b-it --identifier gemma-4-e2b-it-4bit --context-length 8192 --parallel 1"
+  - "port preflight"
+  - "base_url from configs/prod/backtest_ai_configurator.yaml"
   - "lms ps --json"
   - "two stop/start/restart cycles"
   - "/v1/models is not readiness"
@@ -208,6 +212,8 @@ Context ledger:
   - `lms server start --port 8080 --bind 127.0.0.1`;
   - model loaded with identifier `gemma-4-e2b-it-4bit`, context 8192, parallel 1.
 - Use absolute `lms` path on Mac Studio.
+- Read LM Studio `base_url`/port from Roehub config. `127.0.0.1:8080` is only the current default candidate, not a blind hardcode.
+- Add port-conflict preflight to the ensure/smoke path. If the configured port is occupied by another service, the service must not steal it; stop and record blocker or switch to a documented unused loopback port through config/docs/tests.
 - Add launchd/Monit integration without exposing LM Studio outside loopback.
 - Update bootstrap/reload scripts so Mac Studio can install/reload the runtime predictably.
 - Add readiness/smoke command that verifies:
@@ -275,6 +281,7 @@ Stop reading once service labels, scripts, checks and evidence path are clear.
 - `monit summary` or `monit status` includes the LM Studio runtime check, or exact approved alternative is documented.
 - `launchctl print` can show the installed service or exact service-control design is documented.
 - LM Studio runtime recovers from stop/restart path without manual GUI action.
+- Configured LM Studio port has preflight evidence before and after restart cycles, and no non-LM-Studio listener owns it.
 - Two stop/start/restart cycles pass on Mac Studio without a restart storm.
 - `lms ps --json` shows `gemma-4-e2b-it-4bit` loaded.
 - A lightweight structured generation smoke passes after service reload.

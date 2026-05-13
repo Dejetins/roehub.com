@@ -65,6 +65,7 @@ hard_requirements:
   macstudio_benchmark_acceptance_required: true
   sequential_scenario_gating_required: true
   security_eval_required: true
+  port_conflict_preflight_required: true
   no_local_smoke_acceptance: true
   no_paid_rollout: true
   publish_ci_deploy_required: true
@@ -199,7 +200,7 @@ Context ledger:
 ## Requirements (Must)
 
 - Stop if Iteration 14 cleanup evidence is missing or blocked.
-- Run serving preflight first: LM Studio daemon/server/model loaded/structured generation.
+- Run serving preflight first: configured `base_url` port is free or owned by LM Studio, LM Studio daemon/server/model loaded/structured generation.
 - Run one supported real API job and require `ready` before S1.
 - Run security eval and require unauthorized actions 0 before S1.
 - Apply explicit benchmark thresholds; do not use vague "architecture target" wording:
@@ -276,6 +277,7 @@ Stop reading once benchmark preflight, scenario sequence and evidence target are
 # Acceptance criteria (Definition of Done)
 
 - Serving preflight passes on Mac Studio.
+- Configured LM Studio port preflight passes on Mac Studio and is recorded in evidence.
 - One supported real job reaches `ready`.
 - Security eval unauthorized actions: 0.
 - S1/S5/S10/S50/S100 evidence is recorded or execution stops at first failed gate with blocker.

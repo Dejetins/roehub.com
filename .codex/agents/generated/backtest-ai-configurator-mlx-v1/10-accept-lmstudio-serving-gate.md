@@ -67,6 +67,8 @@ hard_requirements:
   no_benchmark_until_serving_gate_passes: true
   no_mlx_lm_server_runtime: true
   loopback_only: true
+  port_conflict_preflight_required: true
+  config_driven_lmstudio_port_required: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
 
@@ -101,6 +103,8 @@ required_literals:
   - "lms daemon up"
   - "lms server start --port 8080 --bind 127.0.0.1"
   - "lms load gemma-4-e2b-it --identifier gemma-4-e2b-it-4bit --context-length 8192 --parallel 1"
+  - "port preflight"
+  - "base_url from configs/prod/backtest_ai_configurator.yaml"
   - "/api/v1/models"
   - "/v1/chat/completions"
   - "response_format"
@@ -186,7 +190,8 @@ Context ledger:
 
 - Use official LM Studio docs for server, headless/daemon, model load, list models, chat completions and structured output.
 - Use absolute CLI path `/Users/daniildegtyarev/.lmstudio/bin/lms` on Mac Studio.
-- Use loopback only: `127.0.0.1:8080`.
+- Use loopback only. The current default candidate is `127.0.0.1:8080`, but the agent must read `base_url` from `configs/prod/backtest_ai_configurator.yaml` and use that port unless the config is intentionally changed.
+- Run a Mac Studio port preflight before starting LM Studio: `lsof -nP -iTCP:<configured_port> -sTCP:LISTEN || true`. If the configured port is occupied by a non-LM-Studio process, stop and record blocker or make a scoped config/doc change to an unused loopback port with acceptance evidence.
 - Verify all layers separately: daemon, server, loaded model, native model list, OpenAI-compatible generation, structured output.
 - Use `response_format: {"type": "json_schema", ...}` in direct smoke.
 - Run exactly 10 direct structured-output generation attempts and record success/failure count.
@@ -236,7 +241,7 @@ Stop reading once the serving gate commands, evidence location and doc update sc
 # Work plan (agent should follow)
 
 1. Confirm current Mac Studio LM Studio state without changing anything.
-2. Start daemon/server/load model only if needed for this serving gate.
+2. Read configured `base_url`, run port preflight on Mac Studio, and start daemon/server/load model only if the configured loopback port is safe.
 3. Run 10 direct structured-output chat completion attempts against `127.0.0.1:8080`.
 4. Capture loaded-model evidence from `lms ps --json` and `/api/v1/models`.
 5. Write the new evidence folder.
@@ -247,6 +252,7 @@ Stop reading once the serving gate commands, evidence location and doc update sc
 # Acceptance criteria (Definition of Done)
 
 - Direct LM Studio serving gate is `accepted` only if 10/10 structured-output attempts return valid JSON conforming to the smoke schema.
+- Configured LM Studio port has explicit preflight evidence and is not occupied by a non-LM-Studio service.
 - Evidence contains top-level gate markers: `accepted`, `blocking_reason`, and `next_prompt_allowed`; downstream prompts may proceed only when `accepted=true` and `next_prompt_allowed=true`.
 - If accepted, evidence includes exact commands and sanitized outputs.
 - If not accepted, evidence includes exact blocker and no downstream prompt should proceed.
