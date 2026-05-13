@@ -1,5 +1,5 @@
 check process roehub_backtest_job_runner matching "apps.worker.backtest_job_runner.main.main"
   start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.backtest-job-runner /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-job-runner.plist"
   stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.backtest-job-runner /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-job-runner.plist"
-  if failed host 127.0.0.1 port 9204 protocol http request "/metrics" for 2 cycles then restart
+  if failed host 127.0.0.1 port 9204 protocol http request "/metrics" for 2 cycles then alert
   if 5 restarts within 10 cycles then unmonitor

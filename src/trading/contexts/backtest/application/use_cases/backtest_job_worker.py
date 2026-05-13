@@ -13,7 +13,12 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobLeaseRepository,
     BacktestJobRepository,
 )
-from trading.contexts.backtest.application.services.v2 import BacktestPreflightService
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    BacktestJobHeavyPromotion,
+)
+from trading.contexts.backtest.application.services.v2.preflight import (
+    BacktestPreflightService,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobErrorPayload,
@@ -36,6 +41,7 @@ class BacktestJobWorkerResult:
     job: BacktestJob | None
     claimed: bool
     lease_lost: bool = False
+    status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,15 +53,12 @@ class BacktestJobWorkerUseCase:
     lease_seconds: int
     heartbeat_interval_seconds: float = 30.0
     locked_by: str | None = None
+    scheduling_classes: tuple[str, ...] | None = None
 
     def run_next(self) -> BacktestJobWorkerResult:
         now = datetime.now(UTC)
         owner = self._locked_by()
-        job = self.lease_repository.claim_next(
-            now=now,
-            locked_by=owner,
-            lease_seconds=self.lease_seconds,
-        )
+        job = self._claim_next(now=now, locked_by=owner)
         if job is None:
             return BacktestJobWorkerResult(job=None, claimed=False)
 
@@ -80,6 +83,23 @@ class BacktestJobWorkerUseCase:
                     job_id=job.job_id,
                     preflight=preflight,
                     updated_at=datetime.now(UTC),
+                )
+            if isinstance(execution_result, BacktestJobHeavyPromotion):
+                requeued = self.lease_repository.promote_to_heavy_and_requeue(
+                    job_id=job.job_id,
+                    now=datetime.now(UTC),
+                    locked_by=owner,
+                    estimated_combinations_upper_bound=(
+                        execution_result.estimated_combinations_upper_bound
+                    ),
+                    actual_combinations=execution_result.actual_combinations,
+                    reason=execution_result.reason,
+                )
+                return BacktestJobWorkerResult(
+                    job=requeued,
+                    claimed=True,
+                    lease_lost=heartbeat.lease_lost or requeued is None,
+                    status="requeued_heavy",
                 )
             finished = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
@@ -110,6 +130,20 @@ class BacktestJobWorkerUseCase:
                 ),
             )
             return BacktestJobWorkerResult(job=failed, claimed=True, lease_lost=failed is None)
+
+    def _claim_next(self, *, now: datetime, locked_by: str) -> BacktestJob | None:
+        if self.scheduling_classes is None:
+            return self.lease_repository.claim_next(
+                now=now,
+                locked_by=locked_by,
+                lease_seconds=self.lease_seconds,
+            )
+        return self.lease_repository.claim_next(
+            now=now,
+            locked_by=locked_by,
+            lease_seconds=self.lease_seconds,
+            scheduling_classes=self.scheduling_classes,
+        )
 
     def _locked_by(self) -> str:
         if self.locked_by is not None and self.locked_by.strip():

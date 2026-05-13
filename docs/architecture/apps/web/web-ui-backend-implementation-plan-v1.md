@@ -1798,7 +1798,10 @@ Playwright CLI:
 
 ## Этап 8.5 - backtest runtime hardening перед публичным UI
 
-Статус 2026-05-08: не реализовано в рамках Web UI v1 checkpoint. Перед публичным `/backtests` create/results flow нужно заново проверить текущую wiring-семантику и убрать/ограничить `sync_inline` path, если он все еще достижим из API request path.
+Статус 2026-05-08: не реализовано в рамках Web UI v1 checkpoint. Историческая
+проблема была в том, что `sync_inline` мог оставаться reachable из API request
+path; эта строка сохранена как historical note, а не как current-state
+acceptance после Stage 8.5/remediation.
 
 Обновление 2026-05-11: production runner target вынесен в
 `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. Этот этап не
@@ -1807,11 +1810,19 @@ Playwright CLI:
 `backtest-job-runner`, tier quotas, очередь full jobs и async lazy trades
 materialization для detail view Web UI.
 
-Цель: убрать архитектурный риск `sync_inline` execution в API process как публичный путь для configurator/results. Browser contract уже должен быть job-based, но фактическое выполнение нужно привести к queued/background semantics до того, как results/configurator станут основной пользовательской поверхностью.
+Обновление 2026-05-13: public create boundary уже job-based:
+`POST /api/backtests/jobs` сохраняет `queued` job и не выполняет full compute в
+API process. Production full-job execution boundary теперь: responsive
+`backtest-job-runner` parent claim/heartbeat/progress/metrics/terminal owner +
+disposable `child process` для одного full job. `BacktestRuntimeJobOrchestrationService`
+остается child-only canonical compute service/direct benchmark surface, а не
+production API/runner parent path.
+
+Цель: удержать архитектурный риск `sync_inline` execution вне API process как публичного пути для configurator/results. Browser contract уже job-based; full compute должен идти через queued/background semantics до того, как results/configurator станут основной пользовательской поверхностью.
 
 Наблюдаемое основание:
 
-- deep research фиксирует, что текущая wiring-конфигурация поднимает `BacktestRuntimeJobOrchestrationService` внутри API process, а `BacktestJobsUseCase.create()` может выполнять job через `sync_inline`;
+- historical deep research фиксировал, что прежняя wiring-конфигурация поднимала `BacktestRuntimeJobOrchestrationService` внутри API process, а `BacktestJobsUseCase.create()` мог выполнять job через `sync_inline`; current implementation must keep this as removed behavior, not target state;
 - UI должен относиться к `POST /api/backtests/jobs` как async create flow независимо от текущей реализации;
 - heavy compute не должен конкурировать с auth, dashboard, monitoring и lightweight read endpoints на текущем backend host.
 
@@ -1832,7 +1843,8 @@ sequenceDiagram
     API->>Q: enqueue/trigger execution
     API-->>UI: 201/200 job DTO state=queued
     W->>DB: claim queued job
-    W->>FS: compute/write summary artifacts
+    W->>W: launch disposable child process
+    W->>FS: child computes bounded top result payload
     W->>DB: succeeded/failed/cancelled + compact summary
     UI->>API: GET job/progress/results
 ```
@@ -2227,7 +2239,7 @@ uv run python tools/load/web_capacity_smoke.py \
 | Auth UX | `compatible-change` для API, `breaking-change` для browser UX | Login становится branded modal/deep-link modal state; registration остается отдельной страницей. |
 | Branded controls | `breaking-change` для browser UX | Visible native select/dropdown заменяется shared Roehub controls; hidden fallback допустим. |
 | Refresh/autorefresh | `compatible-change` | Добавляются manual refresh/autorefresh DTO fields, limits и preference defaults; exchange-bound refresh не обходит backend limiter. |
-| Runtime workflow | `compatible-change` или `unknown` | Backtest create должен стать bounded async path; фактический переход с `sync_inline` требует evidence и rollout notes. |
+| Runtime workflow | `compatible-change` | Backtest create остается bounded async path; full compute переходит через parent/child `backtest-job-runner` workflow без изменения public DTO vocabulary. |
 | Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без Mac Studio evidence, если меняются compute paths. |
 | Performance risk | `unknown` до измерений | Dashboard/strategies/backtests/result-state/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
 

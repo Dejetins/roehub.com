@@ -163,10 +163,14 @@ production reload baseline.
 Возврат `backtest-job-runner` в production baseline описан отдельно:
 `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. До выполнения
 R4 отсутствие `com.roehub.backtest-job-runner` в `launchctl` было baseline. После R4
-операционная проверка service layer включает `launchctl print`, metrics endpoint
-`127.0.0.1:9204` и Prometheus target. Публичный Web UI backtest rollout не считается
-завершенным без R5 dedicated worker smoke: controlled job `queued -> running -> succeeded`,
-lazy trades materialization cache miss/hit, metrics endpoint и Prometheus target.
+операционная проверка service layer включает `launchctl print`, parent metrics endpoint
+`127.0.0.1:9204` и Prometheus target. Full-job compute запускается как disposable
+child process под responsive parent; при диагностике memory нужно разделять parent
+retained `RSS` и child peak `RSS`/exit boundary. Monit metrics failure для
+`roehub_backtest_job_runner` является alert-only и не должен рестартовать live
+compute child. Публичный Web UI backtest rollout не считается завершенным без R5
+dedicated worker smoke: controlled job `queued -> running -> succeeded`, lazy
+trades materialization cache miss/hit, parent metrics endpoint и Prometheus target.
 
 Backtest AI Configurator worker проверяется отдельно от public `/backtests` UI:
 

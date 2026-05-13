@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import inspect
+from dataclasses import dataclass
+from typing import cast
+
+from apps.worker.backtest_job_runner.wiring.modules.backtest_job_runner import (
+    BacktestRunnerTaskResult,
+    BacktestRunnerTaskScheduler,
+    build_backtest_job_runner_app,
+)
+from trading.contexts.backtest.application.use_cases import (
+    BacktestJobWorkerUseCase,
+    BacktestLazyTradesMaterializationWorkerUseCase,
+)
+
+
+def test_scheduler_probes_heavy_before_light_and_batches_light_slots() -> None:
+    scheduler = _scheduler()
+
+    first = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    assert first is not None
+    assert first.scheduling_class == "heavy"
+    scheduler.record_result(
+        scheduling_class="heavy",
+        result=BacktestRunnerTaskResult(task_kind="full_job", claimed=False),
+    )
+
+    second = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    assert second is not None
+    assert second.scheduling_class == "light_candidate"
+    third = scheduler.next_launch(active_light=1, active_heavy=0, active_lazy=0)
+    assert third is not None
+    assert third.scheduling_class == "light_candidate"
+
+
+def test_scheduler_rechecks_heavy_after_light_anti_starvation_limit() -> None:
+    scheduler = _scheduler(full_job_anti_starvation_limit=1)
+    scheduler.record_result(
+        scheduling_class="heavy",
+        result=BacktestRunnerTaskResult(task_kind="full_job", claimed=False),
+    )
+    scheduler.record_result(
+        scheduling_class="light_candidate",
+        result=BacktestRunnerTaskResult(
+            task_kind="full_job",
+            claimed=True,
+            scheduling_class="light_candidate",
+        ),
+    )
+
+    launch = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+
+    assert launch is not None
+    assert launch.scheduling_class == "heavy"
+
+
+def test_production_runner_wiring_does_not_construct_full_compute_service_in_parent() -> None:
+    source = inspect.getsource(build_backtest_job_runner_app)
+
+    assert "BacktestRuntimeJobOrchestrationService" not in source
+    assert "BacktestChildProcessExecutor" in source
+    assert "scheduling_classes=(\"heavy\",)" in source
+
+
+@dataclass
+class _FakeFullWorker:
+    def run_next(self) -> BacktestRunnerTaskResult:
+        return BacktestRunnerTaskResult(task_kind="full_job", claimed=False)
+
+
+@dataclass
+class _FakeLazyWorker:
+    def run_next(self) -> BacktestRunnerTaskResult:
+        return BacktestRunnerTaskResult(task_kind="lazy_detail", claimed=False)
+
+
+def _scheduler(
+    *,
+    full_job_anti_starvation_limit: int = 4,
+) -> BacktestRunnerTaskScheduler:
+    return BacktestRunnerTaskScheduler(
+        light_full_job_worker=cast(BacktestJobWorkerUseCase, _FakeFullWorker()),
+        heavy_full_job_worker=cast(BacktestJobWorkerUseCase, _FakeFullWorker()),
+        lazy_detail_worker=cast(
+            BacktestLazyTradesMaterializationWorkerUseCase,
+            _FakeLazyWorker(),
+        ),
+        light_concurrency=2,
+        heavy_concurrency=1,
+        full_job_anti_starvation_limit=full_job_anti_starvation_limit,
+    )

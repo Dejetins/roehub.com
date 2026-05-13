@@ -50,6 +50,11 @@ from trading.contexts.backtest.application.services.v2 import (
     build_trades_csv,
     symbol_from_job_request,
 )
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
+    SCHEDULING_METADATA_KEY,
+    scheduling_metadata_from_preflight,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJob,
@@ -87,6 +92,7 @@ class BacktestJobsUseCase:
     ) = None
     admission_service: BacktestAdmissionService | None = None
     idempotency_ttl_seconds: int = 86_400
+    light_max_estimated_combinations: int = DEFAULT_LIGHT_ESTIMATED_COMBINATIONS
 
     def preflight(
         self,
@@ -145,7 +151,11 @@ class BacktestJobsUseCase:
             user_id=user_id,
             mode="template",
             created_at=now,
-            request_json=_job_request_json(preflight=preflight, key_hash=key_hash),
+            request_json=_job_request_json(
+                preflight=preflight,
+                key_hash=key_hash,
+                light_max_estimated_combinations=self.light_max_estimated_combinations,
+            ),
             request_hash=preflight.request_hash,
             spec_hash=None,
             spec_payload_json=None,
@@ -686,9 +696,14 @@ def _job_request_json(
     *,
     preflight: BacktestPreflightResult,
     key_hash: str | None,
+    light_max_estimated_combinations: int,
 ) -> dict[str, Any]:
     payload = dict(preflight.normalized_request)
     payload["artifact_metadata"] = preflight.artifact_metadata.as_mapping()
+    payload[SCHEDULING_METADATA_KEY] = scheduling_metadata_from_preflight(
+        preflight=preflight,
+        light_max_estimated_combinations=light_max_estimated_combinations,
+    )
     if key_hash is not None:
         payload["idempotency"] = {"key_hash": key_hash}
     return payload

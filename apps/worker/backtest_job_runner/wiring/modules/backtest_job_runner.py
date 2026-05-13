@@ -5,10 +5,11 @@ import logging
 import os
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, start_http_server
 
@@ -29,15 +30,22 @@ from trading.contexts.backtest.adapters.outbound import (
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
-from trading.contexts.backtest.application.services.v2 import (
-    BacktestComboPlanningService,
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
+    DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
+    BacktestSchedulingClass,
+)
+from trading.contexts.backtest.application.services.v2.lazy_trades_detail import (
     BacktestLazyTradesDetailService,
-    BacktestNoRiskExactScoringService,
+)
+from trading.contexts.backtest.application.services.v2.preflight import (
     BacktestPreflightService,
-    BacktestPreparePoolsService,
     BacktestRuntimeConfig,
-    BacktestRuntimeJobOrchestrationService,
-    BacktestTpSlExactScoringService,
+)
+from trading.contexts.backtest.application.services.v2.prepare_pools import (
+    BacktestPreparePoolsService,
+)
+from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
     BacktestTpSlHitTimesService,
 )
 from trading.contexts.backtest.application.use_cases import (
@@ -51,28 +59,49 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
     YamlBacktestArtifactLoaderV2,
 )
 
+from .child_process import BacktestChildProcessExecutor
+
 log = logging.getLogger(__name__)
 
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _TASK_KIND_FULL_JOB = "full_job"
 _TASK_KIND_LAZY_DETAIL = "lazy_detail"
+_SCHEDULING_CLASS_LIGHT_CANDIDATE: BacktestSchedulingClass = "light_candidate"
+_SCHEDULING_CLASS_HEAVY: BacktestSchedulingClass = "heavy"
 
 
 @dataclass(frozen=True, slots=True)
 class BacktestJobRunnerRuntimeConfig:
     enabled: bool
     concurrency: int
+    light_concurrency: int
+    heavy_concurrency: int
     poll_interval_seconds: float
     empty_backoff_seconds: float
     lease_seconds: int
     heartbeat_interval_seconds: float
     max_jobs_per_process: int
     metrics_port: int
+    child_timeout_seconds: float
+    light_max_estimated_combinations: int
+    light_max_actual_combinations: int
     lazy_detail_anti_starvation_limit: int = 5
+    full_job_anti_starvation_limit: int = 4
 
     def __post_init__(self) -> None:
         if self.concurrency != 1:
-            raise ValueError("ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required for R3")
+            raise ValueError(
+                "ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required; use "
+                "ROEHUB_BACKTEST_LIGHT_CONCURRENCY for full-job child lanes"
+            )
+        if self.light_concurrency <= 0:
+            raise ValueError("ROEHUB_BACKTEST_LIGHT_CONCURRENCY must be > 0")
+        if self.light_concurrency > 3:
+            raise ValueError(
+                "ROEHUB_BACKTEST_LIGHT_CONCURRENCY > 3 requires separate benchmark evidence"
+            )
+        if self.heavy_concurrency != 1:
+            raise ValueError("ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1 is required for v1")
         if self.poll_interval_seconds <= 0:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_POLL_INTERVAL_SECONDS must be > 0")
         if self.empty_backoff_seconds <= 0:
@@ -90,10 +119,20 @@ class BacktestJobRunnerRuntimeConfig:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS must be > 0")
         if self.metrics_port <= 0:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_METRICS_PORT must be > 0")
+        if self.child_timeout_seconds <= 0:
+            raise ValueError("ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS must be > 0")
+        if self.light_max_estimated_combinations <= 0:
+            raise ValueError(
+                "ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS must be > 0"
+            )
+        if self.light_max_actual_combinations <= 0:
+            raise ValueError("ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS must be > 0")
         if self.lazy_detail_anti_starvation_limit <= 0:
             raise ValueError(
                 "ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT must be > 0"
             )
+        if self.full_job_anti_starvation_limit <= 0:
+            raise ValueError("ROEHUB_BACKTEST_FULL_JOB_ANTI_STARVATION_LIMIT must be > 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,39 +141,118 @@ class BacktestRunnerTaskResult:
     claimed: bool
     status: str = "empty"
     paid_level: str = "unknown"
+    scheduling_class: str = "none"
     created_at: datetime | None = None
     started_at: datetime | None = None
     lease_lost: bool = False
     cache_status: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class BacktestRunnerTaskLaunch:
+    task_kind: str
+    scheduling_class: str
+    run: Callable[[], Any]
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRunnerActiveTask:
+    task_kind: str
+    scheduling_class: str
+    started_at_monotonic: float
+
+
 @dataclass(slots=True)
 class BacktestRunnerTaskScheduler:
-    full_job_worker: BacktestJobWorkerUseCase
+    light_full_job_worker: BacktestJobWorkerUseCase
+    heavy_full_job_worker: BacktestJobWorkerUseCase
     lazy_detail_worker: BacktestLazyTradesMaterializationWorkerUseCase
+    light_concurrency: int = 2
+    heavy_concurrency: int = 1
     lazy_detail_anti_starvation_limit: int = 5
+    full_job_anti_starvation_limit: int = 4
     _lazy_detail_streak: int = 0
+    _try_heavy_next: bool = True
+    _light_batch_launched: int = 0
+    _consecutive_light_claims: int = 0
+    _full_empty_rounds: int = 0
 
-    def run_next(self) -> BacktestRunnerTaskResult:
-        if self._lazy_detail_streak >= self.lazy_detail_anti_starvation_limit:
-            full_result = _full_job_task_result(self.full_job_worker.run_next())
-            if full_result.claimed:
-                self._lazy_detail_streak = 0
-                return full_result
-            lazy_result = _lazy_detail_task_result(self.lazy_detail_worker.run_next())
-            if lazy_result.claimed:
+    def next_launch(
+        self,
+        *,
+        active_light: int,
+        active_heavy: int,
+        active_lazy: int,
+    ) -> BacktestRunnerTaskLaunch | None:
+        if active_heavy > 0:
+            return None
+        if active_light > 0:
+            if (
+                active_light < self.light_concurrency
+                and self._light_batch_launched < self.light_concurrency
+                and self._consecutive_light_claims < self.full_job_anti_starvation_limit
+            ):
+                self._light_batch_launched += 1
+                return BacktestRunnerTaskLaunch(
+                    task_kind=_TASK_KIND_FULL_JOB,
+                    scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
+                    run=self.light_full_job_worker.run_next,
+                )
+            return None
+        if active_lazy > 0:
+            return None
+
+        self._light_batch_launched = 0
+        if (
+            self._try_heavy_next
+            or self._consecutive_light_claims >= self.full_job_anti_starvation_limit
+        ):
+            self._try_heavy_next = False
+            return BacktestRunnerTaskLaunch(
+                task_kind=_TASK_KIND_FULL_JOB,
+                scheduling_class=_SCHEDULING_CLASS_HEAVY,
+                run=self.heavy_full_job_worker.run_next,
+            )
+        if self._full_empty_rounds >= 2:
+            return BacktestRunnerTaskLaunch(
+                task_kind=_TASK_KIND_LAZY_DETAIL,
+                scheduling_class="none",
+                run=self.lazy_detail_worker.run_next,
+            )
+        self._light_batch_launched = 1
+        return BacktestRunnerTaskLaunch(
+            task_kind=_TASK_KIND_FULL_JOB,
+            scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
+            run=self.light_full_job_worker.run_next,
+        )
+
+    def record_result(
+        self,
+        *,
+        scheduling_class: str,
+        result: BacktestRunnerTaskResult,
+    ) -> None:
+        if result.task_kind == _TASK_KIND_LAZY_DETAIL:
+            if result.claimed:
                 self._lazy_detail_streak += 1
-            return lazy_result
-
-        lazy_result = _lazy_detail_task_result(self.lazy_detail_worker.run_next())
-        if lazy_result.claimed:
-            self._lazy_detail_streak += 1
-            return lazy_result
-
-        full_result = _full_job_task_result(self.full_job_worker.run_next())
-        if full_result.claimed:
-            self._lazy_detail_streak = 0
-        return full_result
+            return
+        self._lazy_detail_streak = 0
+        if scheduling_class == _SCHEDULING_CLASS_HEAVY:
+            if result.claimed:
+                self._try_heavy_next = True
+                self._consecutive_light_claims = 0
+                self._full_empty_rounds = 0
+            else:
+                self._full_empty_rounds += 1
+            return
+        if result.claimed:
+            self._consecutive_light_claims += 1
+            self._full_empty_rounds = 0
+            if self._consecutive_light_claims >= self.full_job_anti_starvation_limit:
+                self._try_heavy_next = True
+        else:
+            self._try_heavy_next = True
+            self._full_empty_rounds += 1
 
 
 class BacktestJobRunnerMetrics:
@@ -172,6 +290,12 @@ class BacktestJobRunnerMetrics:
             ("task_kind",),
             registry=self.registry,
         )
+        self.active_children = Gauge(
+            "backtest_runner_active_children",
+            "Backtest runner active child process count",
+            ("scheduling_class",),
+            registry=self.registry,
+        )
         self.lease_lost_total = Counter(
             "backtest_runner_lease_lost_total",
             "Backtest runner lease lost count",
@@ -192,13 +316,19 @@ class BacktestJobRunnerMetrics:
         )
         self.active.labels(task_kind=_TASK_KIND_FULL_JOB).set(0)
         self.active.labels(task_kind=_TASK_KIND_LAZY_DETAIL).set(0)
+        self.active_children.labels(scheduling_class="light").set(0)
+        self.active_children.labels(scheduling_class="heavy").set(0)
         self.last_success_unixtime.labels(task_kind=_TASK_KIND_FULL_JOB).set(0)
         self.last_success_unixtime.labels(task_kind=_TASK_KIND_LAZY_DETAIL).set(0)
 
     def observe_result(
         self,
         *,
-        result: BacktestRunnerTaskResult | BacktestJobWorkerResult,
+        result: (
+            BacktestRunnerTaskResult
+            | BacktestJobWorkerResult
+            | BacktestLazyTradesMaterializationWorkerResult
+        ),
         duration_seconds: float,
     ) -> None:
         normalized = _coerce_task_result(result=result)
@@ -234,11 +364,16 @@ class BacktestJobRunnerMetrics:
                 datetime.now(UTC).timestamp()
             )
 
+    def set_active_children(self, *, light: int, heavy: int) -> None:
+        self.active.labels(task_kind=_TASK_KIND_FULL_JOB).set(light + heavy)
+        self.active_children.labels(scheduling_class="light").set(light)
+        self.active_children.labels(scheduling_class="heavy").set(heavy)
+
 
 @dataclass(frozen=True, slots=True)
 class BacktestJobRunnerApp:
     runtime_config: BacktestJobRunnerRuntimeConfig
-    worker: Any
+    worker: BacktestRunnerTaskScheduler
     metrics: BacktestJobRunnerMetrics
     metrics_port: int
 
@@ -246,57 +381,138 @@ class BacktestJobRunnerApp:
         start_http_server(self.metrics_port, registry=self.metrics.registry)
         log.info("backtest-job-runner metrics server started on port %s", self.metrics_port)
         processed_jobs = 0
-        while not stop_event.is_set():
-            started = time.perf_counter()
-            active_task_kind = _TASK_KIND_FULL_JOB
+        loop = asyncio.get_running_loop()
+        active: dict[asyncio.Future[Any], BacktestRunnerActiveTask] = {}
+        max_workers = (
+            self.runtime_config.light_concurrency
+            + self.runtime_config.heavy_concurrency
+            + 1
+        )
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            while not stop_event.is_set():
+                processed_jobs += self._reap_finished_tasks(active=active)
+                light_active, heavy_active, lazy_active = _active_counts(active=active)
+                self.metrics.set_active_children(light=light_active, heavy=heavy_active)
+                if (
+                    processed_jobs >= self.runtime_config.max_jobs_per_process
+                    and not active
+                ):
+                    log.info(
+                        "backtest-job-runner reached parent max task accounting: %s",
+                        self.runtime_config.max_jobs_per_process,
+                    )
+                    return
+
+                launched = self._launch_available_tasks(
+                    loop=loop,
+                    pool=pool,
+                    active=active,
+                )
+                if active:
+                    try:
+                        await asyncio.wait_for(
+                            stop_event.wait(),
+                            timeout=self.runtime_config.poll_interval_seconds,
+                        )
+                    except TimeoutError:
+                        continue
+                else:
+                    wait_seconds = (
+                        self.runtime_config.poll_interval_seconds
+                        if launched
+                        else self.runtime_config.empty_backoff_seconds
+                    )
+                    try:
+                        await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+                    except TimeoutError:
+                        continue
+
+    def _launch_available_tasks(
+        self,
+        *,
+        loop: asyncio.AbstractEventLoop,
+        pool: ThreadPoolExecutor,
+        active: dict[asyncio.Future[Any], BacktestRunnerActiveTask],
+    ) -> bool:
+        launched = False
+        while True:
+            light_active, heavy_active, lazy_active = _active_counts(active=active)
+            launch = self.worker.next_launch(
+                active_light=light_active,
+                active_heavy=heavy_active,
+                active_lazy=lazy_active,
+            )
+            if launch is None:
+                return launched
+            future = loop.run_in_executor(pool, launch.run)
+            active[future] = BacktestRunnerActiveTask(
+                task_kind=launch.task_kind,
+                scheduling_class=launch.scheduling_class,
+                started_at_monotonic=time.perf_counter(),
+            )
+            launched = True
+            log.info(
+                "backtest runner launched task: kind=%s scheduling_class=%s",
+                launch.task_kind,
+                launch.scheduling_class,
+            )
+            if launch.scheduling_class == _SCHEDULING_CLASS_HEAVY:
+                return launched
+
+    def _reap_finished_tasks(
+        self,
+        *,
+        active: dict[asyncio.Future[Any], BacktestRunnerActiveTask],
+    ) -> int:
+        processed = 0
+        for future, meta in list(active.items()):
+            if not future.done():
+                continue
+            active.pop(future)
+            duration_seconds = time.perf_counter() - meta.started_at_monotonic
             try:
-                result = self.worker.run_next()
-                normalized_result = _coerce_task_result(result=result)
-                active_task_kind = normalized_result.task_kind
+                raw_result = future.result()
+                normalized_result = _coerce_task_result(
+                    result=raw_result,
+                    scheduling_class=meta.scheduling_class,
+                )
             except Exception:  # noqa: BLE001
-                active_task_kind = _TASK_KIND_FULL_JOB
                 self.metrics.tasks_finished_total.labels(
-                    task_kind=_TASK_KIND_FULL_JOB,
+                    task_kind=meta.task_kind,
                     status="runner_error",
                 ).inc()
-                log.exception("backtest-job-runner iteration failed")
+                log.exception(
+                    "backtest runner task failed before worker result: kind=%s "
+                    "scheduling_class=%s",
+                    meta.task_kind,
+                    meta.scheduling_class,
+                )
                 normalized_result = BacktestRunnerTaskResult(
-                    task_kind=_TASK_KIND_FULL_JOB,
+                    task_kind=meta.task_kind,
+                    scheduling_class=meta.scheduling_class,
                     claimed=False,
+                    status="runner_error",
                 )
-            self.metrics.active.labels(task_kind=active_task_kind).set(1)
-            try:
-                duration_seconds = time.perf_counter() - started
-                self.metrics.observe_result(
-                    result=normalized_result,
-                    duration_seconds=duration_seconds,
-                )
-            finally:
-                self.metrics.active.labels(task_kind=active_task_kind).set(0)
+            self.metrics.observe_result(
+                result=normalized_result,
+                duration_seconds=duration_seconds,
+            )
+            self.worker.record_result(
+                scheduling_class=meta.scheduling_class,
+                result=normalized_result,
+            )
             if normalized_result.claimed:
-                processed_jobs += 1
+                processed += 1
                 log.info(
-                    "backtest runner task processed: kind=%s claimed=%s status=%s "
-                    "lease_lost=%s",
+                    "backtest runner task processed: kind=%s scheduling_class=%s "
+                    "claimed=%s status=%s lease_lost=%s",
                     normalized_result.task_kind,
+                    normalized_result.scheduling_class,
                     normalized_result.claimed,
                     normalized_result.status,
                     normalized_result.lease_lost,
                 )
-                if processed_jobs >= self.runtime_config.max_jobs_per_process:
-                    log.info(
-                        "backtest-job-runner reached max tasks per process: %s",
-                        self.runtime_config.max_jobs_per_process,
-                    )
-                    return
-                wait_seconds = self.runtime_config.poll_interval_seconds
-            else:
-                wait_seconds = self.runtime_config.empty_backoff_seconds
-
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
-            except TimeoutError:
-                continue
+        return processed
 
 
 def load_backtest_job_runner_runtime_config(
@@ -312,6 +528,16 @@ def load_backtest_job_runner_runtime_config(
         concurrency=_env_int(
             environ=environ,
             key="ROEHUB_BACKTEST_RUNNER_CONCURRENCY",
+            default=1,
+        ),
+        light_concurrency=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_LIGHT_CONCURRENCY",
+            default=2,
+        ),
+        heavy_concurrency=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_HEAVY_CONCURRENCY",
             default=1,
         ),
         poll_interval_seconds=_env_float(
@@ -344,10 +570,30 @@ def load_backtest_job_runner_runtime_config(
             key="ROEHUB_BACKTEST_RUNNER_METRICS_PORT",
             default=9204,
         ),
+        child_timeout_seconds=_env_float(
+            environ=environ,
+            key="ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS",
+            default=21_600.0,
+        ),
+        light_max_estimated_combinations=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS",
+            default=DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
+        ),
+        light_max_actual_combinations=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS",
+            default=DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
+        ),
         lazy_detail_anti_starvation_limit=_env_int(
             environ=environ,
             key="ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT",
             default=5,
+        ),
+        full_job_anti_starvation_limit=_env_int(
+            environ=environ,
+            key="ROEHUB_BACKTEST_FULL_JOB_ANTI_STARVATION_LIMIT",
+            default=4,
         ),
     )
 
@@ -400,28 +646,45 @@ def build_backtest_job_runner_app(
         artifact_context_resolver=artifact_context_resolver,
         runtime_config=backtest_runtime_config,
     )
-    prepare_pools = BacktestPreparePoolsService(
-        artifact_array_loader=artifact_array_loader,
-        defaults_provider=defaults_provider,
-    )
-    executor = BacktestRuntimeJobOrchestrationService(
-        prepare_pools=prepare_pools,
-        combo_planning=BacktestComboPlanningService(),
-        no_risk_exact=BacktestNoRiskExactScoringService(),
-        tp_sl_hit_times=BacktestTpSlHitTimesService(
-            artifact_array_loader=artifact_array_loader
+    light_executor = BacktestChildProcessExecutor(
+        environ=effective_environ,
+        scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
+        light_max_actual_combinations=(
+            effective_runtime_config.light_max_actual_combinations
         ),
-        tp_sl_exact=BacktestTpSlExactScoringService(),
-        artifact_array_loader=artifact_array_loader,
+        timeout_seconds=effective_runtime_config.child_timeout_seconds,
     )
-    full_job_worker = BacktestJobWorkerUseCase(
+    heavy_executor = BacktestChildProcessExecutor(
+        environ=effective_environ,
+        scheduling_class=_SCHEDULING_CLASS_HEAVY,
+        light_max_actual_combinations=(
+            effective_runtime_config.light_max_actual_combinations
+        ),
+        timeout_seconds=effective_runtime_config.child_timeout_seconds,
+    )
+    light_full_job_worker = BacktestJobWorkerUseCase(
         lease_repository=lease_repository,
         job_repository=job_repository,
         preflight_service=preflight_service,
-        executor=executor,
+        executor=light_executor,
         lease_seconds=effective_runtime_config.lease_seconds,
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
+        scheduling_classes=("light_candidate", "light"),
+    )
+    heavy_full_job_worker = BacktestJobWorkerUseCase(
+        lease_repository=lease_repository,
+        job_repository=job_repository,
+        preflight_service=preflight_service,
+        executor=heavy_executor,
+        lease_seconds=effective_runtime_config.lease_seconds,
+        heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
+        locked_by=_build_locked_by(),
+        scheduling_classes=("heavy",),
+    )
+    prepare_pools = BacktestPreparePoolsService(
+        artifact_array_loader=artifact_array_loader,
+        defaults_provider=defaults_provider,
     )
     lazy_trades_service = BacktestLazyTradesDetailService(
         prepare_pools=prepare_pools,
@@ -446,10 +709,16 @@ def build_backtest_job_runner_app(
         locked_by=_build_locked_by(),
     )
     scheduler = BacktestRunnerTaskScheduler(
-        full_job_worker=full_job_worker,
+        light_full_job_worker=light_full_job_worker,
+        heavy_full_job_worker=heavy_full_job_worker,
         lazy_detail_worker=lazy_detail_worker,
+        light_concurrency=effective_runtime_config.light_concurrency,
+        heavy_concurrency=effective_runtime_config.heavy_concurrency,
         lazy_detail_anti_starvation_limit=(
             effective_runtime_config.lazy_detail_anti_starvation_limit
+        ),
+        full_job_anti_starvation_limit=(
+            effective_runtime_config.full_job_anti_starvation_limit
         ),
     )
     return BacktestJobRunnerApp(
@@ -489,19 +758,32 @@ def _paid_level_from_job(*, job: BacktestJob | None) -> str:
 
 def _coerce_task_result(
     *,
-    result: BacktestRunnerTaskResult | BacktestJobWorkerResult,
+    result: (
+        BacktestRunnerTaskResult
+        | BacktestJobWorkerResult
+        | BacktestLazyTradesMaterializationWorkerResult
+    ),
+    scheduling_class: str = "none",
 ) -> BacktestRunnerTaskResult:
     if isinstance(result, BacktestRunnerTaskResult):
         return result
-    return _full_job_task_result(result)
+    if isinstance(result, BacktestLazyTradesMaterializationWorkerResult):
+        return _lazy_detail_task_result(result)
+    return _full_job_task_result(result, scheduling_class=scheduling_class)
 
 
-def _full_job_task_result(result: BacktestJobWorkerResult) -> BacktestRunnerTaskResult:
+def _full_job_task_result(
+    result: BacktestJobWorkerResult,
+    *,
+    scheduling_class: str = "none",
+) -> BacktestRunnerTaskResult:
     job = result.job
     return BacktestRunnerTaskResult(
         task_kind=_TASK_KIND_FULL_JOB,
         claimed=result.claimed,
-        status="lease_lost" if result.lease_lost or job is None else job.state,
+        status=result.status
+        or ("lease_lost" if result.lease_lost or job is None else job.state),
+        scheduling_class=scheduling_class,
         paid_level=_paid_level_from_job(job=job),
         created_at=None if job is None else job.created_at,
         started_at=None if job is None else job.started_at,
@@ -517,12 +799,30 @@ def _lazy_detail_task_result(
         task_kind=_TASK_KIND_LAZY_DETAIL,
         claimed=result.claimed,
         status="lease_lost" if result.lease_lost or task is None else task.status,
+        scheduling_class="none",
         paid_level="unknown",
         created_at=None if task is None else task.created_at,
         started_at=None if task is None else task.started_at,
         lease_lost=result.lease_lost,
         cache_status=result.cache_status,
     )
+
+
+def _active_counts(
+    *,
+    active: Mapping[asyncio.Future[Any], BacktestRunnerActiveTask],
+) -> tuple[int, int, int]:
+    light = 0
+    heavy = 0
+    lazy = 0
+    for meta in active.values():
+        if meta.task_kind == _TASK_KIND_LAZY_DETAIL:
+            lazy += 1
+        elif meta.scheduling_class == _SCHEDULING_CLASS_HEAVY:
+            heavy += 1
+        else:
+            light += 1
+    return light, heavy, lazy
 
 
 def _env_bool(*, environ: Mapping[str, str], key: str, default: bool) -> bool:

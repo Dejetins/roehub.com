@@ -199,7 +199,8 @@ Monitoring считается в рабочем состоянии, когда �
 - `probe_success` не сигнализирует массовых падений probes
 - `node-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter` отдают метрики
 - `market-data-ws-worker` и `market-data-scheduler` метрики доступны
-- `backtest-job-runner` target `127.0.0.1:9204` в `up` и endpoint `/metrics` отвечает
+- `backtest-job-runner` parent target `127.0.0.1:9204` в `up` и endpoint `/metrics`
+  отвечает независимо от active disposable full-job child process
 - `backtest-ai-configurator-worker` target `127.0.0.1:9205` в `up`, `/health/ready` и `/metrics` отвечают
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision

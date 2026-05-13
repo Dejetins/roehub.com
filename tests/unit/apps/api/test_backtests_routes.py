@@ -165,6 +165,8 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert repository.jobs is not None
     stored = repository.jobs[UUID(payload["job_id"])]
     assert stored.execution_mode == "background_auto"
+    assert stored.request_json["scheduling"]["scheduling_class"] == "light_candidate"
+    assert stored.request_json["scheduling"]["estimated_combinations_upper_bound"] == 6
     assert trigger.calls == ((stored.job_id, stored.request_hash),)
 
     _complete_job(repository=repository, job_id=stored.job_id)

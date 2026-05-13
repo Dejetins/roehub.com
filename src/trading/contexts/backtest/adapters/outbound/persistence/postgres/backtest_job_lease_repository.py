@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from typing import Any, Mapping
 from uuid import UUID
@@ -100,6 +101,7 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
         now: datetime,
         locked_by: str,
         lease_seconds: int,
+        scheduling_classes: tuple[str, ...] | None = None,
     ) -> BacktestJob | None:
         """
         Claim one queued/reclaim candidate job using FIFO order and SKIP LOCKED semantics.
@@ -122,6 +124,9 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
         lease_expires_at = now + timedelta(seconds=validated_lease_seconds)
         claimed_select_columns = _qualify_job_select_columns(relation_alias="jobs")
         final_select_columns = _qualify_job_select_columns(relation_alias="claimed")
+        scheduling_filter_sql, scheduling_parameters = _claim_scheduling_filter(
+            scheduling_classes=scheduling_classes
+        )
 
         query = f"""
         WITH queued_candidate AS (
@@ -129,6 +134,7 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
                 job_id
             FROM {self._jobs_table}
             WHERE state = 'queued'
+              {scheduling_filter_sql}
             ORDER BY created_at ASC, job_id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -139,6 +145,7 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
             FROM {self._jobs_table}
             WHERE state = 'running'
               AND lease_expires_at <= %(now)s
+              {scheduling_filter_sql}
             ORDER BY lease_expires_at ASC, created_at ASC, job_id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -183,6 +190,87 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
                 "now": now,
                 "locked_by": normalized_owner,
                 "lease_expires_at": lease_expires_at,
+                **scheduling_parameters,
+            },
+        )
+        if row is None:
+            return None
+        return _map_job_row(row=row)
+
+    def promote_to_heavy_and_requeue(
+        self,
+        *,
+        job_id: UUID,
+        now: datetime,
+        locked_by: str,
+        estimated_combinations_upper_bound: int,
+        actual_combinations: int,
+        reason: str,
+    ) -> BacktestJob | None:
+        normalized_owner = _normalize_locked_by(value=locked_by)
+        if estimated_combinations_upper_bound < 0:
+            raise BacktestStorageError(
+                "estimated_combinations_upper_bound must be >= 0"
+            )
+        if actual_combinations < 0:
+            raise BacktestStorageError("actual_combinations must be >= 0")
+        normalized_reason = reason.strip()
+        if not normalized_reason:
+            raise BacktestStorageError("promotion reason must be non-empty")
+        scheduling_json = json.dumps(
+            {
+                "version": 1,
+                "source": "post_prepare_refinement",
+                "scheduling_class": "heavy",
+                "estimated_combinations_upper_bound": (
+                    estimated_combinations_upper_bound
+                ),
+                "actual_combinations": actual_combinations,
+                "promotion_reason": normalized_reason,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        query = f"""
+        WITH updated AS (
+            UPDATE {self._jobs_table} AS jobs
+            SET
+                state = 'queued',
+                stage = 'stage_a',
+                processed_units = 0,
+                total_units = 0,
+                progress_updated_at = %(now)s,
+                updated_at = %(now)s,
+                started_at = NULL,
+                locked_by = NULL,
+                locked_at = NULL,
+                lease_expires_at = NULL,
+                heartbeat_at = NULL,
+                request_json = jsonb_set(
+                    jobs.request_json,
+                    '{{scheduling}}',
+                    %(scheduling_json)s::jsonb,
+                    true
+                )
+            WHERE jobs.job_id = %(job_id)s
+              AND jobs.state = 'running'
+              AND jobs.locked_by = %(locked_by)s
+              AND jobs.lease_expires_at > %(now)s
+            RETURNING
+                {_BACKTEST_JOB_SELECT_COLUMNS}
+        )
+        SELECT
+            {_BACKTEST_JOB_SELECT_COLUMNS}
+        FROM updated
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "job_id": job_id,
+                "now": now,
+                "locked_by": normalized_owner,
+                "scheduling_json": scheduling_json,
             },
         )
         if row is None:
@@ -402,6 +490,37 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
         if row is None:
             return None
         return _map_job_row(row=row)
+
+
+def _claim_scheduling_filter(
+    *,
+    scheduling_classes: tuple[str, ...] | None,
+) -> tuple[str, dict[str, Any]]:
+    if scheduling_classes is None:
+        return "", {}
+    normalized = tuple(
+        sorted({item.strip().lower() for item in scheduling_classes if item.strip()})
+    )
+    if not normalized:
+        raise BacktestStorageError("scheduling_classes must be non-empty when provided")
+    unsupported = set(normalized) - {"light_candidate", "light", "heavy"}
+    if unsupported:
+        raise BacktestStorageError(
+            f"unsupported scheduling_classes: {sorted(unsupported)!r}"
+        )
+    clauses: list[str] = []
+    parameters: dict[str, Any] = {}
+    if "heavy" in normalized:
+        clauses.append(
+            "COALESCE(request_json -> 'scheduling' ->> 'scheduling_class', 'heavy') = 'heavy'"
+        )
+    light_classes = tuple(item for item in normalized if item != "heavy")
+    if light_classes:
+        clauses.append(
+            "(request_json -> 'scheduling' ->> 'scheduling_class') = ANY(%(scheduling_classes)s)"
+        )
+        parameters["scheduling_classes"] = list(light_classes)
+    return f"AND ({' OR '.join(clauses)})", parameters
 
 
 

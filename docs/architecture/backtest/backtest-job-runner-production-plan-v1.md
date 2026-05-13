@@ -86,19 +86,26 @@ operations.
 API process не выполняет long-running backtest compute и не выполняет тяжелый
 lazy trades cache-miss recompute в production request path.
 
-### 2) V1 запускает один worker process на Mac Studio
+### 2) V1 запускает responsive parent и disposable child processes
 
 V1 target:
 
 - один `launchd` service: `com.roehub.backtest-job-runner`;
-- один process;
-- effective compute concurrency: `1`;
-- configuration-ready поля для будущего N workers остаются, но default и
-  acceptance v1 запрещают параллельное выполнение.
+- один long-lived parent process, который владеет claim, heartbeat, progress,
+  metrics, child supervision и terminal commit coordination;
+- full backtest compute выполняется в отдельном `child process` для одного job;
+- каждый full-job child process является disposable и завершает работу после
+  ровно одного full job, поэтому hard memory release/RSS boundary привязан к OS
+  process exit, а не к Python `gc.collect()`;
+- parent не строит `BacktestRuntimeJobOrchestrationService`; этот compute graph
+  находится только в child entrypoint/direct benchmark/test surfaces;
+- default full-job policy для Mac Studio v1:
+  `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=2`,
+  `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`, без light/heavy overlap.
 
-Причина: текущий host должен сначала доказать стабильность lease, memory profile,
-metrics и recovery path на одном process. Параллелизм включается отдельным этапом
-после benchmark/load evidence.
+Причина: current production failure mode показал, что full compute в parent может
+мешать `/metrics` и провоцировать Monit restart. Parent должен оставаться
+responsive, а память full job должна возвращаться через disposable child exit.
 
 ### 3) Очередь full jobs остается в `backtest_jobs`
 
@@ -111,9 +118,21 @@ queued -> running -> succeeded|failed|cancelled
 Claim semantics:
 
 - claim через Postgres `FOR UPDATE SKIP LOCKED`;
-- FIFO по `created_at ASC, job_id ASC` для queued jobs;
+- heavy jobs claim FIFO по `created_at ASC, job_id ASC`;
 - reclaim expired `running` jobs через `lease_expires_at <= now`;
 - terminal write guarded by `(job_id, locked_by, lease_expires_at > now)`.
+
+Scheduling semantics:
+
+- preflight сохраняет additive metadata `request_json.scheduling`;
+- `scheduling_class=heavy` используется для obvious-heavy jobs и для старых/
+  неизвестных rows без scheduling metadata;
+- `scheduling_class=light_candidate` означает только bounded preflight estimate,
+  не окончательное `light`;
+- child after prepare/basic stages подтверждает `light` или возвращает bounded
+  promotion result, после чего parent requeue-ит job как `heavy` до exact scoring;
+- stream of light jobs не должен indefinitely starve older heavy jobs: parent
+  регулярно probes heavy lane и сбрасывает light batch после anti-starvation limit.
 
 Crash/restart semantics: `at-least-once compute`, но `at-most-one terminal commit`.
 Повторный compute после crash допустим, если прежний lease истек и прежний process
@@ -291,7 +310,13 @@ Planned env/config keys:
 - `ROEHUB_BACKTEST_RUNNER_LEASE_SECONDS=120`;
 - `ROEHUB_BACKTEST_RUNNER_HEARTBEAT_INTERVAL_SECONDS=30`;
 - `ROEHUB_BACKTEST_RUNNER_MAX_JOB_RUNTIME_SECONDS=21600`;
-- `ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS=10`;
+- `ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS=21600`;
+- `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=2`;
+- `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`;
+- `ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS=50000`;
+- `ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS=50000`;
+- `ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS=10` remains parent lifecycle
+  accounting only; it is not the primary full-job memory-release strategy;
 - `ROEHUB_BACKTEST_RUNNER_METRICS_PORT=9204`;
 - `ROEHUB_BACKTEST_DETAIL_CACHE_TTL_SECONDS=172800`;
 - `ROEHUB_BACKTEST_DETAIL_MATERIALIZATION_ENABLED=true`;
@@ -321,6 +346,7 @@ Required metrics:
 - `backtest_runner_task_duration_seconds{task_kind,status}`;
 - `backtest_runner_queue_wait_seconds{task_kind,paid_level}`;
 - `backtest_runner_active{task_kind}`;
+- `backtest_runner_active_children{scheduling_class}`;
 - `backtest_runner_lease_lost_total{task_kind}`;
 - `backtest_lazy_trades_cache_total{status}`;
 - `backtest_quota_rejections_total{scope,paid_level,reason}`;
@@ -342,6 +368,9 @@ V1 target:
 - logs: `/Users/daniildegtyarev/Library/Logs/roehub/backtest-job-runner.out.log`
   and `.err.log`;
 - Monit may supervise/alert via launchd wrapper, but launchd remains process owner.
+- Monit metrics timeout must not restart live compute; `/metrics` failure is
+  alert-only for this service because parent/child supervision owns active child
+  lifecycle.
 
 Important: current runbook says legacy `backtest-job-runner` plists are removed
 and runner is not in production reload baseline. Implementation must replace that
@@ -363,7 +392,8 @@ smoke:
 7. call lazy detail endpoint;
 8. on cache miss observe materialization `queued/running/completed`;
 9. verify cached second read;
-10. verify metrics endpoint and Prometheus target health;
+10. verify parent metrics endpoint and Prometheus target health while child
+    compute is active;
 11. verify logs contain no secrets/full payloads.
 
 Missing artifacts/config is a blocker for production acceptance. A separate
@@ -379,8 +409,8 @@ processed by explicit operator decision.
 
 | Risk | Why it matters | Plan mitigation |
 |---|---|---|
-| Long compute loses lease | Another worker can reclaim and duplicate compute | Heartbeat during execution; lease-owner guarded terminal write; v1 one process until evidence. |
-| Memory growth | Backtest runtime is array-heavy | `MAX_JOBS_PER_PROCESS`, launchd restart, RSS/load smoke, no compute in API. |
+| Long compute loses lease | Another worker can reclaim and duplicate compute | Parent heartbeat during child execution; lease-owner guarded terminal write; at-most-one terminal commit. |
+| Memory growth | Backtest runtime is array-heavy | Disposable child process per full job; parent retained RSS and child peak RSS are separate evidence. |
 | Lazy trades cache miss blocks API | Detail view can repeat old `sync_inline` problem | Cache hit in API only; cache miss enqueues materialization. |
 | Full job starvation by detail tasks | Interactive detail priority can delay queued jobs | Anti-starvation after 5 detail tasks while full queue non-empty. |
 | Running cancel expectations | UI may imply immediate stop | Cooperative cancel only; UI displays `cancel_requested`. |

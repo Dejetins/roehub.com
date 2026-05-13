@@ -471,6 +471,7 @@ class BacktestJobLeaseRepository(Protocol):
         now: datetime,
         locked_by: str,
         lease_seconds: int,
+        scheduling_classes: tuple[str, ...] | None = None,
     ) -> BacktestJob | None:
         """
         Claim one job using FIFO queue order and SKIP LOCKED reclaim semantics.
@@ -479,6 +480,8 @@ class BacktestJobLeaseRepository(Protocol):
             now: Claim timestamp in UTC.
             locked_by: Worker owner identity.
             lease_seconds: Lease TTL in seconds.
+            scheduling_classes: Optional runner scheduling classes to claim. Missing
+                scheduling metadata is treated as `heavy` by adapters.
         Returns:
             BacktestJob | None: Claimed running job snapshot or `None` when queue is empty.
         Assumptions:
@@ -487,6 +490,38 @@ class BacktestJobLeaseRepository(Protocol):
             ValueError: If storage write/read fails.
         Side Effects:
             Updates one row lease fields in `backtest_jobs` table.
+        """
+        ...
+
+    def promote_to_heavy_and_requeue(
+        self,
+        *,
+        job_id: UUID,
+        now: datetime,
+        locked_by: str,
+        estimated_combinations_upper_bound: int,
+        actual_combinations: int,
+        reason: str,
+    ) -> BacktestJob | None:
+        """
+        Requeue a running `light_candidate` job as `heavy` under the active lease owner.
+
+        Args:
+            job_id: Job identifier.
+            now: Requeue timestamp in UTC.
+            locked_by: Expected worker owner identity.
+            estimated_combinations_upper_bound: Preflight conservative estimate.
+            actual_combinations: Post-prepare/basic actual combination count.
+            reason: Low-cardinality promotion reason.
+        Returns:
+            BacktestJob | None: Requeued job snapshot or `None` when lease is lost.
+        Assumptions:
+            This is used before exact scoring; parent keeps terminal ownership and does not
+            write a terminal state for this attempt.
+        Raises:
+            ValueError: If storage write/read fails.
+        Side Effects:
+            Updates one row in `backtest_jobs` and preserves the job for FIFO heavy claim.
         """
         ...
 

@@ -167,6 +167,12 @@ def test_create_persists_queued_background_job_and_triggers_execution() -> None:
     assert len(repository.jobs) == 1
     stored = next(iter(repository.jobs.values()))
     assert stored.execution_mode == "background_auto"
+    assert stored.request_json["scheduling"] == {
+        "version": 1,
+        "source": "preflight",
+        "scheduling_class": "light_candidate",
+        "estimated_combinations_upper_bound": 1,
+    }
     assert stored.request_hash == "d" * 64
     assert trigger.calls == ((stored.job_id, stored.request_hash),)
 

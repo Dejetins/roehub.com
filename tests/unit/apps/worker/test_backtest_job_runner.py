@@ -34,12 +34,17 @@ def _runtime_config(**overrides: Any) -> BacktestJobRunnerRuntimeConfig:
     payload = {
         "enabled": True,
         "concurrency": 1,
+        "light_concurrency": 2,
+        "heavy_concurrency": 1,
         "poll_interval_seconds": 0.001,
         "empty_backoff_seconds": 0.001,
         "lease_seconds": 120,
         "heartbeat_interval_seconds": 30.0,
         "max_jobs_per_process": 1,
         "metrics_port": 19204,
+        "child_timeout_seconds": 21600.0,
+        "light_max_estimated_combinations": 50000,
+        "light_max_actual_combinations": 50000,
     }
     payload.update(overrides)
     return BacktestJobRunnerRuntimeConfig(**payload)
@@ -128,10 +133,11 @@ def test_runner_app_starts_metrics_and_exits_after_max_jobs(monkeypatch) -> None
         started_at=datetime.now(UTC) - timedelta(seconds=2),
     )
     worker = _Worker(results=[BacktestJobWorkerResult(job=cast(Any, job), claimed=True)])
+    scheduler = _SingleLaunchScheduler(worker=worker)
     metrics = BacktestJobRunnerMetrics()
     app = BacktestJobRunnerApp(
         runtime_config=_runtime_config(max_jobs_per_process=1),
-        worker=cast(Any, worker),
+        worker=cast(Any, scheduler),
         metrics=metrics,
         metrics_port=19204,
     )
@@ -180,24 +186,8 @@ def test_runner_metrics_records_lazy_detail_cache_status() -> None:
     assert metrics.lazy_trades_cache_total.labels(status="miss")._value.get() == 1
 
 
-def test_task_scheduler_forces_full_job_after_lazy_detail_streak() -> None:
-    lazy_worker = _TaskWorker(
-        results=[
-            BacktestLazyTradesMaterializationWorkerResult(
-                task=cast(Any, _lazy_task()),
-                claimed=True,
-            ),
-            BacktestLazyTradesMaterializationWorkerResult(
-                task=cast(Any, _lazy_task()),
-                claimed=True,
-            ),
-            BacktestLazyTradesMaterializationWorkerResult(
-                task=cast(Any, _lazy_task()),
-                claimed=True,
-            ),
-        ]
-    )
-    full_worker = _TaskWorker(
+def test_task_scheduler_probes_heavy_before_light_lane() -> None:
+    heavy_worker = _TaskWorker(
         results=[
             BacktestJobWorkerResult(
                 job=cast(Any, _job(state="succeeded")),
@@ -205,23 +195,54 @@ def test_task_scheduler_forces_full_job_after_lazy_detail_streak() -> None:
             )
         ]
     )
+    light_worker = _TaskWorker(results=[])
+    lazy_worker = _TaskWorker(results=[])
     scheduler = BacktestRunnerTaskScheduler(
-        full_job_worker=cast(Any, full_worker),
+        light_full_job_worker=cast(Any, light_worker),
+        heavy_full_job_worker=cast(Any, heavy_worker),
         lazy_detail_worker=cast(Any, lazy_worker),
-        lazy_detail_anti_starvation_limit=2,
     )
 
-    first = scheduler.run_next()
-    second = scheduler.run_next()
-    third = scheduler.run_next()
+    launch = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
 
-    assert [first.task_kind, second.task_kind, third.task_kind] == [
-        "lazy_detail",
-        "lazy_detail",
-        "full_job",
-    ]
-    assert lazy_worker.calls == 2
-    assert full_worker.calls == 1
+    assert launch is not None
+    assert launch.scheduling_class == "heavy"
+    result = launch.run()
+    assert isinstance(result, BacktestJobWorkerResult)
+    assert result.claimed is True
+    assert heavy_worker.calls == 1
+    assert light_worker.calls == 0
+
+
+class _SingleLaunchScheduler:
+    def __init__(self, *, worker: _Worker) -> None:
+        self._worker = worker
+        self._launched = False
+
+    def next_launch(
+        self,
+        *,
+        active_light: int,
+        active_heavy: int,
+        active_lazy: int,
+    ) -> Any:
+        _ = active_light, active_heavy, active_lazy
+        if self._launched:
+            return None
+        self._launched = True
+        return SimpleNamespace(
+            task_kind="full_job",
+            scheduling_class="heavy",
+            run=self._worker.run_next,
+        )
+
+    def record_result(
+        self,
+        *,
+        scheduling_class: str,
+        result: BacktestRunnerTaskResult,
+    ) -> None:
+        _ = scheduling_class, result
 
 
 class _Worker:

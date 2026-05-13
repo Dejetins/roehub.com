@@ -14,6 +14,12 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 
+from .job_scheduling import (
+    DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
+    BacktestSchedulingClass,
+    estimated_combinations_upper_bound_from_job_request,
+    raise_if_light_candidate_needs_heavy_slot,
+)
 from .top_result_assembly import (
     TOP_RESULT_ASSEMBLY_STAGE_NAME,
     BacktestTopResultAssemblyService,
@@ -42,7 +48,7 @@ class BacktestJobExecutionResult:
 @dataclass(frozen=True, slots=True)
 class BacktestRuntimeJobOrchestrationService:
     """
-    Sync-inline v1 job executor around the accepted artifact runtime services.
+    Child-only full-job executor around the accepted artifact runtime services.
     """
 
     prepare_pools: Any
@@ -59,6 +65,8 @@ class BacktestRuntimeJobOrchestrationService:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        scheduling_class: BacktestSchedulingClass = "heavy",
+        light_max_actual_combinations: int = DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     ) -> BacktestJobExecutionResult:
         normalized_request = preflight.normalized_request
         risk = normalized_request.get("risk")
@@ -76,6 +84,17 @@ class BacktestRuntimeJobOrchestrationService:
             combo_result = self.combo_planning.execute(
                 prepared_result=prepared_result,
                 normalized_request=normalized_request,
+            )
+            confirmed_scheduling_class = raise_if_light_candidate_needs_heavy_slot(
+                scheduling_class=scheduling_class,
+                estimated_combinations_upper_bound=(
+                    estimated_combinations_upper_bound_from_job_request(
+                        request_json=normalized_request
+                    )
+                    or preflight.cost_estimate.candidate_combinations
+                ),
+                actual_combinations=combo_result.telemetry.cartesian_combinations,
+                light_max_actual_combinations=light_max_actual_combinations,
             )
             if risk_mode == "none":
                 exact_result = self.no_risk_exact.execute(
@@ -118,7 +137,9 @@ class BacktestRuntimeJobOrchestrationService:
             cleanup_evidence = {
                 "runtime_result": exact_result.memory_cleanup_evidence.as_mapping(),
                 "result_contains_heavy_references": False,
-                "worker_recycle_required": False,
+                "worker_recycle_required": True,
+                "worker_recycle_strategy": "disposable child process",
+                "scheduling_class": confirmed_scheduling_class,
             }
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,

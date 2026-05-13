@@ -20,6 +20,9 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestPreflightService,
     BacktestTopResultAssemblyService,
 )
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    BacktestJobHeavyPromotion,
+)
 from trading.contexts.backtest.application.use_cases import BacktestJobWorkerUseCase
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
@@ -105,12 +108,60 @@ def test_worker_heartbeats_active_lease_while_executor_runs() -> None:
     assert lease_repository.heartbeat_calls >= 1
 
 
+def test_worker_requeues_light_candidate_as_heavy_without_terminal_commit() -> None:
+    job = _queued_job()
+    repository = _Repository(job=job)
+    lease_repository = _LeaseRepository(repository=repository)
+    use_case = BacktestJobWorkerUseCase(
+        lease_repository=lease_repository,
+        job_repository=cast(BacktestJobRepository, repository),
+        preflight_service=cast(BacktestPreflightService, _PreflightService()),
+        executor=_PromotingExecutor(),
+        lease_seconds=60,
+        locked_by="test-worker",
+        scheduling_classes=("light_candidate",),
+    )
+
+    result = use_case.run_next()
+
+    assert result.claimed is True
+    assert result.status == "requeued_heavy"
+    assert result.job is not None
+    assert result.job.state == "queued"
+    assert result.job.request_json["scheduling"]["scheduling_class"] == "heavy"
+    assert repository.top_rows == ()
+    assert repository.terminal_commits == 0
+    assert lease_repository.promotions == 1
+
+
+def test_worker_marks_lease_lost_when_terminal_commit_guard_fails() -> None:
+    job = _queued_job()
+    repository = _Repository(job=job, finish_returns_none=True)
+    use_case = BacktestJobWorkerUseCase(
+        lease_repository=_LeaseRepository(repository=repository),
+        job_repository=cast(BacktestJobRepository, repository),
+        preflight_service=cast(BacktestPreflightService, _PreflightService()),
+        executor=_Executor(),
+        lease_seconds=60,
+        locked_by="test-worker",
+    )
+
+    result = use_case.run_next()
+
+    assert result.claimed is True
+    assert result.lease_lost is True
+    assert result.job is None
+    assert repository.top_rows == ()
+    assert repository.terminal_commits == 0
+
+
 @dataclass
 class _LeaseRepository:
     repository: "_Repository"
     progress_updates: tuple[tuple[BacktestJobStage, int, int], ...] = ()
     heartbeat_calls: int = 0
     heartbeat_event: threading.Event | None = None
+    promotions: int = 0
 
     def claim_next(
         self,
@@ -118,7 +169,9 @@ class _LeaseRepository:
         now: datetime,
         locked_by: str,
         lease_seconds: int,
+        scheduling_classes: tuple[str, ...] | None = None,
     ) -> BacktestJob | None:
+        _ = scheduling_classes
         if self.repository.job.state != "queued":
             return None
         claimed = self.repository.job.claim(
@@ -191,11 +244,59 @@ class _LeaseRepository:
         self.repository.job = finished
         return finished
 
+    def promote_to_heavy_and_requeue(
+        self,
+        *,
+        job_id: UUID,
+        now: datetime,
+        locked_by: str,
+        estimated_combinations_upper_bound: int,
+        actual_combinations: int,
+        reason: str,
+    ) -> BacktestJob | None:
+        _ = locked_by, estimated_combinations_upper_bound, actual_combinations, reason
+        if self.repository.job.job_id != job_id or self.repository.job.state != "running":
+            return None
+        request = dict(self.repository.job.request_json)
+        request["scheduling"] = {
+            "scheduling_class": "heavy",
+            "estimated_combinations_upper_bound": estimated_combinations_upper_bound,
+            "actual_combinations": actual_combinations,
+            "promotion_reason": reason,
+        }
+        requeued = BacktestJob.create_queued(
+            job_id=self.repository.job.job_id,
+            user_id=self.repository.job.user_id,
+            mode=self.repository.job.mode,
+            created_at=self.repository.job.created_at,
+            request_json=request,
+            request_hash=self.repository.job.request_hash,
+            spec_hash=self.repository.job.spec_hash,
+            spec_payload_json=self.repository.job.spec_payload_json,
+            engine_params_hash=self.repository.job.engine_params_hash,
+            backtest_runtime_config_hash=self.repository.job.backtest_runtime_config_hash,
+            artifact_pin=self.repository.job.artifact_pin,
+            execution_mode=self.repository.job.execution_mode,
+            market_id=self.repository.job.market_id,
+            symbol=self.repository.job.symbol,
+            timeframe=self.repository.job.timeframe,
+            requested_top_n=self.repository.job.requested_top_n,
+            ranking_primary_metric=self.repository.job.ranking_primary_metric,
+            ranking_secondary_metric=self.repository.job.ranking_secondary_metric,
+        )
+        object.__setattr__(requeued, "attempt", self.repository.job.attempt)
+        object.__setattr__(requeued, "updated_at", now)
+        self.repository.job = requeued
+        self.promotions += 1
+        return requeued
+
 
 @dataclass
 class _Repository:
     job: BacktestJob
     top_rows: tuple[BacktestJobTopVariant, ...] = ()
+    finish_returns_none: bool = False
+    terminal_commits: int = 0
 
     def finish_with_top_variants(
         self,
@@ -212,6 +313,8 @@ class _Repository:
         _ = locked_by
         if self.job.job_id != job_id or self.job.user_id != user_id:
             return None
+        if self.finish_returns_none:
+            return None
         self.job = self.job.finish(
             next_state=next_state,
             changed_at=now,
@@ -219,6 +322,7 @@ class _Repository:
             last_error_json=last_error_json,
         )
         self.top_rows = top_variants
+        self.terminal_commits += 1
         return self.job
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
@@ -281,6 +385,21 @@ class _FailingExecutor:
     ) -> BacktestJobExecutionResult:
         _ = job_id, preflight, updated_at
         raise RuntimeError("boom")
+
+
+class _PromotingExecutor:
+    def execute(
+        self,
+        *,
+        job_id: UUID,
+        preflight: BacktestPreflightResult,
+        updated_at: datetime,
+    ) -> BacktestJobHeavyPromotion:
+        _ = job_id, preflight, updated_at
+        return BacktestJobHeavyPromotion(
+            estimated_combinations_upper_bound=10,
+            actual_combinations=100000,
+        )
 
 
 @dataclass
