@@ -703,6 +703,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     themes_css = (_WEB_ROOT / "dist/css/themes.css").read_text(encoding="utf-8")
     motion_config_css = (_WEB_ROOT / "dist/css/motion-config.css").read_text(encoding="utf-8")
     layout_css = (_WEB_ROOT / "dist/css/layout.css").read_text(encoding="utf-8")
+    base_css = (_WEB_ROOT / "dist/css/base.css").read_text(encoding="utf-8")
     theme_js = (_WEB_ROOT / "dist/js/core/theme.js").read_text(encoding="utf-8")
     api_js = (_WEB_ROOT / "dist/js/core/api.js").read_text(encoding="utf-8")
     poller_js = (_WEB_ROOT / "dist/js/core/poller.js").read_text(encoding="utf-8")
@@ -720,6 +721,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "--rh-financial-negative" in tokens_css
     assert "--rh-canvas: #000000" in tokens_css
     assert "--rh-workstation-panel-bg" in tokens_css
+    assert "[hidden]" in base_css
+    assert "display: none !important;" in base_css
     assert "background: var(--rh-canvas)" in layout_css
     assert "--rh-cli-meter-fill" in tokens_css
     assert "--rh-page-transition-duration:" in motion_config_css
