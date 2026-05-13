@@ -66,15 +66,7 @@ def classify_preflight_scheduling(
 ) -> BacktestSchedulingDecision:
     if light_max_estimated_combinations <= 0:
         raise ValueError("light_max_estimated_combinations must be > 0")
-    estimate = int(
-        preflight.cost_estimate.estimated_combinations_upper_bound
-        or preflight.cost_estimate.candidate_combinations
-    )
-    if preflight.cost_estimate.scheduling_class == "heavy":
-        return BacktestSchedulingDecision(
-            scheduling_class="heavy",
-            estimated_combinations_upper_bound=max(estimate, 0),
-        )
+    estimate = int(preflight.cost_estimate.candidate_combinations)
     if estimate <= 0:
         return BacktestSchedulingDecision(
             scheduling_class="heavy",
@@ -107,19 +99,6 @@ def scheduling_metadata_from_preflight(
         "estimated_combinations_upper_bound": (
             decision.estimated_combinations_upper_bound
         ),
-        "estimated_combinations": int(
-            preflight.cost_estimate.estimated_combinations
-            or preflight.cost_estimate.candidate_combinations
-        ),
-        "arity": preflight.cost_estimate.arity,
-        "row_count_upper_bounds_by_indicator": dict(
-            preflight.cost_estimate.row_count_upper_bounds_by_indicator or {}
-        ),
-        "risk_mode": preflight.cost_estimate.risk_mode,
-        "requested_range": None
-        if preflight.cost_estimate.requested_range is None
-        else dict(preflight.cost_estimate.requested_range),
-        "requested_top_n": preflight.cost_estimate.requested_top_n,
     }
 
 

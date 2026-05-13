@@ -57,38 +57,6 @@ def preflight_from_mapping(*, payload: Mapping[str, Any]) -> BacktestPreflightRe
             candidate_combinations=int(cost_estimate["candidate_combinations"]),
             tp_sl_cells=int(cost_estimate["tp_sl_cells"]),
             cost_class=str(cost_estimate["cost_class"]),
-            estimated_combinations_upper_bound=(
-                None
-                if cost_estimate.get("estimated_combinations_upper_bound") is None
-                else int(cost_estimate["estimated_combinations_upper_bound"])
-            ),
-            estimated_combinations=(
-                None
-                if cost_estimate.get("estimated_combinations") is None
-                else int(cost_estimate["estimated_combinations"])
-            ),
-            arity=None if cost_estimate.get("arity") is None else int(cost_estimate["arity"]),
-            row_count_upper_bounds_by_indicator=dict(
-                _mapping(cost_estimate.get("row_count_upper_bounds_by_indicator", {}))
-            ),
-            risk_mode=(
-                None if cost_estimate.get("risk_mode") is None else str(cost_estimate["risk_mode"])
-            ),
-            requested_range=(
-                None
-                if cost_estimate.get("requested_range") is None
-                else dict(_mapping(cost_estimate["requested_range"]))
-            ),
-            requested_top_n=(
-                None
-                if cost_estimate.get("requested_top_n") is None
-                else int(cost_estimate["requested_top_n"])
-            ),
-            scheduling_class=(
-                None
-                if cost_estimate.get("scheduling_class") is None
-                else str(cost_estimate["scheduling_class"])
-            ),
         ),
         warnings=tuple(
             _validation_issue_from_mapping(item)
