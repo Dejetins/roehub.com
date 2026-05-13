@@ -60,6 +60,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
 )
 
 from .child_process import BacktestChildProcessExecutor
+from .lazy_trades_child_process import BacktestLazyTradesChildProcessExecutor
 
 log = logging.getLogger(__name__)
 
@@ -122,15 +123,11 @@ class BacktestJobRunnerRuntimeConfig:
         if self.child_timeout_seconds <= 0:
             raise ValueError("ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS must be > 0")
         if self.light_max_estimated_combinations <= 0:
-            raise ValueError(
-                "ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS must be > 0"
-            )
+            raise ValueError("ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS must be > 0")
         if self.light_max_actual_combinations <= 0:
             raise ValueError("ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS must be > 0")
         if self.lazy_detail_anti_starvation_limit <= 0:
-            raise ValueError(
-                "ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT must be > 0"
-            )
+            raise ValueError("ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT must be > 0")
         if self.full_job_anti_starvation_limit <= 0:
             raise ValueError("ROEHUB_BACKTEST_FULL_JOB_ANTI_STARVATION_LIMIT must be > 0")
 
@@ -348,9 +345,7 @@ class BacktestJobRunnerMetrics:
             status=status,
         ).observe(max(duration_seconds, 0.0))
         if normalized.created_at is not None and normalized.started_at is not None:
-            queue_wait_seconds = (
-                normalized.started_at - normalized.created_at
-            ).total_seconds()
+            queue_wait_seconds = (normalized.started_at - normalized.created_at).total_seconds()
             self.queue_wait_seconds.labels(
                 task_kind=normalized.task_kind,
                 paid_level=normalized.paid_level,
@@ -384,19 +379,14 @@ class BacktestJobRunnerApp:
         loop = asyncio.get_running_loop()
         active: dict[asyncio.Future[Any], BacktestRunnerActiveTask] = {}
         max_workers = (
-            self.runtime_config.light_concurrency
-            + self.runtime_config.heavy_concurrency
-            + 1
+            self.runtime_config.light_concurrency + self.runtime_config.heavy_concurrency + 1
         )
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             while not stop_event.is_set():
                 processed_jobs += self._reap_finished_tasks(active=active)
                 light_active, heavy_active, lazy_active = _active_counts(active=active)
                 self.metrics.set_active_children(light=light_active, heavy=heavy_active)
-                if (
-                    processed_jobs >= self.runtime_config.max_jobs_per_process
-                    and not active
-                ):
+                if processed_jobs >= self.runtime_config.max_jobs_per_process and not active:
                     log.info(
                         "backtest-job-runner reached parent max task accounting: %s",
                         self.runtime_config.max_jobs_per_process,
@@ -619,22 +609,16 @@ def build_backtest_job_runner_app(
         environ=effective_environ,
         artifact_config_path=artifact_config_path,
     )
-    artifact_path_builder = BacktestArtifactPathBuilderV2(
-        root=artifact_config.artifact_root_path()
-    )
+    artifact_path_builder = BacktestArtifactPathBuilderV2(root=artifact_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=artifact_path_builder)
     artifact_context_resolver = FilesystemBacktestArtifactContextResolver(
         artifact_loader=artifact_loader
     )
-    artifact_array_loader = FilesystemBacktestArtifactArrayLoader(
-        artifact_loader=artifact_loader
-    )
+    artifact_array_loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=artifact_loader)
     backtest_runtime_config = BacktestRuntimeConfig(
         hit_times_tp_levels_pct=artifact_config.hit_times_grid.tp_levels_pct,
         hit_times_sl_levels_pct=artifact_config.hit_times_grid.sl_levels_pct,
-        artifact_config_hash=build_backtest_artifacts_runtime_config_hash(
-            config=artifact_config
-        ),
+        artifact_config_hash=build_backtest_artifacts_runtime_config_hash(config=artifact_config),
     )
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     job_repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
@@ -650,17 +634,13 @@ def build_backtest_job_runner_app(
     light_executor = BacktestChildProcessExecutor(
         environ=effective_environ,
         scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
-        light_max_actual_combinations=(
-            effective_runtime_config.light_max_actual_combinations
-        ),
+        light_max_actual_combinations=(effective_runtime_config.light_max_actual_combinations),
         timeout_seconds=effective_runtime_config.child_timeout_seconds,
     )
     heavy_executor = BacktestChildProcessExecutor(
         environ=effective_environ,
         scheduling_class=_SCHEDULING_CLASS_HEAVY,
-        light_max_actual_combinations=(
-            effective_runtime_config.light_max_actual_combinations
-        ),
+        light_max_actual_combinations=(effective_runtime_config.light_max_actual_combinations),
         timeout_seconds=effective_runtime_config.child_timeout_seconds,
     )
     light_full_job_worker = BacktestJobWorkerUseCase(
@@ -689,9 +669,7 @@ def build_backtest_job_runner_app(
     )
     lazy_trades_service = BacktestLazyTradesDetailService(
         prepare_pools=prepare_pools,
-        tp_sl_hit_times=BacktestTpSlHitTimesService(
-            artifact_array_loader=artifact_array_loader
-        ),
+        tp_sl_hit_times=BacktestTpSlHitTimesService(artifact_array_loader=artifact_array_loader),
         cache=LocalFileBacktestLazyTradesCache(
             root=Path(
                 effective_environ.get(
@@ -708,6 +686,10 @@ def build_backtest_job_runner_app(
         lease_seconds=effective_runtime_config.lease_seconds,
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
+        executor=BacktestLazyTradesChildProcessExecutor(
+            environ=effective_environ,
+            timeout_seconds=effective_runtime_config.child_timeout_seconds,
+        ),
     )
     scheduler = BacktestRunnerTaskScheduler(
         light_full_job_worker=light_full_job_worker,
@@ -718,9 +700,7 @@ def build_backtest_job_runner_app(
         lazy_detail_anti_starvation_limit=(
             effective_runtime_config.lazy_detail_anti_starvation_limit
         ),
-        full_job_anti_starvation_limit=(
-            effective_runtime_config.full_job_anti_starvation_limit
-        ),
+        full_job_anti_starvation_limit=(effective_runtime_config.full_job_anti_starvation_limit),
     )
     return BacktestJobRunnerApp(
         runtime_config=effective_runtime_config,
@@ -782,8 +762,7 @@ def _full_job_task_result(
     return BacktestRunnerTaskResult(
         task_kind=_TASK_KIND_FULL_JOB,
         claimed=result.claimed,
-        status=result.status
-        or ("lease_lost" if result.lease_lost or job is None else job.state),
+        status=result.status or ("lease_lost" if result.lease_lost or job is None else job.state),
         scheduling_class=scheduling_class,
         paid_level=_paid_level_from_job(job=job),
         created_at=None if job is None else job.created_at,

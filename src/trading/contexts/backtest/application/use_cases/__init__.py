@@ -16,6 +16,8 @@ from .errors import (
     validation_error,
 )
 from .lazy_trades_materialization_worker import (
+    BacktestLazyTradesMaterializationExecutionResult,
+    BacktestLazyTradesMaterializationExecutor,
     BacktestLazyTradesMaterializationWorkerResult,
     BacktestLazyTradesMaterializationWorkerUseCase,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "BacktestJobExecutor",
     "BacktestJobWorkerResult",
     "BacktestJobWorkerUseCase",
+    "BacktestLazyTradesMaterializationExecutionResult",
+    "BacktestLazyTradesMaterializationExecutor",
     "BacktestLazyTradesMaterializationWorkerResult",
     "BacktestLazyTradesMaterializationWorkerUseCase",
     "BacktestJobsUseCase",

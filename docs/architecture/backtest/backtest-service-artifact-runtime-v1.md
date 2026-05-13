@@ -395,7 +395,10 @@ Returns one persisted variant summary and full parameter decomposition.
 
 ### `POST /backtests/jobs/{job_id}/variants/{variant_key}/trades`
 
-Computes or returns cached lazy trades for one variant.
+Returns cached lazy trades views for one variant or creates/replays a lazy
+materialization task. Cache hits use bounded/chunked readers over the lazy trades
+cache bundle; cache misses are computed by a disposable runner child process, not
+inside the API process.
 
 ### `POST /backtests/jobs/{job_id}/cancel`
 
@@ -1090,7 +1093,7 @@ Failure behavior:
 - invalid request returns deterministic 422;
 - missing artifact family returns deterministic runtime failure on job;
 - request TP/SL not covered by published grid returns deterministic 422 before job execution if possible;
-- lazy trades cache failure must not fail the trades response if recompute succeeds;
+- lazy trades cache failure must not fail materialization if child recompute succeeds;
 - benchmark failure blocks the current iteration from being considered complete.
 
 ## План внедрения
@@ -1405,12 +1408,14 @@ SHA-only column, можно сломать validation, indexes или lazy-trade
   это противоречит readable route contract.
 
 Риск: lazy trades cache зависит от deployment topology. В single-host v1 local
-file/object cache на 48h достаточен: cache miss просто запускает deterministic
-recompute для одного variant. В multi-host deployment запрос `show trades` может
+file/object cache на 48h достаточен: cache miss запускает deterministic
+materialization для одного variant в disposable child process, а cache hit читает
+bounded bundle (`metadata.json` + `trades.jsonl`) без monolithic full-detail load
+в API. В multi-host deployment запрос `show trades` может
 попасть на другой API/worker host, где local cache файла нет. Это не ломает
 correctness, но может давать лишний recompute и нестабильную latency. Решения:
 
-- v1 default: single API/worker host или sticky routing + local cache;
+- v1 default: single API/worker host или sticky routing + local bounded cache;
 - scale-out trigger: перед несколькими API/worker hosts включить shared object
   storage для lazy trades payload;
 - Postgres JSONB допустим только для малых payloads и metadata, но не как

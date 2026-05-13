@@ -5,7 +5,7 @@ import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import BacktestLazyTradesDetailReadModel
@@ -27,6 +27,20 @@ class BacktestLazyTradesMaterializationWorkerResult:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestLazyTradesMaterializationExecutionResult:
+    cache_status: str
+    cache_path: str | None = None
+
+
+class BacktestLazyTradesMaterializationExecutor(Protocol):
+    def execute(
+        self,
+        *,
+        task: BacktestLazyTradesMaterializationTask,
+    ) -> BacktestLazyTradesMaterializationExecutionResult: ...
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestLazyTradesMaterializationWorkerUseCase:
     materialization_repository: BacktestLazyTradesMaterializationRepository
     job_repository: BacktestJobRepository
@@ -34,6 +48,7 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
     lease_seconds: int
     heartbeat_interval_seconds: float = 30.0
     locked_by: str | None = None
+    executor: BacktestLazyTradesMaterializationExecutor | None = None
 
     def run_next(self) -> BacktestLazyTradesMaterializationWorkerResult:
         now = datetime.now(UTC)
@@ -54,14 +69,14 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
                 lease_seconds=self.lease_seconds,
                 interval_seconds=self.heartbeat_interval_seconds,
             ) as heartbeat:
-                detail = self._execute(task=task)
+                execution = self._execute(task=task)
             finished = self.materialization_repository.finish_completed(
                 task_id=task.task_id,
                 owner_user_id=task.owner_user_id,
                 now=datetime.now(UTC),
                 locked_by=owner,
-                cache_status=str(detail.cache.get("status", "unknown")),
-                cache_path=_optional_str(detail.cache.get("cache_path")),
+                cache_status=execution.cache_status,
+                cache_path=execution.cache_path,
             )
             return BacktestLazyTradesMaterializationWorkerResult(
                 task=finished,
@@ -87,6 +102,19 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
             )
 
     def _execute(
+        self,
+        *,
+        task: BacktestLazyTradesMaterializationTask,
+    ) -> BacktestLazyTradesMaterializationExecutionResult:
+        if self.executor is not None:
+            return self.executor.execute(task=task)
+        detail = self._execute_in_process_for_tests(task=task)
+        return BacktestLazyTradesMaterializationExecutionResult(
+            cache_status=str(detail.cache.get("status", "unknown")),
+            cache_path=_optional_str(detail.cache.get("cache_path")),
+        )
+
+    def _execute_in_process_for_tests(
         self,
         *,
         task: BacktestLazyTradesMaterializationTask,
@@ -211,6 +239,8 @@ def _optional_str(value: Any) -> str | None:
 
 
 __all__ = [
+    "BacktestLazyTradesMaterializationExecutionResult",
+    "BacktestLazyTradesMaterializationExecutor",
     "BacktestLazyTradesMaterializationWorkerResult",
     "BacktestLazyTradesMaterializationWorkerUseCase",
 ]

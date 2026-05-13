@@ -232,6 +232,26 @@ class _MemoryCache:
             raise self.raise_on_write
         self.writes = (*self.writes, (cache_key, payload))
 
+    def read_page(self, **kwargs: Any) -> BacktestLazyTradesCacheReadResult:
+        _ = kwargs
+        return self.read_result
+
+    def read_series(self, **kwargs: Any) -> BacktestLazyTradesCacheReadResult:
+        _ = kwargs
+        return self.read_result
+
+    def read_monthly_stats(self, **kwargs: Any) -> BacktestLazyTradesCacheReadResult:
+        _ = kwargs
+        return self.read_result
+
+    def read_symbol_stats(self, **kwargs: Any) -> BacktestLazyTradesCacheReadResult:
+        _ = kwargs
+        return self.read_result
+
+    def read_csv(self, **kwargs: Any) -> BacktestLazyTradesCacheReadResult:
+        _ = kwargs
+        return self.read_result
+
 
 class _FailingPreparePools:
     def __getattr__(self, name: str) -> Any:
@@ -324,12 +344,16 @@ def _service_fixture(
         requested_top_n=100,
         ranking_primary_metric="total_return_pct",
     )
-    row = BacktestTopResultAssemblyService().assemble(
-        job_id=job_id,
-        normalized_request=request,
-        top_results=(_top_result(risk_mode=risk_mode),),
-        updated_at=datetime.now(UTC),
-    ).top_variants[0]
+    row = (
+        BacktestTopResultAssemblyService()
+        .assemble(
+            job_id=job_id,
+            normalized_request=request,
+            top_results=(_top_result(risk_mode=risk_mode),),
+            updated_at=datetime.now(UTC),
+        )
+        .top_variants[0]
+    )
     return service, cache, job, row
 
 

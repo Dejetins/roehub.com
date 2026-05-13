@@ -156,18 +156,19 @@ sequenceDiagram
 
     UI->>API: POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades
     API->>API: auth + ownership + variant lookup
-    API->>C: cache read
+    API->>C: bounded/chunked cache read
     alt cache hit
-        API-->>UI: 200 trades/detail payload
+        API-->>UI: 200 bounded detail/page/series/stat/CSV payload
     else cache miss
         API->>DB: create/replay lazy materialization task
         API-->>UI: 202 status=queued + detail_task_id + retry_after_seconds
         W->>DB: claim detail task
-        W->>C: recompute one variant + atomic cache write
+        W->>W: start disposable child process for one lazy task
+        W->>C: child recomputes one variant + atomic bundle cache write
         W->>DB: completed/failed
         UI->>API: GET trades/status or GET trades?page=...
-        API->>C: cache read
-        API-->>UI: 200 detail/trades payload or queued/running status
+        API->>C: bounded/chunked cache read
+        API-->>UI: 200 bounded payload or queued/running status
     end
 ```
 
@@ -199,7 +200,11 @@ backtest_lazy_trades_materializations
 - unique active key: `(owner_user_id, job_id, public_variant_key, cache_key)` для
   non-terminal или свежей successful materialization;
 - повторный POST при уже queued/running task возвращает тот же task status;
-- cache hit возвращает payload без создания task.
+- cache hit возвращает payload без создания task, но только через bounded/chunked
+  readers (`metadata.json` + `trades.jsonl` bundle), без full-detail JSON load в
+  API process.
+- lazy cache miss исполняется только одноразовым child process; parent владеет
+  claim, heartbeat, metrics, child supervision и terminal status.
 
 API compatibility:
 
@@ -260,7 +265,7 @@ Full jobs:
 
 Lazy trades detail:
 
-- cache hit: p95 < 500ms target;
+- cache hit through bounded/chunked readers: p95 < 500ms target;
 - cache miss при idle runner: target < 60s, evidence-dependent;
 - при занятом runner UI обязан показывать queued/running state и
   `retry_after_seconds`.
@@ -474,8 +479,12 @@ Acceptance:
   completed/failed/cancelled и worker execution.
 - Изменить production cache-miss behavior: `POST /trades` returns queued/running task
   instead of blocking on recompute.
-- Runner обрабатывает detail tasks and writes cache atomically.
-- `GET /trades`/series/stat endpoints read cache/status and stay bounded.
+- Runner parent обрабатывает claim/heartbeat/terminal status, запускает
+  disposable lazy child process и не выполняет recompute in-process.
+- Lazy child writes cache atomically as a bundle: metadata/summary JSON plus
+  chunk-readable trades JSONL.
+- `GET /trades`/series/stat/CSV endpoints read cache/status through bounded
+  cache readers and stay bounded.
 
 Acceptance:
 

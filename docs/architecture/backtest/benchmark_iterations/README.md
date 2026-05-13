@@ -261,6 +261,19 @@ comparison against the previous service run.
 | lazy_trades_compute | | | | | |
 | lazy_trades_cache_hit | | | | | |
 
+For lazy trades memory-remediation prompts, record `lazy_trades_compute` and
+`lazy_trades_cache_hit` separately:
+
+- `lazy_trades_compute`: child process PID, child peak RSS, child final RSS if
+  observable, `vmmap`/physical footprint snapshot when available, and evidence
+  that the child process exited after one task.
+- `lazy_trades_cache_hit`: API process RSS before/after bounded read, retained
+  `RSS` delta, physical footprint delta when available, read mode
+  (`page|series|monthly_stats|symbol_stats|csv|metadata`) and row/page limits.
+- `result_contains_heavy_references` and `worker_recycle_required` must remain
+  explicit fields in memory evidence so prompt 04 can distinguish child compute
+  memory release from API cache-hit retained memory.
+
 ## Memory Cleanup Evidence
 
 Cleanup evidence is a service hygiene check, not a canonical notebook stage. It

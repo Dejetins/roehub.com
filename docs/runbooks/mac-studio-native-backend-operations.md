@@ -20,6 +20,7 @@
 - keycloak runtime: `/opt/roehub/keycloak/current`
 - host config root: `/opt/roehub/config`
 - backtest artifact root: `/opt/roehub/state/backtest_artifacts/v2`
+- lazy trades cache root: `/opt/roehub/state/backtest/trades_cache`
 - host binaries: `/opt/roehub/bin`, `/opt/clickhouse/clickhouse`
 - prod env: `/Users/daniildegtyarev/.config/roehub/roehub.env`
 - keycloak env: `/Users/daniildegtyarev/.config/roehub/keycloak.env`
@@ -118,6 +119,27 @@ Monit проверки/управление:
 Monit launchd wrapper semantics:
 
 - `start` runs `launchctl enable`, then `bootstrap` when needed, then `kickstart`;
+
+## Backtest lazy trades cache
+
+Lazy trades cache miss is executed by `com.roehub.backtest-job-runner` through a
+one-task disposable child process. The runner parent owns claim, heartbeat,
+metrics at `127.0.0.1:9204/metrics`, child supervision, and terminal
+materialization status.
+
+Cache hit reads in API use the bounded bundle layout under
+`/opt/roehub/state/backtest/trades_cache`:
+
+- `metadata.json` stores schema, cache identity, summary and bounded metadata;
+- `trades.jsonl` stores one sorted trade row per line for page/stat/series/CSV
+  chunk reads;
+- historical monolithic cache JSON files are migration-only/miss inputs and are
+  not a public API cache-hit read path.
+
+Safe cleanup: remove only digest directories below the lazy trades cache root
+when invalidating lazy detail cache. Do not remove
+`/opt/roehub/state/backtest_artifacts/v2`; that is the artifact source used for
+job execution and lazy recompute.
 - `stop` runs `launchctl disable`, then `bootout`;
 - `restart` runs the same `stop` and `start` sequence, so a stopped service is re-enabled
   explicitly instead of depending on prior launchd state.

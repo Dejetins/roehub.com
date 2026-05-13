@@ -11,6 +11,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.use_cases import (
+    BacktestLazyTradesMaterializationExecutionResult,
     BacktestLazyTradesMaterializationWorkerUseCase,
 )
 from trading.shared_kernel.primitives import UserId
@@ -20,13 +21,14 @@ def test_lazy_trades_worker_claims_executes_and_finishes_task() -> None:
     task = _task()
     repository = _MaterializationRepository(task=task)
     jobs = _JobRepository(owner_user_id=task.owner_user_id, job_id=task.job_id)
-    service = _LazyTradesService()
+    executor = _LazyTradesChildExecutor()
     use_case = BacktestLazyTradesMaterializationWorkerUseCase(
         materialization_repository=cast(Any, repository),
         job_repository=cast(Any, jobs),
-        lazy_trades_service=cast(Any, service),
+        lazy_trades_service=cast(Any, _LazyTradesService()),
         lease_seconds=60,
         locked_by="test-runner",
+        executor=executor,
     )
 
     result = use_case.run_next()
@@ -37,8 +39,8 @@ def test_lazy_trades_worker_claims_executes_and_finishes_task() -> None:
     assert result.task.status == "completed"
     assert result.cache_status == "miss"
     assert repository.finished_completed == (task.task_id,)
-    assert service.calls == ((task.job_id, task.public_variant_key),)
-    assert jobs.owner_scoped_gets == ((task.job_id, task.owner_user_id),)
+    assert executor.calls == (task.task_id,)
+    assert jobs.owner_scoped_gets == ()
 
 
 def test_lazy_trades_worker_marks_task_failed_when_variant_missing() -> None:
@@ -65,6 +67,31 @@ def test_lazy_trades_worker_marks_task_failed_when_variant_missing() -> None:
     assert repository.last_error_json is not None
     assert repository.last_error_json["code"] == "backtest.variant_not_found"
     assert repository.last_error_json["details"]["retryable"] is False
+
+
+def test_lazy_trades_worker_maps_child_failure_to_failed_task() -> None:
+    task = _task()
+    repository = _MaterializationRepository(task=task)
+    executor = _LazyTradesChildExecutor(raise_error=RuntimeError("child failed"))
+    use_case = BacktestLazyTradesMaterializationWorkerUseCase(
+        materialization_repository=cast(Any, repository),
+        job_repository=cast(
+            Any, _JobRepository(owner_user_id=task.owner_user_id, job_id=task.job_id)
+        ),
+        lazy_trades_service=cast(Any, _LazyTradesService()),
+        lease_seconds=60,
+        locked_by="test-runner",
+        executor=executor,
+    )
+
+    result = use_case.run_next()
+
+    assert result.claimed is True
+    assert result.task is not None
+    assert result.task.status == "failed"
+    assert repository.last_error_json is not None
+    assert repository.last_error_json["code"] == "unexpected_error"
+    assert repository.last_error_json["details"]["retryable"] is True
 
 
 @dataclass
@@ -204,6 +231,25 @@ class _LazyTradesService:
             chart_overlay={},
             cache={"status": "miss"},
             timing={"lazy_trades_compute": 0.001},
+        )
+
+
+@dataclass
+class _LazyTradesChildExecutor:
+    calls: tuple[UUID, ...] = ()
+    raise_error: Exception | None = None
+
+    def execute(
+        self,
+        *,
+        task: BacktestLazyTradesMaterializationTask,
+    ) -> BacktestLazyTradesMaterializationExecutionResult:
+        self.calls = (*self.calls, task.task_id)
+        if self.raise_error is not None:
+            raise self.raise_error
+        return BacktestLazyTradesMaterializationExecutionResult(
+            cache_status="miss",
+            cache_path="/tmp/trades-cache",
         )
 
 

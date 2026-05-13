@@ -1,3 +1,4 @@
+import inspect
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -103,9 +104,7 @@ def test_post_backtest_preflight_invalid_indicator_returns_backtest_422() -> Non
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "backtest.invalid_request"
-    assert response.json()["error"]["details"]["errors"][0]["path"] == (
-        "indicators.0.indicator_id"
-    )
+    assert response.json()["error"]["details"]["errors"][0]["path"] == ("indicators.0.indicator_id")
 
 
 def test_post_backtest_preflight_artifacts_unavailable_returns_backtest_503() -> None:
@@ -350,8 +349,9 @@ def test_post_backtest_variant_trades_cache_miss_returns_202_materialization_sta
     assert payload["cache"]["cache_key"] == "f" * 64
     assert payload["materialization"]["status"] == "queued"
     assert payload["materialization"]["correlation_id"] == payload["materialization"]["task_id"]
-    assert payload["materialization"]["request_identity"]["request_hash"] == (
-        created.json()["request_hash"]
+    assert (
+        payload["materialization"]["request_identity"]["request_hash"]
+        == (created.json()["request_hash"])
     )
     assert payload["materialization"]["retry_after_seconds"] == 2
     assert payload["pagination"] == {"mode": "none"}
@@ -654,6 +654,54 @@ def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> N
     assert len(bounded_csv_response.text.splitlines()) == 6
     assert foreign_csv.status_code == 403
     assert foreign_csv.json()["error"]["code"] == "backtest.forbidden"
+    assert repository.jobs is not None
+
+
+def test_get_backtest_variant_views_use_bounded_cache_readers_not_full_detail_loader() -> None:
+    source = inspect.getsource(BacktestJobsUseCase)
+    for method_name in (
+        "variant_series",
+        "monthly_stats",
+        "symbol_stats",
+        "paginated_trades",
+        "trades_csv",
+    ):
+        method_source = inspect.getsource(getattr(BacktestJobsUseCase, method_name))
+        assert "self.trades(" not in method_source
+    assert ".read_page(" in source
+    assert ".read_series(" in source
+    assert ".read_monthly_stats(" in source
+    assert ".read_symbol_stats(" in source
+    assert ".read_csv(" in source
+
+
+def test_get_backtest_variant_page_denies_owner_before_cache_read() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000251"},
+        json=_valid_request(),
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000251"},
+    ).json()["items"][0]
+
+    response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000252"},
+    )
+
+    assert response.status_code == 403
+    assert lazy_service.requests == ()
 
 
 def test_get_backtest_variant_stats_are_bounded_by_selected_variant() -> None:
@@ -1310,6 +1358,10 @@ class _FakeLazyTradesService:
     trade_count: int = 12
     requests: tuple[tuple[str, str], ...] = ()
     execute_calls: int = 0
+    last_detail: BacktestLazyTradesDetailReadModel | None = None
+
+    def __post_init__(self) -> None:
+        self.cache = _FakeLazyTradesCache(service=self)
 
     def read_cached(
         self,
@@ -1329,18 +1381,20 @@ class _FakeLazyTradesService:
             variant_hash=variant_hash,
             request_hash=job.request_hash,
             engine_params_hash=job.engine_params_hash,
-            artifact_manifest_hash=str(job.request_json["artifact_metadata"]["artifact_manifest_hash"]),
+            artifact_manifest_hash=str(
+                job.request_json["artifact_metadata"]["artifact_manifest_hash"]
+            ),
             summary_metrics=dict(row.summary_metrics_json),
             canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
             readable_params=dict(row.payload_json["readable_params"]),
             trades=tuple(
-                _fake_trade(index, include_equity=self.include_equity)
-                for index in trade_range
+                _fake_trade(index, include_equity=self.include_equity) for index in trade_range
             ),
             chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
             cache={"status": "hit" if self.cache_hit else "miss"},
             timing={"lazy_trades_cache_hit": 0.001} if self.cache_hit else {},
         )
+        self.last_detail = detail
         return _Probe(
             detail=detail if self.cache_hit else None,
             cache_status="hit" if self.cache_hit else "miss",
@@ -1359,6 +1413,228 @@ class _FakeLazyTradesService:
             row=row,
             public_variant_key=public_variant_key,
         ).detail  # type: ignore[return-value]
+
+
+@dataclass
+class _FakeLazyTradesCache:
+    service: _FakeLazyTradesService
+
+    def read_page(
+        self,
+        *,
+        cache_key: Any,
+        now: datetime,
+        ttl_seconds: int,
+        page: int,
+        page_size: int,
+    ) -> "_CacheRead":
+        _ = cache_key, now, ttl_seconds
+        detail = self._detail()
+        ordered = sorted(detail.trades, key=lambda item: int(item["trade_index"]))
+        offset = (page - 1) * page_size
+        items = tuple(dict(item) for item in ordered[offset : offset + page_size])
+        total = len(ordered)
+        return _CacheRead(
+            payload={
+                "job_id": detail.job_id,
+                "variant_key": detail.variant_key,
+                "variant_hash": detail.variant_hash,
+                "items": items,
+                "pagination": {
+                    "mode": "page",
+                    "page": page,
+                    "page_size": page_size,
+                    "max_page_size": 100,
+                    "total": total,
+                    "has_next": offset + page_size < total,
+                    "has_previous": page > 1,
+                    "next_page": page + 1 if offset + page_size < total else None,
+                    "previous_page": page - 1 if page > 1 else None,
+                    "sort": "trade_index_asc",
+                },
+                "summary_metrics": dict(detail.summary_metrics),
+                "cache": dict(detail.cache),
+                "timing": dict(detail.timing),
+            }
+        )
+
+    def read_series(
+        self,
+        *,
+        cache_key: Any,
+        now: datetime,
+        ttl_seconds: int,
+        kind: str,
+        points: int,
+    ) -> "_CacheRead":
+        _ = cache_key, now, ttl_seconds
+        detail = self._detail()
+        source = [
+            {
+                "x": trade.get("exit_timestamp") or trade.get("trade_index"),
+                "trade_index": trade.get("trade_index"),
+                "value": trade.get("equity_after"),
+                "net_pnl_quote": trade.get("net_pnl_quote"),
+            }
+            for trade in sorted(detail.trades, key=lambda item: int(item["trade_index"]))
+            if trade.get("equity_after") is not None
+        ]
+        if kind == "drawdown":
+            peak = None
+            drawdown = []
+            for item in source:
+                value = item["value"]
+                assert value is not None
+                equity = float(value)
+                peak = equity if peak is None else max(peak, equity)
+                drawdown.append(
+                    {
+                        "x": item["x"],
+                        "trade_index": item["trade_index"],
+                        "value": 0.0 if peak <= 0 else ((equity - peak) / peak) * 100.0,
+                        "equity": equity,
+                    }
+                )
+            source = drawdown
+        sampled = source[:points]
+        return _CacheRead(
+            payload={
+                "job_id": detail.job_id,
+                "variant_key": detail.variant_key,
+                "variant_hash": detail.variant_hash,
+                "kind": kind,
+                "points": sampled,
+                "requested_points": points,
+                "max_points": points,
+                "returned_points": len(sampled),
+                "source_points": len(source),
+                "downsampled": len(sampled) < len(source),
+                "cache": dict(detail.cache),
+                "timing": dict(detail.timing),
+            }
+        )
+
+    def read_monthly_stats(
+        self,
+        *,
+        cache_key: Any,
+        now: datetime,
+        ttl_seconds: int,
+    ) -> "_CacheRead":
+        _ = cache_key, now, ttl_seconds
+        detail = self._detail()
+        return _CacheRead(
+            payload={
+                "job_id": detail.job_id,
+                "variant_key": detail.variant_key,
+                "variant_hash": detail.variant_hash,
+                "items": [
+                    {
+                        "month": "2026-01",
+                        "trades_count": 2,
+                        "net_pnl_quote": 1.0,
+                        "return_pct": 1.0,
+                        "wins": 1,
+                        "losses": 1,
+                        "win_rate_pct": 50.0,
+                    }
+                    for _ in range(9)
+                ],
+                "bounds": {
+                    "max_items": 600,
+                    "returned_items": 9,
+                    "source_items": 9,
+                    "truncated": False,
+                    "sort": "month_asc",
+                },
+                "cache": dict(detail.cache),
+                "timing": dict(detail.timing),
+            }
+        )
+
+    def read_symbol_stats(
+        self,
+        *,
+        cache_key: Any,
+        now: datetime,
+        ttl_seconds: int,
+        symbol: str | None,
+    ) -> "_CacheRead":
+        _ = cache_key, now, ttl_seconds
+        detail = self._detail()
+        return _CacheRead(
+            payload={
+                "job_id": detail.job_id,
+                "variant_key": detail.variant_key,
+                "variant_hash": detail.variant_hash,
+                "items": [
+                    {
+                        "symbol": symbol or "unknown",
+                        "trades_count": 12,
+                        "net_pnl_quote": 4.0,
+                        "return_pct": 4.0,
+                        "wins": 8,
+                        "losses": 4,
+                        "win_rate_pct": 66.66666666666666,
+                    }
+                ],
+                "bounds": {
+                    "max_items": 1,
+                    "returned_items": 1,
+                    "source_items": 1,
+                    "truncated": False,
+                    "sort": "symbol_asc",
+                },
+                "cache": dict(detail.cache),
+                "timing": dict(detail.timing),
+            }
+        )
+
+    def read_csv(
+        self,
+        *,
+        cache_key: Any,
+        now: datetime,
+        ttl_seconds: int,
+        max_rows: int,
+    ) -> "_CacheRead":
+        _ = cache_key, now, ttl_seconds
+        detail = self._detail()
+        rows = sorted(detail.trades, key=lambda item: int(item["trade_index"]))
+        header = "trade_index,entry_timestamp,exit_timestamp\n"
+        lines = [
+            header,
+            *(
+                f"{row['trade_index']},{row['entry_timestamp']},{row['exit_timestamp']}\n"
+                for row in rows[:max_rows]
+            ),
+        ]
+        return _CacheRead(
+            payload={
+                "content": "".join(lines),
+                "row_count": min(len(rows), max_rows),
+                "total_rows": len(rows),
+                "max_rows": max_rows,
+                "truncated": len(rows) > max_rows,
+                "sort": "trade_index_asc",
+                "cache": dict(detail.cache),
+                "timing": dict(detail.timing),
+            }
+        )
+
+    def _detail(self) -> BacktestLazyTradesDetailReadModel:
+        assert self.service.last_detail is not None
+        return self.service.last_detail
+
+
+@dataclass(frozen=True)
+class _CacheRead:
+    payload: dict[str, Any]
+    status: str = "hit"
+
+    @property
+    def is_hit(self) -> bool:
+        return self.status == "hit" and self.payload is not None
 
 
 @dataclass(frozen=True)
@@ -1611,8 +1887,7 @@ class _FakeJobRepository:
         items = [
             job
             for job in self.jobs.values()
-            if job.user_id == query.user_id
-            and (query.state is None or job.state == query.state)
+            if job.user_id == query.user_id and (query.state is None or job.state == query.state)
         ]
         items.sort(key=lambda item: (item.created_at, str(item.job_id)), reverse=True)
         return BacktestJobListPage(items=tuple(items[: query.limit]), next_cursor=None)
@@ -1657,11 +1932,16 @@ class _FakeJobRepository:
         assert self.jobs is not None
         assert self.top_rows is not None
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id or job.state not in {
-            "succeeded",
-            "failed",
-            "cancelled",
-        }:
+        if (
+            job is None
+            or job.user_id != user_id
+            or job.state
+            not in {
+                "succeeded",
+                "failed",
+                "cancelled",
+            }
+        ):
             return False
         del self.jobs[job_id]
         self.top_rows.pop(job_id, None)

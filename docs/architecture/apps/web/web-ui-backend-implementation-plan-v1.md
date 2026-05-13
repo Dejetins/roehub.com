@@ -1960,12 +1960,13 @@ Backend/API-добавления:
 
 Поведение backend:
 
-- `POST /trades` остается lazy detail entrypoint: cache hit возвращает `200`, cache
-  miss возвращает `202` materialization status и не выполняет тяжелый recompute в API
-  process;
+- `POST /trades` остается lazy detail entrypoint: cache hit возвращает `200` из
+  bounded cache bundle, cache miss возвращает `202` materialization status и не
+  выполняет тяжелый recompute в API process;
 - `GET /trades` возвращает только paginated rows, cache/status/degraded state или
   retry metadata, но не запускает повторный full compute;
-- chart endpoints возвращают downsampled series, максимум 600-1500 points;
+- chart/stat endpoints читают bounded/chunked cache readers и возвращают
+  downsampled series, максимум 600-1500 points;
 - неизвестный публичный `variant_key` возвращает 404;
 - storage identity остается разделенной: публичный `variant_key`, стабильный `variant_hash`.
 
@@ -2027,13 +2028,13 @@ Frontend integration:
 |---|---|---|---|
 | `GET /api/backtests/jobs/{job_id}/summary` | Реализован и тестируется; bounded, не вызывает lazy trades service. | Используется `backtests.js` через `data-job-summary-endpoint-template` для раскрытия variants. | Сохранить как primary selected-job summary contract. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | Реализован и owner/public-key scoped. | Endpoint template есть в DOM, но текущий UI не делает отдельный detail fetch. | Оставить stable handoff для будущего detail panel. |
-| `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | Реализован как lazy trades detail; сейчас cache miss может вычисляться в API use case. | Текущий UI не вызывает POST напрямую. | Перевести cache miss на `202` materialization task до публичного detail UI. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | Реализован и тестируется на point bounds/raw hash rejection. | Текущий UI не вызывает; `renderBacktestSeries` отсутствует намеренно. | Harden: не запускать sync lazy recompute на cache miss; вернуть status/degraded или materialized data. |
+| `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | Реализован как lazy trades detail: cache hit читает bounded bundle, cache miss создает/replays materialization task. | Текущий UI не вызывает POST напрямую. | Сохранять как status/materialization entrypoint; full-detail cache-hit load запрещен. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | Реализован и тестируется на point bounds/raw hash rejection; cache hit читает bounded series reader. | Текущий UI не вызывает; `renderBacktestSeries` отсутствует намеренно. | Не запускать sync lazy recompute на cache miss; вернуть status/degraded или materialized data. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | Реализован аналогично equity. | Текущий UI не вызывает. | Те же materialization/cache-status требования. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется. | Текущий UI не вызывает. | Те же materialization/cache-status требования; DTO остается bounded. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Реализован и тестируется. | Текущий UI не вызывает. | Те же materialization/cache-status требования; source symbol берется из job request. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination. | Текущий UI не вызывает; `/trades?page=` отсутствует в JS. | Перед UI table убедиться, что pagination читает materialized/cache data без повторного full recompute. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Реализован, owner-scoped, текущий UI рендерит CSV links. | Используется как link в variant expansion. | Зафиксировать export bounds/cache policy; для больших payloads рассмотреть async export или cache-only response. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Текущий UI не вызывает. | Те же materialization/cache-status требования; DTO остается bounded. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Текущий UI не вызывает. | Те же materialization/cache-status требования; source symbol берется из job request. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination; cache hit читает только requested page plus metadata. | Текущий UI не вызывает; `/trades?page=` отсутствует в JS. | Перед UI table сохранять server pagination и materialization status. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Реализован, owner-scoped, текущий UI рендерит CSV links; export читает cache chunked до bounded max rows. | Используется как link в variant expansion. | Для очень больших payloads рассмотреть async export; full-detail cache load запрещен. |
 
 Playwright CLI:
 

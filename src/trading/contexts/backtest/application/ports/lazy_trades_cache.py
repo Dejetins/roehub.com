@@ -58,8 +58,7 @@ class BacktestLazyTradesCache(Protocol):
         cache_key: BacktestLazyTradesCacheKey,
         now: datetime,
         ttl_seconds: int,
-    ) -> BacktestLazyTradesCacheReadResult:
-        ...
+    ) -> BacktestLazyTradesCacheReadResult: ...
 
     def write(
         self,
@@ -68,8 +67,53 @@ class BacktestLazyTradesCache(Protocol):
         payload: Mapping[str, Any],
         now: datetime,
         ttl_seconds: int,
-    ) -> None:
-        ...
+    ) -> None: ...
+
+    def read_page(
+        self,
+        *,
+        cache_key: BacktestLazyTradesCacheKey,
+        now: datetime,
+        ttl_seconds: int,
+        page: int,
+        page_size: int,
+    ) -> BacktestLazyTradesCacheReadResult: ...
+
+    def read_series(
+        self,
+        *,
+        cache_key: BacktestLazyTradesCacheKey,
+        now: datetime,
+        ttl_seconds: int,
+        kind: str,
+        points: int,
+    ) -> BacktestLazyTradesCacheReadResult: ...
+
+    def read_monthly_stats(
+        self,
+        *,
+        cache_key: BacktestLazyTradesCacheKey,
+        now: datetime,
+        ttl_seconds: int,
+    ) -> BacktestLazyTradesCacheReadResult: ...
+
+    def read_symbol_stats(
+        self,
+        *,
+        cache_key: BacktestLazyTradesCacheKey,
+        now: datetime,
+        ttl_seconds: int,
+        symbol: str | None,
+    ) -> BacktestLazyTradesCacheReadResult: ...
+
+    def read_csv(
+        self,
+        *,
+        cache_key: BacktestLazyTradesCacheKey,
+        now: datetime,
+        ttl_seconds: int,
+        max_rows: int,
+    ) -> BacktestLazyTradesCacheReadResult: ...
 
 
 def build_lazy_trades_cache_key(

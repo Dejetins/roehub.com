@@ -263,11 +263,13 @@ POST /backtests/jobs/{job_id}/variants/{variant_key}/trades
 - проверяет ownership;
 - читает persisted job request snapshot и selected variant params;
 - читает current artifact data по historical-prefix invariant и stored artifact metadata;
-- cache hit возвращает trades + chart overlay payload;
+- cache hit возвращает bounded detail/page/series/stat/CSV payload через
+  chunk-readable cache readers; API не читает full trades/detail JSON в память;
 - cache miss в production не должен выполнять тяжелый recompute внутри API request
-  path; он создает или переиспользует materialization task, который исполняет
-  `backtest-job-runner`;
-- может сохранить cache на 1-2 дня.
+  path; он создает или переиспользует materialization task, который
+  `backtest-job-runner` исполняет в одноразовом `child process`;
+- cache сохраняется на 1-2 дня как bundle: metadata/summary JSON и
+  chunk-readable `trades.jsonl`.
 
 Рекомендация по cache:
 
@@ -422,7 +424,7 @@ ranking metric, requested `top_n`, timestamps `created/started/finished` и link
 
 Production target:
 
-- cache hit: `200` с trades/detail payload;
+- cache hit: `200` с bounded detail/page/series/stat/CSV payload из cache bundle;
 - cache miss: `202` со статусом materialization task, `retry_after_seconds` и
   ссылкой/контрактом для повторного чтения;
 - sync recompute внутри API process допустим только как transitional non-production
@@ -978,10 +980,11 @@ stage, не меняет порядок notebook stages и не сравнива
 ### Lazy trades
 
 - recompute exact trades для одного `variant_key`;
-- cache result на 48h;
-- cache hit возвращает chart-ready payload из API;
-- cache miss материализуется через `backtest-job-runner`, чтобы Web UI detail view
-  не блокировал API process.
+- cache result на 48h как bounded bundle, а не monolithic cache JSON;
+- cache hit возвращает page/series/stat/CSV views через bounded/chunked readers;
+- cache miss материализуется через disposable `child process` под контролем
+  `backtest-job-runner`, чтобы Web UI detail view не блокировал API process и
+  чтобы RSS/physical footprint тяжелого recompute освобождались при exit child.
 
 Lazy trades не является частью `total_without_warmup`; у него свой benchmark gate:
 `lazy_trades_compute` и `lazy_trades_cache_hit`.
@@ -2054,12 +2057,13 @@ SHA-only column, можно сломать validation, indexes или lazy-trade
 
 Риск: lazy trades cache зависит от deployment topology. В single-host v1 local
 file/object cache на 48h достаточен: cache miss запускает deterministic
-materialization для одного variant через runner. В multi-host deployment запрос
+materialization для одного variant через disposable runner child, а cache hit
+читает bounded bundle. В multi-host deployment запрос
 `show trades` может
 попасть на другой API/worker host, где local cache файла нет. Это не ломает
 correctness, но может давать лишний recompute и нестабильную latency. Решения:
 
-- v1 default: single API/worker host или sticky routing + local cache;
+- v1 default: single API/worker host или sticky routing + local bounded cache;
 - scale-out trigger: перед несколькими API/worker hosts включить shared object
   storage для lazy trades payload;
 - Postgres JSONB допустим только для малых payloads и metadata, но не как
