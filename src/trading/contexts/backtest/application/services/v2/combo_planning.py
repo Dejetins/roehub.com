@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Mapping, Sequence
 
+import numba as nb
 import numpy as np
 
 from trading.contexts.backtest.application.dto import (
@@ -31,6 +32,7 @@ BUILD_PROXY_CONTEXT_STAGE_NAME = "build_proxy_context"
 COMBO_ITERATION_STAGE_NAME = "combo_iteration"
 PROXY_FILTER_STAGE_NAME = "proxy_filter"
 COMBO_CHUNK_SIZE = 4096
+LEGACY_PRODUCT_HELPER_MAX_COMBINATIONS = 1_000_000
 NEG_INF = np.float32(-1e30)
 
 _SUPPORTED_DIRECTIONS = ("long_only", "long_short_reversal")
@@ -213,7 +215,26 @@ class BacktestComboPlanningService:
             indicator_ids=indicator_ids,
             local_row_pools=local_row_pools,
         )
-        combo_iter = iter_combo_chunks(
+        if not proxy_context.active:
+            return BacktestComboPlanningResult(
+                backend=backend,
+                exact_context=exact_context,
+                proxy_context=proxy_context,
+                telemetry=BacktestComboPlanningTelemetry(
+                    stage_timings=stage_timings,
+                    cartesian_combinations=cartesian_combinations,
+                    combo_chunks_processed=0,
+                    exact_candidates_evaluated=cartesian_combinations,
+                    proxy_candidates_seen=cartesian_combinations,
+                    proxy_candidates_valid=cartesian_combinations,
+                    proxy_candidates_selected=cartesian_combinations,
+                    combo_iteration_mode="ordinal_streaming_pass_through",
+                    streamed_candidate_count=cartesian_combinations,
+                    materialized_candidate_count=0,
+                ),
+            )
+
+        combo_iter = iter_ordinal_combo_chunks(
             indicator_ids=indicator_ids,
             local_row_pools=local_row_pools,
             chunk_size=self.config.combo_chunk_size,
@@ -257,6 +278,9 @@ class BacktestComboPlanningService:
                 proxy_candidates_seen=proxy_candidates_seen,
                 proxy_candidates_valid=proxy_candidates_valid,
                 proxy_candidates_selected=proxy_candidates_selected,
+                combo_iteration_mode="ordinal_proxy_filter",
+                streamed_candidate_count=cartesian_combinations,
+                materialized_candidate_count=proxy_candidates_seen,
             ),
         )
 
@@ -623,7 +647,11 @@ def iter_combo_chunks(
     chunk_size: int,
 ) -> Iterator[BacktestComboChunk]:
     """
-    Yield bounded Cartesian chunks in `itertools.product` order.
+    Yield small bounded Cartesian chunks in `itertools.product` order.
+
+    This is retained as a reference/test helper. Production full-job scoring must
+    use ordinal streaming so large grids cannot enter Python object Cartesian
+    generation.
     """
 
     if chunk_size <= 0:
@@ -631,6 +659,15 @@ def iter_combo_chunks(
     ids = tuple(str(indicator_id) for indicator_id in indicator_ids)
     if not ids:
         raise ValueError("indicator_ids must not be empty")
+    total_count = cartesian_combo_count(
+        indicator_ids=ids,
+        local_row_pools=local_row_pools,
+    )
+    if total_count > LEGACY_PRODUCT_HELPER_MAX_COMBINATIONS:
+        raise ValueError(
+            "iter_combo_chunks is limited to small reference grids; use "
+            "iter_ordinal_combo_chunks for production-sized Cartesian spaces"
+        )
     buffers: dict[str, list[int]] = {indicator_id: [] for indicator_id in ids}
     ordered_pools = tuple(
         np.asarray(local_row_pools[indicator_id], dtype=np.int32)
@@ -657,6 +694,93 @@ def iter_combo_chunks(
                 for indicator_id in ids
             },
         )
+
+
+def iter_ordinal_combo_chunks(
+    *,
+    indicator_ids: Sequence[str],
+    local_row_pools: Mapping[str, np.ndarray],
+    chunk_size: int,
+) -> Iterator[BacktestComboChunk]:
+    """
+    Yield bounded Cartesian chunks by decoding ordinal ranges.
+
+    The decoded order matches `itertools.product(*ordered_pools)`: the last
+    indicator varies fastest, the first varies slowest.
+    """
+
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+    ids = tuple(str(indicator_id) for indicator_id in indicator_ids)
+    if not ids:
+        raise ValueError("indicator_ids must not be empty")
+    pool_matrix, pool_sizes = _pool_decode_matrix(
+        indicator_ids=ids,
+        local_row_pools=local_row_pools,
+    )
+    total_count = cartesian_combo_count(
+        indicator_ids=ids,
+        local_row_pools=local_row_pools,
+    )
+    for start_ordinal in range(0, total_count, chunk_size):
+        current_size = min(chunk_size, total_count - start_ordinal)
+        decoded = np.empty((len(ids), current_size), dtype=np.int32)
+        decode_ordinal_combo_chunk(
+            pool_matrix,
+            pool_sizes,
+            np.int64(start_ordinal),
+            decoded,
+        )
+        yield BacktestComboChunk(
+            indicator_ids=ids,
+            rows_by_indicator={
+                indicator_id: decoded[pos]
+                for pos, indicator_id in enumerate(ids)
+            },
+        )
+
+
+def _pool_decode_matrix(
+    *,
+    indicator_ids: Sequence[str],
+    local_row_pools: Mapping[str, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    ids = tuple(str(indicator_id) for indicator_id in indicator_ids)
+    ordered_pools = tuple(
+        np.ascontiguousarray(np.asarray(local_row_pools[indicator_id], dtype=np.int32))
+        for indicator_id in ids
+    )
+    if any(int(pool.shape[0]) <= 0 for pool in ordered_pools):
+        raise ValueError("all local row pools must be non-empty")
+    max_rows = max(int(pool.shape[0]) for pool in ordered_pools)
+    pool_matrix = np.zeros((len(ids), max_rows), dtype=np.int32)
+    pool_sizes = np.empty(len(ids), dtype=np.int64)
+    for pos, pool in enumerate(ordered_pools):
+        pool_size = int(pool.shape[0])
+        pool_matrix[pos, :pool_size] = pool
+        pool_sizes[pos] = np.int64(pool_size)
+    return np.ascontiguousarray(pool_matrix), pool_sizes
+
+
+@nb.njit(cache=True)
+def decode_ordinal_combo_chunk(
+    pool_matrix: np.ndarray,
+    pool_sizes: np.ndarray,
+    start_ordinal: np.int64,
+    out_rows_by_pos: np.ndarray,
+) -> None:
+    arity = int(pool_sizes.shape[0])
+    chunk_len = int(out_rows_by_pos.shape[1])
+    for chunk_pos in range(chunk_len):
+        remaining = np.int64(start_ordinal + np.int64(chunk_pos))
+        for indicator_pos in range(arity - 1, -1, -1):
+            pool_size = np.int64(pool_sizes[indicator_pos])
+            local_index = remaining % pool_size
+            remaining = remaining // pool_size
+            out_rows_by_pos[indicator_pos, chunk_pos] = pool_matrix[
+                indicator_pos,
+                local_index,
+            ]
 
 
 def make_combo_idx_matrix(
@@ -788,6 +912,7 @@ __all__ = [
     "EVENT_SEGMENTS_2_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND",
+    "LEGACY_PRODUCT_HELPER_MAX_COMBINATIONS",
     "NEG_INF",
     "PROXY_FILTER_STAGE_NAME",
     "STREAMING_2_NO_RISK_BACKEND",
@@ -799,8 +924,10 @@ __all__ = [
     "build_local_row_pools",
     "build_segment_stack",
     "cartesian_combo_count",
+    "decode_ordinal_combo_chunk",
     "gather_combo_proxy_cache_two",
     "iter_combo_chunks",
+    "iter_ordinal_combo_chunks",
     "make_combo_idx_matrix",
     "proxy_prefilter_combos_chunk_n",
     "proxy_prefilter_combos_chunk_two",

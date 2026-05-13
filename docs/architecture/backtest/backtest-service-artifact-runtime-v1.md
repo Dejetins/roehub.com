@@ -643,16 +643,19 @@ This stage exists only when combo prefilter is active:
 
 ### Benchmark stage: `combo_iteration`
 
-Notebook method: `iter_combo_chunks`.
+Current production method: ordinal/range streaming over local row-pool
+cardinalities. Legacy `iter_combo_chunks` / `itertools.product` is a small
+reference/test helper only and is guarded away from large full-job spaces.
 
 This stage:
 
-- builds deterministic Cartesian product over filtered local row pools;
-- preserves indicator order from the normalized request;
-- emits chunks as `{indicator_id: int32[K]}`;
-- uses bounded chunk size (`4096` in canonical benchmark);
-- records `cartesian_combinations`, `combo_chunks_processed` and
-  `exact_candidates_evaluated`.
+- preserves canonical product order: the last indicator varies fastest;
+- decodes bounded ordinal ranges into `{indicator_id: int32[K]}` through a
+  compiled Numba decode path;
+- avoids a complete Cartesian pre-pass when proxy filtering is pass-through;
+- records `cartesian_combinations`, `combo_iteration_mode`,
+  `streamed_candidate_count`, `materialized_candidate_count`,
+  `combo_chunks_processed` and `exact_candidates_evaluated`.
 
 ### Benchmark stage: `proxy_filter`
 
@@ -775,7 +778,7 @@ Every benchmark record must expose notebook-compatible timer names:
 | `prepare_pools` | yes | Artifact load, slicing, row selection, row prefilter, segment build. |
 | `build_exact_context` | yes | Arity-first segment context where required. |
 | `build_proxy_context` | yes | May be near zero when proxy prefilter is pass-through. |
-| `combo_iteration` | yes | Cartesian chunk generation. |
+| `combo_iteration` | yes | Ordinal/range streaming; pass-through proxy does not pre-scan the full space. |
 | `proxy_filter` | yes | Pass-through or active combo pruning. |
 | `self_check` | benchmark/test yes | Bounded parity check. |
 | `exact_scoring` | yes | No-risk or TP/SL exact scorer. |
@@ -808,7 +811,7 @@ progress exposes the finer pipeline stage.
 | `prepare_pools` | `stage_a` | Artifact load, slicing, row selection, prefilter and segment build. |
 | `build_exact_context` | `stage_a` / `stage_b` | Segment stack for exact kernels. |
 | `build_proxy_context` | `stage_a` | Optional combo proxy context. |
-| `combo_iteration` | `stage_a` / `stage_b` | Cartesian chunk planning. |
+| `combo_iteration` | `stage_a` / `stage_b` | Ordinal chunking / stream descriptor, not large Python Cartesian planning. |
 | `proxy_filter` | `stage_a` / `stage_b` | Optional combo pruning. |
 | `self_check` | `stage_a` / `stage_b` | Benchmark/test parity check. |
 | `exact_scoring` with `risk.mode = "none"` | `stage_a` | No Stage B risk grid. |

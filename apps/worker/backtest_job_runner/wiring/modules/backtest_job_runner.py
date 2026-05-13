@@ -575,9 +575,10 @@ def load_backtest_job_runner_runtime_config(
             key="ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS",
             default=21_600.0,
         ),
-        light_max_estimated_combinations=_env_int(
+        light_max_estimated_combinations=_env_int_with_aliases(
             environ=environ,
             key="ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS",
+            aliases=("ROEHUB_BACKTEST_LIGHT_MAX_COMBINATIONS",),
             default=DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
         ),
         light_max_actual_combinations=_env_int(
@@ -846,6 +847,20 @@ def _env_int(*, environ: Mapping[str, str], key: str, default: int) -> int:
     except ValueError as error:
         raise ValueError(f"{key} must be integer") from error
     return value
+
+
+def _env_int_with_aliases(
+    *,
+    environ: Mapping[str, str],
+    key: str,
+    aliases: tuple[str, ...],
+    default: int,
+) -> int:
+    for candidate in (key, *aliases):
+        raw_value = environ.get(candidate)
+        if raw_value is not None and raw_value.strip():
+            return _env_int(environ=environ, key=candidate, default=default)
+    return default
 
 
 def _env_float(*, environ: Mapping[str, str], key: str, default: float) -> float:

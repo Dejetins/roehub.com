@@ -220,6 +220,8 @@ class BacktestTpSlExactTelemetry:
     backend_implementation_id: str | None = None
     metric_names: tuple[str, ...] = TP_SL_EXACT_METRIC_NAMES
     sample_metrics: Mapping[str, float] | None = None
+    numba_num_threads: int | None = None
+    numba_thread_source: str | None = None
 
     def __post_init__(self) -> None:
         if self.request_top_n <= 0:
@@ -230,10 +232,12 @@ class BacktestTpSlExactTelemetry:
             raise ValueError("heap_capacity must be > 0")
         if self.top_results_count < 0:
             raise ValueError("top_results_count must be >= 0")
-        if self.top_results_count > self.benchmark_top_k:
-            raise ValueError("top_results_count must be <= benchmark_top_k")
+        if self.top_results_count > self.heap_capacity:
+            raise ValueError("top_results_count must be <= heap_capacity")
         if self.exact_candidates_evaluated < 0:
             raise ValueError("exact_candidates_evaluated must be >= 0")
+        if self.numba_num_threads is not None and self.numba_num_threads <= 0:
+            raise ValueError("numba_num_threads must be > 0 when provided")
         object.__setattr__(
             self,
             "stage_timings",
@@ -268,6 +272,8 @@ class BacktestTpSlExactTelemetry:
             "sample_metrics": None
             if self.sample_metrics is None
             else dict(self.sample_metrics),
+            "numba_num_threads": self.numba_num_threads,
+            "numba_thread_source": self.numba_thread_source,
         }
 
 

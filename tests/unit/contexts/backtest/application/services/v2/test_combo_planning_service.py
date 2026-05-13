@@ -5,6 +5,7 @@ from typing import Any, Sequence
 import numpy as np
 import pytest
 
+import trading.contexts.backtest.application.services.v2.combo_planning as combo_planning_module
 from trading.contexts.backtest.application.dto import (
     BacktestComboPlanningConfig,
     BacktestPreparePoolsResult,
@@ -28,6 +29,7 @@ from trading.contexts.backtest.application.services.v2 import (
     build_signal_segments,
     cartesian_combo_count,
     iter_combo_chunks,
+    iter_ordinal_combo_chunks,
 )
 
 
@@ -150,8 +152,15 @@ def test_combo_iteration_matches_cartesian_order_and_records_counts() -> None:
         "gamma": np.arange(2, dtype=np.int32),
     }
 
-    chunks = list(
+    legacy_chunks = list(
         iter_combo_chunks(
+            indicator_ids=("alpha", "beta", "gamma"),
+            local_row_pools=local_row_pools,
+            chunk_size=4,
+        )
+    )
+    ordinal_chunks = list(
+        iter_ordinal_combo_chunks(
             indicator_ids=("alpha", "beta", "gamma"),
             local_row_pools=local_row_pools,
             chunk_size=4,
@@ -162,6 +171,10 @@ def test_combo_iteration_matches_cartesian_order_and_records_counts() -> None:
         normalized_request=_normalized_request(risk_mode="none"),
     )
 
+    assert [chunk.as_mapping() for chunk in ordinal_chunks] == [
+        chunk.as_mapping() for chunk in legacy_chunks
+    ]
+    chunks = ordinal_chunks
     assert [chunk.size for chunk in chunks] == [4, 4, 4]
     assert chunks[0].rows_by_indicator["alpha"].tolist() == [0, 0, 0, 0]
     assert chunks[0].rows_by_indicator["beta"].tolist() == [0, 0, 1, 1]
@@ -182,11 +195,55 @@ def test_combo_iteration_matches_cartesian_order_and_records_counts() -> None:
         PROXY_FILTER_STAGE_NAME,
     }
     assert result.telemetry.cartesian_combinations == 12
-    assert result.telemetry.combo_chunks_processed == 3
+    assert result.telemetry.combo_chunks_processed == 0
     assert result.telemetry.exact_candidates_evaluated == 12
     assert result.telemetry.proxy_candidates_seen == 12
     assert result.telemetry.proxy_candidates_valid == 12
     assert result.telemetry.proxy_candidates_selected == 12
+    assert result.telemetry.combo_iteration_mode == "ordinal_streaming_pass_through"
+    assert result.telemetry.streamed_candidate_count == 12
+    assert result.telemetry.materialized_candidate_count == 0
+
+
+def test_large_pass_through_combo_planning_does_not_enter_legacy_product(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden_product(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("itertools.product must not run for large full jobs")
+
+    monkeypatch.setattr(combo_planning_module.itertools, "product", forbidden_product)
+    prepared = _large_prepared_result(arity=5, row_count=196)
+    result = BacktestComboPlanningService().execute(
+        prepared_result=prepared,
+        normalized_request=_normalized_request(risk_mode="none"),
+    )
+
+    assert result.telemetry.cartesian_combinations == 289_254_654_976
+    assert result.telemetry.combo_chunks_processed == 0
+    assert result.telemetry.exact_candidates_evaluated == 289_254_654_976
+    assert result.telemetry.combo_iteration_mode == "ordinal_streaming_pass_through"
+
+
+def test_legacy_product_helper_rejects_large_grids_before_product(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden_product(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("itertools.product must not run for large full jobs")
+
+    monkeypatch.setattr(combo_planning_module.itertools, "product", forbidden_product)
+    local_row_pools = {
+        f"indicator_{index}": np.arange(196, dtype=np.int32)
+        for index in range(5)
+    }
+
+    with pytest.raises(ValueError, match="small reference grids"):
+        next(
+            iter_combo_chunks(
+                indicator_ids=tuple(local_row_pools),
+                local_row_pools=local_row_pools,
+                chunk_size=4096,
+            )
+        )
 
 
 def test_build_proxy_context_pass_through_avoids_heavy_arrays() -> None:
@@ -293,6 +350,40 @@ def test_active_generic_n_proxy_filter_uses_eval_stack_and_min_confirm() -> None
     assert filter_result.proxy is not None
     assert filter_result.confirm.tolist() == [2, 2]
     assert filter_result.proxy.tolist() == pytest.approx([3.0, 1.0])
+
+
+def _large_prepared_result(*, arity: int, row_count: int) -> BacktestPreparePoolsResult:
+    indicator_ids = tuple(f"indicator_{index}" for index in range(arity))
+    pools = tuple(
+        _pool(
+            indicator_id=indicator_id,
+            trade_rows=[[1] for _ in range(row_count)],
+            eval_rows=[[1] for _ in range(row_count)],
+        )
+        for indicator_id in indicator_ids
+    )
+    return BacktestPreparePoolsResult(
+        timeframe="15m",
+        indicator_ids=indicator_ids,
+        indicator_pools=pools,
+        signal_returns_15m=np.asarray([1.0], dtype=np.float32),
+        execution_mapping=PreparedExecutionMapping(
+            signal_entry_exec_idx_15m=np.asarray([1], dtype=np.int32),
+            run_bar_open_1m_idx_15m=np.asarray([0], dtype=np.uint32),
+            run_bar_close_1m_idx_15m=np.asarray([1], dtype=np.uint32),
+            t_exec_limit_1m=1,
+        ),
+        time_slice_start_15m=0,
+        time_slice_stop_15m=1,
+        trade_T_length=1,
+        eval_T_length=1,
+        row_metadata_order_hash="l" * 64,
+        timing=PreparePoolsTiming(
+            stage_name="prepare_pools_core",
+            wall_time_s=0.0,
+            subsegments={"prepare_pools_core": 0.0},
+        ),
+    )
 
 
 def _prepared_result(*, indicator_ids: Sequence[str]) -> BacktestPreparePoolsResult:

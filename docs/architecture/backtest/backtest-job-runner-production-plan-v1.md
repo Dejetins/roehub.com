@@ -125,6 +125,10 @@ Claim semantics:
 Scheduling semantics:
 
 - preflight сохраняет additive metadata `request_json.scheduling`;
+- metadata включает `scheduling_class`,
+  `estimated_combinations_upper_bound`, `estimated_combinations`, `arity`,
+  per-indicator row upper bounds, `risk_mode`, requested range и requested
+  `top_n`;
 - `scheduling_class=heavy` используется для obvious-heavy jobs и для старых/
   неизвестных rows без scheduling metadata;
 - `scheduling_class=light_candidate` означает только bounded preflight estimate,
@@ -314,7 +318,12 @@ Planned env/config keys:
 - `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=2`;
 - `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`;
 - `ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS=50000`;
+- `ROEHUB_BACKTEST_LIGHT_MAX_COMBINATIONS=50000` may be used as the shorter
+  alias for the same preflight light threshold;
 - `ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS=50000`;
+- `ROEHUB_BACKTEST_NUMBA_NUM_THREADS=<host default override>`;
+- `ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS=2`;
+- `ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS=<full host budget>`;
 - `ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS=10` remains parent lifecycle
   accounting only; it is not the primary full-job memory-release strategy;
 - `ROEHUB_BACKTEST_RUNNER_METRICS_PORT=9204`;

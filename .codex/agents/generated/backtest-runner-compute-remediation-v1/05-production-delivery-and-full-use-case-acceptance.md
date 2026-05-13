@@ -66,6 +66,8 @@ style_references:
 
 hard_requirements:
   direct_main_delivery_required: true
+  github_yeet_publish_required_for_local_changes: true
+  no_pr_delivery_required: true
   local_gates_before_publish_required: true
   ci_green_required: true
   macstudio_sync_required: true
@@ -93,11 +95,19 @@ task_toggles:
   implementation_changes_allowed: false
   fix_introduced_failures_allowed: true
   publish_after_success: true
+  publish_via_github_yeet: true
+  direct_main_push_for_scoped_fixes: true
+  merge_to_main_required: true
+  deploy_to_macstudio_required: true
   run_browser_if_ui_visible: true
   run_macstudio_benchmark: true
   run_mixed_scheduler_smoke: true
 
 skill_routing:
+  - skill: github:yeet
+    use_when: "local scoped changes or introduced blocker fixes need publication before final main delivery"
+    timing: after local gates and before `publish-ci-deploy`
+    reason: "safe scope inspection, intentional commit, direct main push, and no unrelated staging"
   - skill: publish-ci-deploy
     use_when: "local gates and benchmark prerequisites are ready for delivery"
     timing: before ship
@@ -137,6 +147,9 @@ required_literals:
   - "backtest_runner_tasks_claimed_total"
   - "backtest_runner_last_success_unixtime"
   - "publish-ci-deploy"
+  - "github:yeet"
+  - "git push origin main"
+  - "origin/main"
   - "git pull --ff-only"
   - "benchmark_results.json"
   - "benchmark_summary.md"
@@ -201,6 +214,8 @@ quality_gates:
     expect: "passes"
   - cmd: "uv run python -m tools.docs.generate_docs_index --check"
     expect: "passes"
+  - cmd: "gh --version && gh auth status"
+    expect: "passes before `github:yeet` publication when local changes exist, or publish blocker is reported"
 
 expected_primary_touches:
   - "none unless fixing introduced delivery blockers"
@@ -258,7 +273,10 @@ Benchmark acceptance must use the same May 2 benchmark family, but the single he
 - Verify worktree scope before staging or publishing.
 - Preserve unrelated dirty files.
 - Run local gates before publishing.
+- If local scoped changes or introduced blocker fixes exist, use `github:yeet` discipline first: inspect `git status -sb`, stage only intended files, commit, run relevant checks, and push directly to `main`/`origin/main`.
+- Do not use `git add -A` when the worktree contains unrelated changes.
 - Use `publish-ci-deploy` for the end-to-end delivery flow.
+- Verify the accepted commit is on `origin/main`; if there are no local changes to publish, verify the intended commit is already on `origin/main` before deployment.
 - Watch CI/deploy to green and fix introduced failures.
 - Sync Mac Studio checkout and runtime; verify actual deployed code identity.
 - Reload services through repository scripts/runbook.
@@ -344,6 +362,7 @@ Do not convert this manifest into a broad mandatory reading list.
 
 Skill routing for this task:
 
+- `github:yeet`: use for scoped local changes or introduced blocker fixes before main delivery; stage only intended files, commit, and push directly to `main`/`origin/main`.
 - `publish-ci-deploy`: use for delivery, CI watch, Mac Studio sync, deploy, and post-deploy verification.
 - `backend-performance-evidence`: use for benchmark, CPU/RSS, and latency evidence.
 - `root-cause-debugging`: use if any gate, service, benchmark, or UI/API smoke fails.
@@ -354,18 +373,21 @@ Skill routing for this task:
 1. Verify prerequisite implementation and benchmark evidence exist.
 2. Inspect worktree and isolate intended changes only.
 3. Run local gates.
-4. Publish via `publish-ci-deploy`, watch CI/deploy, and fix introduced blockers.
-5. Sync Mac Studio and verify deployed runtime identity.
-6. Reload services and verify launchd/Monit/Prometheus state.
-7. Run final benchmark acceptance with the 140+ second heaviest job excluded and all other reference jobs included.
-8. Run controlled UI/API production smoke.
-9. Run mixed scheduler smoke for light parallelism and heavy FIFO.
-10. Verify full-job child memory release, lazy cache-miss child memory release, cache-hit bounded API memory, metrics, logs, and API responsiveness.
-11. Produce final Russian report with exact evidence and residual risks.
+4. If local changes exist, publish them with `github:yeet` discipline by committing and pushing directly to `main`/`origin/main`.
+5. Use `publish-ci-deploy` to watch CI/deploy and fix introduced blockers.
+6. Sync Mac Studio and verify deployed runtime identity.
+7. Reload services and verify launchd/Monit/Prometheus state.
+8. Run final benchmark acceptance with the 140+ second heaviest job excluded and all other reference jobs included.
+9. Run controlled UI/API production smoke.
+10. Run mixed scheduler smoke for light parallelism and heavy FIFO.
+11. Verify full-job child memory release, lazy cache-miss child memory release, cache-hit bounded API memory, metrics, logs, and API responsiveness.
+12. Produce final Russian report with exact evidence and residual risks.
 
 # Acceptance criteria (Definition of Done)
 
 - Local gates pass or unrelated pre-existing failures are clearly classified.
+- Local scoped changes, if any, are committed and pushed directly to `main`/`origin/main`, or the report states that there were no local changes to publish.
+- The accepted commit is present on `origin/main`.
 - CI/deploy is green.
 - Mac Studio has the intended commit/runtime files.
 - Runner service is loaded/running.
@@ -403,6 +425,9 @@ Skill routing for this task:
 
 - Use non-destructive git commands.
 - Do not revert unrelated user changes.
+- Do not silently stage unrelated files; `github:yeet` publication must stage only scoped changes unless the user explicitly confirms the whole worktree.
+- Use direct `main`/`origin/main` delivery here.
+- Direct main push via `github:yeet` is not itself production delivery; `publish-ci-deploy` must still watch CI/deploy, sync Mac Studio, and verify runtime smoke.
 - Do not claim production success before Mac Studio evidence.
 
 # Files to indicate (expected touched areas)
@@ -437,6 +462,7 @@ Possible secondary touches:
 - `uv run pyright`
 - `bash -n scripts/macos/bootstrap_native_prod.sh scripts/macos/reload_launchd_services.sh scripts/macos/smoke_prod.sh`
 - `uv run python -m tools.docs.generate_docs_index --check`
+- `gh --version && gh auth status` before `github:yeet` publication when local changes exist
 
 # Final output: report format (strict)
 

@@ -26,6 +26,9 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.ports.staged_runner import (
     BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
 )
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
+)
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactCoordinatesV2,
     artifact_market_id_from_coordinates_v2,
@@ -219,7 +222,12 @@ class BacktestPreflightService:
         coordinates = self._normalize_coordinates(payload=payload)
         timeframe = self._normalize_timeframe(payload=payload)
         time_range = self._normalize_time_range(payload=payload)
-        indicators, indicator_rows, candidate_combinations = self._normalize_indicators(
+        (
+            indicators,
+            indicator_rows,
+            candidate_combinations,
+            row_count_upper_bounds_by_indicator,
+        ) = self._normalize_indicators(
             payload=payload,
             guardrails=guardrails,
         )
@@ -261,6 +269,17 @@ class BacktestPreflightService:
             candidate_combinations=candidate_combinations,
             tp_sl_cells=tp_sl_cells,
             cost_class=_cost_class(candidate_combinations=candidate_combinations),
+            estimated_combinations_upper_bound=candidate_combinations,
+            estimated_combinations=candidate_combinations,
+            arity=len(indicators),
+            row_count_upper_bounds_by_indicator=row_count_upper_bounds_by_indicator,
+            risk_mode=str(risk["mode"]),
+            requested_range=time_range,
+            requested_top_n=top_n,
+            scheduling_class=_preflight_scheduling_class(
+                estimated_combinations_upper_bound=candidate_combinations,
+                arity=len(indicators),
+            ),
         )
         warnings = self._guardrail_warnings(
             cost_estimate=cost_estimate,
@@ -359,7 +378,7 @@ class BacktestPreflightService:
         *,
         payload: Mapping[str, Any],
         guardrails: BacktestRuntimeGuardrails,
-    ) -> tuple[list[dict[str, Any]], int, int]:
+    ) -> tuple[list[dict[str, Any]], int, int, dict[str, int]]:
         raw_indicators = payload.get("indicators")
         if not isinstance(raw_indicators, Sequence) or isinstance(
             raw_indicators,
@@ -394,6 +413,7 @@ class BacktestPreflightService:
         supported_ids = set(self.defaults_provider.supported_indicator_ids())
         normalized: list[dict[str, Any]] = []
         row_counts: list[int] = []
+        row_count_upper_bounds_by_indicator: dict[str, int] = {}
         for index, raw_indicator in enumerate(raw_indicators):
             path = f"indicators.{index}"
             if not isinstance(raw_indicator, Mapping):
@@ -426,6 +446,10 @@ class BacktestPreflightService:
             source_count = len(sources) if len(sources) > 0 else 1
             row_count = source_count * int(window["count"])
             row_counts.append(row_count)
+            row_count_key = indicator_id
+            if row_count_key in row_count_upper_bounds_by_indicator:
+                row_count_key = f"{indicator_id}#{index}"
+            row_count_upper_bounds_by_indicator[row_count_key] = row_count
             normalized.append(
                 {
                     "indicator_id": indicator_id,
@@ -442,7 +466,12 @@ class BacktestPreflightService:
         candidate_combinations = 1
         for row_count in row_counts:
             candidate_combinations *= row_count
-        return normalized, indicator_rows, candidate_combinations
+        return (
+            normalized,
+            indicator_rows,
+            candidate_combinations,
+            row_count_upper_bounds_by_indicator,
+        )
 
     def _normalize_sources(
         self,
@@ -1113,6 +1142,20 @@ def _cost_class(*, candidate_combinations: int) -> str:
     if candidate_combinations <= 50_000:
         return "medium"
     return "large"
+
+
+def _preflight_scheduling_class(
+    *,
+    estimated_combinations_upper_bound: int,
+    arity: int,
+) -> str:
+    if estimated_combinations_upper_bound <= 0:
+        return "heavy"
+    if arity <= 0:
+        return "heavy"
+    if estimated_combinations_upper_bound > DEFAULT_LIGHT_ESTIMATED_COMBINATIONS:
+        return "heavy"
+    return "light_candidate"
 
 
 def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:

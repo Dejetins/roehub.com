@@ -106,7 +106,11 @@ task_toggles:
   update_api_read_paths_if_needed: true
   update_tests: true
   run_macstudio_memory_smoke: false
-  publish_after_success: false
+  publish_after_success: true
+  publish_via_github_yeet: true
+  direct_main_push_after_local_gates: true
+  merge_to_main_in_this_prompt: true
+  deploy_to_macstudio_in_this_prompt: true
 
 skill_routing:
   - skill: architecture-design
@@ -129,6 +133,14 @@ skill_routing:
     use_when: "changing cache schema, lazy detail DTOs, endpoint response behavior, task statuses, or config keys"
     timing: before final report
     reason: "cache-hit behavior is externally visible through results/detail endpoints"
+  - skill: github:yeet
+    use_when: "local gates pass and scoped lazy-memory changes should be published for review"
+    timing: after verification and before host delivery
+    reason: "safe scope inspection, intentional commit, direct main push, and no unrelated staging"
+  - skill: publish-ci-deploy
+    use_when: "direct main push is complete and updates must be delivered to Mac Studio"
+    timing: after `github:yeet` publish
+    reason: "CI/deploy watch, Mac Studio sync, service reload, and production smoke"
 
 target_envs:
   - local-dev
@@ -160,6 +172,11 @@ required_literals:
   - "physical footprint"
   - "queued -> running -> completed"
   - "127.0.0.1:9204/metrics"
+  - "github:yeet"
+  - "git push origin main"
+  - "origin/main"
+  - "publish-ci-deploy"
+  - "git pull --ff-only"
 
 non_goals:
   - "Do not change scoring semantics or lazy trades parity."
@@ -168,6 +185,7 @@ non_goals:
   - "Do not require browser/UI redesign for this runtime fix."
   - "Do not run final Mac Studio benchmark acceptance in this prompt; prompt 04 owns acceptance evidence."
   - "Do not use the single 140+ second heaviest benchmark job in any required benchmark or smoke check."
+  - "Do not stop at local gates; direct `main`/`origin/main` delivery and Mac Studio smoke are required after gates pass."
 
 final_report_format:
   language: ru
@@ -181,6 +199,9 @@ final_report_format:
     - "Tests"
     - "Contract impact"
     - "Risks"
+    - "Publish"
+    - "CI/deploy"
+    - "Mac Studio delivery"
     - "Next prompt"
 
 quality_gates:
@@ -192,6 +213,8 @@ quality_gates:
     expect: "passes or unrelated pre-existing failures classified"
   - cmd: "uv run python -m tools.docs.generate_docs_index --check"
     expect: "passes if docs changed"
+  - cmd: "gh --version && gh auth status"
+    expect: "passes before `github:yeet` publication, or publish blocker is reported"
 
 expected_primary_touches:
   - "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py"
@@ -398,6 +421,8 @@ Skill routing for this task:
 - `root-cause-debugging`: use if child execution, cache identity, or endpoint memory behavior fails.
 - `backend-quality-gates`: use during verification for uv-based tests/lint/type checks.
 - `contract-impact-analysis`: use before final report if cache schema, DTO, status, or config behavior changes.
+- `github:yeet`: use after local gates for scope inspection, selective staging, commit, and direct push to `main`/`origin/main`.
+- `publish-ci-deploy`: use after direct main push to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload services, and smoke production.
 
 1. Confirm the current lazy cache miss and cache hit paths.
 2. Design the minimal lazy child-process contract and parent supervision behavior.
@@ -407,6 +432,10 @@ Skill routing for this task:
 6. Add tests for child terminal behavior, bounded read behavior, owner checks before cache read, and backward compatibility/miss handling.
 7. Run focused gates and classify any unrelated failures.
 8. Leave Mac Studio memory-release benchmark acceptance to prompt 04, but make the implementation expose enough evidence hooks for it.
+9. Inspect `git status -sb` and the scoped diff before publication.
+10. If gates pass and the worktree scope is clean enough, use `github:yeet` discipline to stage only intended files, commit, and push directly to `main`/`origin/main`.
+11. Use `publish-ci-deploy` to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload the affected services, and run the required smoke checks.
+12. If the worktree is mixed, `gh` is missing, or `gh auth status` fails, stop publication and report the exact blocker without publishing.
 
 # Acceptance criteria (Definition of Done)
 
@@ -425,6 +454,8 @@ Skill routing for this task:
 - Tests or static assertions prove `LocalFileBacktestLazyTradesCache.read` full-payload loading is not used by public API cache-hit paths.
 - Prompt 04 can measure cache miss child RSS and API cache-hit retained RSS separately.
 - Docs cleanup evidence proves active docs no longer describe in-process lazy cache miss or full-detail cache-hit loading as current behavior.
+- Scoped changes are committed and pushed directly to `main`/`origin/main` after local gates, or a precise publication blocker is reported.
+- Mac Studio is synchronized from `main` with `git pull --ff-only`, affected services are reloaded, and smoke evidence is reported.
 
 # Implementation constraints
 
@@ -448,6 +479,12 @@ Skill routing for this task:
 - The hard memory-release guarantee comes from child exit, not from `gc.collect()`.
 - API cache-hit memory must be bounded by page/chunk size, not by total trades count.
 - Avoid high-cardinality metrics labels.
+
+## Delivery safety
+
+- Push directly to `main`/`origin/main` only after local gates pass and scoped staging is confirmed.
+- Do not use `git add -A` in a mixed worktree; stage only intended scoped files.
+- CI watch, Mac Studio sync, service reload, and smoke evidence are part of this prompt's delivery step.
 
 # Files to indicate (expected touched areas)
 
@@ -475,6 +512,7 @@ Possible secondary touches:
 - Do not make cache miss synchronous in API.
 - Do not run final Mac Studio acceptance here.
 - Do not use the single 140+ second heaviest benchmark job in any required check.
+- Do not stop at local gates without direct `main`/`origin/main` delivery and Mac Studio smoke.
 
 # Quality gates (must run and pass)
 
@@ -482,6 +520,7 @@ Possible secondary touches:
 - `uv run ruff check apps/api apps/worker src/trading/contexts/backtest tests/unit/apps/api tests/unit/apps/worker tests/unit/contexts/backtest`
 - `uv run pyright`
 - `uv run python -m tools.docs.generate_docs_index --check` if docs changed
+- `gh --version && gh auth status` before `github:yeet` publication
 
 # Final output: report format (strict)
 
@@ -494,6 +533,9 @@ Write the final report in Russian with these sections:
 - `Tests`
 - `Contract impact`
 - `Risks`
+- `Publish`
+- `CI/deploy`
+- `Mac Studio delivery`
 - `Next prompt`
 
-Include exact commands run, pass/fail status, and any pre-existing unrelated failures.
+Include exact commands run, pass/fail status, any pre-existing unrelated failures, main push commit SHA, and Mac Studio delivery evidence.

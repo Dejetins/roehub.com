@@ -115,7 +115,11 @@ task_toggles:
   run_macstudio_benchmark: true
   run_mixed_scheduler_smoke: true
   fix_introduced_benchmark_failures_allowed: true
-  publish_after_success: false
+  publish_after_success: true
+  publish_via_github_yeet: true
+  direct_main_push_after_local_gates: true
+  merge_to_main_in_this_prompt: true
+  deploy_to_macstudio_in_this_prompt: true
 
 skill_routing:
   - skill: backend-performance-evidence
@@ -138,6 +142,14 @@ skill_routing:
     use_when: "benchmark script requires API, DTO, telemetry, persistence, or config changes"
     timing: before final report
     reason: "evidence changes must not silently alter public runtime contracts"
+  - skill: github:yeet
+    use_when: "benchmark artifacts and any benchmark harness fixes are complete and should be published for final delivery review"
+    timing: after Mac Studio benchmark evidence and local gates
+    reason: "safe scope inspection, intentional commit, direct main push, and no unrelated staging"
+  - skill: publish-ci-deploy
+    use_when: "direct main push is complete and benchmark artifacts must be delivered to Mac Studio"
+    timing: after `github:yeet` publish
+    reason: "CI/deploy watch, Mac Studio sync, service reload, and production smoke"
 
 target_envs:
   - local-dev
@@ -173,6 +185,11 @@ required_literals:
   - "docs drift audit"
   - "historical_prefix_compatible"
   - "MacStudioDaniil"
+  - "github:yeet"
+  - "git push origin main"
+  - "origin/main"
+  - "publish-ci-deploy"
+  - "git pull --ff-only"
 
 non_goals:
   - "Do not invent new benchmark parameters as primary acceptance."
@@ -186,6 +203,7 @@ non_goals:
   - "Do not claim memory release from `gc.collect()` alone; child process exit evidence is required."
   - "Do not accept benchmark success if old in-process/full-detail production paths remain reachable."
   - "Do not accept benchmark success if active docs still describe removed paths as current production behavior."
+  - "Do not stop at local gates; direct `main`/`origin/main` delivery and Mac Studio smoke are required after gates pass."
 
 final_report_format:
   language: ru
@@ -204,6 +222,9 @@ final_report_format:
     - "Artifacts"
     - "Contract impact"
     - "Risks"
+    - "Publish"
+    - "CI/deploy"
+    - "Mac Studio delivery"
     - "Next prompt"
 
 quality_gates:
@@ -217,6 +238,8 @@ quality_gates:
     expect: "passes"
   - cmd: "uv run python -m tools.docs.generate_docs_index --check"
     expect: "passes"
+  - cmd: "gh --version && gh auth status"
+    expect: "passes before `github:yeet` publication, or publish blocker is reported"
 
 expected_primary_touches:
   - "scripts/backtest/run_api_runner_benchmark_parity.py"
@@ -373,6 +396,8 @@ Skill routing for this task:
 - `numba`: use if thread/JIT/parallel diagnostics are needed.
 - `backend-quality-gates`: use for test/lint/type/docs gates.
 - `contract-impact-analysis`: use if script work requires runtime contract changes.
+- `github:yeet`: use after Mac Studio evidence and local gates for scope inspection, selective staging, commit, and direct push to `main`/`origin/main`.
+- `publish-ci-deploy`: use after direct main push to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload services, and smoke production.
 
 1. Reconstruct the Iteration 8 benchmark fixture and required metadata from existing docs/scripts.
 2. Design the API-runner benchmark flow and identify how it waits for job state and reads top results.
@@ -384,6 +409,10 @@ Skill routing for this task:
 8. Compare parity and stage results against the May 2 accepted reference excluding only the recorded 140+ second heaviest job.
 9. Report scheduler and memory-release evidence separately from canonical compute parity.
 10. Stop on blocker if Mac Studio evidence is unavailable or non-comparable.
+11. Inspect `git status -sb` and the scoped diff before publication.
+12. If benchmark evidence and gates pass, use `github:yeet` discipline to stage only intended files, commit, and push directly to `main`/`origin/main`.
+13. Use `publish-ci-deploy` to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload the affected services, and run the required smoke checks.
+14. If the worktree is mixed, `gh` is missing, or `gh auth status` fails, stop publication and report the exact blocker without publishing.
 
 # Acceptance criteria (Definition of Done)
 
@@ -407,6 +436,8 @@ Skill routing for this task:
 - Docs drift audit proves active docs no longer describe removed paths as current production behavior.
 - The benchmark records whether light/heavy overlap is disabled or explicitly benchmark-enabled.
 - Performance comparisons respect benchmark README comparability rules.
+- Scoped benchmark/script/docs changes are committed and pushed directly to `main`/`origin/main` after acceptance evidence, or a precise publication blocker is reported.
+- Mac Studio is synchronized from `main` with `git pull --ff-only`, affected services are reloaded, and smoke evidence is reported.
 
 # Implementation constraints
 
@@ -427,6 +458,12 @@ Skill routing for this task:
 - Mac Studio evidence is acceptance.
 - Local evidence is developer evidence.
 - Missing artifacts/config are blockers, not success.
+
+## Delivery safety
+
+- Push directly to `main`/`origin/main` only after local gates pass and scoped staging is confirmed.
+- Do not use `git add -A` in a mixed worktree; stage only intended scoped files.
+- CI watch, Mac Studio sync, service reload, and smoke evidence are part of this prompt's delivery step.
 
 # Files to indicate (expected touched areas)
 
@@ -454,7 +491,7 @@ Possible secondary touches:
 - Do not claim memory release from `gc.collect()` alone.
 - Do not accept benchmark success if the old production in-process compute, old full-detail cache loader, or old large-grid Cartesian iterator remains reachable.
 - Do not accept benchmark success if stale docs still describe those removed paths as active/current production behavior.
-- Do not publish/deploy in this prompt unless explicitly instructed.
+- Do not stop at local gates without direct `main`/`origin/main` delivery and Mac Studio smoke.
 
 # Quality gates (must run and pass)
 
@@ -463,6 +500,7 @@ Possible secondary touches:
 - `uv run pyright`
 - `uv run python scripts/backtest/validate_benchmark_accounting.py --out docs/architecture/backtest/benchmark_iterations/<new_iteration_dir>/local_accounting_validation.json`
 - `uv run python -m tools.docs.generate_docs_index --check`
+- `gh --version && gh auth status` before `github:yeet` publication
 
 # Final output: report format (strict)
 
@@ -479,6 +517,9 @@ Write the final report in Russian with these sections:
 - `Artifacts`
 - `Contract impact`
 - `Risks`
+- `Publish`
+- `CI/deploy`
+- `Mac Studio delivery`
 - `Next prompt`
 
-Include exact benchmark folder path, command lines, commit SHA, Mac Studio host, and pass/fail decision.
+Include exact benchmark folder path, command lines, commit SHA, Mac Studio host, pass/fail decision, main push commit SHA, and Mac Studio delivery evidence.

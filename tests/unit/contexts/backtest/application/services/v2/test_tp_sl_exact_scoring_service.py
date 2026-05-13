@@ -364,7 +364,7 @@ def test_tp_sl_self_check_fails_fast_on_best_cell_drift(
         )
 
 
-def test_tp_sl_heap_uses_benchmark_top_k_and_not_request_top_n(
+def test_tp_sl_heap_uses_request_top_n_and_not_benchmark_top_k(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     prepared = _prepared_result(
@@ -392,15 +392,15 @@ def test_tp_sl_heap_uses_benchmark_top_k_and_not_request_top_n(
 
     assert result.telemetry.request_top_n == 100
     assert result.telemetry.benchmark_top_k == 3
-    assert result.telemetry.heap_capacity == 3
-    assert result.telemetry.top_results_count == 3
+    assert result.telemetry.heap_capacity == 100
+    assert result.telemetry.top_results_count == 6
     assert [
         (
             top.score,
             top.metrics["best_tp_pct"],
             dict(top.indicator_rows),
         )
-        for top in result.top_results
+        for top in result.top_results[:3]
     ] == [
         (5.0, pytest.approx(10.0), {"alpha": 0, "beta": 2}),
         (5.0, pytest.approx(2.0), {"alpha": 0, "beta": 1}),

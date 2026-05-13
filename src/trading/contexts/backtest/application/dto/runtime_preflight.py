@@ -164,13 +164,43 @@ class BacktestCostEstimate:
     candidate_combinations: int
     tp_sl_cells: int
     cost_class: str
+    estimated_combinations_upper_bound: int | None = None
+    estimated_combinations: int | None = None
+    arity: int | None = None
+    row_count_upper_bounds_by_indicator: JsonMapping | None = None
+    risk_mode: str | None = None
+    requested_range: JsonMapping | None = None
+    requested_top_n: int | None = None
+    scheduling_class: str | None = None
 
-    def as_mapping(self) -> dict[str, int | str]:
+    def as_mapping(self) -> dict[str, Any]:
+        estimated_upper_bound = (
+            self.candidate_combinations
+            if self.estimated_combinations_upper_bound is None
+            else self.estimated_combinations_upper_bound
+        )
+        estimated_combinations = (
+            self.candidate_combinations
+            if self.estimated_combinations is None
+            else self.estimated_combinations
+        )
         return {
             "indicator_rows": self.indicator_rows,
             "candidate_combinations": self.candidate_combinations,
             "tp_sl_cells": self.tp_sl_cells,
             "cost_class": self.cost_class,
+            "estimated_combinations_upper_bound": estimated_upper_bound,
+            "estimated_combinations": estimated_combinations,
+            "arity": self.arity,
+            "row_count_upper_bounds_by_indicator": dict(
+                self.row_count_upper_bounds_by_indicator or {}
+            ),
+            "risk_mode": self.risk_mode,
+            "requested_range": None
+            if self.requested_range is None
+            else dict(self.requested_range),
+            "requested_top_n": self.requested_top_n,
+            "scheduling_class": self.scheduling_class,
         }
 
 

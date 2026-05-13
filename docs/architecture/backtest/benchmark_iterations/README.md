@@ -21,6 +21,21 @@
 Benchmark вне `Mac Studio` не считается acceptance evidence. Локальные docs/static
 checks можно записывать как developer evidence, но не как acceptance benchmark.
 
+Для hot-path replacement итераций evidence дополнительно должен явно фиксировать:
+
+- `combo_iteration_mode` (`ordinal_streaming_pass_through` или active proxy
+  ordinal mode);
+- отсутствие large-grid route через legacy `itertools.product` helper;
+- production heap/result capacity из `request.top_n`, отдельно от
+  `benchmark_top_k = 5`;
+- effective `NUMBA_NUM_THREADS` и источник backtest-specific config
+  (`ROEHUB_BACKTEST_NUMBA_NUM_THREADS`,
+  `ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS`,
+  `ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS`);
+- если prompt требует `exclude_heaviest_140s_job`, heaviest reference job
+  исключается только из optional/local checks; все остальные reference jobs
+  остаются required для Mac Studio acceptance.
+
 ## Канонический baseline
 
 - Notebook baseline:
@@ -96,9 +111,12 @@ uv run python scripts/backtest/validate_benchmark_accounting.py \
   --out docs/architecture/backtest/benchmark_iterations/<iteration>/local_accounting_validation.json
 ```
 
-Она проверяет, что `request.top_n = 100`, `benchmark_top_k = 5`,
+Для historical canonical benchmark fixtures она проверяет, что
+`request.top_n = 100`, `benchmark_top_k = 5`,
 `sample_warmup_top_k = 1`, `top_results_count = 5` и heap capacity записаны как
-benchmark metadata, что notebook `prepare_pools` нормализован в
+benchmark metadata, not production result capacity. Для production evidence
+дополнительно проверяется `request.top_n`/heap capacity текущего public contract.
+Также проверяется, что notebook `prepare_pools` нормализован в
 `prepare_pools_core`, а `service_total_without_warmup` и другие service-only
 поля не попадают в canonical stage comparison.
 
@@ -159,6 +177,13 @@ YYYY-MM-DD_iteration_<n>_<short_name>/README.md
 - Execution settings:
 - Ranking:
 - Top N:
+- Production Top N:
+- Benchmark Top K:
+- Scheduling class:
+- Estimated combinations upper bound:
+- Numba threads:
+- Legacy large Cartesian path:
+- Excluded optional jobs:
 
 ## Environment
 

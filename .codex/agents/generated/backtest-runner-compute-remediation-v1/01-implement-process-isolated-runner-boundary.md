@@ -102,7 +102,11 @@ task_toggles:
   add_light_heavy_scheduler_policy: true
   update_runbook_if_needed: true
   run_macstudio_smoke: false
-  publish_after_success: false
+  publish_after_success: true
+  publish_via_github_yeet: true
+  direct_main_push_after_local_gates: true
+  merge_to_main_in_this_prompt: true
+  deploy_to_macstudio_in_this_prompt: true
 
 skill_routing:
   - skill: architecture-design
@@ -121,6 +125,14 @@ skill_routing:
     use_when: "changing job states, metrics names, config keys, persistence fields, or lazy detail status behavior"
     timing: before final report
     reason: "process isolation must remain a compatible runtime workflow change"
+  - skill: github:yeet
+    use_when: "scoped implementation/docs changes pass local gates and are ready to publish"
+    timing: after local gates and before host delivery
+    reason: "safe scope inspection, intentional commit, direct main push, and no unrelated staging"
+  - skill: publish-ci-deploy
+    use_when: "direct main push is complete and updates must be delivered to Mac Studio"
+    timing: after `github:yeet` publish
+    reason: "CI/deploy watch, Mac Studio sync, service reload, and production smoke"
 
 target_envs:
   - local-dev
@@ -153,6 +165,11 @@ required_literals:
   - "estimated_combinations_upper_bound"
   - "ROEHUB_BACKTEST_LIGHT_CONCURRENCY"
   - "ROEHUB_BACKTEST_HEAVY_CONCURRENCY"
+  - "github:yeet"
+  - "git push origin main"
+  - "origin/main"
+  - "publish-ci-deploy"
+  - "git pull --ff-only"
 
 non_goals:
   - "Do not move long-running compute back into `com.roehub.api`."
@@ -163,6 +180,7 @@ non_goals:
   - "Do not change public jobs API DTO vocabulary unless a blocker proves it necessary."
   - "Do not run final Mac Studio benchmark acceptance; that belongs to the benchmark prompt."
   - "Do not implement lazy trades cache-miss child execution or cache-hit bounded readers here; that belongs to prompt 03."
+  - "Do not stop at local gates; direct `main`/`origin/main` delivery and Mac Studio smoke are required after gates pass."
 
 final_report_format:
   language: ru
@@ -176,6 +194,9 @@ final_report_format:
     - "Tests"
     - "Contract impact"
     - "Risks"
+    - "Publish"
+    - "CI/deploy"
+    - "Mac Studio delivery"
     - "Next prompt"
 
 quality_gates:
@@ -189,6 +210,8 @@ quality_gates:
     expect: "passes if shell files changed"
   - cmd: "uv run python -m tools.docs.generate_docs_index --check"
     expect: "passes if docs changed"
+  - cmd: "gh --version && gh auth status"
+    expect: "passes before `github:yeet` publication, or publish blocker is reported"
 
 expected_primary_touches:
   - "apps/worker/backtest_job_runner/**"
@@ -400,6 +423,8 @@ Skill routing for this task:
 - `root-cause-debugging`: use if runner, child, lease, or Monit behavior cannot be reproduced or localized.
 - `backend-quality-gates`: use during verification for uv-based tests/lint/type checks.
 - `contract-impact-analysis`: use before final report if any externally relied-on behavior changes.
+- `github:yeet`: use after local gates for scope inspection, selective staging, commit, and direct push to `main`/`origin/main`.
+- `publish-ci-deploy`: use after direct main push to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload services, and smoke production.
 
 1. Verify current API create remains enqueue-only.
 2. Design the minimal parent/child process contract and record assumptions in code comments or nearby docs only where useful.
@@ -411,6 +436,8 @@ Skill routing for this task:
 8. Adjust Monit/service behavior so launchd/Monit supervise parent liveness, not child compute responsiveness.
 9. Add focused unit tests around success/failure/reclaim/lease/scheduling behavior.
 10. Run required quality gates and classify any unrelated pre-existing failures.
+11. If gates pass and the scoped diff is isolated, use `github:yeet` discipline to stage only intended files, commit, and push directly to `main`/`origin/main`.
+12. Use `publish-ci-deploy` to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload the affected services, and run the required smoke checks.
 
 # Acceptance criteria (Definition of Done)
 
@@ -434,6 +461,8 @@ Skill routing for this task:
 - Tests or static assertions prove production runner wiring does not construct the full compute service graph in the parent.
 - Grep/static check proves `BacktestRuntimeJobOrchestrationService` is reachable from child entrypoint/direct benchmark/test code only, not from production parent service composition.
 - Docs cleanup evidence proves active docs no longer describe the removed parent in-process compute path as current production behavior.
+- Scoped changes are committed and pushed directly to `main`/`origin/main` after local gates, unless worktree scope is mixed or `gh`/GitHub auth is blocked.
+- Mac Studio is synchronized from `main` with `git pull --ff-only`, affected services are reloaded, and smoke evidence is reported.
 
 # Implementation constraints
 
@@ -479,6 +508,8 @@ Possible secondary touches:
 - Do not run final production benchmark acceptance here.
 - Do not move compute back into API.
 - Do not process old queued jobs as acceptance evidence.
+- Do not stop at local gates without direct `main`/`origin/main` delivery and Mac Studio smoke.
+- Do not use `git add -A` when the worktree contains unrelated changes; follow `github:yeet` selective staging rules.
 
 # Quality gates (must run and pass)
 
@@ -487,6 +518,7 @@ Possible secondary touches:
 - `uv run pyright`
 - `bash -n scripts/macos/bootstrap_native_prod.sh scripts/macos/reload_launchd_services.sh scripts/macos/smoke_prod.sh` if shell files changed
 - `uv run python -m tools.docs.generate_docs_index --check` if docs changed
+- `gh --version` and `gh auth status` before `github:yeet` publish
 
 # Final output: report format (strict)
 
@@ -498,6 +530,9 @@ Write the final report in Russian with these sections:
 - `Tests`
 - `Contract impact`
 - `Risks`
+- `Publish`
+- `CI/deploy`
+- `Mac Studio delivery`
 - `Next prompt`
 
-Include exact commands run, pass/fail status, and any pre-existing unrelated failures.
+Include exact commands run, pass/fail status, main push commit SHA, Mac Studio delivery evidence, and any pre-existing unrelated failures.

@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence, cast
 import numpy as np
 import pytest
 
+import trading.contexts.backtest.application.services.v2.combo_planning as combo_planning_module
 import trading.contexts.backtest.application.services.v2.no_risk_exact as no_risk_exact_module
 from trading.contexts.backtest.application.dto import (
     BacktestComboPlanningResult,
@@ -73,7 +74,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
         normalized_request=_normalized_request(top_n=100),
     )
 
-    assert len(result.top_results) == 5
+    assert len(result.top_results) == 12
     assert result.top_results[0].rank == 1
     assert result.top_results[0].score == pytest.approx(2.970297029702987)
     assert dict(result.top_results[0].indicator_rows) == {
@@ -95,8 +96,8 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     }
     assert result.telemetry.request_top_n == 100
     assert result.telemetry.benchmark_top_k == 5
-    assert result.telemetry.heap_capacity == 5
-    assert result.telemetry.top_results_count == 5
+    assert result.telemetry.heap_capacity == 100
+    assert result.telemetry.top_results_count == 12
     assert result.telemetry.exact_candidates_evaluated == 12
     assert result.telemetry.risk_mode == "none"
     assert result.telemetry.direction_mode == "long_short_reversal"
@@ -113,6 +114,9 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     }
     assert result.telemetry.metric_names == NO_RISK_METRIC_NAMES
     assert set(result.telemetry.sample_metrics or {}) == set(NO_RISK_METRIC_NAMES)
+    assert result.telemetry.numba_num_threads is not None
+    assert result.telemetry.numba_num_threads > 0
+    assert result.telemetry.numba_thread_source
     assert result.self_check.status == NO_RISK_SELF_CHECK_NOT_RUN_STATUS
     assert result.memory_cleanup_evidence.result_is_compact is True
     assert result.memory_cleanup_evidence.cleanup_duration_s is not None
@@ -121,31 +125,75 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     mapping = result.as_mapping()
     assert mapping["telemetry"]["request_top_n"] == 100
     assert mapping["telemetry"]["benchmark_top_k"] == 5
-    assert mapping["telemetry"]["top_results_count"] == 5
-    assert len(mapping["top_results"]) == 5
+    assert mapping["telemetry"]["top_results_count"] == 12
+    assert len(mapping["top_results"]) == 12
     assert mapping["telemetry"]["backend_logical_name"] == "event_segments_3_no_risk"
     assert mapping["telemetry"]["backend_implementation_id"] == EVENT_SEGMENTS_N_NO_RISK_BACKEND
     assert set(mapping["telemetry"]["sample_metrics"]) == set(NO_RISK_METRIC_NAMES)
+    assert mapping["telemetry"]["numba_num_threads"] == result.telemetry.numba_num_threads
+    assert mapping["telemetry"]["numba_thread_source"] == result.telemetry.numba_thread_source
     assert mapping["memory_cleanup_evidence"]["result_is_compact"] is True
     assert mapping["memory_cleanup_evidence"]["cleanup_duration_s"] >= 0.0
 
 
-def test_no_risk_heap_capacity_uses_benchmark_top_k_not_request_top_n() -> None:
+def test_no_risk_heap_capacity_uses_request_top_n_not_benchmark_top_k() -> None:
     prepared = _prepared_result(indicator_ids=("alpha", "beta", "gamma"))
     result = BacktestNoRiskExactScoringService(
         config=BacktestNoRiskExactConfig(benchmark_top_k=1, default_request_top_n=100),
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=4),
     )
 
-    assert result.telemetry.request_top_n == 100
+    assert result.telemetry.request_top_n == 4
     assert result.telemetry.benchmark_top_k == 1
-    assert result.telemetry.heap_capacity == 1
+    assert result.telemetry.heap_capacity == 4
     assert result.telemetry.exact_candidates_evaluated == 12
-    assert result.telemetry.top_results_count == 1
-    assert len(result.top_results) == 1
+    assert result.telemetry.top_results_count == 4
+    assert len(result.top_results) == 4
+
+
+def test_no_risk_request_top_n_50_can_return_50_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _many_rows_prepared_result(row_count=8)
+    _patch_exact_scores(monkeypatch, scores=tuple(float(index) for index in range(64)))
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(benchmark_top_k=5, default_request_top_n=50),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(top_n=50),
+    )
+
+    assert result.telemetry.request_top_n == 50
+    assert result.telemetry.benchmark_top_k == 5
+    assert result.telemetry.heap_capacity == 50
+    assert result.telemetry.exact_candidates_evaluated == 64
+    assert result.telemetry.top_results_count == 50
+    assert len(result.top_results) == 50
+
+
+def test_no_risk_large_selected_batches_do_not_enter_legacy_product(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden_product(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("itertools.product must not run for large full jobs")
+
+    monkeypatch.setattr(combo_planning_module.itertools, "product", forbidden_product)
+    prepared = _large_prepared_result(arity=5, row_count=196)
+    batch = next(
+        no_risk_exact_module._iter_selected_candidate_batches(
+            prepared_result=prepared,
+            combo_planning_result=_combo_planning_result(prepared=prepared),
+        )
+    )
+
+    assert no_risk_exact_module._selected_size(batch.rows_by_indicator) == 4096
+    assert batch.rows_by_indicator["indicator_0"][:3].tolist() == [0, 0, 0]
+    assert batch.rows_by_indicator["indicator_4"][:3].tolist() == [0, 1, 2]
 
 
 def test_no_risk_heap_orders_by_score_then_original_rows(
@@ -159,7 +207,7 @@ def test_no_risk_heap_orders_by_score_then_original_rows(
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=3),
     )
 
     assert [
@@ -191,7 +239,7 @@ def test_no_risk_heap_does_not_materialize_metadata_for_rejected_candidates(
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=1),
     )
 
     assert result.telemetry.exact_candidates_evaluated == 6
@@ -221,10 +269,10 @@ def test_no_risk_arity_one_heap_materializes_metadata_only_for_retained_row(
             prepared=prepared,
             direction_mode="long_only",
         ),
-        normalized_request=_normalized_request(top_n=100, direction_mode="long_only"),
+        normalized_request=_normalized_request(top_n=1, direction_mode="long_only"),
     )
 
-    assert result.telemetry.request_top_n == 100
+    assert result.telemetry.request_top_n == 1
     assert result.telemetry.benchmark_top_k == 1
     assert result.telemetry.top_results_count == 1
     assert [
@@ -294,7 +342,7 @@ def test_top_result_proxy_fill_recomputes_only_final_pending_rows(
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=1),
     )
 
     assert result.telemetry.top_results_count == 1
@@ -358,7 +406,7 @@ def test_top_result_metadata_removes_proxy_fill_internal_fields() -> None:
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=1),
     )
 
     metadata = result.top_results[0].metadata
@@ -374,7 +422,7 @@ def test_no_risk_canonical_top_result_payload_matches_notebook_shape() -> None:
     ).execute(
         prepared_result=prepared,
         combo_planning_result=_combo_planning_result(prepared=prepared),
-        normalized_request=_normalized_request(top_n=100),
+        normalized_request=_normalized_request(top_n=1),
     )
 
     payload = result.canonical_top_results_payload()
@@ -730,6 +778,73 @@ def _execute_and_return_heavy_refs() -> tuple[Any, dict[str, weakref.ReferenceTy
         normalized_request=_normalized_request(),
     )
     return result, refs
+
+
+def _many_rows_prepared_result(*, row_count: int) -> BacktestPreparePoolsResult:
+    return _prepared_from_pools(
+        indicator_ids=("alpha", "beta"),
+        pools=(
+            _pool(
+                indicator_id="alpha",
+                trade_rows=[[1, 0, -1, 1] for _ in range(row_count)],
+                eval_rows=[[1, 0, -1] for _ in range(row_count)],
+            ),
+            _pool(
+                indicator_id="beta",
+                trade_rows=[[1, 0, -1, 1] for _ in range(row_count)],
+                eval_rows=[[1, 0, -1] for _ in range(row_count)],
+            ),
+        ),
+        row_metadata_order_hash="m" * 64,
+    )
+
+
+def _large_prepared_result(*, arity: int, row_count: int) -> BacktestPreparePoolsResult:
+    indicator_ids = tuple(f"indicator_{index}" for index in range(arity))
+    return _prepared_from_pools(
+        indicator_ids=indicator_ids,
+        pools=tuple(
+            _pool(
+                indicator_id=indicator_id,
+                trade_rows=[[1] for _ in range(row_count)],
+                eval_rows=[[1] for _ in range(row_count)],
+            )
+            for indicator_id in indicator_ids
+        ),
+        row_metadata_order_hash="l" * 64,
+    )
+
+
+def _prepared_from_pools(
+    *,
+    indicator_ids: Sequence[str],
+    pools: Sequence[PreparedIndicatorPool],
+    row_metadata_order_hash: str,
+) -> BacktestPreparePoolsResult:
+    return BacktestPreparePoolsResult(
+        timeframe="15m",
+        indicator_ids=tuple(indicator_ids),
+        indicator_pools=tuple(pools),
+        signal_returns_15m=np.asarray([1.0, 2.0, -2.0], dtype=np.float32),
+        execution_mapping=PreparedExecutionMapping(
+            signal_entry_exec_idx_15m=np.asarray([1, 2, 3, 4], dtype=np.int32),
+            run_bar_open_1m_idx_15m=np.asarray([0, 1, 2, 3], dtype=np.uint32),
+            run_bar_close_1m_idx_15m=np.asarray([1, 2, 3, 4], dtype=np.uint32),
+            t_exec_limit_1m=4,
+        ),
+        time_slice_start_15m=0,
+        time_slice_stop_15m=4,
+        trade_T_length=4,
+        eval_T_length=3,
+        row_metadata_order_hash=row_metadata_order_hash,
+        timing=PreparePoolsTiming(
+            stage_name="prepare_pools_core",
+            wall_time_s=0.0,
+            subsegments={"prepare_pools_core": 0.0},
+        ),
+        execution_open_1m=np.asarray([100.0, 101.0, 103.0, 99.0, 98.0], dtype=np.float32),
+        execution_close_1m=np.asarray([100.5, 102.0, 100.0, 98.0, 97.0], dtype=np.float32),
+    )
 
 
 def _prepared_result(*, indicator_ids: Sequence[str]) -> BacktestPreparePoolsResult:

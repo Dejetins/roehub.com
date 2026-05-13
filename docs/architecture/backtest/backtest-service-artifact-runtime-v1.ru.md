@@ -357,14 +357,17 @@ Postgres-only JSONB допустим для малых payloads, но v1 дол�
 Важно: публичный `top_n` и canonical benchmark `top_k` — разные величины.
 
 - `top_n` — продуктовый/API контракт: сколько summary rows нужно сохранить и
-  вернуть для job. v1 default/max: `100`.
-- `benchmark_top_k` — размер heap/top results в каноническом benchmark. Текущий
+  вернуть для job. v1 default/max: `50`.
+- `benchmark_top_k` — metadata для канонического benchmark. Текущий
   notebook target вызывает `run_benchmark_matrix(..., top_k=5)`, поэтому все
   canonical timer targets для `heap_update` и `top_result_proxy_fill`
-  относятся к `5` финальным top rows, а не к публичному `top_n = 100`.
+  относятся к `5` финальным benchmark rows, а не к публичному `top_n`.
 - если service benchmark сравнивается с canonical notebook target, runner должен
   явно использовать `benchmark_top_k = 5` и записывать рядом `request.top_n`.
-- production budget для `top_n = 100` измеряется отдельно как service-specific
+- production result capacity и heap capacity берутся из `request.top_n`
+  (`top_n=50` для текущего public contract); `benchmark_top_k=5` не ограничивает
+  production rows.
+- production budget для `top_n = 50` измеряется отдельно как service-specific
   overhead и не должен смешиваться с notebook-compatible timer comparison.
 
 Ответ:
@@ -686,16 +689,20 @@ no-risk и всех TP/SL risk-on runs эта stage обязательна.
 
 ### Измеряемая стадия бенчмарка: `combo_iteration`
 
-Метод notebook: `iter_combo_chunks`.
+Current production method: ordinal/range streaming over local row-pool cardinalities.
+Legacy `iter_combo_chunks`/`itertools.product` is retained only as a small
+reference/test helper and is guarded away from large full-job spaces.
 
 Эта stage:
 
-- строит deterministic Cartesian product по filtered local row pools;
-- сохраняет indicator order из normalized request;
-- emits chunks как `{indicator_id: int32[K]}`;
-- использует bounded chunk size (`4096` в canonical benchmark);
-- записывает `cartesian_combinations`, `combo_chunks_processed` и
-  `exact_candidates_evaluated`.
+- сохраняет canonical product order: последний indicator меняется быстрее всех;
+- декодирует bounded ordinal ranges в `{indicator_id: int32[K]}` через compiled
+  Numba decode path;
+- не выполняет полный Cartesian pre-pass, когда proxy filter является
+  pass-through (`combo_top_frac = 1.0`, `combo_min_confirm = 1`);
+- записывает `cartesian_combinations`, `combo_iteration_mode`,
+  `streamed_candidate_count`, `materialized_candidate_count`,
+  `combo_chunks_processed` и `exact_candidates_evaluated`.
 
 ### Измеряемая стадия бенчмарка: `proxy_filter`
 
@@ -798,9 +805,9 @@ boundary:
 
 - full benchmark run использует `benchmark_top_k = 5`;
 - sample warmup использует `top_k = 1`;
-- `request.top_n = 100` из публичного fixture не применяется к canonical
+- historical `request.top_n = 100` из benchmark fixture не применяется к canonical
   comparison этой stage;
-- если service дополнительно прогоняет product mode с `top_n = 100`, этот
+- если service дополнительно прогоняет production mode с `top_n = 50`, этот
   результат записывается как отдельный service-specific budget, а не как
   замена canonical `heap_update`.
 
@@ -865,7 +872,9 @@ Notebook-compatible boundary:
   arity 1 и arity 3..10;
 - мутирует compact summary item полями `confirm_count` и `proxy_score`;
 - удаляет notebook-internal `_local_indices` и `_proxy_pending`;
-- возвращает `top_results` длиной не больше `benchmark_top_k`.
+- в benchmark mode возвращает `top_results` длиной не больше
+  `benchmark_top_k`; в production mode retained heap/result capacity задается
+  `request.top_n`.
 
 Benchmark по `top_result_proxy_fill` должен сравниваться per tuple
 `{arity, direction_mode}`. Median pass не достаточен: отдельный fail arity 2
@@ -877,12 +886,13 @@ Benchmark по `top_result_proxy_fill` должен сравниваться per
 - повторный exact scoring;
 - расчет public/storage identity;
 - сборку persisted rows;
-- batch-fill proxy metadata для `request.top_n = 100`, если benchmark
+- batch-fill proxy metadata для production `request.top_n`, если benchmark
   сравнивается с canonical `top_k = 5`.
 
-Если production runtime хочет сохранять `top_n = 100`, это отдельный режим:
+Если production runtime сохраняет `top_n = 50`, это отдельный режим:
 сначала должна пройти canonical parity на `top_k = 5`, затем измеряется
-service-specific `top_n = 100` overhead.
+service-specific `top_n = 50` overhead. `benchmark_top_k=5` не должен cap-ить
+production results.
 
 ### Service-only стадия: `top_result_assembly`
 
@@ -938,7 +948,7 @@ Production service должен вернуть full summary metrics и для ri
 | `prepare_pools` | yes | Artifact load, slicing, row selection, row prefilter, segment build. |
 | `build_exact_context` | yes | Arity-first segment context, где требуется. |
 | `build_proxy_context` | yes | Может быть близок к нулю, когда proxy prefilter является pass-through. |
-| `combo_iteration` | yes | Генерация Cartesian chunks. |
+| `combo_iteration` | yes | Ordinal/range streaming; для pass-through proxy без полного pre-pass. |
 | `proxy_filter` | yes | Pass-through или active combo pruning. |
 | `self_check` | benchmark/test yes | Ограниченная parity check. |
 | `exact_scoring` | yes | No-risk или TP/SL exact scorer. |
@@ -994,7 +1004,7 @@ Persisted job state может оставаться coarse (`stage_a`, `stage_b`
 | `prepare_pools_total` | `stage_a` | Aggregate service telemetry, не notebook comparison target. |
 | `build_exact_context` | `stage_a` / `stage_b` | Segment stack для exact kernels. |
 | `build_proxy_context` | `stage_a` | Optional combo proxy context. |
-| `combo_iteration` | `stage_a` / `stage_b` | Cartesian chunk planning. |
+| `combo_iteration` | `stage_a` / `stage_b` | Ordinal chunking / stream descriptor, not large Python Cartesian planning. |
 | `proxy_filter` | `stage_a` / `stage_b` | Optional combo pruning. |
 | `self_check` | `stage_a` / `stage_b` | Benchmark/test parity check. |
 | `exact_scoring` with `risk.mode = "none"` | `stage_a` | Нет Stage B risk grid. |
@@ -1054,13 +1064,15 @@ apps/api routes
 JSON evidence является источником истины для numeric target values. Summary нужен
 только для удобства review и не должен вручную редактироваться отдельно.
 
-Особенность текущего canonical evidence: JSON request сохраняет публичный
+Особенность historical canonical evidence: JSON request сохраняет публичный
 `top_n = 100`, но benchmark entry point вызывает
 `run_benchmark_matrix(..., top_k=5)`. Поэтому comparison по `heap_update`,
 `top_result_proxy_fill`, `total_without_warmup` и result hashes должен учитывать
 фактический `top_results_count = 5`. Реализация, которая внутри measured
 notebook-compatible stages строит 100 rows, сравнивается с неправильной
-нагрузкой и не может быть принята как доказательство parity.
+нагрузкой и не может быть принята как доказательство parity. Это historical
+benchmark metadata; текущий production heap/result capacity берется из
+`request.top_n` и для UI-created jobs должен поддерживать `top_n=50`.
 
 Известный непринятый benchmark record:
 
@@ -1209,7 +1221,7 @@ target values:
   измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook timer
   targets;
 - `heap_update` и `top_result_proxy_fill` сравниваются с canonical notebook target
-  только при том же `benchmark_top_k = 5`; product run с `top_n = 100`
+  только при том же `benchmark_top_k = 5`; production run с `top_n = 50`
   требует отдельного service-specific budget record;
 - для arity 1..7 target source:
   `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
@@ -1628,7 +1640,8 @@ fail по `prepare_pools_total` сохранен в evidence как `stage_bound
 
 Реализация:
 
-- вход stage — heap размера `benchmark_top_k`;
+- вход stage — heap размера `benchmark_top_k` для historical benchmark mode или
+  `request.top_n` для production mode;
 - stage сортирует heap descending по heap key;
 - proxy recompute выполняется только для final top rows с
   `_proxy_pending = true`;
@@ -1636,7 +1649,9 @@ fail по `prepare_pools_total` сохранен в evidence как `stage_bound
   `len(eval_rows) == 2` вызывает compiled `proxy_for_two_rows(...)`, остальные
   arity используют generic consensus path;
 - stage удаляет `_local_indices` и `_proxy_pending`;
-- stage возвращает `top_results` длиной не больше `benchmark_top_k`.
+- stage возвращает `top_results` длиной не больше `benchmark_top_k` для
+  historical benchmark mode; production result count ограничивается
+  `request.top_n`.
 
 Измерение:
 
@@ -1644,7 +1659,7 @@ fail по `prepare_pools_total` сохранен в evidence как `stage_bound
 - arity-2 pass обязателен отдельно, потому что именно он имеет special fast path
   в notebook;
 - stage не включает lazy trades, exact scoring, identity/hash assembly,
-  persisted rows или product `top_n = 100` proxy fill.
+  persisted rows или production `top_n = 50` proxy fill.
 
 #### Итерация 4.5: canonical result shape и hash/parity
 
@@ -1717,7 +1732,7 @@ fail по `prepare_pools_total` сохранен в evidence как `stage_bound
 - public `variant_key`;
 - `variant_hash` / `indicator_variant_hash`;
 - API DTO/read-model assembly;
-- product `top_n = 100` performance gate.
+- production `top_n = 50` performance gate.
 
 Эти задачи принадлежат `top_result_assembly` / `persist_top_n_io` и закрываются
 в Iteration 7. Если они прототипируются раньше, их timings должны быть

@@ -29,7 +29,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
     BacktestComboPlanningService,
     build_local_row_pools,
-    iter_combo_chunks,
+    iter_ordinal_combo_chunks,
     make_combo_idx_matrix,
 )
 from trading.contexts.backtest.application.services.v2.execution_sizing import (
@@ -50,6 +50,9 @@ from trading.contexts.backtest.application.services.v2.no_risk_exact import (
     _pool_by_id,
     _request_top_n_from_normalized,
     _risk_mode_from_normalized,
+)
+from trading.contexts.backtest.application.services.v2.numba_runtime import (
+    current_backtest_numba_telemetry,
 )
 from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
     HIT_TIMES_ARTIFACT_PATH_V2,
@@ -278,7 +281,7 @@ class BacktestTpSlExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=self.config.heap_capacity,
+                    top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
                 )
                 scored_count += scored
@@ -295,7 +298,7 @@ class BacktestTpSlExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=self.config.heap_capacity,
+                    top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
                 )
                 scored_count += scored
@@ -313,11 +316,12 @@ class BacktestTpSlExactScoringService:
             stage_timings[TP_SL_FULL_METRICS_SECOND_PASS_STAGE_NAME] = (
                 time.perf_counter() - metrics_start
             )
+            numba_telemetry = current_backtest_numba_telemetry()
             telemetry = BacktestTpSlExactTelemetry(
                 stage_timings=stage_timings,
                 request_top_n=request_top_n,
                 benchmark_top_k=self.config.benchmark_top_k,
-                heap_capacity=self.config.heap_capacity,
+                heap_capacity=request_top_n,
                 top_results_count=len(top_results),
                 exact_candidates_evaluated=scored_count,
                 risk_mode=risk_mode,
@@ -329,6 +333,8 @@ class BacktestTpSlExactScoringService:
                 backend_implementation_id=backend.backend_id,
                 metric_names=TP_SL_EXACT_METRIC_NAMES,
                 sample_metrics=sample_metrics,
+                numba_num_threads=int(numba_telemetry["numba_num_threads"]),
+                numba_thread_source=str(numba_telemetry["numba_thread_source"]),
             )
         finally:
             cleanup_start = time.perf_counter()
@@ -1819,11 +1825,16 @@ def _iter_selected_candidate_batches(
 ) -> Iterator[_SelectedCandidateBatch]:
     local_row_pools = build_local_row_pools(prepared_result=prepared_result)
     filter_service = BacktestComboPlanningService()
-    for combo_chunk in iter_combo_chunks(
+    for combo_chunk in iter_ordinal_combo_chunks(
         indicator_ids=prepared_result.indicator_ids,
         local_row_pools=local_row_pools,
         chunk_size=COMBO_CHUNK_SIZE,
     ):
+        if not combo_planning_result.proxy_context.active:
+            yield _SelectedCandidateBatch(
+                rows_by_indicator=combo_chunk.rows_by_indicator
+            )
+            continue
         filter_result = filter_service.proxy_filter(
             combo_chunk=combo_chunk,
             proxy_context=combo_planning_result.proxy_context,

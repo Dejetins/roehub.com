@@ -243,6 +243,9 @@ class BacktestComboPlanningTelemetry:
     proxy_candidates_seen: int
     proxy_candidates_valid: int
     proxy_candidates_selected: int
+    combo_iteration_mode: str = "legacy_cartesian_reference"
+    streamed_candidate_count: int = 0
+    materialized_candidate_count: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -260,6 +263,9 @@ class BacktestComboPlanningTelemetry:
             "proxy_candidates_seen": self.proxy_candidates_seen,
             "proxy_candidates_valid": self.proxy_candidates_valid,
             "proxy_candidates_selected": self.proxy_candidates_selected,
+            "combo_iteration_mode": self.combo_iteration_mode,
+            "streamed_candidate_count": self.streamed_candidate_count,
+            "materialized_candidate_count": self.materialized_candidate_count,
         }
 
 

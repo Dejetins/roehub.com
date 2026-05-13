@@ -104,7 +104,11 @@ task_toggles:
   add_per_class_numba_thread_budget_if_needed: true
   add_progress_hooks_if_low_risk: true
   change_public_api: false
-  publish_after_success: false
+  publish_after_success: true
+  publish_via_github_yeet: true
+  direct_main_push_after_local_gates: true
+  merge_to_main_in_this_prompt: true
+  deploy_to_macstudio_in_this_prompt: true
 
 skill_routing:
   - skill: backend-performance-evidence
@@ -127,6 +131,14 @@ skill_routing:
     use_when: "running focused unit/lint/type gates"
     timing: during verification
     reason: "Roehub backend gates are uv-based"
+  - skill: github:yeet
+    use_when: "local gates pass and scoped hot-path changes should be published for review"
+    timing: after verification and before host delivery
+    reason: "safe scope inspection, intentional commit, direct main push, and no unrelated staging"
+  - skill: publish-ci-deploy
+    use_when: "direct main push is complete and updates must be delivered to Mac Studio"
+    timing: after `github:yeet` publish
+    reason: "CI/deploy watch, Mac Studio sync, service reload, and production smoke"
 
 target_envs:
   - local-dev
@@ -160,6 +172,11 @@ required_literals:
   - "ordinal chunking"
   - "exact_scoring"
   - "heap_update"
+  - "github:yeet"
+  - "git push origin main"
+  - "origin/main"
+  - "publish-ci-deploy"
+  - "git pull --ff-only"
 
 non_goals:
   - "Do not rewrite notebook semantics or scoring formulas."
@@ -168,6 +185,7 @@ non_goals:
   - "Do not broaden indicators catalog or UI work."
   - "Do not use random sampling to replace exact top-N computation."
   - "Do not run the single heaviest 140+ second benchmark job in any optional local or Mac Studio check from this prompt."
+  - "Do not stop at local gates; direct `main`/`origin/main` delivery and Mac Studio smoke are required after gates pass."
 
 final_report_format:
   language: ru
@@ -181,6 +199,9 @@ final_report_format:
     - "Local gates"
     - "Performance evidence"
     - "Contract impact"
+    - "Publish"
+    - "CI/deploy"
+    - "Mac Studio delivery"
     - "Next prompt"
 
 quality_gates:
@@ -192,6 +213,8 @@ quality_gates:
     expect: "passes or unrelated pre-existing failures classified"
   - cmd: "uv run python scripts/backtest/validate_benchmark_accounting.py --out docs/architecture/backtest/benchmark_iterations/<new_iteration_dir>/local_accounting_validation.json"
     expect: "passes after the benchmark prompt creates the new iteration dir; otherwise state not run"
+  - cmd: "gh --version && gh auth status"
+    expect: "passes before `github:yeet` publication, or publish blocker is reported"
 
 expected_primary_touches:
   - "src/trading/contexts/backtest/application/services/v2/combo_planning.py"
@@ -390,6 +413,8 @@ Skill routing for this task:
 - `root-cause-debugging`: use if parity or performance behavior is unexplained.
 - `contract-impact-analysis`: use before final report for `top_n`, admission, config, or telemetry changes.
 - `backend-quality-gates`: use during focused verification.
+- `github:yeet`: use after local gates for scope inspection, selective staging, commit, and direct push to `main`/`origin/main`.
+- `publish-ci-deploy`: use after direct main push to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload services, and smoke production.
 
 1. Establish the current hot path and parity-sensitive ordering on a small fixture.
 2. Design ordinal chunking for N pools with deterministic product-order equivalence.
@@ -400,6 +425,10 @@ Skill routing for this task:
 7. Fix production `top_n` capacity and preserve `benchmark_top_k=5` accounting.
 8. Add focused tests for ordering, parity, top-N capacity, preflight classification, post-prepare promotion, and admission guardrails.
 9. Run quality gates and report performance evidence as local developer evidence only unless run on Mac Studio.
+10. Inspect `git status -sb` and the scoped diff before publication.
+11. If gates pass and the worktree scope is clean enough, use `github:yeet` discipline to stage only intended files, commit, and push directly to `main`/`origin/main`.
+12. Use `publish-ci-deploy` to watch CI/deploy, sync Mac Studio with `git pull --ff-only`, reload the affected services, and run the required smoke checks.
+13. If the worktree is mixed, `gh` is missing, or `gh auth status` fails, stop publication and report the exact blocker without publishing.
 
 # Acceptance criteria (Definition of Done)
 
@@ -418,6 +447,8 @@ Skill routing for this task:
 - Per-class Numba thread budget is explicit or intentionally deferred with a documented blocker.
 - Numba thread count/config is explicit and visible in logs or telemetry.
 - Tests prove semantic parity on bounded fixtures.
+- Scoped changes are committed and pushed directly to `main`/`origin/main` after local gates, or a precise publication blocker is reported.
+- Mac Studio is synchronized from `main` with `git pull --ff-only`, affected services are reloaded, and smoke evidence is reported.
 - Final report separates local developer evidence from Mac Studio acceptance evidence.
 
 # Implementation constraints
@@ -440,6 +471,12 @@ Skill routing for this task:
 - Mac Studio benchmark acceptance belongs to the next prompt.
 - Local microbenchmarks are developer evidence only.
 - Do not enable light parallelism in production until the benchmark prompt proves mixed scheduling is safe.
+
+## Delivery safety
+
+- Push directly to `main`/`origin/main` only after local gates pass and scoped staging is confirmed.
+- Do not use `git add -A` in a mixed worktree; stage only intended scoped files.
+- CI watch, Mac Studio sync, service reload, and smoke evidence are part of this prompt's delivery step.
 
 # Files to indicate (expected touched areas)
 
@@ -464,13 +501,14 @@ Possible secondary touches:
 - Do not change scoring formulas.
 - Do not implement final benchmark evidence writer here unless it is trivial and does not distract.
 - Do not change Web UI layout.
-- Do not publish or deploy from this prompt.
+- Do not stop at local gates without direct `main`/`origin/main` delivery and Mac Studio smoke.
 
 # Quality gates (must run and pass)
 
 - `uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_admission.py`
 - `uv run ruff check src/trading/contexts/backtest tests/unit/contexts/backtest`
 - `uv run pyright`
+- `gh --version && gh auth status` before `github:yeet` publication
 
 # Final output: report format (strict)
 
@@ -483,6 +521,9 @@ Write the final report in Russian with these sections:
 - `Local gates`
 - `Performance evidence`
 - `Contract impact`
+- `Publish`
+- `CI/deploy`
+- `Mac Studio delivery`
 - `Next prompt`
 
-Include exact commands run, pass/fail status, and whether any performance numbers are acceptance evidence or only developer evidence.
+Include exact commands run, pass/fail status, whether any performance numbers are acceptance evidence or only developer evidence, main push commit SHA, and Mac Studio delivery evidence.

@@ -74,6 +74,17 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
         "candidate_combinations": 6,
         "tp_sl_cells": 0,
         "cost_class": "small",
+        "estimated_combinations_upper_bound": 6,
+        "estimated_combinations": 6,
+        "arity": 1,
+        "row_count_upper_bounds_by_indicator": {"ma.dema": 6},
+        "risk_mode": "none",
+        "requested_range": {
+            "start": "2020-01-11T20:08:00Z",
+            "end": "2026-04-11T20:08:00Z",
+        },
+        "requested_top_n": 50,
+        "scheduling_class": "light_candidate",
     }
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),) * 2
 
@@ -210,6 +221,33 @@ def test_preflight_rejects_request_too_expensive() -> None:
 
     assert exc_info.value.error_code == BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE
     assert exc_info.value.issues[0].code == "max_indicator_rows"
+
+
+def test_preflight_classifies_obvious_196_pow_5_grid_as_heavy() -> None:
+    request = _valid_request()
+    request["indicators"] = [
+        {
+            "indicator_id": "ma.dema",
+            "sources": ["close"],
+            "window": {"start": 5, "stop": 200, "step": 1},
+        }
+        for _ in range(5)
+    ]
+
+    result = _service().execute(request)
+
+    assert result.cost_estimate.estimated_combinations_upper_bound == 289_254_654_976
+    assert result.cost_estimate.arity == 5
+    assert result.cost_estimate.requested_top_n == 50
+    assert result.cost_estimate.risk_mode == "none"
+    assert result.cost_estimate.scheduling_class == "heavy"
+    assert result.cost_estimate.row_count_upper_bounds_by_indicator == {
+        "ma.dema": 196,
+        "ma.dema#1": 196,
+        "ma.dema#2": 196,
+        "ma.dema#3": 196,
+        "ma.dema#4": 196,
+    }
 
 
 def test_preflight_tp_sl_grid_validates_cells_and_configured_coverage() -> None:
