@@ -434,7 +434,7 @@ def _run_scheduler_smoke(
         _create_scheduler_job(
             client=client,
             canonical=canonical,
-            arity=7,
+            arity=5,
             risk_mode="none",
             direction_mode="long_only",
             label="heavy_1",
@@ -452,7 +452,7 @@ def _run_scheduler_smoke(
         _create_scheduler_job(
             client=client,
             canonical=canonical,
-            arity=7,
+            arity=5,
             risk_mode="none",
             direction_mode="long_short_reversal",
             label="heavy_2",
