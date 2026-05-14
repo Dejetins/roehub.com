@@ -3,7 +3,7 @@ from __future__ import annotations
 import gc
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Mapping
 from uuid import UUID
@@ -35,6 +35,7 @@ class BacktestJobExecutionResult:
     stage_timings: Mapping[str, float]
     summary_hash: str
     cleanup_evidence: Mapping[str, Any]
+    exact_diagnostics: Mapping[str, Any] = field(default_factory=dict)
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -42,6 +43,7 @@ class BacktestJobExecutionResult:
             "stage_timings": dict(self.stage_timings),
             "summary_hash": self.summary_hash,
             "cleanup_evidence": dict(self.cleanup_evidence),
+            "exact_diagnostics": dict(self.exact_diagnostics),
         }
 
 
@@ -141,11 +143,19 @@ class BacktestRuntimeJobOrchestrationService:
                 "worker_recycle_strategy": "disposable child process",
                 "scheduling_class": confirmed_scheduling_class,
             }
+            exact_diagnostics = {
+                "telemetry": exact_result.telemetry.as_mapping(),
+                "self_check": exact_result.self_check.as_mapping(),
+                "top_results_sample": [
+                    item.as_mapping() for item in exact_result.top_results[:5]
+                ],
+            }
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,
                 stage_timings=stage_timings,
                 summary_hash=assembly.summary_hash,
                 cleanup_evidence=cleanup_evidence,
+                exact_diagnostics=exact_diagnostics,
             )
         finally:
             del hit_times_result

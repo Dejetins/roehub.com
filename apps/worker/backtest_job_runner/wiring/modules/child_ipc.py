@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Mapping
 from uuid import UUID
@@ -23,6 +23,7 @@ class BacktestChildSuccessResult:
     stage_timings: Mapping[str, float]
     summary_hash: str
     cleanup_evidence: Mapping[str, Any]
+    exact_diagnostics: Mapping[str, Any] = field(default_factory=dict)
 
 
 def preflight_to_mapping(*, preflight: BacktestPreflightResult) -> dict[str, Any]:
@@ -78,6 +79,7 @@ def child_success_to_mapping(*, result: Any) -> dict[str, Any]:
         "stage_timings": dict(result.stage_timings),
         "summary_hash": str(result.summary_hash),
         "cleanup_evidence": dict(result.cleanup_evidence),
+        "exact_diagnostics": dict(result.exact_diagnostics),
     }
 
 
@@ -118,6 +120,7 @@ def child_result_from_mapping(
         },
         summary_hash=str(payload["summary_hash"]),
         cleanup_evidence=dict(_mapping(payload.get("cleanup_evidence"))),
+        exact_diagnostics=dict(_mapping(payload.get("exact_diagnostics", {}))),
     )
 
 

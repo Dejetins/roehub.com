@@ -13,6 +13,7 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest.application.services.v2.combo_planning import (
+    BacktestComboPlanningConfig,
     BacktestComboPlanningService,
 )
 from trading.contexts.backtest.application.services.v2.job_orchestration import (
@@ -22,6 +23,7 @@ from trading.contexts.backtest.application.services.v2.no_risk_exact import (
     BacktestNoRiskExactScoringService,
 )
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
+    BacktestPreparePoolsConfig,
     BacktestPreparePoolsService,
 )
 from trading.contexts.backtest.application.services.v2.tp_sl_exact import (
@@ -55,10 +57,19 @@ def build_full_job_compute_executor(
     prepare_pools = BacktestPreparePoolsService(
         artifact_array_loader=artifact_array_loader,
         defaults_provider=defaults_provider,
+        config=BacktestPreparePoolsConfig(
+            row_prefilter_top_fraction=1.0,
+            row_prefilter_min_nonzero=1,
+        ),
     )
     return BacktestRuntimeJobOrchestrationService(
         prepare_pools=prepare_pools,
-        combo_planning=BacktestComboPlanningService(),
+        combo_planning=BacktestComboPlanningService(
+            config=BacktestComboPlanningConfig(
+                combo_top_frac=1.0,
+                combo_min_confirm=1,
+            ),
+        ),
         no_risk_exact=BacktestNoRiskExactScoringService(),
         tp_sl_hit_times=BacktestTpSlHitTimesService(
             artifact_array_loader=artifact_array_loader

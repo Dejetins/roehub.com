@@ -84,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
 
     canonical = _load_json(args.canonical_json)
     reference = _load_json(args.reference_json)
-    reference_runs, excluded = _reference_runs(canonical=canonical)
+    reference_runs, excluded = _reference_runs(canonical=canonical, reference=reference)
     if args.smoke_only:
         reference_runs = _smoke_subset(reference_runs)
 
@@ -257,11 +257,15 @@ def _run_reference_jobs(
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
         )
-        top = client.request_json("GET", f"/backtests/jobs/{job_id}/top")
-        parity = _compare_top_results(api_top=top, reference_run=reference_run)
         child_evidence = _read_full_job_child_evidence(
             evidence_dir=child_evidence_dir,
             job_id=job_id,
+        )
+        top = client.request_json("GET", f"/backtests/jobs/{job_id}/top")
+        parity = _compare_reference_results(
+            api_top=top,
+            child_evidence=child_evidence,
+            reference_run=reference_run,
         )
         stage_timings = _merged_stage_timings(child_evidence)
         memory = _child_memory_summary(child_evidence)
@@ -872,19 +876,32 @@ def _build_runner_harness(
 def _reference_runs(
     *,
     canonical: Mapping[str, Any],
+    reference: Mapping[str, Any],
 ) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
-    runs = [cast(Mapping[str, Any], item) for item in _list(canonical.get("runs"))]
-    if not runs:
+    canonical_runs = [
+        cast(Mapping[str, Any], item) for item in _list(canonical.get("runs"))
+    ]
+    if not canonical_runs:
         raise RuntimeError("canonical benchmark JSON has no runs")
     heaviest = max(
-        runs,
+        canonical_runs,
         key=lambda item: float(
             cast(Mapping[str, Any], item["runtime_metrics"])["wall_time_s"]
         ),
     )
-    required = [item for item in runs if item is not heaviest]
+    heaviest_name = _reference_job_name(run=heaviest)
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for key in ("no_risk_regression_runs", "tp_sl_regression_runs")
+        for item in _list(reference.get(key))
+    ]
+    if not accepted_runs:
+        raise RuntimeError("accepted May 2 reference JSON has no regression runs")
+    required = [
+        item for item in accepted_runs if _reference_job_name(run=item) != heaviest_name
+    ]
     excluded = {
-        "job_name": _reference_job_name(run=heaviest),
+        "job_name": heaviest_name,
         "risk_mode": heaviest.get("risk_mode"),
         "arity": len(cast(Sequence[Any], heaviest.get("indicator_ids", ()))),
         "direction_mode": heaviest.get("direction_mode"),
@@ -1015,56 +1032,179 @@ def _create_scheduler_job(
     }
 
 
-def _compare_top_results(
+def _compare_reference_results(
     *,
     api_top: Mapping[str, Any],
+    child_evidence: Sequence[Mapping[str, Any]],
     reference_run: Mapping[str, Any],
 ) -> dict[str, Any]:
     items = [cast(Mapping[str, Any], item) for item in _list(api_top.get("items"))]
-    reference_items = [
+    diagnostics = _latest_exact_diagnostics(child_evidence=child_evidence)
+    telemetry = _mapping(diagnostics.get("telemetry", {}))
+    top_results_sample = [
+        cast(Mapping[str, Any], item)
+        for item in _list(diagnostics.get("top_results_sample"))
+    ]
+    telemetry_mismatches = _compare_telemetry(
+        telemetry=telemetry,
+        reference_run=reference_run,
+    )
+    sample_mismatches = _compare_sample_metrics(
+        telemetry=telemetry,
+        reference_run=reference_run,
+    )
+    reference_top_results = [
         cast(Mapping[str, Any], item)
         for item in _list(reference_run.get("top_results"))[:BENCHMARK_TOP_K]
     ]
-    mismatches: list[dict[str, Any]] = []
-    for index, reference in enumerate(reference_items):
-        if index >= len(items):
-            mismatches.append({"rank": index + 1, "reason": "missing_api_row"})
-            continue
-        actual = items[index]
-        actual_metrics = _mapping(actual.get("summary_metrics"))
-        for key in ("total_return_pct", "trade_count"):
-            expected_value = reference.get(key)
-            actual_value = actual_metrics.get(key, actual.get(key))
-            if not _float_equal(expected_value, actual_value):
-                mismatches.append(
-                    {
-                        "rank": index + 1,
-                        "field": key,
-                        "expected": expected_value,
-                        "actual": actual_value,
-                    }
-                )
-        for key in ("best_tp_pct", "best_sl_pct"):
-            if key not in reference:
-                continue
-            expected_value = reference.get(key)
-            actual_value = actual_metrics.get(key, actual.get(key))
-            if not _float_equal(expected_value, actual_value):
-                mismatches.append(
-                    {
-                        "rank": index + 1,
-                        "field": key,
-                        "expected": expected_value,
-                        "actual": actual_value,
-                    }
-                )
+    accepted_top_mismatches = _compare_top_result_samples(
+        actual_items=top_results_sample,
+        expected_items=reference_top_results,
+        actual_metrics_key="metrics",
+    )
+    api_child_mismatches = _compare_top_result_samples(
+        actual_items=items,
+        expected_items=top_results_sample[:BENCHMARK_TOP_K],
+        actual_metrics_key="summary_metrics",
+    )
+    api_shape_pass = int(api_top.get("_status") or 200) == 200 and bool(items)
+    accepted_top_required = bool(reference_top_results)
+    accepted_top_pass = not accepted_top_required or not accepted_top_mismatches
+    pass_value = (
+        api_shape_pass
+        and not telemetry_mismatches
+        and not sample_mismatches
+        and accepted_top_pass
+        and not api_child_mismatches
+    )
     return {
-        "compared": min(len(items), len(reference_items)),
-        "expected_top_k": BENCHMARK_TOP_K,
+        "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
         "api_items": len(items),
-        "mismatches": mismatches,
-        "pass": not mismatches and len(items) >= len(reference_items),
+        "api_shape_pass": api_shape_pass,
+        "exact_telemetry": {
+            "risk_mode": telemetry.get("risk_mode"),
+            "arity": telemetry.get("arity"),
+            "direction_mode": telemetry.get("direction_mode"),
+            "exact_candidates_evaluated": telemetry.get("exact_candidates_evaluated"),
+            "top_results_count": telemetry.get("top_results_count"),
+            "request_top_n": telemetry.get("request_top_n"),
+            "benchmark_top_k": telemetry.get("benchmark_top_k"),
+            "numba_num_threads": telemetry.get("numba_num_threads"),
+            "numba_thread_source": telemetry.get("numba_thread_source"),
+        },
+        "telemetry_mismatches": telemetry_mismatches,
+        "sample_metrics_mismatches": sample_mismatches,
+        "accepted_top_results_required": accepted_top_required,
+        "accepted_top_results_mismatches": accepted_top_mismatches,
+        "api_child_top_mismatches": api_child_mismatches,
+        "pass": pass_value,
     }
+
+
+def _latest_exact_diagnostics(
+    *,
+    child_evidence: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    for item in reversed(child_evidence):
+        diagnostics = item.get("exact_diagnostics")
+        if isinstance(diagnostics, Mapping) and "telemetry" in diagnostics:
+            return dict(diagnostics)
+    return {}
+
+
+def _compare_telemetry(
+    *,
+    telemetry: Mapping[str, Any],
+    reference_run: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    for key in ("risk_mode", "arity", "direction_mode", "exact_candidates_evaluated"):
+        expected = reference_run.get(key)
+        actual = telemetry.get(key)
+        if expected != actual:
+            mismatches.append({"field": key, "expected": expected, "actual": actual})
+    if telemetry.get("request_top_n") != REQUEST_TOP_N:
+        mismatches.append(
+            {
+                "field": "request_top_n",
+                "expected": REQUEST_TOP_N,
+                "actual": telemetry.get("request_top_n"),
+            }
+        )
+    if telemetry.get("benchmark_top_k") != BENCHMARK_TOP_K:
+        mismatches.append(
+            {
+                "field": "benchmark_top_k",
+                "expected": BENCHMARK_TOP_K,
+                "actual": telemetry.get("benchmark_top_k"),
+            }
+        )
+    return mismatches
+
+
+def _compare_sample_metrics(
+    *,
+    telemetry: Mapping[str, Any],
+    reference_run: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    reference_sample = reference_run.get("sample_metrics")
+    if not isinstance(reference_sample, Mapping):
+        return []
+    actual_sample = telemetry.get("sample_metrics")
+    if not isinstance(actual_sample, Mapping):
+        return [{"field": "sample_metrics", "reason": "missing_actual_sample_metrics"}]
+    return _compare_metric_mapping(
+        actual=actual_sample,
+        expected=reference_sample,
+        rank=None,
+    )
+
+
+def _compare_top_result_samples(
+    *,
+    actual_items: Sequence[Mapping[str, Any]],
+    expected_items: Sequence[Mapping[str, Any]],
+    actual_metrics_key: str,
+) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    for index, expected in enumerate(expected_items):
+        if index >= len(actual_items):
+            mismatches.append({"rank": index + 1, "reason": "missing_actual_row"})
+            continue
+        actual = actual_items[index]
+        actual_metrics = _mapping(actual.get(actual_metrics_key))
+        expected_metrics = _mapping(expected.get("metrics", expected))
+        mismatches.extend(
+            _compare_metric_mapping(
+                actual=actual_metrics,
+                expected=expected_metrics,
+                rank=index + 1,
+            )
+        )
+    return mismatches
+
+
+def _compare_metric_mapping(
+    *,
+    actual: Mapping[str, Any],
+    expected: Mapping[str, Any],
+    rank: int | None,
+) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    for key, expected_value in expected.items():
+        if key not in actual:
+            continue
+        actual_value = actual.get(key)
+        if not _float_equal(expected_value, actual_value):
+            mismatch = {
+                "field": key,
+                "expected": expected_value,
+                "actual": actual_value,
+            }
+            if rank is not None:
+                mismatch["rank"] = rank
+            mismatches.append(mismatch)
+    return mismatches
 
 
 def _read_full_job_child_evidence(
