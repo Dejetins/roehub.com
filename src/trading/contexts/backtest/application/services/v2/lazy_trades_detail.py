@@ -216,6 +216,7 @@ class BacktestLazyTradesDetailService:
     ) -> dict[str, Any]:
         normalized_request = dict(job.request_json)
         coordinates = _coordinates_from_request(normalized_request)
+        required_row_ids_by_indicator = _row_ids_by_indicator_from_top_variant(row=row)
         try:
             context = self.prepare_pools.resolve_artifact_context(
                 coordinates=coordinates,
@@ -233,7 +234,10 @@ class BacktestLazyTradesDetailService:
                 normalized_request=normalized_request,
                 runtime_arrays=runtime_arrays,
                 request_slice=request_slice,
+                required_row_ids_by_indicator=required_row_ids_by_indicator,
             )
+        except RoehubError:
+            raise
         except Exception as error:  # noqa: BLE001
             raise RoehubError(
                 code="backtest.artifacts_unavailable",
@@ -528,18 +532,7 @@ def _local_indices_from_row(
     row: BacktestJobTopVariant,
     prepared: BacktestPreparePoolsResult,
 ) -> tuple[int, ...]:
-    canonical = _mapping(dict(row.payload_json).get("canonical_variant_params"))
-    indicators = canonical.get("indicators")
-    if not isinstance(indicators, Sequence) or isinstance(indicators, (str, bytes)):
-        raise _variant_conflict(
-            message="Top variant canonical params have invalid indicators payload",
-            details={"variant_hash": row.variant_key},
-        )
-    row_id_by_indicator: dict[str, int] = {}
-    for item in indicators:
-        if not isinstance(item, Mapping):
-            continue
-        row_id_by_indicator[str(item.get("indicator_id"))] = int(item.get("row_id", -1))
+    row_id_by_indicator = _row_ids_by_indicator_from_top_variant(row=row)
     local_indices: list[int] = []
     pools_by_id = {pool.indicator_id: pool for pool in prepared.indicator_pools}
     for indicator_id in prepared.indicator_ids:
@@ -548,7 +541,13 @@ def _local_indices_from_row(
                 message="Top variant canonical params do not cover prepared indicator",
                 details={"indicator_id": indicator_id, "variant_hash": row.variant_key},
             )
-        row_id = row_id_by_indicator[indicator_id]
+        row_ids = row_id_by_indicator[indicator_id]
+        if len(row_ids) != 1:
+            raise _variant_conflict(
+                message="Top variant canonical params have invalid row id payload",
+                details={"indicator_id": indicator_id, "variant_hash": row.variant_key},
+            )
+        row_id = row_ids[0]
         pool = pools_by_id[indicator_id]
         matches = np.flatnonzero(np.asarray(pool.row_ids, dtype=np.int64) == row_id)
         if int(matches.size) != 1:
@@ -562,6 +561,26 @@ def _local_indices_from_row(
             )
         local_indices.append(int(matches[0]))
     return tuple(local_indices)
+
+
+def _row_ids_by_indicator_from_top_variant(
+    *,
+    row: BacktestJobTopVariant,
+) -> dict[str, tuple[int, ...]]:
+    canonical = _mapping(dict(row.payload_json).get("canonical_variant_params"))
+    indicators = canonical.get("indicators")
+    if not isinstance(indicators, Sequence) or isinstance(indicators, (str, bytes)):
+        raise _variant_conflict(
+            message="Top variant canonical params have invalid indicators payload",
+            details={"variant_hash": row.variant_key},
+        )
+    row_ids_by_indicator: dict[str, tuple[int, ...]] = {}
+    for item in indicators:
+        if not isinstance(item, Mapping):
+            continue
+        indicator_id = str(item.get("indicator_id"))
+        row_ids_by_indicator[indicator_id] = (int(item.get("row_id", -1)),)
+    return row_ids_by_indicator
 
 
 def _no_risk_trade_rows(

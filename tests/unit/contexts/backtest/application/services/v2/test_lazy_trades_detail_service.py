@@ -22,6 +22,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCoordinates,
     BacktestNoRiskTopResult,
+    BacktestPreparePoolsConfig,
     BacktestTpSlHitTimesSubset,
     BacktestTpSlTopResult,
 )
@@ -120,6 +121,27 @@ def test_lazy_trades_cache_write_failure_returns_recomputed_payload(tmp_path: Pa
 
     assert result.cache["status"] == "write_failed"
     assert result.cache["warning"] == "disk full"
+    assert result.trades
+
+
+def test_lazy_trades_recompute_retains_top_variant_row_filtered_by_prefilter(
+    tmp_path: Path,
+) -> None:
+    service, _cache, job, row = _service_fixture(
+        tmp_path=tmp_path,
+        risk_mode="none",
+        top_row_id=0,
+        row_prefilter_top_fraction=0.5,
+    )
+
+    result = service.execute(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+
+    indicator_params = result.canonical_variant_params["indicators"][0]
+    assert indicator_params["row_id"] == 0
     assert result.trades
 
 
@@ -301,6 +323,8 @@ def _service_fixture(
     *,
     tmp_path: Path,
     risk_mode: str,
+    top_row_id: int = 1,
+    row_prefilter_top_fraction: float | None = None,
 ) -> tuple[BacktestLazyTradesDetailService, _MemoryCache, BacktestJob, BacktestJobTopVariant]:
     store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
     loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
@@ -309,6 +333,9 @@ def _service_fixture(
         defaults_provider=YamlBacktestGridDefaultsProvider.from_yaml(
             config_path="configs/prod/indicators.yaml",
         ),
+        config=BacktestPreparePoolsConfig(row_prefilter_top_fraction=row_prefilter_top_fraction)
+        if row_prefilter_top_fraction is not None
+        else BacktestPreparePoolsConfig(),
     )
     cache = _MemoryCache()
     service = BacktestLazyTradesDetailService(
@@ -349,7 +376,7 @@ def _service_fixture(
         .assemble(
             job_id=job_id,
             normalized_request=request,
-            top_results=(_top_result(risk_mode=risk_mode),),
+            top_results=(_top_result(risk_mode=risk_mode, row_id=top_row_id),),
             updated_at=datetime.now(UTC),
         )
         .top_variants[0]
@@ -357,12 +384,17 @@ def _service_fixture(
     return service, cache, job, row
 
 
-def _top_result(*, risk_mode: str) -> BacktestNoRiskTopResult | BacktestTpSlTopResult:
+def _top_result(
+    *,
+    risk_mode: str,
+    row_id: int = 1,
+) -> BacktestNoRiskTopResult | BacktestTpSlTopResult:
+    metadata = {"ma.ema.source": "close", "ma.ema.window": 5 + row_id}
     if risk_mode == "tp_sl_grid":
         return BacktestTpSlTopResult(
             rank=1,
             score=1.0,
-            indicator_rows={"ma.ema": 1},
+            indicator_rows={"ma.ema": row_id},
             best_tp_idx=0,
             best_sl_idx=0,
             metrics={
@@ -371,14 +403,14 @@ def _top_result(*, risk_mode: str) -> BacktestNoRiskTopResult | BacktestTpSlTopR
                 "best_tp_pct": 2.0,
                 "best_sl_pct": 1.0,
             },
-            metadata={"ma.ema.source": "close", "ma.ema.window": 6},
+            metadata=metadata,
         )
     return BacktestNoRiskTopResult(
         rank=1,
         score=1.0,
-        indicator_rows={"ma.ema": 1},
+        indicator_rows={"ma.ema": row_id},
         metrics={"total_return_pct": 1.0, "trade_count": 1.0},
-        metadata={"ma.ema.source": "close", "ma.ema.window": 6},
+        metadata=metadata,
     )
 
 

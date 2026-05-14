@@ -252,6 +252,7 @@ class BacktestPreparePoolsService:
         normalized_request: Mapping[str, Any],
         runtime_arrays: BacktestPreparePoolsRuntimeArrays,
         request_slice: BacktestPreparePoolsRequestSlice,
+        required_row_ids_by_indicator: Mapping[str, Sequence[int]] | None = None,
     ) -> BacktestPreparePoolsResult:
         """
         Notebook-compatible `prepare_indicator_pools(...)` scope.
@@ -294,6 +295,9 @@ class BacktestPreparePoolsService:
                 min_nonzero=self.config.row_prefilter_min_nonzero,
                 fee_rate=fee_rate,
                 time_chunk=self.config.time_chunk,
+                required_row_ids=()
+                if required_row_ids_by_indicator is None
+                else required_row_ids_by_indicator.get(selection.indicator_id, ()),
             )
             for selection in selected_rows
         )
@@ -439,6 +443,7 @@ def prefilter_indicator_rows(
     min_nonzero: int,
     fee_rate: float,
     time_chunk: int,
+    required_row_ids: Sequence[int] = (),
 ) -> _PrefilteredIndicatorRows:
     """
     Notebook-equivalent `fused_row_prefilter_stats` plus `topk_fraction_idx`.
@@ -462,14 +467,32 @@ def prefilter_indicator_rows(
 
     adjusted = proxy - (np.float32(fee_rate) * nonzero.astype(np.float32))
     valid = nonzero >= int(min_nonzero)
-    if not np.any(valid):
+    required = tuple(dict.fromkeys(int(row_id) for row_id in required_row_ids))
+    if required:
+        required_row_ids_i32 = np.asarray(required, dtype=np.int32)
+        required_mask = np.isin(row_ids_i32, required_row_ids_i32)
+        required_idx = np.flatnonzero(required_mask).astype(np.int32)
+        missing = sorted(set(required) - set(row_ids_i32[required_idx].tolist()))
+        if missing:
+            raise BacktestPreparePoolsRejected(
+                f"Required row ids {missing!r} are absent for {indicator_id!r}"
+            )
+    else:
+        required_idx = np.empty(0, dtype=np.int32)
+    if not np.any(valid) and int(required_idx.size) == 0:
         raise BacktestPreparePoolsRejected(
             f"No rows survive min_nonzero={min_nonzero} for {indicator_id!r}"
         )
 
     valid_idx = np.flatnonzero(valid)
-    keep_from_valid = topk_fraction_idx(adjusted[valid_idx], top_frac)
-    keep_idx = np.sort(valid_idx[keep_from_valid].astype(np.int32))
+    if int(valid_idx.size) > 0:
+        keep_from_valid = topk_fraction_idx(adjusted[valid_idx], top_frac)
+        keep_idx = valid_idx[keep_from_valid].astype(np.int32)
+    else:
+        keep_idx = np.empty(0, dtype=np.int32)
+    if int(required_idx.size) > 0:
+        keep_idx = np.unique(np.concatenate((keep_idx, required_idx))).astype(np.int32)
+    keep_idx = np.sort(keep_idx)
 
     filtered_row_ids = np.ascontiguousarray(row_ids_i32[keep_idx])
     filtered_trade_T = np.ascontiguousarray(trade_T[keep_idx])

@@ -1052,9 +1052,10 @@ def _compare_reference_results(
         reference_run=reference_run,
     )
     quality_top_zero = _quality_top_zero_result(telemetry=telemetry, api_items=len(items))
+    quality_gate_enabled = _quality_gate_enabled(telemetry=telemetry)
     sample_mismatches = (
         []
-        if quality_top_zero
+        if quality_gate_enabled
         else _compare_sample_metrics(
             telemetry=telemetry,
             reference_run=reference_run,
@@ -1066,7 +1067,7 @@ def _compare_reference_results(
     ]
     accepted_top_mismatches = (
         []
-        if quality_top_zero
+        if quality_gate_enabled
         else _compare_top_result_samples(
             actual_items=top_results_sample,
             expected_items=reference_top_results,
@@ -1085,7 +1086,7 @@ def _compare_reference_results(
     api_shape_pass = int(api_top.get("_status") or 200) == 200 and (
         bool(items) or quality_top_zero
     )
-    accepted_top_required = bool(reference_top_results) and not quality_top_zero
+    accepted_top_required = bool(reference_top_results) and not quality_gate_enabled
     accepted_top_pass = not accepted_top_required or not accepted_top_mismatches
     pass_value = (
         api_shape_pass
@@ -1116,6 +1117,7 @@ def _compare_reference_results(
                 "quality_candidates_heap_eligible"
             ),
             "quality_top_zero": quality_top_zero,
+            "quality_gate_enabled": quality_gate_enabled,
         },
         "telemetry_mismatches": telemetry_mismatches,
         "sample_metrics_mismatches": sample_mismatches,
@@ -1141,6 +1143,11 @@ def _quality_top_zero_result(*, telemetry: Mapping[str, Any], api_items: int) ->
         and heap_eligible == 0
         and below_min == evaluated
     )
+
+
+def _quality_gate_enabled(*, telemetry: Mapping[str, Any]) -> bool:
+    min_closed_trades = telemetry.get("min_closed_trades")
+    return isinstance(min_closed_trades, int) and min_closed_trades > 0
 
 
 def _latest_exact_diagnostics(

@@ -174,6 +174,41 @@ def test_prepare_pools_row_prefilter_keeps_top_adjusted_row(tmp_path: Path) -> N
     assert [item.row_id for item in pool.metadata] == [1]
 
 
+def test_prepare_pools_core_retains_required_variant_rows_for_lazy_detail(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    service = _service(store=store, top_fraction=0.5)
+    request = _normalized_request(fee_rate=0.0)
+    context = service.resolve_artifact_context(
+        coordinates=BacktestCoordinates(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_metadata=_artifact_metadata(store=store),
+    )
+    runtime_arrays = service.open_artifact_arrays(
+        normalized_request=request,
+        context=context,
+    )
+    request_slice = service.prepare_request_slice(
+        normalized_request=request,
+        runtime_arrays=runtime_arrays,
+    )
+
+    result = service.prepare_pools_core(
+        normalized_request=request,
+        runtime_arrays=runtime_arrays,
+        request_slice=request_slice,
+        required_row_ids_by_indicator={"ma.ema": (0,)},
+    )
+
+    pool = result.indicator_pools[0]
+    assert pool.row_ids.tolist() == [0, 1]
+    assert [item.row_id for item in pool.metadata] == [0, 1]
+
+
 def test_prepare_pools_rejects_time_range_outside_artifact_coverage(
     tmp_path: Path,
 ) -> None:
