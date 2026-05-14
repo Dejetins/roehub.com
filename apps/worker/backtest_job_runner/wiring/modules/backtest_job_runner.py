@@ -24,11 +24,16 @@ from trading.contexts.backtest.adapters.outbound import (
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
+    load_backtest_admission_config,
     load_backtest_artifacts_runtime_config,
+    resolve_backtest_admission_config_path,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
+)
+from trading.contexts.backtest.application.services.v2.admission import (
+    BacktestAdmissionService,
 )
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
@@ -631,6 +636,14 @@ def build_backtest_job_runner_app(
         artifact_context_resolver=artifact_context_resolver,
         runtime_config=backtest_runtime_config,
     )
+    admission_service = BacktestAdmissionService(
+        config=load_backtest_admission_config(
+            resolve_backtest_admission_config_path(environ=effective_environ)
+        )
+    )
+    worker_validation_guardrails = admission_service.preflight_validation_guardrails(
+        base_guardrails=backtest_runtime_config.guardrails,
+    )
     light_executor = BacktestChildProcessExecutor(
         environ=effective_environ,
         scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
@@ -652,6 +665,7 @@ def build_backtest_job_runner_app(
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
         scheduling_classes=("light_candidate", "light"),
+        validation_guardrails=worker_validation_guardrails,
     )
     heavy_full_job_worker = BacktestJobWorkerUseCase(
         lease_repository=lease_repository,
@@ -662,6 +676,7 @@ def build_backtest_job_runner_app(
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
         scheduling_classes=("heavy",),
+        validation_guardrails=worker_validation_guardrails,
     )
     prepare_pools = BacktestPreparePoolsService(
         artifact_array_loader=artifact_array_loader,

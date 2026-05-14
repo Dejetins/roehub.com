@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestCostEstimate,
     BacktestNoRiskTopResult,
     BacktestPreflightResult,
+    BacktestRuntimeGuardrails,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services.v2 import (
@@ -59,6 +60,29 @@ def test_worker_claims_updates_progress_executes_and_finishes_job() -> None:
     assert len(repository.top_rows) == 1
     assert lease_repository.progress_updates == (("stage_a", 0, 1),)
     assert executor.calls == (job.job_id,)
+
+
+def test_worker_replays_admitted_job_with_configured_validation_guardrails() -> None:
+    job = _queued_job()
+    repository = _Repository(job=job)
+    preflight_service = _GuardrailCapturingPreflightService()
+    use_case = BacktestJobWorkerUseCase(
+        lease_repository=_LeaseRepository(repository=repository),
+        job_repository=cast(BacktestJobRepository, repository),
+        preflight_service=cast(BacktestPreflightService, preflight_service),
+        executor=_Executor(),
+        lease_seconds=60,
+        locked_by="test-worker",
+        validation_guardrails=BacktestRuntimeGuardrails(max_top_n=100),
+    )
+
+    result = use_case.run_next()
+
+    assert result.claimed is True
+    assert result.job is not None
+    assert result.job.state == "succeeded"
+    assert preflight_service.validation_guardrails is not None
+    assert preflight_service.validation_guardrails.max_top_n == 100
 
 
 def test_worker_persists_failed_state_when_executor_raises() -> None:
@@ -452,6 +476,19 @@ class _PreflightService:
                 cost_class="small",
             ),
         )
+
+
+class _GuardrailCapturingPreflightService:
+    validation_guardrails: BacktestRuntimeGuardrails | None = None
+
+    def execute(
+        self,
+        payload: Any,
+        *,
+        validation_guardrails: BacktestRuntimeGuardrails | None = None,
+    ) -> BacktestPreflightResult:
+        self.validation_guardrails = validation_guardrails
+        return _PreflightService().execute(payload)
 
 
 def _queued_job() -> BacktestJob:

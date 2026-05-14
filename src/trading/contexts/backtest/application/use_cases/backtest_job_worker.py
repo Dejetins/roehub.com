@@ -8,7 +8,10 @@ from time import monotonic
 from typing import Any, Protocol
 from uuid import UUID
 
-from trading.contexts.backtest.application.dto import BacktestPreflightResult
+from trading.contexts.backtest.application.dto import (
+    BacktestPreflightResult,
+    BacktestRuntimeGuardrails,
+)
 from trading.contexts.backtest.application.ports import (
     BacktestJobLeaseRepository,
     BacktestJobRepository,
@@ -54,6 +57,7 @@ class BacktestJobWorkerUseCase:
     heartbeat_interval_seconds: float = 30.0
     locked_by: str | None = None
     scheduling_classes: tuple[str, ...] | None = None
+    validation_guardrails: BacktestRuntimeGuardrails | None = None
 
     def run_next(self) -> BacktestJobWorkerResult:
         now = datetime.now(UTC)
@@ -71,7 +75,13 @@ class BacktestJobWorkerUseCase:
             total_units=1,
         )
         try:
-            preflight = self.preflight_service.execute(dict(job.request_json))
+            if self.validation_guardrails is None:
+                preflight = self.preflight_service.execute(dict(job.request_json))
+            else:
+                preflight = self.preflight_service.execute(
+                    dict(job.request_json),
+                    validation_guardrails=self.validation_guardrails,
+                )
             with _LeaseHeartbeat(
                 lease_repository=self.lease_repository,
                 job_id=job.job_id,
