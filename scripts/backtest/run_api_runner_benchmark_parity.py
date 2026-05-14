@@ -769,10 +769,6 @@ def _run_lazy_worker_until_completed(
             status = str(row["status"])
             if status not in statuses:
                 statuses.append(status)
-            client.request_json(
-                "GET",
-                f"/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=5",
-            )
             time.sleep(poll_interval_seconds)
         result = future.result()
     row = prod_smoke._lazy_task_row(dsn=dsn, task_id=task_id)
