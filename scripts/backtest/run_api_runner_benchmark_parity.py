@@ -540,12 +540,20 @@ def _run_scheduler_phase(
             _reap_scheduler_futures(active=active, finished=finished, scheduler=scheduler)
             light_active = sum(1 for item in active.values() if item["scheduling_class"] != "heavy")
             heavy_active = sum(1 for item in active.values() if item["scheduling_class"] == "heavy")
+            terminal_done = all(
+                _job_detail_row(dsn=dsn, job_id=item)["state"] == "succeeded"
+                for item in job_ids
+            )
+            if not active and terminal_done:
+                break
             launch = scheduler.next_launch(
                 active_light=light_active,
                 active_heavy=heavy_active,
                 active_lazy=0,
             )
             while launch is not None:
+                if launch.task_kind != "full_job":
+                    break
                 future = pool.submit(launch.run)
                 active[future] = {
                     "task_kind": launch.task_kind,
@@ -578,12 +586,6 @@ def _run_scheduler_phase(
                     "api_status_latency_ms": _status_burst_latency(client=client, job_ids=job_ids),
                 }
             )
-            terminal_done = all(
-                _job_detail_row(dsn=dsn, job_id=item)["state"] == "succeeded"
-                for item in job_ids
-            )
-            if not active and terminal_done:
-                break
             time.sleep(poll_interval_seconds)
         _reap_scheduler_futures(active=active, finished=finished, scheduler=scheduler)
     rows = [_job_detail_row(dsn=dsn, job_id=job_id) for job_id in job_ids]
