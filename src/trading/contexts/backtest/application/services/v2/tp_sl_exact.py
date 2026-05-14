@@ -103,6 +103,28 @@ def _execution_settings_from_normalized(
     )
 
 
+def _min_closed_trades_from_normalized(normalized_request: Mapping[str, Any]) -> int:
+    quality_constraints = normalized_request.get("quality_constraints")
+    if quality_constraints is None:
+        return 0
+    if not isinstance(quality_constraints, Mapping):
+        raise BacktestTpSlExactRejected(
+            "normalized_request.quality_constraints must be a mapping when provided"
+        )
+    raw_min_closed_trades = quality_constraints.get("min_closed_trades")
+    if raw_min_closed_trades is None:
+        return 0
+    if (
+        isinstance(raw_min_closed_trades, bool)
+        or not isinstance(raw_min_closed_trades, int)
+        or raw_min_closed_trades <= 0
+    ):
+        raise BacktestTpSlExactRejected(
+            "normalized_request.quality_constraints.min_closed_trades must be a positive integer"
+        )
+    return int(raw_min_closed_trades)
+
+
 @dataclass(frozen=True, slots=True)
 class _TpSlRuntimeContext:
     run_abs_start_15m: np.int32
@@ -221,6 +243,7 @@ class BacktestTpSlExactScoringService:
             normalized_request,
             default_request_top_n=self.config.default_request_top_n,
         )
+        min_closed_trades = _min_closed_trades_from_normalized(normalized_request)
         top_k_context = _top_k_context_from_prepared(prepared_result)
         backend_logical_name = _backend_logical_name(arity=arity)
         stage_timings = {TP_SL_EXACT_BOUNDARY_STAGE_NAME: time.perf_counter() - boundary_start}
@@ -275,10 +298,17 @@ class BacktestTpSlExactScoringService:
             stage_timings[TP_SL_EXACT_SCORING_ALIAS_STAGE_NAME] = 0.0
             stage_timings[TP_SL_HEAP_UPDATE_STAGE_NAME] = 0.0
             scored_count = 0
+            below_min_trades_count = 0
+            heap_eligible_count = 0
             sample_metrics: Mapping[str, float] | None = None
             candidate_ordinal_start = 0
             if first_selected_batch is not None:
-                scored, sample_metrics = self._score_selected_rows(
+                (
+                    scored,
+                    sample_metrics,
+                    below_min_trades,
+                    heap_eligible,
+                ) = self._score_selected_rows(
                     selected_batch=first_selected_batch,
                     prepared_result=prepared_result,
                     combo_planning_result=combo_planning_result,
@@ -290,12 +320,20 @@ class BacktestTpSlExactScoringService:
                     top_k_context=top_k_context,
                     top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
+                    min_closed_trades=min_closed_trades,
                 )
                 scored_count += scored
+                below_min_trades_count += below_min_trades
+                heap_eligible_count += heap_eligible
                 candidate_ordinal_start += scored
             assert selected_batches_iter is not None
             for selected_batch in selected_batches_iter:
-                scored, sample_metrics = self._score_selected_rows(
+                (
+                    scored,
+                    sample_metrics,
+                    below_min_trades,
+                    heap_eligible,
+                ) = self._score_selected_rows(
                     selected_batch=selected_batch,
                     prepared_result=prepared_result,
                     combo_planning_result=combo_planning_result,
@@ -307,8 +345,11 @@ class BacktestTpSlExactScoringService:
                     top_k_context=top_k_context,
                     top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
+                    min_closed_trades=min_closed_trades,
                 )
                 scored_count += scored
+                below_min_trades_count += below_min_trades
+                heap_eligible_count += heap_eligible
                 candidate_ordinal_start += scored
 
             metrics_start = time.perf_counter()
@@ -348,6 +389,9 @@ class BacktestTpSlExactScoringService:
                 sample_metrics=sample_metrics,
                 numba_num_threads=int(numba_telemetry["numba_num_threads"]),
                 numba_thread_source=str(numba_telemetry["numba_thread_source"]),
+                min_closed_trades=min_closed_trades,
+                quality_candidates_below_min_trades=below_min_trades_count,
+                quality_candidates_heap_eligible=heap_eligible_count,
             )
         finally:
             cleanup_start = time.perf_counter()
@@ -403,11 +447,12 @@ class BacktestTpSlExactScoringService:
         top_k_context: _TopKContext,
         top_k: int,
         candidate_ordinal_start: int,
-    ) -> tuple[int, Mapping[str, float] | None]:
+        min_closed_trades: int,
+    ) -> tuple[int, Mapping[str, float] | None, int, int]:
         selected_rows_by_indicator = selected_batch.rows_by_indicator
         selected_size = _selected_size(selected_rows_by_indicator)
         if selected_size <= 0:
-            return 0, sample_metrics
+            return 0, sample_metrics, 0, 0
         allocation_start = time.perf_counter()
         buffers = _allocate_score_buffers(selected_size)
         _add_timing(
@@ -427,11 +472,20 @@ class BacktestTpSlExactScoringService:
         elapsed = time.perf_counter() - exact_start
         stage_timings[TP_SL_EXACT_SCORING_STAGE_NAME] += elapsed
         stage_timings[TP_SL_EXACT_SCORING_ALIAS_STAGE_NAME] += elapsed
+        below_min_trades = int(np.count_nonzero(buffers.trade_count < min_closed_trades))
+        heap_eligible = buffers.size - below_min_trades
         if sample_metrics is None:
+            sample_index = _first_quality_eligible_index(
+                trade_count=buffers.trade_count,
+                min_closed_trades=min_closed_trades,
+            )
+        else:
+            sample_index = None
+        if sample_index is not None:
             sample_metrics = _sample_metrics_at(
                 buffers=buffers,
                 hit_times=hit_times,
-                index=0,
+                index=sample_index,
             )
         heap_start = time.perf_counter()
         _update_heap_total_return_desc(
@@ -442,9 +496,10 @@ class BacktestTpSlExactScoringService:
             buffers=buffers,
             top_k=top_k,
             candidate_ordinal_start=candidate_ordinal_start,
+            min_closed_trades=min_closed_trades,
         )
         stage_timings[TP_SL_HEAP_UPDATE_STAGE_NAME] += time.perf_counter() - heap_start
-        return buffers.size, sample_metrics
+        return buffers.size, sample_metrics, below_min_trades, heap_eligible
 
     def _run_self_check(
         self,
@@ -1944,6 +1999,17 @@ def _sample_metrics_at(
     }
 
 
+def _first_quality_eligible_index(
+    *,
+    trade_count: np.ndarray,
+    min_closed_trades: int,
+) -> int | None:
+    for idx in range(int(trade_count.shape[0])):
+        if int(trade_count[idx]) >= min_closed_trades:
+            return idx
+    return None
+
+
 def _top_k_context_from_prepared(prepared_result: BacktestPreparePoolsResult) -> _TopKContext:
     pools_by_id = _pool_by_id(prepared_result)
     indicator_ids = tuple(prepared_result.indicator_ids)
@@ -1965,6 +2031,7 @@ def _update_heap_total_return_desc(
     buffers: _TpSlScoreBuffers,
     top_k: int,
     candidate_ordinal_start: int,
+    min_closed_trades: int,
 ) -> None:
     selected_rows_by_pos = tuple(
         selected_rows_by_indicator[indicator_id]
@@ -1973,12 +2040,14 @@ def _update_heap_total_return_desc(
     row_ids_by_pos = top_k_context.row_ids_by_pos
     selected_indices, selected_count = _tp_sl_select_top_k_indices(
         buffers.total_return_pct,
+        buffers.trade_count,
         buffers.best_tp_idx,
         buffers.best_sl_idx,
         hit_times.tp_values,
         hit_times.sl_values,
         np.int64(candidate_ordinal_start),
         np.int32(top_k),
+        np.int32(min_closed_trades),
     )
     for selected_pos in range(selected_count):
         result_index = int(selected_indices[selected_pos])
@@ -2092,12 +2161,14 @@ def _tp_sl_top_key_less(
 @nb.njit(cache=True)
 def _tp_sl_select_top_k_indices(
     scores: np.ndarray,
+    trade_count: np.ndarray,
     best_tp_idx: np.ndarray,
     best_sl_idx: np.ndarray,
     tp_values: np.ndarray,
     sl_values: np.ndarray,
     candidate_ordinal_start: np.int64,
     top_k: np.int32,
+    min_closed_trades: np.int32,
 ) -> tuple[np.ndarray, np.int32]:
     selected_indices = np.empty(top_k, dtype=np.int32)
     selected_scores = np.empty(top_k, dtype=np.float64)
@@ -2106,6 +2177,8 @@ def _tp_sl_select_top_k_indices(
     selected_neg_ord = np.empty(top_k, dtype=np.int64)
     count = np.int32(0)
     for result_index in range(scores.shape[0]):
+        if trade_count[result_index] < min_closed_trades:
+            continue
         score = float(scores[result_index])
         tp_pct = float(tp_values[best_tp_idx[result_index]]) * 100.0
         sl_pct = float(sl_values[best_sl_idx[result_index]]) * 100.0

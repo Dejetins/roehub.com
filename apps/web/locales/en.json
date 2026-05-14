@@ -235,6 +235,7 @@
   "backtests.variants.csv": "CSV",
   "backtests.variants.empty": "No variants for this job",
   "backtests.variants.loading": "Loading variants",
+  "backtests.variants.none_passed_quality_gate": "No strategies passed the minimum closed-trades quality filter.",
   "backtests.variants.params": "Params",
   "backtests.variants.rank": "Rank",
   "backtests.variants.title": "Top variants for job {job}",

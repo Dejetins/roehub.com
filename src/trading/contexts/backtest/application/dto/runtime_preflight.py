@@ -106,6 +106,7 @@ class BacktestRuntimeDefaults:
     ranking_metrics: tuple[str, ...]
     ranking_default: JsonMapping
     top_n_default: int
+    quality_constraints_default: JsonMapping
     guardrails: BacktestRuntimeGuardrails
     execution_defaults: BacktestExecutionDefaults
     supported_indicator_ids: tuple[str, ...]
@@ -123,6 +124,7 @@ class BacktestRuntimeDefaults:
             "ranking_metrics": list(self.ranking_metrics),
             "ranking_default": dict(self.ranking_default),
             "top_n_default": self.top_n_default,
+            "quality_constraints_default": dict(self.quality_constraints_default),
             "guardrails": self.guardrails.as_mapping(),
             "execution_defaults": self.execution_defaults.as_mapping(),
             "supported_indicator_ids": list(self.supported_indicator_ids),

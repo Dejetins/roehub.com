@@ -235,6 +235,7 @@
   "backtests.variants.csv": "CSV",
   "backtests.variants.empty": "Нет вариантов для этой job",
   "backtests.variants.loading": "Загрузка вариантов",
+  "backtests.variants.none_passed_quality_gate": "Нет стратегий, прошедших фильтр качества по числу сделок.",
   "backtests.variants.params": "Параметры",
   "backtests.variants.rank": "Ранг",
   "backtests.variants.title": "Top variants для job {job}",

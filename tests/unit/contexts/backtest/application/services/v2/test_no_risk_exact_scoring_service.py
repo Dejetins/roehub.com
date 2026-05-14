@@ -34,6 +34,7 @@ from trading.contexts.backtest.application.services.v2 import (
     NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
     NO_RISK_EXACT_SCORED_STATUS,
     NO_RISK_EXACT_SCORING_STAGE_NAME,
+    NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME,
     NO_RISK_HEAP_UPDATE_STAGE_NAME,
     NO_RISK_METRIC_NAMES,
     NO_RISK_SELF_CHECK_NOT_RUN_STATUS,
@@ -109,6 +110,7 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert set(result.telemetry.stage_timings) == {
         NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
         NO_RISK_EXACT_SCORING_STAGE_NAME,
+        NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME,
         NO_RISK_HEAP_UPDATE_STAGE_NAME,
         NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME,
     }
@@ -134,6 +136,26 @@ def test_no_risk_exact_boundary_scores_compact_internal_telemetry() -> None:
     assert mapping["telemetry"]["numba_thread_source"] == result.telemetry.numba_thread_source
     assert mapping["memory_cleanup_evidence"]["result_is_compact"] is True
     assert mapping["memory_cleanup_evidence"]["cleanup_duration_s"] >= 0.0
+
+
+def test_no_risk_quality_gate_filters_final_trade_count_only() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta", "gamma"))
+    request = _normalized_request(top_n=100)
+    request["quality_constraints"] = {"min_closed_trades": 2}
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(default_request_top_n=100),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=request,
+    )
+
+    assert result.top_results == ()
+    assert result.telemetry.min_closed_trades == 2
+    assert result.telemetry.exact_candidates_evaluated == 12
+    assert result.telemetry.quality_candidates_below_min_trades == 12
+    assert result.telemetry.quality_candidates_heap_eligible == 0
 
 
 def test_no_risk_heap_capacity_uses_request_top_n_not_benchmark_top_k() -> None:
@@ -1161,12 +1183,31 @@ def _patch_exact_scores(
 ) -> None:
     def fixed_evaluate(**kwargs: Any) -> None:
         buffers = kwargs["buffers"]
-        assert buffers.size == len(scores)
-        buffers.total_return_pct[:] = np.asarray(scores, dtype=np.float64)
+        prepared = cast(BacktestPreparePoolsResult, kwargs["prepared_result"])
+        selected_rows_by_indicator = cast(
+            Mapping[str, np.ndarray],
+            kwargs["selected_rows_by_indicator"],
+        )
+        pool_sizes = tuple(
+            int(
+                prepared.indicator_pools[
+                    prepared.indicator_ids.index(indicator_id)
+                ].trade_T.shape[0]
+            )
+            for indicator_id in prepared.indicator_ids
+        )
+        selected_scores = np.empty(buffers.size, dtype=np.float64)
+        for row_idx in range(buffers.size):
+            ordinal = 0
+            for indicator_pos, indicator_id in enumerate(prepared.indicator_ids):
+                ordinal *= pool_sizes[indicator_pos]
+                ordinal += int(selected_rows_by_indicator[indicator_id][row_idx])
+            selected_scores[row_idx] = float(scores[ordinal])
+        buffers.total_return_pct[:] = selected_scores
         buffers.max_drawdown_pct[:] = 0.0
         buffers.return_over_max_drawdown[:] = 0.0
         buffers.profit_factor[:] = 0.0
-        buffers.trade_count[:] = 0
+        buffers.trade_count[:] = 1
         buffers.sharpe_trades[:] = 0.0
         buffers.win_rate_pct[:] = 0.0
         buffers.avg_trade_ret_pct[:] = 0.0

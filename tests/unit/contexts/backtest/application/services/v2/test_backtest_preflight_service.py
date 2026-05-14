@@ -43,6 +43,12 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
     assert "total_return_pct" in response["ranking_metrics"]
     assert response["top_n_default"] == 50
     assert response["guardrails"]["max_candidate_combinations"] == 10_000_000_000_000
+    assert response["quality_constraints_default"] == {
+        "min_closed_trades_policy": "timeframe_sqrt_v1",
+        "base_trades_per_year_at_1h": 24,
+        "min_trades_per_year": 12,
+        "max_trades_per_year": 365,
+    }
     assert "ma.dema" in response["supported_indicator_ids"]
 
 
@@ -60,6 +66,7 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
         "symbol": "BTCUSDT",
     }
     assert first.normalized_request["timeframe"] == "15m"
+    assert first.normalized_request["quality_constraints"] == {"min_closed_trades": 300}
     assert first.normalized_request["execution"]["sizing"] == {
         "mode": "fixed_equity_pct",
         "equity_pct": 10.0,
@@ -87,6 +94,15 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
         "scheduling_class": "heavy",
     }
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),) * 2
+
+
+def test_preflight_accepts_explicit_min_closed_trades_override() -> None:
+    request = _valid_request()
+    request["quality_constraints"] = {"min_closed_trades": 37}
+
+    result = _service().execute(request)
+
+    assert result.normalized_request["quality_constraints"] == {"min_closed_trades": 37}
 
 
 @pytest.mark.parametrize(

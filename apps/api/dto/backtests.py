@@ -30,6 +30,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     ranking_metrics: list[str]
     ranking_default: dict[str, Any]
     top_n_default: int
+    quality_constraints_default: dict[str, Any]
     guardrails: dict[str, Any]
     execution_defaults: dict[str, Any]
     supported_indicator_ids: list[str]

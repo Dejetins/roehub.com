@@ -222,6 +222,9 @@ class BacktestTpSlExactTelemetry:
     sample_metrics: Mapping[str, float] | None = None
     numba_num_threads: int | None = None
     numba_thread_source: str | None = None
+    min_closed_trades: int = 0
+    quality_candidates_below_min_trades: int = 0
+    quality_candidates_heap_eligible: int = 0
 
     def __post_init__(self) -> None:
         if self.request_top_n <= 0:
@@ -236,6 +239,12 @@ class BacktestTpSlExactTelemetry:
             raise ValueError("top_results_count must be <= heap_capacity")
         if self.exact_candidates_evaluated < 0:
             raise ValueError("exact_candidates_evaluated must be >= 0")
+        if self.min_closed_trades < 0:
+            raise ValueError("min_closed_trades must be >= 0")
+        if self.quality_candidates_below_min_trades < 0:
+            raise ValueError("quality_candidates_below_min_trades must be >= 0")
+        if self.quality_candidates_heap_eligible < 0:
+            raise ValueError("quality_candidates_heap_eligible must be >= 0")
         if self.numba_num_threads is not None and self.numba_num_threads <= 0:
             raise ValueError("numba_num_threads must be > 0 when provided")
         object.__setattr__(
@@ -274,6 +283,9 @@ class BacktestTpSlExactTelemetry:
             else dict(self.sample_metrics),
             "numba_num_threads": self.numba_num_threads,
             "numba_thread_source": self.numba_thread_source,
+            "min_closed_trades": self.min_closed_trades,
+            "quality_candidates_below_min_trades": self.quality_candidates_below_min_trades,
+            "quality_candidates_heap_eligible": self.quality_candidates_heap_eligible,
         }
 
 

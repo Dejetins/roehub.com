@@ -54,6 +54,7 @@ NO_RISK_SELF_CHECK_STAGE_NAME = "self_check"
 NO_RISK_COMBO_CHUNK_DECODE_STAGE_NAME = "combo_chunk_decode"
 NO_RISK_PROXY_FILTER_STAGE_NAME = "proxy_filter"
 NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME = "metric_buffer_allocation"
+NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME = "full_metric_second_pass"
 NO_RISK_TELEMETRY_BUILD_STAGE_NAME = "telemetry_build"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
@@ -73,6 +74,8 @@ NO_RISK_METRIC_NAMES = (
     "avg_trade_exec_bars",
     "exposure_pct",
 )
+NO_RISK_SEARCH_METRIC_PROFILE = "ranking_total_return_trade_count"
+NO_RISK_FULL_METRIC_PROFILE = "full"
 
 
 class BacktestNoRiskExactRejected(ValueError):
@@ -104,6 +107,10 @@ class _MetricBuffers:
     def size(self) -> int:
         return int(self.total_return_pct.shape[0])
 
+    @property
+    def full_metrics_available(self) -> bool:
+        return int(self.max_drawdown_pct.shape[0]) == self.size
+
 
 @dataclass(frozen=True, slots=True)
 class _SelectedCandidateBatch:
@@ -127,6 +134,11 @@ class _TopKContext:
     indicator_ids: tuple[str, ...]
     row_ids_by_pos: tuple[np.ndarray, ...]
     metadata_by_pos: tuple[tuple[Any, ...], ...]
+
+
+@dataclass(slots=True)
+class _NoRiskScratch:
+    segment_pos_workspace: np.ndarray | None = None
 
 
 class _NoRiskHeapEntry(NamedTuple):
@@ -194,6 +206,12 @@ class BacktestNoRiskExactScoringService:
             default_request_top_n=self.config.default_request_top_n,
         )
         ranking = _ranking_from_normalized(normalized_request)
+        min_closed_trades = _min_closed_trades_from_normalized(normalized_request)
+        metric_profile = (
+            NO_RISK_SEARCH_METRIC_PROFILE
+            if ranking.is_default_total_return_desc
+            else NO_RISK_FULL_METRIC_PROFILE
+        )
         top_k_context = _top_k_context_from_prepared(prepared_result)
         backend_logical_name = _backend_logical_name(backend_id=backend.backend_id, arity=arity)
         stage_timings = {
@@ -243,11 +261,20 @@ class BacktestNoRiskExactScoringService:
 
             stage_timings[NO_RISK_EXACT_SCORING_STAGE_NAME] = 0.0
             stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] = 0.0
+            stage_timings[NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME] = 0.0
             heap = []
+            scratch = _NoRiskScratch()
             scored_count = 0
+            below_min_trades_count = 0
+            heap_eligible_count = 0
             sample_metrics: Mapping[str, float] | None = None
             if first_selected_batch is not None:
-                scored, sample_metrics = self._score_selected_rows(
+                (
+                    scored,
+                    sample_metrics,
+                    below_min_trades,
+                    heap_eligible,
+                ) = self._score_selected_rows(
                     selected_batch=first_selected_batch,
                     prepared_result=prepared_result,
                     combo_planning_result=combo_planning_result,
@@ -260,11 +287,21 @@ class BacktestNoRiskExactScoringService:
                     top_k_context=top_k_context,
                     top_k=request_top_n,
                     ranking=ranking,
+                    min_closed_trades=min_closed_trades,
+                    metric_profile=metric_profile,
+                    scratch=scratch,
                 )
                 scored_count += scored
+                below_min_trades_count += below_min_trades
+                heap_eligible_count += heap_eligible
             assert selected_batches_iter is not None
             for selected_batch in selected_batches_iter:
-                scored, sample_metrics = self._score_selected_rows(
+                (
+                    scored,
+                    sample_metrics,
+                    below_min_trades,
+                    heap_eligible,
+                ) = self._score_selected_rows(
                     selected_batch=selected_batch,
                     prepared_result=prepared_result,
                     combo_planning_result=combo_planning_result,
@@ -277,19 +314,30 @@ class BacktestNoRiskExactScoringService:
                     top_k_context=top_k_context,
                     top_k=request_top_n,
                     ranking=ranking,
+                    min_closed_trades=min_closed_trades,
+                    metric_profile=metric_profile,
+                    scratch=scratch,
                 )
                 scored_count += scored
+                below_min_trades_count += below_min_trades
+                heap_eligible_count += heap_eligible
 
             top_result_start = time.perf_counter()
             top_results = _top_results_from_heap(
                 heap,
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
+                execution_settings=execution_settings,
+                execution_open_1m=execution_open_1m,
+                execution_close_1m=execution_close_1m,
                 top_k_context=top_k_context,
+                stage_timings=stage_timings,
             )
             stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
                 time.perf_counter() - top_result_start
             )
+            if sample_metrics is None and top_results:
+                sample_metrics = dict(top_results[0].metrics)
             telemetry_start = time.perf_counter()
             numba_telemetry = current_backtest_numba_telemetry()
             _add_timing(
@@ -315,6 +363,10 @@ class BacktestNoRiskExactScoringService:
                 sample_metrics=sample_metrics,
                 numba_num_threads=int(numba_telemetry["numba_num_threads"]),
                 numba_thread_source=str(numba_telemetry["numba_thread_source"]),
+                min_closed_trades=min_closed_trades,
+                quality_candidates_below_min_trades=below_min_trades_count,
+                quality_candidates_heap_eligible=heap_eligible_count,
+                metric_profile=metric_profile,
             )
         finally:
             cleanup_start = time.perf_counter()
@@ -375,13 +427,19 @@ class BacktestNoRiskExactScoringService:
         top_k_context: _TopKContext,
         top_k: int,
         ranking: _RankingSpec,
-    ) -> tuple[int, Mapping[str, float] | None]:
+        min_closed_trades: int,
+        metric_profile: str,
+        scratch: _NoRiskScratch,
+    ) -> tuple[int, Mapping[str, float] | None, int, int]:
         selected_rows_by_indicator = selected_batch.rows_by_indicator
         selected_size = _selected_size(selected_rows_by_indicator)
         if selected_size <= 0:
-            return 0, sample_metrics
+            return 0, sample_metrics, 0, 0
         allocation_start = time.perf_counter()
-        buffers = _allocate_metric_buffers(selected_size)
+        buffers = _allocate_metric_buffers(
+            selected_size,
+            full_metrics=metric_profile == NO_RISK_FULL_METRIC_PROFILE,
+        )
         _add_timing(
             stage_timings=stage_timings if _exact_profile_enabled() else None,
             key=NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME,
@@ -396,11 +454,14 @@ class BacktestNoRiskExactScoringService:
             execution_open_1m=execution_open_1m,
             execution_close_1m=execution_close_1m,
             buffers=buffers,
+            scratch=scratch,
         )
         stage_timings[NO_RISK_EXACT_SCORING_STAGE_NAME] += (
             time.perf_counter() - exact_start
         )
-        if sample_metrics is None:
+        below_min_trades = int(np.count_nonzero(buffers.trade_count < min_closed_trades))
+        heap_eligible = buffers.size - below_min_trades
+        if sample_metrics is None and buffers.full_metrics_available:
             sample_metrics = _metrics_at(buffers=buffers, index=0)
         heap_start = time.perf_counter()
         if ranking.is_default_total_return_desc:
@@ -412,6 +473,7 @@ class BacktestNoRiskExactScoringService:
                 confirm=selected_batch.confirm,
                 proxy=selected_batch.proxy,
                 top_k=top_k,
+                min_closed_trades=min_closed_trades,
             )
         else:
             _update_heap_generic_ranking(
@@ -423,9 +485,15 @@ class BacktestNoRiskExactScoringService:
                 proxy=selected_batch.proxy,
                 top_k=top_k,
                 ranking=ranking,
+                min_closed_trades=min_closed_trades,
             )
         stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] += time.perf_counter() - heap_start
-        return buffers.size, sample_metrics
+        return (
+            buffers.size,
+            sample_metrics,
+            below_min_trades,
+            heap_eligible,
+        )
 
     def _run_self_check(
         self,
@@ -569,6 +637,7 @@ def evaluate_no_risk_exact_chunk(
     execution_open_1m: np.ndarray,
     execution_close_1m: np.ndarray,
     buffers: _MetricBuffers,
+    scratch: _NoRiskScratch | None = None,
 ) -> None:
     """
     Dispatch one selected no-risk chunk through the configured exact backend.
@@ -677,9 +746,10 @@ def evaluate_no_risk_exact_chunk(
             ),
             indicator_ids=indicator_ids,
         )
-        segment_pos_workspace = np.empty(
-            (combo_idx_by_indicator.shape[1], combo_idx_by_indicator.shape[0]),
-            dtype=np.int32,
+        segment_pos_workspace = _segment_pos_workspace(
+            scratch=scratch,
+            combo_count=int(combo_idx_by_indicator.shape[1]),
+            arity=int(combo_idx_by_indicator.shape[0]),
         )
         event_segments_n_no_risk(
             combo_idx_by_indicator,
@@ -1009,6 +1079,11 @@ def _write_final_metrics(
     out_exposure_pct: np.ndarray,
 ) -> None:
     total_return_pct = ((equity / init_cash_quote) - 1.0) * 100.0
+    out_total_return_pct[k] = total_return_pct
+    out_trade_count[k] = closed_trade_count
+    if out_max_drawdown_pct.shape[0] == 0:
+        return
+
     if gross_loss_quote > 0.0:
         profit_factor = gross_profit_quote / gross_loss_quote
     elif gross_profit_quote > 0.0:
@@ -1039,11 +1114,9 @@ def _write_final_metrics(
         bars_per_year_exec,
         t_exec,
     )
-    out_total_return_pct[k] = total_return_pct
     out_max_drawdown_pct[k] = max_drawdown_pct
     out_return_over_max_drawdown[k] = return_over_max_drawdown
     out_profit_factor[k] = profit_factor
-    out_trade_count[k] = closed_trade_count
     out_sharpe_trades[k] = sharpe_trades
     out_win_rate_pct[k] = win_rate_pct
     out_avg_trade_ret_pct[k] = avg_trade_ret_pct
@@ -2149,6 +2222,28 @@ def _request_top_n_from_normalized(
     return raw_top_n
 
 
+def _min_closed_trades_from_normalized(normalized_request: Mapping[str, Any]) -> int:
+    quality_constraints = normalized_request.get("quality_constraints")
+    if quality_constraints is None:
+        return 0
+    if not isinstance(quality_constraints, Mapping):
+        raise BacktestNoRiskExactRejected(
+            "normalized_request.quality_constraints must be a mapping"
+        )
+    raw_min_closed_trades = quality_constraints.get("min_closed_trades")
+    if raw_min_closed_trades is None:
+        return 0
+    if (
+        isinstance(raw_min_closed_trades, bool)
+        or not isinstance(raw_min_closed_trades, int)
+        or raw_min_closed_trades <= 0
+    ):
+        raise BacktestNoRiskExactRejected(
+            "normalized_request.quality_constraints.min_closed_trades must be a positive integer"
+        )
+    return int(raw_min_closed_trades)
+
+
 def _execution_settings_from_normalized(
     normalized_request: Mapping[str, Any],
     *,
@@ -2290,18 +2385,40 @@ def _selected_size(selected_rows_by_indicator: Mapping[str, np.ndarray]) -> int:
     return int(first.shape[0])
 
 
-def _allocate_metric_buffers(size: int) -> _MetricBuffers:
+def _segment_pos_workspace(
+    *,
+    scratch: _NoRiskScratch | None,
+    combo_count: int,
+    arity: int,
+) -> np.ndarray:
+    if scratch is None:
+        return np.empty((combo_count, arity), dtype=np.int32)
+    current = scratch.segment_pos_workspace
+    if (
+        current is None
+        or int(current.shape[0]) < combo_count
+        or int(current.shape[1]) < arity
+    ):
+        current = np.empty((combo_count, arity), dtype=np.int32)
+        scratch.segment_pos_workspace = current
+    return current[:combo_count, :arity]
+
+
+def _allocate_metric_buffers(size: int, *, full_metrics: bool = True) -> _MetricBuffers:
+    empty_float64 = np.empty(0, dtype=np.float64)
     return _MetricBuffers(
         total_return_pct=np.empty(size, dtype=np.float64),
-        max_drawdown_pct=np.empty(size, dtype=np.float64),
-        return_over_max_drawdown=np.empty(size, dtype=np.float64),
-        profit_factor=np.empty(size, dtype=np.float64),
+        max_drawdown_pct=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
+        return_over_max_drawdown=np.empty(size, dtype=np.float64)
+        if full_metrics
+        else empty_float64,
+        profit_factor=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
         trade_count=np.empty(size, dtype=np.int32),
-        sharpe_trades=np.empty(size, dtype=np.float64),
-        win_rate_pct=np.empty(size, dtype=np.float64),
-        avg_trade_ret_pct=np.empty(size, dtype=np.float64),
-        avg_trade_exec_bars=np.empty(size, dtype=np.float64),
-        exposure_pct=np.empty(size, dtype=np.float64),
+        sharpe_trades=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
+        win_rate_pct=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
+        avg_trade_ret_pct=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
+        avg_trade_exec_bars=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
+        exposure_pct=np.empty(size, dtype=np.float64) if full_metrics else empty_float64,
     )
 
 
@@ -2365,6 +2482,7 @@ def _update_heap_total_return_desc(
     confirm: np.ndarray | None,
     proxy: np.ndarray | None,
     top_k: int,
+    min_closed_trades: int,
 ) -> None:
     _update_heap_from_score_values(
         heap=heap,
@@ -2376,6 +2494,7 @@ def _update_heap_total_return_desc(
         confirm=confirm,
         proxy=proxy,
         top_k=top_k,
+        min_closed_trades=min_closed_trades,
     )
 
 
@@ -2389,6 +2508,7 @@ def _update_heap_generic_ranking(
     proxy: np.ndarray | None,
     top_k: int,
     ranking: _RankingSpec,
+    min_closed_trades: int,
 ) -> None:
     score_multiplier = 1.0 if ranking.direction == "desc" else -1.0
     _update_heap_from_score_values(
@@ -2401,6 +2521,7 @@ def _update_heap_generic_ranking(
         confirm=confirm,
         proxy=proxy,
         top_k=top_k,
+        min_closed_trades=min_closed_trades,
     )
 
 
@@ -2415,6 +2536,7 @@ def _update_heap_from_score_values(
     confirm: np.ndarray | None,
     proxy: np.ndarray | None,
     top_k: int,
+    min_closed_trades: int,
 ) -> None:
     selected_rows_by_pos = tuple(
         selected_rows_by_indicator[indicator_id]
@@ -2426,6 +2548,8 @@ def _update_heap_from_score_values(
         selected_0 = selected_rows_by_pos[0]
         row_ids_0 = row_ids_by_pos[0]
         for result_index in range(buffers.size):
+            if int(buffers.trade_count[result_index]) < min_closed_trades:
+                continue
             local_0 = int(selected_0[result_index])
             local_indices = (local_0,)
             original_rows = (int(row_ids_0[local_0]),)
@@ -2473,6 +2597,8 @@ def _update_heap_from_score_values(
         row_ids_0 = row_ids_by_pos[0]
         row_ids_1 = row_ids_by_pos[1]
         for result_index in range(buffers.size):
+            if int(buffers.trade_count[result_index]) < min_closed_trades:
+                continue
             local_0 = int(selected_0[result_index])
             local_1 = int(selected_1[result_index])
             local_indices = (local_0, local_1)
@@ -2516,6 +2642,8 @@ def _update_heap_from_score_values(
         return
 
     for result_index in range(buffers.size):
+        if int(buffers.trade_count[result_index]) < min_closed_trades:
+            continue
         local_values = []
         original_values = []
         for pos, selected_rows in enumerate(selected_rows_by_pos):
@@ -2587,7 +2715,7 @@ def _materialize_heap_entry(
         score=score,
         original_rows=original_rows,
         local_indices=local_indices,
-        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metric_values=_heap_metric_values(buffers=buffers, index=result_index),
         metric_buffers=None,
         metric_index=-1,
         metadata_by_pos=tuple(
@@ -2625,7 +2753,7 @@ def _materialize_heap_entry_arity1(
         score=score,
         original_rows=(original_row,),
         local_indices=(local_index,),
-        metric_values=_metric_values_at(buffers=buffers, index=result_index),
+        metric_values=_heap_metric_values(buffers=buffers, index=result_index),
         metric_buffers=None,
         metric_index=-1,
         metadata_by_pos=(top_k_context.metadata_by_pos[0][local_index],),
@@ -2640,11 +2768,30 @@ def _top_results_from_heap(
     *,
     prepared_result: BacktestPreparePoolsResult,
     combo_planning_result: BacktestComboPlanningResult,
+    execution_settings: _ExecutionSettings,
+    execution_open_1m: np.ndarray,
+    execution_close_1m: np.ndarray,
     top_k_context: _TopKContext,
+    stage_timings: dict[str, float],
 ) -> tuple[BacktestNoRiskTopResult, ...]:
     pools_by_id = _pool_by_id(prepared_result)
+    sorted_entries = tuple(
+        entry
+        for _, entry in sorted(heap, key=lambda pair: pair[0], reverse=True)
+    )
+    hydrated_entries = _hydrate_full_metric_entries(
+        sorted_entries,
+        prepared_result=prepared_result,
+        combo_planning_result=combo_planning_result,
+        execution_settings=execution_settings,
+        execution_open_1m=execution_open_1m,
+        execution_close_1m=execution_close_1m,
+        top_k_context=top_k_context,
+        stage_timings=stage_timings,
+    )
+    n_intervals = int(prepared_result.signal_returns_15m.shape[0])
     eval_rows_by_pos = tuple(
-        np.ascontiguousarray(pools_by_id[indicator_id].eval_T)
+        pools_by_id[indicator_id].eval_T[:, :n_intervals]
         for indicator_id in top_k_context.indicator_ids
     )
     proxy_context = combo_planning_result.proxy_context
@@ -2671,11 +2818,51 @@ def _top_results_from_heap(
                 ),
             ),
         )
-        for rank, (_, entry) in enumerate(
-            sorted(heap, key=lambda pair: pair[0], reverse=True),
-            start=1,
-        )
+        for rank, entry in enumerate(hydrated_entries, start=1)
     )
+
+
+def _hydrate_full_metric_entries(
+    entries: tuple[_NoRiskHeapEntry, ...],
+    *,
+    prepared_result: BacktestPreparePoolsResult,
+    combo_planning_result: BacktestComboPlanningResult,
+    execution_settings: _ExecutionSettings,
+    execution_open_1m: np.ndarray,
+    execution_close_1m: np.ndarray,
+    top_k_context: _TopKContext,
+    stage_timings: dict[str, float],
+) -> tuple[_NoRiskHeapEntry, ...]:
+    if not entries or all(entry.metric_values for entry in entries):
+        return entries
+
+    pass_start = time.perf_counter()
+    rows_by_indicator = {
+        indicator_id: np.asarray(
+            [entry.local_indices[pos] for entry in entries],
+            dtype=np.int32,
+        )
+        for pos, indicator_id in enumerate(top_k_context.indicator_ids)
+    }
+    buffers = _allocate_metric_buffers(len(entries), full_metrics=True)
+    evaluate_no_risk_exact_chunk(
+        selected_rows_by_indicator=rows_by_indicator,
+        prepared_result=prepared_result,
+        combo_planning_result=combo_planning_result,
+        execution_settings=execution_settings,
+        execution_open_1m=execution_open_1m,
+        execution_close_1m=execution_close_1m,
+        buffers=buffers,
+        scratch=_NoRiskScratch(),
+    )
+    hydrated = tuple(
+        entry._replace(metric_values=_metric_values_at(buffers=buffers, index=index))
+        for index, entry in enumerate(entries)
+    )
+    stage_timings[NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME] += (
+        time.perf_counter() - pass_start
+    )
+    return hydrated
 
 
 def _metric_values_from_heap_entry(entry: _NoRiskHeapEntry) -> tuple[float, ...]:
@@ -2684,6 +2871,12 @@ def _metric_values_from_heap_entry(entry: _NoRiskHeapEntry) -> tuple[float, ...]
     if entry.metric_buffers is None:
         raise RuntimeError("deferred no-risk heap metrics require metric buffers")
     return _metric_values_at(buffers=entry.metric_buffers, index=entry.metric_index)
+
+
+def _heap_metric_values(*, buffers: _MetricBuffers, index: int) -> tuple[float, ...]:
+    if not buffers.full_metrics_available:
+        return ()
+    return _metric_values_at(buffers=buffers, index=index)
 
 
 def _top_result_metadata(
@@ -2796,6 +2989,7 @@ __all__ = [
     "NO_RISK_EXACT_BOUNDARY_STATUS",
     "NO_RISK_EXACT_SCORED_STATUS",
     "NO_RISK_EXACT_SCORING_STAGE_NAME",
+    "NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME",
     "NO_RISK_HEAP_UPDATE_STAGE_NAME",
     "NO_RISK_METRIC_NAMES",
     "NO_RISK_SELF_CHECK_NOT_RUN_STATUS",

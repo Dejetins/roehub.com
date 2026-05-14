@@ -1288,7 +1288,7 @@ function renderVariantExpansion(root, row) {
     : "backtests-variant-frame backtests-variant-frame--static";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
-    : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : t("backtests.variants.empty"))}</td></tr>`;
+    : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : variantEmptyText(row, summary))}</td></tr>`;
   return `
     <tr class="backtests-variant-expansion">
       <td class="backtests-variant-cell" colspan="9">
@@ -1317,12 +1317,35 @@ function renderVariantExpansion(root, row) {
                 <tbody>${body}</tbody>
               </table>
             </div>
-            ${renderSelectedVariantDetail(root, row.job_id, variants)}
+            ${variants.length ? renderSelectedVariantDetail(root, row.job_id, variants) : renderVariantEmptyDetail(row, summary)}
           </section>
         </div>
       </td>
     </tr>
   `;
+}
+
+function variantEmptyText(row, summary) {
+  if (isQualityGateEmptyResult(row, summary)) {
+    return t("backtests.variants.none_passed_quality_gate");
+  }
+  return t("backtests.variants.empty");
+}
+
+function renderVariantEmptyDetail(row, summary) {
+  const message = isQualityGateEmptyResult(row, summary)
+    ? t("backtests.variants.none_passed_quality_gate")
+    : t("backtests.results.unavailable");
+  return `
+    <section class="backtests-result-detail" data-result-state="unavailable">
+      <div class="backtests-result-state">${escapeHtml(message)}</div>
+    </section>
+  `;
+}
+
+function isQualityGateEmptyResult(row, summary) {
+  const topCount = Number(summary?.job?.terminal_summary?.top_variants_count);
+  return row?.state === "succeeded" && summary && Number.isFinite(topCount) && topCount === 0;
 }
 
 function queueVariantPanelAnimation(root) {

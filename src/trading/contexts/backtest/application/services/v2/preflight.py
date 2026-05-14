@@ -57,6 +57,11 @@ DEFAULT_BACKTEST_RANKING_V1: Mapping[str, str] = {
     "direction": "desc",
 }
 DEFAULT_BACKTEST_TOP_N_V1 = 50
+DEFAULT_BACKTEST_MIN_CLOSED_TRADES_POLICY_V1 = "timeframe_sqrt_v1"
+DEFAULT_BACKTEST_MIN_TRADES_PER_YEAR_V1 = 12
+DEFAULT_BACKTEST_MAX_TRADES_PER_YEAR_V1 = 365
+DEFAULT_BACKTEST_BASE_TRADES_PER_YEAR_AT_1H_V1 = 24
+HOURS_PER_YEAR_V1 = 365.25 * 24.0
 
 BACKTEST_ERROR_INVALID_REQUEST = "backtest.invalid_request"
 BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED = "backtest.tp_sl_grid_not_covered"
@@ -130,6 +135,7 @@ class BacktestRuntimeDefaultsService:
             ranking_metrics=BACKTEST_RANKING_METRICS_V1,
             ranking_default=DEFAULT_BACKTEST_RANKING_V1,
             top_n_default=DEFAULT_BACKTEST_TOP_N_V1,
+            quality_constraints_default=_quality_constraints_default_mapping(),
             guardrails=self.runtime_config.guardrails,
             execution_defaults=self.runtime_config.execution_defaults,
             supported_indicator_ids=supported_indicator_ids,
@@ -231,6 +237,11 @@ class BacktestPreflightService:
         execution = self._normalize_execution(payload=payload)
         ranking = self._normalize_ranking(payload=payload)
         top_n = self._normalize_top_n(payload=payload)
+        quality_constraints = self._normalize_quality_constraints(
+            payload=payload,
+            timeframe=timeframe,
+            time_range=time_range,
+        )
         risk, tp_sl_cells = self._normalize_risk(payload=payload, guardrails=guardrails)
 
         too_expensive_issues = self._cost_guardrail_issues(
@@ -257,6 +268,7 @@ class BacktestPreflightService:
             "execution": execution,
             "ranking": ranking,
             "top_n": top_n,
+            "quality_constraints": quality_constraints,
         }
         request_hash = _canonical_json_sha256(normalized_request)
         result_config_hash = self._result_config_hash()
@@ -661,6 +673,35 @@ class BacktestPreflightService:
         raw_top_n = payload.get("top_n", DEFAULT_BACKTEST_TOP_N_V1)
         return _positive_int(raw_top_n, path="top_n")
 
+    def _normalize_quality_constraints(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        timeframe: str,
+        time_range: Mapping[str, str],
+    ) -> dict[str, int]:
+        raw_constraints = payload.get("quality_constraints", {})
+        if raw_constraints is None:
+            raw_constraints = {}
+        if not isinstance(raw_constraints, Mapping):
+            raise _invalid_request(
+                path="quality_constraints",
+                code="invalid_type",
+                message="quality_constraints must be an object when provided",
+            )
+        raw_min_closed_trades = raw_constraints.get("min_closed_trades")
+        if raw_min_closed_trades is None:
+            min_closed_trades = _auto_min_closed_trades(
+                timeframe=timeframe,
+                time_range=time_range,
+            )
+        else:
+            min_closed_trades = _positive_int(
+                raw_min_closed_trades,
+                path="quality_constraints.min_closed_trades",
+            )
+        return {"min_closed_trades": min_closed_trades}
+
     def _normalize_risk(
         self,
         *,
@@ -829,6 +870,7 @@ class BacktestPreflightService:
             "ranking_default": DEFAULT_BACKTEST_RANKING_V1,
             "supported_timeframes": SUPPORTED_BACKTEST_TIMEFRAMES_V1,
             "top_n_default": DEFAULT_BACKTEST_TOP_N_V1,
+            "quality_constraints_default": _quality_constraints_default_mapping(),
             "hit_times_grid": {
                 "tp_levels_pct": self.runtime_config.hit_times_tp_levels_pct,
                 "sl_levels_pct": self.runtime_config.hit_times_sl_levels_pct,
@@ -1139,6 +1181,84 @@ def _cost_class(*, candidate_combinations: int) -> str:
     if candidate_combinations <= 50_000:
         return "medium"
     return "large"
+
+
+def _quality_constraints_default_mapping() -> dict[str, int | str]:
+    return {
+        "min_closed_trades_policy": DEFAULT_BACKTEST_MIN_CLOSED_TRADES_POLICY_V1,
+        "base_trades_per_year_at_1h": DEFAULT_BACKTEST_BASE_TRADES_PER_YEAR_AT_1H_V1,
+        "min_trades_per_year": DEFAULT_BACKTEST_MIN_TRADES_PER_YEAR_V1,
+        "max_trades_per_year": DEFAULT_BACKTEST_MAX_TRADES_PER_YEAR_V1,
+    }
+
+
+def _auto_min_closed_trades(
+    *,
+    timeframe: str,
+    time_range: Mapping[str, str],
+) -> int:
+    start = _parse_utc_timestamp(time_range.get("start"), path="time_range.start")
+    end = _parse_utc_timestamp(time_range.get("end"), path="time_range.end")
+    period_hours = max((end - start).total_seconds() / 3600.0, 0.0)
+    timeframe_minutes = _timeframe_minutes(timeframe)
+    trades_per_year = _timeframe_scaled_trades_per_year(
+        timeframe_minutes=timeframe_minutes,
+    )
+    years = period_hours / HOURS_PER_YEAR_V1
+    return max(1, int(math.ceil(years * trades_per_year)))
+
+
+def _timeframe_scaled_trades_per_year(*, timeframe_minutes: int) -> int:
+    if timeframe_minutes <= 0:
+        raise _invalid_request(
+            path="timeframe",
+            code="unsupported_timeframe",
+            message="timeframe must be positive",
+        )
+    scaled = DEFAULT_BACKTEST_BASE_TRADES_PER_YEAR_AT_1H_V1 * math.sqrt(
+        60.0 / float(timeframe_minutes)
+    )
+    bounded = min(
+        DEFAULT_BACKTEST_MAX_TRADES_PER_YEAR_V1,
+        max(DEFAULT_BACKTEST_MIN_TRADES_PER_YEAR_V1, int(math.ceil(scaled))),
+    )
+    return int(bounded)
+
+
+def _timeframe_minutes(timeframe: str) -> int:
+    normalized = timeframe.strip().lower()
+    if len(normalized) < 2:
+        raise _invalid_request(
+            path="timeframe",
+            code="unsupported_timeframe",
+            message="timeframe must use '<integer><m|h|d>' form",
+        )
+    raw_value = normalized[:-1]
+    unit = normalized[-1]
+    if not raw_value.isdigit():
+        raise _invalid_request(
+            path="timeframe",
+            code="unsupported_timeframe",
+            message="timeframe must use '<integer><m|h|d>' form",
+        )
+    value = int(raw_value)
+    if value <= 0:
+        raise _invalid_request(
+            path="timeframe",
+            code="unsupported_timeframe",
+            message="timeframe value must be > 0",
+        )
+    if unit == "m":
+        return value
+    if unit == "h":
+        return value * 60
+    if unit == "d":
+        return value * 60 * 24
+    raise _invalid_request(
+        path="timeframe",
+        code="unsupported_timeframe",
+        message="timeframe must use '<integer><m|h|d>' form",
+    )
 
 
 def _preflight_scheduling_class(

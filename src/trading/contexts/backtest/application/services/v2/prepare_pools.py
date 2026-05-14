@@ -264,7 +264,7 @@ class BacktestPreparePoolsService:
             raise BacktestPreparePoolsRejected(
                 f"runtime arrays timeframe {runtime_arrays.timeframe!r} does not match "
                 f"request timeframe {timeframe!r}"
-            )
+        )
         indicator_requests = _indicator_requests_from_normalized(normalized_request)
         fee_rate = _fee_rate_from_normalized(normalized_request)
 
@@ -473,9 +473,7 @@ def prefilter_indicator_rows(
 
     filtered_row_ids = np.ascontiguousarray(row_ids_i32[keep_idx])
     filtered_trade_T = np.ascontiguousarray(trade_T[keep_idx])
-    filtered_eval_T = np.ascontiguousarray(
-        filtered_trade_T[:, : int(signal_returns_15m.shape[0])]
-    )
+    filtered_eval_T = filtered_trade_T[:, : int(signal_returns_15m.shape[0])]
     filtered_metadata = tuple(metadata[int(index)] for index in keep_idx)
     row_score = np.ascontiguousarray(adjusted[keep_idx])
     return _PrefilteredIndicatorRows(

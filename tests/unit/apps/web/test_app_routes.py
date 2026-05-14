@@ -792,6 +792,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "top_limit" in backtests_js
     assert "variantPreviewLimit" in backtests_js
     assert "queueVariantPanelAnimation" in backtests_js
+    assert "variantEmptyText" in backtests_js
+    assert "backtests.variants.none_passed_quality_gate" in backtests_js
     assert "compactMagnitude(indicatorCombinationCount())" in backtests_js
     assert "trashIcon(t(\"backtests.actions.delete\"))" in backtests_js
     assert "&times;" not in backtests_js

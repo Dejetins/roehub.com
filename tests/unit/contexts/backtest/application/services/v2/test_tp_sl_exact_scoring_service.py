@@ -408,6 +408,42 @@ def test_tp_sl_heap_uses_request_top_n_and_not_benchmark_top_k(
     ]
 
 
+def test_tp_sl_quality_gate_filters_final_trade_count_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(
+        indicator_ids=("alpha", "beta"),
+        trade_rows_by_id={
+            "alpha": [[1, 1, 0, 0], [1, 1, 0, 0]],
+            "beta": [[1, 1, 0, 0], [1, 1, 0, 0], [1, 1, 0, 0]],
+        },
+    )
+    _patch_tp_sl_scores(
+        monkeypatch,
+        scores=(1.0, 5.0, 5.0, 2.0, 3.0, 4.0),
+        trade_counts=(1, 1, 1, 1, 1, 1),
+        best_tp=(0, 0, 1, 0, 0, 0),
+        best_sl=(0, 0, 0, 0, 0, 0),
+    )
+    request = _normalized_request(top_n=100, fee_rate=0.0)
+    request["quality_constraints"] = {"min_closed_trades": 2}
+
+    result = BacktestTpSlExactScoringService(
+        config=BacktestTpSlExactConfig(benchmark_top_k=3, default_request_top_n=100),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        hit_times_result=_hit_times_result(tp_values=(0.02, 0.10), sl_values=(0.02,)),
+        normalized_request=request,
+    )
+
+    assert result.top_results == ()
+    assert result.telemetry.min_closed_trades == 2
+    assert result.telemetry.exact_candidates_evaluated == 6
+    assert result.telemetry.quality_candidates_below_min_trades == 6
+    assert result.telemetry.quality_candidates_heap_eligible == 0
+
+
 def test_tp_sl_full_metrics_second_pass_is_bounded_and_service_only() -> None:
     prepared = _prepared_result(
         indicator_ids=("alpha",),
@@ -748,6 +784,7 @@ def _patch_tp_sl_scores(
     monkeypatch: pytest.MonkeyPatch,
     *,
     scores: Sequence[float],
+    trade_counts: Sequence[int] | None = None,
     best_tp: Sequence[int],
     best_sl: Sequence[int],
 ) -> None:
@@ -755,7 +792,10 @@ def _patch_tp_sl_scores(
         buffers = kwargs["buffers"]
         assert buffers.size == len(scores)
         buffers.total_return_pct[:] = np.asarray(scores, dtype=np.float64)
-        buffers.trade_count[:] = 1
+        buffers.trade_count[:] = np.asarray(
+            trade_counts if trade_counts is not None else [1] * len(scores),
+            dtype=np.int32,
+        )
         buffers.best_tp_idx[:] = np.asarray(best_tp, dtype=np.int32)
         buffers.best_sl_idx[:] = np.asarray(best_sl, dtype=np.int32)
 
