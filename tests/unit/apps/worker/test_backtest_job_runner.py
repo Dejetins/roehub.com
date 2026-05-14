@@ -34,7 +34,7 @@ def _runtime_config(**overrides: Any) -> BacktestJobRunnerRuntimeConfig:
     payload = {
         "enabled": True,
         "concurrency": 1,
-        "light_concurrency": 2,
+        "light_concurrency": 0,
         "heavy_concurrency": 1,
         "poll_interval_seconds": 0.001,
         "empty_backoff_seconds": 0.001,
@@ -186,7 +186,7 @@ def test_runner_metrics_records_lazy_detail_cache_status() -> None:
     assert metrics.lazy_trades_cache_total.labels(status="miss")._value.get() == 1
 
 
-def test_task_scheduler_probes_heavy_before_light_lane() -> None:
+def test_task_scheduler_uses_heavy_lane_only_for_full_jobs() -> None:
     heavy_worker = _TaskWorker(
         results=[
             BacktestJobWorkerResult(
@@ -195,10 +195,8 @@ def test_task_scheduler_probes_heavy_before_light_lane() -> None:
             )
         ]
     )
-    light_worker = _TaskWorker(results=[])
     lazy_worker = _TaskWorker(results=[])
     scheduler = BacktestRunnerTaskScheduler(
-        light_full_job_worker=cast(Any, light_worker),
         heavy_full_job_worker=cast(Any, heavy_worker),
         lazy_detail_worker=cast(Any, lazy_worker),
     )
@@ -211,7 +209,7 @@ def test_task_scheduler_probes_heavy_before_light_lane() -> None:
     assert isinstance(result, BacktestJobWorkerResult)
     assert result.claimed is True
     assert heavy_worker.calls == 1
-    assert light_worker.calls == 0
+    assert scheduler.next_launch(active_light=1, active_heavy=0, active_lazy=0) is None
 
 
 class _SingleLaunchScheduler:

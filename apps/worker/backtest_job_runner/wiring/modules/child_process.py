@@ -46,6 +46,7 @@ class BacktestChildProcessExecutor:
         updated_at: datetime,
     ) -> object:
         _ = updated_at
+        scheduling_class: BacktestSchedulingClass = "heavy"
         started = datetime.now().timestamp()
         with tempfile.TemporaryDirectory(prefix="roehub-backtest-child-") as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -70,19 +71,19 @@ class BacktestChildProcessExecutor:
                 "--output-json",
                 str(output_path),
                 "--scheduling-class",
-                self.scheduling_class,
+                scheduling_class,
                 "--light-max-actual-combinations",
                 str(self.light_max_actual_combinations),
             ]
             env = backtest_numba_environ(
                 environ={**self.environ, "PYTHONUNBUFFERED": "1"},
-                scheduling_class=self.scheduling_class,
+                scheduling_class=scheduling_class,
             )
             log.info(
                 "starting backtest child process: job_id=%s scheduling_class=%s "
                 "numba_threads=%s numba_thread_source=%s",
                 job_id,
-                self.scheduling_class,
+                scheduling_class,
                 env.get("ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS"),
                 env.get("ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"),
             )
@@ -94,7 +95,7 @@ class BacktestChildProcessExecutor:
                 metadata={
                     "task_kind": "full_job",
                     "job_id": str(job_id),
-                    "scheduling_class": self.scheduling_class,
+                    "scheduling_class": scheduling_class,
                     "child_module": self.child_module,
                     "numba_threads": env.get(
                         "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS"

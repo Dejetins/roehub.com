@@ -170,7 +170,7 @@ def test_create_persists_queued_background_job_and_triggers_execution() -> None:
     scheduling = stored.request_json["scheduling"]
     assert scheduling["version"] == 1
     assert scheduling["source"] == "preflight"
-    assert scheduling["scheduling_class"] == "light_candidate"
+    assert scheduling["scheduling_class"] == "heavy"
     assert scheduling["estimated_combinations_upper_bound"] == 1
     assert scheduling["estimated_combinations"] == 1
     assert stored.request_hash == "d" * 64

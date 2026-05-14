@@ -18,37 +18,25 @@ from trading.contexts.backtest.application.use_cases import (
 )
 
 
-def test_scheduler_probes_heavy_before_light_and_batches_light_slots() -> None:
+def test_scheduler_uses_single_heavy_full_job_lane() -> None:
     scheduler = _scheduler()
 
     first = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
     assert first is not None
     assert first.scheduling_class == "heavy"
+
+    assert scheduler.next_launch(active_light=0, active_heavy=1, active_lazy=0) is None
+    assert scheduler.next_launch(active_light=1, active_heavy=0, active_lazy=0) is None
+
+
+def test_scheduler_rechecks_heavy_after_successful_full_job() -> None:
+    scheduler = _scheduler()
     scheduler.record_result(
         scheduling_class="heavy",
-        result=BacktestRunnerTaskResult(task_kind="full_job", claimed=False),
-    )
-
-    second = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
-    assert second is not None
-    assert second.scheduling_class == "light_candidate"
-    third = scheduler.next_launch(active_light=1, active_heavy=0, active_lazy=0)
-    assert third is not None
-    assert third.scheduling_class == "light_candidate"
-
-
-def test_scheduler_rechecks_heavy_after_light_anti_starvation_limit() -> None:
-    scheduler = _scheduler(full_job_anti_starvation_limit=1)
-    scheduler.record_result(
-        scheduling_class="heavy",
-        result=BacktestRunnerTaskResult(task_kind="full_job", claimed=False),
-    )
-    scheduler.record_result(
-        scheduling_class="light_candidate",
         result=BacktestRunnerTaskResult(
             task_kind="full_job",
             claimed=True,
-            scheduling_class="light_candidate",
+            scheduling_class="heavy",
         ),
     )
 
@@ -62,7 +50,6 @@ def test_scheduler_returns_to_full_poll_after_empty_lazy_probe() -> None:
     scheduler = _scheduler()
 
     _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
-    _record_empty_full_probe(scheduler=scheduler, scheduling_class="light_candidate")
     _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
     lazy = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
     assert lazy is not None
@@ -82,7 +69,6 @@ def test_scheduler_limits_consecutive_lazy_claims_before_full_probe() -> None:
     scheduler = _scheduler(lazy_detail_anti_starvation_limit=2)
 
     _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
-    _record_empty_full_probe(scheduler=scheduler, scheduling_class="light_candidate")
     _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
     for _ in range(2):
         lazy = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
@@ -104,7 +90,8 @@ def test_production_runner_wiring_does_not_construct_full_compute_service_in_par
 
     assert "BacktestRuntimeJobOrchestrationService" not in source
     assert "BacktestChildProcessExecutor" in source
-    assert "scheduling_classes=(\"heavy\",)" in source
+    assert "light_full_job_worker" not in source
+    assert "scheduling_classes=None" in source
 
 
 def test_child_compute_wiring_uses_canonical_selection_configs() -> None:
@@ -149,17 +136,13 @@ def _record_empty_full_probe(
 def _scheduler(
     *,
     lazy_detail_anti_starvation_limit: int = 5,
-    full_job_anti_starvation_limit: int = 4,
 ) -> BacktestRunnerTaskScheduler:
     return BacktestRunnerTaskScheduler(
-        light_full_job_worker=cast(BacktestJobWorkerUseCase, _FakeFullWorker()),
         heavy_full_job_worker=cast(BacktestJobWorkerUseCase, _FakeFullWorker()),
         lazy_detail_worker=cast(
             BacktestLazyTradesMaterializationWorkerUseCase,
             _FakeLazyWorker(),
         ),
-        light_concurrency=2,
         heavy_concurrency=1,
         lazy_detail_anti_starvation_limit=lazy_detail_anti_starvation_limit,
-        full_job_anti_starvation_limit=full_job_anti_starvation_limit,
     )

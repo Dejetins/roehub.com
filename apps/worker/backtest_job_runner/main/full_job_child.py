@@ -6,7 +6,6 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 from uuid import UUID
 
 from apps.worker.backtest_job_runner.wiring.modules.child_ipc import (
@@ -50,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     job_id = UUID(args.job_id)
     preflight_path = Path(args.preflight_json)
     output_path = Path(args.output_json)
-    scheduling_class = cast(BacktestSchedulingClass, args.scheduling_class)
+    _ = args.scheduling_class
+    scheduling_class: BacktestSchedulingClass = "heavy"
     os.environ.update(
         backtest_numba_environ(environ=os.environ, scheduling_class=scheduling_class)
     )

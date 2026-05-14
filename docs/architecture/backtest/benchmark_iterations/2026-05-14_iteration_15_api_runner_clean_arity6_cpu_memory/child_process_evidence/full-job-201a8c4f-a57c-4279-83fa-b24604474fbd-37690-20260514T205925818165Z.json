@@ -1,0 +1,43 @@
+{
+  "command": [
+    "/opt/roehub/app/.venv/bin/python",
+    "-m",
+    "apps.worker.backtest_job_runner.main.full_job_child",
+    "--job-id",
+    "201a8c4f-a57c-4279-83fa-b24604474fbd",
+    "--preflight-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-gp9njy4f/preflight.json",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-gp9njy4f/result.json",
+    "--scheduling-class",
+    "heavy",
+    "--light-max-actual-combinations",
+    "50000"
+  ],
+  "elapsed_seconds": 17.182653,
+  "exit_code": 0,
+  "finished_at": "2026-05-14T20:59:25.813655Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "job_id": "201a8c4f-a57c-4279-83fa-b24604474fbd",
+    "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+    "numba_threads": "12",
+    "scheduling_class": "heavy",
+    "task_kind": "full_job"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 37667,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 344064,
+  "parent_rss_after_bytes": 134250496,
+  "parent_rss_before_bytes": 133906432,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 249249792,
+  "pid": 37690,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-05-14T20:59:08.631002Z",
+  "stderr_tail": "2026-05-14 23:59:09,004 INFO __main__ backtest child process started: job_id=201a8c4f-a57c-4279-83fa-b24604474fbd scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-05-14 23:59:25,721 INFO __main__ backtest child process finished: job_id=201a8c4f-a57c-4279-83fa-b24604474fbd status=succeeded elapsed_seconds=16.717\n",
+  "stdout_tail": "",
+  "timed_out": false
+}

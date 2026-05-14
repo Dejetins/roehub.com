@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import heapq
 import math
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, NamedTuple
@@ -50,6 +51,10 @@ NO_RISK_HEAP_UPDATE_STAGE_NAME = "heap_update"
 NO_RISK_TOP_RESULT_ASSEMBLY_STAGE_NAME = "top_result_assembly"
 NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME = "top_result_proxy_fill"
 NO_RISK_SELF_CHECK_STAGE_NAME = "self_check"
+NO_RISK_COMBO_CHUNK_DECODE_STAGE_NAME = "combo_chunk_decode"
+NO_RISK_PROXY_FILTER_STAGE_NAME = "proxy_filter"
+NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME = "metric_buffer_allocation"
+NO_RISK_TELEMETRY_BUILD_STAGE_NAME = "telemetry_build"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
 NO_RISK_SELF_CHECK_NOT_RUN_STATUS = "not_run"
@@ -212,9 +217,11 @@ class BacktestNoRiskExactScoringService:
         selected_batch: _SelectedCandidateBatch | None = None
         heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] | None = None
         try:
+            profile_stage_timings = stage_timings if _exact_profile_enabled() else None
             selected_batches_iter = _iter_selected_candidate_batches(
                 prepared_result=prepared_result,
                 combo_planning_result=combo_planning_result,
+                profile_stage_timings=profile_stage_timings,
             )
             first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
             if self.config.run_self_check:
@@ -283,7 +290,13 @@ class BacktestNoRiskExactScoringService:
             stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
                 time.perf_counter() - top_result_start
             )
+            telemetry_start = time.perf_counter()
             numba_telemetry = current_backtest_numba_telemetry()
+            _add_timing(
+                stage_timings=profile_stage_timings,
+                key=NO_RISK_TELEMETRY_BUILD_STAGE_NAME,
+                elapsed=time.perf_counter() - telemetry_start,
+            )
             telemetry = BacktestNoRiskExactTelemetry(
                 stage_timings=stage_timings,
                 request_top_n=request_top_n,
@@ -367,7 +380,13 @@ class BacktestNoRiskExactScoringService:
         selected_size = _selected_size(selected_rows_by_indicator)
         if selected_size <= 0:
             return 0, sample_metrics
+        allocation_start = time.perf_counter()
         buffers = _allocate_metric_buffers(selected_size)
+        _add_timing(
+            stage_timings=stage_timings if _exact_profile_enabled() else None,
+            key=NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME,
+            elapsed=time.perf_counter() - allocation_start,
+        )
         exact_start = time.perf_counter()
         evaluate_no_risk_exact_chunk(
             selected_rows_by_indicator=selected_rows_by_indicator,
@@ -2189,14 +2208,31 @@ def _iter_selected_candidate_batches(
     *,
     prepared_result: BacktestPreparePoolsResult,
     combo_planning_result: BacktestComboPlanningResult,
+    profile_stage_timings: dict[str, float] | None = None,
 ) -> Iterator[_SelectedCandidateBatch]:
     local_row_pools = build_local_row_pools(prepared_result=prepared_result)
     filter_service = BacktestComboPlanningService()
-    for combo_chunk in iter_ordinal_combo_chunks(
+    combo_chunks = iter_ordinal_combo_chunks(
         indicator_ids=prepared_result.indicator_ids,
         local_row_pools=local_row_pools,
         chunk_size=COMBO_CHUNK_SIZE,
-    ):
+    )
+    while True:
+        decode_start = time.perf_counter()
+        try:
+            combo_chunk = next(combo_chunks)
+        except StopIteration:
+            _add_timing(
+                stage_timings=profile_stage_timings,
+                key=NO_RISK_COMBO_CHUNK_DECODE_STAGE_NAME,
+                elapsed=time.perf_counter() - decode_start,
+            )
+            break
+        _add_timing(
+            stage_timings=profile_stage_timings,
+            key=NO_RISK_COMBO_CHUNK_DECODE_STAGE_NAME,
+            elapsed=time.perf_counter() - decode_start,
+        )
         if not combo_planning_result.proxy_context.active:
             yield _SelectedCandidateBatch(
                 rows_by_indicator=combo_chunk.rows_by_indicator,
@@ -2204,9 +2240,15 @@ def _iter_selected_candidate_batches(
                 proxy=None,
             )
             continue
+        proxy_start = time.perf_counter()
         filter_result = filter_service.proxy_filter(
             combo_chunk=combo_chunk,
             proxy_context=combo_planning_result.proxy_context,
+        )
+        _add_timing(
+            stage_timings=profile_stage_timings,
+            key=NO_RISK_PROXY_FILTER_STAGE_NAME,
+            elapsed=time.perf_counter() - proxy_start,
         )
         if filter_result.selected_candidate_count > 0:
             yield _SelectedCandidateBatch(
@@ -2214,6 +2256,22 @@ def _iter_selected_candidate_batches(
                 confirm=filter_result.confirm,
                 proxy=filter_result.proxy,
             )
+
+
+def _exact_profile_enabled() -> bool:
+    raw = os.environ.get("ROEHUB_BACKTEST_EXACT_PROFILE", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _add_timing(
+    *,
+    stage_timings: dict[str, float] | None,
+    key: str,
+    elapsed: float,
+) -> None:
+    if stage_timings is None:
+        return
+    stage_timings[key] = stage_timings.get(key, 0.0) + elapsed
 
 
 def _next_selected_candidate_batch(

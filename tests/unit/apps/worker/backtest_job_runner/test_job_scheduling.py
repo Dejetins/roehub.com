@@ -15,7 +15,7 @@ from trading.contexts.backtest.application.services.v2.job_scheduling import (
 )
 
 
-def test_preflight_classifies_bounded_small_jobs_as_light_candidate() -> None:
+def test_preflight_classifies_all_full_jobs_as_heavy() -> None:
     preflight = _preflight(candidate_combinations=100)
 
     decision = classify_preflight_scheduling(
@@ -23,10 +23,8 @@ def test_preflight_classifies_bounded_small_jobs_as_light_candidate() -> None:
         light_max_estimated_combinations=50000,
     )
 
-    assert decision.scheduling_class == "light_candidate"
-    assert scheduling_metadata_from_preflight(preflight=preflight)["scheduling_class"] == (
-        "light_candidate"
-    )
+    assert decision.scheduling_class == "heavy"
+    assert scheduling_metadata_from_preflight(preflight=preflight)["scheduling_class"] == "heavy"
 
 
 def test_preflight_classifies_obvious_heavy_jobs_as_heavy() -> None:

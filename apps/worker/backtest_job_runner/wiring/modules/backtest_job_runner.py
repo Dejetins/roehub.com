@@ -72,7 +72,6 @@ log = logging.getLogger(__name__)
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _TASK_KIND_FULL_JOB = "full_job"
 _TASK_KIND_LAZY_DETAIL = "lazy_detail"
-_SCHEDULING_CLASS_LIGHT_CANDIDATE: BacktestSchedulingClass = "light_candidate"
 _SCHEDULING_CLASS_HEAVY: BacktestSchedulingClass = "heavy"
 
 
@@ -92,19 +91,16 @@ class BacktestJobRunnerRuntimeConfig:
     light_max_estimated_combinations: int
     light_max_actual_combinations: int
     lazy_detail_anti_starvation_limit: int = 5
-    full_job_anti_starvation_limit: int = 4
 
     def __post_init__(self) -> None:
         if self.concurrency != 1:
             raise ValueError(
-                "ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required; use "
-                "ROEHUB_BACKTEST_LIGHT_CONCURRENCY for full-job child lanes"
+                "ROEHUB_BACKTEST_RUNNER_CONCURRENCY=1 is required for v1"
             )
-        if self.light_concurrency <= 0:
-            raise ValueError("ROEHUB_BACKTEST_LIGHT_CONCURRENCY must be > 0")
-        if self.light_concurrency > 3:
+        if self.light_concurrency != 0:
             raise ValueError(
-                "ROEHUB_BACKTEST_LIGHT_CONCURRENCY > 3 requires separate benchmark evidence"
+                "ROEHUB_BACKTEST_LIGHT_CONCURRENCY=0 is required; full jobs always use "
+                "the single heavy child lane"
             )
         if self.heavy_concurrency != 1:
             raise ValueError("ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1 is required for v1")
@@ -133,8 +129,6 @@ class BacktestJobRunnerRuntimeConfig:
             raise ValueError("ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS must be > 0")
         if self.lazy_detail_anti_starvation_limit <= 0:
             raise ValueError("ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT must be > 0")
-        if self.full_job_anti_starvation_limit <= 0:
-            raise ValueError("ROEHUB_BACKTEST_FULL_JOB_ANTI_STARVATION_LIMIT must be > 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,17 +160,11 @@ class BacktestRunnerActiveTask:
 
 @dataclass(slots=True)
 class BacktestRunnerTaskScheduler:
-    light_full_job_worker: BacktestJobWorkerUseCase
     heavy_full_job_worker: BacktestJobWorkerUseCase
     lazy_detail_worker: BacktestLazyTradesMaterializationWorkerUseCase
-    light_concurrency: int = 2
     heavy_concurrency: int = 1
     lazy_detail_anti_starvation_limit: int = 5
-    full_job_anti_starvation_limit: int = 4
     _lazy_detail_streak: int = 0
-    _try_heavy_next: bool = True
-    _light_batch_launched: int = 0
-    _consecutive_light_claims: int = 0
     _full_empty_rounds: int = 0
 
     def next_launch(
@@ -189,43 +177,20 @@ class BacktestRunnerTaskScheduler:
         if active_heavy > 0:
             return None
         if active_light > 0:
-            if (
-                active_light < self.light_concurrency
-                and self._light_batch_launched < self.light_concurrency
-                and self._consecutive_light_claims < self.full_job_anti_starvation_limit
-            ):
-                self._light_batch_launched += 1
-                return BacktestRunnerTaskLaunch(
-                    task_kind=_TASK_KIND_FULL_JOB,
-                    scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
-                    run=self.light_full_job_worker.run_next,
-                )
             return None
         if active_lazy > 0:
             return None
 
-        self._light_batch_launched = 0
-        if (
-            self._try_heavy_next
-            or self._consecutive_light_claims >= self.full_job_anti_starvation_limit
-        ):
-            self._try_heavy_next = False
-            return BacktestRunnerTaskLaunch(
-                task_kind=_TASK_KIND_FULL_JOB,
-                scheduling_class=_SCHEDULING_CLASS_HEAVY,
-                run=self.heavy_full_job_worker.run_next,
-            )
         if self._full_empty_rounds >= 2:
             return BacktestRunnerTaskLaunch(
                 task_kind=_TASK_KIND_LAZY_DETAIL,
                 scheduling_class="none",
                 run=self.lazy_detail_worker.run_next,
             )
-        self._light_batch_launched = 1
         return BacktestRunnerTaskLaunch(
             task_kind=_TASK_KIND_FULL_JOB,
-            scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
-            run=self.light_full_job_worker.run_next,
+            scheduling_class=_SCHEDULING_CLASS_HEAVY,
+            run=self.heavy_full_job_worker.run_next,
         )
 
     def record_result(
@@ -240,28 +205,14 @@ class BacktestRunnerTaskScheduler:
                 if self._lazy_detail_streak >= self.lazy_detail_anti_starvation_limit:
                     self._lazy_detail_streak = 0
                     self._full_empty_rounds = 0
-                    self._try_heavy_next = True
             else:
                 self._lazy_detail_streak = 0
                 self._full_empty_rounds = 0
-                self._try_heavy_next = True
             return
         self._lazy_detail_streak = 0
-        if scheduling_class == _SCHEDULING_CLASS_HEAVY:
-            if result.claimed:
-                self._try_heavy_next = True
-                self._consecutive_light_claims = 0
-                self._full_empty_rounds = 0
-            else:
-                self._full_empty_rounds += 1
-            return
         if result.claimed:
-            self._consecutive_light_claims += 1
             self._full_empty_rounds = 0
-            if self._consecutive_light_claims >= self.full_job_anti_starvation_limit:
-                self._try_heavy_next = True
         else:
-            self._try_heavy_next = True
             self._full_empty_rounds += 1
 
 
@@ -536,7 +487,7 @@ def load_backtest_job_runner_runtime_config(
         light_concurrency=_env_int(
             environ=environ,
             key="ROEHUB_BACKTEST_LIGHT_CONCURRENCY",
-            default=2,
+            default=0,
         ),
         heavy_concurrency=_env_int(
             environ=environ,
@@ -594,11 +545,6 @@ def load_backtest_job_runner_runtime_config(
             key="ROEHUB_BACKTEST_RUNNER_LAZY_DETAIL_ANTI_STARVATION_LIMIT",
             default=5,
         ),
-        full_job_anti_starvation_limit=_env_int(
-            environ=environ,
-            key="ROEHUB_BACKTEST_FULL_JOB_ANTI_STARVATION_LIMIT",
-            default=4,
-        ),
     )
 
 
@@ -652,28 +598,11 @@ def build_backtest_job_runner_app(
     worker_validation_guardrails = admission_service.preflight_validation_guardrails(
         base_guardrails=backtest_runtime_config.guardrails,
     )
-    light_executor = BacktestChildProcessExecutor(
-        environ=effective_environ,
-        scheduling_class=_SCHEDULING_CLASS_LIGHT_CANDIDATE,
-        light_max_actual_combinations=(effective_runtime_config.light_max_actual_combinations),
-        timeout_seconds=effective_runtime_config.child_timeout_seconds,
-    )
     heavy_executor = BacktestChildProcessExecutor(
         environ=effective_environ,
         scheduling_class=_SCHEDULING_CLASS_HEAVY,
         light_max_actual_combinations=(effective_runtime_config.light_max_actual_combinations),
         timeout_seconds=effective_runtime_config.child_timeout_seconds,
-    )
-    light_full_job_worker = BacktestJobWorkerUseCase(
-        lease_repository=lease_repository,
-        job_repository=job_repository,
-        preflight_service=preflight_service,
-        executor=light_executor,
-        lease_seconds=effective_runtime_config.lease_seconds,
-        heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
-        locked_by=_build_locked_by(),
-        scheduling_classes=("light_candidate", "light"),
-        validation_guardrails=worker_validation_guardrails,
     )
     heavy_full_job_worker = BacktestJobWorkerUseCase(
         lease_repository=lease_repository,
@@ -683,7 +612,7 @@ def build_backtest_job_runner_app(
         lease_seconds=effective_runtime_config.lease_seconds,
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
-        scheduling_classes=("heavy",),
+        scheduling_classes=None,
         validation_guardrails=worker_validation_guardrails,
     )
     prepare_pools = BacktestPreparePoolsService(
@@ -715,15 +644,12 @@ def build_backtest_job_runner_app(
         ),
     )
     scheduler = BacktestRunnerTaskScheduler(
-        light_full_job_worker=light_full_job_worker,
         heavy_full_job_worker=heavy_full_job_worker,
         lazy_detail_worker=lazy_detail_worker,
-        light_concurrency=effective_runtime_config.light_concurrency,
         heavy_concurrency=effective_runtime_config.heavy_concurrency,
         lazy_detail_anti_starvation_limit=(
             effective_runtime_config.lazy_detail_anti_starvation_limit
         ),
-        full_job_anti_starvation_limit=(effective_runtime_config.full_job_anti_starvation_limit),
     )
     return BacktestJobRunnerApp(
         runtime_config=effective_runtime_config,

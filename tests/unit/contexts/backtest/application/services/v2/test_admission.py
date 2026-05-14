@@ -17,7 +17,6 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     NUMBA_NUM_THREADS,
     ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS,
-    ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS,
     BacktestJobSchedulingPromotionRequired,
     backtest_numba_environ,
     classify_preflight_scheduling,
@@ -27,7 +26,7 @@ from trading.contexts.backtest.application.services.v2.job_scheduling import (
 from trading.shared_kernel.primitives import PaidLevel
 
 
-def test_prod_admission_config_preserves_benchmark_top_n_for_ultra_only() -> None:
+def test_prod_admission_config_caps_all_paid_levels_at_top_50() -> None:
     service = BacktestAdmissionService(
         config=load_backtest_admission_config("configs/prod/backtest_admission.yaml")
     )
@@ -35,8 +34,8 @@ def test_prod_admission_config_preserves_benchmark_top_n_for_ultra_only() -> Non
         base_guardrails=BacktestRuntimeGuardrails(),
     )
 
-    assert guardrails.max_top_n == 100
-    assert service.config.policy_for(paid_level=PaidLevel("ultra")).max_top_n == 100
+    assert guardrails.max_top_n == 50
+    assert service.config.policy_for(paid_level=PaidLevel("ultra")).max_top_n == 50
     assert service.config.policy_for(paid_level=PaidLevel("pro")).max_top_n == 50
 
 
@@ -63,7 +62,7 @@ def test_preflight_scheduler_metadata_preserves_conservative_upper_bound() -> No
     assert metadata["requested_top_n"] == 50
 
 
-def test_preflight_scheduler_classifies_bounded_jobs_as_light_candidate_only() -> None:
+def test_preflight_scheduler_classifies_bounded_jobs_as_heavy() -> None:
     metadata = scheduling_metadata_from_preflight(
         preflight=_preflight(
             estimated_combinations_upper_bound=512,
@@ -72,7 +71,7 @@ def test_preflight_scheduler_classifies_bounded_jobs_as_light_candidate_only() -
         light_max_estimated_combinations=50_000,
     )
 
-    assert metadata["scheduling_class"] == "light_candidate"
+    assert metadata["scheduling_class"] == "heavy"
 
 
 def test_post_prepare_light_candidate_promotes_to_heavy_before_exact_scoring() -> None:
@@ -88,27 +87,20 @@ def test_post_prepare_light_candidate_promotes_to_heavy_before_exact_scoring() -
     assert exc_info.value.promotion.actual_combinations == 50_001
 
 
-def test_backtest_numba_environ_uses_per_class_thread_budget() -> None:
-    light_env = backtest_numba_environ(
-        environ={
-            ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS: "2",
-            ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS: "10",
-        },
-        scheduling_class="light_candidate",
-    )
+def test_backtest_numba_environ_uses_heavy_thread_budget_for_full_jobs() -> None:
     heavy_env = backtest_numba_environ(
         environ={
-            ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS: "2",
             ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS: "10",
         },
         scheduling_class="heavy",
     )
-
-    assert light_env[NUMBA_NUM_THREADS] == "2"
-    assert heavy_env[NUMBA_NUM_THREADS] == "10"
-    assert light_env["ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"] == (
-        ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS
+    legacy_light_env = backtest_numba_environ(
+        environ={ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS: "10"},
+        scheduling_class="light_candidate",
     )
+
+    assert heavy_env[NUMBA_NUM_THREADS] == "10"
+    assert legacy_light_env[NUMBA_NUM_THREADS] == "10"
     assert heavy_env["ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"] == (
         ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS
     )

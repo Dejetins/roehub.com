@@ -84,7 +84,7 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
             "end": "2026-04-11T20:08:00Z",
         },
         "requested_top_n": 50,
-        "scheduling_class": "light_candidate",
+        "scheduling_class": "heavy",
     }
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),) * 2
 

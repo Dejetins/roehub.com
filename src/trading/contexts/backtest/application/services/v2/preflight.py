@@ -26,9 +26,6 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.ports.staged_runner import (
     BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
 )
-from trading.contexts.backtest.application.services.v2.job_scheduling import (
-    DEFAULT_LIGHT_ESTIMATED_COMBINATIONS,
-)
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactCoordinatesV2,
     artifact_market_id_from_coordinates_v2,
@@ -1149,13 +1146,8 @@ def _preflight_scheduling_class(
     estimated_combinations_upper_bound: int,
     arity: int,
 ) -> str:
-    if estimated_combinations_upper_bound <= 0:
-        return "heavy"
-    if arity <= 0:
-        return "heavy"
-    if estimated_combinations_upper_bound > DEFAULT_LIGHT_ESTIMATED_COMBINATIONS:
-        return "heavy"
-    return "light_candidate"
+    _ = estimated_combinations_upper_bound, arity
+    return "heavy"
 
 
 def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:

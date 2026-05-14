@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -56,16 +56,20 @@ DEFAULT_REFERENCE_JSON = Path(
 )
 DEFAULT_OUTPUT_ROOT = Path(
     "docs/architecture/backtest/benchmark_iterations/"
-    f"{datetime.now().strftime('%Y-%m-%d')}_iteration_11_api_runner_compute_memory_parity"
+    f"{datetime.now().strftime('%Y-%m-%d')}_iteration_15_api_runner_clean_arity6_cpu_memory"
 )
-REQUEST_TOP_N = 100
+REQUEST_TOP_N = 50
 BENCHMARK_TOP_K = 5
 REFERENCE_ROWS_PER_INDICATOR = 6
 REFERENCE_WARMUP_ROWS_PER_INDICATOR = 2
+REFERENCE_ONLY_ARITY = 6
 _DEFAULT_API_BASE = "http://127.0.0.1:8000"
 _DEFAULT_COOKIE_NAME = "roehub_session_id"
 _PARITY_FLOAT_TOLERANCE = 1e-5
 _CACHE_HIT_RSS_DELTA_LIMIT_BYTES = 64 * 1024 * 1024
+_SYSTEM_RETAINED_MEMORY_LIMIT_BYTES = 512 * 1024 * 1024
+_REFERENCE_SPEED_RATIO_MIN = 0.8
+_DEFAULT_CPU_SAMPLE_INTERVAL_SECONDS = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,9 +111,16 @@ def main(argv: list[str] | None = None) -> int:
             "timeframe": "15m",
             "top_n": REQUEST_TOP_N,
             "benchmark_top_k": BENCHMARK_TOP_K,
+            "only_arity": REFERENCE_ONLY_ARITY,
             "rows_per_indicator": REFERENCE_ROWS_PER_INDICATOR,
             "warmup_rows_per_indicator": REFERENCE_WARMUP_ROWS_PER_INDICATOR,
             "exclude_heaviest_140s_job": True,
+            "full_jobs": "heavy",
+            "numba_threads": 12,
+            "runner_concurrency": "one heavy child",
+            "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
+            "cpu_sample_interval_seconds": args.cpu_sample_interval_seconds,
+            "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
         },
         "excluded_reference_job": excluded,
         "artifact_reference": {
@@ -138,7 +149,6 @@ def main(argv: list[str] | None = None) -> int:
         harness = _build_runner_harness(
             child_evidence_dir=child_evidence_dir,
             light_max_actual_combinations=args.light_max_actual_combinations,
-            light_concurrency=args.light_concurrency,
             heavy_concurrency=1,
         )
         benchmark_jobs = _run_reference_jobs(
@@ -150,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
             child_evidence_dir=child_evidence_dir,
             timeout_seconds=args.timeout_seconds,
             poll_interval_seconds=args.poll_interval_seconds,
+            system_memory_cleanup_wait_seconds=args.system_memory_cleanup_wait_seconds,
+            cpu_sample_interval_seconds=args.cpu_sample_interval_seconds,
         )
         payload["api_runner_path"] = {
             "runner_entrypoint": "BacktestJobWorkerUseCase.run_next",
@@ -161,14 +173,7 @@ def main(argv: list[str] | None = None) -> int:
         payload["performance"] = _performance_summary(benchmark_jobs)
         payload["memory_release"] = _memory_release_summary(benchmark_jobs)
 
-        scheduler_smoke = _run_scheduler_smoke(
-            dsn=dsn,
-            client=client,
-            canonical=canonical,
-            child_evidence_dir=child_evidence_dir,
-            timeout_seconds=args.timeout_seconds,
-            poll_interval_seconds=args.poll_interval_seconds,
-        )
+        scheduler_smoke = _runner_policy_smoke(scheduler=harness.scheduler)
         payload["mixed_scheduler_smoke"] = scheduler_smoke
 
         lazy_memory = _run_lazy_memory_checks(
@@ -213,11 +218,21 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout-seconds", type=int, default=3600)
     parser.add_argument("--poll-interval-seconds", type=float, default=0.1)
     parser.add_argument("--session-ttl-seconds", type=int, default=7200)
-    parser.add_argument("--light-concurrency", type=int, default=2)
     parser.add_argument("--light-max-actual-combinations", type=int, default=50_000)
+    parser.add_argument(
+        "--system-memory-cleanup-wait-seconds",
+        type=float,
+        default=30.0,
+    )
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--allow-backlog", action="store_true")
     parser.add_argument("--no-fail-on-threshold", action="store_true")
+    parser.add_argument(
+        "--cpu-sample-interval-seconds",
+        type=float,
+        default=_DEFAULT_CPU_SAMPLE_INTERVAL_SECONDS,
+        help="Sample child process CPU with ps at this interval; <=0 disables sampling.",
+    )
     return parser
 
 
@@ -231,6 +246,8 @@ def _run_reference_jobs(
     child_evidence_dir: Path,
     timeout_seconds: int,
     poll_interval_seconds: float,
+    system_memory_cleanup_wait_seconds: float,
+    cpu_sample_interval_seconds: float,
 ) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for index, reference_run in enumerate(reference_runs, start=1):
@@ -247,7 +264,8 @@ def _run_reference_jobs(
         job_id = str(created["job_id"])
         row_before = _job_detail_row(dsn=dsn, job_id=job_id)
         scheduling = _scheduling_from_row(row=row_before)
-        lane = str(scheduling.get("scheduling_class") or "heavy")
+        lane = "heavy"
+        system_memory_before = _system_memory_snapshot()
         run_result = _process_job_until_terminal(
             dsn=dsn,
             client=client,
@@ -256,7 +274,12 @@ def _run_reference_jobs(
             lane=lane,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
+            cpu_sample_interval_seconds=cpu_sample_interval_seconds,
         )
+        system_memory_after = _system_memory_snapshot()
+        if system_memory_cleanup_wait_seconds > 0:
+            time.sleep(system_memory_cleanup_wait_seconds)
+        system_memory_delayed = _system_memory_snapshot()
         child_evidence = _read_full_job_child_evidence(
             evidence_dir=child_evidence_dir,
             job_id=job_id,
@@ -269,6 +292,15 @@ def _run_reference_jobs(
         )
         stage_timings = _merged_stage_timings(child_evidence)
         memory = _child_memory_summary(child_evidence)
+        memory["system_memory_cleanup"] = _system_memory_cleanup_gate(
+            before=system_memory_before,
+            after=system_memory_after,
+            delayed=system_memory_delayed,
+            wait_seconds=system_memory_cleanup_wait_seconds,
+        )
+        memory["pass"] = bool(memory["pass"]) and bool(
+            cast(Mapping[str, Any], memory["system_memory_cleanup"])["pass"]
+        )
         jobs.append(
             {
                 "index": index,
@@ -277,6 +309,9 @@ def _run_reference_jobs(
                 "risk_mode": reference_run.get("risk_mode"),
                 "arity": len(cast(Sequence[Any], reference_run.get("indicator_ids", ()))),
                 "direction_mode": reference_run.get("direction_mode"),
+                "reference_exact_scoring_s": _reference_run_exact_seconds(
+                    run=reference_run
+                ),
                 "created_state": created.get("state"),
                 "request_hash": created.get("request_hash"),
                 "scheduling": scheduling,
@@ -285,6 +320,7 @@ def _run_reference_jobs(
                 "parity": parity,
                 "stage_timings": stage_timings,
                 "service_only_overhead": _service_only_overhead(stage_timings),
+                "cpu_sampling": _mapping(run_result.get("cpu_sampling")),
                 "child_process_evidence": child_evidence,
                 "memory": memory,
                 "pass": (
@@ -306,6 +342,7 @@ def _process_job_until_terminal(
     lane: str,
     timeout_seconds: int,
     poll_interval_seconds: float,
+    cpu_sample_interval_seconds: float,
 ) -> dict[str, Any]:
     attempts: list[dict[str, Any]] = []
     current_lane = lane
@@ -323,6 +360,7 @@ def _process_job_until_terminal(
             job_id=job_id,
             timeout_seconds=max(int(deadline - time.monotonic()), 1),
             poll_interval_seconds=poll_interval_seconds,
+            cpu_sample_interval_seconds=cpu_sample_interval_seconds,
         )
         attempts.append(attempt)
         if attempt.get("worker_status") == "requeued_heavy":
@@ -340,12 +378,16 @@ def _process_job_until_terminal(
     if pass_state and (not state_path or state_path[-1] != "succeeded"):
         state_path.append("succeeded")
     has_running = "running" in state_path or terminal.get("started_at") is not None
+    cpu_sampling = _combine_cpu_sampling(
+        _mapping(attempt.get("cpu_sampling")) for attempt in attempts
+    )
     return {
         "attempts": attempts,
         "state_path": " -> ".join(state_path),
         "required_path": "queued -> running -> succeeded",
         "required_path_pass": has_running and pass_state,
         "terminal": _job_terminal(row=terminal),
+        "cpu_sampling": cpu_sampling,
         "pass": has_running and pass_state,
     }
 
@@ -358,10 +400,13 @@ def _run_worker_attempt(
     job_id: str,
     timeout_seconds: int,
     poll_interval_seconds: float,
+    cpu_sample_interval_seconds: float,
 ) -> dict[str, Any]:
     observed_states: list[str] = ["queued"]
     api_latencies_ms: list[float] = []
     running_samples: list[dict[str, Any]] = []
+    cpu_samples: list[dict[str, Any]] = []
+    next_cpu_sample_at = 0.0
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(worker.run_next)
         deadline = time.monotonic() + timeout_seconds
@@ -377,6 +422,12 @@ def _run_worker_attempt(
             db_row = _job_detail_row(dsn=dsn, job_id=job_id)
             if str(db_row["state"]) == "running":
                 running_samples.append(_running_sample(row=db_row))
+                now = time.monotonic()
+                if cpu_sample_interval_seconds > 0 and now >= next_cpu_sample_at:
+                    sample = _full_job_child_cpu_sample(job_id=job_id)
+                    if sample is not None:
+                        cpu_samples.append(sample)
+                    next_cpu_sample_at = now + cpu_sample_interval_seconds
             time.sleep(poll_interval_seconds)
         result = future.result()
     job = getattr(result, "job", None)
@@ -388,145 +439,80 @@ def _run_worker_attempt(
         "observed_states": observed_states,
         "running_samples": running_samples[:5],
         "api_responsiveness": _latency_summary(api_latencies_ms),
+        "cpu_sampling": _cpu_sampling_summary(
+            samples=cpu_samples,
+            sample_interval_seconds=cpu_sample_interval_seconds,
+        ),
     }
 
 
-def _run_scheduler_smoke(
-    *,
-    dsn: str,
-    client: Any,
-    canonical: Mapping[str, Any],
-    child_evidence_dir: Path,
-    timeout_seconds: int,
-    poll_interval_seconds: float,
-) -> dict[str, Any]:
-    light_harness = _build_runner_harness(
-        child_evidence_dir=child_evidence_dir,
-        light_max_actual_combinations=50_000,
-        light_concurrency=2,
-        heavy_concurrency=1,
+def _runner_policy_smoke(*, scheduler: Any) -> dict[str, Any]:
+    first = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    blocked_by_heavy = scheduler.next_launch(
+        active_light=0,
+        active_heavy=1,
+        active_lazy=0,
     )
-    light_jobs = [
-        _create_scheduler_job(
-            client=client,
-            canonical=canonical,
-            arity=1,
-            risk_mode="none",
-            direction_mode="long_only",
-            label="light_1",
-            short_range=True,
-        ),
-        _create_scheduler_job(
-            client=client,
-            canonical=canonical,
-            arity=1,
-            risk_mode="none",
-            direction_mode="long_short_reversal",
-            label="light_2",
-            short_range=True,
-        ),
-    ]
-    light_phase = _run_scheduler_phase(
-        dsn=dsn,
-        client=client,
-        scheduler=light_harness.scheduler,
-        job_ids=[job["job_id"] for job in light_jobs],
-        timeout_seconds=timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
+    blocked_by_light = scheduler.next_launch(
+        active_light=1,
+        active_heavy=0,
+        active_lazy=0,
     )
-
-    heavy_harness = _build_runner_harness(
-        child_evidence_dir=child_evidence_dir,
-        light_max_actual_combinations=50_000,
-        light_concurrency=2,
-        heavy_concurrency=1,
+    if first is not None:
+        scheduler.record_result(
+            scheduling_class=str(first.scheduling_class),
+            result=runner_module.BacktestRunnerTaskResult(
+                task_kind="full_job",
+                scheduling_class=str(first.scheduling_class),
+                claimed=False,
+            ),
+        )
+    second = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    if second is not None:
+        scheduler.record_result(
+            scheduling_class=str(second.scheduling_class),
+            result=runner_module.BacktestRunnerTaskResult(
+                task_kind="full_job",
+                scheduling_class=str(second.scheduling_class),
+                claimed=False,
+            ),
+        )
+    lazy_after_empty_full = scheduler.next_launch(
+        active_light=0,
+        active_heavy=0,
+        active_lazy=0,
     )
-    heavy_jobs = [
-        _create_scheduler_job(
-            client=client,
-            canonical=canonical,
-            arity=3,
-            risk_mode="none",
-            direction_mode="long_only",
-            label="heavy_1",
-            short_range=True,
-        ),
-        _create_scheduler_job(
-            client=client,
-            canonical=canonical,
-            arity=1,
-            risk_mode="none",
-            direction_mode="long_only",
-            label="light_not_starving_heavy",
-            short_range=True,
-        ),
-        _create_scheduler_job(
-            client=client,
-            canonical=canonical,
-            arity=3,
-            risk_mode="none",
-            direction_mode="long_short_reversal",
-            label="heavy_2",
-            short_range=True,
-        ),
-    ]
-    heavy_phase = _run_scheduler_phase(
-        dsn=dsn,
-        client=client,
-        scheduler=heavy_harness.scheduler,
-        job_ids=[job["job_id"] for job in heavy_jobs],
-        timeout_seconds=timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
-    )
-
-    promotion_harness = _build_runner_harness(
-        child_evidence_dir=child_evidence_dir,
-        light_max_actual_combinations=10,
-        light_concurrency=2,
-        heavy_concurrency=1,
-    )
-    promotion_job = _create_scheduler_job(
-        client=client,
-        canonical=canonical,
-        arity=2,
-        risk_mode="none",
-        direction_mode="long_only",
-        label="light_candidate_promotion",
-        short_range=True,
-    )
-    promotion_result = _process_job_until_terminal(
-        dsn=dsn,
-        client=client,
-        scheduler=promotion_harness.scheduler,
-        job_id=promotion_job["job_id"],
-        lane="light_candidate",
-        timeout_seconds=timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
-    )
-    promotion_row = _job_detail_row(dsn=dsn, job_id=promotion_job["job_id"])
-    promotion_scheduling = _scheduling_from_row(row=promotion_row)
     pass_value = (
-        bool(light_phase["pass"])
-        and bool(heavy_phase["pass"])
-        and bool(promotion_result["pass"])
-        and promotion_scheduling.get("source") == "post_prepare_refinement"
-        and promotion_scheduling.get("scheduling_class") == "heavy"
+        first is not None
+        and first.task_kind == "full_job"
+        and first.scheduling_class == "heavy"
+        and blocked_by_heavy is None
+        and blocked_by_light is None
+        and second is not None
+        and second.scheduling_class == "heavy"
+        and lazy_after_empty_full is not None
+        and lazy_after_empty_full.task_kind == "lazy_detail"
     )
     return {
         "configured": {
-            "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 2,
+            "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 0,
             "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": 1,
-            "light_heavy_overlap": "disabled_v1",
+            "full_job_lane": "heavy_only",
+            "light_promotion_path": "not_used",
         },
-        "light_jobs": light_jobs,
-        "heavy_jobs": heavy_jobs,
-        "light_phase": light_phase,
-        "heavy_phase": heavy_phase,
-        "promotion_case": {
-            "job": promotion_job,
-            "result": promotion_result,
-            "post_prepare_scheduling": promotion_scheduling,
-            "covered": True,
+        "first_full_probe": None
+        if first is None
+        else {"task_kind": first.task_kind, "scheduling_class": first.scheduling_class},
+        "blocks_when_heavy_active": blocked_by_heavy is None,
+        "blocks_when_light_active": blocked_by_light is None,
+        "second_full_probe": None
+        if second is None
+        else {"task_kind": second.task_kind, "scheduling_class": second.scheduling_class},
+        "lazy_after_two_empty_full_probes": None
+        if lazy_after_empty_full is None
+        else {
+            "task_kind": lazy_after_empty_full.task_kind,
+            "scheduling_class": lazy_after_empty_full.scheduling_class,
         },
         "pass": pass_value,
     }
@@ -843,7 +829,6 @@ def _build_runner_harness(
     *,
     child_evidence_dir: Path,
     light_max_actual_combinations: int,
-    light_concurrency: int,
     heavy_concurrency: int,
 ) -> _RunnerHarness:
     env = dict(os.environ)
@@ -852,8 +837,11 @@ def _build_runner_harness(
             "ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR": str(child_evidence_dir),
             "ROEHUB_BACKTEST_CHILD_EVIDENCE_SAMPLE_INTERVAL_SECONDS": "0.2",
             "ROEHUB_BACKTEST_RUNNER_CONCURRENCY": "1",
-            "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": str(light_concurrency),
+            "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": "0",
             "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": str(heavy_concurrency),
+            "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS": "12",
+            "ROEHUB_BACKTEST_NUMBA_NUM_THREADS": "12",
+            "NUMBA_NUM_THREADS": "12",
             "ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS": str(
                 light_max_actual_combinations
             ),
@@ -894,8 +882,13 @@ def _reference_runs(
     if not accepted_runs:
         raise RuntimeError("accepted May 2 reference JSON has no regression runs")
     required = [
-        item for item in accepted_runs if _reference_job_name(run=item) != heaviest_name
+        item
+        for item in accepted_runs
+        if _reference_job_name(run=item) != heaviest_name
+        and len(cast(Sequence[Any], item.get("indicator_ids", ()))) == REFERENCE_ONLY_ARITY
     ]
+    if not required:
+        raise RuntimeError(f"no accepted May 2 reference runs for arity {REFERENCE_ONLY_ARITY}")
     excluded = {
         "job_name": heaviest_name,
         "risk_mode": heaviest.get("risk_mode"),
@@ -958,10 +951,13 @@ def _request_for_reference_run(
     else:
         raise RuntimeError(f"unsupported reference risk_mode: {risk_mode}")
     if rows_per_indicator is not None:
-        return _with_limited_indicator_windows(
+        request = _with_limited_indicator_windows(
             request=request,
             rows_per_indicator=rows_per_indicator,
         )
+    else:
+        request = dict(request)
+    request["top_n"] = REQUEST_TOP_N
     return request
 
 
@@ -1290,6 +1286,89 @@ def _child_memory_summary(child_evidence: Sequence[Mapping[str, Any]]) -> dict[s
     }
 
 
+def _system_memory_snapshot() -> dict[str, Any]:
+    if platform.system() != "Darwin":
+        return {"available": False, "reason": "vm_stat is macOS-only"}
+    try:
+        completed = subprocess.run(
+            ["vm_stat"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        return {"available": False, "reason": str(error)}
+    page_size = 4096
+    values: dict[str, int] = {}
+    for line in completed.stdout.splitlines():
+        if "page size of" in line:
+            parts = [part for part in line.split() if part.isdigit()]
+            if parts:
+                page_size = int(parts[0])
+            continue
+        if ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        normalized_key = key.strip().lower().replace(" ", "_").replace("-", "_")
+        digits = "".join(ch for ch in raw_value if ch.isdigit())
+        if digits:
+            values[normalized_key] = int(digits)
+    anonymous_pages = (
+        values.get("pages_active", 0)
+        + values.get("pages_inactive", 0)
+        + values.get("pages_speculative", 0)
+        + values.get("pages_wired_down", 0)
+        + values.get("pages_occupied_by_compressor", 0)
+    )
+    free_like_pages = (
+        values.get("pages_free", 0)
+        + values.get("pages_speculative", 0)
+    )
+    return {
+        "available": True,
+        "page_size": page_size,
+        "captured_at": datetime.now(UTC).isoformat(),
+        "anonymous_or_wired_bytes": anonymous_pages * page_size,
+        "free_like_bytes": free_like_pages * page_size,
+        "pages": values,
+    }
+
+
+def _system_memory_cleanup_gate(
+    *,
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    delayed: Mapping[str, Any],
+    wait_seconds: float,
+) -> dict[str, Any]:
+    if not before.get("available") or not delayed.get("available"):
+        return {
+            "available": False,
+            "before": dict(before),
+            "after": dict(after),
+            "delayed": dict(delayed),
+            "pass": False,
+        }
+    before_bytes = int(before.get("anonymous_or_wired_bytes") or 0)
+    after_bytes = int(after.get("anonymous_or_wired_bytes") or 0)
+    delayed_bytes = int(delayed.get("anonymous_or_wired_bytes") or 0)
+    retained_delta = delayed_bytes - before_bytes
+    immediate_delta = after_bytes - before_bytes
+    return {
+        "available": True,
+        "wait_seconds": wait_seconds,
+        "metric": "anonymous_or_wired_bytes",
+        "before_bytes": before_bytes,
+        "after_bytes": after_bytes,
+        "delayed_bytes": delayed_bytes,
+        "immediate_delta_bytes": immediate_delta,
+        "retained_delta_bytes": retained_delta,
+        "limit_bytes": _SYSTEM_RETAINED_MEMORY_LIMIT_BYTES,
+        "pass": retained_delta <= _SYSTEM_RETAINED_MEMORY_LIMIT_BYTES,
+    }
+
+
 def _parity_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     failed = [job["job_name"] for job in jobs if not cast(Mapping[str, Any], job["parity"])["pass"]]
     return {
@@ -1301,23 +1380,57 @@ def _parity_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def _performance_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    ratios = []
+    failed_speed_jobs = []
+    failed_cpu_sampling_jobs = []
+    for job in jobs:
+        current_exact = _current_exact_seconds(timings=_mapping(job.get("stage_timings")))
+        reference_exact = _reference_exact_seconds(job=job)
+        ratio = (
+            None
+            if current_exact is None or reference_exact is None or current_exact <= 0
+            else reference_exact / current_exact
+        )
+        ratios.append({"job_name": job.get("job_name"), "may2_over_current_ratio": ratio})
+        if ratio is None or ratio < _REFERENCE_SPEED_RATIO_MIN:
+            failed_speed_jobs.append(job.get("job_name"))
+        if int(_mapping(job.get("cpu_sampling")).get("sample_count") or 0) <= 0:
+            failed_cpu_sampling_jobs.append(job.get("job_name"))
     return {
         "stage_timing_jobs": len([job for job in jobs if job.get("stage_timings")]),
+        "cpu_sampling_jobs": len(jobs) - len(failed_cpu_sampling_jobs),
         "service_only_overhead_separate": True,
         "canonical_stage_comparison_policy": (
             "API/runner wall and service-only overhead are recorded separately from "
             "May 2 notebook-compatible stage timings."
         ),
-        "pass": all(bool(job.get("stage_timings")) for job in jobs),
+        "reference_speed_ratio_min": _REFERENCE_SPEED_RATIO_MIN,
+        "speed_ratios": ratios,
+        "failed_speed_jobs": failed_speed_jobs,
+        "failed_cpu_sampling_jobs": failed_cpu_sampling_jobs,
+        "pass": all(bool(job.get("stage_timings")) for job in jobs)
+        and not failed_speed_jobs
+        and not failed_cpu_sampling_jobs,
     }
 
 
 def _memory_release_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     failed = [job["job_name"] for job in jobs if not cast(Mapping[str, Any], job["memory"])["pass"]]
+    system_failed = [
+        job["job_name"]
+        for job in jobs
+        if not cast(
+            Mapping[str, Any],
+            cast(Mapping[str, Any], job["memory"]).get("system_memory_cleanup", {}),
+        ).get("pass")
+    ]
     return {
         "checked_jobs": len(jobs),
         "failed_jobs": failed,
+        "system_memory_failed_jobs": system_failed,
         "parent_retained_rss_delta_evidence": True,
+        "system_memory_cleanup_gate": True,
+        "system_memory_cleanup_limit_bytes": _SYSTEM_RETAINED_MEMORY_LIMIT_BYTES,
         "vmmap": any(
             cast(Mapping[str, Any], job["memory"]).get(
                 "vmmap_or_physical_footprint_available"
@@ -1646,6 +1759,142 @@ def _latency_summary(values: Sequence[float]) -> dict[str, float | int | None]:
     }
 
 
+def _full_job_child_cpu_sample(*, job_id: str) -> dict[str, Any] | None:
+    try:
+        completed = subprocess.run(
+            ["ps", "-axww", "-o", "pid=,ppid=,%cpu=,%mem=,rss=,command="],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+    job_marker = f"--job-id {job_id}"
+    for line in completed.stdout.splitlines():
+        if "apps.worker.backtest_job_runner.main.full_job_child" not in line:
+            continue
+        if job_marker not in line:
+            continue
+        parts = line.split(None, 5)
+        if len(parts) < 6:
+            continue
+        pid, ppid, cpu, mem, rss_kb, command = parts
+        rss_kb_int = _int_or_none(rss_kb)
+        return {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "pid": _int_or_none(pid),
+            "ppid": _int_or_none(ppid),
+            "cpu_percent": _float_or_none(cpu),
+            "mem_percent": _float_or_none(mem),
+            "rss_bytes": None if rss_kb_int is None else rss_kb_int * 1024,
+            "command": command,
+        }
+    return None
+
+
+def _cpu_sampling_summary(
+    *,
+    samples: Sequence[Mapping[str, Any]],
+    sample_interval_seconds: float | None,
+) -> dict[str, Any]:
+    cpu_values = [
+        float(sample["cpu_percent"])
+        for sample in samples
+        if isinstance(sample.get("cpu_percent"), int | float)
+    ]
+    rss_values = [
+        int(sample["rss_bytes"])
+        for sample in samples
+        if isinstance(sample.get("rss_bytes"), int)
+    ]
+    pid_values = sorted(
+        {
+            int(sample["pid"])
+            for sample in samples
+            if isinstance(sample.get("pid"), int)
+        }
+    )
+    return {
+        "sample_interval_seconds": sample_interval_seconds,
+        "sample_count": len(cpu_values),
+        "child_pids": pid_values,
+        "mean_cpu_percent": _mean_or_none(cpu_values),
+        "p50_cpu_percent": _percentile_or_none(cpu_values, percentile=50),
+        "p95_cpu_percent": _percentile_or_none(cpu_values, percentile=95),
+        "max_cpu_percent": max(cpu_values) if cpu_values else None,
+        "mean_core_equivalent": None
+        if not cpu_values
+        else cast(float, _mean_or_none(cpu_values)) / 100.0,
+        "p50_core_equivalent": None
+        if not cpu_values
+        else cast(float, _percentile_or_none(cpu_values, percentile=50)) / 100.0,
+        "p95_core_equivalent": None
+        if not cpu_values
+        else cast(float, _percentile_or_none(cpu_values, percentile=95)) / 100.0,
+        "peak_rss_bytes": max(rss_values) if rss_values else None,
+        "available": bool(cpu_values),
+        "method": (
+            "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= "
+            "filtered by full_job_child --job-id"
+        ),
+        "samples": [dict(sample) for sample in samples],
+    }
+
+
+def _combine_cpu_sampling(summaries: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    samples: list[Mapping[str, Any]] = []
+    sample_interval_seconds: float | None = None
+    for summary in summaries:
+        if sample_interval_seconds is None and isinstance(
+            summary.get("sample_interval_seconds"),
+            int | float,
+        ):
+            sample_interval_seconds = float(summary["sample_interval_seconds"])
+        samples.extend(
+            cast(Mapping[str, Any], sample)
+            for sample in _list(summary.get("samples"))
+            if isinstance(sample, Mapping)
+        )
+    return _cpu_sampling_summary(
+        samples=samples,
+        sample_interval_seconds=sample_interval_seconds,
+    )
+
+
+def _mean_or_none(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _percentile_or_none(values: Sequence[float], *, percentile: int) -> float | None:
+    if not values:
+        return None
+    sorted_values = sorted(values)
+    if len(sorted_values) == 1:
+        return sorted_values[0]
+    rank = (len(sorted_values) - 1) * (percentile / 100.0)
+    lower = int(rank)
+    upper = min(lower + 1, len(sorted_values) - 1)
+    fraction = rank - lower
+    return sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * fraction
+
+
+def _float_or_none(raw: str) -> float | None:
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _int_or_none(raw: str) -> int | None:
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
 def _collapse_state_path(states: Sequence[Any]) -> list[str]:
     out: list[str] = []
     for raw in states:
@@ -1744,15 +1993,60 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     memory = _mapping(payload.get("memory_release"))
     scheduler = _mapping(payload.get("mixed_scheduler_smoke"))
     lazy = _mapping(payload.get("lazy_cache_hit_memory"))
+    jobs = [_mapping(item) for item in _list(api_runner.get("jobs"))]
+    ratio_values: list[float] = []
+    cpu_mean_values: list[float] = []
+    for job in jobs:
+        timings = _mapping(job.get("stage_timings"))
+        reference_exact = _reference_exact_seconds(job=job)
+        current_exact = _current_exact_seconds(timings=timings)
+        if current_exact is not None and reference_exact is not None and current_exact > 0:
+            ratio_values.append(reference_exact / current_exact)
+        cpu_mean = _float_mapping_value(_mapping(job.get("cpu_sampling")), "mean_cpu_percent")
+        if cpu_mean is not None:
+            cpu_mean_values.append(cpu_mean)
+    memory_failed_jobs = _list(memory.get("failed_jobs"))
+    lazy_worker = _mapping(lazy.get("miss_worker"))
     lines = [
-        "# Iteration 11 API runner compute memory parity",
+        "# Iteration 15 API runner clean arity-6 CPU/memory benchmark",
+        "",
+        (
+            "Чистый Mac Studio benchmark для API-runner path без `vmmap`-наблюдения "
+            "в hot path: BTCUSDT / 15m / arity 6, 12 Numba threads, "
+            "`top_n=50`, `benchmark_top_k=5`, sustained CPU sampler и memory gate."
+        ),
+        "",
+        "## Короткий вывод",
+        "",
+        (
+            "- Compute/performance: "
+            f"`{'pass' if performance.get('pass') else 'fail'}`; "
+            f"speed ratio May2/current = `{_fmt_float(min(ratio_values) if ratio_values else None)}"
+            f"..{_fmt_float(max(ratio_values) if ratio_values else None)}`."
+        ),
+        (
+            "- CPU: "
+            f"`{'pass' if not performance.get('failed_cpu_sampling_jobs') else 'fail'}`; "
+            f"mean child CPU = `{_fmt_float(min(cpu_mean_values) if cpu_mean_values else None)}"
+            f"..{_fmt_float(max(cpu_mean_values) if cpu_mean_values else None)}%`."
+        ),
+        (
+            "- Acceptance: "
+            f"`{'pass' if payload.get('pass') else 'fail'}`; "
+            "старые vmmap-contaminated результаты не учитываются."
+        ),
+        (
+            "- Что не прошло: "
+            f"memory failed jobs = `{memory_failed_jobs}`, "
+            f"lazy status path = `{lazy_worker.get('status_path')}`."
+        ),
         "",
         "## Intent",
         "",
         (
-            "Проверить, что API-created jobs проходят через runner/child path "
-            "и дают тот же canonical compute result, что May 2 reference, "
-            "отдельно от scheduler и memory evidence."
+            "Проверить приемочный путь API-created job -> runner -> одноразовый "
+            "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 "
+            "reference."
         ),
         "",
         "## Benchmark fixture",
@@ -1761,7 +2055,16 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"- Git commit: `{payload.get('git_commit')}`",
         f"- Canonical JSON: `{payload.get('canonical_json')}`",
         f"- Reference: `{payload.get('reference_iteration')}`",
-        "- BTCUSDT / 15m / REQUEST_TOP_N = 100 / BENCHMARK_TOP_K = 5",
+        "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5",
+        (
+            "- Full jobs policy: `heavy_only`, "
+            "`ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`, "
+            "`ROEHUB_BACKTEST_LIGHT_CONCURRENCY=0`, `NUMBA_NUM_THREADS=12`."
+        ),
+        (
+            "- CPU sampler: sustained `ps` samples by child `--job-id`; "
+            "`vmmap`/physical-footprint observation is disabled for clean timing."
+        ),
         (
             f"- Excluded: `{_mapping(payload.get('excluded_reference_job')).get('job_name')}` "
             "because `exclude_heaviest_140s_job`."
@@ -1787,12 +2090,51 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "## Performance",
         "",
         f"- Stage timing jobs: `{performance.get('stage_timing_jobs')}`",
+        f"- CPU sampling jobs: `{performance.get('cpu_sampling_jobs')}`",
+        f"- CPU sampling failed jobs: `{performance.get('failed_cpu_sampling_jobs')}`",
         f"- Policy: {performance.get('canonical_stage_comparison_policy')}",
         "",
+        (
+            "| Job | Threads | Exact current s | Exact May2 s | Ratio | "
+            "CPU mean % | CPU p50 % | CPU max % | System memory gate |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for job in jobs:
+        timings = _mapping(job.get("stage_timings"))
+        parity_payload = _mapping(job.get("parity"))
+        telemetry = _mapping(parity_payload.get("exact_telemetry"))
+        memory_payload = _mapping(job.get("memory"))
+        system_gate = _mapping(memory_payload.get("system_memory_cleanup"))
+        cpu_sampling = _mapping(job.get("cpu_sampling"))
+        reference_exact = _reference_exact_seconds(job=job)
+        current_exact = _current_exact_seconds(timings=timings)
+        ratio = (
+            None
+            if current_exact is None or reference_exact is None or current_exact <= 0
+            else reference_exact / current_exact
+        )
+        lines.append(
+            "| "
+            f"`{job.get('job_name')}` | "
+            f"{telemetry.get('numba_num_threads')} | "
+            f"{_fmt_float(current_exact)} | "
+            f"{_fmt_float(reference_exact)} | "
+            f"{_fmt_float(ratio)} | "
+            f"{_fmt_float(_float_mapping_value(cpu_sampling, 'mean_cpu_percent'))} | "
+            f"{_fmt_float(_float_mapping_value(cpu_sampling, 'p50_cpu_percent'))} | "
+            f"{_fmt_float(_float_mapping_value(cpu_sampling, 'max_cpu_percent'))} | "
+            f"{'pass' if system_gate.get('pass') else 'fail'} |"
+        )
+    lines.extend(
+        [
+            "",
         "## Memory release",
         "",
         f"- Checked jobs: `{memory.get('checked_jobs')}`",
         f"- Failed jobs: `{memory.get('failed_jobs')}`",
+        f"- System memory failed jobs: `{memory.get('system_memory_failed_jobs')}`",
+        f"- System cleanup limit bytes: `{memory.get('system_memory_cleanup_limit_bytes')}`",
         f"- vmmap / physical footprint: `{'yes' if memory.get('vmmap') else 'no'}`",
         "",
         "## Lazy cache-hit memory",
@@ -1832,8 +2174,46 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "local_accounting_validation.json"
         ),
         "```",
-    ]
+        ]
+    )
     return "\n".join(lines) + "\n"
+
+
+def _reference_run_exact_seconds(*, run: Mapping[str, Any]) -> float | None:
+    timers = _mapping(run.get("timers"))
+    value = timers.get("exact_scoring")
+    if isinstance(value, int | float):
+        return float(value)
+    value = timers.get("tp_sl_exact_scoring")
+    if isinstance(value, int | float):
+        return float(value)
+    return None
+
+
+def _reference_exact_seconds(*, job: Mapping[str, Any]) -> float | None:
+    value = job.get("reference_exact_scoring_s")
+    return float(value) if isinstance(value, int | float) else None
+
+
+def _current_exact_seconds(*, timings: Mapping[str, Any]) -> float | None:
+    value = timings.get("exact_scoring")
+    if isinstance(value, int | float):
+        return float(value)
+    value = timings.get("tp_sl_exact_scoring")
+    if isinstance(value, int | float):
+        return float(value)
+    return None
+
+
+def _fmt_float(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:.3f}"
+
+
+def _float_mapping_value(payload: Mapping[str, Any], key: str) -> float | None:
+    value = payload.get(key)
+    return float(value) if isinstance(value, int | float) else None
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

@@ -100,8 +100,10 @@ V1 target:
 - parent не строит `BacktestRuntimeJobOrchestrationService`; этот compute graph
   находится только в child entrypoint/direct benchmark/test surfaces;
 - default full-job policy для Mac Studio v1:
-  `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=2`,
-  `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`, без light/heavy overlap.
+  `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=0`,
+  `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`,
+  `ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS=12`; все full jobs идут в один
+  heavy child lane, без light/full overlap и без light promotion в hot path.
 
 Причина: current production failure mode показал, что full compute в parent может
 мешать `/metrics` и провоцировать Monit restart. Parent должен оставаться
@@ -129,14 +131,12 @@ Scheduling semantics:
   `estimated_combinations_upper_bound`, `estimated_combinations`, `arity`,
   per-indicator row upper bounds, `risk_mode`, requested range и requested
   `top_n`;
-- `scheduling_class=heavy` используется для obvious-heavy jobs и для старых/
-  неизвестных rows без scheduling metadata;
-- `scheduling_class=light_candidate` означает только bounded preflight estimate,
-  не окончательное `light`;
-- child after prepare/basic stages подтверждает `light` или возвращает bounded
-  promotion result, после чего parent requeue-ит job как `heavy` до exact scoring;
-- stream of light jobs не должен indefinitely starve older heavy jobs: parent
-  регулярно probes heavy lane и сбрасывает light batch после anti-starvation limit.
+- `scheduling_class=heavy` используется для всех новых full jobs, независимо от
+  preflight estimate;
+- старые rows с `light_candidate`/`light` metadata нормализуются в heavy path при
+  исполнении full job;
+- child после prepare/basic stages не выполняет light confirmation/promotion:
+  exact scoring всегда стартует уже в heavy child с 12 Numba threads.
 
 Crash/restart semantics: `at-least-once compute`, но `at-most-one terminal commit`.
 Повторный compute после crash допустим, если прежний lease истек и прежний process
@@ -320,15 +320,14 @@ Planned env/config keys:
 - `ROEHUB_BACKTEST_RUNNER_HEARTBEAT_INTERVAL_SECONDS=30`;
 - `ROEHUB_BACKTEST_RUNNER_MAX_JOB_RUNTIME_SECONDS=21600`;
 - `ROEHUB_BACKTEST_CHILD_TIMEOUT_SECONDS=21600`;
-- `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=2`;
+- `ROEHUB_BACKTEST_LIGHT_CONCURRENCY=0`;
 - `ROEHUB_BACKTEST_HEAVY_CONCURRENCY=1`;
 - `ROEHUB_BACKTEST_LIGHT_MAX_ESTIMATED_COMBINATIONS=50000`;
 - `ROEHUB_BACKTEST_LIGHT_MAX_COMBINATIONS=50000` may be used as the shorter
   alias for the same preflight light threshold;
 - `ROEHUB_BACKTEST_LIGHT_MAX_ACTUAL_COMBINATIONS=50000`;
-- `ROEHUB_BACKTEST_NUMBA_NUM_THREADS=<host default override>`;
-- `ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS=2`;
-- `ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS=<full host budget>`;
+- `ROEHUB_BACKTEST_NUMBA_NUM_THREADS=12`;
+- `ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS=12`;
 - `ROEHUB_BACKTEST_RUNNER_MAX_JOBS_PER_PROCESS=10` remains parent lifecycle
   accounting only; it is not the primary full-job memory-release strategy;
 - `ROEHUB_BACKTEST_RUNNER_METRICS_PORT=9204`;

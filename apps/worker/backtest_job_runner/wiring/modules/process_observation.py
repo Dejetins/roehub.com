@@ -13,6 +13,8 @@ from typing import Any, Mapping, Sequence
 
 _EVIDENCE_DIR_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR"
 _SAMPLE_INTERVAL_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_SAMPLE_INTERVAL_SECONDS"
+_COLLECT_RSS_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_COLLECT_RSS"
+_COLLECT_VMMAP_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_COLLECT_VMMAP"
 _DEFAULT_SAMPLE_INTERVAL_SECONDS = 0.2
 
 
@@ -34,10 +36,14 @@ def run_observed_subprocess(
 ) -> ObservedProcessResult:
     started_at = datetime.now(UTC)
     parent_pid = os.getpid()
-    parent_rss_before = _rss_bytes(parent_pid)
-    parent_footprint_before = _physical_footprint_bytes(parent_pid)
     sample_interval = _sample_interval_seconds(env=env)
     evidence_dir = _evidence_dir(env=env)
+    collect_rss = _collect_rss(env=env, evidence_dir=evidence_dir)
+    collect_vmmap = _collect_vmmap(env=env)
+    parent_rss_before = _rss_bytes(parent_pid) if collect_rss else None
+    parent_footprint_before = (
+        _physical_footprint_bytes(parent_pid) if collect_vmmap else None
+    )
     stdout_file = NamedTemporaryFile("w+", encoding="utf-8", delete=False)
     stderr_file = NamedTemporaryFile("w+", encoding="utf-8", delete=False)
     stdout_path = Path(stdout_file.name)
@@ -57,15 +63,17 @@ def run_observed_subprocess(
             )
             deadline = time.monotonic() + timeout_seconds
             while process.poll() is None:
-                rss_bytes = _rss_bytes(process.pid)
-                if rss_bytes is not None:
-                    peak_rss_bytes = max(peak_rss_bytes or 0, rss_bytes)
-                footprint_bytes = _physical_footprint_bytes(process.pid)
-                if footprint_bytes is not None:
-                    peak_physical_footprint_bytes = max(
-                        peak_physical_footprint_bytes or 0,
-                        footprint_bytes,
-                    )
+                if collect_rss:
+                    rss_bytes = _rss_bytes(process.pid)
+                    if rss_bytes is not None:
+                        peak_rss_bytes = max(peak_rss_bytes or 0, rss_bytes)
+                if collect_vmmap:
+                    footprint_bytes = _physical_footprint_bytes(process.pid)
+                    if footprint_bytes is not None:
+                        peak_physical_footprint_bytes = max(
+                            peak_physical_footprint_bytes or 0,
+                            footprint_bytes,
+                        )
                 if time.monotonic() >= deadline:
                     timed_out = True
                     process.kill()
@@ -76,8 +84,10 @@ def run_observed_subprocess(
         stdout = _read_text(path=stdout_path)
         stderr = _read_text(path=stderr_path)
         finished_at = datetime.now(UTC)
-        parent_rss_after = _rss_bytes(parent_pid)
-        parent_footprint_after = _physical_footprint_bytes(parent_pid)
+        parent_rss_after = _rss_bytes(parent_pid) if collect_rss else None
+        parent_footprint_after = (
+            _physical_footprint_bytes(parent_pid) if collect_vmmap else None
+        )
         evidence = {
             "schema": "roehub_child_process_evidence_v1",
             "metadata": dict(metadata),
@@ -137,6 +147,21 @@ def _sample_interval_seconds(*, env: Mapping[str, str]) -> float:
     except ValueError:
         return _DEFAULT_SAMPLE_INTERVAL_SECONDS
     return value if value > 0 else _DEFAULT_SAMPLE_INTERVAL_SECONDS
+
+
+def _collect_rss(*, env: Mapping[str, str], evidence_dir: Path | None) -> bool:
+    raw = env.get(_COLLECT_RSS_KEY)
+    if raw is not None:
+        return _truthy(raw)
+    return evidence_dir is not None
+
+
+def _collect_vmmap(*, env: Mapping[str, str]) -> bool:
+    return _truthy(env.get(_COLLECT_VMMAP_KEY, ""))
+
+
+def _truthy(raw: str) -> bool:
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _rss_bytes(pid: int) -> int | None:

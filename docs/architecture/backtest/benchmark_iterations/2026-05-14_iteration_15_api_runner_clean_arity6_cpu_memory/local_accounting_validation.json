@@ -1,0 +1,73 @@
+{
+  "benchmark_top_k": 5,
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "canonical_stage_order": [
+    "service_warmup",
+    "numba_warmup",
+    "sample_warmup",
+    "total_without_warmup",
+    "load_hit_times",
+    "tp_sl_grid_validation",
+    "prepare_pools_core",
+    "build_exact_context",
+    "build_proxy_context",
+    "combo_iteration",
+    "proxy_filter",
+    "self_check",
+    "exact_scoring",
+    "tp_sl_exact_scoring",
+    "heap_update",
+    "top_result_proxy_fill"
+  ],
+  "heap_capacity": 5,
+  "prepare_pools_alias_normalized": true,
+  "request": {
+    "top_n": 100
+  },
+  "risk_modes": [
+    "none",
+    "tp_sl_grid"
+  ],
+  "run_count": 28,
+  "sample_warmup_top_k": 1,
+  "schema": "backtest_benchmark_accounting_validation_v1",
+  "service_only_telemetry_fields": [
+    "artifact_context_resolve",
+    "artifact_array_open",
+    "request_slice_prepare",
+    "prepare_pools_total",
+    "service_total_without_warmup",
+    "top_result_assembly",
+    "tp_sl_full_metrics_second_pass",
+    "persist_top_n_io",
+    "lazy_trades_compute",
+    "lazy_trades_cache_hit"
+  ],
+  "service_total_compared_to_canonical": false,
+  "stage_aliases": {
+    "prepare_pools": "prepare_pools_core",
+    "total": "total_without_warmup"
+  },
+  "stage_presence": {
+    "build_exact_context": 28,
+    "build_proxy_context": 28,
+    "combo_iteration": 28,
+    "exact_scoring": 28,
+    "heap_update": 28,
+    "load_hit_times": 14,
+    "numba_warmup": 28,
+    "prepare_pools_core": 28,
+    "proxy_filter": 28,
+    "sample_warmup": 28,
+    "self_check": 28,
+    "service_warmup": 28,
+    "top_result_proxy_fill": 28,
+    "total_without_warmup": 28,
+    "tp_sl_exact_scoring": 14,
+    "tp_sl_grid_validation": 14
+  },
+  "top_results_count_values": [
+    5
+  ],
+  "total_alias_is_historical": true
+}

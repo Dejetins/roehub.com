@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
@@ -11,7 +10,7 @@ BacktestSchedulingClass = Literal["light_candidate", "light", "heavy"]
 SCHEDULING_METADATA_KEY = "scheduling"
 DEFAULT_LIGHT_ESTIMATED_COMBINATIONS = 50_000
 DEFAULT_LIGHT_ACTUAL_COMBINATIONS = 50_000
-DEFAULT_LIGHT_NUMBA_NUM_THREADS = 2
+DEFAULT_FULL_JOB_NUMBA_NUM_THREADS = 12
 ROEHUB_BACKTEST_NUMBA_NUM_THREADS = "ROEHUB_BACKTEST_NUMBA_NUM_THREADS"
 ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS = "ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS"
 ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS = "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS"
@@ -70,24 +69,9 @@ def classify_preflight_scheduling(
         preflight.cost_estimate.estimated_combinations_upper_bound
         or preflight.cost_estimate.candidate_combinations
     )
-    if preflight.cost_estimate.scheduling_class == "heavy":
-        return BacktestSchedulingDecision(
-            scheduling_class="heavy",
-            estimated_combinations_upper_bound=max(estimate, 0),
-        )
-    if estimate <= 0:
-        return BacktestSchedulingDecision(
-            scheduling_class="heavy",
-            estimated_combinations_upper_bound=max(estimate, 0),
-        )
-    if estimate > light_max_estimated_combinations:
-        return BacktestSchedulingDecision(
-            scheduling_class="heavy",
-            estimated_combinations_upper_bound=estimate,
-        )
     return BacktestSchedulingDecision(
-        scheduling_class="light_candidate",
-        estimated_combinations_upper_bound=estimate,
+        scheduling_class="heavy",
+        estimated_combinations_upper_bound=max(estimate, 0),
     )
 
 
@@ -132,7 +116,7 @@ def scheduling_class_from_job_request(
         return "heavy"
     raw_class = raw_scheduling.get("scheduling_class")
     if raw_class in {"light_candidate", "light", "heavy"}:
-        return raw_class
+        return "heavy"
     return "heavy"
 
 
@@ -173,15 +157,10 @@ def resolve_backtest_numba_thread_decision(
     environ: Mapping[str, str],
     scheduling_class: BacktestSchedulingClass,
 ) -> BacktestNumbaThreadDecision:
-    class_key = (
-        ROEHUB_BACKTEST_LIGHT_NUMBA_NUM_THREADS
-        if scheduling_class in {"light_candidate", "light"}
-        else ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS
-    )
+    _ = scheduling_class
     for key in (
-        class_key,
+        ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS,
         ROEHUB_BACKTEST_NUMBA_NUM_THREADS,
-        NUMBA_NUM_THREADS,
     ):
         raw_value = environ.get(key)
         if raw_value is None or not raw_value.strip():
@@ -190,14 +169,9 @@ def resolve_backtest_numba_thread_decision(
             num_threads=_positive_env_int(key=key, raw_value=raw_value),
             source=key,
         )
-    if scheduling_class in {"light_candidate", "light"}:
-        return BacktestNumbaThreadDecision(
-            num_threads=DEFAULT_LIGHT_NUMBA_NUM_THREADS,
-            source="default_light_budget",
-        )
     return BacktestNumbaThreadDecision(
-        num_threads=max(int(os.cpu_count() or 1), 1),
-        source="default_full_host_budget",
+        num_threads=DEFAULT_FULL_JOB_NUMBA_NUM_THREADS,
+        source="default_full_job_budget",
     )
 
 

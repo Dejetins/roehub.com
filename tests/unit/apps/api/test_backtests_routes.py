@@ -164,7 +164,7 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert repository.jobs is not None
     stored = repository.jobs[UUID(payload["job_id"])]
     assert stored.execution_mode == "background_auto"
-    assert stored.request_json["scheduling"]["scheduling_class"] == "light_candidate"
+    assert stored.request_json["scheduling"]["scheduling_class"] == "heavy"
     assert stored.request_json["scheduling"]["estimated_combinations_upper_bound"] == 6
     assert trigger.calls == ((stored.job_id, stored.request_hash),)
 
@@ -188,7 +188,7 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
 
 
-def test_post_backtest_job_allows_ultra_top_n_100_for_benchmark_contract() -> None:
+def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
     repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
     request = _valid_request()
@@ -203,12 +203,8 @@ def test_post_backtest_job_allows_ultra_top_n_100_for_benchmark_contract() -> No
         json=request,
     )
 
-    assert response.status_code == 201
-    payload = response.json()
-    assert repository.jobs is not None
-    stored = repository.jobs[UUID(payload["job_id"])]
-    assert stored.request_json["top_n"] == 100
-    assert stored.request_json["scheduling"]["requested_top_n"] == 100
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.request_too_expensive"
 
 
 def test_post_backtest_job_free_active_quota_returns_429_with_retry_details() -> None:
