@@ -653,9 +653,19 @@ def _run_lazy_memory_checks(
     timeout_seconds: int,
     poll_interval_seconds: float,
 ) -> dict[str, Any]:
-    target = next((job for job in benchmark_jobs if job.get("pass")), None)
+    target = next(
+        (
+            job
+            for job in benchmark_jobs
+            if _mapping(job.get("runner")).get("pass") and int(job.get("api_top_count") or 0) > 0
+        ),
+        None,
+    )
     if target is None:
-        return {"pass": False, "reason": "no successful benchmark job for lazy check"}
+        return {
+            "pass": False,
+            "reason": "no successful benchmark job with top variants for lazy check",
+        }
     job_id = str(target["job_id"])
     top = client.request_json("GET", f"/backtests/jobs/{job_id}/top")
     top_items = _list(top.get("items"))
@@ -1041,26 +1051,41 @@ def _compare_reference_results(
         telemetry=telemetry,
         reference_run=reference_run,
     )
-    sample_mismatches = _compare_sample_metrics(
-        telemetry=telemetry,
-        reference_run=reference_run,
+    quality_top_zero = _quality_top_zero_result(telemetry=telemetry, api_items=len(items))
+    sample_mismatches = (
+        []
+        if quality_top_zero
+        else _compare_sample_metrics(
+            telemetry=telemetry,
+            reference_run=reference_run,
+        )
     )
     reference_top_results = [
         cast(Mapping[str, Any], item)
         for item in _list(reference_run.get("top_results"))[:BENCHMARK_TOP_K]
     ]
-    accepted_top_mismatches = _compare_top_result_samples(
-        actual_items=top_results_sample,
-        expected_items=reference_top_results,
-        actual_metrics_key="metrics",
+    accepted_top_mismatches = (
+        []
+        if quality_top_zero
+        else _compare_top_result_samples(
+            actual_items=top_results_sample,
+            expected_items=reference_top_results,
+            actual_metrics_key="metrics",
+        )
     )
-    api_child_mismatches = _compare_top_result_samples(
-        actual_items=items,
-        expected_items=top_results_sample[:BENCHMARK_TOP_K],
-        actual_metrics_key="summary_metrics",
+    api_child_mismatches = (
+        []
+        if quality_top_zero
+        else _compare_top_result_samples(
+            actual_items=items,
+            expected_items=top_results_sample[:BENCHMARK_TOP_K],
+            actual_metrics_key="summary_metrics",
+        )
     )
-    api_shape_pass = int(api_top.get("_status") or 200) == 200 and bool(items)
-    accepted_top_required = bool(reference_top_results)
+    api_shape_pass = int(api_top.get("_status") or 200) == 200 and (
+        bool(items) or quality_top_zero
+    )
+    accepted_top_required = bool(reference_top_results) and not quality_top_zero
     accepted_top_pass = not accepted_top_required or not accepted_top_mismatches
     pass_value = (
         api_shape_pass
@@ -1083,6 +1108,14 @@ def _compare_reference_results(
             "benchmark_top_k": telemetry.get("benchmark_top_k"),
             "numba_num_threads": telemetry.get("numba_num_threads"),
             "numba_thread_source": telemetry.get("numba_thread_source"),
+            "min_closed_trades": telemetry.get("min_closed_trades"),
+            "quality_candidates_below_min_trades": telemetry.get(
+                "quality_candidates_below_min_trades"
+            ),
+            "quality_candidates_heap_eligible": telemetry.get(
+                "quality_candidates_heap_eligible"
+            ),
+            "quality_top_zero": quality_top_zero,
         },
         "telemetry_mismatches": telemetry_mismatches,
         "sample_metrics_mismatches": sample_mismatches,
@@ -1091,6 +1124,23 @@ def _compare_reference_results(
         "api_child_top_mismatches": api_child_mismatches,
         "pass": pass_value,
     }
+
+
+def _quality_top_zero_result(*, telemetry: Mapping[str, Any], api_items: int) -> bool:
+    if api_items != 0:
+        return False
+    top_results_count = telemetry.get("top_results_count")
+    min_closed_trades = telemetry.get("min_closed_trades")
+    heap_eligible = telemetry.get("quality_candidates_heap_eligible")
+    below_min = telemetry.get("quality_candidates_below_min_trades")
+    evaluated = telemetry.get("exact_candidates_evaluated")
+    return (
+        top_results_count == 0
+        and isinstance(min_closed_trades, int)
+        and min_closed_trades > 0
+        and heap_eligible == 0
+        and below_min == evaluated
+    )
 
 
 def _latest_exact_diagnostics(
