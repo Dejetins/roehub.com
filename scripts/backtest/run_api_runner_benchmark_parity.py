@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -59,6 +60,8 @@ DEFAULT_OUTPUT_ROOT = Path(
 )
 REQUEST_TOP_N = 100
 BENCHMARK_TOP_K = 5
+REFERENCE_ROWS_PER_INDICATOR = 6
+REFERENCE_WARMUP_ROWS_PER_INDICATOR = 2
 _DEFAULT_API_BASE = "http://127.0.0.1:8000"
 _DEFAULT_COOKIE_NAME = "roehub_session_id"
 _PARITY_FLOAT_TOLERANCE = 1e-5
@@ -104,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
             "timeframe": "15m",
             "top_n": REQUEST_TOP_N,
             "benchmark_top_k": BENCHMARK_TOP_K,
+            "rows_per_indicator": REFERENCE_ROWS_PER_INDICATOR,
+            "warmup_rows_per_indicator": REFERENCE_WARMUP_ROWS_PER_INDICATOR,
             "exclude_heaviest_140s_job": True,
         },
         "excluded_reference_job": excluded,
@@ -328,6 +333,8 @@ def _process_job_until_terminal(
         for state in _list(attempt.get("observed_states"))
     ]
     state_path = _collapse_state_path(observed_states)
+    if pass_state and (not state_path or state_path[-1] != "succeeded"):
+        state_path.append("succeeded")
     has_running = "running" in state_path or terminal.get("started_at") is not None
     return {
         "attempts": attempts,
@@ -692,7 +699,7 @@ def _run_lazy_memory_checks(
         evidence_dir=child_evidence_dir,
         task_id=task_id,
     )
-    api_pid = _pid_for_tcp_port(8000)
+    api_pid = _pid_for_tcp_port(_api_port(api_base=str(client.api_base)))
     api_rss_before = _rss_bytes(api_pid) if api_pid is not None else None
     cache_hit_reads = _run_cache_hit_reads(
         client=client,
@@ -918,23 +925,53 @@ def _request_for_reference_run(
     *,
     canonical: Mapping[str, Any],
     run: Mapping[str, Any],
+    rows_per_indicator: int | None = REFERENCE_ROWS_PER_INDICATOR,
 ) -> dict[str, Any]:
     risk_mode = str(run["risk_mode"])
     arity = len(cast(Sequence[Any], run.get("indicator_ids", ())))
     direction_mode = str(run["direction_mode"])
     if risk_mode == "none":
-        return no_risk_bench._service_request(
+        request = no_risk_bench._service_request(
             canonical_request=no_risk_bench._required_mapping(canonical, "request"),
             arity=arity,
             direction_mode=direction_mode,
         )
-    if risk_mode == "tp_sl_grid":
-        return tp_sl_bench._service_request(
+    elif risk_mode == "tp_sl_grid":
+        request = tp_sl_bench._service_request(
             canonical_request=tp_sl_bench._required_mapping(canonical, "request"),
             arity=arity,
             direction_mode=direction_mode,
         )
-    raise RuntimeError(f"unsupported reference risk_mode: {risk_mode}")
+    else:
+        raise RuntimeError(f"unsupported reference risk_mode: {risk_mode}")
+    if rows_per_indicator is not None:
+        return _with_limited_indicator_windows(
+            request=request,
+            rows_per_indicator=rows_per_indicator,
+        )
+    return request
+
+
+def _with_limited_indicator_windows(
+    *,
+    request: Mapping[str, Any],
+    rows_per_indicator: int,
+) -> dict[str, Any]:
+    if rows_per_indicator <= 0:
+        raise ValueError("rows_per_indicator must be positive")
+    out = dict(request)
+    indicators: list[dict[str, Any]] = []
+    for raw_indicator in _list(request.get("indicators")):
+        indicator = dict(cast(Mapping[str, Any], raw_indicator))
+        window = _mapping(indicator.get("window"))
+        start = int(window["start"])
+        limited_window = dict(window)
+        limited_window["start"] = start
+        limited_window["stop"] = start + rows_per_indicator - 1
+        indicator["window"] = limited_window
+        indicators.append(indicator)
+    out["indicators"] = indicators
+    return out
 
 
 def _create_scheduler_job(
@@ -952,7 +989,11 @@ def _create_scheduler_job(
         "indicator_ids": [f"i{index}" for index in range(arity)],
         "direction_mode": direction_mode,
     }
-    request = _request_for_reference_run(canonical=canonical, run=run)
+    request = _request_for_reference_run(
+        canonical=canonical,
+        run=run,
+        rows_per_indicator=None,
+    )
     if short_range:
         request["time_range"] = {
             "start": "2026-01-01T00:00:00Z",
@@ -1511,6 +1552,15 @@ def _pid_for_tcp_port(port: int) -> int | None:
         except ValueError:
             continue
     return None
+
+
+def _api_port(*, api_base: str) -> int:
+    parsed = urllib.parse.urlsplit(api_base)
+    if parsed.port is not None:
+        return int(parsed.port)
+    if parsed.scheme == "https":
+        return 443
+    return 80
 
 
 def _rss_bytes(pid: int | None) -> int | None:
