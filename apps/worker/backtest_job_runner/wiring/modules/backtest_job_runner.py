@@ -237,6 +237,14 @@ class BacktestRunnerTaskScheduler:
         if result.task_kind == _TASK_KIND_LAZY_DETAIL:
             if result.claimed:
                 self._lazy_detail_streak += 1
+                if self._lazy_detail_streak >= self.lazy_detail_anti_starvation_limit:
+                    self._lazy_detail_streak = 0
+                    self._full_empty_rounds = 0
+                    self._try_heavy_next = True
+            else:
+                self._lazy_detail_streak = 0
+                self._full_empty_rounds = 0
+                self._try_heavy_next = True
             return
         self._lazy_detail_streak = 0
         if scheduling_class == _SCHEDULING_CLASS_HEAVY:

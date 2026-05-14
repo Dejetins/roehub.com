@@ -58,6 +58,47 @@ def test_scheduler_rechecks_heavy_after_light_anti_starvation_limit() -> None:
     assert launch.scheduling_class == "heavy"
 
 
+def test_scheduler_returns_to_full_poll_after_empty_lazy_probe() -> None:
+    scheduler = _scheduler()
+
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="light_candidate")
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
+    lazy = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    assert lazy is not None
+    assert lazy.task_kind == "lazy_detail"
+
+    scheduler.record_result(
+        scheduling_class="none",
+        result=BacktestRunnerTaskResult(task_kind="lazy_detail", claimed=False),
+    )
+    launch = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+
+    assert launch is not None
+    assert launch.scheduling_class == "heavy"
+
+
+def test_scheduler_limits_consecutive_lazy_claims_before_full_probe() -> None:
+    scheduler = _scheduler(lazy_detail_anti_starvation_limit=2)
+
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="light_candidate")
+    _record_empty_full_probe(scheduler=scheduler, scheduling_class="heavy")
+    for _ in range(2):
+        lazy = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+        assert lazy is not None
+        assert lazy.task_kind == "lazy_detail"
+        scheduler.record_result(
+            scheduling_class="none",
+            result=BacktestRunnerTaskResult(task_kind="lazy_detail", claimed=True),
+        )
+
+    launch = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+
+    assert launch is not None
+    assert launch.scheduling_class == "heavy"
+
+
 def test_production_runner_wiring_does_not_construct_full_compute_service_in_parent() -> None:
     source = inspect.getsource(build_backtest_job_runner_app)
 
@@ -87,8 +128,27 @@ class _FakeLazyWorker:
         return BacktestRunnerTaskResult(task_kind="lazy_detail", claimed=False)
 
 
+def _record_empty_full_probe(
+    *,
+    scheduler: BacktestRunnerTaskScheduler,
+    scheduling_class: str,
+) -> None:
+    launch = scheduler.next_launch(active_light=0, active_heavy=0, active_lazy=0)
+    assert launch is not None
+    assert launch.scheduling_class == scheduling_class
+    scheduler.record_result(
+        scheduling_class=scheduling_class,
+        result=BacktestRunnerTaskResult(
+            task_kind="full_job",
+            claimed=False,
+            scheduling_class=scheduling_class,
+        ),
+    )
+
+
 def _scheduler(
     *,
+    lazy_detail_anti_starvation_limit: int = 5,
     full_job_anti_starvation_limit: int = 4,
 ) -> BacktestRunnerTaskScheduler:
     return BacktestRunnerTaskScheduler(
@@ -100,5 +160,6 @@ def _scheduler(
         ),
         light_concurrency=2,
         heavy_concurrency=1,
+        lazy_detail_anti_starvation_limit=lazy_detail_anti_starvation_limit,
         full_job_anti_starvation_limit=full_job_anti_starvation_limit,
     )
