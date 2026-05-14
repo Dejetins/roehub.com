@@ -188,6 +188,29 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
 
 
+def test_post_backtest_job_allows_ultra_top_n_100_for_benchmark_contract() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    request = _valid_request()
+    request["top_n"] = 100
+
+    response = client.post(
+        "/backtests/jobs",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000243",
+            "x-paid-level": "ultra",
+        },
+        json=request,
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert repository.jobs is not None
+    stored = repository.jobs[UUID(payload["job_id"])]
+    assert stored.request_json["top_n"] == 100
+    assert stored.request_json["scheduling"]["requested_top_n"] == 100
+
+
 def test_post_backtest_job_free_active_quota_returns_429_with_retry_details() -> None:
     repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))

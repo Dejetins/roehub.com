@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import pytest
 
+from trading.contexts.backtest.adapters.outbound.config import (
+    load_backtest_admission_config,
+)
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
     BacktestCostEstimate,
     BacktestPreflightResult,
+    BacktestRuntimeGuardrails,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    BacktestAdmissionService,
 )
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     NUMBA_NUM_THREADS,
@@ -17,6 +24,20 @@ from trading.contexts.backtest.application.services.v2.job_scheduling import (
     raise_if_light_candidate_needs_heavy_slot,
     scheduling_metadata_from_preflight,
 )
+from trading.shared_kernel.primitives import PaidLevel
+
+
+def test_prod_admission_config_preserves_benchmark_top_n_for_ultra_only() -> None:
+    service = BacktestAdmissionService(
+        config=load_backtest_admission_config("configs/prod/backtest_admission.yaml")
+    )
+    guardrails = service.preflight_validation_guardrails(
+        base_guardrails=BacktestRuntimeGuardrails(),
+    )
+
+    assert guardrails.max_top_n == 100
+    assert service.config.policy_for(paid_level=PaidLevel("ultra")).max_top_n == 100
+    assert service.config.policy_for(paid_level=PaidLevel("pro")).max_top_n == 50
 
 
 def test_preflight_scheduler_metadata_preserves_conservative_upper_bound() -> None:
