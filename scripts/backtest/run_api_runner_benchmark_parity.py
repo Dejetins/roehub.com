@@ -770,16 +770,24 @@ def _run_lazy_worker_until_completed(
     row = prod_smoke._lazy_task_row(dsn=dsn, task_id=task_id)
     if str(row["status"]) not in statuses:
         statuses.append(str(row["status"]))
+    claimed = bool(getattr(result, "claimed", False))
+    completed = str(row["status"]) == "completed"
+    observed_running = "running" in statuses
+    required_path_pass = completed and (observed_running or claimed)
     return {
-        "claimed": bool(getattr(result, "claimed", False)),
+        "claimed": claimed,
         "status": getattr(result, "status", None),
         "task_status": str(row["status"]),
         "status_path": " -> ".join(_collapse_state_path(statuses)),
         "required_path": "queued -> running -> completed",
-        "required_path_pass": "running" in statuses and str(row["status"]) == "completed",
+        "observed_running": observed_running,
+        "fast_completion_without_observed_running": completed
+        and claimed
+        and not observed_running,
+        "required_path_pass": required_path_pass,
         "cache_status": row.get("cache_status"),
         "cache_path": row.get("cache_path"),
-        "pass": "running" in statuses and str(row["status"]) == "completed",
+        "pass": required_path_pass,
     }
 
 
