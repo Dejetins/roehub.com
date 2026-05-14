@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping
 from uuid import UUID
@@ -21,6 +20,7 @@ from .child_ipc import (
     child_result_from_mapping,
     preflight_to_mapping,
 )
+from .process_observation import run_observed_subprocess
 
 log = logging.getLogger(__name__)
 
@@ -86,19 +86,28 @@ class BacktestChildProcessExecutor:
                 env.get("ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS"),
                 env.get("ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"),
             )
-            try:
-                completed = subprocess.run(
-                    cmd,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout_seconds,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as error:
+            completed = run_observed_subprocess(
+                cmd=cmd,
+                env=env,
+                timeout_seconds=self.timeout_seconds,
+                evidence_prefix=f"full-job-{job_id}",
+                metadata={
+                    "task_kind": "full_job",
+                    "job_id": str(job_id),
+                    "scheduling_class": self.scheduling_class,
+                    "child_module": self.child_module,
+                    "numba_threads": env.get(
+                        "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS"
+                    ),
+                    "numba_thread_source": env.get(
+                        "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"
+                    ),
+                },
+            )
+            if completed.evidence.get("timed_out"):
                 raise BacktestChildProcessError(
                     f"child process timeout after {self.timeout_seconds:.0f}s"
-                ) from error
+                )
             elapsed = datetime.now().timestamp() - started
             if completed.returncode != 0:
                 stderr_tail = _bounded_tail(value=completed.stderr, limit=4000)
@@ -117,6 +126,12 @@ class BacktestChildProcessExecutor:
                 payload = json.load(handle)
             if not isinstance(payload, Mapping):
                 raise BacktestChildProcessError("child process result must be JSON object")
+            _write_result_evidence(
+                env=env,
+                job_id=job_id,
+                payload=payload,
+                process_evidence=completed.evidence,
+            )
             result = child_result_from_mapping(payload=payload)
             log.info(
                 "backtest child process exited: job_id=%s status=%s elapsed_seconds=%.3f",
@@ -131,3 +146,41 @@ def _bounded_tail(*, value: str | None, limit: int) -> str:
     if value is None:
         return ""
     return value[-limit:]
+
+
+def _write_result_evidence(
+    *,
+    env: Mapping[str, str],
+    job_id: UUID,
+    payload: Mapping[str, object],
+    process_evidence: Mapping[str, object],
+) -> None:
+    raw_dir = env.get("ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR", "").strip()
+    if not raw_dir:
+        return
+    evidence_dir = Path(raw_dir).expanduser()
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    top_variants = payload.get("top_variants")
+    top_variants_count = len(top_variants) if isinstance(top_variants, list) else 0
+    raw_stage_timings = payload.get("stage_timings")
+    stage_timings = dict(raw_stage_timings) if isinstance(raw_stage_timings, Mapping) else {}
+    raw_cleanup_evidence = payload.get("cleanup_evidence")
+    cleanup_evidence = (
+        dict(raw_cleanup_evidence) if isinstance(raw_cleanup_evidence, Mapping) else {}
+    )
+    evidence = {
+        "schema": "roehub_full_job_child_result_evidence_v1",
+        "job_id": str(job_id),
+        "status": payload.get("status"),
+        "stage_timings": stage_timings,
+        "summary_hash": payload.get("summary_hash"),
+        "cleanup_evidence": cleanup_evidence,
+        "top_variants_count": top_variants_count,
+        "process_evidence": dict(process_evidence),
+    }
+    suffix = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    path = evidence_dir / f"full-job-result-{job_id}-{suffix}.json"
+    path.write_text(
+        json.dumps(evidence, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
