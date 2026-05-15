@@ -220,7 +220,10 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_rsi_ru",
         mode="create",
         locale="ru",
-        message="Собери валидный конфиг /backtests для BTCUSDT с RSI на 15m",
+        message=(
+            "Собери валидный конфиг /backtests для BTCUSDT на 15m "
+            "с indicator_id momentum.rsi."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
@@ -229,25 +232,34 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_rsi_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests BTCUSDT RSI configuration on 15m.",
+        message=(
+            "Create a valid /backtests BTCUSDT configuration on 15m "
+            "with indicator_id momentum.rsi."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
     ),
     PromptCase(
-        case_id="ready_eth_ema_en",
+        case_id="ready_btc_ema_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests ETHUSDT EMA configuration on 15m.",
+        message=(
+            "Create a valid /backtests BTCUSDT configuration on 15m "
+            "with indicator_id ma.ema."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
     ),
     PromptCase(
-        case_id="ready_sol_atr_en",
+        case_id="ready_btc_atr_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests SOLUSDT ATR configuration on 15m.",
+        message=(
+            "Create a valid /backtests BTCUSDT configuration on 15m "
+            "with indicator_id volatility.atr."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
@@ -256,7 +268,10 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_dema_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests BTCUSDT DEMA configuration on 15m.",
+        message=(
+            "Create a valid /backtests BTCUSDT configuration on 15m "
+            "with indicator_id ma.dema."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
@@ -265,7 +280,10 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_sma_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests BTCUSDT SMA configuration on 15m.",
+        message=(
+            "Create a valid /backtests BTCUSDT configuration on 15m "
+            "with indicator_id ma.sma."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
@@ -274,16 +292,19 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_tp_sl_en",
         mode="suggest_safer",
         locale="en",
-        message="Suggest a safer /backtests BTCUSDT RSI config with stop loss and take profit.",
+        message=(
+            "Suggest a safer /backtests BTCUSDT config with indicator_id momentum.rsi, "
+            "stop loss, and take profit."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
     ),
     PromptCase(
-        case_id="ready_edit_eth_ema_en",
+        case_id="ready_edit_btc_ema_en",
         mode="edit",
         locale="en",
-        message="Edit this /backtests config to use ETHUSDT and EMA on 15m.",
+        message="Edit this /backtests config to use indicator_id ma.ema on 15m.",
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
@@ -322,7 +343,10 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         case_id="ready_btc_top10_en",
         mode="create",
         locale="en",
-        message="Create a valid /backtests BTCUSDT RSI config on 15m and keep top 10 results.",
+        message=(
+            "Create a valid /backtests BTCUSDT config on 15m with "
+            "indicator_id momentum.rsi and keep top 10 results."
+        ),
         category="supported_ready",
         supported=True,
         expected_statuses=("ready",),
