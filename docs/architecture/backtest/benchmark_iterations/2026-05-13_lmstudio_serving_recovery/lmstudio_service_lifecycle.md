@@ -8,10 +8,12 @@ post-reload recovery. It is not an S1/S5/S10/S50/S100 benchmark.
 
 ## Gate Verdict
 
-- accepted: false
-- blocking_reason: implementation pending Mac Studio deployment verification
-- next_prompt_allowed: false
+- accepted: true
+- blocking_reason: null
+- next_prompt_allowed: true
 - host: `MacStudioDaniil`
+- timestamp UTC: `2026-05-15T22:17:35Z`
+- deployed runtime commit: `5e43906023997eba44c199bc4ce16c76eb65fc6a`
 - runtime: `lm_studio`
 - launchd label: `com.roehub.lmstudio-backtest-ai-runtime`
 - Monit check: `roehub_lmstudio_backtest_ai_runtime`
@@ -72,7 +74,7 @@ The smoke uses a bounded retry loop for transient post-restart HTTP connection
 closures while LM Studio is reattaching the server/model. Port conflict and
 public-bind failures are not retried.
 
-## Verification To Record After Deploy
+## Mac Studio Verification
 
 ```bash
 bash scripts/macos/bootstrap_native_prod.sh
@@ -84,7 +86,28 @@ launchctl print gui/$(id -u)/com.roehub.lmstudio-backtest-ai-runtime
 /opt/roehub/app/scripts/macos/smoke_lmstudio_backtest_ai_runtime.sh --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json
 ```
 
-Two stop/start/restart cycles must be recorded before this gate can be accepted.
+Recorded evidence:
+
+| Check | Result |
+| --- | --- |
+| `git pull --ff-only origin main` on Mac Studio checkout | `5e43906023997eba44c199bc4ce16c76eb65fc6a` |
+| `bootstrap_native_prod.sh` + `reload_launchd_services.sh prod` | installed and bootstrapped `com.roehub.lmstudio-backtest-ai-runtime` |
+| Monit syntax/reload | `Control file syntax OK`, `Reinitializing monit daemon` |
+| Clean cycle 1 stop | `lms server status --json --quiet` returned `{"running":false,"port":8080}` |
+| Clean cycle 1 start smoke | `accepted=True`, `next_prompt_allowed=True`, `attempts=1`, listener `127.0.0.1:8080 (LISTEN)` |
+| Clean cycle 1 restart smoke | `accepted=True`, `next_prompt_allowed=True`, `attempts=1`, listener `127.0.0.1:8080 (LISTEN)` |
+| Clean cycle 2 stop | `lms server status --json --quiet` returned `{"running":false,"port":8080}` |
+| Clean cycle 2 start smoke | `accepted=True`, `next_prompt_allowed=True`, `attempts=1`, listener `127.0.0.1:8080 (LISTEN)` |
+| Clean cycle 2 restart smoke | `accepted=True`, `next_prompt_allowed=True`, `attempts=1`, listener `127.0.0.1:8080 (LISTEN)` |
+| Monit final status | `roehub_lmstudio_backtest_ai_runtime` `OK`, `last exit value 0`, `monitoring status Monitored` |
+| launchd final status | `state = not running`, `last exit code = 0`; expected for one-shot `KeepAlive=false` ensure job |
+| `lms ps --json` | `identifier=gemma-4-e2b-it-4bit`, `contextLength=8192`, `parallel=1`, `status=idle` |
+| Worker readiness after companion smoke | `/health/ready` returned `status=ready` |
+| Production smoke | `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
+
+No restart storm was observed: Monit stayed `Monitored`, final status was `OK`,
+final `last exit value` was `0`, and the launchd one-shot exited with code `0`
+instead of being kept alive.
 
 ## Machine-Readable Summary
 

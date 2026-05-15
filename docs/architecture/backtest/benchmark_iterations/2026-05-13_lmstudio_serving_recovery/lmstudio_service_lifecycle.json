@@ -1,8 +1,10 @@
 {
-  "accepted": false,
-  "blocking_reason": "implementation pending Mac Studio deployment verification",
-  "next_prompt_allowed": false,
+  "accepted": true,
+  "blocking_reason": null,
+  "next_prompt_allowed": true,
   "host": "MacStudioDaniil",
+  "timestamp_utc": "2026-05-15T22:17:35Z",
+  "deployed_runtime_commit": "5e43906023997eba44c199bc4ce16c76eb65fc6a",
   "runtime": "lm_studio",
   "launchd_label": "com.roehub.lmstudio-backtest-ai-runtime",
   "monit_check": "roehub_lmstudio_backtest_ai_runtime",
@@ -17,8 +19,30 @@
     "bounded_retry_for_post_restart_http_race": true
   },
   "verification": {
-    "two_stop_start_restart_cycles": false,
-    "no_restart_storm": false,
-    "macstudio_deployed": false
+    "two_stop_start_restart_cycles": true,
+    "clean_cycle_1_start": {
+      "accepted": true,
+      "readiness_attempts": 1
+    },
+    "clean_cycle_1_restart": {
+      "accepted": true,
+      "readiness_attempts": 1
+    },
+    "clean_cycle_2_start": {
+      "accepted": true,
+      "readiness_attempts": 1
+    },
+    "clean_cycle_2_restart": {
+      "accepted": true,
+      "readiness_attempts": 1
+    },
+    "monit_status": "OK",
+    "monit_last_exit_value": 0,
+    "launchd_last_exit_code": 0,
+    "launchd_state": "not running",
+    "no_restart_storm": true,
+    "macstudio_deployed": true,
+    "worker_health_ready_after_companion_smoke": true,
+    "smoke_prod_passed": true
   }
 }
