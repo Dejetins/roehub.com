@@ -442,6 +442,15 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert response.status_code == 200
     assert 'data-page="backtests"' in response.text
     assert 'data-backtests-root' in response.text
+    assert 'data-config-field="strategy"' in response.text
+    assert 'type="text" value="" data-config-field="strategy"' in response.text
+    assert response.text.index('data-config-field="strategy"') < response.text.index(
+        'data-config-field="symbol"'
+    )
+    assert response.text.index('data-config-field="symbol"') < response.text.index(
+        'id="backtest-market-trigger"'
+    )
+    assert 'data-current-value="sizing_mode">All in</span>' in response.text
     assert 'data-workstation-endpoint="/api/ui/backtests/workstation"' in response.text
     assert 'data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"' in response.text
     assert 'data-preflight-endpoint="/api/backtests/preflight"' in response.text
@@ -830,6 +839,11 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "symbolQuery" in backtests_js
     assert "[data-backtest-menu='" in backtests_js
     assert "buildSizingPayload" in backtests_js
+    assert 'sizing_mode: "all_in"' in backtests_js
+    assert "function ensureStrategyName" in backtests_js
+    assert "entry_timestamp" in backtests_js
+    assert "net_pnl_quote" in backtests_js
+    assert "function renderMonthlyStatsTable" in backtests_js
     assert "toggleStatusRefreshMenu" in backtests_js
     assert "data-symbol-select" in backtests_js
     assert "filterSymbols(root, state.symbolQuery);" in backtests_js

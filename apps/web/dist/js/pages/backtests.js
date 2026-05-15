@@ -47,9 +47,10 @@ const state = {
   risk_mode: "none",
   risk_tp_enabled: true,
   risk_sl_enabled: true,
-  sizing_mode: "fixed_equity_pct",
+  sizing_mode: "all_in",
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
+  strategyNameTouched: false,
   job_state: "",
   job_exchange: "",
   job_market_type: "",
@@ -741,6 +742,102 @@ function selectedSymbols(root) {
   return selected.length ? selected.slice(0, 1) : [state.symbol || "BTCUSDT"];
 }
 
+function currentStrategyName(root) {
+  return (qs("[data-config-field='strategy']", root)?.value || "").trim();
+}
+
+function ensureStrategyName(root) {
+  const field = qs("[data-config-field='strategy']", root);
+  if (!(field instanceof HTMLInputElement)) {
+    return "";
+  }
+  const current = field.value.trim();
+  if (current) {
+    return current;
+  }
+  if (state.strategyNameTouched) {
+    return "";
+  }
+  const generated = generateStrategyName(root);
+  field.value = generated;
+  return generated;
+}
+
+function generateStrategyName(root) {
+  const indicators = strategyIndicatorParts();
+  const indicatorText = indicators.length ? indicators.join("-") : "indicators";
+  const riskText = state.risk_mode === "tp_sl_grid"
+    ? strategyRiskPart(root)
+    : "no-risk";
+  const seed = {
+    timeframe: state.timeframe,
+    direction: state.direction,
+    risk: riskText,
+    sizing: state.sizing_mode,
+    ranking: [state.ranking_metric, state.ranking_order],
+    indicators,
+  };
+  const hash = shortHash(JSON.stringify(seed));
+  return `${indicatorText}-${state.timeframe}-${directionSlug(state.direction)}-${riskText}-${hash}`.slice(0, 72);
+}
+
+function strategyIndicatorParts() {
+  const indicators = state.selectedIndicators.length
+    ? state.selectedIndicators
+    : (state.runtimeDefaults?.config_draft?.indicators || []);
+  return indicators.slice(0, 4).map((indicator) => {
+    const indicatorId = indicator.indicator_id || "indicator";
+    const source = Array.isArray(indicator.sources) && indicator.sources.length
+      ? indicator.sources.join("-")
+      : "src";
+    const windowValue = indicator.window || indicator.params?.window;
+    return slugToken([labelForId(indicatorId), source, strategyWindowPart(windowValue)].filter(Boolean).join("-"));
+  }).filter(Boolean);
+}
+
+function strategyWindowPart(value) {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+  const start = value.start ?? value.from;
+  const stop = value.stop ?? value.to ?? value.stop_incl;
+  const step = value.step;
+  return [start, stop, step].filter((item) => item !== undefined && item !== null && item !== "").join("x");
+}
+
+function strategyRiskPart(root) {
+  const parts = [];
+  if (state.risk_tp_enabled) {
+    parts.push(`tp${qs("[data-risk-field='tp_start']", root)?.value || DEFAULT_TP_START_PCT}-${qs("[data-risk-field='tp_stop']", root)?.value || DEFAULT_TP_STOP_PCT}`);
+  }
+  if (state.risk_sl_enabled) {
+    parts.push(`sl${qs("[data-risk-field='sl_start']", root)?.value || DEFAULT_SL_START_PCT}-${qs("[data-risk-field='sl_stop']", root)?.value || DEFAULT_SL_STOP_PCT}`);
+  }
+  return slugToken(parts.join("-") || "risk-off");
+}
+
+function directionSlug(value) {
+  return value === "long_only" ? "long" : "long-short";
+}
+
+function slugToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function shortHash(value) {
+  let hash = 2166136261;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).slice(0, 6);
+}
+
 function buildRequestPayload(root) {
   const start = qs("[data-config-field='start']", root)?.value || "2023-01-01";
   const end = qs("[data-config-field='end']", root)?.value || "2024-01-01";
@@ -786,6 +883,7 @@ function buildRequestPayload(root) {
   }
 
   return {
+    strategy_name: currentStrategyName(root),
     coordinates: {
       exchange: state.market,
       market_type: state.market_type,
@@ -821,7 +919,7 @@ function positiveSizingNumber(root, name, fallback) {
 }
 
 function buildSizingPayload(root) {
-  const mode = state.sizing_mode || "fixed_equity_pct";
+  const mode = state.sizing_mode || "all_in";
   if (mode === "all_in") {
     return { mode };
   }
@@ -1136,7 +1234,7 @@ function otherRiskSideEnabled(side) {
 }
 
 function updateSizingPanel(root) {
-  const mode = state.sizing_mode || "fixed_equity_pct";
+  const mode = state.sizing_mode || "all_in";
   const visibleFields = new Set();
   if (mode === "fixed_quote") {
     visibleFields.add("quote_amount");
@@ -1625,8 +1723,7 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
           ${renderChartShell("drawdown", t("backtests.result_detail.drawdown"), details?.drawdown)}
         </div>
         <div class="backtests-result-stat-tables">
-          ${renderStatsTable("monthly", t("backtests.result_detail.monthly"), details?.monthly)}
-          ${renderStatsTable("symbol", t("backtests.result_detail.symbol"), details?.symbol)}
+          ${renderMonthlyStatsTable(root, details?.monthly)}
         </div>
         ${renderTradesPanel(details)}
       </div>
@@ -1668,19 +1765,24 @@ function renderChartShell(kind, label, payload) {
   `;
 }
 
-function renderStatsTable(kind, label, payload) {
-  const items = Array.isArray(payload?.items) ? payload.items.slice(0, 6) : [];
-  const body = items.length
-    ? items.map((item) => renderStatsRow(kind, item)).join("")
-    : `<tr><td colspan="4">${escapeHtml(resultStatusText(payload, t("backtests.results.unavailable")))}</td></tr>`;
+function renderMonthlyStatsTable(root, payload) {
+  const matrix = monthlyStatsMatrix(root, payload);
+  const unavailable = !matrix.items.length;
+  const head = matrix.years.length
+    ? `<tr><th></th>${matrix.years.map((year) => `<th>${escapeHtml(year)}</th>`).join("")}</tr>`
+    : "";
+  const body = unavailable
+    ? `<tr><td colspan="${Math.max(2, matrix.years.length + 1)}">${escapeHtml(resultStatusText(payload, t("backtests.results.unavailable")))}</td></tr>`
+    : Array.from({ length: 12 }, (_, index) => renderMonthlyStatsRow(index + 1, matrix)).join("");
   return `
-    <section class="backtests-result-stats" data-result-stats="${escapeHtml(kind)}" data-result-state="${escapeHtml(resultPayloadState(payload))}">
+    <section class="backtests-result-stats" data-result-stats="monthly" data-result-state="${escapeHtml(resultPayloadState(payload))}">
       <header>
-        <strong>${escapeHtml(label)}</strong>
+        <strong>${escapeHtml(t("backtests.result_detail.monthly"))}</strong>
         <span>${escapeHtml(resultStatusText(payload, t("backtests.result_detail.pending")))}</span>
       </header>
       <div class="backtests-table-wrap backtests-result-stats-wrap">
         <table class="backtests-table backtests-table--result-stats">
+          <thead>${head}</thead>
           <tbody>${body}</tbody>
         </table>
       </div>
@@ -1688,25 +1790,55 @@ function renderStatsTable(kind, label, payload) {
   `;
 }
 
-function renderStatsRow(kind, item) {
-  if (kind === "monthly") {
-    return `
-      <tr>
-        <td>${escapeHtml(item.month || item.period || "--")}</td>
-        <td class="${financialClass(item.total_pnl ?? item.pnl)}">${escapeHtml(moneyOrDash(item.total_pnl ?? item.pnl))}</td>
-        <td>${escapeHtml(integerOrDash(item.trades_count ?? item.trade_count))}</td>
-        <td>${escapeHtml(percent(item.win_rate_pct, 1))}</td>
-      </tr>
-    `;
+function monthlyStatsMatrix(root, payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const itemYears = new Set();
+  const values = new Map();
+  items.forEach((item) => {
+    const monthKey = String(item.month || item.period || "");
+    const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+    if (!match) {
+      return;
+    }
+    const year = match[1];
+    const month = Number(match[2]);
+    const value = valueOrFallback(
+      item.return_pct,
+      valueOrFallback(item.pnl_pct, item.total_return_pct)
+    );
+    itemYears.add(year);
+    values.set(`${year}-${month}`, value);
+  });
+  const years = yearsForMonthlyStats(root, itemYears);
+  return { items, years, values };
+}
+
+function yearsForMonthlyStats(root, itemYears) {
+  const years = new Set(itemYears);
+  const row = state.jobRows.find((job) => job.job_id === state.selectedJobId);
+  const period = String(row?.period || "");
+  const dates = period.match(/(\d{4})-\d{2}-\d{2}/g) || [];
+  if (dates.length >= 2) {
+    const startYear = Number(dates[0].slice(0, 4));
+    const endYear = Number(dates[1].slice(0, 4));
+    if (Number.isInteger(startYear) && Number.isInteger(endYear) && startYear <= endYear) {
+      for (let year = startYear; year <= endYear; year += 1) {
+        years.add(String(year));
+      }
+    }
   }
-  return `
-    <tr>
-      <td>${escapeHtml(item.symbol || "--")}</td>
-      <td class="${financialClass(item.total_pnl ?? item.pnl)}">${escapeHtml(moneyOrDash(item.total_pnl ?? item.pnl))}</td>
-      <td>${escapeHtml(integerOrDash(item.trades_count ?? item.trade_count))}</td>
-      <td>${escapeHtml(percent(item.win_rate_pct, 1))}</td>
-    </tr>
-  `;
+  if (!years.size) {
+    years.add(String(new Date().getFullYear()));
+  }
+  return Array.from(years).sort();
+}
+
+function renderMonthlyStatsRow(month, matrix) {
+  const cells = matrix.years.map((year) => {
+    const value = matrix.values.get(`${year}-${month}`);
+    return `<td class="${financialClass(value)}">${escapeHtml(percent(value, 2))}</td>`;
+  }).join("");
+  return `<tr><th>${month}</th>${cells}</tr>`;
 }
 
 function renderTradesPanel(details) {
@@ -1748,16 +1880,40 @@ function renderTradesPanel(details) {
 }
 
 function renderTradeRow(item) {
+  const entryValue = formatTradePoint(
+    item.entry_timestamp || item.entry_time || item.opened_at || item.timestamp,
+    item.entry_price
+  );
+  const exitValue = formatTradePoint(
+    item.exit_timestamp || item.exit_time || item.closed_at,
+    item.exit_price
+  );
+  const pnlValue = valueOrFallback(item.net_pnl_quote, valueOrFallback(item.pnl, item.pnl_quote));
   return `
     <tr>
-      <td>${escapeHtml(formatDateTimeMinute(item.entry_time || item.opened_at || item.timestamp))}</td>
-      <td>${escapeHtml(formatDateTimeMinute(item.exit_time || item.closed_at))}</td>
+      <td>${escapeHtml(entryValue)}</td>
+      <td>${escapeHtml(exitValue)}</td>
       <td>${escapeHtml(item.side || item.direction || "--")}</td>
       <td>${escapeHtml(decimalOrDash(item.qty ?? item.quantity ?? item.size, 4))}</td>
-      <td class="${financialClass(item.pnl ?? item.pnl_quote)}">${escapeHtml(moneyOrDash(item.pnl ?? item.pnl_quote))}</td>
+      <td class="${financialClass(pnlValue)}">${escapeHtml(moneyOrDash(pnlValue))}</td>
       <td>${escapeHtml(item.exit_reason || item.reason || "--")}</td>
     </tr>
   `;
+}
+
+function formatTradePoint(timestamp, price) {
+  const time = formatDateTimeMinute(timestamp);
+  const priceText = decimalOrDash(price, 4);
+  if (time === "--" && priceText === "--") {
+    return "--";
+  }
+  if (time === "--") {
+    return priceText;
+  }
+  if (priceText === "--") {
+    return time;
+  }
+  return `${time} @ ${priceText}`;
 }
 
 function renderResultCanvases(root) {
@@ -1987,7 +2143,6 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1 }
     equity: apiFetch(appendSearchParams(variantEndpoint(root, "equity", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
     drawdown: apiFetch(appendSearchParams(variantEndpoint(root, "drawdown", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
     monthly: apiFetch(variantEndpoint(root, "monthly", jobId, variantKey)),
-    symbol: apiFetch(variantEndpoint(root, "symbol", jobId, variantKey)),
     trades: apiFetch(tradesPath),
   };
   const request = Promise.allSettled(Object.values(requests))
@@ -2515,6 +2670,7 @@ async function applyAiConfiguration(root, jobId) {
 }
 
 async function preflight(root) {
+  ensureStrategyName(root);
   const payload = buildRequestPayload(root);
   const endpoint = root.dataset.preflightEndpoint || "/api/backtests/preflight";
   setText("[data-create-status]", t("backtests.status.preflight"), root);
@@ -3015,6 +3171,17 @@ function bind(root) {
     filterSymbols(root, state.symbolQuery);
   });
   root.addEventListener("input", (event) => {
+    const configInput = event.target.closest("[data-config-field]");
+    if (configInput instanceof HTMLInputElement) {
+      if (configInput.dataset.configField === "strategy") {
+        state.strategyNameTouched = Boolean(configInput.value.trim());
+      }
+      if (configInput.dataset.configField === "symbol") {
+        const symbol = configInput.value.trim().toUpperCase();
+        state.symbol = symbol;
+        state.selectedSymbols = symbol ? new Set([symbol]) : new Set();
+      }
+    }
     const riskInput = event.target.closest("[data-risk-field]");
     if (riskInput instanceof HTMLInputElement) {
       updateCombinationsCount(root);

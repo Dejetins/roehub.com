@@ -36,15 +36,17 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     jobs_use_case = _build_jobs_use_case(repository=repository)
     client = _build_client(jobs_use_case=jobs_use_case)
 
+    request = dict(_valid_request())
+    request["strategy_name"] = "dema-1h-long-short-a1b2c3"
     created = jobs_use_case.create(
         user_id=_USER_ID,
-        payload=_valid_request(),
+        payload=request,
         idempotency_key="workstation-key",
     )
     _complete_job(repository=repository, job_id=UUID(created.job.job_id))
 
     response = client.get(
-        "/ui/backtests/workstation?state=succeeded&query=mean",
+        "/ui/backtests/workstation?state=succeeded&query=dema",
         headers={"x-user-id": str(_USER_ID)},
     )
 
@@ -57,6 +59,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["config_draft"]["top_n"] == 10
     assert payload["config_draft"]["timeframe"] == "1h"
     assert payload["config_draft"]["execution"]["direction_mode"] == "long_short_reversal"
+    assert payload["config_draft"]["execution"]["sizing"] == {"mode": "all_in"}
     assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["source"] == "market_data_reference"
     assert payload["instrument_universe"]["markets"] == [
@@ -93,10 +96,12 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["optimization_overview"]["completed_jobs"] == 1
     assert payload["recent_events"]["items"]
     assert payload["job_table"]["filters"]["state"] == "succeeded"
-    assert payload["job_table"]["filters"]["query"] == "mean"
+    assert payload["job_table"]["filters"]["query"] == "dema"
     assert payload["job_table"]["items"][0]["job_id"] == created.job.job_id
+    assert payload["job_table"]["items"][0]["strategy"] == "dema-1h-long-short-a1b2c3"
     assert payload["job_table"]["items"][0]["exchange"] == "binance"
     assert payload["job_table"]["items"][0]["market_type"] == "spot"
+    assert payload["job_table"]["items"][0]["direction"] == "long_short_reversal"
     assert payload["refresh_control"]["manual"] is True
     assert payload["refresh_control"]["default_preset"] == "15s"
     assert "trades" not in payload["job_table"]["items"][0]

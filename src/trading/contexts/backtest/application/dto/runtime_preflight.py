@@ -87,7 +87,7 @@ class BacktestExecutionDefaults:
             "fee_rate": self.fee_rate,
             "slippage_rate": self.slippage_rate,
             "initial_cash_quote": self.initial_cash_quote,
-            "sizing": dict(self.sizing or {"mode": "fixed_equity_pct", "equity_pct": 10.0}),
+            "sizing": dict(self.sizing or {"mode": "all_in"}),
             "profit_lock": dict(self.profit_lock or {"enabled": False}),
             "close_on_end": self.close_on_end,
         }

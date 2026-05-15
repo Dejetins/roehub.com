@@ -1034,7 +1034,7 @@
 
 .backtests-result-body {
   display: grid;
-  grid-template-columns: minmax(360px, 0.78fr) minmax(320px, 0.64fr) minmax(420px, 1fr);
+  grid-template-columns: minmax(360px, 0.78fr) minmax(380px, 0.9fr) minmax(420px, 1fr);
   gap: 6px;
   min-width: 0;
 }
@@ -1069,6 +1069,11 @@
 .backtests-result-stats-wrap {
   height: 88px;
   min-height: 88px;
+}
+
+.backtests-result-stats[data-result-stats="monthly"] .backtests-result-stats-wrap {
+  height: 214px;
+  min-height: 214px;
 }
 
 .backtests-result-trades-wrap {

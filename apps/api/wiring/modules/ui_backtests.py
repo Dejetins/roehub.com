@@ -598,7 +598,7 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
             "initial_cash_quote": execution_defaults.get("initial_cash_quote", 10000.0),
             "sizing": execution_defaults.get(
                 "sizing",
-                {"mode": "fixed_equity_pct", "equity_pct": 10.0},
+                {"mode": "all_in"},
             ),
             "profit_lock": execution_defaults.get("profit_lock", {"enabled": False}),
             "close_on_end": execution_defaults.get("close_on_end", True),
@@ -809,6 +809,7 @@ def _build_recent_events(
 
 def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
     request = dict(item.get("request") or {})
+    ui_metadata = dict(request.get("ui_metadata") or {})
     coordinates = dict(request.get("coordinates") or {})
     execution = dict(request.get("execution") or {})
     indicators = list(request.get("indicators") or [])
@@ -820,7 +821,7 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
     return BacktestJobTableRowResponse(
         job_id=str(item.get("job_id") or ""),
         state=str(item.get("state") or "unknown"),
-        strategy=_DEFAULT_STRATEGY,
+        strategy=str(ui_metadata.get("strategy_name") or _DEFAULT_STRATEGY),
         exchange=str(coordinates.get("exchange") or "--"),
         market_type=str(coordinates.get("market_type") or "--"),
         symbol=str(coordinates.get("symbol") or "--"),

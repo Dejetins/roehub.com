@@ -363,7 +363,10 @@ def _request_summary(*, request: Mapping[str, Any]) -> dict[str, Any]:
         "coordinates": _mapping_payload(request.get("coordinates")),
         "timeframe": request.get("timeframe"),
         "time_range": _mapping_payload(request.get("time_range")),
+        "indicators": _sequence_payload(request.get("indicators")),
         "risk_mode": risk.get("mode") if isinstance(risk, Mapping) else None,
+        "execution": _mapping_payload(request.get("execution")),
+        "ui_metadata": _mapping_payload(request.get("ui_metadata")),
         "top_n": request.get("top_n"),
     }
 
@@ -443,6 +446,12 @@ def _mapping_payload(value: Any) -> dict[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
+
+
+def _sequence_payload(value: Any) -> tuple[dict[str, Any], ...]:
+    if not isinstance(value, (tuple, list)):
+        return ()
+    return tuple(dict(item) for item in value if isinstance(item, Mapping))
 
 
 def _format_datetime(value: datetime | None) -> str | None:

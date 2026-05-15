@@ -152,6 +152,7 @@ class BacktestJobsUseCase:
                 preflight=preflight,
                 key_hash=key_hash,
                 light_max_estimated_combinations=self.light_max_estimated_combinations,
+                strategy_name=_strategy_name_from_payload(payload),
             ),
             request_hash=preflight.request_hash,
             spec_hash=None,
@@ -844,8 +845,11 @@ def _job_request_json(
     preflight: BacktestPreflightResult,
     key_hash: str | None,
     light_max_estimated_combinations: int,
+    strategy_name: str | None,
 ) -> dict[str, Any]:
     payload = dict(preflight.normalized_request)
+    if strategy_name:
+        payload["ui_metadata"] = {"strategy_name": strategy_name}
     payload["artifact_metadata"] = preflight.artifact_metadata.as_mapping()
     payload[SCHEDULING_METADATA_KEY] = scheduling_metadata_from_preflight(
         preflight=preflight,
@@ -854,6 +858,16 @@ def _job_request_json(
     if key_hash is not None:
         payload["idempotency"] = {"key_hash": key_hash}
     return payload
+
+
+def _strategy_name_from_payload(payload: Mapping[str, Any]) -> str | None:
+    raw = payload.get("strategy_name")
+    if not isinstance(raw, str):
+        return None
+    normalized = " ".join(raw.strip().split())
+    if not normalized:
+        return None
+    return normalized[:96]
 
 
 def _artifact_pin(*, preflight: BacktestPreflightResult) -> BacktestJobArtifactPin:
