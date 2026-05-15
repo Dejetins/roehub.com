@@ -236,6 +236,44 @@ def test_lmstudio_adapter_normalizes_empty_clarification_config_to_null() -> Non
     assert json.loads(response.raw_output)["config"] is None
 
 
+def test_lmstudio_adapter_leaves_business_schema_validation_to_application() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "schema_version": 1,
+                                    "mode": "create",
+                                    "status": "config_ready",
+                                    "assistant_message": "Drafted.",
+                                    "assumptions": [],
+                                    "warnings": [],
+                                    "config": {},
+                                    "suggestions": [],
+                                },
+                                separators=(",", ":"),
+                            )
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+
+    adapter = LMStudioOpenAICompatibleAdapter(
+        config=_model_config(),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    response = adapter.generate_config(_request(prompt_text="prompt"))
+
+    assert json.loads(response.raw_output)["config"] == {}
+
+
 def _model_config(
     *,
     base_url: str = "http://127.0.0.1:8080",

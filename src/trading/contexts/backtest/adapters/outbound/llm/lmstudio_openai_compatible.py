@@ -105,7 +105,6 @@ class LMStudioOpenAICompatibleAdapter:
         normalized_output = _validate_structured_content(
             raw_output=raw_output,
             schema=response_format["json_schema"]["schema"],
-            application_schema=request.output_schema_json,
             kind=kind,
         )
         usage = data.get("usage")
@@ -405,7 +404,6 @@ def _validate_structured_content(
     *,
     raw_output: str,
     schema: Mapping[str, Any],
-    application_schema: Mapping[str, Any],
     kind: str,
 ) -> str:
     try:
@@ -426,15 +424,6 @@ def _validate_structured_content(
             f"LM Studio {kind} structured content failed schema validation at {path}"
         )
     normalized = _normalize_for_application_schema(parsed)
-    application_errors = tuple(
-        Draft202012Validator(application_schema).iter_errors(normalized)
-    )
-    if application_errors:
-        first = application_errors[0]
-        path = ".".join(str(part) for part in first.absolute_path) or "body"
-        raise LMStudioOpenAICompatibleAdapterError(
-            f"LM Studio {kind} content failed application schema validation at {path}"
-        )
     return _canonical_json(normalized)
 
 
@@ -446,7 +435,20 @@ def _normalize_for_application_schema(parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(
+        _json_ready(value),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_json_ready(item) for item in value]
+    return value
 
 
 _SECRET_PATTERNS = (
