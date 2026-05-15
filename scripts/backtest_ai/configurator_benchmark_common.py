@@ -737,7 +737,7 @@ class HttpAiConfigClient:
 
     def _headers_for_user(self, *, user_index: int) -> dict[str, str]:
         headers = dict(self.headers)
-        if self.user_id_header is not None:
+        if self.user_id_header:
             headers[self.user_id_header] = _stable_user_id(
                 prefix=self.user_id_prefix,
                 user_index=user_index,
