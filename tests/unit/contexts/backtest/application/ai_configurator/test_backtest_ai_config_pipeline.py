@@ -47,7 +47,7 @@ def test_pipeline_safe_prompt_produces_current_form_ready_config() -> None:
     assert result.validated_config["indicators"][0]["indicator_id"] == "momentum.rsi"
     assert result.validated_config["risk"] == {"mode": "none"}
     assert result.validated_config["ranking"]["primary_metric"] == "total_return_pct"
-    assert result.validated_config["top_n"] == 50
+    assert result.validated_config["top_n"] == 10
     assert "symbols" not in result.validated_config
     assert "strategy" not in result.validated_config
     assert len(result.llm_attempts) == 1

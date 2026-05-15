@@ -42,7 +42,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
         "fixed_equity_pct_max_quote",
     ]
     assert "total_return_pct" in response["ranking_metrics"]
-    assert response["top_n_default"] == 50
+    assert response["top_n_default"] == 10
     assert response["guardrails"]["max_candidate_combinations"] == 10_000_000_000_000
     assert response["quality_constraints_default"] == {
         "min_closed_trades_policy": "timeframe_sqrt_v1",
@@ -91,7 +91,7 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
             "start": "2020-01-11T20:08:00Z",
             "end": "2026-04-11T20:08:00Z",
         },
-        "requested_top_n": 50,
+        "requested_top_n": 10,
         "scheduling_class": "heavy",
     }
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),) * 2
@@ -104,6 +104,16 @@ def test_preflight_accepts_explicit_min_closed_trades_override() -> None:
     result = _service().execute(request)
 
     assert result.normalized_request["quality_constraints"] == {"min_closed_trades": 37}
+
+
+def test_preflight_uses_top_n_10_when_request_omits_top_n() -> None:
+    request = _valid_request()
+    request.pop("top_n")
+
+    result = _service().execute(request)
+
+    assert result.normalized_request["top_n"] == 10
+    assert result.cost_estimate.requested_top_n == 10
 
 
 @pytest.mark.parametrize(
@@ -255,7 +265,7 @@ def test_preflight_classifies_obvious_196_pow_5_grid_as_heavy() -> None:
 
     assert result.cost_estimate.estimated_combinations_upper_bound == 289_254_654_976
     assert result.cost_estimate.arity == 5
-    assert result.cost_estimate.requested_top_n == 50
+    assert result.cost_estimate.requested_top_n == 10
     assert result.cost_estimate.risk_mode == "none"
     assert result.cost_estimate.scheduling_class == "heavy"
     assert result.cost_estimate.row_count_upper_bounds_by_indicator == {
@@ -443,5 +453,5 @@ def _valid_request() -> dict[str, Any]:
             "primary_metric": "total_return_pct",
             "direction": "desc",
         },
-        "top_n": 50,
+        "top_n": 10,
     }

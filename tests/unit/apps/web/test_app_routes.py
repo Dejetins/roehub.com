@@ -491,7 +491,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     )
     assert 'data-variant-open-delay-ms="180"' in response.text
     assert 'data-variant-open-duration-ms="650"' in response.text
-    assert 'data-variant-preview-limit="5"' in response.text
+    assert 'data-variant-preview-limit="10"' in response.text
     assert "data-indicator-add-menu" in response.text
     assert "data-risk-grid" in response.text
     assert "backtests-risk-side-fields" in response.text

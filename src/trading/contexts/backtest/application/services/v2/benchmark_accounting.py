@@ -66,7 +66,7 @@ TP_SL_TOTAL_COMPONENT_STAGES: tuple[str, ...] = (
     "exact_scoring",
     "heap_update",
 )
-DEFAULT_REQUEST_TOP_N = 50
+DEFAULT_REQUEST_TOP_N = 10
 DEFAULT_BENCHMARK_TOP_K = 5
 DEFAULT_SAMPLE_WARMUP_TOP_K = 1
 

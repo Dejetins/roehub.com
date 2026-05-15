@@ -54,6 +54,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
         SUPPORTED_BACKTEST_TIMEFRAMES_V1
     )
     assert "preset" not in payload["config_draft"]
+    assert payload["config_draft"]["top_n"] == 10
     assert payload["config_draft"]["timeframe"] == "1h"
     assert payload["config_draft"]["execution"]["direction_mode"] == "long_short_reversal"
     assert payload["ai_configurator_state"]["enabled"] is False

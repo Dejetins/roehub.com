@@ -7,7 +7,7 @@ import { renderBacktestSeries } from "../charts/backtest_series.js";
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
-const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
+const DEFAULT_VARIANT_PREVIEW_LIMIT = 10;
 const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 50;
 const DEFAULT_TP_START_PCT = 5;
@@ -811,7 +811,7 @@ function buildRequestPayload(root) {
       primary_metric: state.ranking_metric,
       direction: state.ranking_order,
     },
-    top_n: Number(state.runtimeDefaults?.runtime_defaults?.top_n_default || 100),
+    top_n: Number(state.runtimeDefaults?.runtime_defaults?.top_n_default || 10),
   };
 }
 

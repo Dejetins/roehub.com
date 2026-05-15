@@ -359,7 +359,7 @@ Postgres-only JSONB допустим для малых payloads, но v1 дол�
 Важно: публичный `top_n` и canonical benchmark `top_k` — разные величины.
 
 - `top_n` — продуктовый/API контракт: сколько summary rows нужно сохранить и
-  вернуть для job. v1 default/max: `50`.
+  вернуть для job. v1 default: `10`, max: `50`.
 - `benchmark_top_k` — metadata для канонического benchmark. Текущий
   notebook target вызывает `run_benchmark_matrix(..., top_k=5)`, поэтому все
   canonical timer targets для `heap_update` и `top_result_proxy_fill`
@@ -367,10 +367,11 @@ Postgres-only JSONB допустим для малых payloads, но v1 дол�
 - если service benchmark сравнивается с canonical notebook target, runner должен
   явно использовать `benchmark_top_k = 5` и записывать рядом `request.top_n`.
 - production result capacity и heap capacity берутся из `request.top_n`
-  (`top_n=50` для текущего public contract); `benchmark_top_k=5` не ограничивает
-  production rows.
-- production budget для `top_n = 50` измеряется отдельно как service-specific
-  overhead и не должен смешиваться с notebook-compatible timer comparison.
+  (`top_n=10` для текущего default; explicit requests до `max_top_n=50`
+  остаются допустимыми); `benchmark_top_k=5` не ограничивает production rows.
+- production budget для explicit `top_n = 50` измеряется отдельно как
+  service-specific overhead и не должен смешиваться с notebook-compatible timer
+  comparison.
 
 Ответ:
 
@@ -891,7 +892,7 @@ Benchmark по `top_result_proxy_fill` должен сравниваться per
 - batch-fill proxy metadata для production `request.top_n`, если benchmark
   сравнивается с canonical `top_k = 5`.
 
-Если production runtime сохраняет `top_n = 50`, это отдельный режим:
+Если production runtime сохраняет explicit `top_n = 50`, это отдельный режим:
 сначала должна пройти canonical parity на `top_k = 5`, затем измеряется
 service-specific `top_n = 50` overhead. `benchmark_top_k=5` не должен cap-ить
 production results.
@@ -1075,7 +1076,8 @@ JSON evidence является источником истины для numeric 
 notebook-compatible stages строит 100 rows, сравнивается с неправильной
 нагрузкой и не может быть принята как доказательство parity. Это historical
 benchmark metadata; текущий production heap/result capacity берется из
-`request.top_n` и для UI-created jobs должен поддерживать `top_n=50`.
+`request.top_n`; UI-created jobs по умолчанию используют `top_n=10`, а explicit
+requests до `top_n=50` остаются поддержанными guardrails.
 
 Известный непринятый benchmark record:
 
@@ -1224,8 +1226,8 @@ target values:
   измеряются с CPU/RSS evidence, но не сравниваются с canonical notebook timer
   targets;
 - `heap_update` и `top_result_proxy_fill` сравниваются с canonical notebook target
-  только при том же `benchmark_top_k = 5`; production run с `top_n = 50`
-  требует отдельного service-specific budget record;
+  только при том же `benchmark_top_k = 5`; production run с explicit
+  `top_n = 50` требует отдельного service-specific budget record;
 - для arity 1..7 target source:
   `2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`;
 - arity 8..10 не блокируют v1 completion, если arity 1..7 проходят 90%

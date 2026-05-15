@@ -607,7 +607,7 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
             "primary_metric": ranking_default.get("primary_metric", "total_return_pct"),
             "direction": ranking_default.get("direction", "desc"),
         },
-        top_n=int(runtime_defaults.get("top_n_default") or 50),
+        top_n=int(runtime_defaults.get("top_n_default") or 10),
     )
 
 

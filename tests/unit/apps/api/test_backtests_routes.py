@@ -61,7 +61,7 @@ def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
     assert payload["direction_modes"] == ["long_only", "long_short_reversal"]
     assert "fixed_equity_pct_max_quote" in payload["sizing_modes"]
     assert "total_return_pct" in payload["ranking_metrics"]
-    assert payload["top_n_default"] == 50
+    assert payload["top_n_default"] == 10
     assert payload["guardrails"]["max_top_n"] == 50
     assert payload["indicator_param_specs"]["ma.dema"]["params"]["window"] == {
         "mode": "range",
@@ -498,15 +498,15 @@ def test_get_backtest_result_summary_accepts_top_limit() -> None:
         headers={"x-user-id": "00000000-0000-0000-0000-000000000219"},
         json=_valid_request(),
     )
-    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]), top_count=6)
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]), top_count=12)
 
     response = client.get(
-        f"/backtests/jobs/{created.json()['job_id']}/summary?top_limit=5",
+        f"/backtests/jobs/{created.json()['job_id']}/summary?top_limit=10",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000219"},
     )
 
     assert response.status_code == 200
-    assert len(response.json()["top_variants"]["items"]) == 5
+    assert len(response.json()["top_variants"]["items"]) == 10
 
 
 def test_get_backtest_result_series_downsamples_and_rejects_raw_hash() -> None:
