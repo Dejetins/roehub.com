@@ -813,6 +813,7 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
     terminal_summary = dict(item.get("terminal_summary") or {})
     metrics = dict(terminal_summary.get("metrics") or {})
     period = _format_period(request.get("time_range"))
+    cancel_requested_at = item.get("cancel_requested_at")
     return BacktestJobTableRowResponse(
         job_id=str(item.get("job_id") or ""),
         state=str(item.get("state") or "unknown"),
@@ -821,6 +822,7 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
         market_type=str(coordinates.get("market_type") or "--"),
         symbol=str(coordinates.get("symbol") or "--"),
         created_at=str(item.get("created_at") or ""),
+        cancel_requested_at=str(cancel_requested_at) if cancel_requested_at else None,
         indicator_summary=", ".join(
             _indicator_label(str(row.get("indicator_id") or "")) for row in indicators
         )
@@ -839,7 +841,8 @@ def _build_job_row(item: Mapping[str, Any]) -> BacktestJobTableRowResponse:
         retry_after_seconds=int(item.get("retry_after_seconds") or 0),
         links=dict(item.get("links") or {}),
         actions={
-            "can_cancel": str(item.get("state") or "") in {"queued", "running"},
+            "can_cancel": str(item.get("state") or "") in {"queued", "running"}
+            and not cancel_requested_at,
             "can_delete": str(item.get("state") or "") in {"succeeded", "failed", "cancelled"},
             "can_open_top": str(item.get("state") or "") == "succeeded",
         },

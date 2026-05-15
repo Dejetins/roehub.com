@@ -22,6 +22,9 @@ def main() -> int:
     if mode == "timeout":
         time.sleep(10)
         return 0
+    if mode == "cancel_wait":
+        time.sleep(10)
+        return 0
     output_path = Path(args.output_json)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if mode == "promote":

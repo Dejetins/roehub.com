@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+import time
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -21,6 +23,9 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestJobHeavyPromotion,
+)
+from trading.contexts.backtest.application.use_cases import (
+    BacktestJobCancellationRequested,
 )
 
 
@@ -78,6 +83,26 @@ def test_child_process_executor_raises_timeout() -> None:
         )
 
     assert "child process timeout" in str(exc_info.value)
+
+
+def test_child_process_executor_terminates_child_when_cancel_requested() -> None:
+    executor = _executor(mode="cancel_wait", timeout_seconds=5.0)
+    cancel_event = threading.Event()
+
+    def request_cancel() -> None:
+        time.sleep(0.02)
+        cancel_event.set()
+
+    thread = threading.Thread(target=request_cancel, daemon=True)
+    thread.start()
+
+    with pytest.raises(BacktestJobCancellationRequested):
+        executor.execute(
+            job_id=uuid4(),
+            preflight=_preflight(),
+            updated_at=datetime.now(UTC),
+            cancel_event=cancel_event,
+        )
 
 
 def _executor(*, mode: str, timeout_seconds: float = 5.0) -> BacktestChildProcessExecutor:

@@ -515,6 +515,8 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-job-launched-from" in response.text
     assert "data-job-symbol" in response.text
     assert "data-load-more-jobs" in response.text
+    assert "data-job-cancel-dialog" in response.text
+    assert "data-job-cancel-confirm" in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text

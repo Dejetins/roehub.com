@@ -544,6 +544,74 @@
   color: color-mix(in srgb, var(--rh-financial-negative) 70%, var(--rh-muted));
 }
 
+.backtests-cancel-dialog[hidden] {
+  display: none;
+}
+
+.backtests-cancel-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.backtests-cancel-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--rh-canvas) 76%, transparent);
+  cursor: pointer;
+}
+
+.backtests-cancel-dialog__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  width: min(420px, 100%);
+  border: 1px solid var(--rh-accent);
+  background: var(--rh-workstation-panel-bg);
+  padding: 12px;
+  box-shadow: 0 0 0 1px var(--rh-divider);
+}
+
+.backtests-cancel-dialog__heading,
+.backtests-cancel-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backtests-cancel-dialog__heading {
+  justify-content: space-between;
+}
+
+.backtests-cancel-dialog__heading h2 {
+  margin: 0;
+  color: var(--rh-accent-2);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.backtests-cancel-dialog__panel p,
+.backtests-cancel-dialog__actions output {
+  margin: 0;
+  color: var(--rh-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.backtests-cancel-dialog__actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.backtests-cancel-dialog__actions output {
+  margin-right: auto;
+}
+
 .backtests-results-footer {
   display: flex;
   align-items: center;

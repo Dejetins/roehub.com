@@ -85,6 +85,22 @@ def test_backtests_ai_locale_notice_and_load_action_copy_are_bilingual() -> None
     assert "exchange keys" in ru["backtests.ai.notice"]
 
 
+def test_backtests_cancel_confirmation_is_site_modal_and_bilingual() -> None:
+    template = (WEB_ROOT / "templates/pages/backtests.html").read_text(encoding="utf-8")
+    source = (WEB_ROOT / "dist/js/pages/backtests.js").read_text(encoding="utf-8")
+    css = (WEB_ROOT / "dist/css/pages/backtests.css").read_text(encoding="utf-8")
+    en = json.loads((WEB_ROOT / "locales/en.json").read_text(encoding="utf-8"))
+    ru = json.loads((WEB_ROOT / "locales/ru.json").read_text(encoding="utf-8"))
+
+    assert "data-job-cancel-dialog" in template
+    assert "data-job-cancel-confirm" in template
+    assert "openCancelDialog(root" in source
+    assert "window.confirm" not in _function_body(source, "confirmCancelDialog")
+    assert "backtests-cancel-dialog__panel" in css
+    assert en["backtests.cancel_confirm.confirm"] == "Cancel job"
+    assert ru["backtests.cancel_confirm.confirm"] == "Отменить job"
+
+
 def _function_body(source: str, name: str) -> str:
     marker = f"function {name}("
     start = source.index(marker)

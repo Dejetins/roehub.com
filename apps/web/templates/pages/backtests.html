@@ -415,6 +415,37 @@
         </footer>
       </section>
     </div>
+    <div
+      class="backtests-cancel-dialog"
+      data-job-cancel-dialog
+      hidden
+      aria-hidden="true"
+    >
+      <button
+        class="backtests-cancel-dialog__backdrop"
+        type="button"
+        data-job-cancel-dismiss
+        aria-label="{{ t('backtests.cancel_confirm.dismiss') }}"
+      ></button>
+      <section
+        class="backtests-cancel-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="backtests-cancel-dialog-title"
+        aria-describedby="backtests-cancel-dialog-body"
+      >
+        <header class="backtests-cancel-dialog__heading">
+          <h2 id="backtests-cancel-dialog-title" data-job-cancel-title>{{ t("backtests.cancel_confirm.title") }}</h2>
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-job-cancel-dismiss>{{ t("backtests.cancel_confirm.dismiss") }}</button>
+        </header>
+        <p id="backtests-cancel-dialog-body" data-job-cancel-body>{{ t("backtests.cancel_confirm.body_static") }}</p>
+        <div class="backtests-cancel-dialog__actions">
+          <output data-job-cancel-status aria-live="polite"></output>
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-job-cancel-dismiss>{{ t("backtests.cancel_confirm.keep") }}</button>
+          <button class="rh-button rh-button--primary rh-button--compact" type="button" data-job-cancel-confirm>{{ t("backtests.cancel_confirm.confirm") }}</button>
+        </div>
+      </section>
+    </div>
   </section>
 {% endblock %}
 

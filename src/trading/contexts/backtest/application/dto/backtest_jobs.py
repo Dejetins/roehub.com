@@ -44,6 +44,7 @@ class BacktestJobReadModel:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    cancel_requested_at: datetime | None
     updated_at: datetime
     refresh_status: str
     generated_at: datetime
@@ -81,6 +82,7 @@ class BacktestJobReadModel:
             "created_at": _format_datetime(self.created_at),
             "started_at": _format_datetime(self.started_at),
             "finished_at": _format_datetime(self.finished_at),
+            "cancel_requested_at": _format_datetime(self.cancel_requested_at),
             "updated_at": _format_datetime(self.updated_at),
             "refresh_status": self.refresh_status,
             "generated_at": _format_datetime(self.generated_at),
@@ -282,6 +284,7 @@ def build_backtest_job_read_model(
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,
+        cancel_requested_at=job.cancel_requested_at,
         updated_at=job.updated_at,
         refresh_status=_refresh_status(job=job),
         generated_at=generated_at,

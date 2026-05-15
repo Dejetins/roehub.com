@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +15,9 @@ from trading.contexts.backtest.application.dto import BacktestPreflightResult
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestSchedulingClass,
     backtest_numba_environ,
+)
+from trading.contexts.backtest.application.use_cases import (
+    BacktestJobCancellationRequested,
 )
 
 from .child_ipc import (
@@ -44,6 +48,7 @@ class BacktestChildProcessExecutor:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> object:
         _ = updated_at
         scheduling_class: BacktestSchedulingClass = "heavy"
@@ -104,7 +109,12 @@ class BacktestChildProcessExecutor:
                         "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"
                     ),
                 },
+                cancel_event=cancel_event,
             )
+            if completed.evidence.get("cancelled"):
+                raise BacktestJobCancellationRequested(
+                    f"child process cancelled for job_id={job_id}"
+                )
             if completed.evidence.get("timed_out"):
                 raise BacktestChildProcessError(
                     f"child process timeout after {self.timeout_seconds:.0f}s"

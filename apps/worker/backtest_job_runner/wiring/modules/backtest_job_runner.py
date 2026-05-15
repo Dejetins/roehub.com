@@ -512,7 +512,7 @@ def load_backtest_job_runner_runtime_config(
         heartbeat_interval_seconds=_env_float(
             environ=environ,
             key="ROEHUB_BACKTEST_RUNNER_HEARTBEAT_INTERVAL_SECONDS",
-            default=30.0,
+            default=1.0,
         ),
         max_jobs_per_process=_env_int(
             environ=environ,

@@ -24,7 +24,10 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestJobHeavyPromotion,
 )
-from trading.contexts.backtest.application.use_cases import BacktestJobWorkerUseCase
+from trading.contexts.backtest.application.use_cases import (
+    BacktestJobCancellationRequested,
+    BacktestJobWorkerUseCase,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
@@ -132,6 +135,38 @@ def test_worker_heartbeats_active_lease_while_executor_runs() -> None:
     assert lease_repository.heartbeat_calls >= 1
 
 
+def test_worker_cancels_running_child_when_cancel_requested_during_heartbeat() -> None:
+    job = _queued_job()
+    repository = _Repository(job=job)
+    heartbeat_seen = threading.Event()
+    lease_repository = _LeaseRepository(
+        repository=repository,
+        heartbeat_event=heartbeat_seen,
+        request_cancel_on_heartbeat=True,
+    )
+    executor = _CancellableExecutor()
+    use_case = BacktestJobWorkerUseCase(
+        lease_repository=lease_repository,
+        job_repository=cast(BacktestJobRepository, repository),
+        preflight_service=cast(BacktestPreflightService, _PreflightService()),
+        executor=executor,
+        lease_seconds=60,
+        heartbeat_interval_seconds=0.001,
+        locked_by="test-worker",
+    )
+
+    result = use_case.run_next()
+
+    assert heartbeat_seen.is_set()
+    assert executor.cancel_seen is True
+    assert result.claimed is True
+    assert result.status == "cancelled"
+    assert result.job is not None
+    assert result.job.state == "cancelled"
+    assert repository.job.state == "cancelled"
+    assert repository.top_rows == ()
+
+
 def test_worker_requeues_light_candidate_as_heavy_without_terminal_commit() -> None:
     job = _queued_job()
     repository = _Repository(job=job)
@@ -186,6 +221,7 @@ class _LeaseRepository:
     heartbeat_calls: int = 0
     heartbeat_event: threading.Event | None = None
     promotions: int = 0
+    request_cancel_on_heartbeat: bool = False
 
     def claim_next(
         self,
@@ -216,6 +252,8 @@ class _LeaseRepository:
     ) -> BacktestJob | None:
         _ = job_id, now, locked_by, lease_seconds
         self.heartbeat_calls += 1
+        if self.request_cancel_on_heartbeat and self.repository.job.cancel_requested_at is None:
+            self.repository.job = self.repository.job.request_cancel(changed_at=now)
         if self.heartbeat_event is not None:
             self.heartbeat_event.set()
         return self.repository.job
@@ -376,7 +414,9 @@ class _Executor:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestJobExecutionResult:
+        _ = cancel_event
         self.calls = (*self.calls, job_id)
         top_result = BacktestNoRiskTopResult(
             rank=1,
@@ -406,8 +446,9 @@ class _FailingExecutor:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestJobExecutionResult:
-        _ = job_id, preflight, updated_at
+        _ = job_id, preflight, updated_at, cancel_event
         raise RuntimeError("boom")
 
 
@@ -418,8 +459,9 @@ class _PromotingExecutor:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestJobHeavyPromotion:
-        _ = job_id, preflight, updated_at
+        _ = job_id, preflight, updated_at, cancel_event
         return BacktestJobHeavyPromotion(
             estimated_combinations_upper_bound=10,
             actual_combinations=100000,
@@ -436,7 +478,9 @@ class _BlockingExecutor:
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestJobExecutionResult:
+        _ = cancel_event
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
             if self.heartbeat_seen.wait(timeout=0.001):
@@ -460,6 +504,27 @@ class _BlockingExecutor:
             summary_hash=assembly.summary_hash,
             cleanup_evidence={"result_contains_heavy_references": False},
         )
+
+
+@dataclass
+class _CancellableExecutor:
+    cancel_seen: bool = False
+
+    def execute(
+        self,
+        *,
+        job_id: UUID,
+        preflight: BacktestPreflightResult,
+        updated_at: datetime,
+        cancel_event: threading.Event | None = None,
+    ) -> BacktestJobExecutionResult:
+        _ = job_id, preflight, updated_at
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.wait(timeout=0.001):
+                self.cancel_seen = True
+                raise BacktestJobCancellationRequested("cancel requested")
+        raise RuntimeError("cancel event was not observed")
 
 
 class _PreflightService:

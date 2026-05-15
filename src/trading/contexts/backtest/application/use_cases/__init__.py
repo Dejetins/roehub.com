@@ -1,4 +1,5 @@
 from .backtest_job_worker import (
+    BacktestJobCancellationRequested,
     BacktestJobExecutor,
     BacktestJobWorkerResult,
     BacktestJobWorkerUseCase,
@@ -24,6 +25,7 @@ from .lazy_trades_materialization_worker import (
 
 __all__ = [
     "BacktestJobExecutor",
+    "BacktestJobCancellationRequested",
     "BacktestJobWorkerResult",
     "BacktestJobWorkerUseCase",
     "BacktestLazyTradesMaterializationExecutionResult",

@@ -63,6 +63,8 @@ const state = {
   loadedAllJobs: false,
   selectedJobId: null,
   selectedVariantKey: null,
+  pendingCancelJobId: null,
+  pendingCancelTrigger: null,
   resultSummary: null,
   resultDetails: null,
   tradesPage: 1,
@@ -1264,7 +1266,7 @@ function renderJobRow(root, row, index) {
       <td>${escapeHtml(row.direction)}</td>
       <td>
         <div class="backtests-status-cell">
-          <span>${escapeHtml(row.state)} / ${row.progress_percent}%</span>
+          <span>${escapeHtml(jobStatusText(row))} / ${row.progress_percent}%</span>
           ${row.actions?.can_cancel
             ? `<button class="rh-button rh-button--secondary rh-button--compact backtests-row-action" type="button" data-cancel-job-id="${escapeHtml(row.job_id)}">${escapeHtml(t("backtests.actions.cancel"))}</button>`
             : ""}
@@ -1276,6 +1278,13 @@ function renderJobRow(root, row, index) {
     </tr>
     ${selected ? renderVariantExpansion(root, row) : ""}
   `;
+}
+
+function jobStatusText(row) {
+  if (row?.state === "running" && row?.cancel_requested_at) {
+    return t("backtests.state.cancelling");
+  }
+  return row?.state || "--";
 }
 
 function renderVariantExpansion(root, row) {
@@ -2323,6 +2332,60 @@ async function cancelJob(root, jobId) {
   }
 }
 
+function openCancelDialog(root, jobId, trigger) {
+  if (!jobId) {
+    return;
+  }
+  state.pendingCancelJobId = jobId;
+  state.pendingCancelTrigger = trigger instanceof HTMLElement ? trigger : null;
+  const dialog = qs("[data-job-cancel-dialog]", root);
+  if (!dialog) {
+    cancelJob(root, jobId).catch(() => {});
+    return;
+  }
+  setText("[data-job-cancel-title]", t("backtests.cancel_confirm.title"), dialog);
+  setText("[data-job-cancel-body]", t("backtests.cancel_confirm.body", { job: compactId(jobId) }), dialog);
+  setText("[data-job-cancel-status]", "", dialog);
+  const confirm = qs("[data-job-cancel-confirm]", dialog);
+  if (confirm instanceof HTMLButtonElement) {
+    confirm.disabled = false;
+    confirm.textContent = t("backtests.cancel_confirm.confirm");
+  }
+  dialog.hidden = false;
+  dialog.setAttribute("aria-hidden", "false");
+  confirm?.focus();
+}
+
+function closeCancelDialog(root, { restoreFocus = true } = {}) {
+  const dialog = qs("[data-job-cancel-dialog]", root);
+  if (dialog) {
+    dialog.hidden = true;
+    dialog.setAttribute("aria-hidden", "true");
+  }
+  const trigger = state.pendingCancelTrigger;
+  state.pendingCancelJobId = null;
+  state.pendingCancelTrigger = null;
+  if (restoreFocus && trigger?.isConnected) {
+    trigger.focus();
+  }
+}
+
+async function confirmCancelDialog(root) {
+  const dialog = qs("[data-job-cancel-dialog]", root);
+  const jobId = state.pendingCancelJobId;
+  if (!dialog || !jobId) {
+    return;
+  }
+  const confirm = qs("[data-job-cancel-confirm]", dialog);
+  if (confirm instanceof HTMLButtonElement) {
+    confirm.disabled = true;
+    confirm.textContent = t("backtests.status.cancelling", { job: compactId(jobId) });
+  }
+  setText("[data-job-cancel-status]", t("backtests.status.cancelling", { job: compactId(jobId) }), dialog);
+  await cancelJob(root, jobId);
+  closeCancelDialog(root, { restoreFocus: false });
+}
+
 async function deleteJob(root, jobId) {
   if (!jobId) {
     return;
@@ -2500,7 +2563,23 @@ function bind(root) {
     if (cancelButton instanceof HTMLElement) {
       event.preventDefault();
       event.stopPropagation();
-      cancelJob(root, cancelButton.dataset.cancelJobId || "").catch(() => {});
+      openCancelDialog(root, cancelButton.dataset.cancelJobId || "", cancelButton);
+      return;
+    }
+    const cancelConfirm = event.target.closest("[data-job-cancel-confirm]");
+    if (cancelConfirm instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      confirmCancelDialog(root).catch((error) => {
+        setText("[data-create-status]", describeApiError(error), root);
+      });
+      return;
+    }
+    const cancelDismiss = event.target.closest("[data-job-cancel-dismiss]");
+    if (cancelDismiss instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCancelDialog(root);
       return;
     }
     const deleteButton = event.target.closest("[data-delete-job-id]");
@@ -2670,6 +2749,12 @@ function bind(root) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       submitAiPrompt(root).catch(() => {});
+    }
+  });
+  root.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.pendingCancelJobId) {
+      event.preventDefault();
+      closeCancelDialog(root);
     }
   });
   root.addEventListener("change", (event) => {

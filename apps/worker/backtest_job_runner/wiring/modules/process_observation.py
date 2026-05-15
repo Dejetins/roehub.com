@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -33,6 +34,7 @@ def run_observed_subprocess(
     timeout_seconds: float,
     evidence_prefix: str,
     metadata: Mapping[str, Any],
+    cancel_event: threading.Event | None = None,
 ) -> ObservedProcessResult:
     started_at = datetime.now(UTC)
     parent_pid = os.getpid()
@@ -52,6 +54,7 @@ def run_observed_subprocess(
     peak_rss_bytes: int | None = None
     peak_physical_footprint_bytes: int | None = None
     timed_out = False
+    cancelled = False
     try:
         with stdout_file, stderr_file:
             process = subprocess.Popen(  # noqa: S603
@@ -79,6 +82,10 @@ def run_observed_subprocess(
                     process.kill()
                     process.wait(timeout=10)
                     break
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    _stop_process(process=process)
+                    break
                 time.sleep(sample_interval)
             returncode = process.returncode
         stdout = _read_text(path=stdout_path)
@@ -99,6 +106,7 @@ def run_observed_subprocess(
             "elapsed_seconds": (finished_at - started_at).total_seconds(),
             "exit_code": returncode,
             "timed_out": timed_out,
+            "cancelled": cancelled,
             "peak_rss_bytes": peak_rss_bytes,
             "peak_physical_footprint_bytes": peak_physical_footprint_bytes,
             "parent_rss_before_bytes": parent_rss_before,
@@ -229,6 +237,15 @@ def _write_evidence(
         json.dumps(evidence, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _stop_process(*, process: subprocess.Popen[str]) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
 
 
 def _read_text(*, path: Path) -> str:

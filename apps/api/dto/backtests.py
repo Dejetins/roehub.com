@@ -79,6 +79,7 @@ class BacktestJobResponse(BaseModel):
     created_at: str
     started_at: str | None
     finished_at: str | None
+    cancel_requested_at: str | None
     updated_at: str
     refresh_status: str
     generated_at: str

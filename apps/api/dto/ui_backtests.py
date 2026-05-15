@@ -136,6 +136,7 @@ class BacktestJobTableRowResponse(BaseModel):
     market_type: str
     symbol: str
     created_at: str
+    cancel_requested_at: str | None = None
     indicator_summary: str
     period: str
     direction: str

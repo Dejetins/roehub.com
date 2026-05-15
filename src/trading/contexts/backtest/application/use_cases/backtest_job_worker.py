@@ -35,8 +35,13 @@ class BacktestJobExecutor(Protocol):
         job_id: UUID,
         preflight: BacktestPreflightResult,
         updated_at: datetime,
+        cancel_event: threading.Event | None = None,
     ) -> Any:
         ...
+
+
+class BacktestJobCancellationRequested(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +80,7 @@ class BacktestJobWorkerUseCase:
             total_units=1,
         )
         try:
+            cancel_event = threading.Event()
             if self.validation_guardrails is None:
                 preflight = self.preflight_service.execute(dict(job.request_json))
             else:
@@ -88,11 +94,28 @@ class BacktestJobWorkerUseCase:
                 locked_by=owner,
                 lease_seconds=self.lease_seconds,
                 interval_seconds=self.heartbeat_interval_seconds,
+                cancel_event=cancel_event,
             ) as heartbeat:
                 execution_result = self.executor.execute(
                     job_id=job.job_id,
                     preflight=preflight,
                     updated_at=datetime.now(UTC),
+                    cancel_event=cancel_event,
+                )
+            if cancel_event.is_set() or heartbeat.cancel_requested:
+                cancelled = self.job_repository.finish_with_top_variants(
+                    job_id=job.job_id,
+                    user_id=job.user_id,
+                    now=datetime.now(UTC),
+                    locked_by=owner,
+                    next_state="cancelled",
+                    top_variants=(),
+                )
+                return BacktestJobWorkerResult(
+                    job=cancelled,
+                    claimed=True,
+                    lease_lost=heartbeat.lease_lost or cancelled is None,
+                    status="cancelled",
                 )
             if isinstance(execution_result, BacktestJobHeavyPromotion):
                 requeued = self.lease_repository.promote_to_heavy_and_requeue(
@@ -123,6 +146,21 @@ class BacktestJobWorkerUseCase:
                 job=finished,
                 claimed=True,
                 lease_lost=heartbeat.lease_lost or finished is None,
+            )
+        except BacktestJobCancellationRequested:
+            cancelled = self.job_repository.finish_with_top_variants(
+                job_id=job.job_id,
+                user_id=job.user_id,
+                now=datetime.now(UTC),
+                locked_by=owner,
+                next_state="cancelled",
+                top_variants=(),
+            )
+            return BacktestJobWorkerResult(
+                job=cancelled,
+                claimed=True,
+                lease_lost=cancelled is None,
+                status="cancelled",
             )
         except Exception as error:  # noqa: BLE001
             failed = self.job_repository.finish_with_top_variants(
@@ -170,6 +208,7 @@ class _LeaseHeartbeat:
         locked_by: str,
         lease_seconds: int,
         interval_seconds: float,
+        cancel_event: threading.Event,
     ) -> None:
         if interval_seconds <= 0:
             raise ValueError("heartbeat_interval_seconds must be > 0")
@@ -178,8 +217,10 @@ class _LeaseHeartbeat:
         self._locked_by = locked_by
         self._lease_seconds = lease_seconds
         self._interval_seconds = interval_seconds
+        self._cancel_event = cancel_event
         self._stop = threading.Event()
         self._lease_lost = False
+        self._cancel_requested = False
         self._thread = threading.Thread(
             target=self._run,
             name=f"backtest-job-heartbeat-{job_id}",
@@ -189,6 +230,10 @@ class _LeaseHeartbeat:
     @property
     def lease_lost(self) -> bool:
         return self._lease_lost
+
+    @property
+    def cancel_requested(self) -> bool:
+        return self._cancel_requested
 
     def __enter__(self) -> "_LeaseHeartbeat":
         self._thread.start()
@@ -210,11 +255,15 @@ class _LeaseHeartbeat:
             if updated is None:
                 self._lease_lost = True
                 return
+            if updated.cancel_requested_at is not None:
+                self._cancel_requested = True
+                self._cancel_event.set()
             next_heartbeat = monotonic() + self._interval_seconds
 
 
 __all__ = [
     "BacktestJobExecutor",
+    "BacktestJobCancellationRequested",
     "BacktestJobWorkerResult",
     "BacktestJobWorkerUseCase",
 ]
