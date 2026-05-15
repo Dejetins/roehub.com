@@ -218,6 +218,15 @@ def _chat_messages(
         ("TRUSTED_ALLOWED_CATALOG", _canonical_json(request.catalog_subset_json)),
         ("UNTRUSTED_USER_REQUEST", request.job.user_prompt_text),
         (
+            "TRUSTED_REQUEST_INTERPRETATION",
+            _canonical_json(
+                _trusted_request_interpretation(
+                    user_request=request.job.user_prompt_text,
+                    catalog=request.catalog_subset_json,
+                )
+            ),
+        ),
+        (
             "UNTRUSTED_CURRENT_CONFIG",
             _canonical_json(request.job.current_config_json or {}),
         ),
@@ -267,6 +276,87 @@ def _response_format(schema: Mapping[str, Any]) -> dict[str, Any]:
             "schema": lmstudio_schema,
         },
     }
+
+
+def _trusted_request_interpretation(
+    *,
+    user_request: str,
+    catalog: Mapping[str, Any],
+) -> dict[str, Any]:
+    text = user_request.casefold()
+    return {
+        "recognized_symbol": _first_catalog_token(
+            text=text,
+            values=_string_items(catalog.get("symbols")),
+            upper=True,
+        ),
+        "recognized_timeframe": _first_catalog_token(
+            text=text,
+            values=_string_items(catalog.get("timeframes")),
+            upper=False,
+        ),
+        "recognized_indicator_id": _first_indicator_id(text=text, catalog=catalog),
+        "recognized_top_n": _top_n(text),
+        "instruction": (
+            "If recognized fields are non-null and supported, use them instead of "
+            "asking for clarification."
+        ),
+    }
+
+
+def _first_catalog_token(
+    *,
+    text: str,
+    values: tuple[str, ...],
+    upper: bool,
+) -> str | None:
+    for value in values:
+        if _contains_token(text=text, token=value):
+            return value.upper() if upper else value.lower()
+    return None
+
+
+def _first_indicator_id(*, text: str, catalog: Mapping[str, Any]) -> str | None:
+    indicators = catalog.get("indicators")
+    if not isinstance(indicators, list):
+        return None
+    for item in indicators:
+        if not isinstance(item, Mapping):
+            continue
+        indicator_id = item.get("indicator_id")
+        if not isinstance(indicator_id, str) or not indicator_id.strip():
+            continue
+        aliases = [indicator_id, indicator_id.rsplit(".", maxsplit=1)[-1]]
+        raw_aliases = item.get("aliases")
+        if isinstance(raw_aliases, list):
+            aliases.extend(alias for alias in raw_aliases if isinstance(alias, str))
+        if any(_contains_token(text=text, token=alias) for alias in aliases):
+            return indicator_id.strip().lower()
+    return None
+
+
+def _string_items(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item.strip())
+
+
+def _contains_token(*, text: str, token: str) -> bool:
+    normalized = token.strip().casefold()
+    if not normalized:
+        return False
+    pattern = rf"(?<![a-z0-9_.-]){re.escape(normalized)}(?![a-z0-9_.-])"
+    return re.search(pattern, text) is not None
+
+
+def _top_n(text: str) -> int | None:
+    match = re.search(r"\btop\s*[-_ ]?\s*(\d{1,3})\b", text)
+    if match is None:
+        return None
+    value = int(match.group(1))
+    if value < 1:
+        return None
+    return value
 
 
 def _lmstudio_json_schema(schema: Mapping[str, Any]) -> dict[str, Any]:

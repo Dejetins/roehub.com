@@ -61,6 +61,7 @@ def test_lmstudio_adapter_posts_structured_chat_completions_request() -> None:
     assert "trusted prompt envelope" not in payload["messages"][1]["content"]
     assert "Собери конфиг" in payload["messages"][1]["content"]
     assert "TRUSTED_ALLOWED_CATALOG" in payload["messages"][1]["content"]
+    assert "OUTPUT_JSON_SCHEMA" in payload["messages"][1]["content"]
     assert payload["temperature"] == 0.2
     assert payload["top_p"] == 0.9
     assert payload["max_tokens"] == 1024
@@ -77,6 +78,53 @@ def test_lmstudio_adapter_posts_structured_chat_completions_request() -> None:
     assert response.input_tokens_estimate == 7
     assert response.output_tokens_estimate == 3
     assert response.finish_reason == "stop"
+
+
+def test_lmstudio_adapter_adds_trusted_request_interpretation() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"content": _valid_model_output()},
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+
+    adapter = LMStudioOpenAICompatibleAdapter(
+        config=_model_config(),
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    adapter.generate_config(
+        _request(
+            prompt_text="trusted prompt envelope",
+            user_prompt_text="Create BTCUSDT RSI config on 15m and keep top 10 results.",
+            catalog_subset_json={
+                "symbols": ["BTCUSDT"],
+                "timeframes": ["15m"],
+                "indicators": [
+                    {
+                        "indicator_id": "momentum.rsi",
+                        "aliases": ["rsi", "RSI"],
+                    }
+                ],
+            },
+        )
+    )
+
+    content = captured["payload"]["messages"][1]["content"]
+    assert "TRUSTED_REQUEST_INTERPRETATION" in content
+    assert '"recognized_symbol":"BTCUSDT"' in content
+    assert '"recognized_timeframe":"15m"' in content
+    assert '"recognized_indicator_id":"momentum.rsi"' in content
+    assert '"recognized_top_n":10' in content
 
 
 def test_lmstudio_adapter_supports_repair_operation() -> None:
@@ -209,7 +257,12 @@ def _model_config(
     )
 
 
-def _request(*, prompt_text: str) -> BacktestConfigLLMRequest:
+def _request(
+    *,
+    prompt_text: str,
+    user_prompt_text: str = "Собери конфиг",
+    catalog_subset_json: dict[str, Any] | None = None,
+) -> BacktestConfigLLMRequest:
     profile = backtest_ai_prompt_profile_for_mode("create")
     now = datetime(2026, 5, 11, tzinfo=UTC)
     return BacktestConfigLLMRequest(
@@ -220,7 +273,7 @@ def _request(*, prompt_text: str) -> BacktestConfigLLMRequest:
             locale="ru",
             state="running",
             source_page="backtests",
-            user_prompt_text="Собери конфиг",
+            user_prompt_text=user_prompt_text,
             user_prompt_hash="a" * 64,
             system_prompt_version=profile.system_prompt_version,
             system_prompt_hash=profile.system_prompt_hash,
@@ -232,7 +285,7 @@ def _request(*, prompt_text: str) -> BacktestConfigLLMRequest:
         catalog=object(),  # type: ignore[arg-type]
         prompt_profile=profile,
         prompt_text=prompt_text,
-        catalog_subset_json={},
+        catalog_subset_json=catalog_subset_json or {},
         output_schema_json=backtest_ai_model_output_schema(),
     )
 
