@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/opt/roehub/app/.venv/bin/python3",
+    "-m",
+    "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "--task-id",
+    "b79d4aa0-8b5d-4ec1-8ce3-34a629312479",
+    "--job-id",
+    "6c0d250a-ff7f-4763-a4df-f0468b0dd85d",
+    "--owner-user-id",
+    "6960d466-e9fb-4116-a9fb-8f1589c61914",
+    "--variant-key",
+    "job_6c0d250ad85d__dema_close_w5__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w7__rma_close_w10__risk_tp_sl__vh_3ecb2718",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-7t3di02u/result.json"
+  ],
+  "elapsed_seconds": 0.881754,
+  "exit_code": 1,
+  "finished_at": "2026-05-14T22:40:26.311267Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "job_id": "6c0d250a-ff7f-4763-a4df-f0468b0dd85d",
+    "public_variant_key": "job_6c0d250ad85d__dema_close_w5__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w7__rma_close_w10__risk_tp_sl__vh_3ecb2718",
+    "task_id": "b79d4aa0-8b5d-4ec1-8ce3-34a629312479",
+    "task_kind": "lazy_trades"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 50435,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 0,
+  "parent_rss_after_bytes": 137428992,
+  "parent_rss_before_bytes": 137428992,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 199065600,
+  "pid": 53010,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-05-14T22:40:25.429513Z",
+  "stderr_tail": "2026-05-15 01:40:25,855 INFO __main__ lazy trades child process started: task_id=b79d4aa0-8b5d-4ec1-8ce3-34a629312479 job_id=6c0d250a-ff7f-4763-a4df-f0468b0dd85d\n2026-05-15 01:40:26,075 ERROR __main__ lazy trades child process failed: task_id=b79d4aa0-8b5d-4ec1-8ce3-34a629312479 job_id=6c0d250a-ff7f-4763-a4df-f0468b0dd85d\nTraceback (most recent call last):\n  File \"/opt/roehub/app/apps/worker/backtest_job_runner/main/lazy_trades_child.py\", line 88, in main\n    detail = build_lazy_trades_compute_service(environ=os.environ).execute(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/roehub/app/src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py\", line 176, in execute\n    payload = self._recompute_payload(\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/roehub/app/src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py\", line 244, in _recompute_payload\n    local_indices = _local_indices_from_row(row=row, prepared=prepared)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/roehub/app/src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py\", line 555, in _local_indices_from_row\n    raise _variant_conflict(\ntrading.platform.errors.roehub_error.RoehubError\n",
+  "stdout_tail": "",
+  "timed_out": false
+}
