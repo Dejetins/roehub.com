@@ -841,6 +841,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "buildSizingPayload" in backtests_js
     assert 'sizing_mode: "all_in"' in backtests_js
     assert "function ensureStrategyName" in backtests_js
+    assert "function directionLabel" in backtests_js
     assert "entry_timestamp" in backtests_js
     assert "net_pnl_quote" in backtests_js
     assert "function renderMonthlyStatsTable" in backtests_js

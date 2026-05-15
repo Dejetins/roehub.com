@@ -820,6 +820,16 @@ function directionSlug(value) {
   return value === "long_only" ? "long" : "long-short";
 }
 
+function directionLabel(value) {
+  if (value === "long_short_reversal") {
+    return t("backtests.option.long_short");
+  }
+  if (value === "long_only") {
+    return t("backtests.option.long_only");
+  }
+  return value || "--";
+}
+
 function slugToken(value) {
   return String(value || "")
     .trim()
@@ -1503,7 +1513,7 @@ function renderJobRow(root, row, index) {
       <td>${escapeHtml(row.market_type || "--")}</td>
       <td>${escapeHtml(row.symbol || "--")}</td>
       <td>${escapeHtml(row.period)}</td>
-      <td>${escapeHtml(row.direction)}</td>
+      <td>${escapeHtml(directionLabel(row.direction))}</td>
       <td>
         <div class="backtests-status-cell">
           <span>${escapeHtml(jobStatusText(row))} / ${row.progress_percent}%</span>
