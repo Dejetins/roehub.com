@@ -115,6 +115,10 @@ required_literals:
   - "unauthorized actions: 0"
   - "memory_pressure"
   - "vm_stat"
+  - "POST /v1/chat/completions"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -200,7 +204,7 @@ Context ledger:
 ## Requirements (Must)
 
 - Stop if Iteration 14 cleanup evidence is missing or blocked.
-- Run serving preflight first: configured `base_url` port is free or owned by LM Studio, LM Studio daemon/server/model loaded/structured generation.
+- Run serving preflight first: configured `base_url` port is free or owned by LM Studio, LM Studio daemon/server/model loaded/structured generation. The structured generation probe must use `POST /v1/chat/completions`, `response_format.type=json_schema`, string-only JSON Schema `type` values, and parse `choices[0].message.content` as JSON.
 - Run one supported real API job and require `ready` before S1.
 - Run security eval and require unauthorized actions 0 before S1.
 - Apply explicit benchmark thresholds; do not use vague "architecture target" wording:

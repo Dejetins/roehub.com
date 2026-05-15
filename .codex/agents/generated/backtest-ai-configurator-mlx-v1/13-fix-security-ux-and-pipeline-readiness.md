@@ -118,6 +118,10 @@ required_literals:
   - "10/10 ready"
   - "Load configuration"
   - "no chain-of-thought"
+  - "POST /v1/chat/completions"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -214,7 +218,7 @@ Context ledger:
 - Prove safe-prompt false positives are controlled: at least 10 supported safe `/backtests` prompts must have `safe prompts blocked: 0/10`. If any safe prompt is blocked, either reclassify it with a concrete unsafe reason or keep the stage blocked.
 - Prove repair path works at least 5/5 on real Mac Studio or report blocker.
 - Document UI decision: LM Studio Developer UI/logs are ops-only; Roehub UI should not embed them.
-- Prefer using LM Studio structured output and backend statuses instead of adding custom frontend parsing.
+- Prefer using LM Studio structured output and backend statuses instead of adding custom frontend parsing. For LM Studio requests, use `POST /v1/chat/completions`, prompt text in `messages[].content`, `response_format.type=json_schema`, string-only JSON Schema `type` values, and parse `choices[0].message.content` as JSON.
 - Run browser QA if UI files change.
 - Markdown and JSON evidence must include explicit machine-readable gate fields: `accepted: true/false`, `blocking_reason: null|string`, and `next_prompt_allowed: true/false`.
 - Run `publish-ci-deploy` after gates pass.

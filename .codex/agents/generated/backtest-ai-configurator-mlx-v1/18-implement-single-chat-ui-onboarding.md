@@ -127,6 +127,9 @@ required_literals:
   - "AI cannot run backtests"
   - "startup message uses platform locale"
   - "model replies in the language of the user request"
+  - "LM Studio structured output remains backend-owned"
+  - "choices[0].message.content"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -300,6 +303,10 @@ Stop reading once UI write set and test expectations are clear.
 - Startup message appears by default in RU when platform locale is RU and EN when platform locale is EN.
 - UI copy states AI cannot run backtests.
 - Model/assistant output is rendered as text, not HTML.
+- Browser/UI code must not construct LM Studio `response_format` schemas or
+  parse LM Studio raw responses directly. The accepted LM Studio structured
+  output contract remains backend-owned; UI consumes backend statuses and
+  validated configs only.
 - `Load configuration` appears only for validated ready config.
 - Browser QA evidence includes screenshot or explicit visual check, console clean, network clean, no auto-run.
 - Evidence includes `accepted`, `blocking_reason`, `next_prompt_allowed`.

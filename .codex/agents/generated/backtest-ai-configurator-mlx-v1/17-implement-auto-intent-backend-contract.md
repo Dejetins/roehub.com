@@ -121,6 +121,10 @@ required_literals:
   - "model replies in the language of the user request"
   - "AI cannot run backtests"
   - "mode is optional/deprecated"
+  - "POST /v1/chat/completions"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -230,6 +234,10 @@ Context ledger:
 - Browser/user-selected mode must not be authoritative. If a legacy `mode` value is sent, backend may map it into a hint only if documented and tested.
 - Add deterministic intent resolver before LLM call. It may use domain terms, current-config state and clear user phrases; unclear cases must return `needs_clarification` rather than guessing a loadable config.
 - Prompt profile selection must use resolved intent.
+- Any LM Studio `response_format.json_schema` emitted or changed in this prompt
+  must keep every schema `type` value as a string. Do not emit nullable union
+  arrays such as `type: ["string", "null"]`; use empty string or explicit
+  status/boolean fields for optional model-output fields.
 - Prompt/system policy must state:
   - model replies in the language of the user request;
   - AI cannot run backtests;

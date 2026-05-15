@@ -121,6 +121,9 @@ required_literals:
   - "mlx_lm_server"
   - "MLX generate"
   - "MLX repair"
+  - "POST /v1/chat/completions"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -221,7 +224,11 @@ Context ledger:
 - Do not delete historical benchmark evidence; mark it as failed/non-acceptance if needed.
 - Remove dead code only after proving it is not imported or needed.
 - Replace temporary giant queue/concurrency literals with conservative accepted/internal defaults, or keep feature disabled and document why values are not public defaults.
-- Update docs and dependencies so current instructions point to LM Studio.
+- Update docs and dependencies so current instructions point to LM Studio and
+  preserve the accepted API rule: `POST /v1/chat/completions`,
+  `response_format.type=json_schema`, prompt text in `messages[].content`,
+  parse `choices[0].message.content` as JSON, and do not emit JSON Schema
+  nullable union `type: ["string", "null"]`.
 - Produce dependency inventory: inspect `pyproject.toml`, `uv.lock`, and current imports; remove dependencies/imports added only for the failed `mlx_lm.server` path if they are unused, or document why each retained dependency is still needed.
 - Verify Mac Studio has no monitored/running stale `mlx_lm.server` service for this feature.
 - Markdown and JSON evidence must include explicit machine-readable gate fields: `accepted: true/false`, `blocking_reason: null|string`, and `next_prompt_allowed: true/false`.

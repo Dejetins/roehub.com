@@ -10,14 +10,20 @@ benchmark rerun.
   Mac Studio using `/Users/daniildegtyarev/.lmstudio/bin/lms`.
 - Loaded `gemma-4-e2b-it` as `gemma-4-e2b-it-4bit` with context length `8192`
   and `parallel=1`.
-- Ran exactly 10 direct structured-output `/v1/chat/completions` attempts.
-- Recorded blocker evidence because the direct serving gate did not pass.
+- Ran staged direct checks:
+  ordinary `/v1/chat/completions` without `response_format`;
+  simple structured output with string-only schema `type` values;
+  Roehub-like structured output without nullable union.
+- Ran exactly 10 corrected direct structured-output `/v1/chat/completions`
+  attempts.
+- Recorded accepted evidence for LM Studio local API with schema constraint:
+  do not use `"type": ["string", "null"]`.
 
 ## Gate Markers
 
-- accepted: false
-- blocking_reason: `structured_output_success_count=0/10`
-- next_prompt_allowed: false
+- accepted: true
+- blocking_reason: null
+- next_prompt_allowed: true
 
 No S1/S5/S10/S50/S100 benchmark was run in this iteration.
 
@@ -29,5 +35,11 @@ No S1/S5/S10/S50/S100 benchmark was run in this iteration.
 ## Runtime Decision
 
 `mlx_lm.server` is not accepted for this checkpoint. LM Studio local API is the
-target serving boundary, but it is still blocked until direct structured-output
-generation succeeds 10/10 without unloading or crashing the model.
+accepted serving boundary for the next Roehub adapter step when used through
+`POST /v1/chat/completions` on loopback only.
+
+Important API rule: the request itself is JSON, while the model prompt is text
+inside `messages[].content`. Structured output is requested through
+`response_format.type=json_schema`. In the JSON Schema sent to LM Studio, keep
+every `type` value as a string; do not use nullable unions such as
+`"type": ["string", "null"]`.

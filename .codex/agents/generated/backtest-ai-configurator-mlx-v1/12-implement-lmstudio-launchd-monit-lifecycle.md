@@ -121,6 +121,10 @@ required_literals:
   - "lms ps --json"
   - "two stop/start/restart cycles"
   - "/v1/models is not readiness"
+  - "POST /v1/chat/completions"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -220,7 +224,9 @@ Context ledger:
   - server status;
   - `lms ps --json` loaded instance id;
   - `/api/v1/models` loaded instance;
-  - lightweight structured generation.
+  - lightweight structured generation through `POST /v1/chat/completions` with
+    `response_format.type=json_schema`, all JSON Schema `type` values as
+    strings, and parsed `choices[0].message.content`.
 - Do not accept `/v1/models` as readiness. Readiness requires loaded-model identity plus lightweight structured generation.
 - Verify two full stop/start/restart cycles through the chosen launchd/Monit/service-control path on Mac Studio.
 - Prove there is no restart storm: no repeated Monit restart loop, no launchd crash loop, and no "5 restarts within 10 cycles" equivalent. If the selected safe design is Monit check-program instead of a long-running launchd job, document that explicitly.

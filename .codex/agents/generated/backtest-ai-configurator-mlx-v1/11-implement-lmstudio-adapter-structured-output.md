@@ -121,6 +121,11 @@ required_literals:
   - "LMStudioOpenAICompatibleAdapter"
   - "response_format"
   - "json_schema"
+  - "POST /v1/chat/completions"
+  - "messages[].content"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "gemma-4-e2b-it-4bit"
   - "runtime: lm_studio"
   - "/api/v1/models"
@@ -214,7 +219,16 @@ Context ledger:
 
 - Stop if Iteration 10 serving evidence is missing or not accepted.
 - Use LM Studio structured output for both generate and repair.
-- Send `response_format` using the actual `backtest_ai_model_output_schema()`.
+- Send `response_format` using a LM Studio-compatible version of the actual
+  `backtest_ai_model_output_schema()`: every JSON Schema `type` value sent to
+  LM Studio must be a string (`"string"`, `"boolean"`, `"integer"`,
+  `"object"`). Do not send nullable unions such as
+  `"type": ["string", "null"]`; encode absence as an empty string or an
+  explicit status/boolean field at the adapter boundary.
+- Use the documented LM Studio chat shape: HTTP `POST` JSON body to
+  `/v1/chat/completions`, natural-language prompt text in `messages[].content`,
+  `response_format.type=json_schema`, and parse
+  `choices[0].message.content` as the model's JSON string.
 - Keep loopback-only base URL validation.
 - Add a runtime/config key such as `runtime: lm_studio`; do not keep `mlx_lm_server` as current prod runtime.
 - Rename or replace stale adapter classes and tests so production code no longer says `MLXOpenAICompatibleAdapter`.
@@ -284,6 +298,11 @@ Stop reading once adapter write set, config changes and Mac Studio smoke command
 - Production code imports `LMStudioOpenAICompatibleAdapter` or a clearly runtime-neutral name, not `MLXOpenAICompatibleAdapter`.
 - Public package exports and worker wiring no longer expose or import `MLXOpenAICompatibleAdapter`; any remaining old name is historical evidence only.
 - Request payload includes `response_format.type=json_schema`.
+- Request payload does not include JSON Schema nullable union
+  `type: ["string", "null"]`; tests assert all emitted schema `type` values are
+  strings.
+- Adapter parses the HTTP response JSON, then parses `choices[0].message.content`
+  as JSON and validates that object.
 - Mock tests assert payload shape and error diagnostics.
 - Mac Studio adapter smoke has 10/10 generate and 10/10 repair valid JSON responses.
 - Evidence contains top-level gate markers: `accepted`, `blocking_reason`, and `next_prompt_allowed`; downstream prompts may proceed only when `accepted=true` and `next_prompt_allowed=true`.

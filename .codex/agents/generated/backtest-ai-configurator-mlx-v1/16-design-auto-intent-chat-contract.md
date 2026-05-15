@@ -116,6 +116,8 @@ required_literals:
   - "startup message uses platform locale"
   - "AI cannot run backtests"
   - "mode selector removed"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -167,6 +169,10 @@ Done means:
 - a new Russian architecture document defines the single-chat auto-intent contract;
 - old `CREATE / EDIT / EXPLAIN / REPAIR / SAFER` buttons are classified as legacy UI to remove, not to hide;
 - backend target contract is explicit enough for implementation prompts 17-19;
+- backend target contract preserves the accepted LM Studio structured-output
+  rule: request body is JSON, model prompt is text in `messages[].content`, and
+  any `response_format.json_schema` sent to LM Studio uses string-only `type`
+  values with no nullable union arrays;
 - evidence markers are present: `accepted`, `blocking_reason`, `next_prompt_allowed`.
 
 ## Context / Current State

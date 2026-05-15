@@ -64,6 +64,14 @@ plain ES modules:
   readiness нужен `lms ps --json` и/или `/api/v1/models` с
   `loaded_instances`, а generation readiness должен подтверждаться прямым
   `/v1/chat/completions` structured-output smoke.
+- LM Studio structured output принимает обычный JSON HTTP body на
+  `POST /v1/chat/completions`: natural-language prompt передается как текст в
+  `messages[].content`, а machine-readable contract задается через
+  `response_format.type=json_schema`. Для текущего MLX runtime все значения
+  JSON Schema `type` должны быть строками (`"string"`, `"boolean"`,
+  `"integer"`, `"object"`). Не использовать nullable union вида
+  `"type": ["string", "null"]`; для nullable/empty fields в v1 использовать
+  строку с пустым значением или отдельный boolean/status field.
 - MLX оптимизирован под Apple Silicon unified memory, что делает Mac Studio
   M2 Max 64GB подходящим MVP inference host, но concurrency/context window надо
   подтверждать benchmark evidence, а не задавать "на глаз".
@@ -486,6 +494,48 @@ gate:
 Порт берется из `base_url` в
 `configs/prod/backtest_ai_configurator.yaml`; перед start обязателен
 `lsof -nP -iTCP:<configured_port> -sTCP:LISTEN || true`.
+
+LM Studio API contract для следующих проверок:
+
+- HTTP method: `POST`;
+- endpoint: `<base_url>/v1/chat/completions`;
+- request content type: `application/json`;
+- model text prompt: `messages[].content`;
+- structured-output control: `response_format`:
+
+```json
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "roehub_like_smoke",
+    "strict": "true",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "accepted": {"type": "boolean"},
+        "blocking_reason": {"type": "string"},
+        "next_prompt_allowed": {"type": "boolean"},
+        "model_identifier": {"type": "string"},
+        "stage": {"type": "string"},
+        "attempt": {"type": "integer"}
+      },
+      "required": [
+        "accepted",
+        "blocking_reason",
+        "next_prompt_allowed",
+        "model_identifier",
+        "stage",
+        "attempt"
+      ]
+    }
+  }
+}
+```
+
+Expected response location: parse the HTTP response JSON, then parse
+`choices[0].message.content` as JSON. Do not treat `/v1/models` alone as proof
+that this path works; require 10/10 direct structured-output attempts and
+`lms ps --json` still showing the loaded identifier after the run.
 
 ### 7) Model registry и reload
 

@@ -125,6 +125,10 @@ required_literals:
   - "AI cannot run backtests"
   - "Load configuration"
   - "Загрузить конфигурацию"
+  - "POST /v1/chat/completions"
+  - "choices[0].message.content"
+  - "JSON Schema type values must be strings"
+  - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
   - "blocking_reason"
   - "next_prompt_allowed"
@@ -246,6 +250,11 @@ Context ledger:
   - 2 suggest safer prompts;
   - 1 repair invalid config prompt.
 - If LM Studio runtime is not ready, do not fake acceptance; record blocker and keep `accepted=false`.
+- If this prompt performs any direct LM Studio diagnostic, use the accepted
+  request contract: `POST /v1/chat/completions`, prompt text in
+  `messages[].content`, `response_format.type=json_schema`, string-only JSON
+  Schema `type` values, parse `choices[0].message.content` as JSON, and never
+  use `type: ["string", "null"]`.
 - Write markdown and JSON evidence with `accepted`, `blocking_reason`, `next_prompt_allowed`.
 - Run `publish-ci-deploy` after gates pass.
 
