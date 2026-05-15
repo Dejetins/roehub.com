@@ -75,6 +75,32 @@ def test_tp_sl_hit_times_service_selects_requested_contiguous_subset(
     }
 
 
+def test_tp_sl_hit_times_service_materializes_disabled_tp_as_never_hit(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
+    service = BacktestTpSlHitTimesService(artifact_array_loader=loader)
+
+    result = service.execute(
+        normalized_request={
+            "risk": {
+                "mode": "tp_sl_grid",
+                "tp": {"enabled": False},
+                "sl": {"enabled": True, "start_pct": 1.0, "stop_pct": 1.0, "step_pct": 1.0},
+            }
+        },
+        context=_context(store=store, loader=loader),
+    )
+
+    assert result.resolution.requested_grid.tp_enabled is False
+    assert result.resolution.tp_indexes.tolist() == []
+    assert result.hit_times.tp_values.tolist() == pytest.approx([0.0])
+    assert result.hit_times.long_tp.tolist() == [[2, 2]]
+    assert result.hit_times.short_tp.tolist() == [[2, 2]]
+    assert result.hit_times.sl_values.tolist() == pytest.approx([0.01])
+
+
 def test_tp_sl_hit_times_service_rejects_missing_tp_before_table_load(
     tmp_path: Path,
 ) -> None:

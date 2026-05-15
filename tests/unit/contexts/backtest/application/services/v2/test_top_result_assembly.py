@@ -89,6 +89,42 @@ def test_tp_sl_top_result_assembly_persists_best_cell_summary_only() -> None:
     assert row.trades_json is None
 
 
+def test_tp_sl_top_result_assembly_omits_disabled_side_best_level() -> None:
+    result = BacktestTopResultAssemblyService().assemble(
+        job_id=uuid4(),
+        normalized_request=_request(
+            risk={
+                "mode": "tp_sl_grid",
+                "tp": {"enabled": False},
+                "sl": {"enabled": True, "start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+            }
+        ),
+        top_results=(
+            BacktestTpSlTopResult(
+                rank=1,
+                score=33.0,
+                indicator_rows={"ma.dema": 17},
+                best_tp_idx=0,
+                best_sl_idx=3,
+                metrics={
+                    "total_return_pct": 33.0,
+                    "trade_count": 4.0,
+                    "best_tp_pct": 0.0,
+                    "best_sl_pct": 3.5,
+                },
+                metadata={"ma.dema.source": "close", "ma.dema.window": 192},
+            ),
+        ),
+        updated_at=datetime(2026, 5, 1, tzinfo=UTC),
+    )
+
+    row = result.top_variants[0]
+    assert row.best_tp_pct is None
+    assert row.best_sl_pct == 3.5
+    assert row.payload_json["readable_params"]["best_tp_pct"] is None
+    assert "__tp_0" not in row.payload_json["public_variant_key"]
+
+
 def _assemble_for_job(job_id: UUID):
     return BacktestTopResultAssemblyService().assemble(
         job_id=job_id,

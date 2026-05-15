@@ -57,6 +57,8 @@ class BacktestTpSlHitTimesTableArrays:
 class BacktestTpSlRequestedGrid:
     tp_levels_pct: tuple[float, ...]
     sl_levels_pct: tuple[float, ...]
+    tp_enabled: bool = True
+    sl_enabled: bool = True
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -65,6 +67,8 @@ class BacktestTpSlRequestedGrid:
             "tp_count": len(self.tp_levels_pct),
             "sl_count": len(self.sl_levels_pct),
             "cells": len(self.tp_levels_pct) * len(self.sl_levels_pct),
+            "tp_enabled": self.tp_enabled,
+            "sl_enabled": self.sl_enabled,
         }
 
 

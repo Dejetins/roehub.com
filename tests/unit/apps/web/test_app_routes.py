@@ -489,11 +489,14 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         '/variants/{variant_key}/trades.csv"'
         in response.text
     )
-    assert 'data-variant-open-delay-ms="140"' in response.text
-    assert 'data-variant-open-duration-ms="400"' in response.text
+    assert 'data-variant-open-delay-ms="180"' in response.text
+    assert 'data-variant-open-duration-ms="650"' in response.text
     assert 'data-variant-preview-limit="5"' in response.text
     assert "data-indicator-add-menu" in response.text
     assert "data-risk-grid" in response.text
+    assert 'data-risk-side-enabled="tp"' in response.text
+    assert 'data-risk-side-enabled="sl"' in response.text
+    assert "data-clear-job-filters" in response.text
     assert 'data-current-value="sizing_mode"' in response.text
     assert 'data-backtest-menu="market"' in response.text
     assert 'data-backtest-menu="market_type"' in response.text
@@ -799,7 +802,10 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "queueVariantPanelAnimation" in backtests_js
     assert "variantEmptyText" in backtests_js
     assert "backtests.variants.none_passed_quality_gate" in backtests_js
-    assert "compactMagnitude(indicatorCombinationCount())" in backtests_js
+    assert "parameterCombinationCount(root)" in backtests_js
+    assert "riskCombinationCount(root)" in backtests_js
+    assert "data-clear-job-filters" in backtests_js
+    assert "data-variant-closing" in backtests_js
     assert "trashIcon(t(\"backtests.actions.delete\"))" in backtests_js
     assert "&times;" not in backtests_js
     assert "bindStatusBar" in backtests_js

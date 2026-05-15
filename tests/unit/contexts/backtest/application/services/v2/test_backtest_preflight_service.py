@@ -281,6 +281,40 @@ def test_preflight_tp_sl_grid_validates_cells_and_configured_coverage() -> None:
     assert result.cost_estimate.tp_sl_cells == 2209
 
 
+def test_preflight_tp_sl_grid_accepts_one_sided_risk() -> None:
+    request = _valid_request()
+    request["risk"] = {
+        "mode": "tp_sl_grid",
+        "tp": {"enabled": False},
+        "sl": {"enabled": True, "start_pct": 0.5, "stop_pct": 25.0, "step_pct": 0.5},
+    }
+
+    result = _service().execute(request)
+
+    assert result.normalized_request["risk"] == {
+        "mode": "tp_sl_grid",
+        "tp": {"enabled": False},
+        "sl": {"enabled": True, "start_pct": 0.5, "stop_pct": 25.0, "step_pct": 0.5},
+    }
+    assert result.cost_estimate.tp_sl_cells == 50
+
+
+def test_preflight_tp_sl_grid_rejects_both_sides_disabled() -> None:
+    request = _valid_request()
+    request["risk"] = {
+        "mode": "tp_sl_grid",
+        "tp": {"enabled": False},
+        "sl": {"enabled": False},
+    }
+
+    with pytest.raises(BacktestPreflightRejected) as exc_info:
+        _service().execute(request)
+
+    assert exc_info.value.error_code == BACKTEST_ERROR_INVALID_REQUEST
+    assert exc_info.value.issues[0].path == "risk"
+    assert exc_info.value.issues[0].code == "empty"
+
+
 def test_preflight_rejects_tp_sl_grid_outside_configured_coverage() -> None:
     request = _valid_request()
     request["risk"] = {

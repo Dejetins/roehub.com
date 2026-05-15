@@ -5,8 +5,8 @@ import { createPoller } from "../core/poller.js";
 import { renderBacktestSeries } from "../charts/backtest_series.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
-const DEFAULT_VARIANT_OPEN_DELAY_MS = 140;
-const DEFAULT_VARIANT_OPEN_DURATION_MS = 400;
+const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
+const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
 const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 50;
@@ -41,6 +41,8 @@ const state = {
   timeframe: "15m",
   direction: "long_short_reversal",
   risk_mode: "none",
+  risk_tp_enabled: true,
+  risk_sl_enabled: true,
   sizing_mode: "fixed_equity_pct",
   ranking_metric: "total_return_pct",
   ranking_order: "desc",
@@ -69,6 +71,7 @@ const state = {
   resultDetails: null,
   tradesPage: 1,
   animateVariantJobId: null,
+  closingVariantJobId: null,
   configSeeded: false,
   ai: {
     enabled: false,
@@ -305,6 +308,70 @@ function countRange(start, stop, step) {
     return 0;
   }
   return Math.floor((to - from) / stride) + 1;
+}
+
+function updateCombinationsCount(root) {
+  setText("[data-combinations-count]", compactMagnitude(parameterCombinationCount(root)), root);
+}
+
+function parameterCombinationCount(root) {
+  return indicatorCombinationCount() * riskCombinationCount(root);
+}
+
+function riskCombinationCount(root) {
+  if (state.risk_mode !== "tp_sl_grid") {
+    return 1;
+  }
+  const tpCount = state.risk_tp_enabled ? riskSideCount(root, "tp") : 1;
+  const slCount = state.risk_sl_enabled ? riskSideCount(root, "sl") : 1;
+  return Math.max(1, tpCount) * Math.max(1, slCount);
+}
+
+function riskSideCount(root, side) {
+  const start = qs(`[data-risk-field='${side}_start']`, root)?.value;
+  const stop = qs(`[data-risk-field='${side}_stop']`, root)?.value;
+  const step = qs(`[data-risk-field='${side}_step']`, root)?.value || riskGridStep(root, side);
+  return countRange(start, stop, step);
+}
+
+function riskGridLevels(root, side) {
+  const grid = state.runtimeDefaults?.runtime_defaults?.hit_times_grid || {};
+  const values = grid[`${side}_levels_pct`] || [];
+  return values.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
+}
+
+function riskGridStep(root, side) {
+  const levels = riskGridLevels(root, side);
+  if (levels.length > 1) {
+    return Number((levels[1] - levels[0]).toFixed(6));
+  }
+  return 0.5;
+}
+
+function riskGridMax(root, side) {
+  const levels = riskGridLevels(root, side);
+  if (levels.length) {
+    return levels[levels.length - 1];
+  }
+  return side === "tp" ? 50 : 25;
+}
+
+function riskGridMin(root, side) {
+  const levels = riskGridLevels(root, side);
+  if (levels.length) {
+    return levels[0];
+  }
+  return 0.5;
+}
+
+function snapRiskValue(value, { min, max, step }) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return min;
+  }
+  const clamped = Math.max(min, Math.min(max, numeric));
+  const units = Math.round((clamped - min) / step);
+  return Number((min + units * step).toFixed(6));
 }
 
 function formatDate(value) {
@@ -696,16 +763,22 @@ function buildRequestPayload(root) {
       ]).slice(0, 4);
   const risk = { mode: state.risk_mode };
   if (state.risk_mode === "tp_sl_grid") {
-    risk.tp = {
-      start_pct: Number(qs("[data-risk-field='tp_start']", root)?.value || 0.5),
-      stop_pct: Number(qs("[data-risk-field='tp_stop']", root)?.value || 1),
-      step_pct: Number(qs("[data-risk-field='tp_step']", root)?.value || 0.5),
-    };
-    risk.sl = {
-      start_pct: Number(qs("[data-risk-field='sl_start']", root)?.value || 0.5),
-      stop_pct: Number(qs("[data-risk-field='sl_stop']", root)?.value || 1),
-      step_pct: Number(qs("[data-risk-field='sl_step']", root)?.value || 0.5),
-    };
+    risk.tp = state.risk_tp_enabled
+      ? {
+          enabled: true,
+          start_pct: Number(qs("[data-risk-field='tp_start']", root)?.value || riskGridMin(root, "tp")),
+          stop_pct: Number(qs("[data-risk-field='tp_stop']", root)?.value || riskGridMax(root, "tp")),
+          step_pct: riskGridStep(root, "tp"),
+        }
+      : { enabled: false };
+    risk.sl = state.risk_sl_enabled
+      ? {
+          enabled: true,
+          start_pct: Number(qs("[data-risk-field='sl_start']", root)?.value || riskGridMin(root, "sl")),
+          stop_pct: Number(qs("[data-risk-field='sl_stop']", root)?.value || riskGridMax(root, "sl")),
+          step_pct: riskGridStep(root, "sl"),
+        }
+      : { enabled: false };
   }
 
   return {
@@ -941,6 +1014,8 @@ function seedConfigDraft(root, draft, { validateOptions = false, includeIndicato
   })) {
     const tp = draft?.risk?.tp || {};
     const sl = draft?.risk?.sl || {};
+    state.risk_tp_enabled = tp.enabled !== false;
+    state.risk_sl_enabled = sl.enabled !== false;
     const riskValues = {
       tp_start: tp.start_pct,
       tp_stop: tp.stop_pct,
@@ -984,6 +1059,7 @@ function seedRiskPanel(root, grid) {
       field.value = String(value);
     }
   });
+  normalizeRiskControls(root);
 }
 
 function updateRiskPanel(root) {
@@ -991,6 +1067,54 @@ function updateRiskPanel(root) {
   if (riskGrid) {
     riskGrid.hidden = state.risk_mode !== "tp_sl_grid";
   }
+  normalizeRiskControls(root);
+  updateCombinationsCount(root);
+}
+
+function normalizeRiskControls(root) {
+  ["tp", "sl"].forEach((side) => {
+    const enabled = side === "tp" ? state.risk_tp_enabled : state.risk_sl_enabled;
+    const min = riskGridMin(root, side);
+    const max = riskGridMax(root, side);
+    const step = riskGridStep(root, side);
+    const start = qs(`[data-risk-field='${side}_start']`, root);
+    const stop = qs(`[data-risk-field='${side}_stop']`, root);
+    const stepField = qs(`[data-risk-field='${side}_step']`, root);
+    const toggle = qs(`[data-risk-side-enabled='${side}']`, root);
+    if (toggle instanceof HTMLInputElement) {
+      toggle.checked = enabled;
+      toggle.disabled = state.risk_mode !== "tp_sl_grid" || (enabled && !otherRiskSideEnabled(side));
+    }
+    if (stepField instanceof HTMLInputElement) {
+      stepField.min = String(step);
+      stepField.max = String(step);
+      stepField.step = String(step);
+      stepField.value = String(step);
+      stepField.readOnly = true;
+      stepField.disabled = !enabled;
+    }
+    [start, stop].forEach((field) => {
+      if (!(field instanceof HTMLInputElement)) {
+        return;
+      }
+      field.min = String(min);
+      field.max = String(max);
+      field.step = String(step);
+      field.disabled = !enabled;
+    });
+    if (start instanceof HTMLInputElement) {
+      start.value = String(snapRiskValue(start.value || min, { min, max, step }));
+    }
+    if (stop instanceof HTMLInputElement) {
+      const fallback = Math.min(max, min + step);
+      const snapped = snapRiskValue(stop.value || fallback, { min, max, step });
+      stop.value = String(Math.max(Number(start?.value || min), snapped));
+    }
+  });
+}
+
+function otherRiskSideEnabled(side) {
+  return side === "tp" ? state.risk_sl_enabled : state.risk_tp_enabled;
 }
 
 function updateSizingPanel(root) {
@@ -1117,7 +1241,7 @@ function renderIndicators(root, catalog) {
           .join("")
       : `<tr><td colspan="6">${escapeHtml(t("common.unavailable"))}</td></tr>`;
   }
-  setText("[data-combinations-count]", compactMagnitude(indicatorCombinationCount()), root);
+  updateCombinationsCount(root);
 }
 
 function indicatorStateFromDraft(draft) {
@@ -1277,6 +1401,7 @@ function renderJobRow(root, row, index) {
       </td>
     </tr>
     ${selected ? renderVariantExpansion(root, row) : ""}
+    ${!selected && state.closingVariantJobId === row.job_id ? renderVariantExpansion(root, row, { closing: true }) : ""}
   `;
 }
 
@@ -1287,21 +1412,23 @@ function jobStatusText(row) {
   return row?.state || "--";
 }
 
-function renderVariantExpansion(root, row) {
+function renderVariantExpansion(root, row, { closing = false } = {}) {
   const summary = state.resultSummary?.job?.job_id === row.job_id ? state.resultSummary : null;
   const variants = (summary?.top_variants?.items || []).slice(0, variantPreviewLimit(root));
   const title = t("backtests.variants.title", { job: compactId(row.job_id) });
   const shouldAnimate = state.animateVariantJobId === row.job_id;
-  const frameClass = shouldAnimate
-    ? "backtests-variant-frame"
-    : "backtests-variant-frame backtests-variant-frame--static";
+  const frameClass = closing
+    ? "backtests-variant-frame is-open"
+    : shouldAnimate
+      ? "backtests-variant-frame"
+      : "backtests-variant-frame backtests-variant-frame--static";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
     : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : variantEmptyText(row, summary))}</td></tr>`;
   return `
     <tr class="backtests-variant-expansion">
       <td class="backtests-variant-cell" colspan="9">
-        <div class="${frameClass}" data-variant-frame ${shouldAnimate ? 'data-variant-animate="true"' : ""}>
+        <div class="${frameClass}" data-variant-frame ${shouldAnimate ? 'data-variant-animate="true"' : ""} ${closing ? 'data-variant-closing="true"' : ""}>
           <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
             <header class="backtests-variant-panel__heading">
               <strong>${escapeHtml(title)}</strong>
@@ -1360,6 +1487,26 @@ function isQualityGateEmptyResult(row, summary) {
 function queueVariantPanelAnimation(root) {
   if (variantAnimationFrame) {
     window.cancelAnimationFrame(variantAnimationFrame);
+  }
+  const closingFrame = qs("[data-variant-frame][data-variant-closing='true']", root);
+  if (closingFrame) {
+    closingFrame.style.setProperty("--backtests-variant-open-duration", `${variantOpenDurationMs(root)}ms`);
+    closingFrame.style.setProperty("--backtests-variant-height", `${closingFrame.scrollHeight}px`);
+    const close = () => {
+      closingFrame.classList.remove("is-open");
+    };
+    const finish = () => {
+      window.clearTimeout(fallbackTimer);
+      state.closingVariantJobId = null;
+      renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
+    };
+    const fallbackTimer = window.setTimeout(finish, variantOpenDurationMs(root) + 120);
+    closingFrame.addEventListener("transitionend", finish, { once: true });
+    variantAnimationFrame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(close);
+      variantAnimationFrame = null;
+    });
+    return;
   }
   const frame = qs("[data-variant-frame][data-variant-animate='true']", root);
   if (!frame) {
@@ -1656,6 +1803,32 @@ function renderJobPicker(root, rows) {
   );
 }
 
+function clearJobFilters(root) {
+  state.query = "";
+  state.job_exchange = "";
+  state.job_market_type = "";
+  state.job_symbol = "";
+  state.job_state = "";
+  state.launched_from = "";
+  state.launched_to = "";
+  state.selectedJobId = null;
+  state.selectedVariantKey = null;
+  state.closingVariantJobId = null;
+  state.resultSummary = null;
+  state.resultDetails = null;
+  qsa("[data-job-search], [data-job-symbol], [data-job-launched-from], [data-job-launched-to]", root)
+    .forEach((field) => {
+      if (field instanceof HTMLInputElement) {
+        field.value = "";
+      }
+    });
+  updateOptionSelection(root, "job_exchange", "", t("backtests.results.all"), { refresh: false });
+  updateOptionSelection(root, "job_market_type", "", t("backtests.results.all"), { refresh: false });
+  updateOptionSelection(root, "job_state", "", t("backtests.results.all"), { refresh: false });
+  renderJobPicker(root, state.jobRows);
+  refreshWorkstation(root, "manual").catch(() => {});
+}
+
 function renderResultSummary(root, summary) {
   state.resultSummary = summary;
   const selectedKey = state.selectedVariantKey || summary?.selected_variant_key;
@@ -1926,15 +2099,16 @@ function variantPreviewLimit(root) {
 
 async function openSelectedJob(root, jobId) {
   if (!jobId) {
+    state.closingVariantJobId = state.selectedJobId;
     state.selectedJobId = null;
     state.selectedVariantKey = null;
-    state.resultSummary = null;
     state.resultDetails = null;
     state.tradesPage = 1;
     state.animateVariantJobId = null;
     renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
     return;
   }
+  state.closingVariantJobId = null;
   state.selectedVariantKey = null;
   renderJobPicker(root, state.jobRows);
   try {
@@ -2559,6 +2733,13 @@ function bind(root) {
       });
       return;
     }
+    const clearFiltersButton = event.target.closest("[data-clear-job-filters]");
+    if (clearFiltersButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearJobFilters(root);
+      return;
+    }
     const cancelButton = event.target.closest("[data-cancel-job-id]");
     if (cancelButton instanceof HTMLElement) {
       event.preventDefault();
@@ -2745,6 +2926,12 @@ function bind(root) {
     state.symbolQuery = event.target.value || "";
     filterSymbols(root, state.symbolQuery);
   });
+  root.addEventListener("input", (event) => {
+    const riskInput = event.target.closest("[data-risk-field]");
+    if (riskInput instanceof HTMLInputElement) {
+      updateCombinationsCount(root);
+    }
+  });
   qs("[data-ai-prompt]", root)?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -2758,6 +2945,25 @@ function bind(root) {
     }
   });
   root.addEventListener("change", (event) => {
+    const riskToggle = event.target.closest("[data-risk-side-enabled]");
+    if (riskToggle instanceof HTMLInputElement) {
+      const side = riskToggle.dataset.riskSideEnabled || "";
+      if (side === "tp") {
+        state.risk_tp_enabled = riskToggle.checked || !state.risk_sl_enabled;
+      }
+      if (side === "sl") {
+        state.risk_sl_enabled = riskToggle.checked || !state.risk_tp_enabled;
+      }
+      normalizeRiskControls(root);
+      updateCombinationsCount(root);
+      return;
+    }
+    const riskInput = event.target.closest("[data-risk-field]");
+    if (riskInput instanceof HTMLInputElement) {
+      normalizeRiskControls(root);
+      updateCombinationsCount(root);
+      return;
+    }
     const checkbox = event.target.closest("[data-symbol-checkbox]");
     if (checkbox instanceof HTMLInputElement) {
       renderSelectedSymbols(root);
@@ -2770,7 +2976,7 @@ function bind(root) {
       const indicator = state.selectedIndicators[index];
       if (indicator) {
         indicator.window[axisInput.dataset.indicatorWindow || "start"] = Number(axisInput.value);
-        setText("[data-combinations-count]", compactMagnitude(indicatorCombinationCount()), root);
+        updateCombinationsCount(root);
       }
     }
   });

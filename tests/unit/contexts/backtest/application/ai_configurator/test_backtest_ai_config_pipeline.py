@@ -119,11 +119,13 @@ def test_pipeline_tp_sl_grid_uses_hit_times_15m_coverage() -> None:
     assert result.validated_config is not None
     assert result.validated_config["risk"]["mode"] == "tp_sl_grid"
     assert result.validated_config["risk"]["tp"] == {
+        "enabled": True,
         "start_pct": 0.5,
         "stop_pct": 1.0,
         "step_pct": 0.5,
     }
     assert result.validated_config["risk"]["sl"] == {
+        "enabled": True,
         "start_pct": 0.5,
         "stop_pct": 1.0,
         "step_pct": 0.5,

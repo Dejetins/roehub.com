@@ -191,17 +191,25 @@ class BacktestTpSlHitTimesService:
         grid_arrays: BacktestTpSlHitTimesGridArrays,
     ) -> BacktestTpSlGridResolution:
         requested_grid = _requested_grid_from_normalized(normalized_request)
-        tp_match = _resolve_level_indexes(
-            requested_pct=requested_grid.tp_levels_pct,
-            artifact_levels=grid_arrays.tp_values,
-            axis="tp",
-            tolerance=self.match_atol,
+        tp_match = (
+            _resolve_level_indexes(
+                requested_pct=requested_grid.tp_levels_pct,
+                artifact_levels=grid_arrays.tp_values,
+                axis="tp",
+                tolerance=self.match_atol,
+            )
+            if requested_grid.tp_enabled
+            else _LevelMatchResult(indexes=(), issues=())
         )
-        sl_match = _resolve_level_indexes(
-            requested_pct=requested_grid.sl_levels_pct,
-            artifact_levels=grid_arrays.sl_values,
-            axis="sl",
-            tolerance=self.match_atol,
+        sl_match = (
+            _resolve_level_indexes(
+                requested_pct=requested_grid.sl_levels_pct,
+                artifact_levels=grid_arrays.sl_values,
+                axis="sl",
+                tolerance=self.match_atol,
+            )
+            if requested_grid.sl_enabled
+            else _LevelMatchResult(indexes=(), issues=())
         )
         evidence = _grid_evidence(
             grid_arrays=grid_arrays,
@@ -254,14 +262,32 @@ class BacktestTpSlHitTimesService:
         _validate_table_shapes(grid_arrays=grid_arrays, table_arrays=table_arrays)
         tp_indexes = resolution.tp_indexes
         sl_indexes = resolution.sl_indexes
+        sentinel_index = int(grid_arrays.manifest.sentinel_index)
+        disabled_row = np.full((1, sentinel_index), sentinel_index, dtype=np.uint32)
+        if resolution.requested_grid.tp_enabled:
+            tp_values = np.ascontiguousarray(resolution.tp_values, dtype=np.float32)
+            long_tp = np.ascontiguousarray(table_arrays.long_tp[tp_indexes, :], dtype=np.uint32)
+            short_tp = np.ascontiguousarray(table_arrays.short_tp[tp_indexes, :], dtype=np.uint32)
+        else:
+            tp_values = np.ascontiguousarray(np.asarray((0.0,), dtype=np.float32))
+            long_tp = np.ascontiguousarray(disabled_row)
+            short_tp = np.ascontiguousarray(disabled_row)
+        if resolution.requested_grid.sl_enabled:
+            sl_values = np.ascontiguousarray(resolution.sl_values, dtype=np.float32)
+            long_sl = np.ascontiguousarray(table_arrays.long_sl[sl_indexes, :], dtype=np.uint32)
+            short_sl = np.ascontiguousarray(table_arrays.short_sl[sl_indexes, :], dtype=np.uint32)
+        else:
+            sl_values = np.ascontiguousarray(np.asarray((0.0,), dtype=np.float32))
+            long_sl = np.ascontiguousarray(disabled_row)
+            short_sl = np.ascontiguousarray(disabled_row)
         return BacktestTpSlHitTimesSubset(
-            tp_values=np.ascontiguousarray(resolution.tp_values, dtype=np.float32),
-            sl_values=np.ascontiguousarray(resolution.sl_values, dtype=np.float32),
-            long_tp=np.ascontiguousarray(table_arrays.long_tp[tp_indexes, :], dtype=np.uint32),
-            long_sl=np.ascontiguousarray(table_arrays.long_sl[sl_indexes, :], dtype=np.uint32),
-            short_tp=np.ascontiguousarray(table_arrays.short_tp[tp_indexes, :], dtype=np.uint32),
-            short_sl=np.ascontiguousarray(table_arrays.short_sl[sl_indexes, :], dtype=np.uint32),
-            sentinel_index=int(grid_arrays.manifest.sentinel_index),
+            tp_values=tp_values,
+            sl_values=sl_values,
+            long_tp=long_tp,
+            long_sl=long_sl,
+            short_tp=short_tp,
+            short_sl=short_sl,
+            sentinel_index=sentinel_index,
         )
 
     def _load_rejected(
@@ -309,14 +335,35 @@ def _requested_grid_from_normalized(
     if risk.get("mode") != "tp_sl_grid":
         raise _invalid_request("risk.mode", "risk.mode must be tp_sl_grid")
     return BacktestTpSlRequestedGrid(
-        tp_levels_pct=_percent_levels_from_range(risk.get("tp"), path="risk.tp"),
-        sl_levels_pct=_percent_levels_from_range(risk.get("sl"), path="risk.sl"),
+        **_requested_grid_side_payload(
+            tp_value=risk.get("tp"),
+            sl_value=risk.get("sl"),
+        ),
     )
 
 
-def _percent_levels_from_range(value: Any, *, path: str) -> tuple[float, ...]:
+def _requested_grid_side_payload(
+    *,
+    tp_value: Any,
+    sl_value: Any,
+) -> dict[str, Any]:
+    tp_enabled, tp_levels = _percent_levels_from_range(tp_value, path="risk.tp")
+    sl_enabled, sl_levels = _percent_levels_from_range(sl_value, path="risk.sl")
+    if not tp_enabled and not sl_enabled:
+        raise _invalid_request("risk", "at least one of risk.tp or risk.sl must be enabled")
+    return {
+        "tp_levels_pct": tp_levels,
+        "sl_levels_pct": sl_levels,
+        "tp_enabled": tp_enabled,
+        "sl_enabled": sl_enabled,
+    }
+
+
+def _percent_levels_from_range(value: Any, *, path: str) -> tuple[bool, tuple[float, ...]]:
     if not isinstance(value, Mapping):
         raise _invalid_request(path, f"{path} must be a normalized range mapping")
+    if value.get("enabled") is False:
+        return False, (0.0,)
     start = _positive_decimal(value.get("start_pct"), path=f"{path}.start_pct")
     stop = _positive_decimal(value.get("stop_pct"), path=f"{path}.stop_pct")
     step = _positive_decimal(value.get("step_pct"), path=f"{path}.step_pct")
@@ -329,7 +376,7 @@ def _percent_levels_from_range(value: Any, *, path: str) -> tuple[float, ...]:
         current += step
     if not levels:
         raise _invalid_request(path, f"{path} must materialize at least one level")
-    return tuple(levels)
+    return True, tuple(levels)
 
 
 def _positive_decimal(value: Any, *, path: str) -> Decimal:

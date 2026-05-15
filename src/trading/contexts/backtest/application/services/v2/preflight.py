@@ -727,8 +727,14 @@ class BacktestPreflightService:
         if mode == "none":
             return {"mode": "none"}, 0
 
-        tp_levels = _normalize_percent_levels(raw_risk.get("tp"), path="risk.tp")
-        sl_levels = _normalize_percent_levels(raw_risk.get("sl"), path="risk.sl")
+        tp_enabled, tp_levels = _normalize_risk_percent_side(raw_risk.get("tp"), path="risk.tp")
+        sl_enabled, sl_levels = _normalize_risk_percent_side(raw_risk.get("sl"), path="risk.sl")
+        if not tp_enabled and not sl_enabled:
+            raise _invalid_request(
+                path="risk",
+                code="empty",
+                message="at least one of risk.tp or risk.sl must be enabled",
+            )
         cells = len(tp_levels) * len(sl_levels)
         if cells > guardrails.max_tp_sl_cells:
             raise BacktestPreflightRejected(
@@ -749,8 +755,8 @@ class BacktestPreflightService:
         configured_sl = {
             _decimal_level(value) for value in self.runtime_config.hit_times_sl_levels_pct
         }
-        requested_tp = {_decimal_level(value) for value in tp_levels}
-        requested_sl = {_decimal_level(value) for value in sl_levels}
+        requested_tp = {_decimal_level(value) for value in tp_levels} if tp_enabled else set()
+        requested_sl = {_decimal_level(value) for value in sl_levels} if sl_enabled else set()
         if not requested_tp.issubset(configured_tp) or not requested_sl.issubset(configured_sl):
             raise BacktestPreflightRejected(
                 error_code=BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED,
@@ -766,8 +772,8 @@ class BacktestPreflightService:
         return (
             {
                 "mode": "tp_sl_grid",
-                "tp": _level_range_from_values(tp_levels),
-                "sl": _level_range_from_values(sl_levels),
+                "tp": _risk_side_payload(enabled=tp_enabled, levels=tp_levels),
+                "sl": _risk_side_payload(enabled=sl_enabled, levels=sl_levels),
             },
             cells,
         )
@@ -1140,6 +1146,22 @@ def _normalize_percent_levels(value: Any, *, path: str) -> tuple[float, ...]:
         code="invalid_type",
         message=f"{path} must be a range object or explicit level list",
     )
+
+
+def _normalize_risk_percent_side(value: Any, *, path: str) -> tuple[bool, tuple[float, ...]]:
+    if isinstance(value, Mapping):
+        enabled = _strict_bool(value.get("enabled", True), path=f"{path}.enabled")
+        if not enabled:
+            return False, (0.0,)
+    return True, _normalize_percent_levels(value, path=path)
+
+
+def _risk_side_payload(*, enabled: bool, levels: Sequence[float]) -> dict[str, Any]:
+    if not enabled:
+        return {"enabled": False}
+    payload = _level_range_from_values(levels)
+    payload["enabled"] = True
+    return payload
 
 
 def _positive_decimal(value: Any, *, path: str) -> Decimal:

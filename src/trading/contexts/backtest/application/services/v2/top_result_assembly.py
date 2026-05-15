@@ -91,6 +91,11 @@ def _build_top_variant(
     summary_metrics = dict(top_result.metrics)
     best_tp_pct = _optional_float(summary_metrics.get("best_tp_pct"))
     best_sl_pct = _optional_float(summary_metrics.get("best_sl_pct"))
+    risk_payload = _mapping_payload(normalized_request.get("risk"))
+    if _risk_side_disabled(risk_payload, "tp"):
+        best_tp_pct = None
+    if _risk_side_disabled(risk_payload, "sl"):
+        best_sl_pct = None
     canonical_params = {
         "schema_version": 1,
         "indicators": indicators,
@@ -111,7 +116,7 @@ def _build_top_variant(
     variant_hash = _canonical_sha256(canonical_params)
     readable_slug = _readable_slug(
         indicators=indicators,
-        risk_mode=str(_mapping_payload(normalized_request.get("risk")).get("mode", "none")),
+        risk_mode=str(risk_payload.get("mode", "none")),
         best_tp_pct=best_tp_pct,
         best_sl_pct=best_sl_pct,
     )
@@ -127,7 +132,7 @@ def _build_top_variant(
             }
             for item in indicators
         ],
-        "risk_mode": _mapping_payload(normalized_request.get("risk")).get("mode"),
+        "risk_mode": risk_payload.get("mode"),
         "best_tp_pct": best_tp_pct,
         "best_sl_pct": best_sl_pct,
     }
@@ -258,6 +263,10 @@ def _mapping_payload(value: Any) -> dict[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
+
+
+def _risk_side_disabled(risk: Mapping[str, Any], side: str) -> bool:
+    return _mapping_payload(risk.get(side)).get("enabled") is False
 
 
 def _optional_float(value: Any) -> float | None:
