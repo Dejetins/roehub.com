@@ -133,3 +133,16 @@ def test_lmstudio_schema_type_values_must_be_strings() -> None:
         module._assert_schema_type_values_are_strings(
             {"type": "object", "properties": {"x": {"type": ["string", "null"]}}}
         )
+
+
+def test_lmstudio_port_conflict_errors_are_not_retryable() -> None:
+    module = _load_runtime_module()
+
+    assert module._is_non_retryable_readiness_error(
+        module.RuntimeCheckError(
+            "port preflight failed: configured port 8080 is occupied by another service"
+        )
+    )
+    assert not module._is_non_retryable_readiness_error(
+        module.RuntimeCheckError("Remote end closed connection without response")
+    )

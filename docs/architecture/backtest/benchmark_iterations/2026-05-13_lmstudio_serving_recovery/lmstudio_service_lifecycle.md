@@ -68,6 +68,10 @@ The runtime smoke accepts readiness only when all checks pass:
 - `choices[0].message.content` is parsed as JSON and includes
   `accepted=true`, string `blocking_reason`, and `next_prompt_allowed=true`.
 
+The smoke uses a bounded retry loop for transient post-restart HTTP connection
+closures while LM Studio is reattaching the server/model. Port conflict and
+public-bind failures are not retried.
+
 ## Verification To Record After Deploy
 
 ```bash

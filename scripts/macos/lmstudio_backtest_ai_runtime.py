@@ -24,6 +24,8 @@ DEFAULT_MODEL_KEY = "gemma-4-e2b-it"
 DEFAULT_ARTIFACT_PATH = Path(
     "/opt/roehub/state/backtest_ai_configurator/lmstudio_runtime_smoke.json"
 )
+DEFAULT_READINESS_ATTEMPTS = 6
+DEFAULT_READINESS_RETRY_SECONDS = 2.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +166,34 @@ def _smoke_runtime(
     config_path: Path,
 ) -> dict[str, Any]:
     _require_lms(lms)
+    last_error: RuntimeCheckError | None = None
+    for attempt in range(1, DEFAULT_READINESS_ATTEMPTS + 1):
+        try:
+            result = _smoke_runtime_once(
+                lms=lms,
+                target=target,
+                config_path=config_path,
+            )
+            result["readiness_attempts"] = attempt
+            return result
+        except RuntimeCheckError as error:
+            if _is_non_retryable_readiness_error(error):
+                raise
+            last_error = error
+            if attempt >= DEFAULT_READINESS_ATTEMPTS:
+                break
+            time.sleep(DEFAULT_READINESS_RETRY_SECONDS)
+    if last_error is None:
+        raise RuntimeCheckError("LM Studio runtime smoke failed without diagnostics")
+    raise last_error
+
+
+def _smoke_runtime_once(
+    *,
+    lms: Path,
+    target: RuntimeTarget,
+    config_path: Path,
+) -> dict[str, Any]:
     port_preflight = _port_preflight(lms=lms, target=target)
     server_status = _server_status(lms)
     if not _server_running_on_target(server_status, target):
@@ -195,6 +225,15 @@ def _smoke_runtime(
         "generation": generation,
         "timestamp_unix": time.time(),
     }
+
+
+def _is_non_retryable_readiness_error(error: RuntimeCheckError) -> bool:
+    message = str(error)
+    return (
+        message.startswith("port preflight failed:")
+        or "must not bind publicly" in message
+        or "occupied by another service" in message
+    )
 
 
 def _status_runtime(
