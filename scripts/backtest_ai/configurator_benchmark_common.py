@@ -253,12 +253,12 @@ PIPELINE_READY_PROMPT_CASES: tuple[PromptCase, ...] = (
         expected_statuses=("ready",),
     ),
     PromptCase(
-        case_id="ready_btc_atr_en",
+        case_id="ready_btc_hma_en",
         mode="create",
         locale="en",
         message=(
             "Create a valid /backtests BTCUSDT configuration on 15m "
-            "with indicator_id volatility.atr."
+            "with indicator_id ma.hma."
         ),
         category="supported_ready",
         supported=True,
