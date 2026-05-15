@@ -800,6 +800,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "bindStatusBar" in backtests_js
     assert "backtests-variant-frame--static" in backtests_js
     assert '"backtests-variant-frame backtests-variant-frame--static is-open"' not in backtests_js
+    assert "jobId && jobId === state.selectedJobId" in backtests_js
+    assert "state.resultDetails = null;" in backtests_js
     assert "signedDrawdownPercent" in backtests_js
     assert "integerOrDash" in backtests_js
     assert "backtests-download-button" in backtests_js
@@ -832,6 +834,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "grid-row: 1;" in backtests_css
     assert "height: var(--rh-workarea-height);" in backtests_css
     assert ".backtests-instrument-controls" in backtests_css
+    assert "grid-template-columns: minmax(0, 1fr);" in backtests_css
     assert ".backtests-field-pair--dates" in backtests_css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in backtests_css
     assert ".backtests-icon-button" in backtests_css
