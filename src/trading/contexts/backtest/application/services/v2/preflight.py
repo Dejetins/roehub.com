@@ -27,6 +27,7 @@ from trading.contexts.backtest.application.ports.staged_runner import (
     BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ArtifactCoordinatesV2,
     artifact_market_id_from_coordinates_v2,
 )
@@ -39,7 +40,7 @@ from trading.contexts.indicators.domain.specifications.grid_param_spec import (
     GridValue,
 )
 
-SUPPORTED_BACKTEST_TIMEFRAMES_V1: tuple[str, ...] = ("15m",)
+SUPPORTED_BACKTEST_TIMEFRAMES_V1: tuple[str, ...] = ARTIFACT_MAPPING_TIMEFRAMES_V2
 BACKTEST_RISK_MODES_V1: tuple[str, ...] = ("none", "tp_sl_grid")
 BACKTEST_DIRECTION_MODES_V1: tuple[str, ...] = ("long_only", "long_short_reversal")
 BACKTEST_SIZING_MODES_V1: tuple[str, ...] = (
@@ -350,14 +351,17 @@ class BacktestPreflightService:
             raise _invalid_request(
                 path="timeframe",
                 code="required",
-                message="timeframe must be string '15m'",
+                message="timeframe must be a supported backtest timeframe string",
             )
         timeframe = raw_timeframe.strip().lower()
-        if timeframe != "15m":
+        if timeframe not in SUPPORTED_BACKTEST_TIMEFRAMES_V1:
             raise _invalid_request(
                 path="timeframe",
                 code="unsupported_timeframe",
-                message="Only timeframe '15m' is supported for backtest runtime requests",
+                message=(
+                    "timeframe must be one of "
+                    f"{', '.join(SUPPORTED_BACKTEST_TIMEFRAMES_V1)}"
+                ),
             )
         return timeframe
 

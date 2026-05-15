@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestAdmissionConfig,
     BacktestAdmissionService,
     BacktestJobExecutionResult,
@@ -55,7 +56,7 @@ def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["supported_timeframes"] == ["15m"]
+    assert payload["supported_timeframes"] == list(SUPPORTED_BACKTEST_TIMEFRAMES_V1)
     assert payload["risk_modes"] == ["none", "tp_sl_grid"]
     assert payload["direction_modes"] == ["long_only", "long_short_reversal"]
     assert "fixed_equity_pct_max_quote" in payload["sizing_modes"]
@@ -88,6 +89,25 @@ def test_post_backtest_preflight_returns_normalized_result_without_job_creation(
     assert payload["artifact_metadata"]["artifact_slot"] == "slot_a"
     assert payload["cost_estimate"]["candidate_combinations"] == 6
     assert payload["errors"] == []
+    assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),)
+
+
+@pytest.mark.parametrize("timeframe", SUPPORTED_BACKTEST_TIMEFRAMES_V1)
+def test_post_backtest_preflight_accepts_supported_artifact_timeframes(timeframe: str) -> None:
+    resolver = _FakeArtifactResolver()
+    client = _build_client(resolver=resolver)
+    request = _valid_request()
+    request["timeframe"] = timeframe
+
+    response = client.post(
+        "/backtests/preflight",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000212"},
+        json=request,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["normalized_request"]["timeframe"] == timeframe
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),)
 
 

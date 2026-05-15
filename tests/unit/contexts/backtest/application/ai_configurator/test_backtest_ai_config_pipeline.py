@@ -156,7 +156,7 @@ def test_validator_rejects_unsupported_values_and_symbols_array() -> None:
     catalog = pipeline.catalog_resolver.resolve()
     draft = _model_output(catalog=catalog)
     assert isinstance(draft["config"], dict)
-    draft["config"]["timeframe"] = "1h"
+    draft["config"]["timeframe"] = "5m"
     draft["config"]["symbols"] = ["BTCUSDT", "ETHUSDT"]
 
     outcome = pipeline.validator.validate_model_output(

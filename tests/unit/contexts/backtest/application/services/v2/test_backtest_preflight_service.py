@@ -15,6 +15,7 @@ from trading.contexts.backtest.application.services.v2 import (
     BACKTEST_ERROR_INVALID_REQUEST,
     BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE,
     BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED,
+    SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestPreflightRejected,
     BacktestPreflightService,
     BacktestRuntimeConfig,
@@ -30,7 +31,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
 
     response = service.execute().as_mapping()
 
-    assert response["supported_timeframes"] == ["15m"]
+    assert response["supported_timeframes"] == list(SUPPORTED_BACKTEST_TIMEFRAMES_V1)
     assert response["risk_modes"] == ["none", "tp_sl_grid"]
     assert response["direction_modes"] == ["long_only", "long_short_reversal"]
     assert response["sizing_modes"] == [

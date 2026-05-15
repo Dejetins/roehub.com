@@ -27,6 +27,7 @@ from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ArtifactMappingArraysV2,
     ArtifactPriceArraysV2,
     ArtifactSignalMatrixV2,
@@ -930,8 +931,9 @@ def _coordinates_from_normalized(normalized_request: Mapping[str, Any]) -> Backt
 
 def _timeframe_from_normalized(normalized_request: Mapping[str, Any]) -> str:
     timeframe = str(normalized_request.get("timeframe", "")).strip().lower()
-    if timeframe != CANONICAL_BACKTEST_TIMEFRAME_V1:
-        raise BacktestPreparePoolsRejected("prepare_pools supports timeframe '15m' only")
+    if timeframe not in ARTIFACT_MAPPING_TIMEFRAMES_V2:
+        supported = ", ".join(ARTIFACT_MAPPING_TIMEFRAMES_V2)
+        raise BacktestPreparePoolsRejected(f"prepare_pools supports timeframes: {supported}")
     return timeframe
 
 

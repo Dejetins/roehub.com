@@ -499,6 +499,9 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-backtest-menu="market_type"' in response.text
     assert 'id="backtest-instrument-market-trigger"' in response.text
     assert 'id="backtest-instrument-market-type-trigger"' in response.text
+    assert response.text.count('data-backtest-option="timeframe"') >= 10
+    for timeframe in ("15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d"):
+        assert f'data-value="{timeframe}"' in response.text
     assert 'data-sizing-field="equity_pct"' in response.text
     assert 'data-sizing-field="quote_amount"' in response.text
     assert 'data-sizing-bounds-row' in response.text

@@ -37,6 +37,9 @@ from trading.contexts.backtest.application.services.v2 import (
     notebook_compatible_prepare_pools_core_s,
     time_range_slice,
 )
+from trading.contexts.backtest.application.services.v2.prepare_pools import (
+    _timeframe_from_normalized,
+)
 
 
 def test_prepare_pools_prepares_indicator_pool_from_normalized_request(
@@ -103,6 +106,17 @@ def test_prepare_pools_prepares_indicator_pool_from_normalized_request(
         PREPARE_POOLS_CORE_STAGE_NAME,
         PREPARE_POOLS_TOTAL_STAGE_NAME,
     }
+
+
+@pytest.mark.parametrize(
+    "timeframe",
+    ("15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d"),
+)
+def test_timeframe_normalization_accepts_supported_artifact_timeframes(timeframe: str) -> None:
+    request = _normalized_request()
+    request["timeframe"] = timeframe
+
+    assert _timeframe_from_normalized(request) == timeframe
 
 
 def test_prepare_pools_core_excludes_context_open_and_slice_overhead(

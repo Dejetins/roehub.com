@@ -21,6 +21,7 @@ from tests.unit.apps.api.test_backtests_routes import (
 )
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.application.services.v2 import (
+    SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestRuntimeConfig,
     BacktestRuntimeDefaultsService,
 )
@@ -49,7 +50,9 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["runtime_defaults"]["supported_timeframes"] == ["15m"]
+    assert payload["runtime_defaults"]["supported_timeframes"] == list(
+        SUPPORTED_BACKTEST_TIMEFRAMES_V1
+    )
     assert "preset" not in payload["config_draft"]
     assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["source"] == "market_data_reference"
