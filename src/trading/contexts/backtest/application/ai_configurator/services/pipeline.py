@@ -392,7 +392,7 @@ def _contains_token(*, text: str, token: str) -> bool:
     normalized = token.strip().casefold()
     if not normalized:
         return False
-    pattern = rf"(?<![a-z0-9_.-]){re.escape(normalized)}(?![a-z0-9_.-])"
+    pattern = rf"(?<![a-z0-9_-]){re.escape(normalized)}(?![a-z0-9_-])"
     return re.search(pattern, text) is not None
 
 
