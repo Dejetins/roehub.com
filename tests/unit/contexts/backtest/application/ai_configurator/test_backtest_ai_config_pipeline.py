@@ -59,6 +59,74 @@ def test_pipeline_safe_prompt_produces_current_form_ready_config() -> None:
     assert result.llm_attempts[0].raw_model_response
 
 
+def test_pipeline_uses_catalog_fallback_for_supported_incomplete_draft() -> None:
+    incomplete = json.dumps(
+        {
+            "schema_version": 1,
+            "mode": "create",
+            "status": "config_ready",
+            "assistant_message": "Drafted.",
+            "assumptions": [],
+            "warnings": [],
+            "config": {
+                "coordinates": {
+                    "exchange": "binance",
+                    "market_type": "spot",
+                    "symbol": "BTCUSDT",
+                },
+                "timeframe": "15m",
+                "time_range": {"start": None, "end": None},
+                "indicators": [
+                    {"indicator_id": "momentum.rsi", "sources": None, "window": None}
+                ],
+                "risk": {"mode": "none"},
+                "execution": {},
+                "ranking": {"primary_metric": "total_return_pct", "direction": "desc"},
+                "top_n": 10,
+            },
+            "suggestions": [],
+        },
+        separators=(",", ":"),
+    )
+    clarification = json.dumps(
+        {
+            "schema_version": 1,
+            "mode": "repair",
+            "status": "needs_clarification",
+            "assistant_message": "Please provide the missing window.",
+            "assumptions": [],
+            "warnings": [],
+            "config": None,
+            "suggestions": [],
+        },
+        separators=(",", ":"),
+    )
+
+    result = _pipeline(
+        supported_symbols=("BTCUSDT",),
+        llm_gateway=DeterministicBacktestConfigLLMGateway(
+            scripted_generate_outputs=(incomplete,),
+            scripted_repair_outputs=(clarification,),
+        ),
+    ).run(
+        job=_job(
+            message=(
+                "Create a valid /backtests BTCUSDT config on 15m "
+                "with indicator_id momentum.rsi and keep top 10 results."
+            )
+        )
+    )
+
+    assert result.status == "ready"
+    assert result.validated_config is not None
+    assert result.validated_config["indicators"][0]["indicator_id"] == "momentum.rsi"
+    assert result.validated_config["indicators"][0]["sources"] == ["close"]
+    assert result.validated_config["top_n"] == 10
+    assert len(result.llm_attempts) == 2
+    assert result.llm_attempts[0].success is False
+    assert result.llm_attempts[1].success is False
+
+
 def test_pipeline_unsupported_indicator_needs_clarification_without_loadable_config() -> None:
     result = _pipeline().run(
         job=_job(message="Собери конфиг для BTCUSDT на Bollinger Bands")
