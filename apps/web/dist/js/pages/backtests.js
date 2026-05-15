@@ -1920,6 +1920,8 @@ async function openSelectedJob(root, jobId) {
     state.selectedJobId = null;
     state.selectedVariantKey = null;
     state.resultSummary = null;
+    state.resultDetails = null;
+    state.tradesPage = 1;
     state.animateVariantJobId = null;
     renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
     return;
@@ -1943,6 +1945,10 @@ async function openSelectedJob(root, jobId) {
 
 function selectJob(root, jobId, { delayed = true } = {}) {
   clearDelayedVariantOpen();
+  if (jobId && jobId === state.selectedJobId) {
+    openSelectedJob(root, null);
+    return;
+  }
   if (!jobId || !delayed) {
     openSelectedJob(root, jobId);
     return;
