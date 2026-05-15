@@ -67,12 +67,38 @@ _SECRET_PATTERNS = (
     re.compile(r"\b(AKIA|ASIA)[A-Z0-9]{16}\b"),
     re.compile(r"\b(password|passwd|secret|token|api[_-]?key|dsn)\s*[:=]\s*\S+", re.I),
 )
+_SECRET_EXFILTRATION_REQUEST_PATTERNS = (
+    re.compile(
+        r"\b(include|show|list|print|dump|expose|reveal|return|send)\b"
+        r".*\b(env(?:ironment)?\s*vars?|dsn|api\s*tokens?|tokens?|secrets?|"
+        r"credentials?|tailscale\s+urls?)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(env(?:ironment)?\s*vars?|dsn|api\s*tokens?|tokens?|secrets?|"
+        r"credentials?|tailscale\s+urls?)\b"
+        r".*\b(include|show|list|print|dump|expose|reveal|return|send)\b",
+        re.I,
+    ),
+)
 _HTML_OR_LINK_PATTERNS = (
     re.compile(r"<\s*/?\s*[a-z][^>]*>", re.I),
     re.compile(r"\bon[a-z]+\s*=", re.I),
     re.compile(r"\[[^\]]+\]\([^)]+\)"),
     re.compile(r"\b(?:javascript|data):", re.I),
     re.compile(r"https?://", re.I),
+)
+_OUTPUT_INJECTION_REQUEST_PATTERNS = (
+    re.compile(
+        r"\b(put|include|return|show|render|add)\b.*"
+        r"(<\s*script\b|</\s*script\s*>|javascript:|data:|on[a-z]+\s*=)",
+        re.I,
+    ),
+    re.compile(
+        r"(<\s*script\b|</\s*script\s*>|javascript:|data:|on[a-z]+\s*=).*"
+        r"\b(answer|assistant|response|message|output)\b",
+        re.I,
+    ),
 )
 _PRIVATE_LEAK_PATTERNS = (
     re.compile(r"/Users/[^\s]+"),
@@ -85,6 +111,18 @@ _PRIVATE_LEAK_PATTERNS = (
 _AUTO_ACTION_PATTERNS = (
     re.compile(r"\b(run|launch|created|started)\s+(the\s+)?backtest\b", re.I),
     re.compile(r"\bзапуст(и|ил|ила)\s+б[эе]ктест\b", re.I),
+)
+_AUTO_ACTION_REQUEST_PATTERNS = (
+    re.compile(
+        r"\b(run|launch|start|create|submit)\b.*\b(backtest|job)\b.*\b(auto(?:matically)?|now)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(run|launch|start|create|submit)\b.*\bbacktest\b.*\b(delete|cancel|remove)\b",
+        re.I,
+    ),
+    re.compile(r"\b(delete|cancel|remove)\b.*\b(failed\s+)?jobs?\b", re.I),
+    re.compile(r"\bзапуст(и|ить)\b.*\bб[эе]ктест\b.*\bавтомат", re.I),
 )
 
 
@@ -156,6 +194,12 @@ class BacktestAiInputGate:
             flags.append("control_characters")
         if _matches_any(_SECRET_PATTERNS, normalized):
             flags.append("secret_or_credential")
+        if _matches_any(_SECRET_EXFILTRATION_REQUEST_PATTERNS, normalized):
+            flags.append("secret_exfiltration_request")
+        if _matches_any(_OUTPUT_INJECTION_REQUEST_PATTERNS, normalized):
+            flags.append("output_injection_request")
+        if _matches_any(_AUTO_ACTION_REQUEST_PATTERNS, normalized):
+            flags.append("auto_run_backtest_attempt")
         if _matches_any(_JAILBREAK_PATTERNS, normalized):
             flags.append("prompt_injection")
         if _matches_any(_ENCODED_PATTERNS, normalized):
@@ -163,7 +207,13 @@ class BacktestAiInputGate:
         if not _is_domain_prompt(normalized=normalized, mode=mode):
             flags.append("off_topic")
 
-        if "secret_or_credential" in flags or "prompt_injection" in flags:
+        if (
+            "secret_or_credential" in flags
+            or "secret_exfiltration_request" in flags
+            or "output_injection_request" in flags
+            or "auto_run_backtest_attempt" in flags
+            or "prompt_injection" in flags
+        ):
             return BacktestAiInputGateResult(
                 decision="block",
                 flags=tuple(flags),

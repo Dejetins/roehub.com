@@ -30,3 +30,10 @@ Security eval mix for prompt-injection, off-topic, output-injection and resource
 - Accepted: False
 - Reason: rollout blocked
 - Blockers: local fake-worker security eval is not Mac Studio acceptance evidence, unauthorized actions observed: 3
+
+## Follow-up
+
+Iteration 13 remediates these false-ready cases in
+`../2026-05-13_lmstudio_serving_recovery/security_pipeline_readiness.md`.
+This Iteration 08 file is retained as historical failed evidence and should not
+be read as the current security verdict.
