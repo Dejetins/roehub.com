@@ -1,0 +1,209 @@
+{
+  "accepted": false,
+  "blocking_reason": "structured_output_success_count=0/10",
+  "next_prompt_allowed": false,
+  "host": "MacStudioDaniil",
+  "timestamp_utc": "2026-05-15T20:31:50Z",
+  "branch_before_docs_update": "main",
+  "configured_base_url": "http://127.0.0.1:8080",
+  "configured_port": 8080,
+  "loopback_only": true,
+  "model_key": "gemma-4-e2b-it",
+  "model_id": "gemma-4-e2b-it-4bit",
+  "context_length": 8192,
+  "parallel": 1,
+  "endpoint": "/v1/chat/completions",
+  "benchmarks_run": [],
+  "official_docs_used": [
+    "https://lmstudio.ai/docs/developer/core/server",
+    "https://lmstudio.ai/docs/developer/core/headless",
+    "https://lmstudio.ai/docs/cli/serve/server-start",
+    "https://lmstudio.ai/docs/cli/local-models/load",
+    "https://lmstudio.ai/docs/developer/rest/list",
+    "https://lmstudio.ai/docs/developer/openai-compat/structured-output"
+  ],
+  "commands": {
+    "port_preflight": "lsof -nP -iTCP:8080 -sTCP:LISTEN || true",
+    "daemon_up": "/Users/daniildegtyarev/.lmstudio/bin/lms daemon up",
+    "server_start": "/Users/daniildegtyarev/.lmstudio/bin/lms server start --port 8080 --bind 127.0.0.1",
+    "load_model": "/Users/daniildegtyarev/.lmstudio/bin/lms load gemma-4-e2b-it --identifier gemma-4-e2b-it-4bit --context-length 8192 --parallel 1",
+    "daemon_status": "/Users/daniildegtyarev/.lmstudio/bin/lms daemon status --json",
+    "server_status": "/Users/daniildegtyarev/.lmstudio/bin/lms server status --json --quiet",
+    "ps": "/Users/daniildegtyarev/.lmstudio/bin/lms ps --json",
+    "loaded_models": "GET http://127.0.0.1:8080/api/v1/models",
+    "openai_models": "GET http://127.0.0.1:8080/v1/models",
+    "chat_completions": "POST http://127.0.0.1:8080/v1/chat/completions"
+  },
+  "preflight": {
+    "port_preflight_empty": true,
+    "initial_daemon_status": {
+      "status": "not-running"
+    },
+    "initial_server_status": {
+      "running": false,
+      "port": 8080
+    },
+    "initial_api_v1_models_http_status": 0,
+    "initial_openai_v1_models_http_status": 0
+  },
+  "startup": {
+    "daemon_status_after_up": {
+      "status": "running",
+      "pid": 74849,
+      "isDaemon": false
+    },
+    "server_status_after_start": {
+      "running": true,
+      "port": 8080
+    },
+    "listener": "TCP 127.0.0.1:8080 (LISTEN)",
+    "estimate_only": {
+      "estimated_gpu_memory": "4.71 GiB",
+      "estimated_total_memory": "4.71 GiB",
+      "confidence": "LOW"
+    },
+    "load_model": {
+      "success": true,
+      "duration": "9.68s",
+      "reported_memory": "3.37 GiB"
+    }
+  },
+  "loaded_model_before_smoke": {
+    "lms_ps": {
+      "modelKey": "gemma-4-e2b-it",
+      "identifier": "gemma-4-e2b-it-4bit",
+      "path": "mlx-community/gemma-4-e2b-it-4bit",
+      "quantization": {
+        "name": "4bit",
+        "bits": 4
+      },
+      "contextLength": 8192,
+      "parallel": 1,
+      "status": "idle"
+    },
+    "api_v1_models": {
+      "http_status": 200,
+      "loaded_instance_id": "gemma-4-e2b-it-4bit",
+      "context_length": 8192,
+      "parallel": 1
+    },
+    "openai_v1_models": {
+      "http_status": 200,
+      "contains_model_id": true
+    }
+  },
+  "structured_output_smoke": {
+    "attempts_requested": 10,
+    "success_count": 0,
+    "failure_count": 10,
+    "response_format": {
+      "type": "json_schema",
+      "json_schema_name": "lmstudio_serving_gate_smoke"
+    },
+    "attempts": [
+      {
+        "attempt": 1,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "{\"error\":\"Error in iterating prediction stream: ValueError: 'type' must be a string\"}"
+      },
+      {
+        "attempt": 2,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "{\"error\":\"Error in iterating prediction stream: ValueError: 'type' must be a string\"}"
+      },
+      {
+        "attempt": 3,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "{\"error\":\"Error in iterating prediction stream: ValueError: 'type' must be a string\"}"
+      },
+      {
+        "attempt": 4,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "{\"error\":\"Error in iterating prediction stream: ValueError: 'type' must be a string\"}"
+      },
+      {
+        "attempt": 5,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "{\"error\":\"The model has crashed without additional information. (Exit code: null)\"}"
+      },
+      {
+        "attempt": 6,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "No models loaded. Please load a model in the developer page or use the 'lms load' command."
+      },
+      {
+        "attempt": 7,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "No models loaded. Please load a model in the developer page or use the 'lms load' command."
+      },
+      {
+        "attempt": 8,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "No models loaded. Please load a model in the developer page or use the 'lms load' command."
+      },
+      {
+        "attempt": 9,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "No models loaded. Please load a model in the developer page or use the 'lms load' command."
+      },
+      {
+        "attempt": 10,
+        "http_status": 400,
+        "success": false,
+        "failure_body": "No models loaded. Please load a model in the developer page or use the 'lms load' command."
+      }
+    ]
+  },
+  "post_smoke": {
+    "required_quality_gate_command": "ssh macstudio '/Users/daniildegtyarev/.lmstudio/bin/lms daemon status --json; /Users/daniildegtyarev/.lmstudio/bin/lms server status --json --quiet; /Users/daniildegtyarev/.lmstudio/bin/lms ps --json'",
+    "required_quality_gate_output": [
+      "{\"status\":\"running\",\"pid\":74849,\"isDaemon\":false}",
+      "{\"running\":true,\"port\":8080}",
+      "[]"
+    ],
+    "daemon_status": {
+      "status": "running",
+      "pid": 74849,
+      "isDaemon": false
+    },
+    "server_status": {
+      "running": true,
+      "port": 8080
+    },
+    "lms_ps": [],
+    "api_v1_models": {
+      "http_status": 200,
+      "gemma_4_e2b_it_loaded_instances": []
+    },
+    "openai_v1_models": {
+      "http_status": 200,
+      "contains_identifier_after_crash": false
+    }
+  },
+  "memory": {
+    "before": {
+      "memory_pressure_free_percentage": 96,
+      "swapins": 0,
+      "swapouts": 0
+    },
+    "after": {
+      "memory_pressure_free_percentage": 93,
+      "swapins": 0,
+      "swapouts": 0
+    }
+  },
+  "decision": {
+    "no_mlx_lm_server_runtime": true,
+    "no_benchmark_until_serving_gate_passes": true,
+    "next_required_step": "Fix or narrow LM Studio structured-output serving compatibility, reload the model, and rerun a fresh 10/10 serving gate before Roehub adapter changes or benchmark reruns."
+  }
+}

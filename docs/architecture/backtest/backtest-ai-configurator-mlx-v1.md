@@ -52,11 +52,18 @@ plain ES modules:
 
 Внешние runtime-ограничения:
 
-- `mlx_lm.server` дает OpenAI-like HTTP API и поддерживает `stream`, но
-  официальная документация `mlx-lm` предупреждает, что этот server не
-  рекомендуется выставлять как production surface, потому что в нем только
-  базовые security checks. Поэтому он допустим только как internal runtime за
-  gateway.
+- На checkpoint Iteration 10 accepted runtime для `gemma-4-e2b-it-4bit` не
+  является `mlx_lm.server`. Предыдущая попытка с `mlx_lm.server` 0.31.3
+  завершалась ошибкой `ValueError: Received 140 parameters not in model`, а
+  новая recovery-проверка должна доказывать LM Studio local API отдельно.
+- Текущий target runtime boundary: LM Studio local server на loopback
+  (`127.0.0.1`), управляемый через `/Users/daniildegtyarev/.lmstudio/bin/lms`,
+  с моделью `gemma-4-e2b-it` loaded as `gemma-4-e2b-it-4bit`.
+- `/v1/models` не является достаточным readiness gate: список OpenAI-compatible
+  models может отражать downloaded/JIT-visible модели. Для loaded-model
+  readiness нужен `lms ps --json` и/или `/api/v1/models` с
+  `loaded_instances`, а generation readiness должен подтверждаться прямым
+  `/v1/chat/completions` structured-output smoke.
 - MLX оптимизирован под Apple Silicon unified memory, что делает Mac Studio
   M2 Max 64GB подходящим MVP inference host, но concurrency/context window надо
   подтверждать benchmark evidence, а не задавать "на глаз".
@@ -126,11 +133,11 @@ Mac Studio backtest-ai-configurator-worker
         |
         | catalog subset + prompt profile + LLM Gateway
         v
-MLX Runtime Adapter
+LM Studio OpenAI-compatible Adapter
         |
         | loopback only
         v
-mlx_lm.server or custom MLX worker
+LM Studio local server
         |
         v
 JSON parse -> schema validation -> business preflight -> repair loop
@@ -385,17 +392,18 @@ class BacktestConfigLLMGateway(Protocol):
         ...
 ```
 
-Реализация MVP:
+Реализация текущего adapter boundary:
 
 ```text
 MLXOpenAICompatibleAdapter -> http://127.0.0.1:<port>/v1/chat/completions
 ```
 
-`mlx_lm.server` остается internal-only за gateway. Если позже нужен полный
-control lifecycle, adapter можно заменить на custom MLX worker без изменения API
-routes, validators и storage.
+Adapter name пока исторический. На checkpoint Iteration 10 runtime под этим
+OpenAI-compatible boundary должен быть LM Studio local server, а не
+`mlx_lm.server`. Если позже нужен другой model lifecycle, adapter можно
+заменить без изменения API routes, validators и storage.
 
-### 6) MLX Runtime на Mac Studio
+### 6) LM Studio Runtime на Mac Studio
 
 MVP host:
 
@@ -408,10 +416,10 @@ Process layout:
 ```text
 com.roehub.api
 com.roehub.backtest-ai-configurator-worker
-com.roehub.mlx-runtime.backtest-configurator
+LM Studio local server / lms daemon
 ```
 
-`mlx-runtime` bind:
+LM Studio bind:
 
 ```text
 host: 127.0.0.1
@@ -462,8 +470,22 @@ Iteration 05 implementation note:
 python -m apps.worker.backtest_ai_configurator.main.main --once
 ```
 
-Команда выше не стартует `mlx_lm.server`; модель должна быть уже поднята на
-сконфигурированном loopback `base_url`.
+Команда выше не стартует LM Studio. Перед worker smoke модель должна быть
+поднята на сконфигурированном loopback `base_url` и проверена отдельным serving
+gate:
+
+```bash
+/Users/daniildegtyarev/.lmstudio/bin/lms daemon up
+/Users/daniildegtyarev/.lmstudio/bin/lms server start --port 8080 --bind 127.0.0.1
+/Users/daniildegtyarev/.lmstudio/bin/lms load gemma-4-e2b-it \
+  --identifier gemma-4-e2b-it-4bit \
+  --context-length 8192 \
+  --parallel 1
+```
+
+Порт берется из `base_url` в
+`configs/prod/backtest_ai_configurator.yaml`; перед start обязателен
+`lsof -nP -iTCP:<configured_port> -sTCP:LISTEN || true`.
 
 ### 7) Model registry и reload
 
@@ -473,7 +495,7 @@ python -m apps.worker.backtest_ai_configurator.main.main --once
 models:
   backtest_config_default:
     provider: mlx
-    runtime: mlx_lm_server
+    runtime: lmstudio_local_server
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
     base_url: http://127.0.0.1:8081
     context_window_tokens: 8192
@@ -483,7 +505,7 @@ models:
 
   backtest_config_candidate:
     provider: mlx
-    runtime: mlx_lm_server
+    runtime: lmstudio_local_server
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/<other-model>
     base_url: http://127.0.0.1:8082
     context_window_tokens: 8192
@@ -1388,21 +1410,20 @@ Monit:
   unmonitor если restart storm
 ```
 
-Если MVP использует `mlx_lm.server`, то модельный runtime остается внутренним
-loopback service:
+Если MVP использует отдельный model server, то модельный runtime остается
+внутренним loopback service:
 
 ```text
-com.roehub.mlx-backtest-ai-configurator
+lmstudio-local-backtest-ai-configurator
   host: 127.0.0.1
   port: 8081
   public access: no
 ```
 
-Но preferred production shape - один `backtest-ai-configurator-worker`, который
-сам владеет model lifecycle через custom MLX worker. Это проще для readiness,
-drain/reload, метрик, memory accounting и аварийного reload. Разделение на
-`mlx_lm.server` допустимо для MVP, но public API и UI не должны зависеть от
-того, embedded это runtime или отдельный loopback process.
+Iteration 10 recovery shape - LM Studio local API, доказанный прямым generation
+smoke до adapter/benchmark работ. `mlx_lm.server` не является accepted runtime
+для `gemma-4-e2b-it-4bit` на этом checkpoint, пока отдельная совместимая версия
+не будет доказана новым evidence.
 
 ### Автозапуск после перезагрузки
 
@@ -2001,6 +2022,13 @@ S1, S5, S10, S50, S100 benchmark summaries recorded with:
 ## Источники
 
 - `mlx-lm` HTTP server docs: `https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md`
+- LM Studio local server docs: `https://lmstudio.ai/docs/developer/core/server`
+- LM Studio headless daemon docs: `https://lmstudio.ai/docs/developer/core/headless`
+- LM Studio CLI server start docs: `https://lmstudio.ai/docs/cli/serve/server-start`
+- LM Studio CLI model load docs: `https://lmstudio.ai/docs/cli/local-models/load`
+- LM Studio REST model list docs: `https://lmstudio.ai/docs/developer/rest/list`
+- LM Studio structured output docs:
+  `https://lmstudio.ai/docs/developer/openai-compat/structured-output`
 - Apple Open Source MLX project page: `https://opensource.apple.com/projects/mlx/`
 - OWASP LLM Prompt Injection Prevention Cheat Sheet:
   `https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html`
