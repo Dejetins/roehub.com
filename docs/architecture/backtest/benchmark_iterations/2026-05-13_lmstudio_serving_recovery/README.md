@@ -31,6 +31,10 @@ No S1/S5/S10/S50/S100 benchmark was run in this iteration.
 
 - `lmstudio_serving_gate.md`
 - `lmstudio_serving_gate.json`
+- `lmstudio_adapter_acceptance.md`
+- `lmstudio_adapter_acceptance.json`
+- `lmstudio_service_lifecycle.md`
+- `lmstudio_service_lifecycle.json`
 
 ## Runtime Decision
 

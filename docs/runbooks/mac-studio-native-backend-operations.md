@@ -57,6 +57,7 @@ Production:
 - `com.roehub.tailscale-runtime` (`launchd`, periodic one-shot reconnection/check + serve sync)
 - `com.roehub.keycloak` (`launchd`, auth provider, `127.0.0.1:18080`, ready-check `127.0.0.1:19000/health/ready`)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
+- `com.roehub.lmstudio-backtest-ai-runtime` (`launchd` one-shot ensure at login/reload; ongoing Monit `check program`, loopback LM Studio runtime from `configs/prod/backtest_ai_configurator.yaml`)
 - `com.roehub.backtest-ai-configurator-worker` (`launchd`, health `127.0.0.1:9205/health/ready`, metrics `127.0.0.1:9205/metrics`)
 - `com.roehub.backtest-job-runner` (`launchd`, metrics `127.0.0.1:9204`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
@@ -112,6 +113,8 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_job_runner
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status roehub_lmstudio_backtest_ai_runtime
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_lmstudio_backtest_ai_runtime
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status roehub_backtest_ai_configurator_worker
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_backtest_ai_configurator_worker
 ```
@@ -162,7 +165,12 @@ Keycloak auth operations (realm/client/OTP/local setup):
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
 В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc`,
 `infra/scripts/monit/roehub-backtest-job-runner.monitrc` и
-`infra/scripts/monit/roehub-backtest-ai-configurator.monitrc`.
+`infra/scripts/monit/roehub-backtest-ai-configurator.monitrc`. LM Studio runtime
+для AI configurator добавляет
+`infra/scripts/monit/roehub-lmstudio-backtest-ai-runtime.monitrc`; это
+`check program`, а не long-running process check, потому что `lms server start`
+успешно возвращает управление после запуска background server. Такой control path
+избегает launchd/Monit restart storm от one-shot команды.
 `reload_launchd_services.sh` сначала выгружает текущие static services и legacy
 numbered `backtest-job-runner.*` plists, затем bootstrap-ит static services для profile.
 Exact labels `com.roehub.backtest-job-runner` and
@@ -197,13 +205,26 @@ trades materialization cache miss/hit, parent metrics endpoint и Prometheus tar
 Backtest AI Configurator worker проверяется отдельно от public `/backtests` UI:
 
 ```bash
+launchctl print gui/$(id -u)/com.roehub.lmstudio-backtest-ai-runtime | grep -E 'state =|last exit code =|program ='
+/opt/roehub/app/scripts/macos/ensure_lmstudio_backtest_ai_runtime.sh --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json
+/opt/roehub/app/scripts/macos/smoke_lmstudio_backtest_ai_runtime.sh --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json
+/Users/daniildegtyarev/.lmstudio/bin/lms ps --json
+curl -fsS http://127.0.0.1:8080/api/v1/models
 launchctl print gui/$(id -u)/com.roehub.backtest-ai-configurator-worker | grep -E 'state =|pid =|last exit code ='
 curl -fsS http://127.0.0.1:9205/health/live
 curl -fsS http://127.0.0.1:9205/health/ready
 curl -fsS http://127.0.0.1:9205/metrics | rg 'backtest_ai_config_|process_resident_memory_bytes'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_lmstudio_backtest_ai_runtime
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_ai_configurator_worker
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_backtest_ai_configurator_worker
 ```
+
+`/health/ready` у worker не принимается как самостоятельный LM Studio readiness
+gate. Перед acceptance нужно иметь успешный LM Studio companion smoke:
+configured `base_url`/port preflight, `lms ps --json` с
+`gemma-4-e2b-it-4bit`, `/api/v1/models` loaded instance и lightweight
+`POST /v1/chat/completions` structured generation. `/v1/models` сам по себе не
+является readiness.
 
 Training export is an internal ops/admin command only; it writes scrubbed JSONL and
 must not be exposed through the public API:

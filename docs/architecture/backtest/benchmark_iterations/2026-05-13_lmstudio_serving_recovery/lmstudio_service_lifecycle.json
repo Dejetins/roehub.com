@@ -1,0 +1,23 @@
+{
+  "accepted": false,
+  "blocking_reason": "implementation pending Mac Studio deployment verification",
+  "next_prompt_allowed": false,
+  "host": "MacStudioDaniil",
+  "runtime": "lm_studio",
+  "launchd_label": "com.roehub.lmstudio-backtest-ai-runtime",
+  "monit_check": "roehub_lmstudio_backtest_ai_runtime",
+  "model_identifier": "gemma-4-e2b-it-4bit",
+  "config_source": "base_url from configs/prod/backtest_ai_configurator.yaml",
+  "readiness": {
+    "v1_models_is_not_readiness": true,
+    "requires_lms_ps_json": true,
+    "requires_api_v1_models_loaded_instance": true,
+    "requires_chat_completions_generation": true,
+    "json_schema_type_values_must_be_strings": true
+  },
+  "verification": {
+    "two_stop_start_restart_cycles": false,
+    "no_restart_storm": false,
+    "macstudio_deployed": false
+  }
+}

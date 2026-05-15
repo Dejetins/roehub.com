@@ -27,6 +27,9 @@
 - `backtest-artifact-publisher` (`127.0.0.1:9203/metrics`)
 - `backtest-job-runner` (`127.0.0.1:9204/metrics`)
 - `backtest-ai-configurator-worker` (`127.0.0.1:9205/metrics`)
+- `lmstudio-backtest-ai-runtime` контролируется Monit `check program`, а не
+  Prometheus scrape job: check выполняет port preflight, `lms ps --json`,
+  `/api/v1/models` loaded instance и structured `POST /v1/chat/completions`.
 
 ## Backtest runner target
 
@@ -50,6 +53,7 @@ execution and lazy trades cache miss/hit smoke остаются R5 acceptance и
 - `roehub_market_data_ws_worker`
 - `roehub_market_data_scheduler`
 - `roehub_backtest_job_runner`
+- `roehub_lmstudio_backtest_ai_runtime`
 - `roehub_backtest_ai_configurator_worker`
 - `roehub_backtest_artifact_publisher`
 - `roehub_keycloak` (`127.0.0.1:19000/health/ready`)
@@ -70,6 +74,8 @@ TCP probes:
 - `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
 - `node_exporter` — `brew services`
 - `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner`, `backtest-ai-configurator-worker` — user `launchd` services
+- `lmstudio-backtest-ai-runtime` — user `launchd` one-shot ensure at login/reload
+  plus Monit `check program` for ongoing recovery
 
 ## Install and bootstrap commands
 
@@ -88,10 +94,12 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/macos/launchd/com.roehub.redis-exporter.plist`
 - `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
 - `infra/macos/launchd/com.roehub.backtest-job-runner.plist`
+- `infra/macos/launchd/com.roehub.lmstudio-backtest-ai-runtime.plist`
 - `infra/macos/launchd/com.roehub.backtest-ai-configurator-worker.plist`
 - `infra/scripts/monit/launchctl_service_control.sh`
 - `infra/scripts/monit/roehub-market-data.monitrc`
 - `infra/scripts/monit/roehub-backtest-job-runner.monitrc`
+- `infra/scripts/monit/roehub-lmstudio-backtest-ai-runtime.monitrc`
 - `infra/scripts/monit/roehub-backtest-ai-configurator.monitrc`
 - `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
 - `infra/scripts/monit/roehub-keycloak.monitrc`
@@ -176,7 +184,8 @@ curl -fsS http://127.0.0.1:9205/metrics | rg 'backtest_ai_config_|process_reside
 
 ```bash
 brew services list
-launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner|backtest-ai-configurator-worker)'
+launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner|lmstudio-backtest-ai-runtime|backtest-ai-configurator-worker)'
+launchctl print gui/$(id -u)/com.roehub.lmstudio-backtest-ai-runtime | grep -E 'state =|last exit code ='
 launchctl print gui/$(id -u)/com.roehub.backtest-job-runner | grep -E 'state =|pid =|last exit code ='
 launchctl print gui/$(id -u)/com.roehub.backtest-ai-configurator-worker | grep -E 'state =|pid =|last exit code ='
 curl -I http://127.0.0.1:3000
@@ -188,7 +197,7 @@ curl -I http://127.0.0.1:9121
 curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:19000/health/ready
-/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|backtest_ai_configurator_worker|backtest_artifact)'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|lmstudio_backtest_ai_runtime|backtest_ai_configurator_worker|backtest_artifact)'
 ```
 
 ## Minimum done state
@@ -204,6 +213,9 @@ Monitoring считается в рабочем состоянии, когда �
 - `backtest-ai-configurator-worker` target `127.0.0.1:9205` в `up`, `/health/ready` и `/metrics` отвечают
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
+- Monit summary показывает `roehub_lmstudio_backtest_ai_runtime` в `Status ok`;
+  это доказывает loaded model и lightweight generation, а не только порт или
+  `/v1/models`
 - Monit summary показывает `roehub_backtest_ai_configurator_worker` в `Running/Accessible`
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)

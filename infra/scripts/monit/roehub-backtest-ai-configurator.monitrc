@@ -1,4 +1,5 @@
 check process roehub_backtest_ai_configurator_worker matching "apps.worker.backtest_ai_configurator.main.main"
+  depends on roehub_lmstudio_backtest_ai_runtime
   start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.backtest-ai-configurator-worker /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-ai-configurator-worker.plist"
   stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.backtest-ai-configurator-worker /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-ai-configurator-worker.plist"
   if failed host 127.0.0.1 port 9205 protocol http request "/health/ready" for 2 cycles then restart

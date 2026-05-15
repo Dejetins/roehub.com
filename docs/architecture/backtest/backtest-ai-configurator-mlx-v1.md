@@ -64,6 +64,13 @@ plain ES modules:
   readiness нужен `lms ps --json` и/или `/api/v1/models` с
   `loaded_instances`, а generation readiness должен подтверждаться прямым
   `/v1/chat/completions` structured-output smoke.
+- Production lifecycle для этого runtime обслуживается отдельным Mac Studio
+  control plane: launchd one-shot `com.roehub.lmstudio-backtest-ai-runtime` для
+  autostart/reload ensure и Monit `check program`
+  `roehub_lmstudio_backtest_ai_runtime` для ongoing recovery. Это намеренно не
+  long-running `launchd` KeepAlive job, потому что `lms server start` запускает
+  background server и возвращает управление; KeepAlive вокруг такой команды
+  создал бы риск restart storm.
 - LM Studio structured output принимает обычный JSON HTTP body на
   `POST /v1/chat/completions`: natural-language prompt передается как текст в
   `messages[].content`, а machine-readable contract задается через

@@ -1,0 +1,5 @@
+check program roehub_lmstudio_backtest_ai_runtime with path "/opt/roehub/app/scripts/macos/ensure_lmstudio_backtest_ai_runtime.sh --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json"
+  start program = "/opt/roehub/app/scripts/macos/ensure_lmstudio_backtest_ai_runtime.sh --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json"
+  stop program  = "/opt/roehub/app/.venv/bin/python /opt/roehub/app/scripts/macos/lmstudio_backtest_ai_runtime.py stop --config /opt/roehub/app/configs/prod/backtest_ai_configurator.yaml --json"
+  if status != 0 for 2 cycles then restart
+  if 5 restarts within 10 cycles then unmonitor
