@@ -195,7 +195,6 @@
 .backtests-risk-grid {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
   min-width: 0;
   margin: 2px 0 0;
@@ -214,6 +213,21 @@
   text-transform: uppercase;
 }
 
+.backtests-risk-side {
+  display: grid;
+  grid-template-columns: minmax(58px, 0.42fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.backtests-risk-side-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
 .backtests-risk-grid label {
   display: grid;
   gap: 3px;
@@ -221,9 +235,10 @@
 }
 
 .backtests-risk-toggle {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   min-height: 26px;
+  align-self: end;
 }
 
 .backtests-risk-toggle input {

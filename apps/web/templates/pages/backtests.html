@@ -48,7 +48,7 @@
           {% for control in [
             ("market", "backtests.config.market", "backtests.option.binance", [("binance", "backtests.option.binance")]),
             ("market_type", "backtests.config.market_type", "backtests.option.spot", [("spot", "backtests.option.spot")]),
-            ("timeframe", "backtests.config.timeframe", "backtests.option.15m", [("15m", "backtests.option.15m"), ("30m", "backtests.option.30m"), ("1h", "backtests.option.1h"), ("2h", "backtests.option.2h"), ("4h", "backtests.option.4h"), ("6h", "backtests.option.6h"), ("8h", "backtests.option.8h"), ("1d", "backtests.option.1d"), ("2d", "backtests.option.2d"), ("3d", "backtests.option.3d")]),
+            ("timeframe", "backtests.config.timeframe", "backtests.option.1h", [("15m", "backtests.option.15m"), ("30m", "backtests.option.30m"), ("1h", "backtests.option.1h"), ("2h", "backtests.option.2h"), ("4h", "backtests.option.4h"), ("6h", "backtests.option.6h"), ("8h", "backtests.option.8h"), ("1d", "backtests.option.1d"), ("2d", "backtests.option.2d"), ("3d", "backtests.option.3d")]),
             ("direction", "backtests.config.direction", "backtests.option.long_short", [("long_short_reversal", "backtests.option.long_short"), ("long_only", "backtests.option.long_only")]),
             ("risk_mode", "backtests.config.risk_mode", "backtests.option.no_risk", [("none", "backtests.option.no_risk"), ("tp_sl_grid", "backtests.option.tp_sl_grid")]),
             ("sizing_mode", "backtests.config.sizing_mode", "backtests.option.fixed_equity_pct", [("all_in", "backtests.option.all_in"), ("fixed_quote", "backtests.option.fixed_quote"), ("fixed_equity_pct", "backtests.option.fixed_equity_pct"), ("fixed_equity_pct_min_quote", "backtests.option.fixed_equity_pct_min_quote"), ("fixed_equity_pct_max_quote", "backtests.option.fixed_equity_pct_max_quote")]),
@@ -88,21 +88,24 @@
             {% if control[0] == "risk_mode" %}
               <fieldset class="backtests-risk-grid" data-risk-grid hidden>
                 <legend>{{ t("backtests.risk.title") }}</legend>
-                <label class="backtests-risk-toggle">
-                  <input type="checkbox" data-risk-side-enabled="tp" checked>
-                  <span>{{ t("backtests.risk.tp_enabled") }}</span>
-                </label>
-                {% for key, label_key in [("tp_start", "backtests.risk.tp_from"), ("tp_stop", "backtests.risk.tp_to"), ("tp_step", "backtests.risk.tp_step"), ("sl_start", "backtests.risk.sl_from"), ("sl_stop", "backtests.risk.sl_to"), ("sl_step", "backtests.risk.sl_step")] %}
-                  {% if key == "sl_start" %}
+                {% for side, enabled_key, fields in [
+                  ("tp", "backtests.risk.tp_enabled", [("tp_start", "backtests.risk.tp_from"), ("tp_stop", "backtests.risk.tp_to"), ("tp_step", "backtests.risk.tp_step")]),
+                  ("sl", "backtests.risk.sl_enabled", [("sl_start", "backtests.risk.sl_from"), ("sl_stop", "backtests.risk.sl_to"), ("sl_step", "backtests.risk.sl_step")])
+                ] %}
+                  <div class="backtests-risk-side" data-risk-side="{{ side }}">
                     <label class="backtests-risk-toggle">
-                      <input type="checkbox" data-risk-side-enabled="sl" checked>
-                      <span>{{ t("backtests.risk.sl_enabled") }}</span>
+                      <input type="checkbox" data-risk-side-enabled="{{ side }}" checked>
+                      <span>{{ t(enabled_key) }}</span>
                     </label>
-                  {% endif %}
-                  <label>
-                    <span>{{ t(label_key) }}</span>
-                    <input class="backtests-input" type="number" min="0.5" step="0.5" data-risk-field="{{ key }}" aria-label="{{ t(label_key) }}">
-                  </label>
+                    <div class="backtests-risk-side-fields">
+                      {% for key, label_key in fields %}
+                        <label>
+                          <span>{{ t(label_key) }}</span>
+                          <input class="backtests-input" type="number" min="0.5" step="0.5" data-risk-field="{{ key }}" aria-label="{{ t(label_key) }}">
+                        </label>
+                      {% endfor %}
+                    </div>
+                  </div>
                 {% endfor %}
               </fieldset>
             {% endif %}

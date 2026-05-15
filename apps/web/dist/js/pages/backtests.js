@@ -10,6 +10,10 @@ const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 5;
 const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 50;
+const DEFAULT_TP_START_PCT = 5;
+const DEFAULT_TP_STOP_PCT = 30;
+const DEFAULT_SL_START_PCT = 5;
+const DEFAULT_SL_STOP_PCT = 15;
 const REFRESH_PRESETS = {
   off: 0,
   "10s": 10000,
@@ -38,7 +42,7 @@ const state = {
   market: "binance",
   market_type: "spot",
   symbol: "BTCUSDT",
-  timeframe: "15m",
+  timeframe: "1h",
   direction: "long_short_reversal",
   risk_mode: "none",
   risk_tp_enabled: true,
@@ -1043,15 +1047,29 @@ function seedConfigDraft(root, draft, { validateOptions = false, includeIndicato
 }
 
 function seedRiskPanel(root, grid) {
-  const tp = grid.tp_levels_pct || [];
-  const sl = grid.sl_levels_pct || [];
   const defaults = {
-    tp_start: tp[0] ?? 0.5,
-    tp_stop: tp[Math.min(1, Math.max(0, tp.length - 1))] ?? tp[0] ?? 1,
-    tp_step: tp.length > 1 ? Number(tp[1]) - Number(tp[0]) : tp[0] ?? 0.5,
-    sl_start: sl[0] ?? 0.5,
-    sl_stop: sl[Math.min(1, Math.max(0, sl.length - 1))] ?? sl[0] ?? 1,
-    sl_step: sl.length > 1 ? Number(sl[1]) - Number(sl[0]) : sl[0] ?? 0.5,
+    tp_start: snapRiskValue(DEFAULT_TP_START_PCT, {
+      min: riskGridMin(root, "tp"),
+      max: riskGridMax(root, "tp"),
+      step: riskGridStep(root, "tp"),
+    }),
+    tp_stop: snapRiskValue(DEFAULT_TP_STOP_PCT, {
+      min: riskGridMin(root, "tp"),
+      max: riskGridMax(root, "tp"),
+      step: riskGridStep(root, "tp"),
+    }),
+    tp_step: riskGridStep(root, "tp"),
+    sl_start: snapRiskValue(DEFAULT_SL_START_PCT, {
+      min: riskGridMin(root, "sl"),
+      max: riskGridMax(root, "sl"),
+      step: riskGridStep(root, "sl"),
+    }),
+    sl_stop: snapRiskValue(DEFAULT_SL_STOP_PCT, {
+      min: riskGridMin(root, "sl"),
+      max: riskGridMax(root, "sl"),
+      step: riskGridStep(root, "sl"),
+    }),
+    sl_step: riskGridStep(root, "sl"),
   };
   Object.entries(defaults).forEach(([key, value]) => {
     const field = qs(`[data-risk-field='${key}']`, root);
@@ -1758,26 +1776,87 @@ function renderResultCanvases(root) {
 
 function formatVariantParams(variant) {
   const params = variant?.readable_params || variant?.canonical_variant_params || {};
-  const entries = Object.entries(params)
-    .filter(([, value]) => value !== null && value !== undefined && value !== "")
-    .slice(0, 8)
-    .map(([key, value]) => `${key}: ${formatParamValue(value)}`);
-  if (variant?.best_tp_pct !== null && variant?.best_tp_pct !== undefined) {
-    entries.push(`tp: ${variant.best_tp_pct}`);
+  const entries = [];
+  const bestTp = valueOrFallback(variant?.best_tp_pct, params.best_tp_pct);
+  const bestSl = valueOrFallback(variant?.best_sl_pct, params.best_sl_pct);
+  if (bestTp !== null && bestTp !== undefined) {
+    entries.push(`TP ${formatPercentLevel(bestTp)}`);
   }
-  if (variant?.best_sl_pct !== null && variant?.best_sl_pct !== undefined) {
-    entries.push(`sl: ${variant.best_sl_pct}`);
+  if (bestSl !== null && bestSl !== undefined) {
+    entries.push(`SL ${formatPercentLevel(bestSl)}`);
   }
-  return entries.join(" · ") || "--";
+  const indicators = formatIndicatorParams(params.indicators);
+  if (indicators) {
+    entries.push(`Indicators ${indicators}`);
+  }
+  Object.entries(params)
+    .filter(([key, value]) => (
+      !["best_tp_pct", "best_sl_pct", "indicators", "slug"].includes(key) &&
+      value !== null &&
+      value !== undefined &&
+      value !== ""
+    ))
+    .slice(0, 4)
+    .forEach(([key, value]) => {
+      entries.push(`${key}: ${formatParamValue(value)}`);
+    });
+  if (!entries.length) {
+    return "--";
+  }
+  return entries.join(" · ");
+}
+
+function formatPercentLevel(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+  return `${number.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1")}%`;
+}
+
+function formatIndicatorParams(value) {
+  if (!Array.isArray(value) || !value.length) {
+    return "";
+  }
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return String(item || "");
+      }
+      const label = labelForId(item.indicator_id || item.id || "indicator");
+      const source = item.source ? String(item.source) : "";
+      const windowValue = formatIndicatorWindow(item.window);
+      return [label, source, windowValue].filter(Boolean).join(" ");
+    })
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function formatIndicatorWindow(value) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  if (value && typeof value === "object") {
+    const start = value.start ?? value.from;
+    const stop = value.stop ?? value.to ?? value.stop_incl;
+    const step = value.step;
+    if (start !== undefined && stop !== undefined && step !== undefined) {
+      return `w${start}-${stop}/${step}`;
+    }
+    if (start !== undefined && stop !== undefined) {
+      return `w${start}-${stop}`;
+    }
+  }
+  return `w${value}`;
 }
 
 function formatParamValue(value) {
   if (Array.isArray(value)) {
-    return value.join("/");
+    return value.map(formatParamValue).join("/");
   }
   if (value && typeof value === "object") {
     return Object.entries(value)
-      .map(([key, nested]) => `${key}=${nested}`)
+      .map(([key, nested]) => `${key}=${formatParamValue(nested)}`)
       .join(",");
   }
   return String(value);
@@ -2191,7 +2270,7 @@ async function refreshWorkstation(root, reason = "manual", { append = false } = 
         append,
         preserveLoadedRows: !append && reason === "auto" && state.jobRows.length > 0,
       });
-      if (state.selectedJobId && reason !== "initial") {
+      if (state.selectedJobId && reason !== "initial" && reason !== "auto") {
         loadSelectedResult(root).catch(() => {});
       }
       return data;
@@ -2709,6 +2788,11 @@ function bind(root) {
       event.preventDefault();
       event.stopPropagation();
       applyAiConfiguration(root, aiLoad.dataset.aiLoadConfiguration || "").catch(() => {});
+      return;
+    }
+    const riskToggle = event.target.closest(".backtests-risk-toggle");
+    if (riskToggle instanceof HTMLElement) {
+      event.stopPropagation();
       return;
     }
     const option = event.target.closest("[data-backtest-option]");

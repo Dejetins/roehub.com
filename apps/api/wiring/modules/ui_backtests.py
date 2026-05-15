@@ -575,9 +575,11 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
     ranking_default = dict(runtime_defaults.get("ranking_default") or {})
     execution_defaults = dict(runtime_defaults.get("execution_defaults") or {})
     default_end = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    supported_timeframes = runtime_defaults.get("supported_timeframes")
+    direction_modes = runtime_defaults.get("direction_modes")
     return BacktestConfigDraftResponse(
         coordinates={"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"},
-        timeframe=_first(runtime_defaults.get("supported_timeframes"), default="15m"),
+        timeframe=_preferred(supported_timeframes, preferred="1h", default="15m"),
         time_range={"start": "2023-01-01T00:00:00Z", "end": f"{default_end}T00:00:00Z"},
         indicators=_default_indicator_grid(
             indicator_ids=indicator_ids,
@@ -586,8 +588,9 @@ def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfi
         ),
         risk={"mode": _first(runtime_defaults.get("risk_modes"), default="none")},
         execution={
-            "direction_mode": _first(
-                runtime_defaults.get("direction_modes"),
+            "direction_mode": _preferred(
+                direction_modes,
+                preferred="long_short_reversal",
                 default="long_short_reversal",
             ),
             "fee_rate": execution_defaults.get("fee_rate", 0.00075),
@@ -903,6 +906,16 @@ def _first(value: Any, *, default: str) -> str:
         return str(value[0])
     if isinstance(value, tuple) and value:
         return str(value[0])
+    return default
+
+
+def _preferred(value: Any, *, preferred: str, default: str) -> str:
+    if isinstance(value, (list, tuple)):
+        normalized = [str(item) for item in value if item]
+        if preferred in normalized:
+            return preferred
+        if normalized:
+            return normalized[0]
     return default
 
 

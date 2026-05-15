@@ -494,6 +494,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-variant-preview-limit="5"' in response.text
     assert "data-indicator-add-menu" in response.text
     assert "data-risk-grid" in response.text
+    assert "backtests-risk-side-fields" in response.text
     assert 'data-risk-side-enabled="tp"' in response.text
     assert 'data-risk-side-enabled="sl"' in response.text
     assert "data-clear-job-filters" in response.text
@@ -503,6 +504,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'id="backtest-instrument-market-trigger"' in response.text
     assert 'id="backtest-instrument-market-type-trigger"' in response.text
     assert response.text.count('data-backtest-option="timeframe"') >= 10
+    assert 'data-current-value="timeframe">1h</span>' in response.text
     for timeframe in ("15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d"):
         assert f'data-value="{timeframe}"' in response.text
     assert 'data-sizing-field="equity_pct"' in response.text
@@ -806,6 +808,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "riskCombinationCount(root)" in backtests_js
     assert "data-clear-job-filters" in backtests_js
     assert "data-variant-closing" in backtests_js
+    assert "DEFAULT_TP_START_PCT = 5" in backtests_js
+    assert "formatIndicatorParams" in backtests_js
+    assert 'reason !== "auto"' in backtests_js
     assert "trashIcon(t(\"backtests.actions.delete\"))" in backtests_js
     assert "&times;" not in backtests_js
     assert "bindStatusBar" in backtests_js
