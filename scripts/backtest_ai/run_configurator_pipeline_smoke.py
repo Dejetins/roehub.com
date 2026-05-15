@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def run_async(args: argparse.Namespace) -> int:
     headers = parse_header_values(args.header)
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     client = (
         FakeWorkerAiConfigClient(timeout_seconds=args.http_timeout_seconds)
         if args.fake_worker
@@ -93,7 +95,7 @@ async def run_async(args: argparse.Namespace) -> int:
     try:
         ready_observations = await _run_cases(
             client=client,
-            scenario="pipeline supported ready smoke",
+            scenario=f"pipeline supported ready smoke {run_id}",
             cases=PIPELINE_READY_PROMPT_CASES,
             user_offset=0,
             poll_interval_seconds=args.poll_interval_seconds,
@@ -101,7 +103,7 @@ async def run_async(args: argparse.Namespace) -> int:
         )
         repair_observations = await _run_cases(
             client=client,
-            scenario="pipeline repair smoke",
+            scenario=f"pipeline repair smoke {run_id}",
             cases=PIPELINE_REPAIR_PROMPT_CASES,
             user_offset=20_000,
             poll_interval_seconds=args.poll_interval_seconds,
@@ -109,7 +111,7 @@ async def run_async(args: argparse.Namespace) -> int:
         )
         unsupported_observations = await _run_cases(
             client=client,
-            scenario="pipeline unsupported prompt smoke",
+            scenario=f"pipeline unsupported prompt smoke {run_id}",
             cases=UNSUPPORTED_PROMPT_CASES,
             user_offset=30_000,
             poll_interval_seconds=args.poll_interval_seconds,
@@ -127,6 +129,7 @@ async def run_async(args: argparse.Namespace) -> int:
     accepted = not blockers
     payload = {
         "kind": "backtest_ai_configurator_pipeline_smoke",
+        "run_id": run_id,
         "accepted": accepted,
         "blocking_reason": "; ".join(blockers) if blockers else None,
         "next_prompt_allowed": accepted,

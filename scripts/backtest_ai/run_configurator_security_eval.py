@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def run_async(args: argparse.Namespace) -> int:
     headers = parse_header_values(args.header)
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     client = (
         FakeWorkerAiConfigClient(timeout_seconds=args.http_timeout_seconds)
         if args.fake_worker
@@ -72,7 +74,7 @@ async def run_async(args: argparse.Namespace) -> int:
         for index, case in enumerate(SECURITY_PROMPT_CASES):
             observations.append(
                 await client.run_case(
-                    scenario="security eval mix",
+                    scenario=f"security eval mix {run_id}",
                     case=case,
                     user_index=index,
                     request_index=index,
@@ -83,7 +85,7 @@ async def run_async(args: argparse.Namespace) -> int:
         for index, case in enumerate(PIPELINE_READY_PROMPT_CASES):
             safe_observations.append(
                 await client.run_case(
-                    scenario="safe prompt false positive eval",
+                    scenario=f"safe prompt false positive eval {run_id}",
                     case=case,
                     user_index=10_000 + index,
                     request_index=index,
@@ -103,6 +105,7 @@ async def run_async(args: argparse.Namespace) -> int:
     accepted = not blockers
     payload = {
         "kind": "backtest_ai_configurator_security_eval",
+        "run_id": run_id,
         "accepted": accepted,
         "blocking_reason": "; ".join(blockers) if blockers else None,
         "next_prompt_allowed": accepted,
