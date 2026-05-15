@@ -186,7 +186,7 @@ src/trading/contexts/backtest/application/ai_configurator/*
         v
 adapters/outbound/*
         +--> persistence/postgres
-        +--> llm/mlx_openai_compatible
+        +--> llm/lmstudio_openai_compatible
         +--> catalog/runtime_defaults
 ```
 
@@ -403,13 +403,14 @@ class BacktestConfigLLMGateway(Protocol):
 Реализация текущего adapter boundary:
 
 ```text
-MLXOpenAICompatibleAdapter -> http://127.0.0.1:<port>/v1/chat/completions
+LMStudioOpenAICompatibleAdapter -> http://127.0.0.1:<port>/v1/chat/completions
 ```
 
-Adapter name пока исторический. На checkpoint Iteration 10 runtime под этим
-OpenAI-compatible boundary должен быть LM Studio local server, а не
-`mlx_lm.server`. Если позже нужен другой model lifecycle, adapter можно
-заменить без изменения API routes, validators и storage.
+Adapter boundary now names the accepted runtime explicitly. On checkpoint
+Iteration 11 the current production runtime is LM Studio local server, not
+`mlx_lm.server`. If another model lifecycle is needed later, the adapter can be
+replaced behind the same `BacktestConfigLLMGateway` port without changing API
+routes, validators or storage.
 
 ### 6) LM Studio Runtime на Mac Studio
 
@@ -449,6 +450,7 @@ backtest_ai_configurator:
     job_timeout_seconds: 90
     repair_attempts: 1
   model:
+    runtime: lm_studio
     model_id: gemma-4-e2b-it-4bit
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
     base_url: http://127.0.0.1:8080
@@ -467,15 +469,23 @@ backtest_ai_configurator:
 Machine-specific `model_path` можно держать в prod/local config или env override,
 но schema должна поддерживать простой folder path.
 
-Iteration 05 implementation note:
+Iteration 11 implementation note:
 
-- `MLXOpenAICompatibleAdapter` вызывает `base_url + /v1/chat/completions`;
+- `LMStudioOpenAICompatibleAdapter` вызывает `base_url + /v1/chat/completions`;
 - `base_url` валидируется как loopback-only (`127.0.0.1`, `localhost`, `::1`);
+- request body uses OpenAI-compatible chat messages with separate `system` and
+  `user` roles;
+- structured output is required through
+  `response_format: {"type":"json_schema","json_schema":...}`;
+- the JSON Schema sent to LM Studio must use string `type` values only; do not
+  send nullable unions such as `type: ["string", "null"]`;
+- response handling parses HTTP JSON first, then parses
+  `choices[0].message.content` as the model JSON string;
 - `apps.worker.backtest_ai_configurator` запускает claim loop без launchd/Monit;
 - локальный smoke при наличии runtime/model:
 
 ```bash
-python -m apps.worker.backtest_ai_configurator.main.main --once
+uv run python scripts/backtest_ai/run_lmstudio_adapter_smoke.py --attempts 10
 ```
 
 Команда выше не стартует LM Studio. Перед worker smoke модель должна быть
@@ -545,7 +555,7 @@ that this path works; require 10/10 direct structured-output attempts and
 models:
   backtest_config_default:
     provider: mlx
-    runtime: lmstudio_local_server
+    runtime: lm_studio
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
     base_url: http://127.0.0.1:8081
     context_window_tokens: 8192
@@ -555,7 +565,7 @@ models:
 
   backtest_config_candidate:
     provider: mlx
-    runtime: lmstudio_local_server
+    runtime: lm_studio
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/<other-model>
     base_url: http://127.0.0.1:8082
     context_window_tokens: 8192
@@ -1809,15 +1819,15 @@ inference host.
 - Добавить schema validator и business validation через `BacktestPreflightService`.
 - Tests: unsupported symbol/indicator/timeframe, correction/clarification.
 
-### Stage 4 - MLX runtime adapter
+### Stage 4 - LM Studio runtime adapter
 
 - Добавить model registry config.
-- Добавить `MLXOpenAICompatibleAdapter`.
+- Добавить `LMStudioOpenAICompatibleAdapter`.
 - Добавить worker process `backtest-ai-configurator-worker`.
 - Добавить launchd target `com.roehub.backtest-ai-configurator-worker`.
-- Если используется split MVP runtime, добавить internal launchd target для
-  `mlx_lm.server`; если используется custom MLX worker, model lifecycle остается
-  внутри worker process.
+- LM Studio lifecycle stays outside the worker for this checkpoint; do not use
+  `mlx_lm.server` as the production runtime until a separate compatibility gate
+  accepts it.
 - Smoke: one prompt -> valid config on Mac Studio.
 
 ### Stage 5 - Prompt profiles + repair loop

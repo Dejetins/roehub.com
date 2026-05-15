@@ -25,7 +25,7 @@ from .config import (
     resolve_backtest_artifacts_config_path,
 )
 from .defaults import YamlBacktestGridDefaultsProvider
-from .llm import DeterministicBacktestConfigLLMGateway, MLXOpenAICompatibleAdapter
+from .llm import DeterministicBacktestConfigLLMGateway, LMStudioOpenAICompatibleAdapter
 from .persistence import (
     BacktestPostgresGateway,
     PostgresBacktestAiConfigRepository,
@@ -57,7 +57,7 @@ __all__ = [
     "DeterministicBacktestConfigLLMGateway",
     "FilesystemBacktestArtifactContextResolver",
     "LocalFileBacktestLazyTradesCache",
-    "MLXOpenAICompatibleAdapter",
+    "LMStudioOpenAICompatibleAdapter",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",

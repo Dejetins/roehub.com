@@ -163,7 +163,7 @@ def test_worker_metrics_expose_required_names_after_fake_job() -> None:
     metrics.set_model_metadata(
         model_id="gemma-4-e2b-it-4bit",
         loaded=True,
-        runtime="mlx",
+        runtime="lm_studio",
         quantization="4bit",
     )
     payload = generate_latest(metrics.registry).decode("utf-8")

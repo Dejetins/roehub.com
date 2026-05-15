@@ -1,11 +1,11 @@
 from .deterministic import DeterministicBacktestConfigLLMGateway
-from .mlx_openai_compatible import (
-    MLXOpenAICompatibleAdapter,
-    MLXOpenAICompatibleAdapterError,
+from .lmstudio_openai_compatible import (
+    LMStudioOpenAICompatibleAdapter,
+    LMStudioOpenAICompatibleAdapterError,
 )
 
 __all__ = [
     "DeterministicBacktestConfigLLMGateway",
-    "MLXOpenAICompatibleAdapter",
-    "MLXOpenAICompatibleAdapterError",
+    "LMStudioOpenAICompatibleAdapter",
+    "LMStudioOpenAICompatibleAdapterError",
 ]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from ipaddress import ip_address
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 from urllib.parse import urlparse
 
 import yaml
@@ -17,6 +17,7 @@ _ENV_NAME_KEY = "ROEHUB_ENV"
 _ALLOWED_ENVS = ("dev", "prod", "test")
 _CONFIG_PATH_KEY = "ROEHUB_BACKTEST_AI_CONFIGURATOR_CONFIG"
 _CONFIG_VERSION = 1
+_DEFAULT_RUNTIME = "lm_studio"
 _DEFAULT_MODEL_ID = "gemma-4-e2b-it-4bit"
 _DEFAULT_MODEL_PATH = (
     "/Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit"
@@ -52,6 +53,7 @@ class BacktestAiConfiguratorQueueRuntimeConfig:
 
 @dataclass(frozen=True, slots=True)
 class BacktestAiConfiguratorModelRuntimeConfig:
+    runtime: Literal["lm_studio"]
     model_id: str
     model_path: Path
     context_window_tokens: int
@@ -64,6 +66,8 @@ class BacktestAiConfiguratorModelRuntimeConfig:
     active_generations: int = 1
 
     def __post_init__(self) -> None:
+        if self.runtime != "lm_studio":
+            raise ValueError("runtime must be lm_studio")
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
         if not str(self.model_path).strip():
@@ -164,6 +168,7 @@ def _queue_config(payload: Mapping[str, Any]) -> BacktestAiConfiguratorQueueRunt
 
 def _model_config(payload: Mapping[str, Any]) -> BacktestAiConfiguratorModelRuntimeConfig:
     return BacktestAiConfiguratorModelRuntimeConfig(
+        runtime=_runtime(payload),
         model_id=_optional_str(payload, "model_id", default=_DEFAULT_MODEL_ID),
         model_path=Path(_optional_str(payload, "model_path", default=_DEFAULT_MODEL_PATH)),
         context_window_tokens=_optional_int(
@@ -247,6 +252,13 @@ def _optional_str(payload: Mapping[str, Any], key: str, *, default: str) -> str:
             f"backtest AI configurator config field {key!r} must be non-empty string"
         )
     return value.strip()
+
+
+def _runtime(payload: Mapping[str, Any]) -> Literal["lm_studio"]:
+    value = _optional_str(payload, "runtime", default=_DEFAULT_RUNTIME)
+    if value != "lm_studio":
+        raise ValueError("backtest AI configurator config field 'runtime' must be lm_studio")
+    return "lm_studio"
 
 
 def _validate_loopback_base_url(value: str) -> None:

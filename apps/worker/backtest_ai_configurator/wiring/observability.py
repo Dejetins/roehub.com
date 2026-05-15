@@ -283,7 +283,7 @@ class BacktestAiConfiguratorMetrics:
         *,
         model_id: str,
         loaded: bool,
-        runtime: str = "mlx",
+        runtime: str = "lm_studio",
         quantization: str = "unknown",
     ) -> None:
         self.model_loaded.labels(model_id=model_id).set(1 if loaded else 0)

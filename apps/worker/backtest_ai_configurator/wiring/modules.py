@@ -20,7 +20,7 @@ from apps.worker.backtest_ai_configurator.wiring.observability import (
     start_backtest_ai_configurator_http_server,
 )
 from trading.contexts.backtest.adapters.outbound import (
-    MLXOpenAICompatibleAdapter,
+    LMStudioOpenAICompatibleAdapter,
     PsycopgBacktestPostgresGateway,
     load_backtest_ai_configurator_runtime_config,
     resolve_backtest_ai_configurator_config_path,
@@ -199,7 +199,7 @@ def build_backtest_ai_configurator_worker_app(
     )
     ai_config_path = resolve_backtest_ai_configurator_config_path(environ=environ)
     ai_runtime_config = load_backtest_ai_configurator_runtime_config(ai_config_path)
-    adapter = MLXOpenAICompatibleAdapter(config=ai_runtime_config.model)
+    adapter = LMStudioOpenAICompatibleAdapter(config=ai_runtime_config.model)
     use_cases = build_backtest_ai_configurator_use_cases(
         environ=environ,
         llm_gateway=adapter,
@@ -210,7 +210,7 @@ def build_backtest_ai_configurator_worker_app(
     metrics.set_model_metadata(
         model_id=ai_runtime_config.model.model_id,
         loaded=True,
-        runtime="mlx",
+        runtime=ai_runtime_config.model.runtime,
         quantization=_quantization_from_model_path(ai_runtime_config.model.model_path),
     )
     postgres_gateway = PsycopgBacktestPostgresGateway(
