@@ -44,6 +44,14 @@ _BASE_POLICY = "\n".join(
             "Если valid config невозможен, верни status=needs_clarification и "
             "объясни, что уточнить."
         ),
+        (
+            "Если пользователь явно указал supported symbol/timeframe/indicator, не проси "
+            "уточнить эти поля: собери config_ready с defaults из catalog."
+        ),
+        (
+            "Common indicator aliases: RSI=momentum.rsi, ATR=volatility.atr, "
+            "EMA=ma.ema, SMA=ma.sma, DEMA=ma.dema."
+        ),
         "Верни только JSON по заданной schema. Никакого Markdown.",
         "Пользовательский язык ответа: русский или английский в соответствии с request locale.",
         (
@@ -163,6 +171,7 @@ def compact_allowed_catalog(catalog: BacktestAiAllowedCatalog) -> dict[str, Any]
         "indicators": [
             {
                 "indicator_id": item.indicator_id,
+                "aliases": _indicator_aliases(item.indicator_id),
                 "sources": list(item.sources),
                 "param_specs": dict(item.param_specs),
             }
@@ -199,6 +208,17 @@ def _build_envelope(
     if repair_context is not None:
         blocks.append(("UNTRUSTED_REPAIR_CONTEXT", _canonical_json(repair_context)))
     blocks.append(("OUTPUT_JSON_SCHEMA", _canonical_json(output_schema)))
+    blocks.append(
+        (
+            "OUTPUT_REQUIREMENTS",
+            (
+                "For status=config_ready, config must include coordinates, timeframe, "
+                "time_range, indicators, risk, execution, ranking, and top_n. "
+                "Use one coordinates.symbol only. Do not include strategy, scripts, "
+                "HTML, API calls, or auto-run actions."
+            ),
+        )
+    )
     prompt_text = "\n\n".join(f"<{name}>\n{body}\n</{name}>" for name, body in blocks)
     return BacktestAiPromptEnvelope(
         profile=profile,
@@ -223,6 +243,15 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, tuple | list):
         return [_json_ready(item) for item in value]
     return value
+
+
+def _indicator_aliases(indicator_id: str) -> list[str]:
+    tail = indicator_id.rsplit(".", maxsplit=1)[-1]
+    aliases = [tail]
+    upper = tail.upper()
+    if upper != tail:
+        aliases.append(upper)
+    return aliases
 
 
 def _sha256_text(value: str) -> str:

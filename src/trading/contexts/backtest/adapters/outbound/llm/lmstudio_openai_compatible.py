@@ -236,6 +236,19 @@ def _chat_messages(
                 ),
             )
         )
+    blocks.append(("OUTPUT_JSON_SCHEMA", _canonical_json(request.output_schema_json)))
+    blocks.append(
+        (
+            "OUTPUT_REQUIREMENTS",
+            (
+                "For config_ready, config must include coordinates, timeframe, "
+                "time_range, indicators, risk, execution, ranking, and top_n. "
+                "Use only values from TRUSTED_ALLOWED_CATALOG. Use one "
+                "coordinates.symbol only. Never add scripts, HTML, API calls, "
+                "job creation, or auto-run actions."
+            ),
+        )
+    )
     user_content = "\n\n".join(f"<{name}>\n{body}\n</{name}>" for name, body in blocks)
     return [
         {"role": "system", "content": request.prompt_profile.system_policy},
