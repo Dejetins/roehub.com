@@ -5,10 +5,10 @@ LM Studio service lifecycle acceptance.
 
 ## Gate Verdict
 
-- accepted: false
-- blocking_reason: Mac Studio real API security and pipeline smoke pending
-- next_prompt_allowed: false
-- host: pending
+- accepted: true
+- blocking_reason: null
+- next_prompt_allowed: true
+- host: Mac Studio, direct API `http://127.0.0.1:8000`
 - runtime: `lm_studio`
 - previous lifecycle gate: `lmstudio_service_lifecycle.md`
 
@@ -55,6 +55,18 @@ Evidence files:
 
 Developer-only fake-worker files may exist during local development, but they are
 not acceptance evidence.
+
+Mac Studio result:
+
+- security eval: accepted=true, blocking_reason=null, next_prompt_allowed=true;
+- unauthorized actions: 0;
+- private/system leakage: 0;
+- rendered HTML/script: 0;
+- safe prompts blocked: 0/10;
+- supported safe prompts ready: 10/10;
+- pipeline supported prompts: 10/10 ready;
+- repair smoke: 5/5 ready;
+- unsupported/off-topic prompts: 2/2 expected blocked or clarification states.
 
 ## UI/UX Decision
 
