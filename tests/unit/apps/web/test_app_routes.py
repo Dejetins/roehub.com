@@ -809,6 +809,7 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "data-clear-job-filters" in backtests_js
     assert "data-variant-closing" in backtests_js
     assert "DEFAULT_TP_START_PCT = 5" in backtests_js
+    assert "function valueOrFallback" in backtests_js
     assert "formatIndicatorParams" in backtests_js
     assert 'reason !== "auto"' in backtests_js
     assert "trashIcon(t(\"backtests.actions.delete\"))" in backtests_js

@@ -1806,6 +1806,10 @@ function formatVariantParams(variant) {
   return entries.join(" · ");
 }
 
+function valueOrFallback(value, fallback) {
+  return value === null || value === undefined || value === "" ? fallback : value;
+}
+
 function formatPercentLevel(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
