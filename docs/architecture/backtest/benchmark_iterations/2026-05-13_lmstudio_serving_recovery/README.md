@@ -1,8 +1,8 @@
-# Backtest AI Configurator Iteration 10 - LM Studio Serving Recovery
+# Backtest AI Configurator - LM Studio Serving Recovery And Runtime Reset
 
-Recovery evidence for the `/backtests` AI configurator local serving gate on
-the real Mac Studio host before any adapter changes or S1/S5/S10/S50/S100
-benchmark rerun.
+Historical recovery evidence for the `/backtests` AI configurator local serving
+gate on the real Mac Studio host, plus the later reset that retired the
+single-shot prompt/blob adapter contract.
 
 ## Scope
 
@@ -21,11 +21,14 @@ benchmark rerun.
 
 ## Gate Markers
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: single-shot prompt/blob adapter contract retired; tool-agent
+  runtime is pending implementation
 - next_prompt_allowed: true
 
-No S1/S5/S10/S50/S100 benchmark was run in this iteration.
+The original serving evidence remains historical. It is not rollout acceptance
+for the next LM Studio tools implementation. No S1/S5/S10/S50/S100 benchmark is
+accepted from this folder after the reset.
 
 ## Evidence Files
 
@@ -35,6 +38,8 @@ No S1/S5/S10/S50/S100 benchmark was run in this iteration.
 - `lmstudio_adapter_acceptance.json`
 - `lmstudio_service_lifecycle.md`
 - `lmstudio_service_lifecycle.json`
+- `single_shot_contract_retirement.md`
+- `single_shot_contract_retirement.json`
 
 ## Runtime Decision
 
@@ -42,8 +47,5 @@ No S1/S5/S10/S50/S100 benchmark was run in this iteration.
 accepted serving boundary for the next Roehub adapter step when used through
 `POST /v1/chat/completions` on loopback only.
 
-Important API rule: the request itself is JSON, while the model prompt is text
-inside `messages[].content`. Structured output is requested through
-`response_format.type=json_schema`. In the JSON Schema sent to LM Studio, keep
-every `type` value as a string; do not use nullable unions such as
-`"type": ["string", "null"]`.
+The next runtime decision is not the old structured-output adapter. It must use
+LM Studio OpenAI-compatible tools through a backend-owned allowlisted executor.

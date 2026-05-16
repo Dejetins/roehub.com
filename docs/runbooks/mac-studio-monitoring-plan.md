@@ -28,8 +28,10 @@
 - `backtest-job-runner` (`127.0.0.1:9204/metrics`)
 - `backtest-ai-configurator-worker` (`127.0.0.1:9205/metrics`)
 - `lmstudio-backtest-ai-runtime` контролируется Monit `check program`, а не
-  Prometheus scrape job: check выполняет port preflight, `lms ps --json`,
-  `/api/v1/models` loaded instance и structured `POST /v1/chat/completions`.
+  Prometheus scrape job: check выполняет port preflight, `lms ps --json` и
+  `/api/v1/models` loaded instance. Старый structured
+  `POST /v1/chat/completions` smoke retired вместе с single-shot prompt/blob
+  контрактом.
 
 ## Backtest runner target
 
@@ -214,8 +216,8 @@ Monitoring считается в рабочем состоянии, когда �
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
 - Monit summary показывает `roehub_lmstudio_backtest_ai_runtime` в `Status ok`;
-  это доказывает loaded model и lightweight generation, а не только порт или
-  `/v1/models`
+  это доказывает loaded model lifecycle, а не готовность tool-agent
+  конфигуратора
 - Monit summary показывает `roehub_backtest_ai_configurator_worker` в `Running/Accessible`
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)

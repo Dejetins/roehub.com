@@ -210,7 +210,6 @@ def _smoke_runtime_once(
         raise RuntimeCheckError(
             f"/api/v1/models does not show loaded instance {target.model_identifier}"
         )
-    generation = _structured_generation_smoke(target)
     return {
         "accepted": True,
         "blocking_reason": None,
@@ -222,7 +221,8 @@ def _smoke_runtime_once(
         "server_status": server_status,
         "lms_ps": ps,
         "api_v1_models_loaded_instance": True,
-        "generation": generation,
+        "single_shot_chat_probe": "removed",
+        "tool_agent_contract": "pending",
         "timestamp_unix": time.time(),
     }
 
@@ -345,93 +345,6 @@ def _port_listeners(port: int) -> list[dict[str, str]]:
     return listeners
 
 
-def _structured_generation_smoke(target: RuntimeTarget) -> dict[str, Any]:
-    schema = {
-        "type": "object",
-        "properties": {
-            "accepted": {"type": "boolean"},
-            "blocking_reason": {"type": "string"},
-            "next_prompt_allowed": {"type": "boolean"},
-            "model_identifier": {"type": "string"},
-            "stage": {"type": "string"},
-        },
-        "required": [
-            "accepted",
-            "blocking_reason",
-            "next_prompt_allowed",
-            "model_identifier",
-            "stage",
-        ],
-    }
-    _assert_schema_type_values_are_strings(schema)
-    payload = {
-        "model": target.model_identifier,
-        "messages": [
-            {
-                "role": "user",
-                "content": (
-                    "Return exactly one JSON object with accepted true, "
-                    "blocking_reason as an empty string, next_prompt_allowed true, "
-                    f"model_identifier {target.model_identifier}, and stage service_lifecycle."
-                ),
-            }
-        ],
-        "temperature": 0,
-        "max_tokens": 96,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "roehub_lmstudio_service_lifecycle_smoke",
-                "strict": True,
-                "schema": schema,
-            },
-        },
-    }
-    response = _http_json(
-        f"{target.base_url}/v1/chat/completions",
-        method="POST",
-        payload=payload,
-        timeout=60.0,
-    )
-    if not isinstance(response, Mapping):
-        raise RuntimeCheckError("chat completions response is not an object")
-    content = _choice_message_content(response)
-    try:
-        parsed_content = json.loads(content)
-    except json.JSONDecodeError as error:
-        raise RuntimeCheckError(
-            f"choices[0].message.content is not JSON: {content[:200]}"
-        ) from error
-    if parsed_content.get("accepted") is not True:
-        raise RuntimeCheckError("structured generation returned accepted != true")
-    if parsed_content.get("next_prompt_allowed") is not True:
-        raise RuntimeCheckError(
-            "structured generation returned next_prompt_allowed != true"
-        )
-    if not isinstance(parsed_content.get("blocking_reason"), str):
-        raise RuntimeCheckError("structured generation blocking_reason is not a string")
-    return {
-        "endpoint": "POST /v1/chat/completions",
-        "choices_0_message_content": parsed_content,
-    }
-
-
-def _choice_message_content(response: Mapping[str, Any]) -> str:
-    choices = response.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise RuntimeCheckError("chat completions response is missing choices[0]")
-    first = choices[0]
-    if not isinstance(first, Mapping):
-        raise RuntimeCheckError("chat completions choices[0] is not an object")
-    message = first.get("message")
-    if not isinstance(message, Mapping):
-        raise RuntimeCheckError("chat completions choices[0].message is not an object")
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise RuntimeCheckError("chat completions choices[0].message.content is empty")
-    return content
-
-
 def _model_loaded(ps_payload: object, target: RuntimeTarget) -> bool:
     if not isinstance(ps_payload, list):
         return False
@@ -465,18 +378,6 @@ def _loaded_instance_matches(item: object, identifier: str) -> bool:
     if not isinstance(item, Mapping):
         return False
     return item.get("id") == identifier or item.get("identifier") == identifier
-
-
-def _assert_schema_type_values_are_strings(value: object) -> None:
-    if isinstance(value, Mapping):
-        raw_type = value.get("type")
-        if raw_type is not None and not isinstance(raw_type, str):
-            raise RuntimeCheckError("JSON Schema type values must be strings")
-        for child in value.values():
-            _assert_schema_type_values_are_strings(child)
-    elif isinstance(value, list):
-        for child in value:
-            _assert_schema_type_values_are_strings(child)
 
 
 def _server_running_on_target(payload: object, target: RuntimeTarget) -> bool:

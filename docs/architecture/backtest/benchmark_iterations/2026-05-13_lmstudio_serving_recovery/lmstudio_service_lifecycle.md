@@ -1,16 +1,23 @@
 # LM Studio Service Lifecycle - Mac Studio
 
-Service lifecycle gate for `/backtests` AI Configurator LM Studio serving.
+Historical service lifecycle gate for `/backtests` AI Configurator LM Studio
+serving.
+
+Supersession note: on 2026-05-16 the single-shot structured-generation
+readiness contract was retired. The lifecycle evidence below remains useful for
+LM Studio daemon/server/model operations, but it is not current AI Configurator
+acceptance and must not unlock rollout.
 
 This iteration proves production-operable local deployment on Mac Studio:
 automatic startup, idempotent ensure, loaded-model readiness, Monit control and
 post-reload recovery. It is not an S1/S5/S10/S50/S100 benchmark.
 
-## Gate Verdict
+## Current Gate Verdict
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: superseded by single-shot contract retirement
 - next_prompt_allowed: true
+- historical_accepted_at_collection_time: true
 - host: `MacStudioDaniil`
 - timestamp UTC: `2026-05-15T22:17:35Z`
 - deployed runtime commit: `5e43906023997eba44c199bc4ce16c76eb65fc6a`
@@ -52,27 +59,28 @@ This is intentional because `lms server start` starts a background server and
 returns. A launchd `KeepAlive=true` wrapper around that command would risk a
 successful-exit restart loop.
 
-## Readiness Contract
+## Retired Readiness Contract
 
 `/v1/models is not readiness`.
 
-The runtime smoke accepts readiness only when all checks pass:
+At collection time, the runtime smoke accepted readiness only when all checks
+passed:
 
 - port preflight confirms the configured loopback port is not owned by another
   service and is not bound publicly;
 - `lms ps --json` shows loaded identifier `gemma-4-e2b-it-4bit` with context
   `8192` and `parallel=1`;
 - `GET /api/v1/models` shows the loaded instance;
-- `POST /v1/chat/completions` returns structured JSON through
+- retired: `POST /v1/chat/completions` returns structured JSON through
   `response_format.type=json_schema`;
 - all JSON Schema `type` values are strings; do not use
   `type: ["string", "null"]`;
 - `choices[0].message.content` is parsed as JSON and includes
   `accepted=true`, string `blocking_reason`, and `next_prompt_allowed=true`.
 
-The smoke uses a bounded retry loop for transient post-restart HTTP connection
-closures while LM Studio is reattaching the server/model. Port conflict and
-public-bind failures are not retried.
+The current smoke no longer performs the structured-generation probe. It checks
+only LM Studio lifecycle/model-loaded state; tool-agent acceptance must be
+introduced by the new contract.
 
 ## Mac Studio Verification
 
@@ -102,7 +110,7 @@ Recorded evidence:
 | Monit final status | `roehub_lmstudio_backtest_ai_runtime` `OK`, `last exit value 0`, `monitoring status Monitored` |
 | launchd final status | `state = not running`, `last exit code = 0`; expected for one-shot `KeepAlive=false` ensure job |
 | `lms ps --json` | `identifier=gemma-4-e2b-it-4bit`, `contextLength=8192`, `parallel=1`, `status=idle` |
-| Worker readiness after companion smoke | `/health/ready` returned `status=ready` |
+| Worker readiness after companion smoke | Historical: `/health/ready` returned `status=ready`; superseded for tool-agent rollout |
 | Production smoke | `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 No restart storm was observed: Monit stayed `Monitored`, final status was `OK`,

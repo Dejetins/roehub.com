@@ -1,10 +1,10 @@
 {
-  "accepted": true,
-  "blocking_reason": null,
+  "accepted": false,
+  "blocking_reason": "superseded by single-shot contract retirement",
   "next_prompt_allowed": true,
   "current_active_hit_count": 0,
-  "runtime": "lm_studio",
-  "adapter": "LMStudioOpenAICompatibleAdapter",
+  "runtime": "lm_studio_tools",
+  "adapter": null,
   "model_id": "gemma-4-e2b-it-4bit",
   "conservative_limits": {
     "active_generations": 1,
@@ -16,13 +16,16 @@
   },
   "classification": {
     "current": [
+      "runtime: lm_studio_tools",
+      "backend-owned tool-agent placeholder",
+      "validator/catalog/security gates retained"
+    ],
+    "superseded": [
       "runtime: lm_studio",
       "LMStudioOpenAICompatibleAdapter",
-      "POST /v1/chat/completions",
-      "TRUSTED_CAPABILITIES",
-      "externalized_runtime_capabilities",
-      "ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH",
-      "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
+      "POST /v1/chat/completions without tools",
+      "full model-visible capability blob",
+      "externalized_runtime_capabilities"
     ],
     "historical": [
       "mlx_lm.server",
@@ -43,17 +46,17 @@
     "pyproject_toml": "no rejected MLX-serving dependency declared",
     "uv_lock": "no dependency removal required",
     "retained_dependencies": {
-      "httpx": "used by API/Web clients, LM Studio adapter and runtime smokes",
-      "jsonschema": "used by adapter schema validation and business validation"
+      "httpx": "used by API/Web clients and runtime smokes",
+      "jsonschema": "used by business validation"
     }
   },
   "contract_impact": {
     "public_api_contract": "none",
-    "port_contract": "none",
+    "port_contract": "breaking-change",
     "dto_schema": "none",
     "persisted_schema": "none",
-    "config_schema": "none",
-    "config_defaults": "compatible-change",
+    "config_schema": "breaking-change",
+    "config_defaults": "breaking-change",
     "request_hash_cache_key_persistence_identity": "none",
     "browser_visible_behavior": "none"
   }

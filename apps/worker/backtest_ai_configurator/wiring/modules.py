@@ -9,9 +9,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, cast
-from urllib.parse import urljoin
-
-import httpx
 
 from apps.api.wiring.modules.backtest import build_backtest_ai_configurator_use_cases
 from apps.worker.backtest_ai_configurator.wiring.observability import (
@@ -20,7 +17,7 @@ from apps.worker.backtest_ai_configurator.wiring.observability import (
     start_backtest_ai_configurator_http_server,
 )
 from trading.contexts.backtest.adapters.outbound import (
-    LMStudioOpenAICompatibleAdapter,
+    DisabledBacktestConfigAgentGateway,
     PsycopgBacktestPostgresGateway,
     load_backtest_ai_configurator_runtime_config,
     resolve_backtest_ai_configurator_config_path,
@@ -199,17 +196,16 @@ def build_backtest_ai_configurator_worker_app(
     )
     ai_config_path = resolve_backtest_ai_configurator_config_path(environ=environ)
     ai_runtime_config = load_backtest_ai_configurator_runtime_config(ai_config_path)
-    adapter = LMStudioOpenAICompatibleAdapter(config=ai_runtime_config.model)
     use_cases = build_backtest_ai_configurator_use_cases(
         environ=environ,
-        llm_gateway=adapter,
+        agent_gateway=DisabledBacktestConfigAgentGateway(),
     )
     if use_cases is None:
         raise ValueError("backtest AI configurator use cases are unavailable")
     metrics = BacktestAiConfiguratorMetrics()
     metrics.set_model_metadata(
         model_id=ai_runtime_config.model.model_id,
-        loaded=True,
+        loaded=False,
         runtime=ai_runtime_config.model.runtime,
         quantization=_quantization_from_model_path(ai_runtime_config.model.model_path),
     )
@@ -223,7 +219,7 @@ def build_backtest_ai_configurator_worker_app(
         drain_mode=effective_worker_config.drain_mode,
         readiness_checks=(
             _model_path_check(path=ai_runtime_config.model.model_path),
-            _runtime_connection_check(base_url=ai_runtime_config.model.base_url),
+            _tool_agent_pending_check(),
             _postgres_queue_audit_check(gateway=postgres_gateway),
         ),
     )
@@ -283,14 +279,9 @@ def _model_path_check(*, path: Path) -> Callable[[], tuple[bool, str]]:
     return _check
 
 
-def _runtime_connection_check(*, base_url: str) -> Callable[[], tuple[bool, str]]:
+def _tool_agent_pending_check() -> Callable[[], tuple[bool, str]]:
     def _check() -> tuple[bool, str]:
-        try:
-            with httpx.Client(timeout=2.0) as client:
-                response = client.get(urljoin(base_url.rstrip("/") + "/", "v1/models"))
-            return response.status_code < 500, "runtime_connection"
-        except httpx.HTTPError:
-            return False, "runtime_connection"
+        return False, "tool_agent_pending"
 
     return _check
 

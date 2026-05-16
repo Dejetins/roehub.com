@@ -15,6 +15,8 @@ from scripts.backtest_ai.configurator_benchmark_common import (
     local_host_identity,
     markdown_table,
     parse_header_values,
+    parse_session_cookie_file,
+    redacted_auth_inventory,
     summarize_security_observations,
     write_json,
 )
@@ -42,6 +44,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json-name", default="security_eval_results.json")
     parser.add_argument("--markdown-name", default="security_eval_summary.md")
     parser.add_argument(
+        "--session-cookie-file",
+        type=Path,
+        default=None,
+        help=(
+            "JSON object with cookie_name and sessions_by_user_index. "
+            "Session values are used for requests but redacted from evidence."
+        ),
+    )
+    parser.add_argument(
         "--strict-acceptance-exit-code",
         action="store_true",
         help="Exit non-zero when rollout_decision.accepted is false.",
@@ -56,6 +67,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def run_async(args: argparse.Namespace) -> int:
     headers = parse_header_values(args.header)
+    session_cookie_name, session_ids_by_user_index = parse_session_cookie_file(
+        args.session_cookie_file
+    )
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     client = (
         FakeWorkerAiConfigClient(timeout_seconds=args.http_timeout_seconds)
@@ -66,6 +80,8 @@ async def run_async(args: argparse.Namespace) -> int:
             user_id_header=args.user_id_header,
             user_id_prefix=args.user_id_prefix,
             timeout_seconds=args.http_timeout_seconds,
+            session_cookie_name=session_cookie_name,
+            session_ids_by_user_index=session_ids_by_user_index,
         )
     )
     observations = []
@@ -114,6 +130,13 @@ async def run_async(args: argparse.Namespace) -> int:
         else "macstudio_acceptance_candidate",
         "load_generator_host": local_host_identity(),
         "identity": benchmark_identity(config_path=args.config_path),
+        "target": {
+            "base_url": "fake-worker" if args.fake_worker else args.base_url,
+            "auth": redacted_auth_inventory(
+                session_cookie_name=session_cookie_name,
+                session_ids_by_user_index=session_ids_by_user_index,
+            ),
+        },
         "security eval mix": [case.case_id for case in SECURITY_PROMPT_CASES],
         "safe prompt false positive mix": [
             case.case_id for case in PIPELINE_READY_PROMPT_CASES

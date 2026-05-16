@@ -1,121 +1,86 @@
-# Backtest AI Configurator LM Studio v1
+# Backtest AI Configurator Runtime Reset
 
-Current production architecture for the `/backtests` AI configurator.
+Current cleanup state for the `/backtests` AI Configurator.
 
-Status: current MVP contract after LM Studio serving, adapter, service lifecycle
-and one-user pipeline readiness were accepted.
+Status: single-shot LM Studio prompt contract retired. Tool-agent runtime is
+pending implementation.
 
 Date: 2026-05-16.
 
 ## Gate Markers
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: tool-agent runtime is not implemented yet after retiring the
+  single-shot prompt/blob contract
 - next_prompt_allowed: true
 
-This document intentionally keeps the historical file path so older prompt
-packs and handoffs still resolve, but the active runtime contract below is LM
-Studio only for the MVP.
+This document intentionally keeps the historical `mlx-v1` path so old prompt
+artifacts still resolve. It no longer describes an accepted production runtime.
 
-## Current Runtime Contract
+## Retired Runtime Contract
 
-- runtime: `lm_studio`
-- adapter: `LMStudioOpenAICompatibleAdapter`
-- model id: `gemma-4-e2b-it-4bit`
-- serving API: `POST /v1/chat/completions` on loopback only
-- prompt transport: text in `messages[].content`
-- structured output: `response_format.type=json_schema`
-- parser: backend reads `choices[0].message.content` and parses that content as
-  JSON
-- schema rule: JSON Schema type values must be strings; do not use
-  `type: ["string", "null"]`
-- concurrency default: `active_generations: 1`
-- queue default: conservative `max_queue_size`, with public quotas enforced by
-  backend admission checks
+The following contract is no longer active and must not be used as the target
+for new implementation, benchmark, or rollout prompts:
 
-LM Studio lifecycle is outside the worker process. On Mac Studio it is managed
-by:
+- `BacktestConfigLLMGateway` with `generate_config` / `repair_config`;
+- `LMStudioOpenAICompatibleAdapter` that sends only `messages` plus
+  `response_format`;
+- prompt profiles that assemble a full trusted/untrusted prompt envelope;
+- model-visible full `TRUSTED_CAPABILITIES` payloads;
+- benchmark acceptance based on `choices[0].message.content` structured output
+  without tools.
 
-- `infra/macos/launchd/com.roehub.lmstudio-backtest-ai-runtime.plist`
-- `infra/scripts/monit/roehub-lmstudio-backtest-ai-runtime.monitrc`
-- `scripts/macos/ensure_lmstudio_backtest_ai_runtime.sh`
-- `scripts/macos/smoke_lmstudio_backtest_ai_runtime.sh`
+Historical evidence for that path remains useful only as failure/context
+evidence. It is not rollout acceptance for the next implementation.
 
-The `launchd` unit is a one-shot ensure action and the Monit entry is a
-`check program`. It is not a long-running process wrapper around the LM Studio
-server command.
+## Current Code Boundary
 
-## Trust Boundary
+The retained foundation is:
 
-The model never reads repository source code, database state, private paths, raw
-artifact manifests, secrets, runtime config files, or system topology directly.
-The backend produces the only trusted model context:
+- AI config job storage, quota, idempotency, status and SSE shell;
+- deterministic input gate and output gate;
+- catalog resolver as backend-owned source inventory;
+- `BacktestAiConfigValidator` and `BacktestPreflightService` as final gates;
+- indicator executable support, indicator window bounds, and artifact coverage
+  checks.
 
-- `TRUSTED_CAPABILITIES`
-- `externalized_runtime_capabilities`
-- compact JSON Schema for the expected output
-- trusted request interpretation derived by backend code
+The active runtime placeholder is `runtime: lm_studio_tools`. It is disabled by
+default and wired to a pending tool-agent gateway until the new adapter exists.
 
-Assistant-controlled text remains untrusted until output gate, schema
-validation and business validation pass. Browser rendering must keep assistant
-text inert and must not stream raw model JSON into the page.
+## Target Direction
 
-## Capability Source Of Truth
+The next implementation must use LM Studio OpenAI-compatible tools:
 
-Backend validation remains the source of truth:
+1. The model classifies whether the user asks for a `/backtests` configuration.
+2. The model may request backend-owned tools such as context-source reads,
+   indicator specs, artifact coverage, config templates, and validation.
+3. The backend executes only allowlisted tools, with path/resource validation,
+   redaction, size limits, and audit records.
+4. The model returns a candidate config or a nearest valid alternative.
+5. Backend validation remains authoritative before `ready` and before the UI
+   exposes `Load configuration` / `Загрузить конфигурацию`.
 
-- indicator IDs and parameter windows come from backend executable signal
-  support and `configs/prod/indicators.yaml`;
-- period/timeframe requests are clipped to artifact publisher coverage;
-- `BacktestPreflightService` remains the business validation boundary;
-- unsupported or ambiguous requests resolve to clarification/correction states,
-  not loadable configs.
+The model must not receive arbitrary filesystem access. It may request tools;
+the backend decides what can be read or executed.
 
-The model maps natural language to a candidate config. It does not own business
-semantics and cannot make unsupported capabilities valid.
+## Required New Evidence
 
-## Externalized Operator Inputs
+All previous LM Studio single-shot evidence is superseded for rollout. The new
+tool-agent path requires fresh evidence:
 
-Operators may provide additional policy outside the repository:
+- LM Studio tools preflight;
+- one real API job reaching `ready`;
+- tool security eval with unauthorized tool actions equal to zero;
+- S1/S5/S10/S50/S100 load evidence after the smaller gates pass;
+- docs and JSON evidence with `accepted`, `blocking_reason`, and
+  `next_prompt_allowed`.
 
-- `ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH`
-- `ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH`
+## Rollback / Safety
 
-Repository defaults are local/dev fail-safe behavior. Production policy files
-are runtime inputs and must not be treated as model-readable repo source.
+Until the tool-agent runtime is implemented and accepted:
 
-## Historical And Deleted Runtime Classification
-
-| Item | Classification | Current decision |
-| --- | --- | --- |
-| `mlx_lm.server` | historical failure evidence | Not accepted for the MVP runtime. Keep only in historical evidence or explicit non-current cleanup notes. |
-| `MLXOpenAICompatibleAdapter` | deleted/stale adapter name | Not present in active source. Current adapter is `LMStudioOpenAICompatibleAdapter`. |
-| `mlx_lm_server` | stale rejected config value | Not allowed in current config or current tests. Config loader accepts only `runtime: lm_studio`. |
-| `MLX generate` | historical failure wording | May appear only in failed Iteration 08 evidence or cleanup classification. |
-| `MLX repair` | historical failure wording | May appear only in failed Iteration 08 evidence or cleanup classification. |
-| Old prompt files 01-09 | historical prompt artifacts | Do not edit for this cleanup. |
-| Iteration 08 benchmark evidence | historical failure evidence | Preserve as non-acceptance evidence; do not use as current runtime target. |
-| LM Studio launchd and Monit files | intentionally retained | Current accepted lifecycle path. |
-
-## Iteration Evidence
-
-Current accepted evidence:
-
-- `docs/architecture/backtest/benchmark_iterations/2026-05-13_lmstudio_serving_recovery/lmstudio_serving_gate.md`
-- `docs/architecture/backtest/benchmark_iterations/2026-05-13_lmstudio_serving_recovery/lmstudio_adapter_acceptance.md`
-- `docs/architecture/backtest/benchmark_iterations/2026-05-13_lmstudio_serving_recovery/lmstudio_service_lifecycle.md`
-- `docs/architecture/backtest/benchmark_iterations/2026-05-13_lmstudio_serving_recovery/security_pipeline_readiness.md`
-
-Historical failed evidence:
-
-- `docs/architecture/backtest/benchmark_iterations/2026-05-12_iteration_08_ai_configurator_load_security/`
-
-## Rollback Note
-
-Rollback is operational, not a model contract change:
-
-1. Restore the previous repository commit.
-2. Disable or drain `com.roehub.backtest-ai-configurator-worker`.
-3. Stop LM Studio runtime through
-   `scripts/macos/lmstudio_backtest_ai_runtime.py stop`.
-4. Rerun `scripts/macos/smoke_prod.sh` after service reload.
+1. Keep `backtest_ai_configurator.enabled: false` in production config.
+2. Keep the worker drained or not deployed for public use.
+3. Do not use historical single-shot benchmark evidence for rollout.
+4. Preserve validator/catalog/security code as the final safety gate for the
+   future tool-agent pipeline.

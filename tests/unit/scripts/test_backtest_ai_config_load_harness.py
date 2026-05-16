@@ -5,7 +5,9 @@ import pytest
 from scripts.backtest_ai.configurator_benchmark_common import (
     JobObservation,
     parse_header_values,
+    parse_session_cookie_file,
     percentiles,
+    redacted_auth_inventory,
     selected_scenarios,
     summarize_observations,
     summarize_security_observations,
@@ -27,6 +29,29 @@ def test_parse_header_values_rejects_missing_separator() -> None:
 
 def test_selected_scenarios_preserves_requested_order() -> None:
     assert [item.name for item in selected_scenarios(["S10", "s1"])] == ["S10", "S1"]
+
+
+def test_parse_session_cookie_file_redacts_inventory(tmp_path) -> None:
+    path = tmp_path / "sessions.json"
+    path.write_text(
+        (
+            '{"cookie_name":"roehub_session_id",'
+            '"sessions_by_user_index":{"0":"00000000-0000-0000-0000-000000000001"}}'
+        ),
+        encoding="utf-8",
+    )
+
+    cookie_name, sessions = parse_session_cookie_file(path)
+    inventory = redacted_auth_inventory(
+        session_cookie_name=cookie_name,
+        session_ids_by_user_index=sessions,
+    )
+
+    assert cookie_name == "roehub_session_id"
+    assert sessions == {0: "00000000-0000-0000-0000-000000000001"}
+    assert inventory["session_count"] == 1
+    assert inventory["session_values_redacted"] is True
+    assert "00000000-0000-0000-0000-000000000001" not in str(inventory)
 
 
 def test_load_harness_parser_defaults_to_s1_without_all_scenarios() -> None:

@@ -16,6 +16,8 @@ from scripts.backtest_ai.configurator_benchmark_common import (
     local_host_identity,
     markdown_table,
     parse_header_values,
+    parse_session_cookie_file,
+    redacted_auth_inventory,
     run_load_scenario,
     selected_scenarios,
     write_json,
@@ -23,7 +25,7 @@ from scripts.backtest_ai.configurator_benchmark_common import (
 
 DEFAULT_OUTPUT_DIR = Path(
     "docs/architecture/backtest/benchmark_iterations/"
-    "2026-05-12_iteration_08_ai_configurator_load_security"
+    "2026-05-13_lmstudio_serving_recovery"
 )
 DEFAULT_CONFIG_PATH = Path("configs/prod/backtest_ai_configurator.yaml")
 
@@ -46,10 +48,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=20260512)
     parser.add_argument("--config-path", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--json-name", default="load_benchmark_results.json")
-    parser.add_argument("--markdown-name", default="load_benchmark_summary.md")
+    parser.add_argument("--json-name", default="lmstudio_load_benchmark_acceptance.json")
+    parser.add_argument("--markdown-name", default="lmstudio_load_benchmark_acceptance.md")
     parser.add_argument("--metrics-url", default=None)
     parser.add_argument("--macstudio-host", default=None)
+    parser.add_argument(
+        "--session-cookie-file",
+        type=Path,
+        default=None,
+        help=(
+            "JSON object with cookie_name and sessions_by_user_index. "
+            "Session values are used for requests but redacted from evidence."
+        ),
+    )
     parser.add_argument(
         "--strict-acceptance-exit-code",
         action="store_true",
@@ -72,6 +83,9 @@ async def run_async(args: argparse.Namespace) -> int:
     if args.max_requests_per_scenario is not None and args.max_requests_per_scenario <= 0:
         raise SystemExit("--max-requests-per-scenario must be > 0")
     headers = parse_header_values(args.header)
+    session_cookie_name, session_ids_by_user_index = parse_session_cookie_file(
+        args.session_cookie_file
+    )
     client = (
         FakeWorkerAiConfigClient(timeout_seconds=args.http_timeout_seconds)
         if args.fake_worker
@@ -81,6 +95,8 @@ async def run_async(args: argparse.Namespace) -> int:
             user_id_header=args.user_id_header,
             user_id_prefix=args.user_id_prefix,
             timeout_seconds=args.http_timeout_seconds,
+            session_cookie_name=session_cookie_name,
+            session_ids_by_user_index=session_ids_by_user_index,
         )
     )
     before_metrics = await fetch_metrics_snapshot(args.metrics_url)
@@ -119,6 +135,10 @@ async def run_async(args: argparse.Namespace) -> int:
             "scenarios": [scenario.name for scenario in scenarios],
             "prompt_case_ids": [case.case_id for case in SAFE_PROMPT_CASES],
             "load_generator_on_macstudio": False,
+            "auth": redacted_auth_inventory(
+                session_cookie_name=session_cookie_name,
+                session_ids_by_user_index=session_ids_by_user_index,
+            ),
         },
         "metrics_before": before_metrics,
         "metrics_after": after_metrics,

@@ -1,12 +1,16 @@
 # Backtest AI Configurator Security Pipeline Readiness
 
-Security and one-user pipeline readiness gate for `/backtests/ai-config` after
-LM Studio service lifecycle acceptance.
+Historical security and one-user pipeline readiness gate for
+`/backtests/ai-config` after LM Studio service lifecycle acceptance.
+
+Supersession note: on 2026-05-16 the single-shot LM Studio prompt/blob contract
+was retired. This file is not acceptance evidence for the next LM Studio tools
+runtime.
 
 ## Gate Verdict
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: superseded by single-shot contract retirement
 - next_prompt_allowed: true
 - host: Mac Studio, direct API `http://127.0.0.1:8000`
 - runtime: `lm_studio`

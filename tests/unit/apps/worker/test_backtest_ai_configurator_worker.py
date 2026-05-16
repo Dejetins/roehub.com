@@ -17,6 +17,8 @@ from apps.worker.backtest_ai_configurator.wiring.observability import (
     start_backtest_ai_configurator_http_server,
 )
 from trading.contexts.backtest.application.ai_configurator import (
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
     BacktestAiConfigEvent,
     BacktestAiConfigGenerationLimiter,
     BacktestAiConfigJob,
@@ -27,7 +29,6 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiQuotaEvent,
     BacktestAiTrainingExportRecord,
     BacktestAiTrainingExportUseCase,
-    backtest_ai_prompt_profile_for_mode,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -57,7 +58,7 @@ def test_backtest_ai_configurator_worker_processes_queued_job_to_ready() -> None
     assert result.job.model_path_hash == "model-path-hash"
     assert [event.event_name for event in repository.events] == [
         "preparing_catalog",
-        "assembling_prompt",
+        "collecting_context",
         "generating",
         "validating_json",
         "validating_business",
@@ -501,7 +502,6 @@ class _Repository:
 
 def _job(*, source_page: str = "backtests") -> BacktestAiConfigJob:
     now = datetime(2026, 5, 11, tzinfo=UTC)
-    profile = backtest_ai_prompt_profile_for_mode("create")
     return BacktestAiConfigJob(
         job_id=UUID("00000000-0000-0000-0000-000000000701"),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000702"),
@@ -511,8 +511,8 @@ def _job(*, source_page: str = "backtests") -> BacktestAiConfigJob:
         source_page=source_page,
         user_prompt_text="Собери конфиг",
         user_prompt_hash="a" * 64,
-        system_prompt_version=profile.system_prompt_version,
-        system_prompt_hash=profile.system_prompt_hash,
+        system_prompt_version=BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
+        system_prompt_hash=BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
         catalog_snapshot_hash="b" * 64,
         runtime_defaults_hash="c" * 64,
         queued_at=now,

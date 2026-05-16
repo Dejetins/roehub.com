@@ -24,10 +24,6 @@ from .dto import (
     BacktestAiQuotaSnapshot,
 )
 from .quota import BacktestAiQuotaService
-from .services.prompt_profiles import (
-    BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION,
-    backtest_ai_prompt_profile_for_mode,
-)
 
 BACKTEST_AI_CONFIG_ERROR_IDEMPOTENCY_CONFLICT = (
     "backtest.ai_config.idempotency_key_conflict"
@@ -42,6 +38,12 @@ PENDING_CATALOG_SNAPSHOT_HASH = hashlib.sha256(
 ).hexdigest()
 PENDING_RUNTIME_DEFAULTS_HASH = hashlib.sha256(
     b"backtest-ai-configurator-pending-runtime-defaults-v1"
+).hexdigest()
+BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION = (
+    "backtest-ai-configurator-tool-agent-pending-v1"
+)
+BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH = hashlib.sha256(
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION.encode("utf-8")
 ).hexdigest()
 
 _VALID_MODES = {"create", "edit", "explain", "repair", "suggest_safer"}
@@ -68,7 +70,7 @@ class BacktestAiConfigJobsUseCase:
         current_config: Mapping[str, Any] | None = None,
         ui_context: Mapping[str, Any] | None = None,
         catalog_snapshot_hash: str = PENDING_CATALOG_SNAPSHOT_HASH,
-        system_prompt_version: str = BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION,
+        system_prompt_version: str = BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
     ) -> BacktestAiConfigCreateResult:
         normalized_mode = _normalize_mode(mode=mode)
         normalized_locale = _normalize_locale(locale=locale)
@@ -78,7 +80,6 @@ class BacktestAiConfigJobsUseCase:
         )
         current_config_hash = _optional_canonical_hash(current_config)
         prompt_hash = _sha256_text(normalized_prompt)
-        prompt_profile = backtest_ai_prompt_profile_for_mode(normalized_mode)
         runtime_defaults_hash = _runtime_defaults_hash(ui_context=ui_context)
         now = datetime.now(UTC)
 
@@ -174,7 +175,7 @@ class BacktestAiConfigJobsUseCase:
             current_config_hash=current_config_hash,
             current_config_json=current_config,
             system_prompt_version=system_prompt_version,
-            system_prompt_hash=prompt_profile.system_prompt_hash,
+            system_prompt_hash=BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
             catalog_snapshot_hash=catalog_snapshot_hash,
             runtime_defaults_hash=runtime_defaults_hash,
             queued_at=now,
@@ -442,12 +443,13 @@ def _is_sha256(value: str) -> bool:
 
 
 __all__ = [
+    "BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH",
+    "BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION",
     "BACKTEST_AI_CONFIG_ERROR_FORBIDDEN",
     "BACKTEST_AI_CONFIG_ERROR_IDEMPOTENCY_CONFLICT",
     "BACKTEST_AI_CONFIG_ERROR_INVALID_REQUEST",
     "BACKTEST_AI_CONFIG_ERROR_NOT_FOUND",
     "BACKTEST_AI_CONFIG_SOURCE_PAGE",
-    "BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION",
     "BacktestAiConfigJobsUseCase",
     "PENDING_CATALOG_SNAPSHOT_HASH",
     "PENDING_RUNTIME_DEFAULTS_HASH",

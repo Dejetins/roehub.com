@@ -1,13 +1,11 @@
-from .llm_gateway import (
-    BacktestConfigLLMGateway,
-    BacktestConfigLLMRepairRequest,
-    BacktestConfigLLMRequest,
-    BacktestConfigLLMResponse,
+from .agent_gateway import (
+    BacktestConfigAgentGateway,
+    BacktestConfigAgentRequest,
+    BacktestConfigAgentResponse,
 )
 
 __all__ = [
-    "BacktestConfigLLMGateway",
-    "BacktestConfigLLMRepairRequest",
-    "BacktestConfigLLMRequest",
-    "BacktestConfigLLMResponse",
+    "BacktestConfigAgentGateway",
+    "BacktestConfigAgentRequest",
+    "BacktestConfigAgentResponse",
 ]

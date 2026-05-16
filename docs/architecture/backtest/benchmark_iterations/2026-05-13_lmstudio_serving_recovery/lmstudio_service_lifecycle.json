@@ -1,34 +1,37 @@
 {
-  "accepted": true,
-  "blocking_reason": null,
-  "next_prompt_allowed": true,
-  "host": "MacStudioDaniil",
-  "timestamp_utc": "2026-05-15T22:17:35Z",
-  "deployed_runtime_commit": "5e43906023997eba44c199bc4ce16c76eb65fc6a",
-  "runtime": "lm_studio",
-  "launchd_label": "com.roehub.lmstudio-backtest-ai-runtime",
-  "monit_check": "roehub_lmstudio_backtest_ai_runtime",
-  "model_identifier": "gemma-4-e2b-it-4bit",
+  "accepted": false,
+  "blocking_reason": "superseded by single-shot contract retirement; tool-agent runtime pending",
   "config_source": "base_url from configs/prod/backtest_ai_configurator.yaml",
-  "readiness": {
-    "v1_models_is_not_readiness": true,
-    "requires_lms_ps_json": true,
-    "requires_api_v1_models_loaded_instance": true,
-    "requires_chat_completions_generation": true,
-    "json_schema_type_values_must_be_strings": true,
-    "bounded_retry_for_post_restart_http_race": true
+  "current_contract": {
+    "rollout_acceptance": false,
+    "single_shot_structured_generation_probe": "retired",
+    "tool_agent_runtime": "pending"
   },
+  "deployed_runtime_commit": "5e43906023997eba44c199bc4ce16c76eb65fc6a",
+  "historical_accepted_at_collection_time": true,
+  "host": "MacStudioDaniil",
+  "launchd_label": "com.roehub.lmstudio-backtest-ai-runtime",
+  "model_identifier": "gemma-4-e2b-it-4bit",
+  "monit_check": "roehub_lmstudio_backtest_ai_runtime",
+  "next_prompt_allowed": true,
+  "readiness": {
+    "bounded_retry_for_post_restart_http_race": true,
+    "json_schema_type_values_must_be_strings": true,
+    "requires_api_v1_models_loaded_instance": true,
+    "requires_chat_completions_generation": false,
+    "requires_lms_ps_json": true,
+    "requires_tool_agent_acceptance": true,
+    "structured_generation_probe": "retired",
+    "v1_models_is_not_readiness": true
+  },
+  "runtime": "lm_studio_tools",
+  "timestamp_utc": "2026-05-15T22:17:35Z",
   "verification": {
-    "two_stop_start_restart_cycles": true,
-    "clean_cycle_1_start": {
-      "accepted": true,
-      "readiness_attempts": 1
-    },
     "clean_cycle_1_restart": {
       "accepted": true,
       "readiness_attempts": 1
     },
-    "clean_cycle_2_start": {
+    "clean_cycle_1_start": {
       "accepted": true,
       "readiness_attempts": 1
     },
@@ -36,13 +39,18 @@
       "accepted": true,
       "readiness_attempts": 1
     },
-    "monit_status": "OK",
-    "monit_last_exit_value": 0,
+    "clean_cycle_2_start": {
+      "accepted": true,
+      "readiness_attempts": 1
+    },
     "launchd_last_exit_code": 0,
     "launchd_state": "not running",
-    "no_restart_storm": true,
     "macstudio_deployed": true,
-    "worker_health_ready_after_companion_smoke": true,
-    "smoke_prod_passed": true
+    "monit_last_exit_value": 0,
+    "monit_status": "OK",
+    "no_restart_storm": true,
+    "smoke_prod_passed": true,
+    "two_stop_start_restart_cycles": true,
+    "worker_health_ready_after_companion_smoke": "historical_superseded"
   }
 }

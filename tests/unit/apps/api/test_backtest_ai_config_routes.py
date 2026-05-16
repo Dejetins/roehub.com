@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 from apps.api.common import register_api_error_handlers
 from apps.api.routes.backtest_ai_config import build_backtest_ai_config_router
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
-from trading.contexts.backtest.adapters.outbound.llm import (
-    DeterministicBacktestConfigLLMGateway,
+from trading.contexts.backtest.adapters.outbound.ai_config_agent import (
+    DeterministicBacktestConfigAgentGateway,
 )
 from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiCatalogResolver,
@@ -171,7 +171,7 @@ def test_ai_config_fake_worker_produces_ready_snapshot_and_sse_replay() -> None:
     assert "event: ready" in event_stream
     assert "Собери конфиг" not in event_stream
     assert "chain_of_thought" not in event_stream
-    assert repository.llm_attempts
+    assert repository.llm_attempts == []
     assert "Собери конфиг" not in status.text
     assert "raw_model_response" not in status.text
 
@@ -330,7 +330,7 @@ def _pipeline() -> BacktestAiConfigPipeline:
             ),
             output_gate=BacktestAiOutputGate(),
         ),
-        llm_gateway=DeterministicBacktestConfigLLMGateway(),
+        agent_gateway=DeterministicBacktestConfigAgentGateway(),
     )
 
 

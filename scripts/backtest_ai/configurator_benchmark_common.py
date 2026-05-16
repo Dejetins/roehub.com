@@ -31,8 +31,8 @@ if str(SRC_ROOT) not in sys.path:
 from apps.api.common import register_api_error_handlers
 from apps.api.routes.backtest_ai_config import build_backtest_ai_config_router
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
-from trading.contexts.backtest.adapters.outbound.llm import (
-    DeterministicBacktestConfigLLMGateway,
+from trading.contexts.backtest.adapters.outbound.ai_config_agent import (
+    DeterministicBacktestConfigAgentGateway,
 )
 from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiCatalogResolver,
@@ -614,6 +614,8 @@ class HttpAiConfigClient:
     user_id_header: str | None
     user_id_prefix: str
     timeout_seconds: float
+    session_cookie_name: str | None = None
+    session_ids_by_user_index: Mapping[int, str] = field(default_factory=dict)
     client: httpx.AsyncClient = field(init=False)
 
     def __post_init__(self) -> None:
@@ -766,6 +768,17 @@ class HttpAiConfigClient:
                 prefix=self.user_id_prefix,
                 user_index=user_index,
             )
+        if self.session_cookie_name:
+            session_id = self.session_ids_by_user_index.get(user_index)
+            if not session_id:
+                raise ValueError(
+                    f"missing benchmark session cookie for user_index={user_index}"
+                )
+            cookie_value = f"{self.session_cookie_name}={session_id}"
+            if headers.get("Cookie"):
+                headers["Cookie"] = f"{headers['Cookie']}; {cookie_value}"
+            else:
+                headers["Cookie"] = cookie_value
         return headers
 
 
@@ -863,6 +876,49 @@ def parse_header_values(values: Sequence[str]) -> dict[str, str]:
             raise ValueError("header name must be non-empty")
         headers[normalized_name] = raw_header_value.strip()
     return headers
+
+
+def parse_session_cookie_file(path: Path | None) -> tuple[str | None, dict[int, str]]:
+    if path is None:
+        return None, {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("session cookie file must contain a JSON object")
+    cookie_name = str(payload.get("cookie_name") or "roehub_session_id").strip()
+    if not cookie_name:
+        raise ValueError("session cookie file cookie_name must be non-empty")
+    raw_sessions = payload.get("sessions_by_user_index")
+    if not isinstance(raw_sessions, Mapping):
+        raise ValueError("session cookie file requires sessions_by_user_index object")
+    sessions: dict[int, str] = {}
+    for raw_index, raw_session_id in raw_sessions.items():
+        index = int(str(raw_index))
+        session_id = str(raw_session_id).strip()
+        if not session_id:
+            raise ValueError(f"empty session id for user_index={index}")
+        sessions[index] = session_id
+    return cookie_name, sessions
+
+
+def redacted_auth_inventory(
+    *,
+    session_cookie_name: str | None,
+    session_ids_by_user_index: Mapping[int, str],
+) -> JsonObject:
+    user_indexes = sorted(session_ids_by_user_index)
+    return {
+        "session_cookie_configured": session_cookie_name is not None,
+        "session_cookie_name": session_cookie_name if session_cookie_name else None,
+        "session_count": len(session_ids_by_user_index),
+        "user_index_min": user_indexes[0] if user_indexes else None,
+        "user_index_max": user_indexes[-1] if user_indexes else None,
+        "session_inventory_hash": _sha256_text(
+            json.dumps(user_indexes, separators=(",", ":"), sort_keys=True)
+        )
+        if user_indexes
+        else None,
+        "session_values_redacted": True,
+    }
 
 
 def selected_scenarios(names: Sequence[str]) -> tuple[ScenarioSpec, ...]:
@@ -1038,7 +1094,6 @@ def benchmark_identity(*, config_path: Path) -> JsonObject:
         "config_path": str(config_path),
         "config_sha256": _sha256_file(config_path) if config_path.exists() else None,
         "model_id": model.get("model_id"),
-        "model_path": str(model_path) if str(model_path) else None,
         "model_path_hash": _sha256_text(str(model_path)) if str(model_path) else None,
         "model_path_exists": model_path.exists() if str(model_path) else False,
         "context_window_tokens": model.get("context_window_tokens"),
@@ -1378,7 +1433,7 @@ def _fake_pipeline() -> BacktestAiConfigPipeline:
             ),
             output_gate=BacktestAiOutputGate(),
         ),
-        llm_gateway=DeterministicBacktestConfigLLMGateway(),
+        agent_gateway=DeterministicBacktestConfigAgentGateway(),
     )
 
 

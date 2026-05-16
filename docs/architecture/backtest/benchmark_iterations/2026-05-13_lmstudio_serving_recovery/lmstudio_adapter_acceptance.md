@@ -1,14 +1,18 @@
 # LM Studio Adapter Acceptance - Mac Studio
 
-Adapter-level structured-output gate for `/backtests` AI Configurator.
+Historical adapter-level structured-output gate for `/backtests` AI
+Configurator.
+
+Supersession note: on 2026-05-16 this single-shot adapter contract was retired.
+Do not use this evidence as acceptance for the next LM Studio tools runtime.
 
 This evidence proves the Roehub adapter contract only. It is not an
 S1/S5/S10/S50/S100 benchmark and does not accept load performance.
 
 ## Gate Verdict
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: superseded by single-shot contract retirement
 - next_prompt_allowed: true
 - host: `MacStudioDaniil`
 - timestamp UTC: `2026-05-15T21:34:31.096789Z`

@@ -7,15 +7,14 @@ from typing import Any, Literal, Mapping
 
 from trading.contexts.backtest.application.ai_configurator.dto import BacktestAiConfigJob
 from trading.contexts.backtest.application.ai_configurator.ports import (
-    BacktestConfigLLMRepairRequest,
-    BacktestConfigLLMRequest,
-    BacktestConfigLLMResponse,
+    BacktestConfigAgentRequest,
+    BacktestConfigAgentResponse,
 )
 from trading.contexts.backtest.application.ai_configurator.services.catalog import (
     BacktestAiAllowedCatalog,
 )
 
-_MODEL_ID = "deterministic-test-llm-gateway-v1"
+_MODEL_ID = "deterministic-test-tool-agent-v1"
 _SYMBOL_ALIASES: tuple[tuple[str, str], ...] = (
     ("биток", "BTCUSDT"),
     ("биткоин", "BTCUSDT"),
@@ -44,7 +43,7 @@ _UNSUPPORTED_TIMEFRAME_PATTERNS = (
 )
 _DIRECT_SYMBOL_RE = re.compile(r"\b[A-Z0-9]{2,12}USDT\b", re.I)
 
-DeterministicLlmScenario = Literal[
+DeterministicToolAgentScenario = Literal[
     "valid",
     "invalid_json",
     "schema_invalid",
@@ -54,72 +53,72 @@ DeterministicLlmScenario = Literal[
 
 
 @dataclass(frozen=True, slots=True)
-class DeterministicBacktestConfigLLMGateway:
-    """
-    Deterministic model adapter for tests and local fake worker execution.
+class DisabledBacktestConfigAgentGateway:
+    reason: str = "tool_agent_not_implemented"
 
-    It intentionally does not call MLX or any remote model. Scripted scenarios let tests
-    exercise parse, schema, catalog and business repair paths without network/runtime state.
-    """
-
-    generate_scenario: DeterministicLlmScenario = "valid"
-    repair_scenario: DeterministicLlmScenario = "valid"
-    scripted_generate_outputs: tuple[str, ...] = ()
-    scripted_repair_outputs: tuple[str, ...] = ()
-    _generate_index: int = field(default=0, init=False, compare=False)
-    _repair_index: int = field(default=0, init=False, compare=False)
-
-    def generate_config(
+    def run_config_session(
         self,
-        request: BacktestConfigLLMRequest,
-    ) -> BacktestConfigLLMResponse:
-        raw_output = self._next_scripted(kind="generate")
+        request: BacktestConfigAgentRequest,
+    ) -> BacktestConfigAgentResponse:
+        _ = request
+        return BacktestConfigAgentResponse(
+            raw_output=None,
+            model_id=None,
+            finish_reason="blocked",
+            audit_json={"reason": self.reason},
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DeterministicBacktestConfigAgentGateway:
+    """
+    Deterministic backend-agent adapter for tests and local fake execution.
+
+    It does not model the old single-shot prompt envelope. It simulates the
+    future backend-controlled tool-agent result so validator/security behavior
+    can stay covered while the real LM Studio tools adapter is rebuilt.
+    """
+
+    scenario: DeterministicToolAgentScenario = "valid"
+    scripted_outputs: tuple[str, ...] = ()
+    _index: int = field(default=0, init=False, compare=False)
+
+    def run_config_session(
+        self,
+        request: BacktestConfigAgentRequest,
+    ) -> BacktestConfigAgentResponse:
+        raw_output = self._next_scripted()
         if raw_output is None:
             raw_output = _raw_output_for_scenario(
-                scenario=self.generate_scenario,
+                scenario=self.scenario,
                 job=request.job,
                 catalog=request.catalog,
             )
-        return _response(raw_output=raw_output, prompt_text=request.prompt_text)
+        return BacktestConfigAgentResponse(
+            raw_output=raw_output,
+            model_id=_MODEL_ID,
+            latency_ms=0,
+            finish_reason="stop",
+            audit_json={"tool_agent": "deterministic"},
+        )
 
-    def repair_config(
-        self,
-        request: BacktestConfigLLMRepairRequest,
-    ) -> BacktestConfigLLMResponse:
-        raw_output = self._next_scripted(kind="repair")
-        if raw_output is None:
-            raw_output = _raw_output_for_scenario(
-                scenario=self.repair_scenario,
-                job=request.job,
-                catalog=request.catalog,
-            )
-        return _response(raw_output=raw_output, prompt_text=request.prompt_text)
-
-    def _next_scripted(self, *, kind: Literal["generate", "repair"]) -> str | None:
-        if kind == "generate":
-            outputs = self.scripted_generate_outputs
-            index = self._generate_index
-            if index >= len(outputs):
-                return None
-            object.__setattr__(self, "_generate_index", index + 1)
-            return outputs[index]
-        outputs = self.scripted_repair_outputs
-        index = self._repair_index
-        if index >= len(outputs):
+    def _next_scripted(self) -> str | None:
+        index = self._index
+        if index >= len(self.scripted_outputs):
             return None
-        object.__setattr__(self, "_repair_index", index + 1)
-        return outputs[index]
+        object.__setattr__(self, "_index", index + 1)
+        return self.scripted_outputs[index]
 
 
 def _raw_output_for_scenario(
     *,
-    scenario: DeterministicLlmScenario,
+    scenario: DeterministicToolAgentScenario,
     job: BacktestAiConfigJob,
     catalog: BacktestAiAllowedCatalog,
 ) -> str:
     if scenario == "invalid_json":
         return "```json\n{\"schema_version\":1}\n```"
-    draft = _deterministic_model_output(job=job, catalog=catalog)
+    draft = _deterministic_agent_output(job=job, catalog=catalog)
     if scenario == "schema_invalid":
         draft.pop("assistant_message", None)
     elif scenario == "unsupported_config":
@@ -134,22 +133,7 @@ def _raw_output_for_scenario(
     return json.dumps(draft, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _response(*, raw_output: str, prompt_text: str) -> BacktestConfigLLMResponse:
-    return BacktestConfigLLMResponse(
-        raw_output=raw_output,
-        model_id=_MODEL_ID,
-        input_tokens_estimate=_estimate_tokens(prompt_text),
-        output_tokens_estimate=_estimate_tokens(raw_output),
-        latency_ms=0,
-        finish_reason="stop",
-    )
-
-
-def _estimate_tokens(value: str) -> int:
-    return max(1, (len(value) + 3) // 4)
-
-
-def _deterministic_model_output(
+def _deterministic_agent_output(
     *,
     job: BacktestAiConfigJob,
     catalog: BacktestAiAllowedCatalog,
@@ -298,9 +282,7 @@ def _indicator_config(
     indicator_id: str,
     catalog: BacktestAiAllowedCatalog,
 ) -> dict[str, Any]:
-    item = catalog.indicator_by_id(indicator_id)
-    if item is None:
-        item = catalog.indicators[0]
+    item = catalog.indicator_by_id(indicator_id) or catalog.indicators[0]
     params = dict(item.param_specs.get("params") or {})
     window_spec = dict(params.get("window") or {})
     values = window_spec.get("values")
@@ -371,4 +353,8 @@ def _ready_message(*, symbol: str, locale: str) -> str:
     return f"I prepared a valid {symbol} configuration on 15m."
 
 
-__all__ = ["DeterministicBacktestConfigLLMGateway"]
+__all__ = [
+    "DeterministicBacktestConfigAgentGateway",
+    "DeterministicToolAgentScenario",
+    "DisabledBacktestConfigAgentGateway",
+]

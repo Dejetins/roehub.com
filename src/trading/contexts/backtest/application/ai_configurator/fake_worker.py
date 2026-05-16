@@ -18,7 +18,7 @@ _PRE_INPUT_GATE_EVENTS: tuple[tuple[str, str, int], ...] = (
     ("preparing_catalog", "Preparing the current /backtests catalog.", 20),
 )
 _VALIDATION_STAGE_EVENTS: tuple[tuple[str, str, int], ...] = (
-    ("assembling_prompt", "Assembling deterministic catalog-bound request.", 35),
+    ("collecting_context", "Collecting deterministic tool-agent context.", 35),
     ("generating", "Generating deterministic configuration draft.", 55),
     ("validating_json", "Checking JSON shape and output safety.", 70),
     ("validating_business", "Checking /backtests business rules.", 85),

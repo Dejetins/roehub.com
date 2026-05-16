@@ -1,18 +1,21 @@
 # LM Studio Serving Gate - Mac Studio
 
-Direct serving gate for `/backtests` AI configurator. This is prerequisite
-evidence only; it is not a load benchmark and does not accept S1/S5/S10/S50/S100.
+Historical direct serving gate for `/backtests` AI configurator. This evidence
+is retained for LM Studio serving investigation only. It is superseded by the
+2026-05-16 single-shot contract retirement and must not be used as current
+AI Configurator acceptance.
 
-## Gate Verdict
+## Current Gate Verdict
 
-- accepted: true
-- blocking_reason: null
+- accepted: false
+- blocking_reason: superseded by single-shot contract retirement
 - next_prompt_allowed: true
+- historical_accepted_at_collection_time: true
 - host: `MacStudioDaniil`
 - timestamp UTC: `2026-05-15T20:52:39Z`
 - branch before docs update: `main`
 - configured base_url: `http://127.0.0.1:8080`
-- endpoint: `/v1/chat/completions`
+- retired endpoint under test: `/v1/chat/completions`
 - model key: `gemma-4-e2b-it`
 - model identifier: `gemma-4-e2b-it-4bit`
 - context length: `8192`
@@ -145,16 +148,17 @@ That shape caused LM Studio/MLX structured-output generation to fail with
 `ValueError: 'type' must be a string`. For now, encode absence as an empty
 string or a separate boolean/status field.
 
-Expected response handling:
+Retired response handling:
 
 1. Parse the HTTP response body as JSON.
 2. Read `choices[0].message.content`.
 3. Parse that content string as JSON.
 4. Validate the parsed object against the expected fields.
 
-## Corrected Direct Structured Output Attempts
+## Historical Corrected Direct Structured Output Attempts
 
-All 10 corrected attempts used `response_format` with `type: json_schema`
+Historically, all 10 corrected attempts used `response_format` with
+`type: json_schema`
 against `/v1/chat/completions`, with all schema `type` values represented as
 strings.
 

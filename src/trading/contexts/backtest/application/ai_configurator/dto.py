@@ -42,6 +42,7 @@ BacktestAiConfigTerminalState = Literal[
 BacktestAiConfigEventName = Literal[
     "queued",
     "preparing_catalog",
+    "collecting_context",
     "assembling_prompt",
     "generating",
     "validating_json",

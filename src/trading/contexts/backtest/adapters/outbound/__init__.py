@@ -1,3 +1,7 @@
+from .ai_config_agent import (
+    DeterministicBacktestConfigAgentGateway,
+    DisabledBacktestConfigAgentGateway,
+)
 from .artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
@@ -25,7 +29,6 @@ from .config import (
     resolve_backtest_artifacts_config_path,
 )
 from .defaults import YamlBacktestGridDefaultsProvider
-from .llm import DeterministicBacktestConfigLLMGateway, LMStudioOpenAICompatibleAdapter
 from .persistence import (
     BacktestPostgresGateway,
     PostgresBacktestAiConfigRepository,
@@ -54,10 +57,10 @@ __all__ = [
     "PostgresBacktestAiConfigRepository",
     "DEFAULT_LAZY_TRADES_CACHE_ROOT",
     "DatabaseBacktestJobExecutionTrigger",
-    "DeterministicBacktestConfigLLMGateway",
+    "DeterministicBacktestConfigAgentGateway",
+    "DisabledBacktestConfigAgentGateway",
     "FilesystemBacktestArtifactContextResolver",
     "LocalFileBacktestLazyTradesCache",
-    "LMStudioOpenAICompatibleAdapter",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",

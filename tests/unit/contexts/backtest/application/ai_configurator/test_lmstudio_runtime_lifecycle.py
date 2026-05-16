@@ -29,7 +29,7 @@ def _load_runtime_module() -> ModuleType:
 def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="lm_studio",
+        runtime="lm_studio_tools",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -55,7 +55,7 @@ def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
 def test_lmstudio_runtime_target_rejects_base_url_without_explicit_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="lm_studio",
+        runtime="lm_studio_tools",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -126,13 +126,56 @@ def test_lmstudio_api_models_requires_loaded_instance() -> None:
     )
 
 
-def test_lmstudio_schema_type_values_must_be_strings() -> None:
+def test_lmstudio_runtime_smoke_marks_tool_agent_contract_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     module = _load_runtime_module()
+    target = module.RuntimeTarget(
+        base_url="http://127.0.0.1:8080",
+        host="127.0.0.1",
+        port=8080,
+        model_key="gemma-4-e2b-it",
+        model_identifier="gemma-4-e2b-it-4bit",
+        context_length=8192,
+        parallel=1,
+    )
 
-    with pytest.raises(module.RuntimeCheckError, match="type values must be strings"):
-        module._assert_schema_type_values_are_strings(
-            {"type": "object", "properties": {"x": {"type": ["string", "null"]}}}
-        )
+    monkeypatch.setattr(module, "_port_preflight", lambda **_: {"ok": True})
+    monkeypatch.setattr(module, "_server_status", lambda _: {"running": True, "port": 8080})
+    monkeypatch.setattr(
+        module,
+        "_lms_ps",
+        lambda _: [
+            {
+                "identifier": "gemma-4-e2b-it-4bit",
+                "contextLength": 8192,
+                "parallel": 1,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "_http_json",
+        lambda *_args, **_kwargs: {
+            "data": [
+                {
+                    "model_key": "gemma-4-e2b-it",
+                    "loaded_instances": [{"id": "gemma-4-e2b-it-4bit"}],
+                }
+            ]
+        },
+    )
+
+    result = module._smoke_runtime_once(
+        lms=Path("/tmp/lms"),
+        target=target,
+        config_path=Path("configs/prod/backtest_ai_configurator.yaml"),
+    )
+
+    assert result["accepted"] is True
+    assert result["api_v1_models_loaded_instance"] is True
+    assert result["single_shot_chat_probe"] == "removed"
+    assert result["tool_agent_contract"] == "pending"
 
 
 def test_lmstudio_port_conflict_errors_are_not_retryable() -> None:

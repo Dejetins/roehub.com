@@ -10,7 +10,7 @@ from apps.api.routes import (
 from apps.api.wiring.modules.backtest import build_backtest_ai_configurator_use_cases
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
-    DeterministicBacktestConfigLLMGateway,
+    DeterministicBacktestConfigAgentGateway,
     FilesystemBacktestArtifactContextResolver,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
@@ -106,7 +106,7 @@ def _build_pipeline(*, environ: Mapping[str, str]) -> BacktestAiConfigPipeline:
             output_gate=BacktestAiOutputGate(),
         ),
         input_gate=BacktestAiInputGate(),
-        llm_gateway=DeterministicBacktestConfigLLMGateway(),
+        agent_gateway=DeterministicBacktestConfigAgentGateway(),
     )
 
 

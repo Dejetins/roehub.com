@@ -8,19 +8,18 @@ from uuid import UUID
 import pytest
 
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
-from trading.contexts.backtest.adapters.outbound.llm import (
-    DeterministicBacktestConfigLLMGateway,
+from trading.contexts.backtest.adapters.outbound.ai_config_agent import (
+    DeterministicBacktestConfigAgentGateway,
 )
 from trading.contexts.backtest.application.ai_configurator import (
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
     BacktestAiCatalogResolver,
     BacktestAiConfigJob,
     BacktestAiConfigPipeline,
     BacktestAiConfigValidator,
     BacktestAiInputGate,
     BacktestAiOutputGate,
-    backtest_ai_prompt_profile_for_mode,
-    build_generate_prompt_envelope,
-    build_repair_prompt_envelope,
 )
 from trading.contexts.backtest.application.dto.runtime_preflight import (
     BacktestArtifactMetadata,
@@ -53,79 +52,7 @@ def test_pipeline_safe_prompt_produces_current_form_ready_config() -> None:
     assert result.validated_config["top_n"] == 10
     assert "symbols" not in result.validated_config
     assert "strategy" not in result.validated_config
-    assert len(result.llm_attempts) == 1
-    assert result.llm_attempts[0].attempt_kind == "generate"
-    assert result.llm_attempts[0].system_prompt_version == "backtest-ai-configurator-v2"
-    assert result.llm_attempts[0].system_prompt_hash
-    assert result.llm_attempts[0].raw_model_response
-
-
-def test_pipeline_uses_catalog_fallback_for_supported_incomplete_draft() -> None:
-    incomplete = json.dumps(
-        {
-            "schema_version": 1,
-            "mode": "create",
-            "status": "config_ready",
-            "assistant_message": "Drafted.",
-            "assumptions": [],
-            "warnings": [],
-            "config": {
-                "coordinates": {
-                    "exchange": "binance",
-                    "market_type": "spot",
-                    "symbol": "BTCUSDT",
-                },
-                "timeframe": "15m",
-                "time_range": {"start": None, "end": None},
-                "indicators": [
-                    {"indicator_id": "momentum.rsi", "sources": None, "window": None}
-                ],
-                "risk": {"mode": "none"},
-                "execution": {},
-                "ranking": {"primary_metric": "total_return_pct", "direction": "desc"},
-                "top_n": 10,
-            },
-            "suggestions": [],
-        },
-        separators=(",", ":"),
-    )
-    clarification = json.dumps(
-        {
-            "schema_version": 1,
-            "mode": "repair",
-            "status": "needs_clarification",
-            "assistant_message": "Please provide the missing window.",
-            "assumptions": [],
-            "warnings": [],
-            "config": None,
-            "suggestions": [],
-        },
-        separators=(",", ":"),
-    )
-
-    result = _pipeline(
-        supported_symbols=("BTCUSDT",),
-        llm_gateway=DeterministicBacktestConfigLLMGateway(
-            scripted_generate_outputs=(incomplete,),
-            scripted_repair_outputs=(clarification,),
-        ),
-    ).run(
-        job=_job(
-            message=(
-                "Create a valid /backtests BTCUSDT config on 15m "
-                "with indicator_id momentum.rsi and keep top 10 results."
-            )
-        )
-    )
-
-    assert result.status == "ready"
-    assert result.validated_config is not None
-    assert result.validated_config["indicators"][0]["indicator_id"] == "momentum.rsi"
-    assert result.validated_config["indicators"][0]["sources"] == ["close"]
-    assert result.validated_config["top_n"] == 10
-    assert len(result.llm_attempts) == 2
-    assert result.llm_attempts[0].success is False
-    assert result.llm_attempts[1].success is False
+    assert result.llm_attempts == ()
 
 
 def test_pipeline_unsupported_indicator_needs_clarification_without_loadable_config() -> None:
@@ -210,7 +137,7 @@ def test_pipeline_multi_symbol_keeps_single_symbol_loadable_mvp() -> None:
     assert any("ETHUSDT" in item["message"] for item in result.suggestions)
 
 
-def test_pipeline_accepts_frozen_current_config_in_prompt_envelope() -> None:
+def test_pipeline_accepts_frozen_current_config_in_tool_agent_request() -> None:
     result = _pipeline().run(
         job=_job(
             message="Edit this /backtests config to use ETHUSDT and EMA on 15m.",
@@ -357,71 +284,6 @@ def test_validator_rejects_period_after_artifact_publisher_asof() -> None:
     }
 
 
-def test_prompt_envelope_keeps_trusted_blocks_before_untrusted_blocks() -> None:
-    pipeline = _pipeline()
-    catalog = pipeline.catalog_resolver.resolve()
-    envelope = build_generate_prompt_envelope(
-        job=_job(message="Собери конфиг для BTCUSDT"),
-        catalog=catalog,
-    )
-    prompt = envelope.prompt_text
-
-    assert prompt.index("<TRUSTED_SYSTEM_POLICY>") < prompt.index("<TRUSTED_CAPABILITIES>")
-    assert prompt.index("<TRUSTED_CAPABILITIES>") < prompt.index(
-        "<UNTRUSTED_USER_REQUEST>"
-    )
-    assert prompt.index("<UNTRUSTED_USER_REQUEST>") < prompt.index(
-        "<UNTRUSTED_CURRENT_CONFIG>"
-    )
-    assert prompt.index("<UNTRUSTED_CURRENT_CONFIG>") < prompt.index(
-        "<OUTPUT_JSON_SCHEMA>"
-    )
-    for literal in (
-        "<TRUSTED_SYSTEM_POLICY>",
-        "<TRUSTED_CAPABILITIES>",
-        "<UNTRUSTED_USER_REQUEST>",
-        "<UNTRUSTED_CURRENT_CONFIG>",
-        "<OUTPUT_JSON_SCHEMA>",
-    ):
-        assert literal in prompt
-    assert "repair_attempts: 1" not in prompt
-    assert "DSN" in prompt
-
-    repair_prompt = build_repair_prompt_envelope(
-        job=_job(message="Собери конфиг для BTCUSDT"),
-        catalog=catalog,
-        failed_raw_output="{bad",
-        parsed_draft=None,
-        validation_errors=(
-            {"path": "body", "code": "invalid_json", "message": "single object only"},
-        ),
-    ).prompt_text
-    assert "repair_attempts: 1" in repair_prompt
-
-
-def test_system_prompt_can_be_loaded_from_external_absolute_json(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
-    prompt_path = tmp_path / "backtest_ai_system_prompt.json"
-    prompt_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "version": "external-backtest-ai-policy-v1",
-                "system_policy": "<SYSTEM_POLICY>external policy</SYSTEM_POLICY>",
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH", str(prompt_path))
-
-    profile = backtest_ai_prompt_profile_for_mode("create")
-
-    assert profile.system_prompt_version == "external-backtest-ai-policy-v1"
-    assert "<SYSTEM_POLICY>external policy</SYSTEM_POLICY>" in profile.system_policy
-
-
 def test_input_gate_applies_external_security_gate_json(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
@@ -453,70 +315,20 @@ def test_input_gate_applies_external_security_gate_json(
     assert "external_private_catalog_probe" in result.flags
 
 
-def test_pipeline_repairs_invalid_json_once() -> None:
+def test_pipeline_invalid_agent_json_stops_without_single_shot_repair() -> None:
     result = _pipeline(
-        llm_gateway=DeterministicBacktestConfigLLMGateway(
-            generate_scenario="invalid_json",
-            repair_scenario="valid",
-        )
-    ).run(job=_job(message="Create BTCUSDT RSI config"))
-
-    assert result.status == "ready"
-    assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
-        "generate",
-        "repair",
-    ]
-    assert result.llm_attempts[0].failure_reason == "validation_failed"
-    assert result.llm_attempts[1].success is True
-
-
-def test_pipeline_repairs_schema_invalid_json_once() -> None:
-    result = _pipeline(
-        llm_gateway=DeterministicBacktestConfigLLMGateway(
-            generate_scenario="schema_invalid",
-            repair_scenario="valid",
-        )
-    ).run(job=_job(message="Create BTCUSDT RSI config"))
-
-    assert result.status == "ready"
-    assert len(result.llm_attempts) == 2
-    assert result.llm_attempts[0].validation_errors_json
-
-
-def test_pipeline_repairs_business_validation_failure_once() -> None:
-    result = _pipeline(
-        llm_gateway=DeterministicBacktestConfigLLMGateway(
-            generate_scenario="business_invalid",
-            repair_scenario="valid",
-        )
-    ).run(job=_job(message="Create BTCUSDT RSI config"))
-
-    assert result.status == "ready"
-    assert len(result.llm_attempts) == 2
-    assert result.llm_attempts[0].attempt_kind == "generate"
-    assert result.llm_attempts[1].attempt_kind == "repair"
-
-
-def test_pipeline_unrepaired_failure_stops_without_second_repair() -> None:
-    result = _pipeline(
-        llm_gateway=DeterministicBacktestConfigLLMGateway(
-            generate_scenario="invalid_json",
-            repair_scenario="schema_invalid",
-        )
+        agent_gateway=DeterministicBacktestConfigAgentGateway(scenario="invalid_json")
     ).run(job=_job(message="Create BTCUSDT RSI config"))
 
     assert result.status == "needs_clarification"
     assert result.validated_config is None
-    assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
-        "generate",
-        "repair",
-    ]
+    assert result.llm_attempts == ()
 
 
 def _pipeline(
     *,
     supported_symbols: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "SOLUSDT"),
-    llm_gateway: DeterministicBacktestConfigLLMGateway | None = None,
+    agent_gateway: DeterministicBacktestConfigAgentGateway | None = None,
     artifact_capabilities: dict[str, Any] | None = None,
 ) -> BacktestAiConfigPipeline:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
@@ -545,13 +357,12 @@ def _pipeline(
             ),
             output_gate=BacktestAiOutputGate(),
         ),
-        llm_gateway=llm_gateway or DeterministicBacktestConfigLLMGateway(),
+        agent_gateway=agent_gateway or DeterministicBacktestConfigAgentGateway(),
     )
 
 
 def _job(*, message: str, current_config: dict[str, Any] | None = None) -> BacktestAiConfigJob:
     now = datetime(2026, 5, 11, tzinfo=UTC)
-    prompt_profile = backtest_ai_prompt_profile_for_mode("create")
     return BacktestAiConfigJob(
         job_id=UUID("00000000-0000-0000-0000-000000000501"),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000502"),
@@ -562,8 +373,8 @@ def _job(*, message: str, current_config: dict[str, Any] | None = None) -> Backt
         user_prompt_text=message,
         user_prompt_hash="a" * 64,
         current_config_json=current_config,
-        system_prompt_version=prompt_profile.system_prompt_version,
-        system_prompt_hash=prompt_profile.system_prompt_hash,
+        system_prompt_version=BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
+        system_prompt_hash=BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
         catalog_snapshot_hash="b" * 64,
         runtime_defaults_hash="c" * 64,
         queued_at=now,
