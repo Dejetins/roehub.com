@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
+from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    supported_indicator_ids_for_signals_v1,
+)
 from trading.contexts.backtest.application.services.v2 import BacktestRuntimeDefaultsService
 
 _DEFAULT_EXCHANGE = "binance"
@@ -43,6 +46,7 @@ class BacktestAiAllowedCatalog:
     execution_defaults: Mapping[str, Any]
     hit_times_grid: Mapping[str, Any]
     indicators: tuple[BacktestAiIndicatorCatalogItem, ...]
+    artifact_capabilities: Mapping[str, Any] = field(default_factory=dict)
     source_paths: tuple[str, ...] = (_INDICATORS_CONFIG_SOURCE,)
 
     def as_mapping(self) -> dict[str, Any]:
@@ -61,6 +65,7 @@ class BacktestAiAllowedCatalog:
             "execution_defaults": dict(self.execution_defaults),
             "hit_times_grid": dict(self.hit_times_grid),
             "indicators": [item.as_mapping() for item in self.indicators],
+            "artifact_capabilities": _json_ready(self.artifact_capabilities),
             "source_paths": list(self.source_paths),
         }
 
@@ -96,10 +101,7 @@ class BacktestAiAllowedCatalog:
                 "symbol": self.symbols[0],
             },
             "timeframe": self.timeframes[0],
-            "time_range": {
-                "start": "2023-01-01T00:00:00Z",
-                "end": "2024-01-01T00:00:00Z",
-            },
+            "time_range": _default_time_range(self),
             "indicators": [_default_indicator_config(item=default_indicator)],
             "risk": {"mode": self.risk_modes[0]},
             "execution": {
@@ -128,22 +130,36 @@ class BacktestAiCatalogResolver:
     supported_symbols: Sequence[str] = (_DEFAULT_SYMBOL,)
     exchanges: Sequence[str] = (_DEFAULT_EXCHANGE,)
     market_types: Sequence[str] = (_DEFAULT_MARKET_TYPE,)
+    artifact_capabilities: Mapping[str, Any] = field(default_factory=dict)
     source_paths: Sequence[str] = (_INDICATORS_CONFIG_SOURCE,)
 
     def resolve(self) -> BacktestAiAllowedCatalog:
         runtime_defaults = self.runtime_defaults_service.execute().as_mapping()
         indicator_sources = dict(runtime_defaults.get("indicator_sources") or {})
         indicator_param_specs = dict(runtime_defaults.get("indicator_param_specs") or {})
+        executable_indicator_ids = set(supported_indicator_ids_for_signals_v1())
+        supported_indicator_ids = tuple(
+            indicator_id
+            for indicator_id in _normalize_sorted(runtime_defaults.get("supported_indicator_ids"))
+            if indicator_id in executable_indicator_ids
+        )
         indicators = tuple(
             BacktestAiIndicatorCatalogItem(
                 indicator_id=indicator_id,
                 sources=tuple(str(value) for value in indicator_sources.get(indicator_id, [])),
                 param_specs=dict(indicator_param_specs.get(indicator_id) or {}),
             )
-            for indicator_id in _normalize_sorted(runtime_defaults.get("supported_indicator_ids"))
+            for indicator_id in supported_indicator_ids
         )
         if not indicators:
-            raise ValueError("Backtest AI catalog requires at least one supported indicator")
+            raise ValueError(
+                "Backtest AI catalog requires at least one executable supported indicator"
+            )
+        artifact_capabilities = _filtered_artifact_capabilities(
+            artifact_capabilities=self.artifact_capabilities,
+            symbols=self.supported_symbols,
+            executable_indicator_ids=supported_indicator_ids,
+        )
         return BacktestAiAllowedCatalog(
             exchanges=_normalize_preserve_order(self.exchanges, fallback=_DEFAULT_EXCHANGE),
             market_types=_normalize_preserve_order(
@@ -177,6 +193,7 @@ class BacktestAiCatalogResolver:
             execution_defaults=dict(runtime_defaults.get("execution_defaults") or {}),
             hit_times_grid=dict(runtime_defaults.get("hit_times_grid") or {}),
             indicators=indicators,
+            artifact_capabilities=artifact_capabilities,
             source_paths=tuple(self.source_paths),
         )
 
@@ -191,6 +208,91 @@ def _default_indicator_config(*, item: BacktestAiIndicatorCatalogItem) -> dict[s
         "indicator_id": item.indicator_id,
         "sources": list(item.sources[:1]),
         "window": {"start": start, "stop": stop, "step": step},
+    }
+
+
+def _default_time_range(catalog: BacktestAiAllowedCatalog) -> dict[str, str]:
+    capability = _first_timeframe_capability(catalog)
+    if capability is not None:
+        period = capability.get("available_period")
+        if isinstance(period, Mapping):
+            start = period.get("start")
+            end = period.get("end_exclusive") or period.get("end")
+            if isinstance(start, str) and isinstance(end, str):
+                return {"start": start, "end": end}
+    return {
+        "start": "2023-01-01T00:00:00Z",
+        "end": "2024-01-01T00:00:00Z",
+    }
+
+
+def _first_timeframe_capability(
+    catalog: BacktestAiAllowedCatalog,
+) -> Mapping[str, Any] | None:
+    symbols = catalog.artifact_capabilities.get("symbols")
+    if not isinstance(symbols, Mapping):
+        return None
+    symbol_payload = symbols.get(catalog.symbols[0])
+    if not isinstance(symbol_payload, Mapping):
+        return None
+    timeframes = symbol_payload.get("timeframes")
+    if not isinstance(timeframes, Mapping):
+        return None
+    timeframe_payload = timeframes.get(catalog.timeframes[0])
+    return timeframe_payload if isinstance(timeframe_payload, Mapping) else None
+
+
+def _filtered_artifact_capabilities(
+    *,
+    artifact_capabilities: Mapping[str, Any],
+    symbols: Sequence[str],
+    executable_indicator_ids: tuple[str, ...],
+) -> Mapping[str, Any]:
+    if not artifact_capabilities:
+        return {}
+    allowed_symbols = set(_normalize_preserve_order(symbols, fallback=_DEFAULT_SYMBOL))
+    allowed_indicators = set(executable_indicator_ids)
+    raw_symbols = artifact_capabilities.get("symbols")
+    if not isinstance(raw_symbols, Mapping):
+        return {}
+    filtered_symbols: dict[str, Any] = {}
+    for raw_symbol, raw_symbol_payload in raw_symbols.items():
+        symbol = str(raw_symbol).strip().upper()
+        if symbol not in allowed_symbols or not isinstance(raw_symbol_payload, Mapping):
+            continue
+        raw_timeframes = raw_symbol_payload.get("timeframes")
+        if not isinstance(raw_timeframes, Mapping):
+            continue
+        filtered_timeframes: dict[str, Any] = {}
+        for raw_timeframe, raw_timeframe_payload in raw_timeframes.items():
+            timeframe = str(raw_timeframe).strip().lower()
+            if not timeframe or not isinstance(raw_timeframe_payload, Mapping):
+                continue
+            indicators = tuple(
+                indicator_id
+                for indicator_id in _normalize_sorted(raw_timeframe_payload.get("indicators"))
+                if indicator_id in allowed_indicators
+            )
+            if not indicators:
+                continue
+            filtered_timeframes[timeframe] = {
+                "available_period": _json_ready(
+                    raw_timeframe_payload.get("available_period") or {}
+                ),
+                "indicators": list(indicators),
+                "hit_times_available": bool(
+                    raw_timeframe_payload.get("hit_times_available", False)
+                ),
+                "artifact_asof_date": str(raw_timeframe_payload.get("artifact_asof_date", "")),
+                "published_at_utc": str(raw_timeframe_payload.get("published_at_utc", "")),
+            }
+        if filtered_timeframes:
+            filtered_symbols[symbol] = {"timeframes": filtered_timeframes}
+    if not filtered_symbols:
+        return {}
+    return {
+        "schema_version": 1,
+        "symbols": filtered_symbols,
     }
 
 
@@ -219,6 +321,14 @@ def _first_int(value: Any, *, default: int) -> int:
             if isinstance(item, int):
                 return item
     return default
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_json_ready(item) for item in value]
+    return value
 
 
 __all__ = [

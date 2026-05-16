@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
 import re
 import unicodedata
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, Mapping
 
 from .catalog import BacktestAiAllowedCatalog
@@ -21,6 +24,7 @@ BacktestAiSecurityTerminalStatus = Literal[
 
 _MAX_INPUT_BYTES = 12_000
 _MAX_INPUT_CHARS = 8_000
+_SECURITY_GATES_PATH_ENV = "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
 
 _DOMAIN_TERMS = (
     "backtest",
@@ -204,6 +208,7 @@ class BacktestAiInputGate:
             flags.append("prompt_injection")
         if _matches_any(_ENCODED_PATTERNS, normalized):
             flags.append("encoded_instruction")
+        flags.extend(_external_security_flags(normalized))
         if not _is_domain_prompt(normalized=normalized, mode=mode):
             flags.append("off_topic")
 
@@ -213,6 +218,7 @@ class BacktestAiInputGate:
             or "output_injection_request" in flags
             or "auto_run_backtest_attempt" in flags
             or "prompt_injection" in flags
+            or any(flag.startswith("external_") for flag in flags)
         ):
             return BacktestAiInputGateResult(
                 decision="block",
@@ -444,6 +450,41 @@ def _message(status: str, *, locale: str) -> str:
             "Ask for a symbol, indicator, period and risk settings."
         )
     )
+
+
+def _external_security_flags(normalized: str) -> list[str]:
+    raw_path = os.environ.get(_SECURITY_GATES_PATH_ENV, "").strip()
+    if not raw_path:
+        return []
+    path = Path(raw_path)
+    if not path.is_absolute():
+        return ["external_security_policy_invalid"]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ["external_security_policy_invalid"]
+    if not isinstance(payload, Mapping) or payload.get("schema_version") != 1:
+        return ["external_security_policy_invalid"]
+    patterns = payload.get("block_patterns")
+    if not isinstance(patterns, list):
+        return []
+    flags: list[str] = []
+    for item in patterns:
+        if not isinstance(item, Mapping):
+            continue
+        flag = item.get("flag")
+        pattern = item.get("pattern")
+        if not isinstance(flag, str) or not flag.strip().startswith("external_"):
+            continue
+        if not isinstance(pattern, str) or not pattern.strip():
+            continue
+        try:
+            compiled = re.compile(pattern, re.I)
+        except re.error:
+            return ["external_security_policy_invalid"]
+        if compiled.search(normalized) is not None:
+            flags.append(flag.strip())
+    return flags
 
 
 __all__ = [

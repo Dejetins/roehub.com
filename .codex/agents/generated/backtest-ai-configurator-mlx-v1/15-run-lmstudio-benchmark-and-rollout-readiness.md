@@ -29,6 +29,20 @@ context_sources:
       why: "runtime settings under test"
       inspect_symbols:
         - backtest_ai_configurator
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/catalog.py
+      why: "TRUSTED_CAPABILITIES generation and artifact coverage filtering"
+      inspect_symbols:
+        - BacktestAiCatalogResolver
+        - BacktestAiAllowedCatalog
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/prompt_profiles.py
+      why: "structured system prompt and external prompt hook"
+      inspect_symbols:
+        - BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION
+        - compact_allowed_catalog
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/validator.py
+      why: "window and artifact-period gates before ready/loadable state"
+      inspect_symbols:
+        - BacktestAiConfigValidator
     - path: docs/architecture/backtest/benchmark_iterations/2026-05-13_lmstudio_serving_recovery
       why: "accepted serving/readiness evidence"
       inspect_symbols:
@@ -66,6 +80,8 @@ hard_requirements:
   sequential_scenario_gating_required: true
   security_eval_required: true
   port_conflict_preflight_required: true
+  trusted_capabilities_required: true
+  external_policy_inventory_required: true
   no_local_smoke_acceptance: true
   no_paid_rollout: true
   publish_ci_deploy_required: true
@@ -117,6 +133,11 @@ required_literals:
   - "vm_stat"
   - "POST /v1/chat/completions"
   - "choices[0].message.content"
+  - "TRUSTED_CAPABILITIES"
+  - "ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH"
+  - "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
+  - "artifact publisher coverage"
+  - "indicator window bounds"
   - "JSON Schema type values must be strings"
   - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
@@ -205,6 +226,16 @@ Context ledger:
 
 - Stop if Iteration 14 cleanup evidence is missing or blocked.
 - Run serving preflight first: configured `base_url` port is free or owned by LM Studio, LM Studio daemon/server/model loaded/structured generation. The structured generation probe must use `POST /v1/chat/completions`, `response_format.type=json_schema`, string-only JSON Schema `type` values, and parse `choices[0].message.content` as JSON.
+- Before benchmark traffic, record the active AI configurator prompt/data
+  contract: system prompt version/hash, whether
+  `ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH` is configured, whether
+  `ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH` is configured, and the sanitized
+  `TRUSTED_CAPABILITIES` snapshot hash. Do not include private file paths,
+  raw prompt text, raw manifests, DSN, model server URLs, or secrets in evidence.
+- Verify benchmark-ready jobs are constrained by backend-produced capabilities:
+  indicators are executable in backend signal registry, indicator windows stay
+  inside `configs/prod/indicators.yaml` min/max or explicit values, and requested
+  periods do not exceed artifact publisher coverage.
 - Run one supported real API job and require `ready` before S1.
 - Run security eval and require unauthorized actions 0 before S1.
 - Apply explicit benchmark thresholds; do not use vague "architecture target" wording:

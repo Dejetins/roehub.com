@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -56,6 +57,9 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 
@@ -228,6 +232,10 @@ def build_backtest_ai_configurator_use_cases(
     )
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     repository = PostgresBacktestAiConfigRepository(gateway=postgres_gateway)
+    artifact_capabilities = _discover_ai_artifact_capabilities(
+        artifact_config=artifact_config,
+        artifact_loader=artifact_loader,
+    )
     return BacktestAiConfiguratorUseCases(
         jobs=BacktestAiConfigJobsUseCase(
             repository=repository,
@@ -240,7 +248,11 @@ def build_backtest_ai_configurator_use_cases(
         pipeline=BacktestAiConfigPipeline(
             catalog_resolver=BacktestAiCatalogResolver(
                 runtime_defaults_service=runtime_defaults_service,
-                supported_symbols=_discover_ai_artifact_symbols(artifact_config=artifact_config),
+                supported_symbols=_artifact_capability_symbols(
+                    artifact_capabilities=artifact_capabilities,
+                    fallback=_discover_ai_artifact_symbols(artifact_config=artifact_config),
+                ),
+                artifact_capabilities=artifact_capabilities,
             ),
             validator=BacktestAiConfigValidator(
                 preflight_service=preflight_service,
@@ -267,6 +279,92 @@ def _discover_ai_artifact_symbols(*, artifact_config: Any) -> tuple[str, ...]:
                 if child.is_dir() and (child / "current.yaml").exists():
                     discovered.add(child.name.upper())
     return tuple(sorted(discovered)) or ("BTCUSDT",)
+
+
+def _discover_ai_artifact_capabilities(
+    *,
+    artifact_config: Any,
+    artifact_loader: Any,
+) -> dict[str, Any]:
+    root = artifact_config.artifact_root_path()
+    if not root.exists() or not root.is_dir():
+        return {}
+    symbols: dict[str, Any] = {}
+    for exchange_root in root.iterdir():
+        if not exchange_root.is_dir():
+            continue
+        for market_type_root in exchange_root.iterdir():
+            if not market_type_root.is_dir():
+                continue
+            for symbol_root in market_type_root.iterdir():
+                if not symbol_root.is_dir() or not (symbol_root / "current.yaml").exists():
+                    continue
+                coordinates = ArtifactCoordinatesV2(
+                    exchange=exchange_root.name,
+                    market_type=market_type_root.name,
+                    symbol=symbol_root.name.upper(),
+                )
+                try:
+                    current_pointer = artifact_loader.load_current_pointer(coordinates)
+                    slot_manifest = artifact_loader.load_slot_manifest(
+                        coordinates,
+                        current_pointer.active_slot,
+                    )
+                except (FileNotFoundError, ValueError):
+                    continue
+                timeframe_payload: dict[str, Any] = {}
+                signal_entries_by_timeframe: dict[str, set[str]] = {}
+                for entry in slot_manifest.signals.manifests:
+                    signal_entries_by_timeframe.setdefault(entry.timeframe, set()).add(
+                        entry.indicator_id
+                    )
+                for price_manifest in slot_manifest.prices:
+                    indicators = tuple(
+                        sorted(signal_entries_by_timeframe.get(price_manifest.timeframe, ()))
+                    )
+                    if not indicators:
+                        continue
+                    timeframe_payload[price_manifest.timeframe] = {
+                        "available_period": {
+                            "start": _timestamp_to_utc_literal(
+                                price_manifest.coverage.open_time_start
+                            ),
+                            "end_exclusive": _timestamp_to_utc_literal(
+                                price_manifest.coverage.close_time_end
+                            ),
+                        },
+                        "indicators": list(indicators),
+                        "hit_times_available": price_manifest.timeframe == "15m",
+                        "artifact_asof_date": current_pointer.asof_date,
+                        "published_at_utc": current_pointer.published_at_utc,
+                    }
+                if timeframe_payload:
+                    symbols[symbol_root.name.upper()] = {"timeframes": timeframe_payload}
+    if not symbols:
+        return {}
+    return {"schema_version": 1, "symbols": symbols}
+
+
+def _artifact_capability_symbols(
+    *,
+    artifact_capabilities: Mapping[str, Any],
+    fallback: tuple[str, ...],
+) -> tuple[str, ...]:
+    symbols = artifact_capabilities.get("symbols")
+    if not isinstance(symbols, Mapping):
+        return fallback
+    values = tuple(sorted(str(symbol).upper() for symbol in symbols if str(symbol).strip()))
+    return values or fallback
+
+
+def _timestamp_to_utc_literal(value: int) -> str:
+    divisor = 1000 if abs(value) > 10_000_000_000 else 1
+    return (
+        datetime.fromtimestamp(value / divisor, tz=UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 __all__ = [

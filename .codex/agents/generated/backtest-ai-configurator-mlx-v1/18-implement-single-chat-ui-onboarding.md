@@ -78,6 +78,8 @@ hard_requirements:
   localized_startup_message_required: true
   request_language_response_policy_visible_required: true
   no_ai_backtest_execution_capability_required: true
+  no_capability_or_policy_internals_in_ui_required: true
+  validator_gated_assistant_text_required: true
   browser_qa_required: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
@@ -128,6 +130,9 @@ required_literals:
   - "startup message uses platform locale"
   - "model replies in the language of the user request"
   - "LM Studio structured output remains backend-owned"
+  - "TRUSTED_CAPABILITIES"
+  - "model does not read repository source code"
+  - "every model answer remains validator-gated"
   - "choices[0].message.content"
   - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
@@ -244,6 +249,14 @@ Context ledger:
   - says AI cannot run backtests and user must press existing run button manually.
 - Preserve language policy in UI copy: model replies in the language of the user's request.
 - Preserve status timeline and safe text rendering.
+- Do not expose `TRUSTED_CAPABILITIES`, system prompt text, security gate
+  details, artifact coverage internals, private paths, model server URL, LM
+  Studio URL, or repository/code-source details in browser UI. The browser
+  should show only trusted localized onboarding/status text and validated
+  assistant text from backend state.
+- Treat assistant/model text as backend-validated text only. The UI must not
+  parse raw LM Studio JSON, construct `response_format`, or infer loadability
+  from model text.
 - `Load configuration` / `Загрузить конфигурацию` remains only for backend `ready` with validated config.
 - Update tests to assert old mode controls are gone and onboarding exists.
 - Run browser QA on `/backtests`, including console/network check.

@@ -16,6 +16,7 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigJob,
     BacktestAiConfigPipeline,
     BacktestAiConfigValidator,
+    BacktestAiInputGate,
     BacktestAiOutputGate,
     backtest_ai_prompt_profile_for_mode,
     build_generate_prompt_envelope,
@@ -54,7 +55,7 @@ def test_pipeline_safe_prompt_produces_current_form_ready_config() -> None:
     assert "strategy" not in result.validated_config
     assert len(result.llm_attempts) == 1
     assert result.llm_attempts[0].attempt_kind == "generate"
-    assert result.llm_attempts[0].system_prompt_version == "backtest-ai-configurator-v1"
+    assert result.llm_attempts[0].system_prompt_version == "backtest-ai-configurator-v2"
     assert result.llm_attempts[0].system_prompt_hash
     assert result.llm_attempts[0].raw_model_response
 
@@ -295,6 +296,67 @@ def test_validator_rejects_unsupported_values_and_symbols_array() -> None:
     }
 
 
+def test_validator_rejects_indicator_window_outside_yaml_bounds() -> None:
+    pipeline = _pipeline()
+    catalog = pipeline.catalog_resolver.resolve()
+    draft = _model_output(catalog=catalog)
+    assert isinstance(draft["config"], dict)
+    draft["config"]["indicators"][0]["window"] = {"start": 1, "stop": 500, "step": 1}
+
+    outcome = pipeline.validator.validate_model_output(
+        raw_output=json.dumps(draft),
+        catalog=catalog,
+    )
+
+    assert outcome.status == "needs_clarification"
+    assert outcome.validated_config is None
+    assert {item["code"] for item in outcome.validation_errors} >= {
+        "unsupported_indicator_window"
+    }
+
+
+def test_validator_rejects_period_after_artifact_publisher_asof() -> None:
+    pipeline = _pipeline(
+        artifact_capabilities={
+            "schema_version": 1,
+            "symbols": {
+                "BTCUSDT": {
+                    "timeframes": {
+                        "15m": {
+                            "available_period": {
+                                "start": "2023-01-01T00:00:00Z",
+                                "end_exclusive": "2026-05-15T00:00:00Z",
+                            },
+                            "indicators": ["momentum.rsi"],
+                            "hit_times_available": True,
+                            "artifact_asof_date": "2026-05-15",
+                            "published_at_utc": "2026-05-15T00:00:00Z",
+                        }
+                    }
+                }
+            },
+        }
+    )
+    catalog = pipeline.catalog_resolver.resolve()
+    draft = _model_output(catalog=catalog)
+    assert isinstance(draft["config"], dict)
+    draft["config"]["time_range"] = {
+        "start": "2026-05-15T00:00:00Z",
+        "end": "2026-05-16T00:00:00Z",
+    }
+
+    outcome = pipeline.validator.validate_model_output(
+        raw_output=json.dumps(draft),
+        catalog=catalog,
+    )
+
+    assert outcome.status == "needs_clarification"
+    assert outcome.validated_config is None
+    assert {item["code"] for item in outcome.validation_errors} >= {
+        "artifact_period_unavailable"
+    }
+
+
 def test_prompt_envelope_keeps_trusted_blocks_before_untrusted_blocks() -> None:
     pipeline = _pipeline()
     catalog = pipeline.catalog_resolver.resolve()
@@ -304,10 +366,8 @@ def test_prompt_envelope_keeps_trusted_blocks_before_untrusted_blocks() -> None:
     )
     prompt = envelope.prompt_text
 
-    assert prompt.index("<TRUSTED_SYSTEM_POLICY>") < prompt.index(
-        "<TRUSTED_ALLOWED_CATALOG>"
-    )
-    assert prompt.index("<TRUSTED_ALLOWED_CATALOG>") < prompt.index(
+    assert prompt.index("<TRUSTED_SYSTEM_POLICY>") < prompt.index("<TRUSTED_CAPABILITIES>")
+    assert prompt.index("<TRUSTED_CAPABILITIES>") < prompt.index(
         "<UNTRUSTED_USER_REQUEST>"
     )
     assert prompt.index("<UNTRUSTED_USER_REQUEST>") < prompt.index(
@@ -318,7 +378,7 @@ def test_prompt_envelope_keeps_trusted_blocks_before_untrusted_blocks() -> None:
     )
     for literal in (
         "<TRUSTED_SYSTEM_POLICY>",
-        "<TRUSTED_ALLOWED_CATALOG>",
+        "<TRUSTED_CAPABILITIES>",
         "<UNTRUSTED_USER_REQUEST>",
         "<UNTRUSTED_CURRENT_CONFIG>",
         "<OUTPUT_JSON_SCHEMA>",
@@ -337,6 +397,60 @@ def test_prompt_envelope_keeps_trusted_blocks_before_untrusted_blocks() -> None:
         ),
     ).prompt_text
     assert "repair_attempts: 1" in repair_prompt
+
+
+def test_system_prompt_can_be_loaded_from_external_absolute_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    prompt_path = tmp_path / "backtest_ai_system_prompt.json"
+    prompt_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "version": "external-backtest-ai-policy-v1",
+                "system_policy": "<SYSTEM_POLICY>external policy</SYSTEM_POLICY>",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH", str(prompt_path))
+
+    profile = backtest_ai_prompt_profile_for_mode("create")
+
+    assert profile.system_prompt_version == "external-backtest-ai-policy-v1"
+    assert "<SYSTEM_POLICY>external policy</SYSTEM_POLICY>" in profile.system_policy
+
+
+def test_input_gate_applies_external_security_gate_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    gates_path = tmp_path / "backtest_ai_security_gates.json"
+    gates_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "block_patterns": [
+                    {
+                        "flag": "external_private_catalog_probe",
+                        "pattern": "private catalog probe",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH", str(gates_path))
+
+    result = BacktestAiInputGate().evaluate(
+        message="Create BTCUSDT RSI config with private catalog probe",
+        locale="en",
+        mode="create",
+    )
+
+    assert result.decision == "block"
+    assert "external_private_catalog_probe" in result.flags
 
 
 def test_pipeline_repairs_invalid_json_once() -> None:
@@ -403,6 +517,7 @@ def _pipeline(
     *,
     supported_symbols: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "SOLUSDT"),
     llm_gateway: DeterministicBacktestConfigLLMGateway | None = None,
+    artifact_capabilities: dict[str, Any] | None = None,
 ) -> BacktestAiConfigPipeline:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -420,6 +535,7 @@ def _pipeline(
         catalog_resolver=BacktestAiCatalogResolver(
             runtime_defaults_service=runtime_defaults_service,
             supported_symbols=supported_symbols,
+            artifact_capabilities=artifact_capabilities or {},
         ),
         validator=BacktestAiConfigValidator(
             preflight_service=BacktestPreflightService(

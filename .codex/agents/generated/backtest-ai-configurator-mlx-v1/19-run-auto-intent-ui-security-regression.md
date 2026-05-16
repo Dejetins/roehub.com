@@ -77,6 +77,8 @@ hard_requirements:
   old_mode_ui_zero_reference_required: true
   model_reply_language_regression_required: true
   no_ai_backtest_execution_capability_required: true
+  trusted_capabilities_regression_required: true
+  external_policy_hooks_regression_required: true
   macstudio_pipeline_required_if_lmstudio_ready: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
@@ -123,6 +125,12 @@ required_literals:
   - "model replies in request language"
   - "startup message uses platform locale"
   - "AI cannot run backtests"
+  - "TRUSTED_CAPABILITIES"
+  - "ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH"
+  - "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
+  - "model does not read repository source code"
+  - "indicator window bounds"
+  - "artifact publisher coverage"
   - "Load configuration"
   - "Загрузить конфигурацию"
   - "POST /v1/chat/completions"
@@ -244,6 +252,19 @@ Context ledger:
   - EN prompt gets EN assistant response policy;
   - platform locale affects only startup trusted copy, not model response language.
 - Verify no AI code path calls `/api/backtests/jobs` or creates a backtest job.
+- Verify the final backend trust boundary:
+  - model receives `TRUSTED_CAPABILITIES`, not repository source code, raw
+    manifests, private paths, DB state, runtime URLs, or platform internals;
+  - active capabilities include only backend-executable indicators;
+  - indicator windows outside `configs/prod/indicators.yaml` bounds or explicit
+    values do not produce loadable `ready`;
+  - periods beyond artifact publisher coverage do not produce loadable `ready`;
+  - external system prompt/security gate hooks are preserved and covered by
+    regression tests or documented host configuration evidence.
+- Verify every model answer is still schema/security gated. There must be no
+  free-form general backtesting chat path that bypasses output gate and
+  validator; explain/discussion-style answers must remain non-loadable unless a
+  validated config is present.
 - If LM Studio serving/lifecycle evidence from Iterations 10-15 is accepted, run Mac Studio real pipeline smoke with at least:
   - 5 create/edit supported prompts;
   - 2 explain prompts with no load action;

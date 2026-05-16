@@ -214,7 +214,7 @@ def _chat_messages(
     request: BacktestConfigLLMRequest | BacktestConfigLLMRepairRequest,
 ) -> list[dict[str, str]]:
     blocks: list[tuple[str, str]] = [
-        ("TRUSTED_ALLOWED_CATALOG", _canonical_json(request.catalog_subset_json)),
+        ("TRUSTED_CAPABILITIES", _canonical_json(request.catalog_subset_json)),
         ("UNTRUSTED_USER_REQUEST", request.job.user_prompt_text),
         (
             "TRUSTED_REQUEST_INTERPRETATION",
@@ -251,7 +251,7 @@ def _chat_messages(
             (
                 "For config_ready, config must include coordinates, timeframe, "
                 "time_range, indicators, risk, execution, ranking, and top_n. "
-                "Use only values from TRUSTED_ALLOWED_CATALOG. Use one "
+                "Use only values from TRUSTED_CAPABILITIES. Use one "
                 "coordinates.symbol only. Never add scripts, HTML, API calls, "
                 "job creation, or auto-run actions."
             ),
