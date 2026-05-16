@@ -56,11 +56,11 @@ def test_lmstudio_adapter_posts_structured_chat_completions_request() -> None:
     payload = captured["payload"]
     assert payload["model"] == "gemma-4-e2b-it-4bit"
     assert payload["messages"][0]["role"] == "system"
-    assert "Ты Backtest AI Configurator" in payload["messages"][0]["content"]
+    assert "roehub.backtests.ai_configurator.v2" in payload["messages"][0]["content"]
     assert payload["messages"][1]["role"] == "user"
     assert "trusted prompt envelope" not in payload["messages"][1]["content"]
     assert "Собери конфиг" in payload["messages"][1]["content"]
-    assert "TRUSTED_ALLOWED_CATALOG" in payload["messages"][1]["content"]
+    assert "TRUSTED_CAPABILITIES" in payload["messages"][1]["content"]
     assert "OUTPUT_JSON_SCHEMA" in payload["messages"][1]["content"]
     assert payload["temperature"] == 0.2
     assert payload["top_p"] == 0.9

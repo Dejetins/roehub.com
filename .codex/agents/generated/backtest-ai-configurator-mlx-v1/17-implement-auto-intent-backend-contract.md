@@ -32,10 +32,20 @@ context_sources:
         - BacktestAiConfigJobsUseCase
         - _normalize_mode
     - path: src/trading/contexts/backtest/application/ai_configurator/services/prompt_profiles.py
-      why: "prompt profile selection currently uses mode"
+      why: "prompt profile, structured system prompt and TRUSTED_CAPABILITIES envelope"
       inspect_symbols:
         - backtest_ai_prompt_profile_for_mode
         - build_generate_prompt_envelope
+        - compact_allowed_catalog
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/catalog.py
+      why: "sanitized capability generation and executable indicator filtering"
+      inspect_symbols:
+        - BacktestAiCatalogResolver
+        - BacktestAiAllowedCatalog
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/validator.py
+      why: "all ready/loadable outputs must pass capability and business validation"
+      inspect_symbols:
+        - BacktestAiConfigValidator
   conditional_bundles:
     security_and_language:
       read_when: "when implementing intent/language detection and safety gates"
@@ -75,6 +85,9 @@ hard_requirements:
   legacy_mode_compatibility_explicit: true
   model_reply_language_matches_user_request_required: true
   no_ai_backtest_execution_capability_required: true
+  trusted_capabilities_required: true
+  every_model_answer_validator_gated_required: true
+  external_policy_hooks_preserved_required: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
 
@@ -121,6 +134,12 @@ required_literals:
   - "model replies in the language of the user request"
   - "AI cannot run backtests"
   - "mode is optional/deprecated"
+  - "TRUSTED_CAPABILITIES"
+  - "ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH"
+  - "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
+  - "model does not read repository source code"
+  - "indicator window bounds"
+  - "artifact publisher coverage"
   - "POST /v1/chat/completions"
   - "choices[0].message.content"
   - "JSON Schema type values must be strings"
@@ -234,6 +253,22 @@ Context ledger:
 - Browser/user-selected mode must not be authoritative. If a legacy `mode` value is sent, backend may map it into a hint only if documented and tested.
 - Add deterministic intent resolver before LLM call. It may use domain terms, current-config state and clear user phrases; unclear cases must return `needs_clarification` rather than guessing a loadable config.
 - Prompt profile selection must use resolved intent.
+- Prompt construction must preserve the structured v2 trust boundary:
+  `TRUSTED_CAPABILITIES` is the only model-visible capability/data source, the
+  model must not read or be given repository source code, raw manifests, private
+  paths, DB data, runtime URLs, or logs.
+- Preserve external operator hooks for system prompt and additive security gates:
+  `ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH` and
+  `ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH`. Do not move those runtime inputs
+  into tracked repository prompt/config files.
+- If adding any chat-like/explain behavior, keep it schema/security gated. Do
+  not add a free-form backtesting chat path in this prompt; any future general
+  `discuss_backtest_config` path must be a separate schema with no `config` and
+  no load action.
+- Ready/loadable config output must remain gated by validator checks for
+  backend-executable indicators, `indicators.yaml` window bounds/explicit
+  values, artifact publisher period coverage, output safety, schema and
+  preflight business validation.
 - Any LM Studio `response_format.json_schema` emitted or changed in this prompt
   must keep every schema `type` value as a string. Do not emit nullable union
   arrays such as `type: ["string", "null"]`; use empty string or explicit

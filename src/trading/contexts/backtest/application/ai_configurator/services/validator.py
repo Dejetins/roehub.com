@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, Mapping
 
 from jsonschema import Draft202012Validator
@@ -389,6 +390,20 @@ def _catalog_issues(
                         message="source is not supported by the allowed catalog",
                     )
                 )
+        _catalog_window_issues(
+            window=indicator.get("window"),
+            param_specs=catalog_item.param_specs,
+            path=f"indicators.{index}.window",
+            issues=issues,
+        )
+        _artifact_indicator_issue(
+            config=config,
+            indicator_id=indicator_id,
+            path=f"indicators.{index}.indicator_id",
+            catalog=catalog,
+            issues=issues,
+        )
+    _artifact_period_issues(config=config, catalog=catalog, issues=issues)
     risk = config.get("risk")
     if isinstance(risk, Mapping):
         _catalog_choice(
@@ -442,6 +457,185 @@ def _catalog_issues(
             )
         )
     return tuple(issues)
+
+
+def _catalog_window_issues(
+    *,
+    window: Any,
+    param_specs: Mapping[str, Any],
+    path: str,
+    issues: list[dict[str, str]],
+) -> None:
+    if not isinstance(window, Mapping):
+        return
+    params = param_specs.get("params")
+    if not isinstance(params, Mapping):
+        return
+    window_spec = params.get("window")
+    if not isinstance(window_spec, Mapping):
+        return
+    values = tuple(
+        value
+        for value in (window.get("start"), window.get("stop"), window.get("step"))
+        if isinstance(value, int) and not isinstance(value, bool)
+    )
+    if len(values) != 3:
+        return
+    start, stop, step = values
+    mode = str(window_spec.get("mode", "")).strip().lower()
+    if stop < start:
+        issues.append(
+            _issue(
+                path=path,
+                code="unsupported_indicator_window",
+                message="window.stop must be greater than or equal to window.start",
+            )
+        )
+        return
+    if mode == "range":
+        min_value = _optional_int(window_spec.get("start"))
+        max_value = _optional_int(window_spec.get("stop_incl"))
+        allowed_step = _optional_int(window_spec.get("step"))
+        if (
+            min_value is not None
+            and max_value is not None
+            and allowed_step is not None
+            and (
+                start < min_value
+                or stop > max_value
+                or step < allowed_step
+                or (start - min_value) % allowed_step != 0
+                or (stop - min_value) % allowed_step != 0
+                or step % allowed_step != 0
+            )
+        ):
+            issues.append(
+                _issue(
+                    path=path,
+                    code="unsupported_indicator_window",
+                    message="window is outside supported indicator.yaml min/max/step bounds",
+                )
+            )
+        return
+    if mode == "explicit":
+        allowed_values = {
+            value
+            for value in window_spec.get("values", ())
+            if isinstance(value, int) and not isinstance(value, bool)
+        }
+        if allowed_values and (start not in allowed_values or stop not in allowed_values):
+            issues.append(
+                _issue(
+                    path=path,
+                    code="unsupported_indicator_window",
+                    message="window start/stop must be present in supported explicit values",
+                )
+            )
+
+
+def _artifact_indicator_issue(
+    *,
+    config: Mapping[str, Any],
+    indicator_id: Any,
+    path: str,
+    catalog: BacktestAiAllowedCatalog,
+    issues: list[dict[str, str]],
+) -> None:
+    if not isinstance(indicator_id, str):
+        return
+    capability = _config_timeframe_capability(config=config, catalog=catalog)
+    if capability is None:
+        return
+    indicators = capability.get("indicators")
+    if not isinstance(indicators, list):
+        return
+    allowed = {str(item).strip().lower() for item in indicators if str(item).strip()}
+    if allowed and indicator_id.strip().lower() not in allowed:
+        issues.append(
+            _issue(
+                path=path,
+                code="artifact_indicator_unavailable",
+                message="indicator is not available in the current artifact publisher snapshot",
+            )
+        )
+
+
+def _artifact_period_issues(
+    *,
+    config: Mapping[str, Any],
+    catalog: BacktestAiAllowedCatalog,
+    issues: list[dict[str, str]],
+) -> None:
+    capability = _config_timeframe_capability(config=config, catalog=catalog)
+    if capability is None:
+        return
+    period = capability.get("available_period")
+    if not isinstance(period, Mapping):
+        return
+    available_start = _parse_utc(period.get("start"))
+    available_end = _parse_utc(period.get("end_exclusive") or period.get("end"))
+    requested = config.get("time_range")
+    if (
+        available_start is None
+        or available_end is None
+        or not isinstance(requested, Mapping)
+    ):
+        return
+    requested_start = _parse_utc(requested.get("start"))
+    requested_end = _parse_utc(requested.get("end"))
+    if requested_start is None or requested_end is None:
+        return
+    if requested_start < available_start or requested_end > available_end:
+        issues.append(
+            _issue(
+                path="time_range",
+                code="artifact_period_unavailable",
+                message="time_range is outside the current artifact publisher coverage",
+            )
+        )
+
+
+def _config_timeframe_capability(
+    *,
+    config: Mapping[str, Any],
+    catalog: BacktestAiAllowedCatalog,
+) -> Mapping[str, Any] | None:
+    artifact_capabilities = catalog.artifact_capabilities
+    if not artifact_capabilities:
+        return None
+    coordinates = config.get("coordinates")
+    if not isinstance(coordinates, Mapping):
+        return None
+    symbol = coordinates.get("symbol")
+    timeframe = config.get("timeframe")
+    if not isinstance(symbol, str) or not isinstance(timeframe, str):
+        return None
+    symbols = artifact_capabilities.get("symbols")
+    if not isinstance(symbols, Mapping):
+        return None
+    symbol_payload = symbols.get(symbol.strip().upper())
+    if not isinstance(symbol_payload, Mapping):
+        return None
+    timeframes = symbol_payload.get("timeframes")
+    if not isinstance(timeframes, Mapping):
+        return None
+    timeframe_payload = timeframes.get(timeframe.strip().lower())
+    return timeframe_payload if isinstance(timeframe_payload, Mapping) else None
+
+
+def _parse_utc(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _optional_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 def _catalog_choice(

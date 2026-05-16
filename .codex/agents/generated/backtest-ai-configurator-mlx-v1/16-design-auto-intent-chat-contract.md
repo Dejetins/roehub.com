@@ -42,6 +42,8 @@ context_sources:
       read_when: "when defining target prompt/intent profile responsibilities"
       paths:
         - src/trading/contexts/backtest/application/ai_configurator/services/prompt_profiles.py
+        - src/trading/contexts/backtest/application/ai_configurator/services/catalog.py
+        - src/trading/contexts/backtest/application/ai_configurator/services/validator.py
         - src/trading/contexts/backtest/application/ai_configurator/services/security.py
     ui_state_contract:
       read_when: "when defining backend-to-web state payload"
@@ -72,6 +74,8 @@ hard_requirements:
   startup_message_platform_locale_required: true
   model_reply_language_matches_user_request_required: true
   no_ai_backtest_execution_capability_required: true
+  trusted_capabilities_boundary_required: true
+  no_general_backtesting_chat_scope_creep_required: true
   docs_update_required: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
@@ -115,6 +119,10 @@ required_literals:
   - "model replies in the language of the user request"
   - "startup message uses platform locale"
   - "AI cannot run backtests"
+  - "TRUSTED_CAPABILITIES"
+  - "externalized_runtime_capabilities"
+  - "model does not read repository source code"
+  - "every model answer remains validator-gated"
   - "mode selector removed"
   - "JSON Schema type values must be strings"
   - "do not use type: [\"string\", \"null\"]"
@@ -216,6 +224,22 @@ Context ledger:
   - old user-selected mode is removed from the browser contract;
   - compatibility handling for old `mode` field is explicitly decided and classified;
   - storage can keep existing `mode` column only as a resolved intent/compatibility field if that avoids unsafe migration churn.
+- Define prompt/data boundary:
+  - model does not read repository source code, database state, raw artifact
+    manifests, private paths, runtime config, logs, or platform internals;
+  - backend builds sanitized `TRUSTED_CAPABILITIES` from external/runtime
+    sources and passes only that capability object to the model;
+  - capabilities include only backend-executable indicators, allowed
+    `indicators.yaml` window bounds/explicit values, and artifact publisher
+    period coverage;
+  - system prompt and additive security gates may be supplied by operator-owned
+    absolute JSON files outside the repository.
+- Explicitly decide chat scope: the single chat is an AI configurator chat for
+  `/backtests` config creation/edit/explanation/repair/safety suggestions, not
+  an unrestricted educational backtesting assistant. If a future general
+  `discuss_backtest_config` mode is desired, it must use a separate output
+  schema with no `config`, no load action, and the same input/output security
+  gates.
 - Define language policy:
   - startup UI message uses platform-selected locale;
   - model assistant response uses the language detected from the user request;
@@ -223,6 +247,8 @@ Context ledger:
 - Define safety:
   - model cannot start, schedule, enqueue, or auto-run backtests;
   - AI may only return explanations, clarification, or validated config drafts that the user may apply manually;
+  - every model answer remains schema/security validated before it is shown or
+    treated as loadable; no raw model text is a browser contract;
   - existing backtest run button remains the only job-creation control.
 - Update old/current docs and create the new architecture doc.
 - Run `publish-ci-deploy` after docs gates pass.

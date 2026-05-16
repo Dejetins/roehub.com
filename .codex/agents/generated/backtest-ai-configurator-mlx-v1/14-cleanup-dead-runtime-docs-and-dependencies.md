@@ -17,6 +17,26 @@ context_sources:
     - path: docs/architecture/backtest/backtest-ai-configurator-mlx-v1.md
       why: "main stale architecture doc"
   task_entrypoints:
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/prompt_profiles.py
+      why: "current structured system prompt and TRUSTED_CAPABILITIES envelope"
+      inspect_symbols:
+        - BACKTEST_AI_CONFIG_SYSTEM_PROMPT_VERSION
+        - compact_allowed_catalog
+        - build_generate_prompt_envelope
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/catalog.py
+      why: "sanitized capabilities and executable indicator filtering"
+      inspect_symbols:
+        - BacktestAiCatalogResolver
+        - BacktestAiAllowedCatalog
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/security.py
+      why: "externalized security gate hook and deterministic input/output gates"
+      inspect_symbols:
+        - BacktestAiInputGate
+        - BacktestAiOutputGate
+    - path: src/trading/contexts/backtest/application/ai_configurator/services/validator.py
+      why: "capability, indicator-window and artifact-period validation"
+      inspect_symbols:
+        - BacktestAiConfigValidator
     - path: src/trading/contexts/backtest/adapters/outbound/llm
       why: "runtime adapter code"
       inspect_symbols:
@@ -74,6 +94,7 @@ hard_requirements:
   no_dead_processes_required: true
   zero_current_stale_reference_gate_required: true
   dependency_inventory_required: true
+  external_prompt_capabilities_cleanup_required: true
   publish_ci_deploy_required: true
   macstudio_sync_required: true
 
@@ -122,6 +143,10 @@ required_literals:
   - "MLX generate"
   - "MLX repair"
   - "POST /v1/chat/completions"
+  - "TRUSTED_CAPABILITIES"
+  - "externalized_runtime_capabilities"
+  - "ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH"
+  - "ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH"
   - "JSON Schema type values must be strings"
   - "do not use type: [\"string\", \"null\"]"
   - "accepted: true/false"
@@ -204,6 +229,8 @@ Context ledger:
   - historical failed benchmark must stay visible but not treated as current target.
 - contract_changes:
   - current runtime contract becomes LM Studio only for MVP.
+  - model prompt/data contract becomes structured system policy plus sanitized `TRUSTED_CAPABILITIES`.
+  - system prompt and additive security gates may be loaded from absolute external JSON files outside the repository.
 - risks:
   - deleting useful audit/evidence;
   - leaving dead names that mislead future agents;
@@ -229,6 +256,18 @@ Context ledger:
   `response_format.type=json_schema`, prompt text in `messages[].content`,
   parse `choices[0].message.content` as JSON, and do not emit JSON Schema
   nullable union `type: ["string", "null"]`.
+- Update current docs so the model is never described as reading repository
+  source code, database state, private paths, raw artifact manifests, or runtime
+  config directly. It receives only backend-produced sanitized
+  `TRUSTED_CAPABILITIES`.
+- Preserve the current externalized policy hooks: document
+  `ROEHUB_BACKTEST_AI_SYSTEM_PROMPT_PATH` and
+  `ROEHUB_BACKTEST_AI_SECURITY_GATES_PATH` as operator/runtime inputs outside
+  the repository, with code defaults only as local/dev fail-safe behavior.
+- Ensure cleanup does not remove the capability contract that filters indicators
+  through backend executable signal support, constrains indicator windows to
+  `configs/prod/indicators.yaml`, and clips periods to artifact publisher
+  coverage.
 - Produce dependency inventory: inspect `pyproject.toml`, `uv.lock`, and current imports; remove dependencies/imports added only for the failed `mlx_lm.server` path if they are unused, or document why each retained dependency is still needed.
 - Verify Mac Studio has no monitored/running stale `mlx_lm.server` service for this feature.
 - Markdown and JSON evidence must include explicit machine-readable gate fields: `accepted: true/false`, `blocking_reason: null|string`, and `next_prompt_allowed: true/false`.
