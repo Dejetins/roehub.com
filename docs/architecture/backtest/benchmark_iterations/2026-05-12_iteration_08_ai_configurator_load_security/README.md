@@ -75,7 +75,11 @@ worker host under test.
 
 ## Current Rollout Decision
 
-Rollout status: blocked until Mac Studio benchmark evidence is recorded.
+Rollout status: historical failure evidence / non-acceptance. This folder stays
+visible for audit and benchmark harness reuse, but it is not the current runtime
+target after the accepted LM Studio serving, adapter, lifecycle and pipeline
+readiness gates in
+`../2026-05-13_lmstudio_serving_recovery/security_pipeline_readiness.md`.
 
 Current blocker evidence:
 
@@ -93,6 +97,7 @@ Accepted runtime settings:
 - active generations: not accepted yet;
 - queue limits: not accepted yet.
 
-Current production config keeps AI configurator disabled. Existing high queue
-and concurrency limit literals are not accepted public defaults; they require
-replacement only after Mac Studio evidence supports concrete values.
+The huge queue and concurrency literals captured during this failed iteration
+were never accepted public defaults. Current production config uses conservative
+LM Studio limits and keeps benchmark acceptance separate from this historical
+failure evidence.

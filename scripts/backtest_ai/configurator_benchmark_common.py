@@ -1075,7 +1075,8 @@ def collect_macstudio_snapshot(host: str | None) -> JsonObject | None:
         "echo 'vm_stat:'; vm_stat; "
         "echo 'memory_pressure:'; memory_pressure 2>/dev/null || true; "
         "echo 'worker_processes:'; "
-        "ps -axo pid,ppid,rss,command | grep -E 'backtest-ai-configurator|mlx_lm|mlx' | "
+        "ps -axo pid,ppid,rss,command | "
+        "grep -E 'backtest-ai-configurator|lmstudio|lms|mlx_lm[._]server' | "
         "grep -v grep || true"
     )
     started = time.perf_counter()

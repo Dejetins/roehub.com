@@ -79,7 +79,7 @@ class BacktestAiConfiguratorMetrics:
         )
         self.active_generations = Gauge(
             "backtest_ai_config_active_generations",
-            "Backtest AI configurator active MLX generations.",
+            "Backtest AI configurator active model generations.",
             ("model_id",),
             registry=self.registry,
         )

@@ -100,7 +100,7 @@ backtest_ai_configurator:
     request_timeout_sec: 90
     queue_timeout_sec: 180
   model:
-    runtime: mlx_lm_server
+    runtime: unsupported_local_runtime
     model_id: gemma-4-e2b-it-4bit
     model_path: /tmp/gemma-4-e2b-it-4bit
     context_window_tokens: 8192
