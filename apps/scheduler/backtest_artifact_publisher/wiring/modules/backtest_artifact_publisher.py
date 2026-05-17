@@ -25,6 +25,7 @@ from apps.api.wiring.modules.indicators import (
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest_artifacts.adapters.outbound import (
+    AtomicArtifactAvailabilitySummaryWriterV2,
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
     PostgresBacktestJobRepository,
@@ -37,6 +38,8 @@ from trading.contexts.backtest_artifacts.application.services import (
     ArtifactCoordinatesV2,
     ArtifactSlotPublishErrorV2,
     ArtifactTailRebuildBarsV2,
+    BacktestArtifactAvailabilitySummaryGeneratorV2,
+    BacktestArtifactAvailabilitySummaryResultV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     BacktestSignalRulesEngineV2,
@@ -63,11 +66,18 @@ type PublisherRunStatus = Literal[
     "succeeded",
     "inactive_slot_pinned",
     "validation_failed",
+    "summary_failed",
     "lock_held",
     "unexpected_error",
 ]
 NowProvider = Callable[[], datetime]
 StopRequested = Callable[[], bool]
+
+
+class BacktestArtifactAvailabilitySummaryRegenerator(Protocol):
+    def regenerate(self) -> BacktestArtifactAvailabilitySummaryResultV2:
+        """Regenerate the root-level availability summary."""
+        ...
 
 
 def _default_now_provider() -> datetime:
@@ -460,6 +470,7 @@ class BacktestArtifactPublisherApp:
     """
 
     publish_use_case: PublishBacktestArtifactsV2UseCase
+    availability_summary_generator: BacktestArtifactAvailabilitySummaryRegenerator
     instrument_reader: EnabledInstrumentReader
     metrics: BacktestArtifactPublisherMetrics
     host_lock: BacktestArtifactPublisherHostLock
@@ -489,6 +500,10 @@ class BacktestArtifactPublisherApp:
         """
         if self.publish_use_case is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestArtifactPublisherApp.publish_use_case is required")
+        if self.availability_summary_generator is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestArtifactPublisherApp.availability_summary_generator is required"
+            )
         if self.instrument_reader is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestArtifactPublisherApp.instrument_reader is required")
         if self.metrics is None:  # type: ignore[truthy-bool]
@@ -633,9 +648,34 @@ class BacktestArtifactPublisherApp:
                     successful_symbols += 1
 
             if successful_symbols > 0 or len(coordinates) == 0:
-                self.metrics.backtest_artifact_publish_last_success_unixtime.set(
-                    _validated_utc_datetime(self.now_provider()).timestamp()
-                )
+                try:
+                    summary_result = self.availability_summary_generator.regenerate()
+                except Exception:  # noqa: BLE001
+                    run_status = _promote_run_status(
+                        current=run_status,
+                        candidate="summary_failed",
+                    )
+                    log.exception(
+                        "event=availability_summary_failed "
+                        "component=backtest-artifact-publisher scheduled_for_utc=%s",
+                        scheduled_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    )
+                else:
+                    self.metrics.backtest_artifact_publish_last_success_unixtime.set(
+                        _validated_utc_datetime(self.now_provider()).timestamp()
+                    )
+                    log.info(
+                        "event=availability_summary_generated "
+                        "component=backtest-artifact-publisher scheduled_for_utc=%s "
+                        "summary_path=%s summary_hash=%s instrument_count=%s skipped_count=%s "
+                        "skipped_reasons=%s",
+                        scheduled_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        summary_result.summary_path,
+                        summary_result.summary_hash,
+                        summary_result.instrument_count,
+                        summary_result.skipped_count,
+                        dict(summary_result.skipped_reasons),
+                    )
             self.metrics.backtest_artifact_publish_runs_total.labels(status=run_status).inc()
             log.info(
                 "event=run_finished component=backtest-artifact-publisher "
@@ -818,8 +858,9 @@ def _promote_run_status(
         "succeeded": 0,
         "inactive_slot_pinned": 1,
         "validation_failed": 2,
-        "unexpected_error": 3,
-        "lock_held": 4,
+        "summary_failed": 3,
+        "unexpected_error": 4,
+        "lock_held": 5,
     }
     return current if severity[current] >= severity[candidate] else candidate
 
@@ -861,6 +902,12 @@ def build_backtest_artifact_publisher_app(
     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
+    availability_summary_generator = BacktestArtifactAvailabilitySummaryGeneratorV2(
+        artifact_root=artifact_runtime_config.artifact_root_path(),
+        path_resolver=path_builder,
+        artifact_loader=artifact_loader,
+        writer=AtomicArtifactAvailabilitySummaryWriterV2(),
+    )
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
@@ -921,6 +968,7 @@ def build_backtest_artifact_publisher_app(
     )
     return BacktestArtifactPublisherApp(
         publish_use_case=publish_use_case,
+        availability_summary_generator=availability_summary_generator,
         instrument_reader=ClickHouseEnabledInstrumentReader(
             gateway=clickhouse_gateway,
             database=clickhouse_settings.database,

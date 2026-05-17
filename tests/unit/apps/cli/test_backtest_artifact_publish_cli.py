@@ -14,6 +14,7 @@ from trading.contexts.backtest_artifacts.application.services import (
     ArtifactStageRebuildStatsCollectionV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
+    BacktestArtifactAvailabilitySummaryResultV2,
 )
 from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
@@ -66,6 +67,31 @@ class _FakePublishUseCaseV2:
         return self.result
 
 
+@dataclass(slots=True)
+class _FakeSummaryRegeneratorV2:
+    """
+    Recording fake availability-summary regenerator for CLI tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-ai-configurator-assistant-v1.md
+    Related:
+      - apps/cli/commands/backtest_artifact_publish.py
+    """
+
+    calls: int = 0
+
+    def regenerate(self) -> BacktestArtifactAvailabilitySummaryResultV2:
+        self.calls += 1
+        return BacktestArtifactAvailabilitySummaryResultV2(
+            summary_path=Path("/tmp/artifacts/availability_summary.yaml"),
+            summary_hash="a" * 64,
+            generated_at_utc="2026-03-30T00:05:00Z",
+            instrument_count=1,
+            skipped_count=0,
+            skipped_reasons={},
+        )
+
+
 def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys) -> None:
     """
     Verify CLI parses one explicit target, forwards `--full-rebuild`, and prints JSON output.
@@ -87,6 +113,7 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
       - apps/cli/commands/backtest_artifact_publish.py
     """
     fake_use_case = _FakePublishUseCaseV2(result=_sample_publish_result_v2())
+    fake_summary = _FakeSummaryRegeneratorV2()
     factory_calls: list[tuple[str | None, Mapping[str, str]]] = []
 
     def _factory(
@@ -118,6 +145,7 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
     cli = BacktestArtifactPublishCli(
         environ={"ROEHUB_ENV": "test"},
         use_case_factory=_factory,
+        summary_regenerator_factory=lambda config_path, environ: fake_summary,
     )
 
     exit_code = cli.run(
@@ -151,6 +179,8 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
         "market_type": "spot",
         "symbol": "BTCUSDT",
     }
+    assert fake_summary.calls == 1
+    assert payload["availability_summary"]["summary_hash"] == "a" * 64
 
 
 def test_backtest_artifact_publish_cli_returns_one_on_invalid_config_factory_error() -> None:
@@ -240,12 +270,14 @@ def test_backtest_artifact_publish_cli_renders_text_stage_breakdown(capsys) -> N
       - apps/cli/commands/backtest_artifact_publish.py
     """
     fake_use_case = _FakePublishUseCaseV2(result=_sample_publish_result_v2())
+    fake_summary = _FakeSummaryRegeneratorV2()
     cli = BacktestArtifactPublishCli(
         environ={"ROEHUB_ENV": "test"},
         use_case_factory=lambda config_path, environ: cast(
             PublishBacktestArtifactsV2UseCase,
             fake_use_case,
         ),
+        summary_regenerator_factory=lambda config_path, environ: fake_summary,
     )
 
     exit_code = cli.run(
@@ -266,6 +298,48 @@ def test_backtest_artifact_publish_cli_renders_text_stage_breakdown(capsys) -> N
     assert "stage_rebuild_stats:" in stdout
     assert "prices(reused=4300, rewritten=20)" in stdout
     assert "hit_times(reused=4290, rewritten=20)" in stdout
+    assert "availability_summary_hash: " + ("a" * 64) in stdout
+
+
+def test_backtest_artifact_publish_cli_regenerates_summary_without_publish(capsys) -> None:
+    """
+    Verify summary-only mode avoids rebuilding a symbol root.
+
+    Args:
+        capsys: pytest stdout/stderr capture fixture.
+    Returns:
+        None.
+    Assumptions:
+        Manual operators need a cheap recovery command for `availability_summary.yaml`.
+    Raises:
+        AssertionError: If publish use-case is invoked in summary-only mode.
+    Side Effects:
+        Writes one JSON payload to captured stdout.
+    Docs:
+      - docs/runbooks/backtest-artifacts-rebuild.md
+      - docs/architecture/backtest/backtest-ai-configurator-assistant-v1.md
+    Related:
+      - apps/cli/commands/backtest_artifact_publish.py
+    """
+    fake_use_case = _FakePublishUseCaseV2(result=_sample_publish_result_v2())
+    fake_summary = _FakeSummaryRegeneratorV2()
+    cli = BacktestArtifactPublishCli(
+        environ={"ROEHUB_ENV": "test"},
+        use_case_factory=lambda config_path, environ: cast(
+            PublishBacktestArtifactsV2UseCase,
+            fake_use_case,
+        ),
+        summary_regenerator_factory=lambda config_path, environ: fake_summary,
+    )
+
+    exit_code = cli.run(["--regenerate-summary-only"])
+    payload = json.loads(capsys.readouterr().out.strip())
+
+    assert exit_code == 0
+    assert fake_use_case.requests == []
+    assert fake_summary.calls == 1
+    assert payload["summary_path"] == "/tmp/artifacts/availability_summary.yaml"
+    assert payload["instrument_count"] == 1
 
 
 def test_cli_main_dispatches_backtest_artifact_publish_command(monkeypatch) -> None:

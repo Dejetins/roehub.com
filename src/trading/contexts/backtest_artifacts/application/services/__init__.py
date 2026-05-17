@@ -1,5 +1,9 @@
 """Artifact precompute/publish services isolated behind backtest_artifacts context."""
 
+from .v2.artifact_availability_summary import (
+    BacktestArtifactAvailabilitySummaryGeneratorV2,
+    BacktestArtifactAvailabilitySummaryResultV2,
+)
 from .v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
@@ -27,6 +31,8 @@ __all__ = [
     "ArtifactStageRebuildStatsCollectionV2",
     "ArtifactStageRebuildStatsV2",
     "ArtifactTailRebuildBarsV2",
+    "BacktestArtifactAvailabilitySummaryGeneratorV2",
+    "BacktestArtifactAvailabilitySummaryResultV2",
     "BacktestArtifactPrecomputeRunnerV2",
     "BacktestArtifactSlotPublisherV2",
     "BacktestSignalRulesEngineV2",

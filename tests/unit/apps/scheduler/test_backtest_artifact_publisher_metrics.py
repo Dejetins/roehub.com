@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import cast
 
 from prometheus_client import CollectorRegistry
@@ -16,6 +17,7 @@ from trading.contexts.backtest_artifacts.application.services import (
     ArtifactStageRebuildStatsCollectionV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
+    BacktestArtifactAvailabilitySummaryResultV2,
 )
 from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
@@ -171,6 +173,31 @@ class _SequencedPublishUseCase:
         return cast(PublishBacktestArtifactsV2Result, outcome)
 
 
+@dataclass(slots=True)
+class _FakeAvailabilitySummaryGenerator:
+    """
+    Successful availability-summary generator for scheduler metric tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-ai-configurator-assistant-v1.md
+    Related:
+      - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+    """
+
+    calls: int = 0
+
+    def regenerate(self) -> BacktestArtifactAvailabilitySummaryResultV2:
+        self.calls += 1
+        return BacktestArtifactAvailabilitySummaryResultV2(
+            summary_path=Path("/tmp/artifacts/availability_summary.yaml"),
+            summary_hash="a" * 64,
+            generated_at_utc="2026-03-30T00:10:00Z",
+            instrument_count=1,
+            skipped_count=0,
+            skipped_reasons={},
+        )
+
+
 def _successful_result(
     *,
     symbol: str,
@@ -276,6 +303,7 @@ def test_run_cycle_records_lock_held_metrics() -> None:
     metrics = BacktestArtifactPublisherMetrics(registry=CollectorRegistry())
     app = BacktestArtifactPublisherApp(
         publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(instruments=()),
         metrics=metrics,
         host_lock=_FakeHostLock(acquired=False),
@@ -339,6 +367,7 @@ def test_run_cycle_records_validation_failed_counts_and_last_success() -> None:
     )
     app = BacktestArtifactPublisherApp(
         publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(
             instruments=(
                 InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
@@ -402,6 +431,7 @@ def test_run_cycle_records_unexpected_error_status() -> None:
             PublishBacktestArtifactsV2UseCase,
             _SequencedPublishUseCase(outcomes=[RuntimeError("boom")]),
         ),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(
             instruments=(InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),)
         ),

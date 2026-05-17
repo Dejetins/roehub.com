@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "iteration": "02a-artifact-availability-summary",
+  "status": "accepted",
+  "updated_at": "2026-05-17T21:05:11Z",
+  "accepted": true,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "commit": null,
+  "host": "local,macstudio",
+  "pushed_to_main": false,
+  "origin_main_commit": null,
+  "macstudio_verified": true,
+  "macstudio_commit": null,
+  "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
+  "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
+  "source_of_truth": "artifact_publisher_active_slot_scan",
+  "evidence": {
+    "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.md",
+    "json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.json",
+    "contract": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/artifact_availability_summary_contract.md"
+  },
+  "touched_paths": [
+    "apps/cli/commands/backtest_artifact_publish.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+    "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/artifact_availability_summary_contract.md",
+    "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.md",
+    "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.json",
+    "docs/runbooks/backtest-artifacts-rebuild.md",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/__init__.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/__init__.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/availability_summary_writer.py",
+    "src/trading/contexts/backtest_artifacts/application/services/__init__.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/__init__.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_availability_summary.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+    "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_availability_summary_v2.py"
+  ],
+  "schema_summary": {
+    "schema_version": 1,
+    "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+    "artifact_root_schema_version": 2,
+    "summary_hash": "64_hex_sha256_excluding_summary_hash_and_generated_at_utc",
+    "instrument_key": "exchange/market/symbol",
+    "instrument_fields": [
+      "exchange",
+      "market",
+      "symbol",
+      "active_slot",
+      "slot_generation",
+      "asof_date",
+      "published_at_utc",
+      "manifest_sha256",
+      "start_date",
+      "end_date",
+      "backtest_timeframes",
+      "timeframes",
+      "hit_times"
+    ]
+  },
+  "macstudio": {
+    "host": "MacStudioDaniil",
+    "runtime_path": "/opt/roehub/app",
+    "pre_delivery_temp_workspace": "/tmp/roehub-iteration-02a",
+    "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+    "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
+    "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
+    "summary_generated_at_utc": "2026-05-17T21:05:11Z",
+    "summary_instrument_count": 2,
+    "valid_active_current_count": 2,
+    "counts_match": true,
+    "keys_match": true,
+    "skipped_count": 0,
+    "skipped_reasons": {},
+    "btc_spot_comparison": {
+      "key": "binance/spot/BTCUSDT",
+      "backtest_timeframes_match": true,
+      "slot_generation_match": true,
+      "manifest_sha_match": true,
+      "timeframe": "1h",
+      "coverage": {
+        "start_date": "2017-08-17",
+        "end_date": "2026-05-02",
+        "bars": 76155
+      },
+      "indicator_ids_count": 40,
+      "indicator_ids_match": true
+    }
+  },
+  "local_checks": [
+    {
+      "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_artifact_availability_summary_v2.py tests/unit/apps/cli/test_backtest_artifact_publish_cli.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+      "result": "20 passed"
+    },
+    {
+      "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2",
+      "result": "222 passed"
+    },
+    {
+      "cmd": "uv run ruff check src/trading/contexts/backtest_artifacts apps/scheduler apps/cli tests/unit/contexts/backtest/application/services/v2/test_artifact_availability_summary_v2.py tests/unit/apps/cli/test_backtest_artifact_publish_cli.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+      "result": "passed"
+    },
+    {
+      "cmd": "uv run pyright",
+      "result": "passed; 0 errors"
+    },
+    {
+      "cmd": "uv run python -m tools.docs.generate_docs_index --check",
+      "result": "passed"
+    }
+  ],
+  "contract_impact": {
+    "public_api_contract": "none",
+    "persisted_artifact_contract": "compatible-change",
+    "cli_contract": "compatible-change",
+    "scheduler_workflow": "compatible-change",
+    "config_schema": "none",
+    "request_hash_cache_identity": "none",
+    "ai_request_path": "none"
+  },
+  "delivery": {
+    "mode": "direct_main",
+    "status": "pending_publish_ci_deploy",
+    "ci": null,
+    "deploy_backend": null,
+    "post_deploy_macstudio_summary_smoke": null
+  }
+}

@@ -7,8 +7,8 @@
 | Iteration | Status | Evidence | Accepted | Blocking reason | Next allowed |
 | --- | --- | --- | --- | --- | --- |
 | 01 Reset старой AI ветки | accepted | `iteration_01_reset.{md,json}` | true | none | true |
-| 02A Artifact availability summary | planned | `iteration_02a_artifact_availability_summary.{md,json}` | false | not started | false |
-| 02B Context snapshot | planned | `iteration_02b_context_snapshot.{md,json}` | false | waits for 02A | false |
+| 02A Artifact availability summary | accepted | `iteration_02a_artifact_availability_summary.{md,json}` | true | none | true |
+| 02B Context snapshot | planned | `iteration_02b_context_snapshot.{md,json}` | false | not started | false |
 | 03 Conversation API/storage | planned | `iteration_03_conversation_api.{md,json}` | false | not started | false |
 | 04 Prompt contract + LM Studio adapter | planned | `iteration_04_prompt_lmstudio.{md,json}` | false | not started | false |
 | 05 Validation/repair/load gate | planned | `iteration_05_validation_repair.{md,json}` | false | not started | false |

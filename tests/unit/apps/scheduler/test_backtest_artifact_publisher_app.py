@@ -23,6 +23,7 @@ from trading.contexts.backtest_artifacts.application.services import (
     ArtifactStageRebuildStatsCollectionV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
+    BacktestArtifactAvailabilitySummaryResultV2,
 )
 from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
@@ -174,6 +175,31 @@ class _FakePublishUseCase:
         if not self.results:
             raise AssertionError("missing fake publish result")
         return self.results.pop(0)
+
+
+@dataclass(slots=True)
+class _FakeAvailabilitySummaryGenerator:
+    """
+    Recording availability-summary generator used by scheduler tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-ai-configurator-assistant-v1.md
+    Related:
+      - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+    """
+
+    calls: int = 0
+
+    def regenerate(self) -> BacktestArtifactAvailabilitySummaryResultV2:
+        self.calls += 1
+        return BacktestArtifactAvailabilitySummaryResultV2(
+            summary_path=Path("/tmp/artifacts/availability_summary.yaml"),
+            summary_hash="a" * 64,
+            generated_at_utc="2026-03-30T00:05:00Z",
+            instrument_count=1,
+            skipped_count=0,
+            skipped_reasons={},
+        )
 
 
 def _result(*, exchange: str, market_type: str, symbol: str) -> PublishBacktestArtifactsV2Result:
@@ -665,6 +691,7 @@ def test_run_cycle_uses_sorted_enabled_tradable_universe() -> None:
     registry = CollectorRegistry()
     app = BacktestArtifactPublisherApp(
         publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(
             instruments=(
                 InstrumentId(market_id=MarketId(2), symbol=Symbol("ETHUSDT")),
@@ -721,6 +748,7 @@ def test_run_cycle_logs_stage_rebuild_stats_for_successful_symbol(
     )
     app = BacktestArtifactPublisherApp(
         publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(
             instruments=(InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),)
         ),
@@ -777,6 +805,7 @@ def test_app_starts_metrics_and_exits_cleanly_when_stop_already_set(
     fake_use_case = _FakePublishUseCase(results=[])
     app = BacktestArtifactPublisherApp(
         publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        availability_summary_generator=_FakeAvailabilitySummaryGenerator(),
         instrument_reader=_FakeInstrumentReader(instruments=()),
         metrics=BacktestArtifactPublisherMetrics(registry=CollectorRegistry()),
         host_lock=_FakeHostLock(acquired=True),
