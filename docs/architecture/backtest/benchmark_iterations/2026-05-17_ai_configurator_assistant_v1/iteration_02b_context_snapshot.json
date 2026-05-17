@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "iteration": "02b-context-snapshot",
-  "status": "pending_delivery",
-  "updated_at": "2026-05-18T00:00:00Z",
-  "accepted": false,
-  "blocking_reason": "pending direct-main delivery and Mac Studio smoke",
-  "next_iteration_allowed": false,
-  "commit": null,
-  "host": "local",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
-  "macstudio_verified": false,
-  "macstudio_commit": null,
+  "status": "accepted",
+  "updated_at": "2026-05-17T21:39:11Z",
+  "accepted": true,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
+  "host": "local,macstudio",
+  "pushed_to_main": true,
+  "origin_main_commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
+  "macstudio_verified": true,
+  "macstudio_commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
   "source_of_truth": "availability_summary.yaml",
   "snapshot_contract": {
     "schema_version": 1,
@@ -81,25 +81,87 @@
     "artifact_contract": "none"
   },
   "macstudio": {
-    "host": null,
+    "host": "MacStudioDaniil",
+    "repo_checkout_path": "/Users/daniildegtyarev/Projects/roehub.com",
+    "repo_checkout_commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
     "runtime_path": "/opt/roehub/app",
     "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
-    "summary_hash": null,
-    "snapshot_hash": null,
-    "resolved_symbol": null,
-    "allowed_values_symbol": null,
-    "indicator_audit": null,
-    "smoke_exit_code": null
+    "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
+    "summary_generated_at_utc": "2026-05-17T21:15:44Z",
+    "snapshot_hash": "76f49c4efbc0e4d7d69e45b2fe5684b50d328d857f61a34344ae0243bf413345",
+    "resolved_symbol": "BTCUSDT",
+    "allowed_values_symbol": ["BTCUSDT"],
+    "allowed_values_timeframe_count": 10,
+    "period": {
+      "start_date": "2017-08-19",
+      "end_date": "2026-05-01"
+    },
+    "indicator_audit": {
+      "total_indicators": 40,
+      "available_count": 40,
+      "excluded_count": 0
+    },
+    "explicit_axis_sample": {
+      "indicator_id": "structure.percent_rank",
+      "window_axis": {
+        "mode": "explicit",
+        "values": [10, 14, 20, 28, 42, 56, 84, 126]
+      }
+    },
+    "no_window_axis_sample": {
+      "indicator_id": "volume.obv",
+      "window_axis": {
+        "mode": "none"
+      }
+    },
+    "file_hashes_match_local_commit": true,
+    "verified_file_hashes": {
+      "src/trading/contexts/backtest/application/ai_configurator/context_snapshot.py": "920a46e3e3074ca099e20f161330d885b476a15703a3afda26b352f076529874",
+      "src/trading/contexts/backtest/application/ai_configurator/dto.py": "dbe64a7646bfbe9f4cc0477e283079fc70d65d22058c7ef5c9c7dfafcb5f7c7e",
+      "src/trading/contexts/backtest/adapters/outbound/ai_configurator_context/availability_summary.py": "373cab48bc8dfad74aae87f87b189025ef7754525b9524232b75451d14fe961e",
+      "configs/prod/backtest_ai_configurator.yaml": "c701cef90e3f9630a80a9cd13cd1b67b4a004fb7158d78ec73787af9d76f1c27"
+    },
+    "snapshot_smoke_exit_code": 0,
+    "smoke_prod": {
+      "first_exit_code": 7,
+      "first_failure": "post-reload readiness window on 127.0.0.1:9201",
+      "second_exit_code": 0
+    }
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "pending",
-    "commit": null,
-    "ci": null,
-    "deploy_backend": null,
-    "publish_app_image": null,
-    "deploy_web": null,
-    "smoke_prod": null
+    "status": "deployed",
+    "commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
+    "ci": {
+      "run_id": 26003328745,
+      "workflow": "CI",
+      "conclusion": "success"
+    },
+    "deploy_backend": {
+      "run_id": 26003328715,
+      "workflow": "Deploy Backend",
+      "conclusion": "success"
+    },
+    "publish_app_image": {
+      "run_id": 26003328716,
+      "workflow": "Publish App Image",
+      "conclusion": "success"
+    },
+    "deploy_web": {
+      "run_id": 26003354002,
+      "workflow": "Deploy Web",
+      "conclusion": "success"
+    },
+    "macstudio_sync": {
+      "repo_checkout_commit": "9f0fb780903e3fb4e3341adedfa290c4eaf6ac14",
+      "runtime_path": "/opt/roehub/app",
+      "bootstrap_native_prod": "passed",
+      "reload_launchd_services_prod": "passed"
+    },
+    "smoke_prod": {
+      "cmd": "cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh",
+      "exit_code": 0
+    }
   },
   "evidence": {
     "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02b_context_snapshot.md",

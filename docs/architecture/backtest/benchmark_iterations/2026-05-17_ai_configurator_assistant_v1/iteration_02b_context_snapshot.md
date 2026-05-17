@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: local implementation complete, delivery pending.
+Статус: accepted, published to `origin/main`, deployed and verified on Mac Studio.
 
 ## Цель
 
@@ -139,9 +139,7 @@ Result: passed.
 
 ## Mac Studio
 
-Pending direct-main delivery.
-
-Required post-deploy smoke:
+Post-deploy evidence ran published code from `/opt/roehub/app` against real summary:
 
 ```text
 cd /opt/roehub/app
@@ -184,14 +182,55 @@ print(snapshot.model_prompt_context()["allowed_values"]["symbol"])
 PY
 ```
 
+Result:
+
+- Mac Studio checkout: `/Users/daniildegtyarev/Projects/roehub.com`
+- Mac Studio checkout commit: `9f0fb780903e3fb4e3341adedfa290c4eaf6ac14`
+- Runtime path: `/opt/roehub/app`
+- Summary path: `/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml`
+- Summary hash: `e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7`
+- Summary generated at: `2026-05-17T21:15:44Z`
+- Snapshot hash: `76f49c4efbc0e4d7d69e45b2fe5684b50d328d857f61a34344ae0243bf413345`
+- Resolved symbol: `BTCUSDT`
+- `allowed_values.symbol`: `["BTCUSDT"]`
+- `allowed_values.timeframe` count: 10
+- Period: `2017-08-19` to `2026-05-01`
+- Indicator audit: `total=40`, `available=40`, `excluded=0`
+- `structure.percent_rank.window_axis`: explicit values
+  `[10, 14, 20, 28, 42, 56, 84, 126]`
+- `volume.obv.window_axis`: `none`
+
+Deployed runtime hashes in `/opt/roehub/app` match local commit for:
+
+- `src/trading/contexts/backtest/application/ai_configurator/context_snapshot.py`
+- `src/trading/contexts/backtest/application/ai_configurator/dto.py`
+- `src/trading/contexts/backtest/adapters/outbound/ai_configurator_context/availability_summary.py`
+- `configs/prod/backtest_ai_configurator.yaml`
+
+`bash scripts/macos/smoke_prod.sh`:
+
+- first run after reload: exit code 7, transient readiness window on `127.0.0.1:9201`;
+- second run after port check: exit code 0.
+
 ## Delivery
 
-Pending.
+Direct-main delivery completed.
+
+- local branch: `main`
+- implementation commit: `9f0fb780903e3fb4e3341adedfa290c4eaf6ac14`
+- pushed to `origin/main`: true
+- `CI` run `26003328745`: success
+- `Deploy Backend` run `26003328715`: success
+- `Publish App Image` run `26003328716`: success
+- `Deploy Web` run `26003354002`: success
+- Mac Studio verified commit: `9f0fb780903e3fb4e3341adedfa290c4eaf6ac14`
+- `pushed_to_main`: true
+- `macstudio_verified`: true
 
 ## Acceptance marker
 
-Accepted: false.
+Accepted: true.
 
-Blocking reason: pending direct-main delivery and Mac Studio smoke.
+Blocking reason: none.
 
-Next iteration allowed: false.
+Next iteration allowed: true.
