@@ -5,7 +5,7 @@ Current cleanup state for the `/backtests` AI Configurator.
 Status: single-shot LM Studio prompt contract retired. Tool-agent runtime is
 pending implementation.
 
-Date: 2026-05-17.
+Date: 2026-05-16.
 
 ## Gate Markers
 
@@ -16,12 +16,6 @@ Date: 2026-05-17.
 
 This document intentionally keeps the historical `mlx-v1` path so old prompt
 artifacts still resolve. It no longer describes an accepted production runtime.
-
-Latest cleanup evidence:
-`docs/architecture/backtest/benchmark_iterations/2026-05-17_lmstudio_tools_contract/cleanup_readiness.md`.
-
-Canonical next target:
-`docs/architecture/backtest/backtest-ai-configurator-tool-agent-v1.md`.
 
 ## Retired Runtime Contract
 
@@ -68,11 +62,6 @@ The next implementation must use LM Studio OpenAI-compatible tools:
 
 The model must not receive arbitrary filesystem access. It may request tools;
 the backend decides what can be read or executed.
-
-The tool-agent design is documented in
-`docs/architecture/backtest/backtest-ai-configurator-tool-agent-v1.md`. That
-document is the implementation target for Prompts 03-07 and keeps this reset
-state at `accepted: false` until implementation and Mac Studio acceptance pass.
 
 ## Required New Evidence
 
