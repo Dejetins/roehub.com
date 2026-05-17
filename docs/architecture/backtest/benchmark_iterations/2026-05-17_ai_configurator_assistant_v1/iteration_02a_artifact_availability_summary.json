@@ -2,16 +2,16 @@
   "schema_version": 1,
   "iteration": "02a-artifact-availability-summary",
   "status": "accepted",
-  "updated_at": "2026-05-17T21:05:11Z",
+  "updated_at": "2026-05-17T21:17:45Z",
   "accepted": true,
   "blocking_reason": null,
   "next_iteration_allowed": true,
-  "commit": null,
+  "commit": "fe63cb1cd87f35da7b418edeafb85c49107a2de5",
   "host": "local,macstudio",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
+  "pushed_to_main": true,
+  "origin_main_commit": "fe63cb1cd87f35da7b418edeafb85c49107a2de5",
   "macstudio_verified": true,
-  "macstudio_commit": null,
+  "macstudio_commit": "fe63cb1cd87f35da7b418edeafb85c49107a2de5",
   "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
   "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
   "source_of_truth": "artifact_publisher_active_slot_scan",
@@ -68,7 +68,8 @@
     "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
     "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
     "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
-    "summary_generated_at_utc": "2026-05-17T21:05:11Z",
+    "summary_generated_at_utc": "2026-05-17T21:15:44Z",
+    "summary_hash_matches_content": true,
     "summary_instrument_count": 2,
     "valid_active_current_count": 2,
     "counts_match": true,
@@ -77,10 +78,16 @@
     "skipped_reasons": {},
     "btc_spot_comparison": {
       "key": "binance/spot/BTCUSDT",
+      "active_slot_match": true,
       "backtest_timeframes_match": true,
       "slot_generation_match": true,
       "manifest_sha_match": true,
       "timeframe": "1h",
+      "coverage_match": {
+        "start_date": true,
+        "end_date": true,
+        "bars": true
+      },
       "coverage": {
         "start_date": "2017-08-17",
         "end_date": "2026-05-02",
@@ -123,9 +130,51 @@
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "pending_publish_ci_deploy",
-    "ci": null,
-    "deploy_backend": null,
-    "post_deploy_macstudio_summary_smoke": null
+    "status": "deployed",
+    "commit": "fe63cb1cd87f35da7b418edeafb85c49107a2de5",
+    "ci": {
+      "run_id": 26002792343,
+      "workflow": "CI",
+      "conclusion": "success"
+    },
+    "deploy_backend": {
+      "run_id": 26002792309,
+      "workflow": "Deploy Backend",
+      "conclusion": "success"
+    },
+    "publish_app_image": {
+      "run_id": 26002792328,
+      "workflow": "Publish App Image",
+      "conclusion": "success"
+    },
+    "deploy_web": {
+      "run_id": 26002811146,
+      "workflow": "Deploy Web",
+      "conclusion": "success"
+    },
+    "deployed_runtime": {
+      "path": "/opt/roehub/app",
+      "git_head": "NO_GIT_DIRECTORY",
+      "file_hashes_match_local_commit": true,
+      "verified_files": [
+        "apps/cli/commands/backtest_artifact_publish.py",
+        "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_availability_summary.py",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/availability_summary_writer.py"
+      ]
+    },
+    "post_deploy_macstudio_summary_smoke": {
+      "cmd": "cd /opt/roehub/app && PYTHONPATH=/opt/roehub/app/src:/opt/roehub/app /opt/roehub/app/.venv/bin/python -m apps.cli.main.main backtest-artifact-publish --config /opt/roehub/app/configs/prod/backtest_artifacts.yaml --regenerate-summary-only",
+      "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
+      "summary_hash": "e2615a75818937f79ef7bf5c955b492af383dcadd15c106f4379a07926721df7",
+      "generated_at_utc": "2026-05-17T21:15:44Z",
+      "instrument_count": 2,
+      "skipped_count": 0,
+      "skipped_reasons": {}
+    },
+    "smoke_prod": {
+      "cmd": "cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh",
+      "exit_code": 0
+    }
   }
 }
