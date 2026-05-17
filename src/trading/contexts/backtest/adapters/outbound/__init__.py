@@ -34,6 +34,7 @@ from .defaults import YamlBacktestGridDefaultsProvider
 from .persistence import (
     BacktestPostgresGateway,
     PostgresBacktestAiConfigRepository,
+    PostgresBacktestAiConversationRepository,
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
@@ -57,6 +58,7 @@ __all__ = [
     "BacktestArtifactValidationPlanRuntimeConfig",
     "BacktestArtifactsRuntimeConfig",
     "BacktestPostgresGateway",
+    "PostgresBacktestAiConversationRepository",
     "PostgresBacktestAiConfigRepository",
     "DEFAULT_LAZY_TRADES_CACHE_ROOT",
     "DatabaseBacktestJobExecutionTrigger",

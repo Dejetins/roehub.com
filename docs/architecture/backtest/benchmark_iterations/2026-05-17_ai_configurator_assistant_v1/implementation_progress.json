@@ -32,9 +32,9 @@
     },
     {
       "id": "03-conversation-api-storage",
-      "status": "planned",
-      "accepted": false,
-      "blocking_reason": "not started",
+      "status": "accepted_pending_delivery",
+      "accepted": true,
+      "blocking_reason": "direct-main delivery and final deployed commit verification are pending",
       "next_iteration_allowed": false,
       "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_03_conversation_api.md",
       "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_03_conversation_api.json"

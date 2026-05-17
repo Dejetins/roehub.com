@@ -9,7 +9,7 @@
 | 01 Reset старой AI ветки | accepted | `iteration_01_reset.{md,json}` | true | none | true |
 | 02A Artifact availability summary | accepted | `iteration_02a_artifact_availability_summary.{md,json}` | true | none | true |
 | 02B Context snapshot | accepted | `iteration_02b_context_snapshot.{md,json}` | true | none | true |
-| 03 Conversation API/storage | planned | `iteration_03_conversation_api.{md,json}` | false | not started | false |
+| 03 Conversation API/storage | accepted, delivery pending | `iteration_03_conversation_api.{md,json}` | true | direct-main delivery and final deployed commit verification are pending | false |
 | 04 Prompt contract + LM Studio adapter | planned | `iteration_04_prompt_lmstudio.{md,json}` | false | not started | false |
 | 05 Validation/repair/load gate | planned | `iteration_05_validation_repair.{md,json}` | false | not started | false |
 | 06 UI redesign | planned | `iteration_06_ui.{md,json}` | false | not started | false |

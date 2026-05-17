@@ -9,6 +9,10 @@ from urllib.parse import urlparse
 import yaml
 
 from trading.contexts.backtest.application.ai_configurator import (
+    DEFAULT_BACKTEST_AI_MAX_CONVERSATIONS_PER_USER,
+    DEFAULT_BACKTEST_AI_MAX_MESSAGES_PER_CONVERSATION,
+    DEFAULT_BACKTEST_AI_RETENTION_DAYS,
+    BacktestAiConversationLimits,
     BacktestAiQuotaConfig,
     BacktestAiTierQuota,
 )
@@ -124,6 +128,7 @@ class BacktestAiConfiguratorRuntimeConfig:
     queue: BacktestAiConfiguratorQueueRuntimeConfig
     model: BacktestAiConfiguratorModelRuntimeConfig
     context_snapshot: BacktestAiConfiguratorContextSnapshotRuntimeConfig
+    conversation: BacktestAiConversationLimits
     tier_quotas: Mapping[str, BacktestAiTierQuota]
 
     def to_quota_config(self) -> BacktestAiQuotaConfig:
@@ -168,6 +173,7 @@ def load_backtest_ai_configurator_runtime_config(
         context_snapshot=_context_snapshot_config(
             _optional_mapping(root, "context_snapshot")
         ),
+        conversation=_conversation_config(_optional_mapping(root, "conversation")),
         tier_quotas=_tier_quotas(quotas_payload),
     )
 
@@ -228,6 +234,26 @@ def _context_snapshot_config(
             )
         ),
         max_prompt_indicators=_optional_int(payload, "max_prompt_indicators", default=40),
+    )
+
+
+def _conversation_config(payload: Mapping[str, Any]) -> BacktestAiConversationLimits:
+    return BacktestAiConversationLimits(
+        retention_days=_optional_int(
+            payload,
+            "retention_days",
+            default=DEFAULT_BACKTEST_AI_RETENTION_DAYS,
+        ),
+        max_conversations_per_user=_optional_int(
+            payload,
+            "max_conversations_per_user",
+            default=DEFAULT_BACKTEST_AI_MAX_CONVERSATIONS_PER_USER,
+        ),
+        max_messages_per_conversation=_optional_int(
+            payload,
+            "max_messages_per_conversation",
+            default=DEFAULT_BACKTEST_AI_MAX_MESSAGES_PER_CONVERSATION,
+        ),
     )
 
 

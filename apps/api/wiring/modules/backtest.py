@@ -17,6 +17,7 @@ from trading.contexts.backtest.adapters.outbound import (
     FilesystemBacktestArtifactContextResolver,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestAiConfigRepository,
+    PostgresBacktestAiConversationRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
     PsycopgBacktestPostgresGateway,
@@ -37,6 +38,7 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigJobsUseCase,
     BacktestAiConfigPipeline,
     BacktestAiConfigValidator,
+    BacktestAiConversationUseCase,
     BacktestAiInputGate,
     BacktestAiOutputGate,
     BacktestAiQuotaService,
@@ -65,6 +67,7 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 @dataclass(frozen=True, slots=True)
 class BacktestAiConfiguratorUseCases:
     jobs: BacktestAiConfigJobsUseCase
+    conversations: BacktestAiConversationUseCase
     lease_repository: BacktestAiConfigLeaseRepository
     runtime_config: BacktestAiConfiguratorRuntimeConfig
     pipeline: BacktestAiConfigPipeline
@@ -230,6 +233,9 @@ def build_backtest_ai_configurator_use_cases(
     )
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     repository = PostgresBacktestAiConfigRepository(gateway=postgres_gateway)
+    conversation_repository = PostgresBacktestAiConversationRepository(
+        gateway=postgres_gateway
+    )
     artifact_capabilities = _discover_ai_artifact_capabilities(
         artifact_config=artifact_config,
         artifact_loader=artifact_loader,
@@ -240,6 +246,10 @@ def build_backtest_ai_configurator_use_cases(
             quota_service=BacktestAiQuotaService(
                 config=ai_runtime_config.to_quota_config(),
             ),
+        ),
+        conversations=BacktestAiConversationUseCase(
+            repository=conversation_repository,
+            limits=ai_runtime_config.conversation,
         ),
         lease_repository=repository,
         runtime_config=ai_runtime_config,

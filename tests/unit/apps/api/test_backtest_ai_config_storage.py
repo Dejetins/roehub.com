@@ -6,6 +6,7 @@ from apps.api.routes import build_backtests_router
 from apps.api.wiring.modules.backtest import build_backtest_ai_configurator_use_cases
 from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigJobsUseCase,
+    BacktestAiConversationUseCase,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -21,6 +22,10 @@ def test_backtest_ai_configurator_wiring_builds_storage_boundary_without_enablin
 
     assert use_cases is not None
     assert isinstance(use_cases.jobs, BacktestAiConfigJobsUseCase)
+    assert isinstance(use_cases.conversations, BacktestAiConversationUseCase)
+    assert use_cases.runtime_config.conversation.retention_days == 30
+    assert use_cases.runtime_config.conversation.max_conversations_per_user == 50
+    assert use_cases.runtime_config.conversation.max_messages_per_conversation == 100
     assert use_cases.runtime_config.enabled is False
     assert use_cases.runtime_config.queue.lease_seconds == 120
     assert use_cases.runtime_config.to_quota_config().quota_for(

@@ -22,6 +22,10 @@ backtest_ai_configurator:
     base_url: http://127.0.0.1:8080
     request_timeout_seconds: 90
     active_generations: 1
+  conversation:
+    retention_days: 30
+    max_conversations_per_user: 50
+    max_messages_per_conversation: 100
   quotas:
     free:
       requests_per_5h: 3

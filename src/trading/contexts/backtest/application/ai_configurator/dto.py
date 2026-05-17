@@ -62,6 +62,17 @@ BacktestAiAdmissionStatus = Literal[
     "capacity_delayed",
 ]
 BacktestAiContextAxisMode = Literal["range", "explicit", "none"]
+BacktestAiConversationLocale = Literal["ru", "en"]
+BacktestAiConversationStatus = Literal["active", "archived"]
+BacktestAiConversationTitleSource = Literal["fallback", "model"]
+BacktestAiConversationMessageRole = Literal["system", "assistant", "user"]
+BacktestAiConversationRunStatus = Literal[
+    "awaiting_model",
+    "ready",
+    "needs_clarification",
+    "blocked_by_policy",
+    "failed",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,6 +248,164 @@ class BacktestAiQuotaSnapshot:
     queued_jobs_for_user: int
     active_jobs_for_user: int
     active_jobs_global: int
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiLoadAction:
+    enabled: bool
+    state: str
+    reason: str | None = None
+    config: JsonMapping | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "state", self.state.strip())
+        if not self.state:
+            raise ValueError("BacktestAiLoadAction.state must be non-empty")
+        object.__setattr__(self, "config", _freeze_optional_mapping(self.config))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "state": self.state,
+            "reason": self.reason,
+            "config": None if self.config is None else dict(self.config),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversation:
+    conversation_id: UUID
+    owner_user_id: UserId
+    locale: BacktestAiConversationLocale
+    status: BacktestAiConversationStatus
+    title: str
+    title_source: BacktestAiConversationTitleSource
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: datetime
+    expires_at: datetime
+
+    def public_snapshot(self) -> dict[str, Any]:
+        return {
+            "conversation_id": str(self.conversation_id),
+            "conversation_title": self.title,
+            "locale": self.locale,
+            "status": self.status,
+            "created_at": _format_datetime(self.created_at),
+            "updated_at": _format_datetime(self.updated_at),
+            "last_message_at": _format_datetime(self.last_message_at),
+            "expires_at": _format_datetime(self.expires_at),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversationMessage:
+    message_id: UUID
+    conversation_id: UUID
+    owner_user_id: UserId
+    role: BacktestAiConversationMessageRole
+    content: str
+    created_at: datetime
+    metadata_json: JsonMapping = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "content", self.content.strip())
+        if not self.content:
+            raise ValueError("BacktestAiConversationMessage.content must be non-empty")
+        object.__setattr__(self, "metadata_json", MappingProxyType(dict(self.metadata_json)))
+
+    def public_snapshot(self) -> dict[str, Any]:
+        return {
+            "message_id": str(self.message_id),
+            "conversation_id": str(self.conversation_id),
+            "role": self.role,
+            "content": self.content,
+            "created_at": _format_datetime(self.created_at),
+            "metadata": dict(self.metadata_json),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversationRun:
+    run_id: UUID
+    conversation_id: UUID
+    owner_user_id: UserId
+    user_message_id: UUID
+    assistant_message_id: UUID
+    status: BacktestAiConversationRunStatus
+    load_action: BacktestAiLoadAction
+    created_at: datetime
+    updated_at: datetime
+    intent: str | None = None
+    current_config_json: JsonMapping | None = None
+    validated_config_json: JsonMapping | None = None
+    model_id: str | None = None
+    failure_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "current_config_json",
+            _freeze_optional_mapping(self.current_config_json),
+        )
+        object.__setattr__(
+            self,
+            "validated_config_json",
+            _freeze_optional_mapping(self.validated_config_json),
+        )
+
+    def public_snapshot(self) -> dict[str, Any]:
+        return {
+            "run_id": str(self.run_id),
+            "conversation_id": str(self.conversation_id),
+            "status": self.status,
+            "intent": self.intent,
+            "load_action": self.load_action.as_mapping(),
+            "created_at": _format_datetime(self.created_at),
+            "updated_at": _format_datetime(self.updated_at),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversationModelResponse:
+    assistant_message: str
+    conversation_title: str | None = None
+    status: BacktestAiConversationRunStatus = "awaiting_model"
+    intent: str | None = None
+    load_action: BacktestAiLoadAction = field(
+        default_factory=lambda: BacktestAiLoadAction(
+            enabled=False,
+            state="unavailable",
+            reason="backend_not_ready",
+        )
+    )
+    validated_config_json: JsonMapping | None = None
+    model_id: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "assistant_message", self.assistant_message.strip())
+        if not self.assistant_message:
+            raise ValueError("assistant_message must be non-empty")
+        object.__setattr__(
+            self,
+            "validated_config_json",
+            _freeze_optional_mapping(self.validated_config_json),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversationSendResult:
+    conversation: BacktestAiConversation
+    user_message: BacktestAiConversationMessage
+    assistant_message: BacktestAiConversationMessage
+    run: BacktestAiConversationRun
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiConversationRead:
+    conversation: BacktestAiConversation
+    messages: tuple[BacktestAiConversationMessage, ...]
+    latest_run: BacktestAiConversationRun | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -469,6 +638,17 @@ __all__ = [
     "BacktestAiContextAxis",
     "BacktestAiContextAxisMode",
     "BacktestAiContextSnapshot",
+    "BacktestAiConversation",
+    "BacktestAiConversationLocale",
+    "BacktestAiConversationMessage",
+    "BacktestAiConversationMessageRole",
+    "BacktestAiConversationModelResponse",
+    "BacktestAiConversationRead",
+    "BacktestAiConversationRun",
+    "BacktestAiConversationRunStatus",
+    "BacktestAiConversationSendResult",
+    "BacktestAiConversationStatus",
+    "BacktestAiConversationTitleSource",
     "BacktestAiConfigEvent",
     "BacktestAiConfigEventName",
     "BacktestAiConfigJob",
@@ -479,6 +659,7 @@ __all__ = [
     "BacktestAiConfigMode",
     "BacktestAiConfigTerminalState",
     "BacktestAiIndicatorAvailability",
+    "BacktestAiLoadAction",
     "BacktestAiQuotaAction",
     "BacktestAiQuotaEvent",
     "BacktestAiQuotaSnapshot",

@@ -25,6 +25,10 @@ backtest_ai_configurator:
   context_snapshot:
     availability_summary_path: /opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml
     max_prompt_indicators: 40
+  conversation:
+    retention_days: 30
+    max_conversations_per_user: 50
+    max_messages_per_conversation: 100
   quotas:
     free:
       requests_per_5h: 3

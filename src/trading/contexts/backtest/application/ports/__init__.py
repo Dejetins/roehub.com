@@ -6,6 +6,7 @@ from .backtest_ai_configurator import (
     BacktestAiConfigJobRepository,
     BacktestAiConfigLeaseRepository,
 )
+from .backtest_ai_conversations import BacktestAiConversationRepository
 from .backtest_job_repositories import (
     BacktestJobLeaseRepository,
     BacktestJobListPage,
@@ -37,6 +38,7 @@ __all__ = [
     "BacktestGridDefaultsProvider",
     "BacktestAiConfigJobRepository",
     "BacktestAiConfigLeaseRepository",
+    "BacktestAiConversationRepository",
     "BacktestJobLeaseRepository",
     "BacktestJobExecutionTrigger",
     "BacktestJobListPage",
