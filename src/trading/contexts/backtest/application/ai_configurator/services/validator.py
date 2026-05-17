@@ -39,7 +39,7 @@ _MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
         "schema_version": {"const": 1},
         "mode": {
             "type": "string",
-            "enum": ["create", "edit", "repair", "suggest_safer", "explain"],
+            "enum": ["assistant_v1"],
         },
         "status": {"type": "string", "enum": ["config_ready", "needs_clarification"]},
         "assistant_message": {"type": "string", "minLength": 1, "maxLength": 1200},

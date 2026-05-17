@@ -19,7 +19,7 @@ from .catalog import BacktestAiCatalogResolver
 from .security import BacktestAiInputGate
 from .validator import BacktestAiConfigValidationOutcome, BacktestAiConfigValidator
 
-BacktestAiPipelineStage = Literal["input_gate", "tool_agent", "validation"]
+BacktestAiPipelineStage = Literal["input_gate", "runtime_gateway", "validation"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,13 +114,13 @@ class BacktestAiConfigPipeline:
             return BacktestAiConfigPipelineResult(
                 status="failed",
                 assistant_message=(
-                    "AI configurator tool-agent runtime is not available yet."
+                    "AI configurator assistant v1 runtime is not available yet."
                 ),
                 catalog_snapshot_hash=catalog.snapshot_hash,
-                stage="tool_agent",
+                stage="runtime_gateway",
                 model_id=agent_response.model_id,
                 model_path_hash=agent_response.model_path_hash,
-                last_error="tool_agent_unavailable",
+                last_error="assistant_v1_runtime_unavailable",
                 last_error_json=dict(agent_response.audit_json or {}),
             )
 

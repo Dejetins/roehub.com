@@ -505,7 +505,7 @@ def _job(*, source_page: str = "backtests") -> BacktestAiConfigJob:
     return BacktestAiConfigJob(
         job_id=UUID("00000000-0000-0000-0000-000000000701"),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000702"),
-        mode="create",
+        mode="assistant_v1",
         locale="ru",
         state="queued",
         source_page=source_page,

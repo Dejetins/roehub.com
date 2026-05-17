@@ -28,7 +28,7 @@ DEFAULT_CONFIG_PATH = Path("configs/prod/backtest_ai_configurator.yaml")
 UNSUPPORTED_PROMPT_CASES: tuple[PromptCase, ...] = (
     PromptCase(
         case_id="unsupported_off_topic_ru",
-        mode="create",
+        mode="assistant_v1",
         locale="ru",
         message="Напиши письмо инвесторам про маркетинг.",
         category="off_topic",
@@ -37,7 +37,7 @@ UNSUPPORTED_PROMPT_CASES: tuple[PromptCase, ...] = (
     ),
     PromptCase(
         case_id="unsupported_doge_bollinger_en",
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         message="Create DOGEUSDT 1h Bollinger config for /backtests.",
         category="unsupported_catalog",

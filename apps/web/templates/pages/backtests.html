@@ -16,10 +16,6 @@
     data-job-cancel-endpoint-template="/api/backtests/jobs/{job_id}/cancel"
     data-job-delete-endpoint-template="/api/backtests/jobs/{job_id}"
     data-job-summary-endpoint-template="/api/backtests/jobs/{job_id}/summary"
-    data-ai-config-jobs-endpoint="/api/backtests/ai-config/jobs"
-    data-ai-config-job-endpoint-template="/api/backtests/ai-config/jobs/{job_id}"
-    data-ai-config-events-endpoint-template="/api/backtests/ai-config/jobs/{job_id}/events"
-    data-ai-config-feedback-endpoint-template="/api/backtests/ai-config/jobs/{job_id}/feedback"
     data-variant-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}"
     data-variant-equity-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/equity"
     data-variant-drawdown-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown"
@@ -172,24 +168,6 @@
           <h2>{{ t("backtests.ai.title") }}</h2>
           <span class="backtests-pill" data-ai-state-label>{{ t("backtests.ai.beta") }}</span>
         </header>
-        <div class="backtests-ai-modes" role="radiogroup" aria-label="{{ t('backtests.ai.mode') }}">
-          {% for value, label_key in [
-            ("create", "backtests.ai.mode.create"),
-            ("edit_current", "backtests.ai.mode.edit_current"),
-            ("explain_current", "backtests.ai.mode.explain_current"),
-            ("repair_invalid", "backtests.ai.mode.repair_invalid"),
-            ("suggest_safer", "backtests.ai.mode.suggest_safer")
-          ] %}
-            <button
-              class="backtests-ai-mode {{ 'is-active' if loop.first else '' }}"
-              type="button"
-              role="radio"
-              aria-checked="{{ 'true' if loop.first else 'false' }}"
-              data-ai-mode="{{ value }}"
-              disabled
-            >{{ t(label_key) }}</button>
-          {% endfor %}
-        </div>
         <p class="backtests-ai-notice" data-ai-notice>{{ t("backtests.ai.notice") }}</p>
         <output class="backtests-ai-status" data-ai-status aria-live="polite">{{ t("backtests.ai.status.disabled") }}</output>
         <ol class="backtests-ai-timeline" data-ai-timeline aria-label="{{ t('backtests.ai.timeline') }}"></ol>

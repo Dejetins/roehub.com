@@ -14,7 +14,7 @@ from trading.contexts.backtest.application.ai_configurator.services.catalog impo
     BacktestAiAllowedCatalog,
 )
 
-_MODEL_ID = "deterministic-test-tool-agent-v1"
+_MODEL_ID = "deterministic-assistant-v1-test"
 _SYMBOL_ALIASES: tuple[tuple[str, str], ...] = (
     ("биток", "BTCUSDT"),
     ("биткоин", "BTCUSDT"),
@@ -54,7 +54,7 @@ DeterministicToolAgentScenario = Literal[
 
 @dataclass(frozen=True, slots=True)
 class DisabledBacktestConfigAgentGateway:
-    reason: str = "tool_agent_not_implemented"
+    reason: str = "assistant_v1_runtime_not_implemented"
 
     def run_config_session(
         self,
@@ -99,7 +99,7 @@ class DeterministicBacktestConfigAgentGateway:
             model_id=_MODEL_ID,
             latency_ms=0,
             finish_reason="stop",
-            audit_json={"tool_agent": "deterministic"},
+            audit_json={"assistant_v1_runtime": "deterministic"},
         )
 
     def _next_scripted(self) -> str | None:

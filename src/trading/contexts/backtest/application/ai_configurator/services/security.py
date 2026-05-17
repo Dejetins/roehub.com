@@ -418,7 +418,7 @@ def _matches_any(patterns: tuple[re.Pattern[str], ...], value: str) -> bool:
 
 def _is_domain_prompt(*, normalized: str, mode: str) -> bool:
     text = normalized.casefold()
-    if mode in {"explain", "repair", "suggest_safer"} and len(text) < 160:
+    if mode == "assistant_v1" and len(text) < 160:
         return True
     return any(term in text for term in _DOMAIN_TERMS)
 

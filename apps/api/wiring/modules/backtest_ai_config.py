@@ -43,10 +43,10 @@ def build_backtest_ai_config_router(
 ) -> APIRouter:
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtest_ai_config_router requires current_user_dependency")
-    use_cases = build_backtest_ai_configurator_use_cases(environ=environ)
+    _ = environ
     return build_backtest_ai_config_api_router(
         current_user_dependency=current_user_dependency,
-        jobs_use_case=None if use_cases is None else use_cases.jobs,
+        jobs_use_case=None,
     )
 
 

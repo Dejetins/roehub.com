@@ -215,13 +215,13 @@ def build_backtest_ai_configurator_worker_app(
     health = BacktestAiConfiguratorHealthState(
         config_loaded=True,
         model_id=ai_runtime_config.model.model_id,
-        model_path=str(ai_runtime_config.model.model_path),
-        drain_mode=effective_worker_config.drain_mode,
-        readiness_checks=(
-            _model_path_check(path=ai_runtime_config.model.model_path),
-            _tool_agent_pending_check(),
-            _postgres_queue_audit_check(gateway=postgres_gateway),
-        ),
+            model_path=str(ai_runtime_config.model.model_path),
+            drain_mode=effective_worker_config.drain_mode,
+            readiness_checks=(
+                _model_path_check(path=ai_runtime_config.model.model_path),
+                _assistant_runtime_pending_check(),
+                _postgres_queue_audit_check(gateway=postgres_gateway),
+            ),
     )
     return BacktestAiConfiguratorWorkerApp(
         runtime_config=effective_worker_config,
@@ -279,9 +279,9 @@ def _model_path_check(*, path: Path) -> Callable[[], tuple[bool, str]]:
     return _check
 
 
-def _tool_agent_pending_check() -> Callable[[], tuple[bool, str]]:
+def _assistant_runtime_pending_check() -> Callable[[], tuple[bool, str]]:
     def _check() -> tuple[bool, str]:
-        return False, "tool_agent_pending"
+        return False, "assistant_v1_runtime_pending"
 
     return _check
 

@@ -11,7 +11,7 @@ backtest_ai_configurator:
     queue_timeout_sec: 300
     estimated_wait_seconds: 8
   model:
-    runtime: lm_studio_tools
+    runtime: assistant_v1_pending
     model_id: gemma-4-e2b-it-4bit
     model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
     context_window_tokens: 8192

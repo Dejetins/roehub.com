@@ -1,9 +1,9 @@
 # Backtest AI Configurator Runtime Reset
 
-Current cleanup state for the `/backtests` AI Configurator.
+Historical cleanup state for the retired `/backtests` AI Configurator path.
 
-Status: single-shot LM Studio prompt contract retired. Tool-agent runtime is
-pending implementation.
+Status: superseded. Single-shot LM Studio prompt contract and tool-agent runtime
+are retired from the current path.
 
 Date: 2026-05-16.
 
@@ -36,7 +36,7 @@ for new implementation, benchmark, or rollout prompts:
 Historical evidence for that path remains useful only as failure/context
 evidence. It is not rollout acceptance for the next implementation.
 
-## Current Code Boundary
+## Historical Code Boundary
 
 The retained foundation is:
 
@@ -47,13 +47,15 @@ The retained foundation is:
 - indicator executable support, indicator window bounds, and artifact coverage
   checks.
 
-The active runtime placeholder is `runtime: lm_studio_tools`. It is disabled by
-default, wired to `DisabledBacktestConfigAgentGateway`, and blocked by
-`tool_agent_pending` readiness until the new adapter exists.
+This boundary was kept only as historical context. Iteration 01 of assistant v1
+removed `runtime: lm_studio_tools`, the old one-shot AI job API, and mode-button
+UI from current code/config/browser paths.
 
-## Target Direction
+## Superseded Target Direction
 
-The next implementation must use LM Studio OpenAI-compatible tools:
+The following tool-agent direction was superseded by
+`backtest-ai-configurator-assistant-v1.md` and must not be used as current
+implementation guidance:
 
 1. The model classifies whether the user asks for a `/backtests` configuration.
 2. The model may request backend-owned tools such as context-source reads,
@@ -81,7 +83,7 @@ tool-agent path requires fresh evidence:
 
 ## Rollback / Safety
 
-Until the tool-agent runtime is implemented and accepted:
+Until assistant v1 runtime is implemented and accepted:
 
 1. Keep `backtest_ai_configurator.enabled: false` in production config.
 2. Keep the worker drained or not deployed for public use.

@@ -75,7 +75,7 @@ def build_backtest_ai_config_create_response(
     return BacktestAiConfigCreateResponse(
         job_id=job_id,
         status=result.job.state,
-        events_url=f"/api/backtests/ai-config/jobs/{job_id}/events",
+        events_url=None,
         estimated_wait_seconds=result.admission.estimated_wait_seconds,
         retry_after_seconds=result.admission.retry_after_seconds,
         message=result.admission.message,

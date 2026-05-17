@@ -364,6 +364,11 @@ model:
 
 `runtime: lm_studio_tools` должен быть выведен из текущего production contract для этого MVP. Tool use может быть отдельным будущим направлением, но оно не нужно для сборки одного form config.
 
+Iteration 01 reset устанавливает временный disabled placeholder
+`runtime: assistant_v1_pending` в current env configs. Это не LM Studio adapter
+и не runtime acceptance; `runtime: lm_studio_chat_completions` вводится только в
+итерации Prompt + adapter.
+
 Официальные LM Studio docs фиксируют:
 
 - `lms` управляет local server, loaded models и runtime;
@@ -1780,7 +1785,7 @@ Acceptance:
 | Public same-origin API | breaking-change | `mode` уходит из browser request, добавляются conversation endpoints. |
 | Backend DTO | breaking-change | One-shot `mode` contract заменяется conversation/message + model `intent`. |
 | Persistence | breaking-change для AI configurator | Старые AI job semantics удаляются; создаются чистые conversation/message/run tables. |
-| Config schema | breaking-change | `runtime: lm_studio_tools` заменяется на `runtime: lm_studio_chat_completions`; добавляются `context_snapshot`, `chat_history`. |
+| Config schema | breaking-change | Iteration 01 выводит `runtime: lm_studio_tools` из current configs и ставит disabled reset placeholder `runtime: assistant_v1_pending`; `runtime: lm_studio_chat_completions`, `context_snapshot` и `chat_history` вводятся в следующих итерациях. |
 | Prompt contract | breaking-change | Tool-agent prompt retired, structured chat completion JSON envelope становится source of truth. |
 | AI job API | breaking-change | Старые `/backtests/ai-config/jobs*` endpoints удаляются из current code/docs/tests. |
 | Backtest job API | none | Чат не запускает бектесты и не вызывает core `/backtests/jobs`; обычный ручной запуск бектестов вне чата сохраняется. |

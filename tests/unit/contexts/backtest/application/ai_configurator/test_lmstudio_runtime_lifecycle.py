@@ -29,7 +29,7 @@ def _load_runtime_module() -> ModuleType:
 def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="lm_studio_tools",
+        runtime="assistant_v1_pending",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -55,7 +55,7 @@ def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
 def test_lmstudio_runtime_target_rejects_base_url_without_explicit_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="lm_studio_tools",
+        runtime="assistant_v1_pending",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -126,7 +126,7 @@ def test_lmstudio_api_models_requires_loaded_instance() -> None:
     )
 
 
-def test_lmstudio_runtime_smoke_marks_tool_agent_contract_pending(
+def test_lmstudio_runtime_smoke_marks_assistant_v1_runtime_contract_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_runtime_module()
@@ -175,7 +175,7 @@ def test_lmstudio_runtime_smoke_marks_tool_agent_contract_pending(
     assert result["accepted"] is True
     assert result["api_v1_models_loaded_instance"] is True
     assert result["single_shot_chat_probe"] == "removed"
-    assert result["tool_agent_contract"] == "pending"
+    assert result["assistant_v1_runtime_contract"] == "pending"
 
 
 def test_lmstudio_port_conflict_errors_are_not_retryable() -> None:

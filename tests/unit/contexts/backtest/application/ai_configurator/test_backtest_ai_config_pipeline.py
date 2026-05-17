@@ -137,7 +137,7 @@ def test_pipeline_multi_symbol_keeps_single_symbol_loadable_mvp() -> None:
     assert any("ETHUSDT" in item["message"] for item in result.suggestions)
 
 
-def test_pipeline_accepts_frozen_current_config_in_tool_agent_request() -> None:
+def test_pipeline_accepts_frozen_current_config_in_runtime_request() -> None:
     result = _pipeline().run(
         job=_job(
             message="Edit this /backtests config to use ETHUSDT and EMA on 15m.",
@@ -308,7 +308,7 @@ def test_input_gate_applies_external_security_gate_json(
     result = BacktestAiInputGate().evaluate(
         message="Create BTCUSDT RSI config with private catalog probe",
         locale="en",
-        mode="create",
+        mode="assistant_v1",
     )
 
     assert result.decision == "block"
@@ -366,7 +366,7 @@ def _job(*, message: str, current_config: dict[str, Any] | None = None) -> Backt
     return BacktestAiConfigJob(
         job_id=UUID("00000000-0000-0000-0000-000000000501"),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000502"),
-        mode="create",
+        mode="assistant_v1",
         locale="ru",
         state="running",
         source_page="backtests",
@@ -389,7 +389,7 @@ def _model_output(
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "mode": "create",
+        "mode": "assistant_v1",
         "status": "config_ready",
         "assistant_message": assistant_message,
         "assumptions": [],

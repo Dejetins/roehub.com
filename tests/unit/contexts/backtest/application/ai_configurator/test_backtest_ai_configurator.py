@@ -34,7 +34,7 @@ def test_create_persists_queued_job_event_and_single_quota_charge() -> None:
     result = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="ru",
         user_prompt_text="Собери конфиг для BTCUSDT на RSI",
         idempotency_key="client-request-1",
@@ -69,7 +69,7 @@ def test_idempotency_replay_returns_existing_job_without_duplicate_charge() -> N
     first = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create RSI config",
         idempotency_key="stable-key",
@@ -77,7 +77,7 @@ def test_idempotency_replay_returns_existing_job_without_duplicate_charge() -> N
     replay = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create RSI config",
         idempotency_key="stable-key",
@@ -102,7 +102,7 @@ def test_idempotency_key_conflict_rejects_different_logical_request() -> None:
     use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create RSI config",
         idempotency_key="stable-key",
@@ -112,7 +112,7 @@ def test_idempotency_key_conflict_rejects_different_logical_request() -> None:
         use_case.create(
             user_id=user_id,
             paid_level=PaidLevel.free(),
-            mode="create",
+            mode="assistant_v1",
             locale="en",
             user_prompt_text="Create MACD config",
             idempotency_key="stable-key",
@@ -149,14 +149,14 @@ def test_quota_rejection_records_rejection_without_job_or_charge() -> None:
     accepted = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create RSI config",
     )
     rejected = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create DEMA config",
     )
@@ -181,7 +181,7 @@ def test_owner_scope_hides_foreign_jobs() -> None:
     created = use_case.create(
         user_id=owner_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="ru",
         user_prompt_text="Собери конфиг",
     )
@@ -200,7 +200,7 @@ def test_lease_claim_heartbeat_reclaim_and_attempt_limit_contract() -> None:
     created = use_case.create(
         user_id=user_id,
         paid_level=PaidLevel.free(),
-        mode="create",
+        mode="assistant_v1",
         locale="en",
         user_prompt_text="Create RSI config",
     )

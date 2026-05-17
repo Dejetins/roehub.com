@@ -222,7 +222,7 @@ def _smoke_runtime_once(
         "lms_ps": ps,
         "api_v1_models_loaded_instance": True,
         "single_shot_chat_probe": "removed",
-        "tool_agent_contract": "pending",
+        "assistant_v1_runtime_contract": "pending",
         "timestamp_unix": time.time(),
     }
 

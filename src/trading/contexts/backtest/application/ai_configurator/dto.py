@@ -10,13 +10,7 @@ from trading.shared_kernel.primitives import PaidLevel, UserId
 
 JsonMapping = Mapping[str, Any]
 
-BacktestAiConfigMode = Literal[
-    "create",
-    "edit",
-    "explain",
-    "repair",
-    "suggest_safer",
-]
+BacktestAiConfigMode = Literal["assistant_v1"]
 BacktestAiConfigLocale = Literal["ru", "en"]
 BacktestAiConfigJobState = Literal[
     "queued",

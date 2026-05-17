@@ -40,13 +40,13 @@ PENDING_RUNTIME_DEFAULTS_HASH = hashlib.sha256(
     b"backtest-ai-configurator-pending-runtime-defaults-v1"
 ).hexdigest()
 BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION = (
-    "backtest-ai-configurator-tool-agent-pending-v1"
+    "backtest-ai-configurator-assistant-v1-pending"
 )
 BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH = hashlib.sha256(
     BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION.encode("utf-8")
 ).hexdigest()
 
-_VALID_MODES = {"create", "edit", "explain", "repair", "suggest_safer"}
+_VALID_MODES = {"assistant_v1"}
 _VALID_LOCALES = {"ru", "en"}
 _MAX_IDEMPOTENCY_KEY_LENGTH = 128
 _MAX_USER_PROMPT_CHARS = 16_000
