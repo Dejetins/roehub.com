@@ -1,0 +1,58 @@
+{
+  "accepted": false,
+  "blocking_reason": "tool_agent_pending; single-shot prompt/blob contract retired",
+  "next_prompt_allowed": true,
+  "date": "2026-05-17",
+  "runtime": "lm_studio_tools",
+  "feature_state": "disabled_until_tool_agent",
+  "retired_contracts": [
+    "BacktestConfigLLMGateway",
+    "generate_config",
+    "repair_config",
+    "LMStudioOpenAICompatibleAdapter",
+    "messages plus response_format only",
+    "full prompt envelope",
+    "model-visible TRUSTED_CAPABILITIES blob"
+  ],
+  "preserved_foundation": [
+    "public API routes",
+    "job storage",
+    "quota",
+    "idempotency",
+    "status/SSE shell",
+    "validator",
+    "catalog resolver",
+    "artifact coverage",
+    "indicator bounds",
+    "security gates",
+    "final backend validation"
+  ],
+  "inventory": {
+    "active_code_old_contract_hits": 0,
+    "tombstone_prompt_pack": ".codex/agents/generated/backtest-ai-configurator-mlx-v1",
+    "ignored_scratch_old_blob_hits": 0,
+    "stale_bytecode_removed": [
+      "src/trading/contexts/backtest/adapters/outbound/ai_config_agent/__pycache__/lmstudio_tools.cpython-312.pyc"
+    ]
+  },
+  "contract_impact": {
+    "public_api_contract": "none",
+    "port_contract": "breaking-change",
+    "dto_schema": "none",
+    "persisted_schema": "none",
+    "config_schema_defaults": "compatible-change",
+    "request_hash_cache_key_persistence_identity": "none",
+    "rollout_gate": "breaking-change"
+  },
+  "required_literals": {
+    "single_shot_status": "single-shot prompt/blob contract retired",
+    "old_gateway": "BacktestConfigLLMGateway",
+    "old_adapter": "LMStudioOpenAICompatibleAdapter",
+    "old_capabilities_boundary": "TRUSTED_CAPABILITIES",
+    "runtime": "runtime: lm_studio_tools",
+    "readiness_blocker": "tool_agent_pending",
+    "accepted_marker": "accepted: false",
+    "blocking_reason_marker": "blocking_reason",
+    "next_prompt_allowed_marker": "next_prompt_allowed"
+  }
+}

@@ -74,9 +74,9 @@ class DeterministicBacktestConfigAgentGateway:
     """
     Deterministic backend-agent adapter for tests and local fake execution.
 
-    It does not model the old single-shot prompt envelope. It simulates the
-    future backend-controlled tool-agent result so validator/security behavior
-    can stay covered while the real LM Studio tools adapter is rebuilt.
+    It simulates the future backend-controlled tool-agent result so
+    validator/security behavior can stay covered while the real LM Studio tools
+    adapter is rebuilt.
     """
 
     scenario: DeterministicToolAgentScenario = "valid"

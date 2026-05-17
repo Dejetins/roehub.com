@@ -2,7 +2,11 @@
 prompt_name: backtest_ai_configurator_mlx_v1_02_api_shell_fake_worker
 repo: roehub.com
 branch: main
+status: superseded
+do_not_execute: true
 scope: "Iteration 02: implement browser-visible /backtests/ai-config API shell, SSE/status events, feedback route, and deterministic fake worker without MLX."
+superseded_reason: "Retired on 2026-05-17 during /backtests AI Configurator tools reset. The API/status/SSE shell is retained in current code, but this old prompt pack must not be executed."
+replacement_direction: "Use the forthcoming tool-based LM Studio prompt pack; keep API routes, status/SSE, feedback and deterministic regression helpers as retained foundation."
 
 language:
   implementation: python_fastapi
@@ -156,6 +160,14 @@ safety_notes:
   - "429 may be used at HTTP level, but response body must contain a friendly message."
   - "SSE events are observable stages only, never model reasoning."
 ---
+
+# Superseded Prompt
+
+Do not execute this prompt.
+
+This file is retained only as a historical record for the already-landed
+API/status/SSE shell. Current implementation and docs are the source of truth
+for future `/backtests` AI Configurator work.
 
 # Task
 

@@ -2,7 +2,11 @@
 prompt_name: backtest_ai_configurator_mlx_v1_01_storage_quota_contracts
 repo: roehub.com
 branch: main
+status: superseded
+do_not_execute: true
 scope: "Iteration 01: implement durable storage, DTOs, repository ports, quota accounting, idempotency, and lease contracts for /backtests AI configurator without enabling MLX or UI."
+superseded_reason: "Retired on 2026-05-17 during /backtests AI Configurator tools reset. The storage/quota foundation is retained in current code, but this old prompt pack must not be executed."
+replacement_direction: "Use the forthcoming tool-based LM Studio prompt pack; keep storage, quota, idempotency, lease, status and API shell as retained foundation."
 
 language:
   implementation: python_fastapi_postgres
@@ -157,6 +161,14 @@ safety_notes:
   - "Additive schema only. Existing backtest job tables and hashes must remain unchanged."
   - "If PaidLevel source is unclear, implement quota as a port with deterministic test fake and report the integration point."
 ---
+
+# Superseded Prompt
+
+Do not execute this prompt.
+
+This file is retained only as a historical record for the already-landed
+storage/quota foundation. Current implementation and docs are the source of
+truth for future `/backtests` AI Configurator work.
 
 # Task
 

@@ -2,7 +2,11 @@
 prompt_name: backtest_ai_configurator_mlx_v1_03_catalog_validation_security_gates
 repo: roehub.com
 branch: main
+status: superseded
+do_not_execute: true
 scope: "Iteration 03: implement catalog resolver, current-form mapping, JSON schema, business validation, deterministic security input/output gates, and correction/clarification behavior without MLX."
+superseded_reason: "Retired on 2026-05-17 during /backtests AI Configurator tools reset. The validator/catalog/security foundation is retained in current code, but this old prompt pack must not be executed."
+replacement_direction: "Use the forthcoming tool-based LM Studio prompt pack; keep catalog resolver, validator, artifact coverage, indicator bounds and security gates as retained foundation."
 
 language:
   implementation: python_fastapi
@@ -153,6 +157,14 @@ safety_notes:
   - "Assistant-controlled text must be plain text and pass output gate."
   - "Unsupported indicator/timeframe/symbol must never produce load_action.enabled=true."
 ---
+
+# Superseded Prompt
+
+Do not execute this prompt.
+
+This file is retained only as a historical record for the already-landed
+catalog/validator/security foundation. Current implementation and docs are the
+source of truth for future `/backtests` AI Configurator work.
 
 # Task
 

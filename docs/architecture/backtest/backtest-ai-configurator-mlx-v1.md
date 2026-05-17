@@ -7,6 +7,9 @@ pending implementation.
 
 Date: 2026-05-16.
 
+Latest cleanup evidence:
+`docs/architecture/backtest/benchmark_iterations/2026-05-17_lmstudio_tools_contract/cleanup_readiness.md`.
+
 ## Gate Markers
 
 - accepted: false
@@ -45,7 +48,8 @@ The retained foundation is:
   checks.
 
 The active runtime placeholder is `runtime: lm_studio_tools`. It is disabled by
-default and wired to a pending tool-agent gateway until the new adapter exists.
+default, wired to `DisabledBacktestConfigAgentGateway`, and blocked by
+`tool_agent_pending` readiness until the new adapter exists.
 
 ## Target Direction
 
