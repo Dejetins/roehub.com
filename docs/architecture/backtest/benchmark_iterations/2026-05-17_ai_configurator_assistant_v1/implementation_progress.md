@@ -6,7 +6,7 @@
 
 | Iteration | Status | Evidence | Accepted | Blocking reason | Next allowed |
 | --- | --- | --- | --- | --- | --- |
-| 01 Reset старой AI ветки | in_progress | `iteration_01_reset.{md,json}` | false | pending delivery verification | false |
+| 01 Reset старой AI ветки | accepted | `iteration_01_reset.{md,json}` | true | none | true |
 | 02A Artifact availability summary | planned | `iteration_02a_artifact_availability_summary.{md,json}` | false | not started | false |
 | 02B Context snapshot | planned | `iteration_02b_context_snapshot.{md,json}` | false | waits for 02A | false |
 | 03 Conversation API/storage | planned | `iteration_03_conversation_api.{md,json}` | false | not started | false |

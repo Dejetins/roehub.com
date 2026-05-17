@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "iteration": "01-reset",
-  "status": "in_progress",
-  "updated_at": "2026-05-17T20:31:56Z",
-  "accepted": false,
-  "blocking_reason": "pending direct-main publish, main CI/deploy, and deployed Mac Studio verification",
-  "next_iteration_allowed": false,
-  "commit": null,
-  "host": "local",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
-  "macstudio_verified": false,
-  "macstudio_commit": null,
+  "status": "accepted",
+  "updated_at": "2026-05-17T20:39:33Z",
+  "accepted": true,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "commit": "a6d49673fc83de71923a1a0982b80ad1ccadcd34",
+  "host": "local,macstudio",
+  "pushed_to_main": true,
+  "origin_main_commit": "a6d49673fc83de71923a1a0982b80ad1ccadcd34",
+  "macstudio_verified": true,
+  "macstudio_commit": "a6d49673fc83de71923a1a0982b80ad1ccadcd34",
   "retirement_note": "The old mode-button, one-shot AI job, and tool-agent path was retired because assistant v1 uses a single chat with backend intent classification, backend validation/repair, and no model-triggered backtest execution.",
   "evidence": {
     "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_01_reset.md",
@@ -160,5 +160,42 @@
     "persisted_schema": "none",
     "request_hash_cache_identity": "none",
     "backtest_jobs_api": "none"
+  },
+  "delivery": {
+    "mode": "direct_main",
+    "commit": "a6d49673fc83de71923a1a0982b80ad1ccadcd34",
+    "origin_main_commit": "a6d49673fc83de71923a1a0982b80ad1ccadcd34",
+    "ci": {
+      "run_id": 26001986711,
+      "conclusion": "success"
+    },
+    "deploy_backend": {
+      "run_id": 26001986709,
+      "conclusion": "success"
+    },
+    "publish_app_image": {
+      "run_id": 26001986707,
+      "conclusion": "success"
+    },
+    "deploy_web": {
+      "run_id": 26002013188,
+      "conclusion": "success"
+    }
+  },
+  "macstudio": {
+    "host": "MacStudioDaniil",
+    "runtime_path": "/opt/roehub/app",
+    "runtime_layout": "deployed_copy_without_git",
+    "commit_verified_by": [
+      "github_deploy_workflow_head_sha",
+      "critical_runtime_file_sha256_match"
+    ],
+    "critical_file_hashes_match": true,
+    "active_path_stale_reference_grep": "no matches",
+    "retired_endpoint_probe": {
+      "post_/backtests/ai-config/jobs": 404,
+      "get_/backtests/ai-config/jobs/test": 404
+    },
+    "smoke_prod": "passed"
   }
 }

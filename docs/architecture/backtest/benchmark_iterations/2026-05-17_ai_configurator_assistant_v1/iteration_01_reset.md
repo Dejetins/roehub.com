@@ -2,7 +2,7 @@
 
 Дата: 2026-05-17.
 
-Статус: in_progress.
+Статус: accepted.
 
 ## Цель
 
@@ -155,7 +155,61 @@ Result: passed.
 | Request hash/cache identity | none | Core `/backtests/jobs` manual request identity unchanged. |
 | Backtest jobs API | none | Manual `/backtests/jobs` path is not changed. |
 
+## Mac Studio
+
+Accepted commit: `a6d49673fc83de71923a1a0982b80ad1ccadcd34`.
+
+Mac Studio host: `MacStudioDaniil`.
+
+Runtime layout: `/opt/roehub/app` is a deployed source copy without `.git`, so
+the accepted commit was verified by deployment workflow SHA plus file hashes for
+the changed runtime surfaces.
+
+Checks:
+
+- local and Mac Studio SHA256 match for:
+  - `apps/web/templates/pages/backtests.html`;
+  - `apps/web/dist/js/pages/backtests.js`;
+  - `apps/api/routes/backtest_ai_config.py`;
+  - `configs/prod/backtest_ai_configurator.yaml`.
+- Active deployed path grep:
+
+```text
+grep -RInE "lm_studio_tools|tool_agent|backtests\\.ai\\.mode|edit_current|repair_invalid|suggest_safer|/backtests/ai-config/jobs" src apps configs infra tests
+```
+
+Result: no matches.
+
+- Retired endpoints:
+
+```text
+POST /backtests/ai-config/jobs -> 404
+GET /backtests/ai-config/jobs/test -> 404
+```
+
+- Production smoke:
+
+```text
+ssh macstudio 'cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh'
+```
+
+Result: passed.
+
+## Delivery
+
+Direct-main delivery:
+
+- commit: `a6d49673fc83de71923a1a0982b80ad1ccadcd34`;
+- `origin/main`: `a6d49673fc83de71923a1a0982b80ad1ccadcd34`;
+- CI: `26001986711`, success;
+- Deploy Backend: `26001986709`, success;
+- Publish App Image: `26001986707`, success;
+- Deploy Web: `26002013188`, success.
+
 ## Acceptance marker
 
-Current marker is not accepted until direct-main publish, main CI/deploy, and
-deployed Mac Studio verification are complete.
+Accepted: true.
+
+Blocking reason: none.
+
+Next iteration allowed: true.
