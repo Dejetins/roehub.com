@@ -7,7 +7,8 @@
 
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` — канонический implementation source и целевой contract нового artifact-backed backtest service.
 - `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md` — целевой production-план для повторного ввода `backtest-job-runner`, lazy trades materialization, tier limits, Mac Studio service, metrics и smoke evidence.
-- `docs/architecture/backtest/backtest-ai-configurator-mlx-v1.md` — текущий reset-документ AI configurator для `/backtests`: single-shot LM Studio prompt/blob contract выведен из active runtime path, сохранены storage/API/validator/security foundations, следующий целевой контракт — LM Studio tools.
+- `docs/architecture/backtest/backtest-ai-configurator-assistant-v1.md` — новое целевое ТЗ для `/backtests` AI configurator assistant: один чат, LM Studio chat completions + JSON schema, backend-owned context snapshot, validator/repair, UI history, Monit/metrics и benchmark gates.
+- `docs/architecture/backtest/backtest-ai-configurator-mlx-v1.md` — historical reset-документ AI configurator для `/backtests`: single-shot LM Studio prompt/blob contract выведен из active runtime path; не является source of truth для новой assistant v1 реализации.
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — companion/reference copy; если расходится с русским документом, для реализации побеждает `.ru.md`.
 - `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md` — executable prompt pack для Iteration 0/1 реализации.
 - `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.

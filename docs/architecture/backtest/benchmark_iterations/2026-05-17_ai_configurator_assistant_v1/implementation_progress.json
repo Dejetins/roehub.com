@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "plan": "backtest_ai_configurator_assistant_v1",
+  "updated_at": "2026-05-17T19:38:50Z",
+  "iterations": [
+    {
+      "id": "01-reset",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_01_reset.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_01_reset.json"
+    },
+    {
+      "id": "02a-artifact-availability-summary",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02a_artifact_availability_summary.json"
+    },
+    {
+      "id": "02b-context-snapshot",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "waits for 02A",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02b_context_snapshot.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02b_context_snapshot.json"
+    },
+    {
+      "id": "03-conversation-api-storage",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_03_conversation_api.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_03_conversation_api.json"
+    },
+    {
+      "id": "04-prompt-lmstudio",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_04_prompt_lmstudio.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_04_prompt_lmstudio.json"
+    },
+    {
+      "id": "05-validation-repair",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_05_validation_repair.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_05_validation_repair.json"
+    },
+    {
+      "id": "06-ui",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_06_ui.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_06_ui.json"
+    },
+    {
+      "id": "07-ops",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_07_ops.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_07_ops.json"
+    },
+    {
+      "id": "08-security",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_08_security.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_08_security.json"
+    },
+    {
+      "id": "09-benchmark",
+      "status": "planned",
+      "accepted": false,
+      "blocking_reason": "not started",
+      "next_iteration_allowed": false,
+      "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_09_benchmark.md",
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_09_benchmark.json"
+    }
+  ]
+}
