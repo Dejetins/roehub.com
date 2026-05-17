@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "iteration": "03-conversation-api-storage",
-  "status": "accepted_pending_delivery",
-  "updated_at": "2026-05-18T01:05:00Z",
+  "status": "accepted",
+  "updated_at": "2026-05-17T22:12:00Z",
   "accepted": true,
-  "blocking_reason": "direct-main delivery and final deployed commit verification are pending",
-  "next_iteration_allowed": false,
-  "commit": null,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
   "host": "local",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
+  "pushed_to_main": true,
+  "origin_main_commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
   "macstudio_verified": true,
-  "macstudio_commit": null,
+  "macstudio_commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
   "api_contract": {
     "mode_field_browser_visible": false,
     "old_job_endpoints_removed": true,
@@ -89,9 +89,11 @@
     "runtime_workflow": "compatible-change"
   },
   "macstudio": {
-    "status": "pre_delivery_smoke_passed",
+    "status": "deployed_runtime_smoke_passed",
     "host": "MacStudioDaniil",
-    "worktree": "/tmp/roehub-iter03-smoke",
+    "deployed_path": "/opt/roehub/app",
+    "final_commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
+    "pre_delivery_worktree": "/tmp/roehub-iter03-smoke",
     "base_commit": "2496b1e8e558737138740e6d45e95ee057cdcd50",
     "migration": {
       "cmd": "PYTHONPATH=/tmp/roehub-iter03-smoke/src:/tmp/roehub-iter03-smoke /opt/roehub/app/.venv/bin/python -m apps.migrations.main",
@@ -122,11 +124,72 @@
       },
       "listed_count_before_cleanup": 1,
       "smoke_rows_cleaned_up": true
+    },
+    "deploy_smoke_prod": {
+      "first_attempt": "exit 7 immediately after reload: 127.0.0.1:8000 not ready yet",
+      "second_attempt_after_8s": "passed"
+    },
+    "deployed_api_smoke": {
+      "surface": "FastAPI TestClient from /opt/roehub/app with real Mac Studio STRATEGY_PG_DSN",
+      "owner_user_id": "00000000-0000-0000-0000-000000000904",
+      "conversation_title": "New backtest chat",
+      "limits": {
+        "retention_days": 30,
+        "max_conversations_per_user": 50,
+        "max_messages_per_conversation": 100
+      },
+      "send_status": "awaiting_model",
+      "status_endpoint": "awaiting_model",
+      "load_action": {
+        "enabled": false,
+        "state": "unavailable",
+        "reason": "backend_not_ready",
+        "config": null
+      },
+      "smoke_rows_cleaned_up": true
+    },
+    "runtime_shasums": {
+      "apps/api/routes/backtest_ai_config.py": "1401e6d7e6c5fce329d6e352fafe953af6518980feb036853cde6a0d11a0e7ca",
+      "src/trading/contexts/backtest/application/ai_configurator/conversations.py": "2b2edb628a2e3d12347a43f8d0722ec7f4fc879118c0f69968222c4987e3d790",
+      "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_ai_conversation_repository.py": "b946d05d2caeaf4a617eb5454e353fa745125eac85484eadc344bb4e8156f596",
+      "alembic/versions/20260518_0014_backtest_ai_conversation_storage_v1.py": "0f1a1480bfb3c8b34a7601eebbd84c3432f948ed35d5612b4fdd3c99eea066b6"
     }
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "not_started"
+    "status": "completed",
+    "commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
+    "pushed_to_main": true,
+    "ci": [
+      {
+        "name": "CI",
+        "run_id": 26004024507,
+        "conclusion": "success"
+      },
+      {
+        "name": "Deploy Backend",
+        "run_id": 26004024498,
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish App Image",
+        "run_id": 26004024508,
+        "conclusion": "success"
+      },
+      {
+        "name": "Deploy Web",
+        "run_id": 26004042088,
+        "conclusion": "success"
+      }
+    ],
+    "macstudio_sync": {
+      "path": "/Users/daniildegtyarev/Projects/roehub.com",
+      "commit": "32dc379c36f6e376f7ab17fd5167c5bce6fb68e8",
+      "bootstrap_native_prod": "passed",
+      "reload_launchd_services": "passed",
+      "smoke_prod": "passed on second attempt after post-reload readiness delay",
+      "iteration_api_smoke": "passed"
+    }
   },
   "evidence": {
     "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_03_conversation_api.md",

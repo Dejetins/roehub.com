@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: accepted, direct-main delivery pending.
+Статус: accepted, direct-main delivery completed.
 
 ## Цель
 
@@ -176,14 +176,69 @@ Result:
 
 Smoke rows were deleted by `owner_user_id` after the route checks.
 
+Deployed runtime verification then ran after direct-main delivery on commit
+`32dc379c36f6e376f7ab17fd5167c5bce6fb68e8`.
+
+Mac Studio sync/deploy:
+
+- `git pull --ff-only origin main`: synced `/Users/daniildegtyarev/Projects/roehub.com`
+  to `32dc379c36f6e376f7ab17fd5167c5bce6fb68e8`;
+- `bash scripts/macos/bootstrap_native_prod.sh`: passed;
+- `bash scripts/macos/reload_launchd_services.sh prod`: passed;
+- first immediate `bash scripts/macos/smoke_prod.sh`: exit 7 because `127.0.0.1:8000`
+  was not ready immediately after service reload;
+- second `bash scripts/macos/smoke_prod.sh` after 8 seconds: passed.
+
+Deployed API smoke used `/opt/roehub/app`, FastAPI `TestClient`, real
+`build_backtest_ai_configurator_use_cases`, Mac Studio `STRATEGY_PG_DSN`, and fake
+current user `00000000-0000-0000-0000-000000000904`.
+
+Result:
+
+```json
+{
+  "conversation_title": "New backtest chat",
+  "limits": {
+    "max_conversations_per_user": 50,
+    "max_messages_per_conversation": 100,
+    "retention_days": 30
+  },
+  "load_action": {
+    "config": null,
+    "enabled": false,
+    "reason": "backend_not_ready",
+    "state": "unavailable"
+  },
+  "send_status": "awaiting_model",
+  "status_endpoint": "awaiting_model"
+}
+```
+
+Runtime file hashes in `/opt/roehub/app`:
+
+```text
+1401e6d7e6c5fce329d6e352fafe953af6518980feb036853cde6a0d11a0e7ca  apps/api/routes/backtest_ai_config.py
+2b2edb628a2e3d12347a43f8d0722ec7f4fc879118c0f69968222c4987e3d790  src/trading/contexts/backtest/application/ai_configurator/conversations.py
+b946d05d2caeaf4a617eb5454e353fa745125eac85484eadc344bb4e8156f596  src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_ai_conversation_repository.py
+0f1a1480bfb3c8b34a7601eebbd84c3432f948ed35d5612b4fdd3c99eea066b6  alembic/versions/20260518_0014_backtest_ai_conversation_storage_v1.py
+```
+
 ## Delivery
 
-Direct-main delivery not started yet.
+Direct-main delivery completed.
 
-Current marker before Mac Studio and delivery:
+- implementation commit: `32dc379c36f6e376f7ab17fd5167c5bce6fb68e8`;
+- pushed to `origin/main`: true;
+- GitHub `CI` run `26004024507`: success;
+- GitHub `Deploy Backend` run `26004024498`: success;
+- GitHub `Publish App Image` run `26004024508`: success;
+- GitHub `Deploy Web` run `26004042088`: success;
+- Mac Studio deployed commit: `32dc379c36f6e376f7ab17fd5167c5bce6fb68e8`;
+- deployed API smoke: passed.
+
+Final marker:
 
 - `accepted=true`;
-- `next_iteration_allowed=false`;
-- `pushed_to_main=false`;
-- `macstudio_verified=true` for pre-delivery temp-worktree smoke, final deployed
-  commit verification still pending.
+- `next_iteration_allowed=true`;
+- `pushed_to_main=true`;
+- `macstudio_verified=true`.
