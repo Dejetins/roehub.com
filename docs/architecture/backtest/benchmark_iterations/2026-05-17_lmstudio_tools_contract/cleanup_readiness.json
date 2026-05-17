@@ -1,0 +1,85 @@
+{
+  "accepted": false,
+  "blocking_reason": "tool-agent runtime is not implemented yet; active runtime is intentionally blocked by tool_agent_pending",
+  "next_prompt_allowed": true,
+  "date": "2026-05-17",
+  "runtime_state": {
+    "current_runtime_literal": "runtime: lm_studio_tools",
+    "feature_state": "disabled_blocked_until_tool_agent",
+    "readiness_blocker": "tool_agent_pending",
+    "model_runtime_acceptance": false
+  },
+  "retired_contracts": {
+    "status": "single-shot prompt/blob contract retired",
+    "gateway": "BacktestConfigLLMGateway",
+    "semantics": [
+      "generate_config",
+      "repair_config"
+    ],
+    "adapter": "LMStudioOpenAICompatibleAdapter",
+    "model_visible_blob": "TRUSTED_CAPABILITIES",
+    "adapter_smoke": "messages + response_format with choices[0].message.content"
+  },
+  "inventory": [
+    {
+      "probe": "BacktestConfigLLMGateway",
+      "classification": "historical_doc_only",
+      "active_code_hit": false,
+      "action": "retained only in retirement/reset evidence"
+    },
+    {
+      "probe": "generate_config repair_config",
+      "classification": "retired_single_shot_semantics",
+      "active_code_hit": false,
+      "action": "no active runtime contract remains"
+    },
+    {
+      "probe": "LMStudioOpenAICompatibleAdapter",
+      "classification": "historical_doc_only",
+      "active_code_hit": false,
+      "action": "retained only as retired historical evidence"
+    },
+    {
+      "probe": "TRUSTED_CAPABILITIES",
+      "classification": "retired_model_visible_blob",
+      "active_code_hit": false,
+      "action": "no active prompt/profile builder remains"
+    },
+    {
+      "probe": ".codex/agents/generated/backtest-ai-configurator-mlx-v1",
+      "classification": "tombstone_prompt_pack",
+      "active_code_hit": false,
+      "action": "status superseded and do_not_execute true"
+    },
+    {
+      "probe": "ignored cache and scratch artifacts",
+      "classification": "stale_bytecode_or_scratch",
+      "active_code_hit": false,
+      "action": "targeted binary/hidden search found no old symbols to remove"
+    }
+  ],
+  "preserved_foundation": [
+    "api_routes",
+    "status_sse_shell",
+    "job_storage",
+    "quota",
+    "idempotency",
+    "lease_audit_storage",
+    "input_gate",
+    "output_gate",
+    "catalog_resolver",
+    "artifact_coverage",
+    "indicator_bounds",
+    "BacktestAiConfigValidator",
+    "BacktestPreflightService"
+  ],
+  "contract_impact": {
+    "public_api_contract": "compatible-change",
+    "port_contract": "breaking-change",
+    "dto_schema": "none",
+    "persisted_schema": "none",
+    "config_schema_defaults": "compatible-change",
+    "request_hash_cache_persistence_identity": "none",
+    "rollout_gate": "breaking-change"
+  }
+}
