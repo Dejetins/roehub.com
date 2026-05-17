@@ -2,6 +2,7 @@ from .ai_config_agent import (
     DeterministicBacktestConfigAgentGateway,
     DisabledBacktestConfigAgentGateway,
 )
+from .ai_configurator_context import FilesystemBacktestAiAvailabilitySummaryRepository
 from .artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
@@ -9,6 +10,7 @@ from .artifacts_fs import (
 )
 from .cache_fs import DEFAULT_LAZY_TRADES_CACHE_ROOT, LocalFileBacktestLazyTradesCache
 from .config import (
+    BacktestAiConfiguratorContextSnapshotRuntimeConfig,
     BacktestAiConfiguratorModelRuntimeConfig,
     BacktestAiConfiguratorQueueRuntimeConfig,
     BacktestAiConfiguratorRuntimeConfig,
@@ -42,6 +44,7 @@ from .queue import DatabaseBacktestJobExecutionTrigger
 __all__ = [
     "AtomicArtifactCurrentPointerWriterV2",
     "BacktestAiConfiguratorQueueRuntimeConfig",
+    "BacktestAiConfiguratorContextSnapshotRuntimeConfig",
     "BacktestAiConfiguratorModelRuntimeConfig",
     "BacktestAiConfiguratorRuntimeConfig",
     "BacktestArtifactHitTimesGridRuntimeConfig",
@@ -60,6 +63,7 @@ __all__ = [
     "DeterministicBacktestConfigAgentGateway",
     "DisabledBacktestConfigAgentGateway",
     "FilesystemBacktestArtifactContextResolver",
+    "FilesystemBacktestAiAvailabilitySummaryRepository",
     "LocalFileBacktestLazyTradesCache",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",

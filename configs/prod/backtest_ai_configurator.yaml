@@ -22,6 +22,9 @@ backtest_ai_configurator:
     base_url: http://127.0.0.1:8080
     request_timeout_seconds: 240
     active_generations: 1
+  context_snapshot:
+    availability_summary_path: /opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml
+    max_prompt_indicators: 40
   quotas:
     free:
       requests_per_5h: 3

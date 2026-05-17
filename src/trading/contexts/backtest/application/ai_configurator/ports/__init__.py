@@ -3,8 +3,10 @@ from .agent_gateway import (
     BacktestConfigAgentRequest,
     BacktestConfigAgentResponse,
 )
+from .availability_summary import BacktestAiAvailabilitySummaryRepository
 
 __all__ = [
+    "BacktestAiAvailabilitySummaryRepository",
     "BacktestConfigAgentGateway",
     "BacktestConfigAgentRequest",
     "BacktestConfigAgentResponse",

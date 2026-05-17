@@ -23,6 +23,9 @@ _DEFAULT_MODEL_PATH = (
     "/Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit"
 )
 _DEFAULT_BASE_URL = "http://127.0.0.1:8080"
+_DEFAULT_AVAILABILITY_SUMMARY_PATH = (
+    "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,10 +100,30 @@ class BacktestAiConfiguratorModelRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestAiConfiguratorContextSnapshotRuntimeConfig:
+    availability_summary_path: Path
+    max_prompt_indicators: int = 40
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "availability_summary_path",
+            Path(self.availability_summary_path),
+        )
+        if (
+            isinstance(self.max_prompt_indicators, bool)
+            or not isinstance(self.max_prompt_indicators, int)
+            or self.max_prompt_indicators <= 0
+        ):
+            raise ValueError("max_prompt_indicators must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestAiConfiguratorRuntimeConfig:
     enabled: bool
     queue: BacktestAiConfiguratorQueueRuntimeConfig
     model: BacktestAiConfiguratorModelRuntimeConfig
+    context_snapshot: BacktestAiConfiguratorContextSnapshotRuntimeConfig
     tier_quotas: Mapping[str, BacktestAiTierQuota]
 
     def to_quota_config(self) -> BacktestAiQuotaConfig:
@@ -142,6 +165,9 @@ def load_backtest_ai_configurator_runtime_config(
         enabled=_required_bool(root, "enabled"),
         queue=queue,
         model=_model_config(_optional_mapping(root, "model")),
+        context_snapshot=_context_snapshot_config(
+            _optional_mapping(root, "context_snapshot")
+        ),
         tier_quotas=_tier_quotas(quotas_payload),
     )
 
@@ -187,6 +213,21 @@ def _model_config(payload: Mapping[str, Any]) -> BacktestAiConfiguratorModelRunt
             default=90.0,
         ),
         active_generations=_optional_int(payload, "active_generations", default=1),
+    )
+
+
+def _context_snapshot_config(
+    payload: Mapping[str, Any],
+) -> BacktestAiConfiguratorContextSnapshotRuntimeConfig:
+    return BacktestAiConfiguratorContextSnapshotRuntimeConfig(
+        availability_summary_path=Path(
+            _optional_str(
+                payload,
+                "availability_summary_path",
+                default=_DEFAULT_AVAILABILITY_SUMMARY_PATH,
+            )
+        ),
+        max_prompt_indicators=_optional_int(payload, "max_prompt_indicators", default=40),
     )
 
 
@@ -283,6 +324,7 @@ def _validate_loopback_base_url(value: str) -> None:
 
 
 __all__ = [
+    "BacktestAiConfiguratorContextSnapshotRuntimeConfig",
     "BacktestAiConfiguratorModelRuntimeConfig",
     "BacktestAiConfiguratorQueueRuntimeConfig",
     "BacktestAiConfiguratorRuntimeConfig",

@@ -61,6 +61,7 @@ BacktestAiAdmissionStatus = Literal[
     "quota_exceeded",
     "capacity_delayed",
 ]
+BacktestAiContextAxisMode = Literal["range", "explicit", "none"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,6 +265,184 @@ class BacktestAiAdmissionDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestAiContextAxis:
+    name: str
+    mode: BacktestAiContextAxisMode
+    values: tuple[int | float | str, ...] = ()
+    start: int | float | None = None
+    stop_incl: int | float | None = None
+    step: int | float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", self.name.strip().lower())
+        if not self.name:
+            raise ValueError("BacktestAiContextAxis.name must be non-empty")
+        if self.mode == "explicit" and len(self.values) == 0:
+            raise ValueError("explicit context axis requires values")
+        if self.mode == "range" and (
+            self.start is None or self.stop_incl is None or self.step is None
+        ):
+            raise ValueError("range context axis requires start/stop_incl/step")
+        if self.mode == "none" and (
+            self.values
+            or self.start is not None
+            or self.stop_incl is not None
+            or self.step is not None
+        ):
+            raise ValueError("none context axis must not carry values or range bounds")
+
+    def as_mapping(self) -> dict[str, Any]:
+        if self.mode == "explicit":
+            return {"mode": "explicit", "values": list(self.values)}
+        if self.mode == "range":
+            return {
+                "mode": "range",
+                "start": self.start,
+                "stop_incl": self.stop_incl,
+                "step": self.step,
+            }
+        return {"mode": "none"}
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiIndicatorAvailability:
+    indicator_id: str
+    available: bool
+    reason: str
+    sources: tuple[str, ...]
+    axes: Mapping[str, BacktestAiContextAxis]
+    signal_params: Mapping[str, BacktestAiContextAxis]
+    coverage_timeframes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "indicator_id", self.indicator_id.strip().lower())
+        if not self.indicator_id:
+            raise ValueError("indicator_id must be non-empty")
+        object.__setattr__(self, "sources", tuple(self.sources))
+        object.__setattr__(
+            self,
+            "axes",
+            MappingProxyType(dict(sorted(self.axes.items()))),
+        )
+        object.__setattr__(
+            self,
+            "signal_params",
+            MappingProxyType(dict(sorted(self.signal_params.items()))),
+        )
+        object.__setattr__(self, "coverage_timeframes", tuple(self.coverage_timeframes))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "indicator_id": self.indicator_id,
+            "available": self.available,
+            "reason": self.reason,
+            "sources": list(self.sources),
+            "window_axis": self.axes.get(
+                "window",
+                BacktestAiContextAxis(name="window", mode="none"),
+            ).as_mapping(),
+            "axes": {name: axis.as_mapping() for name, axis in self.axes.items()},
+            "signal_params": {
+                name: axis.as_mapping() for name, axis in self.signal_params.items()
+            },
+            "coverage_timeframes": list(self.coverage_timeframes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestAiContextSnapshot:
+    schema_version: int
+    source: str
+    snapshot_hash: str
+    summary_hash: str
+    summary_generated_at_utc: str
+    resolved_symbol: str
+    exchange: str
+    market_type: str
+    instrument_key: str
+    ignored_symbols: tuple[str, ...]
+    warnings: tuple[str, ...]
+    allowed_values: Mapping[str, Any]
+    period: Mapping[str, str]
+    timeframe_periods: Mapping[str, Mapping[str, Any]]
+    indicators: tuple[BacktestAiIndicatorAvailability, ...]
+    indicator_audit: Mapping[str, Any]
+    provenance: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "resolved_symbol", self.resolved_symbol.strip().upper())
+        object.__setattr__(self, "exchange", self.exchange.strip().lower())
+        object.__setattr__(self, "market_type", self.market_type.strip().lower())
+        object.__setattr__(self, "ignored_symbols", tuple(self.ignored_symbols))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
+        object.__setattr__(
+            self,
+            "allowed_values",
+            MappingProxyType(dict(self.allowed_values)),
+        )
+        object.__setattr__(self, "period", MappingProxyType(dict(self.period)))
+        object.__setattr__(
+            self,
+            "timeframe_periods",
+            MappingProxyType(dict(self.timeframe_periods)),
+        )
+        object.__setattr__(
+            self,
+            "indicator_audit",
+            MappingProxyType(dict(self.indicator_audit)),
+        )
+        object.__setattr__(self, "provenance", MappingProxyType(dict(self.provenance)))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "source": self.source,
+            "snapshot_hash": self.snapshot_hash,
+            "summary_hash": self.summary_hash,
+            "summary_generated_at_utc": self.summary_generated_at_utc,
+            "resolved_symbol": self.resolved_symbol,
+            "exchange": self.exchange,
+            "market_type": self.market_type,
+            "instrument_key": self.instrument_key,
+            "ignored_symbols": list(self.ignored_symbols),
+            "warnings": list(self.warnings),
+            "allowed_values": _json_ready(self.allowed_values),
+            "period": dict(self.period),
+            "timeframe_periods": _json_ready(self.timeframe_periods),
+            "indicators": [item.as_mapping() for item in self.indicators],
+            "indicator_audit": _json_ready(self.indicator_audit),
+            "provenance": _json_ready(self.provenance),
+        }
+
+    def model_prompt_context(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "snapshot_hash": self.snapshot_hash,
+            "allowed_values": _json_ready(self.allowed_values),
+            "resolved_symbol": {
+                "exchange": self.exchange,
+                "market_type": self.market_type,
+                "symbol": self.resolved_symbol,
+            },
+            "ignored_symbols": list(self.ignored_symbols),
+            "warnings": list(self.warnings),
+            "period": dict(self.period),
+            "timeframe_periods": _json_ready(self.timeframe_periods),
+            "indicators": [
+                item.as_mapping() for item in self.indicators if item.available
+            ],
+        }
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_json_ready(item) for item in value]
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestAiConfigCreateResult:
     job: BacktestAiConfigJob | None
     idempotent_replay: bool
@@ -287,6 +466,9 @@ __all__ = [
     "BacktestAiAdmissionDecision",
     "BacktestAiAdmissionStatus",
     "BacktestAiConfigCreateResult",
+    "BacktestAiContextAxis",
+    "BacktestAiContextAxisMode",
+    "BacktestAiContextSnapshot",
     "BacktestAiConfigEvent",
     "BacktestAiConfigEventName",
     "BacktestAiConfigJob",
@@ -296,6 +478,7 @@ __all__ = [
     "BacktestAiConfigLocale",
     "BacktestAiConfigMode",
     "BacktestAiConfigTerminalState",
+    "BacktestAiIndicatorAvailability",
     "BacktestAiQuotaAction",
     "BacktestAiQuotaEvent",
     "BacktestAiQuotaSnapshot",

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "iteration": "02b-context-snapshot",
+  "status": "pending_delivery",
+  "updated_at": "2026-05-18T00:00:00Z",
+  "accepted": false,
+  "blocking_reason": "pending direct-main delivery and Mac Studio smoke",
+  "next_iteration_allowed": false,
+  "commit": null,
+  "host": "local",
+  "pushed_to_main": false,
+  "origin_main_commit": null,
+  "macstudio_verified": false,
+  "macstudio_commit": null,
+  "source_of_truth": "availability_summary.yaml",
+  "snapshot_contract": {
+    "schema_version": 1,
+    "source": "backtest_ai_context_snapshot_v1",
+    "one_symbol_prompt_context": true,
+    "model_prompt_symbol_field": "allowed_values.symbol",
+    "full_symbol_universe_exposed": false,
+    "axis_modes": ["range", "explicit", "none"],
+    "fail_closed_on_missing_summary": true,
+    "sanitized_model_provenance": true
+  },
+  "local_snapshot_evidence": {
+    "summary_source": "synthetic availability_summary.yaml payload in focused tests",
+    "symbols_from_summary": true,
+    "timeframes_from_summary": true,
+    "periods_from_summary": true,
+    "multi_symbol_handling": {
+      "resolved_symbol": "BTCUSDT",
+      "ignored_symbols": ["ETHUSDT"]
+    },
+    "explicit_axis": {
+      "indicator_id": "structure.percent_rank",
+      "window_axis": {
+        "mode": "explicit",
+        "values": [10, 14, 20, 28, 42, 56, 84, 126]
+      }
+    },
+    "no_window_axis": {
+      "indicator_id": "volume.obv",
+      "window_axis": {
+        "mode": "none"
+      }
+    },
+    "indicator_audit": {
+      "total_indicators": 40,
+      "available_count": 40,
+      "excluded_count": 0
+    },
+    "missing_summary_fail_closed": true,
+    "summary_hash_mismatch_fail_closed": true
+  },
+  "local_checks": [
+    {
+      "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/ai_configurator",
+      "result": "40 passed"
+    },
+    {
+      "cmd": "uv run ruff check src/trading/contexts/backtest/application/ai_configurator src/trading/contexts/backtest/adapters/outbound/ai_configurator_context src/trading/contexts/backtest/adapters/outbound/config/backtest_ai_configurator_runtime_config.py tests/unit/contexts/backtest/application/ai_configurator",
+      "result": "passed"
+    },
+    {
+      "cmd": "uv run pyright",
+      "result": "passed; 0 errors"
+    },
+    {
+      "cmd": "uv run python -m tools.docs.generate_docs_index --check",
+      "result": "passed"
+    }
+  ],
+  "contract_impact": {
+    "public_api_contract": "none",
+    "port_contract": "compatible-change",
+    "dto_schema": "compatible-change",
+    "persisted_schema": "none",
+    "config_schema": "compatible-change",
+    "request_hash_cache_identity": "none",
+    "artifact_contract": "none"
+  },
+  "macstudio": {
+    "host": null,
+    "runtime_path": "/opt/roehub/app",
+    "summary_path": "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml",
+    "summary_hash": null,
+    "snapshot_hash": null,
+    "resolved_symbol": null,
+    "allowed_values_symbol": null,
+    "indicator_audit": null,
+    "smoke_exit_code": null
+  },
+  "delivery": {
+    "mode": "direct_main",
+    "status": "pending",
+    "commit": null,
+    "ci": null,
+    "deploy_backend": null,
+    "publish_app_image": null,
+    "deploy_web": null,
+    "smoke_prod": null
+  },
+  "evidence": {
+    "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02b_context_snapshot.md",
+    "json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_02b_context_snapshot.json",
+    "contract": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/context_snapshot_contract.md"
+  }
+}

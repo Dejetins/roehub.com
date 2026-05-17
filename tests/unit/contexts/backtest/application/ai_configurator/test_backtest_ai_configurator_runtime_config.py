@@ -22,6 +22,11 @@ def test_ai_configurator_runtime_config_loads_assistant_v1_reset_placeholder() -
     assert config.model.max_output_tokens == 1024
     assert config.model.request_timeout_seconds == 240
     assert config.queue.lease_seconds == 300
+    assert (
+        str(config.context_snapshot.availability_summary_path)
+        == "/opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml"
+    )
+    assert config.context_snapshot.max_prompt_indicators == 40
 
 
 def test_ai_configurator_runtime_config_rejects_public_lmstudio_base_url(
