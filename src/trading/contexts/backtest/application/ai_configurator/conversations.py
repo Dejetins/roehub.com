@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -13,6 +15,7 @@ from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
 
 from .dto import (
+    BacktestAiConfigJob,
     BacktestAiConversation,
     BacktestAiConversationLocale,
     BacktestAiConversationMessage,
@@ -23,6 +26,12 @@ from .dto import (
     BacktestAiConversationTitleSource,
     BacktestAiLoadAction,
 )
+from .jobs import (
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
+    BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
+    BACKTEST_AI_CONFIG_SOURCE_PAGE,
+)
+from .services import BacktestAiConfigPipeline
 
 BACKTEST_AI_CONVERSATION_ERROR_INVALID_REQUEST = "backtest.ai_config.invalid_request"
 BACKTEST_AI_CONVERSATION_ERROR_NOT_FOUND = "backtest.ai_config.not_found"
@@ -99,6 +108,74 @@ class DisabledBacktestAiConversationGateway:
                 state="unavailable",
                 reason="backend_not_ready",
             ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineBacktestAiConversationGateway:
+    pipeline: BacktestAiConfigPipeline
+    runtime_enabled: bool = True
+
+    def generate_reply(
+        self,
+        *,
+        conversation: BacktestAiConversation,
+        user_message: str,
+        current_config: Mapping[str, Any] | None,
+        ui_context: Mapping[str, Any] | None,
+    ) -> BacktestAiConversationModelResponse:
+        if not self.runtime_enabled:
+            return DisabledBacktestAiConversationGateway().generate_reply(
+                conversation=conversation,
+                user_message=user_message,
+                current_config=current_config,
+                ui_context=ui_context,
+            )
+        _ = ui_context
+        now = datetime.now(UTC)
+        job = BacktestAiConfigJob(
+            job_id=uuid4(),
+            owner_user_id=conversation.owner_user_id,
+            mode="assistant_v1",
+            locale=conversation.locale,
+            state="running",
+            source_page=BACKTEST_AI_CONFIG_SOURCE_PAGE,
+            user_prompt_text=user_message,
+            user_prompt_hash=_sha256_text(user_message),
+            current_config_hash=_optional_hash(current_config),
+            current_config_json=current_config,
+            system_prompt_version=BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION,
+            system_prompt_hash=BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH,
+            catalog_snapshot_hash="conversation-inline",
+            runtime_defaults_hash="conversation-inline",
+            queued_at=now,
+            updated_at=now,
+        )
+        result = self.pipeline.run(job=job)
+        if result.status == "ready" and result.validated_config is not None:
+            load_action = BacktestAiLoadAction(
+                enabled=True,
+                state="ready",
+                reason=None,
+                config=result.validated_config,
+            )
+            validated_config = result.validated_config
+        else:
+            load_action = BacktestAiLoadAction(
+                enabled=False,
+                state=result.status,
+                reason=result.last_error or "no_ready_config",
+                config=None,
+            )
+            validated_config = None
+        return BacktestAiConversationModelResponse(
+            assistant_message=result.assistant_message,
+            conversation_title=None,
+            status=result.status,
+            intent=result.intent,
+            load_action=load_action,
+            validated_config_json=validated_config,
+            model_id=result.model_id,
         )
 
 
@@ -401,6 +478,23 @@ def _utc_now(*, now: datetime | None) -> datetime:
     return now.astimezone(UTC)
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _optional_hash(value: Mapping[str, Any] | None) -> str | None:
+    if value is None:
+        return None
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 __all__ = [
     "BACKTEST_AI_CONVERSATION_ERROR_INVALID_REQUEST",
     "BACKTEST_AI_CONVERSATION_ERROR_NOT_FOUND",
@@ -413,4 +507,5 @@ __all__ = [
     "BacktestAiConversationLimits",
     "BacktestAiConversationUseCase",
     "DisabledBacktestAiConversationGateway",
+    "PipelineBacktestAiConversationGateway",
 ]

@@ -4,6 +4,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.adapters.outbound.ai_config_agent import (
     LMStudioChatCompletionsResult,
     LMStudioChatCompletionsSettings,
@@ -13,10 +14,16 @@ from trading.contexts.backtest.application.ai_configurator import (
     BACKTEST_AI_OUTPUT_SCHEMA_NAME,
     CANONICAL_SYSTEM_PROMPT,
     SYSTEM_PROMPT_ID,
+    BacktestAiCatalogResolver,
     backtest_ai_lmstudio_response_format,
     backtest_ai_model_output_schema,
     backtest_ai_output_example,
     build_backtest_ai_prompt_package,
+    trusted_context_from_catalog,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    BacktestRuntimeConfig,
+    BacktestRuntimeDefaultsService,
 )
 
 
@@ -81,6 +88,36 @@ def test_prompt_package_separates_trusted_context_current_form_recent_chat_and_u
     assert "USER_MESSAGE" in user_content
     assert "OUTPUT_JSON_SCHEMA" in user_content
     assert "OUTPUT_JSON_EXAMPLE" in user_content
+
+
+def test_trusted_context_hides_not_loadable_no_window_indicators() -> None:
+    defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path="configs/prod/indicators.yaml"
+    )
+    runtime_config = BacktestRuntimeConfig(
+        hit_times_tp_levels_pct=tuple(i / 2 for i in range(1, 101)),
+        hit_times_sl_levels_pct=tuple(i / 2 for i in range(1, 51)),
+        artifact_config_hash="a" * 64,
+    )
+    catalog = BacktestAiCatalogResolver(
+        runtime_defaults_service=BacktestRuntimeDefaultsService(
+            defaults_provider=defaults_provider,
+            runtime_config=runtime_config,
+        )
+    ).resolve()
+
+    context = trusted_context_from_catalog(catalog=catalog)
+    allowed = context["allowed_values"]
+
+    assert len(allowed["indicators"]) == 32
+    assert len(allowed["excluded_indicators"]) == 8
+    assert "volume.obv" not in {
+        item["indicator_id"] for item in allowed["indicators"]
+    }
+    assert {
+        "indicator_id": "volume.obv",
+        "reason": "hidden_until_no_window_runtime_contract_is_loadable",
+    } in allowed["excluded_indicators"]
 
 
 def test_lmstudio_adapter_payload_uses_chat_completions_without_tools() -> None:

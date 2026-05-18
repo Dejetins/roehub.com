@@ -16,6 +16,14 @@ class BacktestConfigAgentRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestConfigAgentRepairRequest:
+    job: BacktestAiConfigJob
+    catalog: BacktestAiAllowedCatalog
+    previous_draft: Mapping[str, Any]
+    validation_errors: tuple[Mapping[str, Any], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestConfigAgentResponse:
     raw_output: str | None
     model_id: str | None = None
@@ -39,9 +47,19 @@ class BacktestConfigAgentGateway(Protocol):
         """
         ...
 
+    def run_repair_config_session(
+        self,
+        request: BacktestConfigAgentRepairRequest,
+    ) -> BacktestConfigAgentResponse:
+        """
+        Run the single backend-owned repair attempt with the same runtime.
+        """
+        ...
+
 
 __all__ = [
     "BacktestConfigAgentGateway",
+    "BacktestConfigAgentRepairRequest",
     "BacktestConfigAgentRequest",
     "BacktestConfigAgentResponse",
 ]

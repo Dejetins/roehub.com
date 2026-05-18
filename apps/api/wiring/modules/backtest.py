@@ -15,6 +15,8 @@ from trading.contexts.backtest.adapters.outbound import (
     DatabaseBacktestJobExecutionTrigger,
     DisabledBacktestConfigAgentGateway,
     FilesystemBacktestArtifactContextResolver,
+    LMStudioChatCompletionsSettings,
+    LMStudioOpenAICompatibleAdapter,
     LocalFileBacktestLazyTradesCache,
     PostgresBacktestAiConfigRepository,
     PostgresBacktestAiConversationRepository,
@@ -42,8 +44,11 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiInputGate,
     BacktestAiOutputGate,
     BacktestAiQuotaService,
+    PipelineBacktestAiConversationGateway,
 )
-from trading.contexts.backtest.application.ai_configurator.ports import BacktestConfigAgentGateway
+from trading.contexts.backtest.application.ai_configurator.ports import (
+    BacktestConfigAgentGateway,
+)
 from trading.contexts.backtest.application.ports import BacktestAiConfigLeaseRepository
 from trading.contexts.backtest.application.services.v2 import (
     BacktestAdmissionService,
@@ -240,6 +245,25 @@ def build_backtest_ai_configurator_use_cases(
         artifact_config=artifact_config,
         artifact_loader=artifact_loader,
     )
+    effective_agent_gateway = agent_gateway or _build_backtest_ai_agent_gateway(
+        runtime_config=ai_runtime_config
+    )
+    pipeline = BacktestAiConfigPipeline(
+        catalog_resolver=BacktestAiCatalogResolver(
+            runtime_defaults_service=runtime_defaults_service,
+            supported_symbols=_artifact_capability_symbols(
+                artifact_capabilities=artifact_capabilities,
+                fallback=_discover_ai_artifact_symbols(artifact_config=artifact_config),
+            ),
+            artifact_capabilities=artifact_capabilities,
+        ),
+        validator=BacktestAiConfigValidator(
+            preflight_service=preflight_service,
+            output_gate=BacktestAiOutputGate(),
+        ),
+        input_gate=BacktestAiInputGate(),
+        agent_gateway=effective_agent_gateway,
+    )
     return BacktestAiConfiguratorUseCases(
         jobs=BacktestAiConfigJobsUseCase(
             repository=repository,
@@ -250,25 +274,27 @@ def build_backtest_ai_configurator_use_cases(
         conversations=BacktestAiConversationUseCase(
             repository=conversation_repository,
             limits=ai_runtime_config.conversation,
+            gateway=PipelineBacktestAiConversationGateway(
+                pipeline=pipeline,
+                runtime_enabled=ai_runtime_config.enabled,
+            ),
         ),
         lease_repository=repository,
         runtime_config=ai_runtime_config,
-        pipeline=BacktestAiConfigPipeline(
-            catalog_resolver=BacktestAiCatalogResolver(
-                runtime_defaults_service=runtime_defaults_service,
-                supported_symbols=_artifact_capability_symbols(
-                    artifact_capabilities=artifact_capabilities,
-                    fallback=_discover_ai_artifact_symbols(artifact_config=artifact_config),
-                ),
-                artifact_capabilities=artifact_capabilities,
-            ),
-            validator=BacktestAiConfigValidator(
-                preflight_service=preflight_service,
-                output_gate=BacktestAiOutputGate(),
-            ),
-            input_gate=BacktestAiInputGate(),
-            agent_gateway=agent_gateway or DisabledBacktestConfigAgentGateway(),
-        ),
+        pipeline=pipeline,
+    )
+
+
+def _build_backtest_ai_agent_gateway(
+    *,
+    runtime_config: BacktestAiConfiguratorRuntimeConfig,
+) -> BacktestConfigAgentGateway:
+    if not runtime_config.enabled:
+        return DisabledBacktestConfigAgentGateway()
+    return LMStudioOpenAICompatibleAdapter(
+        settings=LMStudioChatCompletionsSettings.from_runtime_config(
+            runtime_config.model
+        )
     )
 
 

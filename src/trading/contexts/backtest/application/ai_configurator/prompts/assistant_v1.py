@@ -153,7 +153,19 @@ def trusted_context_from_catalog(
             "ranking_default": dict(catalog.ranking_default),
             "top_n_default": catalog.top_n_default,
             "execution_defaults": dict(catalog.execution_defaults),
-            "indicators": [_indicator_prompt_context(item) for item in catalog.indicators],
+            "indicators": [
+                _indicator_prompt_context(item)
+                for item in catalog.indicators
+                if _is_prompt_loadable_indicator(item)
+            ],
+            "excluded_indicators": [
+                {
+                    "indicator_id": item.indicator_id,
+                    "reason": "hidden_until_no_window_runtime_contract_is_loadable",
+                }
+                for item in catalog.indicators
+                if not _is_prompt_loadable_indicator(item)
+            ],
         },
     }
 
@@ -230,6 +242,11 @@ def _indicator_prompt_context(item: Any) -> dict[str, Any]:
         "sources": list(item.sources),
         "params": _json_ready(params),
     }
+
+
+def _is_prompt_loadable_indicator(item: Any) -> bool:
+    params = item.param_specs.get("params")
+    return isinstance(params, Mapping) and isinstance(params.get("window"), Mapping)
 
 
 def _json_ready(value: Any) -> Any:

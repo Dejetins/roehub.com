@@ -71,6 +71,8 @@ BacktestAiConversationRunStatus = Literal[
     "ready",
     "needs_clarification",
     "blocked_by_policy",
+    "input_too_large",
+    "security_review",
     "failed",
 ]
 

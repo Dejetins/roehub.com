@@ -7,6 +7,7 @@ from .conversations import (
     BacktestAiConversationLimits,
     BacktestAiConversationUseCase,
     DisabledBacktestAiConversationGateway,
+    PipelineBacktestAiConversationGateway,
 )
 from .dto import (
     BacktestAiAdmissionDecision,
@@ -58,6 +59,7 @@ from .jobs import (
 from .ports import (
     BacktestAiAvailabilitySummaryRepository,
     BacktestConfigAgentGateway,
+    BacktestConfigAgentRepairRequest,
     BacktestConfigAgentRequest,
     BacktestConfigAgentResponse,
 )
@@ -187,6 +189,7 @@ __all__ = [
     "BacktestAiTrainingQualityLabel",
     "BacktestAiValidationStatus",
     "BacktestConfigAgentGateway",
+    "BacktestConfigAgentRepairRequest",
     "BacktestConfigAgentRequest",
     "BacktestConfigAgentResponse",
     "CANONICAL_SYSTEM_PROMPT",
@@ -197,6 +200,7 @@ __all__ = [
     "DEFAULT_BACKTEST_AI_MAX_MESSAGES_PER_CONVERSATION",
     "DEFAULT_BACKTEST_AI_RETENTION_DAYS",
     "DisabledBacktestAiConversationGateway",
+    "PipelineBacktestAiConversationGateway",
     "JsonMapping",
     "PENDING_CATALOG_SNAPSHOT_HASH",
     "PENDING_RUNTIME_DEFAULTS_HASH",

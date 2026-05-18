@@ -7,6 +7,7 @@ from typing import Any, Literal, Mapping
 
 from trading.contexts.backtest.application.ai_configurator.dto import BacktestAiConfigJob
 from trading.contexts.backtest.application.ai_configurator.ports import (
+    BacktestConfigAgentRepairRequest,
     BacktestConfigAgentRequest,
     BacktestConfigAgentResponse,
 )
@@ -68,6 +69,18 @@ class DisabledBacktestConfigAgentGateway:
             audit_json={"reason": self.reason},
         )
 
+    def run_repair_config_session(
+        self,
+        request: BacktestConfigAgentRepairRequest,
+    ) -> BacktestConfigAgentResponse:
+        _ = request
+        return BacktestConfigAgentResponse(
+            raw_output=None,
+            model_id=None,
+            finish_reason="blocked",
+            audit_json={"reason": self.reason, "repair_attempt": True},
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class DeterministicBacktestConfigAgentGateway:
@@ -102,6 +115,24 @@ class DeterministicBacktestConfigAgentGateway:
             audit_json={"assistant_v1_runtime": "deterministic"},
         )
 
+    def run_repair_config_session(
+        self,
+        request: BacktestConfigAgentRepairRequest,
+    ) -> BacktestConfigAgentResponse:
+        raw_output = self._next_scripted()
+        if raw_output is None:
+            raw_output = _repair_output(request=request)
+        return BacktestConfigAgentResponse(
+            raw_output=raw_output,
+            model_id=_MODEL_ID,
+            latency_ms=0,
+            finish_reason="stop",
+            audit_json={
+                "assistant_v1_runtime": "deterministic",
+                "repair_attempt": True,
+            },
+        )
+
     def _next_scripted(self) -> str | None:
         index = self._index
         if index >= len(self.scripted_outputs):
@@ -130,6 +161,52 @@ def _raw_output_for_scenario(
             "start": "2024-01-01T00:00:00Z",
             "end": "2023-01-01T00:00:00Z",
         }
+    return json.dumps(draft, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _repair_output(*, request: BacktestConfigAgentRepairRequest) -> str:
+    codes = {str(item.get("code") or "") for item in request.validation_errors}
+    draft = dict(request.previous_draft)
+    if "schema_validation_failed" in codes:
+        repaired = _deterministic_agent_output(job=request.job, catalog=request.catalog)
+        return json.dumps(
+            repaired,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+    if "invalid_range" in codes:
+        config = draft.get("config")
+        if isinstance(config, dict):
+            config["time_range"] = {
+                "start": "2023-01-01T00:00:00Z",
+                "end": "2024-01-01T00:00:00Z",
+            }
+            draft["assistant_message"] = _ready_message(
+                symbol=str(
+                    (
+                        config.get("coordinates", {})
+                        if isinstance(config.get("coordinates"), dict)
+                        else {}
+                    ).get("symbol", "BTCUSDT")
+                ),
+                locale=request.job.locale,
+            )
+            draft["status"] = "config_ready"
+            draft["unsupported_items"] = []
+            draft["clarifying_questions"] = []
+            draft["warnings"] = []
+        return json.dumps(
+            draft,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+    draft["status"] = "needs_clarification"
+    draft["config"] = None
+    draft["assistant_message"] = (
+        "The requested /backtests configuration needs clarification."
+    )
     return json.dumps(draft, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 

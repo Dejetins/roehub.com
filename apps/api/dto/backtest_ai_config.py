@@ -162,12 +162,18 @@ def build_backtest_ai_config_job_response(
 ) -> BacktestAiConfigJobResponse:
     snapshot = job.public_snapshot()
     validated_config = snapshot["validated_config"]
-    load_action: dict[str, Any] = {"enabled": False}
+    load_action = BacktestAiLoadAction(
+        enabled=False,
+        state=str(snapshot["status"]),
+        reason="no_ready_config",
+    ).as_mapping()
     if job.state == "ready" and isinstance(validated_config, dict):
-        load_action = {
-            "enabled": True,
-            "label": "Загрузить конфигурацию",
-        }
+        load_action = BacktestAiLoadAction(
+            enabled=True,
+            state="ready",
+            reason=None,
+            config=validated_config,
+        ).as_mapping()
     return BacktestAiConfigJobResponse(
         job_id=str(snapshot["job_id"]),
         status=str(snapshot["status"]),

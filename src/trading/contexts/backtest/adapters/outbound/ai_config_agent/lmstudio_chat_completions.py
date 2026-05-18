@@ -8,6 +8,7 @@ from typing import Any, Mapping
 import httpx
 
 from trading.contexts.backtest.application.ai_configurator.ports import (
+    BacktestConfigAgentRepairRequest,
     BacktestConfigAgentRequest,
     BacktestConfigAgentResponse,
 )
@@ -95,6 +96,43 @@ class LMStudioOpenAICompatibleAdapter:
             latency_ms=result.latency_ms,
             finish_reason=result.finish_reason,
             audit_json=result.audit_json,
+        )
+
+    def run_repair_config_session(
+        self,
+        request: BacktestConfigAgentRepairRequest,
+    ) -> BacktestConfigAgentResponse:
+        package = build_backtest_ai_prompt_package(
+            trusted_context=trusted_context_from_catalog(catalog=request.catalog),
+            current_form_config=request.job.current_config_json,
+            recent_chat_context=(),
+            user_message=request.job.user_prompt_text,
+        )
+        try:
+            result = self.run_repair_session(
+                package=package,
+                previous_draft=request.previous_draft,
+                validation_errors=request.validation_errors,
+            )
+        except LMStudioChatCompletionsError as error:
+            return BacktestConfigAgentResponse(
+                raw_output=None,
+                model_id=self.settings.model_id,
+                finish_reason="error",
+                audit_json={
+                    "runtime": "lm_studio",
+                    "endpoint": f"POST {_CHAT_COMPLETIONS_PATH}",
+                    "response_format": "json_schema",
+                    "repair_attempt": True,
+                    "error": str(error),
+                },
+            )
+        return BacktestConfigAgentResponse(
+            raw_output=result.content,
+            model_id=result.model_id or self.settings.model_id,
+            latency_ms=result.latency_ms,
+            finish_reason=result.finish_reason,
+            audit_json={**dict(result.audit_json), "repair_attempt": True},
         )
 
     def complete_prompt_package(

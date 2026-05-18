@@ -52,7 +52,8 @@ def test_pipeline_safe_prompt_produces_current_form_ready_config() -> None:
     assert result.validated_config["top_n"] == 10
     assert "symbols" not in result.validated_config
     assert "strategy" not in result.validated_config
-    assert result.llm_attempts == ()
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == ["generate"]
+    assert result.llm_attempts[0].success is True
 
 
 def test_pipeline_unsupported_indicator_needs_clarification_without_loadable_config() -> None:
@@ -322,7 +323,45 @@ def test_pipeline_invalid_agent_json_stops_without_single_shot_repair() -> None:
 
     assert result.status == "needs_clarification"
     assert result.validated_config is None
-    assert result.llm_attempts == ()
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == ["generate"]
+    assert result.llm_attempts[0].success is False
+
+
+def test_pipeline_schema_failure_repairs_once_to_ready() -> None:
+    result = _pipeline(
+        agent_gateway=DeterministicBacktestConfigAgentGateway(scenario="schema_invalid")
+    ).run(job=_job(message="Create BTCUSDT RSI config"))
+
+    assert result.status == "ready"
+    assert result.validated_config is not None
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
+        "generate",
+        "repair",
+    ]
+    assert result.llm_attempts[0].success is False
+    assert result.llm_attempts[1].success is True
+
+
+def test_pipeline_repair_failure_stops_after_one_attempt() -> None:
+    pipeline = _pipeline()
+    catalog = pipeline.catalog_resolver.resolve()
+    invalid = _model_output(catalog=catalog)
+    invalid.pop("assistant_message")
+    raw_invalid = json.dumps(invalid, sort_keys=True, separators=(",", ":"))
+
+    result = _pipeline(
+        agent_gateway=DeterministicBacktestConfigAgentGateway(
+            scripted_outputs=(raw_invalid, raw_invalid)
+        )
+    ).run(job=_job(message="Create BTCUSDT RSI config"))
+
+    assert result.status == "needs_clarification"
+    assert result.validated_config is None
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
+        "generate",
+        "repair",
+    ]
+    assert all(not attempt.success for attempt in result.llm_attempts)
 
 
 def _pipeline(
