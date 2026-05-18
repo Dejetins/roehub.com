@@ -96,7 +96,9 @@ def _run_smoke(*, config_path: Path) -> dict[str, Any]:
         job=_sample_job(
             message=(
                 "Create a valid /backtests BTCUSDT configuration on 15m with "
-                "momentum.rsi. Do not run a backtest."
+                "momentum.rsi, risk.mode none, execution.direction_mode long_only, "
+                "execution.sizing.mode all_in, ranking total_return_pct desc, and "
+                "top_n 10. Do not run a backtest."
             )
         )
     )

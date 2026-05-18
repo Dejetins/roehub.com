@@ -56,6 +56,7 @@ OUTPUT:
 CONFIG_RULES:
 - A config must directly match the /backtests form contract.
 - Prefer CURRENT_FORM_CONFIG_JSON defaults when the user did not request a change.
+- risk.mode accepts only TRUSTED_CONTEXT_JSON.allowed_values.risk_modes values; long_only and long_short_reversal are execution.direction_mode values, never risk.mode values.
 - Ask a concise clarification when required information is missing.
 - Never create a config for an off-topic, malicious, secret-seeking, or auto-run-backtest request.
 
