@@ -64,6 +64,7 @@ def test_pipeline_unsupported_indicator_needs_clarification_without_loadable_con
     assert result.status == "needs_clarification"
     assert result.validated_config is None
     assert {item["code"] for item in result.validation_errors} == {"unsupported_indicator"}
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == ["generate"]
     assert "Bollinger" in result.assistant_message
 
 
@@ -334,6 +335,34 @@ def test_pipeline_schema_failure_repairs_once_to_ready() -> None:
 
     assert result.status == "ready"
     assert result.validated_config is not None
+    assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
+        "generate",
+        "repair",
+    ]
+    assert result.llm_attempts[0].success is False
+    assert result.llm_attempts[1].success is True
+
+
+def test_pipeline_repairable_catalog_enum_repairs_once_to_ready() -> None:
+    pipeline = _pipeline()
+    catalog = pipeline.catalog_resolver.resolve()
+    invalid = _model_output(catalog=catalog)
+    valid = _model_output(catalog=catalog)
+    assert isinstance(invalid["config"], dict)
+    invalid["config"]["risk"] = {"mode": "disabled"}
+
+    result = _pipeline(
+        agent_gateway=DeterministicBacktestConfigAgentGateway(
+            scripted_outputs=(
+                json.dumps(invalid, sort_keys=True, separators=(",", ":")),
+                json.dumps(valid, sort_keys=True, separators=(",", ":")),
+            )
+        )
+    ).run(job=_job(message="Create BTCUSDT RSI config"))
+
+    assert result.status == "ready"
+    assert result.validated_config is not None
+    assert result.validated_config["risk"] == {"mode": "none"}
     assert [attempt.attempt_kind for attempt in result.llm_attempts] == [
         "generate",
         "repair",

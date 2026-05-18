@@ -312,6 +312,7 @@ def _catalog_issues(
             path="risk.mode",
             code="unsupported_risk_mode",
             issues=issues,
+            repair_value=catalog.risk_modes[0] if catalog.risk_modes else None,
         )
     execution = config.get("execution")
     if isinstance(execution, Mapping):
@@ -321,6 +322,7 @@ def _catalog_issues(
             path="execution.direction_mode",
             code="unsupported_direction_mode",
             issues=issues,
+            repair_value=catalog.direction_modes[0] if catalog.direction_modes else None,
         )
         sizing = execution.get("sizing")
         if isinstance(sizing, Mapping):
@@ -330,6 +332,7 @@ def _catalog_issues(
                 path="execution.sizing.mode",
                 code="unsupported_sizing_mode",
                 issues=issues,
+                repair_value=catalog.sizing_modes[0] if catalog.sizing_modes else None,
             )
     ranking = config.get("ranking")
     if isinstance(ranking, Mapping):
@@ -339,6 +342,7 @@ def _catalog_issues(
             path="ranking.primary_metric",
             code="unsupported_ranking_metric",
             issues=issues,
+            repair_value=catalog.ranking_metrics[0] if catalog.ranking_metrics else None,
         )
     if "symbols" in config:
         issues.append(
@@ -546,19 +550,21 @@ def _catalog_choice(
     code: str,
     issues: list[dict[str, str]],
     upper: bool = False,
+    repair_value: str | None = None,
 ) -> None:
     if not isinstance(value, str):
         return
     normalized = value.strip().upper() if upper else value.strip().lower()
     allowed_set = {item.upper() if upper else item.lower() for item in allowed}
     if normalized not in allowed_set:
-        issues.append(
-            _issue(
-                path=path,
-                code=code,
-                message=f"{path} is not supported by the allowed catalog",
-            )
+        issue = _issue(
+            path=path,
+            code=code,
+            message=f"{path} is not supported by the allowed catalog",
         )
+        if repair_value:
+            issue["repair_value"] = repair_value
+        issues.append(issue)
 
 
 def _needs_clarification(
