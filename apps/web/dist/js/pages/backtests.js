@@ -24,6 +24,7 @@ const REFRESH_PRESETS = {
 };
 
 const state = {
+  workspaceView: "configure",
   market: "binance",
   market_type: "spot",
   symbol: "BTCUSDT",
@@ -773,6 +774,57 @@ function updateOptionSelection(root, name, value, label, { refresh = true } = {}
   if (name === "sizing_mode") {
     updateSizingPanel(root);
   }
+  renderConfigSummary(root);
+}
+
+function initialWorkspaceView(root) {
+  const mode = root.dataset.initialMode || "";
+  if (root.dataset.initialJobId || mode === "selected_job" || mode === "results") {
+    return "results";
+  }
+  return "configure";
+}
+
+function setWorkspaceView(root, view) {
+  const nextView = view === "results" ? "results" : "configure";
+  state.workspaceView = nextView;
+  root.dataset.backtestsActiveView = nextView;
+  qsa(".backtests-modebar [data-backtests-view-button]", root).forEach((button) => {
+    const selected = button.dataset.backtestsViewButton === nextView;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  renderConfigSummary(root);
+  if (nextView === "results") {
+    renderResultCanvases(root);
+  }
+}
+
+function configFieldValue(root, name, fallback = "--") {
+  const field = qs(`[data-config-field='${name}']`, root);
+  const value = field instanceof HTMLInputElement ? field.value.trim() : "";
+  return value || fallback;
+}
+
+function currentValueLabel(root, name, fallback = "--") {
+  const value = qs(`[data-current-value='${name}']`, root)?.textContent?.trim() || "";
+  return value || fallback;
+}
+
+function renderConfigSummary(root) {
+  const values = {
+    strategy: configFieldValue(root, "strategy"),
+    symbol: configFieldValue(root, "symbol", state.symbol || "BTCUSDT"),
+    timeframe: currentValueLabel(root, "timeframe", state.timeframe || "1h"),
+    direction: currentValueLabel(root, "direction"),
+    risk_mode: currentValueLabel(root, "risk_mode"),
+    sizing_mode: currentValueLabel(root, "sizing_mode"),
+    start: configFieldValue(root, "start"),
+    end: configFieldValue(root, "end"),
+  };
+  Object.entries(values).forEach(([name, value]) => {
+    setText(`[data-config-summary='${name}']`, value, root);
+  });
 }
 
 function renderDropdownOptions(root, name, options) {
@@ -841,6 +893,7 @@ function renderRuntimeControls(root, data) {
   }
   updateRiskPanel(root);
   updateSizingPanel(root);
+  renderConfigSummary(root);
 }
 
 function seedConfigDraft(root, draft, { validateOptions = false, includeIndicators = false } = {}) {
@@ -920,6 +973,7 @@ function seedConfigDraft(root, draft, { validateOptions = false, includeIndicato
   renderSelectedSymbols(root);
   updateRiskPanel(root);
   updateSizingPanel(root);
+  renderConfigSummary(root);
 }
 
 function seedRiskPanel(root, grid) {
@@ -1063,6 +1117,7 @@ function renderSymbols(root, universe) {
     filterSymbols(root, state.symbolQuery);
   }
   renderSelectedSymbols(root);
+  renderConfigSummary(root);
 }
 
 function renderSelectedSymbols(root) {
@@ -2082,6 +2137,7 @@ async function loadSelectedResult(root) {
   if (!state.selectedJobId || activeResultRequest) {
     return activeResultRequest;
   }
+  setWorkspaceView(root, "results");
   activeResultRequest = loadResultSummary(root, state.selectedJobId)
     .then(() => loadSelectedVariantDetails(root))
     .finally(() => {
@@ -2124,6 +2180,7 @@ async function openSelectedJob(root, jobId) {
     return;
   }
   state.closingVariantJobId = null;
+  setWorkspaceView(root, "results");
   state.selectedVariantKey = null;
   renderJobPicker(root, state.jobRows);
   try {
@@ -2258,6 +2315,7 @@ async function createJob(root) {
     setText("[data-create-status]", t("backtests.status.created", { job: created.job_id.slice(0, 8) }), root);
     state.selectedJobId = created.job_id;
     state.selectedVariantKey = null;
+    setWorkspaceView(root, "results");
     await refreshWorkstation(root, "manual");
   } catch (error) {
     setText("[data-create-status]", describeApiError(error), root);
@@ -2482,6 +2540,13 @@ function bindStatusBar(root) {
 function bind(root) {
   bindStatusBar(root);
   root.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-backtests-view-button]");
+    if (viewButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      setWorkspaceView(root, viewButton.dataset.backtestsViewButton || "configure");
+      return;
+    }
     const riskToggle = event.target.closest(".backtests-risk-toggle");
     if (riskToggle instanceof HTMLElement) {
       event.stopPropagation();
@@ -2713,6 +2778,7 @@ function bind(root) {
         state.symbol = symbol;
         state.selectedSymbols = symbol ? new Set([symbol]) : new Set();
       }
+      renderConfigSummary(root);
     }
     const riskInput = event.target.closest("[data-risk-field]");
     if (riskInput instanceof HTMLInputElement) {
@@ -2737,12 +2803,14 @@ function bind(root) {
       }
       normalizeRiskControls(root);
       updateCombinationsCount(root);
+      renderConfigSummary(root);
       return;
     }
     const riskInput = event.target.closest("[data-risk-field]");
     if (riskInput instanceof HTMLInputElement) {
       normalizeRiskControls(root);
       updateCombinationsCount(root);
+      renderConfigSummary(root);
       return;
     }
     const checkbox = event.target.closest("[data-symbol-checkbox]");
@@ -2768,6 +2836,7 @@ function init() {
   if (!root) {
     return;
   }
+  setWorkspaceView(root, initialWorkspaceView(root));
   bind(root);
   state.selectedJobId = root.dataset.initialJobId || null;
   refreshWorkstation(root, "initial").then(() => {

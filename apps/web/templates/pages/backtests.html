@@ -32,6 +32,23 @@
   >
     {% include "fragments/backtests/loading_state.html" %}
 
+    <header class="backtests-modebar" role="tablist" aria-label="{{ t('backtests.mode.label') }}">
+      <button
+        class="backtests-modebar__button is-active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        data-backtests-view-button="configure"
+      >{{ t("backtests.mode.configure") }}</button>
+      <button
+        class="backtests-modebar__button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        data-backtests-view-button="results"
+      >{{ t("backtests.mode.results") }}</button>
+    </header>
+
     <div class="backtests-grid">
       <section class="terminal-panel backtests-config" data-backtests-panel="config">
         <header class="panel-heading"><h2>{{ t("backtests.config.title") }}</h2></header>
@@ -251,25 +268,9 @@
         </footer>
       </section>
 
-      <section class="terminal-panel backtests-optimization" data-backtests-panel="optimization">
-        <header class="panel-heading"><h2>{{ t("backtests.optimization.title") }}</h2></header>
-        <div class="backtests-optimization-shell">
-          <div class="backtests-progress-head">
-            <span data-progress-label>{{ t("backtests.optimization.awaiting") }}</span>
-            <strong data-progress-percent>0%</strong>
-          </div>
-          <div class="backtests-progress-track" aria-label="{{ t('backtests.optimization.progress') }}"><span data-progress-bar></span></div>
-          <div class="backtests-progress-meta">
-            <span>{{ t("backtests.optimization.units") }}</span>
-            <strong data-progress-units>0/0</strong>
-          </div>
-        </div>
-        <div class="backtests-summary-counters">
-          <div><span>{{ t("backtests.optimization.remaining") }}</span><strong data-remaining>--</strong></div>
-          <div><span>{{ t("backtests.optimization.completed") }}</span><strong data-completed>0</strong></div>
-          <div><span>{{ t("backtests.optimization.running") }}</span><strong data-running>0</strong></div>
-          <div><span>{{ t("backtests.optimization.queued") }}</span><strong data-queued>0</strong></div>
-        </div>
+      <section class="terminal-panel backtests-ai-chat" data-backtests-panel="ai_chat">
+        <header class="panel-heading"><h2>{{ t("backtests.ai_chat.title") }}</h2></header>
+        <div class="backtests-ai-chat-shell" aria-hidden="true"></div>
       </section>
 
       <section class="terminal-panel backtests-results" data-backtests-panel="jobs_variants">
@@ -389,6 +390,47 @@
           <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-load-more-jobs hidden>{{ t("backtests.results.load_more") }}</button>
         </footer>
       </section>
+
+      <aside class="terminal-panel backtests-config-summary" data-backtests-panel="config_summary">
+        <header class="panel-heading"><h2>{{ t("backtests.config_summary.title") }}</h2></header>
+        <dl class="backtests-config-summary__list">
+          <div>
+            <dt>{{ t("backtests.config.strategy") }}</dt>
+            <dd data-config-summary="strategy">--</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.symbol") }}</dt>
+            <dd data-config-summary="symbol">BTCUSDT</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.timeframe") }}</dt>
+            <dd data-config-summary="timeframe">1h</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.direction") }}</dt>
+            <dd data-config-summary="direction">--</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.risk_mode") }}</dt>
+            <dd data-config-summary="risk_mode">--</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.sizing_mode") }}</dt>
+            <dd data-config-summary="sizing_mode">--</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.start") }}</dt>
+            <dd data-config-summary="start">--</dd>
+          </div>
+          <div>
+            <dt>{{ t("backtests.config.end") }}</dt>
+            <dd data-config-summary="end">--</dd>
+          </div>
+        </dl>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-backtests-view-button="configure">
+          {{ t("backtests.config_summary.edit") }}
+        </button>
+      </aside>
     </div>
     <div
       class="backtests-cancel-dialog"

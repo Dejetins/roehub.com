@@ -531,6 +531,11 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "data-load-more-jobs" in response.text
     assert "data-job-cancel-dialog" in response.text
     assert "data-job-cancel-confirm" in response.text
+    assert 'class="backtests-modebar"' in response.text
+    assert 'data-backtests-view-button="configure"' in response.text
+    assert 'data-backtests-view-button="results"' in response.text
+    assert 'data-backtests-panel="ai_chat"' in response.text
+    assert 'data-backtests-panel="config_summary"' in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text
@@ -543,8 +548,9 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         "config",
         "instruments",
         "indicators",
-        "optimization",
+        "ai_chat",
         "jobs_variants",
+        "config_summary",
     ]:
         assert f'data-backtests-panel="{panel}"' in response.text
     for removed_fragment in [
@@ -564,7 +570,10 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert main_html.index('data-backtests-panel="instruments"') < main_html.index(
         'data-backtests-panel="indicators"'
     )
-    assert main_html.index('data-backtests-panel="optimization"') < main_html.index(
+    assert main_html.index('data-backtests-panel="indicators"') < main_html.index(
+        'data-backtests-panel="ai_chat"'
+    )
+    assert main_html.index('data-backtests-panel="ai_chat"') < main_html.index(
         'data-backtests-panel="jobs_variants"'
     )
     assert 'data-backtests-refresh-preset' in response.text
@@ -840,6 +849,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "buildSizingPayload" in backtests_js
     assert 'sizing_mode: "all_in"' in backtests_js
     assert "function ensureStrategyName" in backtests_js
+    assert "function setWorkspaceView" in backtests_js
+    assert "function renderConfigSummary" in backtests_js
     assert "function directionLabel" in backtests_js
     assert "entry_timestamp" in backtests_js
     assert "net_pnl_quote" in backtests_js
@@ -865,6 +876,10 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "grid-row: 1;" in backtests_css
     assert "height: var(--rh-workarea-height);" in backtests_css
     assert ".backtests-instrument-controls" in backtests_css
+    assert ".backtests-modebar" in backtests_css
+    assert ".backtests-ai-chat" in backtests_css
+    assert ".backtests-config-summary" in backtests_css
+    assert 'data-backtests-active-view="results"' in backtests_css
     assert "grid-template-columns: minmax(0, 1fr);" in backtests_css
     assert ".backtests-field-pair--dates" in backtests_css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in backtests_css
