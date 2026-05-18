@@ -175,7 +175,7 @@ def _section(name: str, payload: Any) -> str:
     return (
         f"{name}\n"
         "```json\n"
-        f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+        f"{json.dumps(_json_ready(payload), ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
         "```"
     )
 

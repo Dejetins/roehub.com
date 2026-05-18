@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "iteration": "08-security",
+  "status": "accepted",
+  "accepted": true,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "pushed_to_main": false,
+  "macstudio_verified": false,
+  "previous_iteration_gate": {
+    "iteration": "07-ops",
+    "accepted": true,
+    "next_iteration_allowed": true,
+    "pushed_to_main": true,
+    "macstudio_verified": true,
+    "accepted_commit": "1890236f0a05499e91ad3197c7dcd844971bbd97",
+    "accepted_commit_is_ancestor_of_origin_main": true
+  },
+  "security_eval": {
+    "evidence_markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/security_eval.md",
+    "evidence_json": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/security_eval.json",
+    "run_id": "20260518T184755139675Z",
+    "target": "in-process-conversation-api-with-lmstudio-adapter",
+    "runtime": "lm_studio",
+    "model_id": "gemma-4-e2b-it-4bit",
+    "accepted": true,
+    "metrics": {
+      "unauthorized_actions": 0,
+      "secret_path_leakage": 0,
+      "invalid_load_action": 0,
+      "safe_prompts_blocked": "0/10",
+      "accepted_cases": "18/18"
+    }
+  },
+  "local_checks": [
+    {
+      "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/ai_configurator tests/unit/apps/api",
+      "status": "passed",
+      "result": "209 passed"
+    },
+    {
+      "cmd": "uv run ruff check src/trading/contexts/backtest/application/ai_configurator apps/api tests scripts",
+      "status": "passed"
+    },
+    {
+      "cmd": "uv run pyright",
+      "status": "passed",
+      "result": "0 errors"
+    },
+    {
+      "cmd": "uv run python -m tools.docs.generate_docs_index --check",
+      "status": "passed"
+    }
+  ],
+  "delivery": {
+    "mode": "direct_main",
+    "status": "pending",
+    "implementation_commit": null,
+    "ci": [],
+    "macstudio_sync": null
+  },
+  "contract_impact": {
+    "public_api_contract": "compatible-change",
+    "browser_visible_behavior": "compatible-change",
+    "dto_schema": "none",
+    "persisted_schema": "none",
+    "config_schema": "none",
+    "request_hash_cache_identity": "none"
+  },
+  "updated_at": "2026-05-18T18:57:00Z"
+}

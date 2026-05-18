@@ -270,7 +270,7 @@ class BacktestAiLoadAction:
             "enabled": self.enabled,
             "state": self.state,
             "reason": self.reason,
-            "config": None if self.config is None else dict(self.config),
+            "config": None if self.config is None else _json_ready(self.config),
         }
 
 

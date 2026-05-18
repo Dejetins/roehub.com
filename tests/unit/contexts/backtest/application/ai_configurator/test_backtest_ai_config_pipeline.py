@@ -19,6 +19,7 @@ from trading.contexts.backtest.application.ai_configurator import (
     BacktestAiConfigPipeline,
     BacktestAiConfigValidator,
     BacktestAiInputGate,
+    BacktestAiLoadAction,
     BacktestAiOutputGate,
 )
 from trading.contexts.backtest.application.dto.runtime_preflight import (
@@ -180,6 +181,30 @@ def test_pipeline_tp_sl_grid_uses_hit_times_15m_coverage() -> None:
         "start_pct": 0.5,
         "stop_pct": 1.0,
         "step_pct": 0.5,
+    }
+
+
+def test_pipeline_informational_prompt_never_creates_loadable_config() -> None:
+    result = _pipeline().run(
+        job=_job(message="Which indicators are available for /backtests configuration?")
+    )
+
+    assert result.status == "needs_clarification"
+    assert result.validated_config is None
+    assert result.intent == "list_available_indicators"
+    assert result.last_error == "informational_request"
+    assert result.llm_attempts == ()
+
+
+def test_load_action_mapping_is_json_serializable_with_nested_config() -> None:
+    action = BacktestAiLoadAction(
+        enabled=True,
+        state="ready",
+        config={"coordinates": {"symbol": "BTCUSDT"}},
+    )
+
+    assert json.loads(json.dumps(action.as_mapping()))["config"] == {
+        "coordinates": {"symbol": "BTCUSDT"}
     }
 
 

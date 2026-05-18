@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -88,6 +89,22 @@ def test_prompt_package_separates_trusted_context_current_form_recent_chat_and_u
     assert "USER_MESSAGE" in user_content
     assert "OUTPUT_JSON_SCHEMA" in user_content
     assert "OUTPUT_JSON_EXAMPLE" in user_content
+
+
+def test_prompt_package_serializes_frozen_current_config() -> None:
+    package = build_backtest_ai_prompt_package(
+        trusted_context={
+            "context_schema_version": 1,
+            "allowed_values": {"symbol": "BTCUSDT"},
+        },
+        current_form_config=MappingProxyType(
+            {"coordinates": MappingProxyType({"symbol": "BTCUSDT"})}
+        ),
+        recent_chat_context=(),
+        user_message="Edit current config to EMA",
+    )
+
+    assert '"coordinates":{"symbol":"BTCUSDT"}' in package.user_message.content
 
 
 def test_trusted_context_hides_not_loadable_no_window_indicators() -> None:

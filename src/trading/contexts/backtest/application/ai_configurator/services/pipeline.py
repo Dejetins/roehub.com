@@ -128,6 +128,27 @@ class BacktestAiConfigPipeline:
                     "security_decision": input_gate.decision,
                 },
             )
+        informational_intent = _informational_intent(message=job.user_prompt_text)
+        if informational_intent is not None:
+            return BacktestAiConfigPipelineResult(
+                status="needs_clarification",
+                assistant_message=_informational_message(
+                    intent=informational_intent,
+                    locale=job.locale,
+                    catalog_summary={
+                        "symbols": list(catalog.symbols[:8]),
+                        "timeframes": list(catalog.timeframes),
+                        "risk_modes": list(catalog.risk_modes),
+                        "indicators": list(catalog.indicator_ids[:8]),
+                    },
+                ),
+                catalog_snapshot_hash=catalog.snapshot_hash,
+                stage="input_gate",
+                validated_config=None,
+                intent=informational_intent,
+                last_error="informational_request",
+                last_error_json={"load_action_allowed": False},
+            )
 
         agent_response = _timed_agent_session(
             gateway=self.agent_gateway,
@@ -305,6 +326,67 @@ def _intent_from_draft(parsed_draft: dict[str, Any] | None) -> str | None:
     if isinstance(raw_intent, str) and raw_intent.strip():
         return raw_intent.strip()
     return None
+
+
+def _informational_intent(*, message: str) -> str | None:
+    text = message.casefold()
+    if (
+        ("which" in text or "what" in text or "list" in text)
+        and ("available" in text or "can" in text or "supported" in text)
+    ) or ("какие" in text and ("доступ" in text or "поддерж" in text)):
+        if "symbol" in text or "pair" in text or "пары" in text or "символ" in text:
+            return "list_available_symbols"
+        if "timeframe" in text or "таймфрейм" in text:
+            return "list_available_parameters"
+        if "risk" in text or "риск" in text:
+            return "list_available_parameters"
+        if "indicator" in text or "индикатор" in text:
+            return "list_available_indicators"
+        return "list_available_parameters"
+    if (
+        ("explain" in text or "объясни" in text)
+        and ("current" in text or "текущ" in text)
+        and ("without changing" in text or "не меня" in text)
+    ):
+        return "explain_current_config"
+    return None
+
+
+def _informational_message(
+    *,
+    intent: str,
+    locale: str,
+    catalog_summary: dict[str, list[str]],
+) -> str:
+    if locale == "ru":
+        if intent == "list_available_indicators":
+            return "Доступные indicator_id включают: " + ", ".join(
+                catalog_summary["indicators"]
+            )
+        if intent == "list_available_symbols":
+            return "Доступные символы включают: " + ", ".join(catalog_summary["symbols"])
+        if intent == "explain_current_config":
+            return "Я могу объяснить текущую конфигурацию без применения новой."
+        return (
+            "Доступные параметры: timeframes="
+            + ", ".join(catalog_summary["timeframes"])
+            + "; risk_modes="
+            + ", ".join(catalog_summary["risk_modes"])
+        )
+    if intent == "list_available_indicators":
+        return "Available indicator_id values include: " + ", ".join(
+            catalog_summary["indicators"]
+        )
+    if intent == "list_available_symbols":
+        return "Available symbols include: " + ", ".join(catalog_summary["symbols"])
+    if intent == "explain_current_config":
+        return "I can explain the current configuration without applying a new one."
+    return (
+        "Available parameters: timeframes="
+        + ", ".join(catalog_summary["timeframes"])
+        + "; risk_modes="
+        + ", ".join(catalog_summary["risk_modes"])
+    )
 
 
 __all__ = [

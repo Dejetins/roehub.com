@@ -14,7 +14,7 @@
 | 05 Validation/repair/load gate | accepted | `iteration_05_validation_repair.{md,json}` | true | none | true |
 | 06 UI redesign | accepted | `iteration_06_ui.{md,json}` | true | none | true |
 | 07 Ops/Monit/metrics | accepted | `iteration_07_ops.{md,json}` | true | none | true |
-| 08 Security eval | planned | `iteration_08_security.{md,json}` | false | not started | false |
+| 08 Security eval | accepted | `iteration_08_security.{md,json}` | true | none | true |
 | 09 Benchmark Mac Studio | planned | `iteration_09_benchmark.{md,json}` | false | not started | false |
 
 ## Update Contract
