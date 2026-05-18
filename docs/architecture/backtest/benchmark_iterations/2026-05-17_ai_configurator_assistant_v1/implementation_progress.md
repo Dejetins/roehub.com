@@ -12,7 +12,7 @@
 | 03 Conversation API/storage | accepted | `iteration_03_conversation_api.{md,json}` | true | none | true |
 | 04 Prompt contract + LM Studio adapter | accepted | `iteration_04_prompt_lmstudio.{md,json}` | true | none | true |
 | 05 Validation/repair/load gate | accepted | `iteration_05_validation_repair.{md,json}` | true | none | true |
-| 06 UI redesign | delivery_pending | `iteration_06_ui.{md,json}` | true | direct-main delivery pending | false |
+| 06 UI redesign | accepted | `iteration_06_ui.{md,json}` | true | none | true |
 | 07 Ops/Monit/metrics | planned | `iteration_07_ops.{md,json}` | false | not started | false |
 | 08 Security eval | planned | `iteration_08_security.{md,json}` | false | not started | false |
 | 09 Benchmark Mac Studio | planned | `iteration_09_benchmark.{md,json}` | false | not started | false |

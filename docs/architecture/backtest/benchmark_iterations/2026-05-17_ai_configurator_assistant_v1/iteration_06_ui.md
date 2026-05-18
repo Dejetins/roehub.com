@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: accepted locally, direct-main delivery pending.
+Статус: accepted.
 
 ## Предварительный gate
 
@@ -123,9 +123,31 @@ Result: passed after regenerating `docs/architecture/README.md`.
 
 ## Delivery
 
-Direct-main delivery is not completed yet.
+Direct-main delivery completed.
 
-- accepted locally: true;
-- pushed to `origin/main`: false;
-- Mac Studio verified: false;
-- `next_iteration_allowed=false` until direct-main delivery, CI/deploy, Mac Studio sync, and smoke complete.
+- implementation commit: `4ce800699de3d7b1fbf49485b1498e0410c1fda6`;
+- pushed to `origin/main`: true;
+- `CI`: success, run `26037019297`;
+- `Publish App Image`: success, run `26037019303`;
+- `Deploy Backend`: success, run `26037019339`;
+- `Deploy Web`: success, run `26037122636`.
+
+Mac Studio:
+
+- host: `MacStudioDaniil`;
+- repo path: `/Users/daniildegtyarev/projects/roehub.com`;
+- repo commit: `4ce800699de3d7b1fbf49485b1498e0410c1fda6`;
+- runtime path: `/opt/roehub/app`;
+- runtime `/backtests` template, JS, and locale file hashes match repo files;
+- `scripts/macos/smoke_prod.sh`: passed;
+- direct API smoke on `127.0.0.1:8000`: auth `200`, conversation list `200`, create `201`, messages `200`, status `200`, load-action `200`;
+- created smoke conversation locale: `ru`;
+- initial load action enabled: `false`;
+- note: Mac Studio exposes Roehub API on `127.0.0.1:8000`; `127.0.0.1:3000` is Grafana, not Roehub Web SSR.
+
+Acceptance marker:
+
+- accepted: true;
+- pushed to `origin/main`: true;
+- Mac Studio verified: true;
+- next iteration allowed: true.

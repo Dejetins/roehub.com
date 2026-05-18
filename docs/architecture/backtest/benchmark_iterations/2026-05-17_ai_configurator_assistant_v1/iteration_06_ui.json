@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "iteration": "06-ui",
-  "status": "delivery_pending",
+  "status": "accepted",
   "accepted": true,
-  "blocking_reason": "direct-main delivery pending",
-  "next_iteration_allowed": false,
-  "pushed_to_main": false,
-  "macstudio_verified": false,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "pushed_to_main": true,
+  "macstudio_verified": true,
   "previous_iteration_gate": {
     "iteration": "05-validation-repair",
     "accepted": true,
@@ -85,10 +85,49 @@
   ],
   "delivery": {
     "mode": "direct_main",
-    "status": "pending",
-    "implementation_commit": null,
-    "ci": [],
-    "macstudio_sync": null
+    "status": "accepted",
+    "implementation_commit": "4ce800699de3d7b1fbf49485b1498e0410c1fda6",
+    "ci": [
+      {
+        "workflow": "CI",
+        "run_id": 26037019297,
+        "status": "success"
+      },
+      {
+        "workflow": "Publish App Image",
+        "run_id": 26037019303,
+        "status": "success"
+      },
+      {
+        "workflow": "Deploy Backend",
+        "run_id": 26037019339,
+        "status": "success"
+      },
+      {
+        "workflow": "Deploy Web",
+        "run_id": 26037122636,
+        "status": "success"
+      }
+    ],
+    "macstudio_sync": {
+      "host": "MacStudioDaniil",
+      "repo_path": "/Users/daniildegtyarev/projects/roehub.com",
+      "repo_commit": "4ce800699de3d7b1fbf49485b1498e0410c1fda6",
+      "runtime_path": "/opt/roehub/app",
+      "runtime_files_match_repo": true,
+      "production_smoke": "passed",
+      "web_listener_note": "Mac Studio exposes Roehub API on 127.0.0.1:8000; 127.0.0.1:3000 is Grafana, not Roehub Web SSR.",
+      "api_smoke": {
+        "auth_status": 200,
+        "list_status": 200,
+        "create_status": 201,
+        "messages_status": 200,
+        "status_status": 200,
+        "load_status": 200,
+        "created_locale": "ru",
+        "load_action_enabled_initially": false
+      }
+    }
   },
   "contract_impact": {
     "public_api_contract": "none",
@@ -98,5 +137,5 @@
     "config_schema": "none",
     "request_hash_cache_identity": "none"
   },
-  "updated_at": "2026-05-18T13:42:00Z"
+  "updated_at": "2026-05-18T13:49:41Z"
 }
