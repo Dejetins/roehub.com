@@ -1,7 +1,6 @@
 """Outbound adapters for backtest artifacts publish/precompute runtime."""
 
 from .artifacts_fs import (
-    AtomicArtifactAvailabilitySummaryWriterV2,
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
 )
@@ -20,7 +19,6 @@ from .persistence.postgres import (
 )
 
 __all__ = [
-    "AtomicArtifactAvailabilitySummaryWriterV2",
     "AtomicArtifactCurrentPointerWriterV2",
     "BacktestArtifactPathBuilderV2",
     "BacktestArtifactsRuntimeConfig",

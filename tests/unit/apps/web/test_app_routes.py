@@ -541,7 +541,6 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "backtest_ui.js" not in main_html
     for panel in [
         "config",
-        "ai_configurator",
         "instruments",
         "indicators",
         "optimization",
@@ -560,7 +559,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     ]:
         assert removed_fragment not in response.text
     assert main_html.index('data-backtests-panel="config"') < main_html.index(
-        'data-backtests-panel="ai_configurator"'
+        'data-backtests-panel="instruments"'
     )
     assert main_html.index('data-backtests-panel="instruments"') < main_html.index(
         'data-backtests-panel="indicators"'

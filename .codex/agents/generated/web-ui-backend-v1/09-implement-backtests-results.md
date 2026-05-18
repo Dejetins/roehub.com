@@ -123,7 +123,7 @@ package_contract:
   forbidden:
     - "backtests workstation flow rewrites"
     - "worker runtime hardening"
-    - "AI configurator"
+    - "assistant or experimental panels"
     - "full trades in top rows"
   integration_points:
     - "public variant_key mapping"

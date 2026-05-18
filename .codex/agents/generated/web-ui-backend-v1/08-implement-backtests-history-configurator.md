@@ -113,7 +113,7 @@ package_contract:
   forbidden:
     - "backtest runtime worker hardening"
     - "backtest result endpoints/state"
-    - "AI configurator"
+    - "assistant or experimental panels"
     - "canonical request hash changes"
   integration_points:
     - "existing /api/backtests/jobs/preflight/defaults routes"
@@ -252,7 +252,7 @@ Done means:
 ## Requirements (Must)
 
 - Open `/Users/daniildegtyarev/Projects/roehub_web_ui/stategy_backtest.png` before coding.
-- Preserve the reference panel inventory: command bar, left config panel, AI configurator/analysis panel, instruments selector, indicators table/list, optimization overview/progress, recent events, main variants/results table, action/status buttons, bottom status/logos row.
+- Preserve the reference panel inventory: command bar, left config panel, instruments selector, indicators table/list, optimization overview/progress, recent events, main variants/results table, action/status buttons, bottom status/logos row.
 - Add or reuse `GET /api/ui/backtests/workstation?cursor=&state=&query=` as bounded first-render read-model when useful.
 - Include `refresh_status`, `generated_at`, `next_allowed_refresh_at`/`retry_after_seconds` or equivalent for job/progress panels.
 - Use branded dropdown/combobox/listbox controls for market, symbol, timeframe, direction, risk mode, ranking metric/order, presets and filters.
@@ -371,7 +371,7 @@ Use front matter touched paths.
 
 - Backtest results page.
 - Runtime worker hardening.
-- AI configurator.
+- Assistant or experimental panels.
 
 # Quality gates (must run and pass)
 

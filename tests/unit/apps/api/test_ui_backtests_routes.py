@@ -60,7 +60,6 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["config_draft"]["timeframe"] == "1h"
     assert payload["config_draft"]["execution"]["direction_mode"] == "long_short_reversal"
     assert payload["config_draft"]["execution"]["sizing"] == {"mode": "all_in"}
-    assert payload["ai_configurator_state"]["enabled"] is False
     assert payload["instrument_universe"]["source"] == "market_data_reference"
     assert payload["instrument_universe"]["markets"] == [
         {"value": "binance", "label": "Binance", "status": "available"},
@@ -105,24 +104,6 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["refresh_control"]["manual"] is True
     assert payload["refresh_control"]["default_preset"] == "15s"
     assert "trades" not in payload["job_table"]["items"][0]
-
-
-def test_get_backtest_workstation_exposes_ai_configurator_unavailable_state() -> None:
-    client = _build_client(
-        jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()),
-    )
-
-    response = client.get(
-        "/ui/backtests/workstation",
-        headers={"x-user-id": str(_USER_ID)},
-    )
-
-    assert response.status_code == 200
-    state = response.json()["ai_configurator_state"]
-    assert state["enabled"] is False
-    assert state["state"] == "unavailable"
-    assert state["stage"] == "assistant-v1-ui"
-    assert state["endpoints"] == {}
 
 
 def test_get_backtest_workstation_filters_jobs_by_exchange_market_symbol_date() -> None:
@@ -227,7 +208,6 @@ def _build_client(
     *,
     jobs_use_case=None,
     refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
-    ai_configurator_state: dict[str, object] | None = None,
 ) -> TestClient:
     app = FastAPI()
     register_api_error_handlers(app=app)
@@ -241,7 +221,6 @@ def _build_client(
                 search_enabled_tradable_instruments_use_case=(
                     _FakeSearchEnabledTradableInstrumentsUseCase()
                 ),
-                ai_configurator_state=ai_configurator_state,
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
         )

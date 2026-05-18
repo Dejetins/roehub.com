@@ -190,7 +190,7 @@ non_goals:
   - "Do not implement Stage 9 result APIs."
   - "Do not implement charts, CSV export, or paginated trades."
   - "Do not redesign /backtests workstation."
-  - "Do not alter the AI configurator placeholder."
+  - "Do not introduce assistant or experimental panels."
   - "Do not publish if readiness evidence is missing."
 
 final_report_format:

@@ -1719,7 +1719,6 @@ manual refresh и autorefresh работают через `GET /api/ui/backtests
 
 - `runtime_defaults` summary и config limits;
 - `config_draft`/`selected_preset`;
-- `ai_configurator_state` placeholder/disabled/enabled state для Stage 10;
 - `instrument_universe` bounded symbols/exchanges/timeframes;
 - `indicator_catalog` bounded rows/categories/compatibility flags;
 - `optimization_overview` current job/progress/sizing/estimated runtime/worker state;
@@ -1733,7 +1732,6 @@ Frontend / panel inventory из reference:
 
 - command bar `>_ BACKTEST STRATEGY`;
 - left config panel;
-- AI configurator/analysis panel;
 - instruments selector;
 - indicators table/list;
 - optimization overview/progress panel;

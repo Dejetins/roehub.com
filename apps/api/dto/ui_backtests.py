@@ -197,7 +197,6 @@ class BacktestWorkstationResponse(BaseModel):
     sources: list[BacktestWorkstationSourceResponse]
     runtime_defaults: dict[str, Any]
     config_draft: BacktestConfigDraftResponse
-    ai_configurator_state: dict[str, Any]
     instrument_universe: BacktestInstrumentUniverseResponse
     indicator_catalog: BacktestIndicatorCatalogResponse
     optimization_overview: BacktestOptimizationOverviewResponse

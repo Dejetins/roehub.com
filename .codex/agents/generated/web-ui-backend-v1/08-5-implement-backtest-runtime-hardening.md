@@ -107,7 +107,7 @@ package_contract:
     - "tests/unit/contexts/backtest/** job runtime tests"
   forbidden:
     - "browser results/configurator UI"
-    - "AI configurator"
+    - "assistant or experimental panels"
     - "scoring algorithm changes"
     - "canonical request hash changes"
   integration_points:
@@ -364,7 +364,7 @@ Use front matter touched paths.
 # Non-goals
 
 - UI results page.
-- AI configurator.
+- Assistant or experimental panels.
 - New scoring algorithms.
 
 # Quality gates (must run and pass)

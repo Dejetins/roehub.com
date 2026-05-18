@@ -70,7 +70,6 @@ _EVENT_SOURCE = "backtest_job_events"
 _JOB_SOURCE = "backtest_jobs"
 _MARKET_REFERENCE_SOURCE = "market_data_reference"
 _DEFAULT_STRATEGY = "mean_reversion.py"
-_AI_CONFIGURATOR_STAGE = "assistant-v1-ui"
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +151,6 @@ class BacktestWorkstationQueryService:
             _SearchEnabledTradableInstrumentsService | None
         ) = None,
         refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
-        ai_configurator_state: Mapping[str, Any] | None = None,
     ) -> None:
         self._runtime_defaults_service = runtime_defaults_service
         self._jobs_use_case = jobs_use_case
@@ -162,16 +160,6 @@ class BacktestWorkstationQueryService:
             search_enabled_tradable_instruments_use_case
         )
         self._refresh_limiter = refresh_limiter or BacktestWorkstationManualRefreshLimiter()
-        self._ai_configurator_state = dict(
-            ai_configurator_state
-            or _build_ai_configurator_state_payload(
-                enabled=False,
-                state="unavailable",
-                degradation_reason=(
-                    "AI configurator conversation storage is unavailable in this environment."
-                ),
-            )
-        )
 
     def get_workstation(
         self,
@@ -248,7 +236,6 @@ class BacktestWorkstationQueryService:
             sources=sources,
             runtime_defaults=runtime_defaults,
             config_draft=_build_config_draft(runtime_defaults=runtime_defaults),
-            ai_configurator_state=dict(self._ai_configurator_state),
             instrument_universe=instrument_universe.universe,
             indicator_catalog=_build_indicator_catalog(runtime_defaults=runtime_defaults),
             optimization_overview=optimization,
@@ -487,43 +474,9 @@ def build_ui_backtests_router(
             search_enabled_tradable_instruments_use_case=(
                 market_data_reference_use_cases.search_enabled_tradable_instruments
             ),
-            ai_configurator_state=_build_ai_configurator_state(environ=effective_environ),
         ),
         current_user_dependency=current_user_dependency,
     )
-
-
-def _build_ai_configurator_state(*, environ: Mapping[str, str]) -> dict[str, Any]:
-    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
-    if postgres_dsn:
-        return _build_ai_configurator_state_payload(
-            enabled=True,
-            state="conversation_ready",
-            degradation_reason=None,
-        )
-    return _build_ai_configurator_state_payload(
-        enabled=False,
-        state="unavailable",
-        degradation_reason=(
-            "AI configurator conversation storage is unavailable in this environment."
-        ),
-    )
-
-
-def _build_ai_configurator_state_payload(
-    *,
-    enabled: bool,
-    state: str,
-    degradation_reason: str | None,
-) -> dict[str, Any]:
-    return {
-        "state": state,
-        "enabled": enabled,
-        "stage": _AI_CONFIGURATOR_STAGE,
-        "suggested_strategy": _DEFAULT_STRATEGY,
-        "endpoints": {},
-        "degradation_reason": degradation_reason,
-    }
 
 
 def _source(

@@ -1,55 +1,30 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Mapping
 
 from fastapi import APIRouter
 
 from apps.api.routes import build_backtests_router as build_backtests_api_router
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
-    BacktestAiConfiguratorRuntimeConfig,
     BacktestArtifactPathBuilderV2,
     DatabaseBacktestJobExecutionTrigger,
-    DisabledBacktestConfigAgentGateway,
     FilesystemBacktestArtifactContextResolver,
-    LMStudioChatCompletionsSettings,
-    LMStudioOpenAICompatibleAdapter,
     LocalFileBacktestLazyTradesCache,
-    PostgresBacktestAiConfigRepository,
-    PostgresBacktestAiConversationRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
     build_backtest_artifacts_runtime_config_hash,
     load_backtest_admission_config,
-    load_backtest_ai_configurator_runtime_config,
     load_backtest_artifacts_runtime_config,
     resolve_backtest_admission_config_path,
-    resolve_backtest_ai_configurator_config_path,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
-from trading.contexts.backtest.application.ai_configurator import (
-    BacktestAiCatalogResolver,
-    BacktestAiConfigJobsUseCase,
-    BacktestAiConfigPipeline,
-    BacktestAiConfigValidator,
-    BacktestAiConversationUseCase,
-    BacktestAiInputGate,
-    BacktestAiOutputGate,
-    BacktestAiQuotaService,
-    PipelineBacktestAiConversationGateway,
-)
-from trading.contexts.backtest.application.ai_configurator.ports import (
-    BacktestConfigAgentGateway,
-)
-from trading.contexts.backtest.application.ports import BacktestAiConfigLeaseRepository
 from trading.contexts.backtest.application.services.v2 import (
     BacktestAdmissionService,
     BacktestLazyTradesDetailService,
@@ -63,19 +38,7 @@ from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
-from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
-    ArtifactCoordinatesV2,
-)
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestAiConfiguratorUseCases:
-    jobs: BacktestAiConfigJobsUseCase
-    conversations: BacktestAiConversationUseCase
-    lease_repository: BacktestAiConfigLeaseRepository
-    runtime_config: BacktestAiConfiguratorRuntimeConfig
-    pipeline: BacktestAiConfigPipeline
 
 
 def build_backtests_router(
@@ -193,216 +156,6 @@ def _build_jobs_use_case(
     )
 
 
-def build_backtest_ai_configurator_use_cases(
-    *,
-    environ: Mapping[str, str],
-    agent_gateway: BacktestConfigAgentGateway | None = None,
-) -> BacktestAiConfiguratorUseCases | None:
-    """
-    Build Stage 1 Backtest AI configurator storage/use-case boundary without API routes.
-    """
-    effective_environ = _with_local_dev_default(environ=environ)
-    config_path = resolve_backtest_ai_configurator_config_path(environ=effective_environ)
-    ai_runtime_config = load_backtest_ai_configurator_runtime_config(config_path)
-    postgres_dsn = effective_environ.get("STRATEGY_PG_DSN", "").strip()
-    if not postgres_dsn:
-        return None
-    artifact_config_path = resolve_backtest_artifacts_config_path(environ=effective_environ)
-    artifact_config = load_backtest_artifacts_runtime_config(artifact_config_path)
-    defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(
-        environ=effective_environ,
-        artifact_config_path=artifact_config_path,
-    )
-    artifact_path_builder = BacktestArtifactPathBuilderV2(
-        root=artifact_config.artifact_root_path()
-    )
-    artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=artifact_path_builder)
-    artifact_context_resolver = FilesystemBacktestArtifactContextResolver(
-        artifact_loader=artifact_loader
-    )
-    backtest_runtime_config = BacktestRuntimeConfig(
-        hit_times_tp_levels_pct=artifact_config.hit_times_grid.tp_levels_pct,
-        hit_times_sl_levels_pct=artifact_config.hit_times_grid.sl_levels_pct,
-        artifact_config_hash=build_backtest_artifacts_runtime_config_hash(
-            config=artifact_config
-        ),
-    )
-    runtime_defaults_service = BacktestRuntimeDefaultsService(
-        defaults_provider=defaults_provider,
-        runtime_config=backtest_runtime_config,
-    )
-    preflight_service = BacktestPreflightService(
-        defaults_provider=defaults_provider,
-        artifact_context_resolver=artifact_context_resolver,
-        runtime_config=backtest_runtime_config,
-    )
-    postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
-    repository = PostgresBacktestAiConfigRepository(gateway=postgres_gateway)
-    conversation_repository = PostgresBacktestAiConversationRepository(
-        gateway=postgres_gateway
-    )
-    artifact_capabilities = _discover_ai_artifact_capabilities(
-        artifact_config=artifact_config,
-        artifact_loader=artifact_loader,
-    )
-    effective_agent_gateway = agent_gateway or _build_backtest_ai_agent_gateway(
-        runtime_config=ai_runtime_config
-    )
-    pipeline = BacktestAiConfigPipeline(
-        catalog_resolver=BacktestAiCatalogResolver(
-            runtime_defaults_service=runtime_defaults_service,
-            supported_symbols=_artifact_capability_symbols(
-                artifact_capabilities=artifact_capabilities,
-                fallback=_discover_ai_artifact_symbols(artifact_config=artifact_config),
-            ),
-            artifact_capabilities=artifact_capabilities,
-        ),
-        validator=BacktestAiConfigValidator(
-            preflight_service=preflight_service,
-            output_gate=BacktestAiOutputGate(),
-        ),
-        input_gate=BacktestAiInputGate(),
-        agent_gateway=effective_agent_gateway,
-    )
-    return BacktestAiConfiguratorUseCases(
-        jobs=BacktestAiConfigJobsUseCase(
-            repository=repository,
-            quota_service=BacktestAiQuotaService(
-                config=ai_runtime_config.to_quota_config(),
-            ),
-        ),
-        conversations=BacktestAiConversationUseCase(
-            repository=conversation_repository,
-            limits=ai_runtime_config.conversation,
-            gateway=PipelineBacktestAiConversationGateway(
-                pipeline=pipeline,
-                runtime_enabled=ai_runtime_config.enabled,
-            ),
-        ),
-        lease_repository=repository,
-        runtime_config=ai_runtime_config,
-        pipeline=pipeline,
-    )
-
-
-def _build_backtest_ai_agent_gateway(
-    *,
-    runtime_config: BacktestAiConfiguratorRuntimeConfig,
-) -> BacktestConfigAgentGateway:
-    if not runtime_config.enabled:
-        return DisabledBacktestConfigAgentGateway()
-    return LMStudioOpenAICompatibleAdapter(
-        settings=LMStudioChatCompletionsSettings.from_runtime_config(
-            runtime_config.model
-        )
-    )
-
-
-def _discover_ai_artifact_symbols(*, artifact_config: Any) -> tuple[str, ...]:
-    root = artifact_config.artifact_root_path()
-    discovered: set[str] = set()
-    if not root.exists() or not root.is_dir():
-        return ("BTCUSDT",)
-    for exchange_root in root.iterdir():
-        if not exchange_root.is_dir():
-            continue
-        for market_type_root in exchange_root.iterdir():
-            if not market_type_root.is_dir():
-                continue
-            for child in market_type_root.iterdir():
-                if child.is_dir() and (child / "current.yaml").exists():
-                    discovered.add(child.name.upper())
-    return tuple(sorted(discovered)) or ("BTCUSDT",)
-
-
-def _discover_ai_artifact_capabilities(
-    *,
-    artifact_config: Any,
-    artifact_loader: Any,
-) -> dict[str, Any]:
-    root = artifact_config.artifact_root_path()
-    if not root.exists() or not root.is_dir():
-        return {}
-    symbols: dict[str, Any] = {}
-    for exchange_root in root.iterdir():
-        if not exchange_root.is_dir():
-            continue
-        for market_type_root in exchange_root.iterdir():
-            if not market_type_root.is_dir():
-                continue
-            for symbol_root in market_type_root.iterdir():
-                if not symbol_root.is_dir() or not (symbol_root / "current.yaml").exists():
-                    continue
-                coordinates = ArtifactCoordinatesV2(
-                    exchange=exchange_root.name,
-                    market_type=market_type_root.name,
-                    symbol=symbol_root.name.upper(),
-                )
-                try:
-                    current_pointer = artifact_loader.load_current_pointer(coordinates)
-                    slot_manifest = artifact_loader.load_slot_manifest(
-                        coordinates,
-                        current_pointer.active_slot,
-                    )
-                except (FileNotFoundError, ValueError):
-                    continue
-                timeframe_payload: dict[str, Any] = {}
-                signal_entries_by_timeframe: dict[str, set[str]] = {}
-                for entry in slot_manifest.signals.manifests:
-                    signal_entries_by_timeframe.setdefault(entry.timeframe, set()).add(
-                        entry.indicator_id
-                    )
-                for price_manifest in slot_manifest.prices:
-                    indicators = tuple(
-                        sorted(signal_entries_by_timeframe.get(price_manifest.timeframe, ()))
-                    )
-                    if not indicators:
-                        continue
-                    timeframe_payload[price_manifest.timeframe] = {
-                        "available_period": {
-                            "start": _timestamp_to_utc_literal(
-                                price_manifest.coverage.open_time_start
-                            ),
-                            "end_exclusive": _timestamp_to_utc_literal(
-                                price_manifest.coverage.close_time_end
-                            ),
-                        },
-                        "indicators": list(indicators),
-                        "hit_times_available": price_manifest.timeframe == "15m",
-                        "artifact_asof_date": current_pointer.asof_date,
-                        "published_at_utc": current_pointer.published_at_utc,
-                    }
-                if timeframe_payload:
-                    symbols[symbol_root.name.upper()] = {"timeframes": timeframe_payload}
-    if not symbols:
-        return {}
-    return {"schema_version": 1, "symbols": symbols}
-
-
-def _artifact_capability_symbols(
-    *,
-    artifact_capabilities: Mapping[str, Any],
-    fallback: tuple[str, ...],
-) -> tuple[str, ...]:
-    symbols = artifact_capabilities.get("symbols")
-    if not isinstance(symbols, Mapping):
-        return fallback
-    values = tuple(sorted(str(symbol).upper() for symbol in symbols if str(symbol).strip()))
-    return values or fallback
-
-
-def _timestamp_to_utc_literal(value: int) -> str:
-    divisor = 1000 if abs(value) > 10_000_000_000 else 1
-    return (
-        datetime.fromtimestamp(value / divisor, tz=UTC)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
-
-
 __all__ = [
-    "BacktestAiConfiguratorUseCases",
-    "build_backtest_ai_configurator_use_cases",
     "build_backtests_router",
 ]

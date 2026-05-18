@@ -6,7 +6,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Mapping, Protocol, Sequence
+from typing import Callable, Mapping, Sequence
 
 from apps.api.wiring.modules.indicators import (
     build_artifact_precompute_indicators_compute,
@@ -14,7 +14,6 @@ from apps.api.wiring.modules.indicators import (
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest_artifacts.adapters.outbound import (
-    AtomicArtifactAvailabilitySummaryWriterV2,
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
     PostgresBacktestJobRepository,
@@ -26,8 +25,6 @@ from trading.contexts.backtest_artifacts.adapters.outbound import (
 )
 from trading.contexts.backtest_artifacts.application.services import (
     ArtifactCoordinatesV2,
-    BacktestArtifactAvailabilitySummaryGeneratorV2,
-    BacktestArtifactAvailabilitySummaryResultV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     BacktestSignalRulesEngineV2,
@@ -52,16 +49,6 @@ PublishUseCaseFactoryV2 = Callable[
     [str | None, Mapping[str, str]],
     PublishBacktestArtifactsV2UseCase,
 ]
-SummaryRegeneratorFactoryV2 = Callable[
-    [str | None, Mapping[str, str]],
-    "BacktestArtifactAvailabilitySummaryRegeneratorV2",
-]
-
-
-class BacktestArtifactAvailabilitySummaryRegeneratorV2(Protocol):
-    def regenerate(self) -> BacktestArtifactAvailabilitySummaryResultV2:
-        """Regenerate root-level artifact availability summary."""
-        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,11 +65,10 @@ class BacktestArtifactPublishCliArgs:
     """
 
     config: str | None
-    exchange: str | None
-    market_type: str | None
-    symbol: str | None
+    exchange: str
+    market_type: str
+    symbol: str
     full_rebuild: bool
-    regenerate_summary_only: bool
     report_format: str
 
     def to_request(self) -> PublishBacktestArtifactsV2Request:
@@ -105,8 +91,6 @@ class BacktestArtifactPublishCliArgs:
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        if self.exchange is None or self.market_type is None or self.symbol is None:
-            raise ValueError("publish mode requires --exchange, --market-type, and --symbol")
         return PublishBacktestArtifactsV2Request(
             coordinates=ArtifactCoordinatesV2(
                 exchange=self.exchange,
@@ -134,7 +118,6 @@ class BacktestArtifactPublishCli:
         *,
         environ: Mapping[str, str] | None = None,
         use_case_factory: PublishUseCaseFactoryV2 | None = None,
-        summary_regenerator_factory: SummaryRegeneratorFactoryV2 | None = None,
     ) -> None:
         """
         Store environment and optional factory override for CLI wiring/tests.
@@ -142,7 +125,6 @@ class BacktestArtifactPublishCli:
         Args:
             environ: Optional explicit environment mapping.
             use_case_factory: Optional override used by unit tests or alternate wiring.
-            summary_regenerator_factory: Optional override used by unit tests or alternate wiring.
         Returns:
             None.
         Assumptions:
@@ -160,11 +142,6 @@ class BacktestArtifactPublishCli:
         self._environ = dict(environ) if environ is not None else None
         self._use_case_factory = (
             use_case_factory if use_case_factory is not None else _build_publish_use_case_v2
-        )
-        self._summary_regenerator_factory = (
-            summary_regenerator_factory
-            if summary_regenerator_factory is not None
-            else _build_availability_summary_regenerator_v2
         )
 
     def run(self, argv: Sequence[str]) -> int:
@@ -197,33 +174,13 @@ class BacktestArtifactPublishCli:
             return 2
 
         try:
-            if args.regenerate_summary_only:
-                summary_regenerator = self._summary_regenerator_factory(
-                    args.config,
-                    self._effective_environ(),
-                )
-                summary_result = summary_regenerator.regenerate()
-                print(_render_summary_report_v2(summary_result, report_format=args.report_format))
-                return 0
-
             use_case = self._use_case_factory(args.config, self._effective_environ())
             result = use_case.run(args.to_request())
-            summary_regenerator = self._summary_regenerator_factory(
-                args.config,
-                self._effective_environ(),
-            )
-            summary_result = summary_regenerator.regenerate()
         except Exception as error:  # noqa: BLE001
             log.exception("Backtest artifact publish failed: %s", error)
             return 1
 
-        print(
-            _render_report_v2(
-                result=result,
-                summary_result=summary_result,
-                report_format=args.report_format,
-            )
-        )
+        print(_render_report_v2(result=result, report_format=args.report_format))
         return 0
 
     def _effective_environ(self) -> Mapping[str, str]:
@@ -270,30 +227,21 @@ class BacktestArtifactPublishCli:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
         config = None if ns.config is None or not str(ns.config).strip() else str(ns.config).strip()
-        regenerate_summary_only = bool(ns.regenerate_summary_only)
-        exchange = None if ns.exchange is None else str(ns.exchange).strip()
-        market_type = None if ns.market_type is None else str(ns.market_type).strip()
-        symbol = None if ns.symbol is None else str(ns.symbol).strip()
-        if not regenerate_summary_only:
-            if not exchange:
-                raise ValueError("--exchange must be non-empty")
-            if not market_type:
-                raise ValueError("--market-type must be non-empty")
-            if not symbol:
-                raise ValueError("--symbol must be non-empty")
-        if regenerate_summary_only and (exchange or market_type or symbol):
-            raise ValueError(
-                "--regenerate-summary-only must not be combined with symbol publish arguments"
-            )
-        if regenerate_summary_only and bool(ns.full_rebuild):
-            raise ValueError("--regenerate-summary-only must not be combined with --full-rebuild")
+        exchange = str(ns.exchange).strip()
+        market_type = str(ns.market_type).strip()
+        symbol = str(ns.symbol).strip()
+        if not exchange:
+            raise ValueError("--exchange must be non-empty")
+        if not market_type:
+            raise ValueError("--market-type must be non-empty")
+        if not symbol:
+            raise ValueError("--symbol must be non-empty")
         return BacktestArtifactPublishCliArgs(
             config=config,
             exchange=exchange,
             market_type=market_type,
             symbol=symbol,
             full_rebuild=bool(ns.full_rebuild),
-            regenerate_summary_only=regenerate_summary_only,
             report_format=str(ns.report_format),
         )
 
@@ -327,9 +275,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "ROEHUB_BACKTEST_ARTIFACTS_CONFIG or configs/<ROEHUB_ENV>/backtest_artifacts.yaml."
         ),
     )
-    parser.add_argument("--exchange", default=None, help="Exchange literal, e.g. binance")
-    parser.add_argument("--market-type", default=None, help="Market type literal, e.g. spot")
-    parser.add_argument("--symbol", default=None, help="Symbol literal, e.g. BTCUSDT")
+    parser.add_argument("--exchange", required=True, help="Exchange literal, e.g. binance")
+    parser.add_argument("--market-type", required=True, help="Market type literal, e.g. spot")
+    parser.add_argument("--symbol", required=True, help="Symbol literal, e.g. BTCUSDT")
     parser.add_argument(
         "--full-rebuild",
         action="store_true",
@@ -340,14 +288,6 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=("json", "text"),
         default="json",
         help="Output format (default: json)",
-    )
-    parser.add_argument(
-        "--regenerate-summary-only",
-        action="store_true",
-        help=(
-            "Regenerate availability_summary.yaml from existing active current/manifest state "
-            "without rebuilding one symbol root."
-        ),
     )
     return parser
 
@@ -442,46 +382,9 @@ def _build_publish_use_case_v2(
     )
 
 
-def _build_availability_summary_regenerator_v2(
-    config_path: str | None,
-    environ: Mapping[str, str],
-) -> BacktestArtifactAvailabilitySummaryGeneratorV2:
-    """
-    Build the root-level availability summary regenerator from artifact config only.
-
-    Args:
-        config_path: Optional explicit artifact config path override.
-        environ: Runtime environment mapping.
-    Returns:
-        BacktestArtifactAvailabilitySummaryGeneratorV2: Ready-to-run summary generator.
-    Assumptions:
-        Summary regeneration must not require ClickHouse, Postgres, exchange APIs, or AI context.
-    Raises:
-        FileNotFoundError: If the artifact config is missing.
-        ValueError: If artifact config values are invalid.
-    Side Effects:
-        Reads artifact config from disk.
-    """
-    resolved_config_path = (
-        resolve_backtest_artifacts_config_path(environ=environ)
-        if config_path is None
-        else Path(config_path)
-    )
-    artifact_runtime_config = load_backtest_artifacts_runtime_config(resolved_config_path)
-    path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
-    artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
-    return BacktestArtifactAvailabilitySummaryGeneratorV2(
-        artifact_root=artifact_runtime_config.artifact_root_path(),
-        path_resolver=path_builder,
-        artifact_loader=artifact_loader,
-        writer=AtomicArtifactAvailabilitySummaryWriterV2(),
-    )
-
-
 def _render_report_v2(
     *,
     result: PublishBacktestArtifactsV2Result,
-    summary_result: BacktestArtifactAvailabilitySummaryResultV2,
     report_format: str,
 ) -> str:
     """
@@ -507,9 +410,7 @@ def _render_report_v2(
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
     """
     if report_format == "json":
-        payload = dict(result.as_dict())
-        payload["availability_summary"] = dict(summary_result.as_dict())
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(result.as_dict(), ensure_ascii=False)
     if report_format == "text":
         return (
             "backtest-artifact-publish report:\n"
@@ -538,29 +439,6 @@ def _render_report_v2(
             f"hit_times={result.tail_rebuild_bars.hit_times}\n"
             f"- signal_manifest_count: {result.validation.signal_manifest_count}\n"
             f"- hit_times_manifest_present: {result.validation.hit_times_manifest_present}\n"
-            f"- availability_summary_path: {summary_result.summary_path}\n"
-            f"- availability_summary_hash: {summary_result.summary_hash}\n"
-            f"- availability_summary_instruments: {summary_result.instrument_count}\n"
-        )
-    raise ValueError(f"unsupported report format: {report_format!r}")
-
-
-def _render_summary_report_v2(
-    result: BacktestArtifactAvailabilitySummaryResultV2,
-    *,
-    report_format: str,
-) -> str:
-    if report_format == "json":
-        return json.dumps(result.as_dict(), ensure_ascii=False)
-    if report_format == "text":
-        return (
-            "backtest-artifact-availability-summary report:\n"
-            f"- summary_path: {result.summary_path}\n"
-            f"- summary_hash: {result.summary_hash}\n"
-            f"- generated_at_utc: {result.generated_at_utc}\n"
-            f"- instrument_count: {result.instrument_count}\n"
-            f"- skipped_count: {result.skipped_count}\n"
-            f"- skipped_reasons: {dict(result.skipped_reasons)}\n"
         )
     raise ValueError(f"unsupported report format: {report_format!r}")
 

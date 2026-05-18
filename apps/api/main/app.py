@@ -15,7 +15,6 @@ from apps.api.monitoring import install_metrics_middleware
 from apps.api.routes import build_indicators_router, build_operations_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
-    build_backtest_ai_config_router,
     build_backtests_router,
     build_identity_api_module,
     build_indicators_compute,
@@ -98,12 +97,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     )
     app.include_router(
         build_backtests_router(
-            environ=effective_environ,
-            current_user_dependency=identity_module.current_user_dependency,
-        )
-    )
-    app.include_router(
-        build_backtest_ai_config_router(
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
         )
