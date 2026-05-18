@@ -23,6 +23,7 @@ from .dto import (
     BacktestAiQuotaEvent,
     BacktestAiQuotaSnapshot,
 )
+from .prompts import CANONICAL_SYSTEM_PROMPT_SHA256, SYSTEM_PROMPT_ID
 from .quota import BacktestAiQuotaService
 
 BACKTEST_AI_CONFIG_ERROR_IDEMPOTENCY_CONFLICT = (
@@ -39,12 +40,8 @@ PENDING_CATALOG_SNAPSHOT_HASH = hashlib.sha256(
 PENDING_RUNTIME_DEFAULTS_HASH = hashlib.sha256(
     b"backtest-ai-configurator-pending-runtime-defaults-v1"
 ).hexdigest()
-BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION = (
-    "backtest-ai-configurator-assistant-v1-pending"
-)
-BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH = hashlib.sha256(
-    BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION.encode("utf-8")
-).hexdigest()
+BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION = SYSTEM_PROMPT_ID
+BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH = CANONICAL_SYSTEM_PROMPT_SHA256
 
 _VALID_MODES = {"assistant_v1"}
 _VALID_LOCALES = {"ru", "en"}

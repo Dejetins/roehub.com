@@ -218,16 +218,44 @@ def _config_ready_output(
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "mode": job.mode,
+        "intent": _intent_for_message(job.user_prompt_text),
         "status": "config_ready",
         "assistant_message": assistant_message,
-        "assumptions": [
-            "Default execution settings come from current /backtests runtime defaults."
-        ],
+        "conversation_title": _conversation_title(config=config),
         "warnings": warnings,
         "config": config,
-        "suggestions": suggestions,
+        "unsupported_items": [],
+        "clarifying_questions": suggestions,
     }
+
+
+def _intent_for_message(message: str) -> str:
+    lowered = message.casefold()
+    if "repair" in lowered or "почин" in lowered:
+        return "repair_invalid_config"
+    if "safer" in lowered or "безопас" in lowered:
+        return "suggest_safer_config"
+    if "edit" in lowered or "замени" in lowered or "добав" in lowered:
+        return "edit_current_config"
+    return "create_config"
+
+
+def _conversation_title(*, config: Mapping[str, Any]) -> str:
+    coordinates = config.get("coordinates")
+    symbol = "BTCUSDT"
+    if isinstance(coordinates, Mapping):
+        raw_symbol = coordinates.get("symbol")
+        if isinstance(raw_symbol, str) and raw_symbol.strip():
+            symbol = raw_symbol.strip().upper()
+    indicators = config.get("indicators")
+    indicator = "config"
+    if isinstance(indicators, list) and indicators:
+        first = indicators[0]
+        if isinstance(first, Mapping):
+            raw_indicator = first.get("indicator_id")
+            if isinstance(raw_indicator, str) and raw_indicator.strip():
+                indicator = raw_indicator.strip().split(".")[-1].upper()
+    return f"{indicator} for {symbol}"[:60]
 
 
 def _extract_symbols(*, message: str) -> tuple[str, ...]:

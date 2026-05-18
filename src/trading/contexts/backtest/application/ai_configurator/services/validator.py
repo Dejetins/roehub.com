@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
-from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, Mapping
 
 from jsonschema import Draft202012Validator
 
+from trading.contexts.backtest.application.ai_configurator.schema import (
+    backtest_ai_model_output_schema as _backtest_ai_model_output_schema,
+)
 from trading.contexts.backtest.application.dto.runtime_preflight import (
     BacktestValidationIssue,
 )
@@ -20,121 +22,7 @@ from .catalog import BacktestAiAllowedCatalog
 from .security import BacktestAiOutputGate
 
 BacktestAiValidationStatus = Literal["ready", "needs_clarification", "blocked_by_policy"]
-
-_MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "additionalProperties": False,
-    "required": [
-        "schema_version",
-        "mode",
-        "status",
-        "assistant_message",
-        "assumptions",
-        "warnings",
-        "config",
-        "suggestions",
-    ],
-    "properties": {
-        "schema_version": {"const": 1},
-        "mode": {
-            "type": "string",
-            "enum": ["assistant_v1"],
-        },
-        "status": {"type": "string", "enum": ["config_ready", "needs_clarification"]},
-        "assistant_message": {"type": "string", "minLength": 1, "maxLength": 1200},
-        "assumptions": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
-        "warnings": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
-        "config": {
-            "anyOf": [
-                {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": [
-                        "coordinates",
-                        "timeframe",
-                        "time_range",
-                        "indicators",
-                        "risk",
-                        "execution",
-                        "ranking",
-                        "top_n",
-                    ],
-                    "properties": {
-                        "coordinates": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["exchange", "market_type", "symbol"],
-                            "properties": {
-                                "exchange": {"type": "string"},
-                                "market_type": {"type": "string"},
-                                "symbol": {"type": "string"},
-                            },
-                        },
-                        "timeframe": {"type": "string"},
-                        "time_range": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["start", "end"],
-                            "properties": {
-                                "start": {"type": "string"},
-                                "end": {"type": "string"},
-                            },
-                        },
-                        "indicators": {
-                            "type": "array",
-                            "minItems": 1,
-                            "maxItems": 10,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["indicator_id", "sources", "window"],
-                                "properties": {
-                                    "indicator_id": {"type": "string"},
-                                    "sources": {
-                                        "type": "array",
-                                        "items": {"type": "string"},
-                                        "maxItems": 8,
-                                    },
-                                    "window": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "required": ["start", "stop", "step"],
-                                        "properties": {
-                                            "start": {"type": "integer", "minimum": 1},
-                                            "stop": {"type": "integer", "minimum": 1},
-                                            "step": {"type": "integer", "minimum": 1},
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        "risk": {
-                            "type": "object",
-                            "additionalProperties": True,
-                            "required": ["mode"],
-                            "properties": {"mode": {"type": "string"}},
-                        },
-                        "execution": {"type": "object"},
-                        "ranking": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["primary_metric", "direction"],
-                            "properties": {
-                                "primary_metric": {"type": "string"},
-                                "direction": {"type": "string", "enum": ["asc", "desc"]},
-                            },
-                        },
-                        "top_n": {"type": "integer", "minimum": 1},
-                    },
-                },
-                {"type": "null"},
-            ]
-        },
-        "suggestions": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
-    },
-}
-_SCHEMA_VALIDATOR = Draft202012Validator(_MODEL_OUTPUT_SCHEMA)
+_SCHEMA_VALIDATOR = Draft202012Validator(_backtest_ai_model_output_schema())
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,7 +106,19 @@ class BacktestAiConfigValidator:
                 parsed_draft=parsed_result,
             )
 
-        if parsed_result["status"] == "needs_clarification":
+        if parsed_result["status"] == "blocked_by_policy":
+            return BacktestAiConfigValidationOutcome(
+                status="blocked_by_policy",
+                assistant_message=str(parsed_result["assistant_message"]),
+                parsed_draft=parsed_result,
+                warnings=_warning_items(parsed_result),
+                suggestions=_suggestion_items(parsed_result),
+                validation_errors=(),
+                last_error="blocked_by_policy",
+                last_error_json=None,
+            )
+
+        if parsed_result["status"] != "config_ready":
             return BacktestAiConfigValidationOutcome(
                 status="needs_clarification",
                 assistant_message=str(parsed_result["assistant_message"]),
@@ -684,7 +584,7 @@ def _needs_clarification(
 
 
 def backtest_ai_model_output_schema() -> dict[str, Any]:
-    return deepcopy(_MODEL_OUTPUT_SCHEMA)
+    return _backtest_ai_model_output_schema()
 
 
 def _warning_items(payload: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -696,11 +596,22 @@ def _warning_items(payload: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
 
 
 def _suggestion_items(payload: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
-    return tuple(
+    items: list[dict[str, Any]] = [
         {"kind": "suggestion", "message": str(item)}
         for item in payload.get("suggestions", [])
         if str(item).strip()
+    ]
+    items.extend(
+        {"kind": "clarifying_question", "message": str(item)}
+        for item in payload.get("clarifying_questions", [])
+        if str(item).strip()
     )
+    items.extend(
+        {"kind": "unsupported_item", "message": str(item)}
+        for item in payload.get("unsupported_items", [])
+        if str(item).strip()
+    )
+    return tuple(items)
 
 
 def _warning_from_issue(issue: BacktestValidationIssue) -> dict[str, str]:

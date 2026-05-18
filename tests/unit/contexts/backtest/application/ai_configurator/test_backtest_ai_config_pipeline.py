@@ -389,13 +389,14 @@ def _model_output(
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "mode": "assistant_v1",
+        "intent": "create_config",
         "status": "config_ready",
         "assistant_message": assistant_message,
-        "assumptions": [],
+        "conversation_title": "RSI for BTCUSDT",
         "warnings": [],
         "config": catalog.default_config(),
-        "suggestions": [],
+        "unsupported_items": [],
+        "clarifying_questions": [],
     }
 
 

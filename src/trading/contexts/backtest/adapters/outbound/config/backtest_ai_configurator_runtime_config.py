@@ -21,7 +21,7 @@ _ENV_NAME_KEY = "ROEHUB_ENV"
 _ALLOWED_ENVS = ("dev", "prod", "test")
 _CONFIG_PATH_KEY = "ROEHUB_BACKTEST_AI_CONFIGURATOR_CONFIG"
 _CONFIG_VERSION = 1
-_DEFAULT_RUNTIME = "assistant_v1_pending"
+_DEFAULT_RUNTIME = "lm_studio"
 _DEFAULT_MODEL_ID = "gemma-4-e2b-it-4bit"
 _DEFAULT_MODEL_PATH = (
     "/Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit"
@@ -60,7 +60,7 @@ class BacktestAiConfiguratorQueueRuntimeConfig:
 
 @dataclass(frozen=True, slots=True)
 class BacktestAiConfiguratorModelRuntimeConfig:
-    runtime: Literal["assistant_v1_pending"]
+    runtime: Literal["lm_studio"]
     model_id: str
     model_path: Path
     context_window_tokens: int
@@ -73,8 +73,8 @@ class BacktestAiConfiguratorModelRuntimeConfig:
     active_generations: int = 1
 
     def __post_init__(self) -> None:
-        if self.runtime != "assistant_v1_pending":
-            raise ValueError("runtime must be assistant_v1_pending")
+        if self.runtime != "lm_studio":
+            raise ValueError("runtime must be lm_studio")
         if not self.model_id.strip():
             raise ValueError("model_id must be non-empty")
         if not str(self.model_path).strip():
@@ -96,7 +96,12 @@ class BacktestAiConfiguratorModelRuntimeConfig:
             ("top_p", self.top_p),
             ("request_timeout_seconds", self.request_timeout_seconds),
         ):
-            if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise ValueError(f"{field_name} must be a positive number")
+            if field_name == "temperature":
+                if value < 0:
+                    raise ValueError("temperature must be greater than or equal to 0")
+            elif value <= 0:
                 raise ValueError(f"{field_name} must be a positive number")
         if not 0 < self.top_p <= 1:
             raise ValueError("top_p must be in (0, 1]")
@@ -321,13 +326,13 @@ def _optional_str(payload: Mapping[str, Any], key: str, *, default: str) -> str:
     return value.strip()
 
 
-def _runtime(payload: Mapping[str, Any]) -> Literal["assistant_v1_pending"]:
+def _runtime(payload: Mapping[str, Any]) -> Literal["lm_studio"]:
     value = _optional_str(payload, "runtime", default=_DEFAULT_RUNTIME)
-    if value != "assistant_v1_pending":
+    if value != "lm_studio":
         raise ValueError(
-            "backtest AI configurator config field 'runtime' must be assistant_v1_pending"
+            "backtest AI configurator config field 'runtime' must be lm_studio"
         )
-    return "assistant_v1_pending"
+    return "lm_studio"
 
 
 def _validate_loopback_base_url(value: str) -> None:

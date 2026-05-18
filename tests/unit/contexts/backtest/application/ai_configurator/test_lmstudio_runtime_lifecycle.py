@@ -29,7 +29,7 @@ def _load_runtime_module() -> ModuleType:
 def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="assistant_v1_pending",
+        runtime="lm_studio",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -55,7 +55,7 @@ def test_lmstudio_runtime_target_uses_configured_loopback_port() -> None:
 def test_lmstudio_runtime_target_rejects_base_url_without_explicit_port() -> None:
     module = _load_runtime_module()
     config = BacktestAiConfiguratorModelRuntimeConfig(
-        runtime="assistant_v1_pending",
+        runtime="lm_studio",
         model_id="gemma-4-e2b-it-4bit",
         model_path=Path("/Users/daniildegtyarev/.lmstudio/models/gemma-4-e2b-it-4bit"),
         context_window_tokens=8192,
@@ -156,14 +156,7 @@ def test_lmstudio_runtime_smoke_marks_assistant_v1_runtime_contract_pending(
     monkeypatch.setattr(
         module,
         "_http_json",
-        lambda *_args, **_kwargs: {
-            "data": [
-                {
-                    "model_key": "gemma-4-e2b-it",
-                    "loaded_instances": [{"id": "gemma-4-e2b-it-4bit"}],
-                }
-            ]
-        },
+        _lmstudio_http_probe_response,
     )
 
     result = module._smoke_runtime_once(
@@ -174,8 +167,9 @@ def test_lmstudio_runtime_smoke_marks_assistant_v1_runtime_contract_pending(
 
     assert result["accepted"] is True
     assert result["api_v1_models_loaded_instance"] is True
-    assert result["single_shot_chat_probe"] == "removed"
-    assert result["assistant_v1_runtime_contract"] == "pending"
+    assert result["single_shot_chat_probe"]["endpoint"] == "POST /v1/chat/completions"
+    assert result["single_shot_chat_probe"]["response_format"] == "json_schema"
+    assert result["assistant_v1_runtime_contract"] == "chat_completions_ready"
 
 
 def test_lmstudio_port_conflict_errors_are_not_retryable() -> None:
@@ -189,3 +183,25 @@ def test_lmstudio_port_conflict_errors_are_not_retryable() -> None:
     assert not module._is_non_retryable_readiness_error(
         module.RuntimeCheckError("Remote end closed connection without response")
     )
+
+
+def _lmstudio_http_probe_response(url: str, **_kwargs: object) -> dict[str, object]:
+    if url.endswith("/api/v1/models"):
+        return {
+            "data": [
+                {
+                    "model_key": "gemma-4-e2b-it",
+                    "loaded_instances": [{"id": "gemma-4-e2b-it-4bit"}],
+                }
+            ]
+        }
+    if url.endswith("/v1/chat/completions"):
+        return {
+            "choices": [
+                {
+                    "message": {"content": "{\"ok\":\"ready\"}"},
+                    "finish_reason": "stop",
+                }
+            ]
+        }
+    raise AssertionError(f"unexpected URL: {url}")

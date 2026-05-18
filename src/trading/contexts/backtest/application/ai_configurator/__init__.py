@@ -61,11 +61,26 @@ from .ports import (
     BacktestConfigAgentRequest,
     BacktestConfigAgentResponse,
 )
+from .prompts import (
+    CANONICAL_SYSTEM_PROMPT,
+    CANONICAL_SYSTEM_PROMPT_SHA256,
+    SYSTEM_PROMPT_ID,
+    BacktestAiPromptMessage,
+    BacktestAiPromptPackage,
+    build_backtest_ai_prompt_package,
+    trusted_context_from_catalog,
+)
 from .quota import (
     DEFAULT_AI_TIER_QUOTAS,
     BacktestAiQuotaConfig,
     BacktestAiQuotaService,
     BacktestAiTierQuota,
+)
+from .schema import (
+    BACKTEST_AI_OUTPUT_SCHEMA_NAME,
+    BACKTEST_AI_OUTPUT_SCHEMA_VERSION,
+    backtest_ai_lmstudio_response_format,
+    backtest_ai_output_example,
 )
 from .services import (
     BacktestAiAllowedCatalog,
@@ -105,6 +120,8 @@ __all__ = [
     "BACKTEST_AI_CONFIG_AGENT_CONTRACT_HASH",
     "BACKTEST_AI_CONFIG_AGENT_CONTRACT_VERSION",
     "BACKTEST_AI_CONFIG_SOURCE_PAGE",
+    "BACKTEST_AI_OUTPUT_SCHEMA_NAME",
+    "BACKTEST_AI_OUTPUT_SCHEMA_VERSION",
     "BacktestAiAllowedCatalog",
     "BacktestAiAdmissionDecision",
     "BacktestAiAdmissionStatus",
@@ -153,6 +170,8 @@ __all__ = [
     "BacktestAiLoadAction",
     "BacktestAiOutputGate",
     "BacktestAiOutputGateResult",
+    "BacktestAiPromptMessage",
+    "BacktestAiPromptPackage",
     "BacktestAiPipelineStage",
     "BacktestAiQuotaAction",
     "BacktestAiQuotaConfig",
@@ -170,6 +189,8 @@ __all__ = [
     "BacktestConfigAgentGateway",
     "BacktestConfigAgentRequest",
     "BacktestConfigAgentResponse",
+    "CANONICAL_SYSTEM_PROMPT",
+    "CANONICAL_SYSTEM_PROMPT_SHA256",
     "DEFAULT_AI_TIER_QUOTAS",
     "DEFAULT_BACKTEST_AI_CONVERSATION_TITLE",
     "DEFAULT_BACKTEST_AI_MAX_CONVERSATIONS_PER_USER",
@@ -179,5 +200,10 @@ __all__ = [
     "JsonMapping",
     "PENDING_CATALOG_SNAPSHOT_HASH",
     "PENDING_RUNTIME_DEFAULTS_HASH",
+    "SYSTEM_PROMPT_ID",
     "backtest_ai_model_output_schema",
+    "backtest_ai_lmstudio_response_format",
+    "backtest_ai_output_example",
+    "build_backtest_ai_prompt_package",
+    "trusted_context_from_catalog",
 ]

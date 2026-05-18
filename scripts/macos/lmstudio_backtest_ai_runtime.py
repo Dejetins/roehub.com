@@ -210,6 +210,7 @@ def _smoke_runtime_once(
         raise RuntimeCheckError(
             f"/api/v1/models does not show loaded instance {target.model_identifier}"
         )
+    chat_probe = _single_shot_chat_probe(target=target)
     return {
         "accepted": True,
         "blocking_reason": None,
@@ -221,8 +222,8 @@ def _smoke_runtime_once(
         "server_status": server_status,
         "lms_ps": ps,
         "api_v1_models_loaded_instance": True,
-        "single_shot_chat_probe": "removed",
-        "assistant_v1_runtime_contract": "pending",
+        "single_shot_chat_probe": chat_probe,
+        "assistant_v1_runtime_contract": "chat_completions_ready",
         "timestamp_unix": time.time(),
     }
 
@@ -372,6 +373,80 @@ def _api_models_has_loaded_instance(payload: object, identifier: str) -> bool:
     if isinstance(payload, list):
         return any(_api_models_has_loaded_instance(item, identifier) for item in payload)
     return False
+
+
+def _single_shot_chat_probe(*, target: RuntimeTarget) -> dict[str, Any]:
+    payload = {
+        "model": target.model_identifier,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Return only one JSON object matching the response schema.",
+            },
+            {
+                "role": "user",
+                "content": "Return {\"ok\":\"ready\"}.",
+            },
+        ],
+        "temperature": 0.0,
+        "max_tokens": 64,
+        "stream": False,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "roehub_lmstudio_readiness_probe",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["ok"],
+                    "properties": {
+                        "ok": {"type": "string", "enum": ["ready"]},
+                    },
+                },
+            },
+        },
+    }
+    response = _http_json(
+        f"{target.base_url}/v1/chat/completions",
+        method="POST",
+        payload=payload,
+        timeout=30.0,
+    )
+    content = _chat_completion_content(response)
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as error:
+        raise RuntimeCheckError(
+            f"POST /v1/chat/completions returned non-JSON message content: {content[:120]}"
+        ) from error
+    if not isinstance(parsed, Mapping) or parsed.get("ok") != "ready":
+        raise RuntimeCheckError(
+            "POST /v1/chat/completions structured probe returned unexpected payload"
+        )
+    return {
+        "endpoint": "POST /v1/chat/completions",
+        "response_format": "json_schema",
+        "accepted": True,
+    }
+
+
+def _chat_completion_content(payload: object) -> str:
+    if not isinstance(payload, Mapping):
+        raise RuntimeCheckError("POST /v1/chat/completions response must be an object")
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeCheckError("POST /v1/chat/completions response has no choices")
+    choice = choices[0]
+    if not isinstance(choice, Mapping):
+        raise RuntimeCheckError("POST /v1/chat/completions choice must be an object")
+    message = choice.get("message")
+    if not isinstance(message, Mapping):
+        raise RuntimeCheckError("POST /v1/chat/completions choice has no message")
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise RuntimeCheckError("POST /v1/chat/completions message content is empty")
+    return content
 
 
 def _loaded_instance_matches(item: object, identifier: str) -> bool:

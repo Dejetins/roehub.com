@@ -1,6 +1,10 @@
 from .ai_config_agent import (
     DeterministicBacktestConfigAgentGateway,
     DisabledBacktestConfigAgentGateway,
+    LMStudioChatCompletionsError,
+    LMStudioChatCompletionsResult,
+    LMStudioChatCompletionsSettings,
+    LMStudioOpenAICompatibleAdapter,
 )
 from .ai_configurator_context import FilesystemBacktestAiAvailabilitySummaryRepository
 from .artifacts_fs import (
@@ -66,6 +70,10 @@ __all__ = [
     "DisabledBacktestConfigAgentGateway",
     "FilesystemBacktestArtifactContextResolver",
     "FilesystemBacktestAiAvailabilitySummaryRepository",
+    "LMStudioChatCompletionsError",
+    "LMStudioChatCompletionsResult",
+    "LMStudioChatCompletionsSettings",
+    "LMStudioOpenAICompatibleAdapter",
     "LocalFileBacktestLazyTradesCache",
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",

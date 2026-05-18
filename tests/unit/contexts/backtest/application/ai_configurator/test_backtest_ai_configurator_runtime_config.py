@@ -9,12 +9,12 @@ from trading.contexts.backtest.adapters.outbound import (
 )
 
 
-def test_ai_configurator_runtime_config_loads_assistant_v1_reset_placeholder() -> None:
+def test_ai_configurator_runtime_config_loads_lm_studio_runtime() -> None:
     config = load_backtest_ai_configurator_runtime_config(
         Path("configs/prod/backtest_ai_configurator.yaml")
     )
 
-    assert config.model.runtime == "assistant_v1_pending"
+    assert config.model.runtime == "lm_studio"
     assert config.model.model_id == "gemma-4-e2b-it-4bit"
     assert config.model.model_path.name == "gemma-4-e2b-it-4bit"
     assert config.model.base_url == "http://127.0.0.1:8080"
@@ -47,7 +47,7 @@ backtest_ai_configurator:
     request_timeout_sec: 90
     queue_timeout_sec: 180
   model:
-    runtime: assistant_v1_pending
+    runtime: lm_studio
     model_id: gemma-4-e2b-it-4bit
     model_path: /tmp/gemma-4-e2b-it-4bit
     context_window_tokens: 8192
@@ -141,5 +141,5 @@ backtest_ai_configurator:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="runtime.*assistant_v1_pending"):
+    with pytest.raises(ValueError, match="runtime.*lm_studio"):
         load_backtest_ai_configurator_runtime_config(config_path)
