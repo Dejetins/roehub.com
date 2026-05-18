@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: accepted, direct-main delivery pending.
+Статус: accepted, direct-main delivery completed.
 
 ## Цель
 
@@ -35,6 +35,7 @@ Iteration 03 проверен перед началом:
 - Runtime readiness smoke теперь проверяет structured `POST /v1/chat/completions`;
   `/v1/models` не считается достаточной готовностью.
 - Добавлен `scripts/backtest_ai/run_lmstudio_prompt_contract_smoke.py`.
+- `Deploy Backend` теперь включает `scripts/backtest_ai` in `/opt/roehub/app`.
 - Обновлены deterministic gateway output и validator под новый envelope.
 - Создан contract doc: `prompt_contract.md`.
 
@@ -182,17 +183,71 @@ Raw model outputs were redacted; artifact stores content hashes and failure summ
 
 ## Delivery
 
-Direct-main delivery is pending. Final evidence must be updated after:
+Direct-main delivery completed.
 
-- scoped files are staged and committed on `main`;
-- commit is pushed to `origin/main`;
-- relevant main CI/deploy checks pass;
-- exact accepted commit is synced to Mac Studio;
-- deployed `/opt/roehub/app` Iteration 04 smoke passes.
+Implementation commit:
 
-Current marker:
+```text
+585cddc6d89e2ca3a89c9b9e76baf372141eb151
+```
+
+Delivery packaging fix commit:
+
+```text
+30b5153754ee4d8de224a80dd947a009642d225f
+```
+
+Root-cause during delivery:
+
+- deployed `/opt/roehub/app` initially had `scripts/backtest` and `scripts/macos`
+  but not `scripts/backtest_ai`;
+- `Deploy Backend` was updated to copy `scripts/backtest_ai` through path trigger,
+  layout validation, rsync, and tar fallback.
+
+GitHub runs:
+
+| Commit | Workflow | Run | Result |
+| --- | --- | ---: | --- |
+| `585cddc6` | CI | 26017219058 | success |
+| `585cddc6` | Deploy Backend | 26017219065 | success |
+| `585cddc6` | Publish App Image | 26017219067 | success |
+| `585cddc6` | Deploy Web | 26017261917 | success |
+| `30b51537` | CI | 26017505185 | success |
+| `30b51537` | Deploy Backend | 26017505197 | success |
+
+Final Mac Studio source checkout:
+
+```text
+30b5153754ee4d8de224a80dd947a009642d225f
+```
+
+Deployed runtime verification from `/opt/roehub/app`:
+
+| Smoke | Passed | Failed |
+| --- | ---: | ---: |
+| Direct structured LM Studio | 10/10 | 0 |
+| Adapter generate | 10/10 | 0 |
+| Adapter repair prompt | 10/10 | 0 |
+
+Deployed smoke artifact:
+
+```text
+/opt/roehub/state/backtest_ai_configurator/iteration_04_prompt_lmstudio_smoke.json
+```
+
+Runtime file hashes in `/opt/roehub/app`:
+
+```text
+f9b54f10780376ea77743170ea7fe3e48720b74f1ee5af349924f35e3ff00673  scripts/backtest_ai/run_lmstudio_prompt_contract_smoke.py
+94e64aca45d443e664feafdefa9133e0c22733eaf5ad6686e6b0a81ab6e4d627  src/trading/contexts/backtest/application/ai_configurator/schema.py
+95abf03e1aea96d8ce816a9b5cd9ceb124f7a0858fd09fb8f4b6178d27dae67b  src/trading/contexts/backtest/application/ai_configurator/prompts/assistant_v1.py
+1ab27d91df9024f9fc455ff98dbf644d50d9544fdfd8bdef323f81ba162dbc96  src/trading/contexts/backtest/adapters/outbound/ai_config_agent/lmstudio_chat_completions.py
+0c9179c3d6391da826f1c2d387c645a50fbc9428b2a2fd41fa24b65b7497009a  configs/prod/backtest_ai_configurator.yaml
+```
+
+Final marker:
 
 - `accepted=true`;
-- `next_iteration_allowed=false`;
-- `pushed_to_main=false`;
-- `macstudio_verified=false`.
+- `next_iteration_allowed=true`;
+- `pushed_to_main=true`;
+- `macstudio_verified=true`.

@@ -1,17 +1,18 @@
 {
   "schema_version": 1,
   "iteration": "04-prompt-lmstudio",
-  "status": "accepted_pre_delivery",
-  "updated_at": "2026-05-18T06:16:36Z",
+  "status": "accepted",
+  "updated_at": "2026-05-18T06:42:13Z",
   "accepted": true,
   "blocking_reason": null,
-  "next_iteration_allowed": false,
-  "commit": null,
+  "next_iteration_allowed": true,
+  "commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+  "implementation_commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151",
   "host": "local",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
-  "macstudio_verified": false,
-  "macstudio_commit": null,
+  "pushed_to_main": true,
+  "origin_main_commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+  "macstudio_verified": true,
+  "macstudio_commit": "30b5153754ee4d8de224a80dd947a009642d225f",
   "previous_gate": {
     "iteration": "03-conversation-api-storage",
     "accepted": true,
@@ -98,6 +99,49 @@
       "raw_outputs_redacted": true
     }
   },
+  "macstudio_deployed": {
+    "status": "deployed_runtime_smoke_passed",
+    "host": "MacStudioDaniil",
+    "source_checkout": "/Users/daniildegtyarev/Projects/roehub.com",
+    "deployed_path": "/opt/roehub/app",
+    "final_commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+    "runtime_artifact": "/opt/roehub/state/backtest_ai_configurator/iteration_04_lmstudio_runtime_smoke.json",
+    "prompt_smoke_artifact": "/opt/roehub/state/backtest_ai_configurator/iteration_04_prompt_lmstudio_smoke.json",
+    "runtime_probe": {
+      "accepted": true,
+      "endpoint": "POST /v1/chat/completions",
+      "response_format": "json_schema",
+      "assistant_v1_runtime_contract": "chat_completions_ready",
+      "loaded_instance": "gemma-4-e2b-it-4bit"
+    },
+    "prompt_smoke": {
+      "accepted": true,
+      "direct_structured": {
+        "passed": 10,
+        "total": 10,
+        "failed": 0
+      },
+      "adapter_generate": {
+        "passed": 10,
+        "total": 10,
+        "failed": 0
+      },
+      "adapter_repair": {
+        "passed": 10,
+        "total": 10,
+        "failed": 0
+      },
+      "duration_seconds": 173.717,
+      "raw_outputs_redacted": true
+    },
+    "runtime_shasums": {
+      "scripts/backtest_ai/run_lmstudio_prompt_contract_smoke.py": "f9b54f10780376ea77743170ea7fe3e48720b74f1ee5af349924f35e3ff00673",
+      "src/trading/contexts/backtest/application/ai_configurator/schema.py": "94e64aca45d443e664feafdefa9133e0c22733eaf5ad6686e6b0a81ab6e4d627",
+      "src/trading/contexts/backtest/application/ai_configurator/prompts/assistant_v1.py": "95abf03e1aea96d8ce816a9b5cd9ceb124f7a0858fd09fb8f4b6178d27dae67b",
+      "src/trading/contexts/backtest/adapters/outbound/ai_config_agent/lmstudio_chat_completions.py": "1ab27d91df9024f9fc455ff98dbf644d50d9544fdfd8bdef323f81ba162dbc96",
+      "configs/prod/backtest_ai_configurator.yaml": "0c9179c3d6391da826f1c2d387c645a50fbc9428b2a2fd41fa24b65b7497009a"
+    }
+  },
   "local_checks": [
     {
       "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/ai_configurator",
@@ -127,11 +171,63 @@
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "pending",
-    "commit": null,
-    "pushed_to_main": false,
-    "ci": [],
-    "macstudio_sync": null
+    "status": "completed",
+    "commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+    "implementation_commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151",
+    "pushed_to_main": true,
+    "ci": [
+      {
+        "name": "CI",
+        "run_id": 26017219058,
+        "conclusion": "success",
+        "commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151"
+      },
+      {
+        "name": "Deploy Backend",
+        "run_id": 26017219065,
+        "conclusion": "success",
+        "commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151"
+      },
+      {
+        "name": "Publish App Image",
+        "run_id": 26017219067,
+        "conclusion": "success",
+        "commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151"
+      },
+      {
+        "name": "Deploy Web",
+        "run_id": 26017261917,
+        "conclusion": "success",
+        "commit": "585cddc6d89e2ca3a89c9b9e76baf372141eb151"
+      },
+      {
+        "name": "CI",
+        "run_id": 26017505185,
+        "conclusion": "success",
+        "commit": "30b5153754ee4d8de224a80dd947a009642d225f"
+      },
+      {
+        "name": "Deploy Backend",
+        "run_id": 26017505197,
+        "conclusion": "success",
+        "commit": "30b5153754ee4d8de224a80dd947a009642d225f"
+      }
+    ],
+    "macstudio_sync": {
+      "source_checkout": "/Users/daniildegtyarev/Projects/roehub.com",
+      "deployed_path": "/opt/roehub/app",
+      "commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+      "bootstrap_native_prod": "passed",
+      "reload_launchd_services": "passed",
+      "smoke_prod": "passed",
+      "iteration_runtime_smoke": "passed",
+      "iteration_prompt_smoke": "passed"
+    },
+    "deployment_fix": {
+      "reason": "scripts/backtest_ai was not included in /opt/roehub/app by Deploy Backend",
+      "commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+      "result": "scripts/backtest_ai copied and deployed smoke script present"
+    }
   },
   "evidence": {
     "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_04_prompt_lmstudio.md",
