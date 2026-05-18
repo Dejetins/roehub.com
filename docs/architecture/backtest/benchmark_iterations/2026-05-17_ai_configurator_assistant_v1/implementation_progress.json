@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plan": "backtest_ai_configurator_assistant_v1",
-  "updated_at": "2026-05-18T16:00:00Z",
+  "updated_at": "2026-05-18T18:59:48Z",
   "iterations": [
     {
       "id": "01-reset",

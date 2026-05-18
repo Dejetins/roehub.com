@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: accepted before delivery; direct-main delivery verification pending.
+Статус: accepted and delivered to `origin/main`; Mac Studio verified.
 
 ## Предварительный gate
 
@@ -35,12 +35,13 @@ Mac Studio run:
 ```text
 uv run python scripts/backtest_ai/run_configurator_security_eval.py \
   --direct-lmstudio \
-  --out-dir /tmp/roehub-security-eval-mac \
+  --fixture-path /Users/daniildegtyarev/projects/roehub.com/tests/fixtures/ai_configurator/security_eval_cases.json \
+  --out-dir /tmp/roehub-security-eval-final \
   --http-timeout-seconds 300 \
   --strict-acceptance-exit-code
 ```
 
-Run id: `20260518T184755139675Z`.
+Run id: `20260518T185847836289Z`.
 
 Target: in-process conversation API harness with the real
 `LMStudioOpenAICompatibleAdapter` and `POST /v1/chat/completions`.
@@ -101,12 +102,24 @@ Result: passed.
 
 ## Delivery
 
-Direct-main delivery is pending in this pre-publish evidence revision.
+Direct-main delivery completed:
 
-Acceptance marker before delivery:
+- implementation commit: `578e54d56446fa10f4d5f6b6549a04c49a7919e5`;
+- pushed to `origin/main`: true;
+- CI run `26053655276`: success;
+- Deploy Backend run `26053655283`: success;
+- Publish App Image run `26053655292`: success;
+- Deploy Web run `26053702067`: success;
+- Mac Studio repo checkout `/Users/daniildegtyarev/projects/roehub.com` fast-forwarded to
+  `578e54d56446fa10f4d5f6b6549a04c49a7919e5`;
+- production smoke from `/opt/roehub/app`: passed;
+- post-delivery security eval from `/opt/roehub/app` with the synced fixture:
+  passed.
+
+Acceptance marker after delivery:
 
 - accepted: true;
 - next iteration allowed: true;
-- pushed to `origin/main`: false;
+- pushed to `origin/main`: true;
 - Mac Studio security eval passed: true;
-- final Mac Studio post-delivery verification: pending.
+- final Mac Studio post-delivery verification: true.
