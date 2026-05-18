@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "iteration": "06-ui",
+  "status": "delivery_pending",
+  "accepted": true,
+  "blocking_reason": "direct-main delivery pending",
+  "next_iteration_allowed": false,
+  "pushed_to_main": false,
+  "macstudio_verified": false,
+  "previous_iteration_gate": {
+    "iteration": "05-validation-repair",
+    "accepted": true,
+    "next_iteration_allowed": true,
+    "pushed_to_main": true,
+    "macstudio_verified": true,
+    "accepted_commit": "30b5153754ee4d8de224a80dd947a009642d225f",
+    "accepted_commit_is_ancestor_of_origin_main": true
+  },
+  "ui_contract": {
+    "single_chat": true,
+    "mode_buttons_removed": true,
+    "startup_message_platform_language": true,
+    "assistant_answer_user_prompt_language_smoke": true,
+    "chain_of_thought_visible": false,
+    "stage_statuses": [
+      "queued",
+      "preparing_context",
+      "generating",
+      "validating",
+      "repairing",
+      "ready",
+      "error"
+    ],
+    "apply_configuration_backend_ready_only": true,
+    "apply_runs_backtest_or_preflight": false,
+    "explicit_indicator_axis_discrete_control": true,
+    "no_window_indicator_synthetic_from_to_step": false
+  },
+  "browser_qa": {
+    "target": "http://127.0.0.1:8765/backtests",
+    "harness": "real apps.web SSR /backtests template with httpx MockTransport API responses; no production data writes",
+    "artifact": "output/playwright/backtest-ai-iteration-06/browser_qa.json",
+    "screenshots": [
+      "output/playwright/backtest-ai-iteration-06/desktop-initial.png",
+      "output/playwright/backtest-ai-iteration-06/desktop-ready-apply.png",
+      "output/playwright/backtest-ai-iteration-06/desktop-indicator-axes.png",
+      "output/playwright/backtest-ai-iteration-06/mobile-ru-initial.png"
+    ],
+    "console_errors_or_warnings": 0,
+    "unexpected_failed_network": 0,
+    "accepted": true
+  },
+  "local_checks": [
+    {
+      "cmd": "node --check apps/web/dist/js/pages/backtests.js",
+      "status": "passed"
+    },
+    {
+      "cmd": "python -m json.tool apps/web/locales/en.json && python -m json.tool apps/web/locales/ru.json",
+      "status": "passed"
+    },
+    {
+      "cmd": "uv run pytest -q tests/unit/apps/web/test_backtests_ai_configurator.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/api/test_backtest_ai_config_routes.py",
+      "status": "passed",
+      "result": "16 passed"
+    },
+    {
+      "cmd": "uv run pytest -q tests/unit/apps/web tests/unit/apps/api",
+      "status": "passed",
+      "result": "197 passed, 3 warnings"
+    },
+    {
+      "cmd": "uv run ruff check apps/web apps/api tests/unit/apps/web tests/unit/apps/api",
+      "status": "passed"
+    },
+    {
+      "cmd": "uv run pyright",
+      "status": "passed",
+      "result": "0 errors"
+    },
+    {
+      "cmd": "uv run python -m tools.docs.generate_docs_index --check",
+      "status": "passed"
+    }
+  ],
+  "delivery": {
+    "mode": "direct_main",
+    "status": "pending",
+    "implementation_commit": null,
+    "ci": [],
+    "macstudio_sync": null
+  },
+  "contract_impact": {
+    "public_api_contract": "none",
+    "browser_visible_behavior": "compatible-change",
+    "dto_schema": "none",
+    "persisted_schema": "none",
+    "config_schema": "none",
+    "request_hash_cache_identity": "none"
+  },
+  "updated_at": "2026-05-18T13:42:00Z"
+}

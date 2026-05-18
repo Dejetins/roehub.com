@@ -70,7 +70,7 @@ _EVENT_SOURCE = "backtest_job_events"
 _JOB_SOURCE = "backtest_jobs"
 _MARKET_REFERENCE_SOURCE = "market_data_reference"
 _DEFAULT_STRATEGY = "mean_reversion.py"
-_AI_CONFIGURATOR_STAGE = "assistant-v1-reset"
+_AI_CONFIGURATOR_STAGE = "assistant-v1-ui"
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,10 +166,9 @@ class BacktestWorkstationQueryService:
             ai_configurator_state
             or _build_ai_configurator_state_payload(
                 enabled=False,
-                state="reset",
+                state="unavailable",
                 degradation_reason=(
-                    "AI configurator assistant v1 is being rebuilt; old one-shot AI "
-                    "jobs are retired."
+                    "AI configurator conversation storage is unavailable in this environment."
                 ),
             )
         )
@@ -495,13 +494,18 @@ def build_ui_backtests_router(
 
 
 def _build_ai_configurator_state(*, environ: Mapping[str, str]) -> dict[str, Any]:
-    _ = environ
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if postgres_dsn:
+        return _build_ai_configurator_state_payload(
+            enabled=True,
+            state="conversation_ready",
+            degradation_reason=None,
+        )
     return _build_ai_configurator_state_payload(
         enabled=False,
-        state="reset",
+        state="unavailable",
         degradation_reason=(
-            "AI configurator assistant v1 is being rebuilt; old one-shot AI jobs "
-            "are retired."
+            "AI configurator conversation storage is unavailable in this environment."
         ),
     )
 
@@ -517,7 +521,6 @@ def _build_ai_configurator_state_payload(
         "enabled": enabled,
         "stage": _AI_CONFIGURATOR_STAGE,
         "suggested_strategy": _DEFAULT_STRATEGY,
-        "modes": [],
         "endpoints": {},
         "degradation_reason": degradation_reason,
     }

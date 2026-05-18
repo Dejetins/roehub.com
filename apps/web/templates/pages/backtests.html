@@ -23,6 +23,10 @@
     data-variant-symbol-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats"
     data-variant-trades-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page={page}&page_size={page_size}"
     data-variant-trades-csv-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv"
+    data-ai-conversations-endpoint="/api/backtests/ai-config/conversations"
+    data-ai-conversation-messages-endpoint-template="/api/backtests/ai-config/conversations/{conversation_id}/messages"
+    data-ai-conversation-status-endpoint-template="/api/backtests/ai-config/conversations/{conversation_id}/status"
+    data-ai-conversation-load-action-endpoint-template="/api/backtests/ai-config/conversations/{conversation_id}/load-action"
     data-variant-open-delay-ms="180"
     data-variant-open-duration-ms="650"
     data-variant-preview-limit="10"
@@ -169,6 +173,11 @@
           <span class="backtests-pill" data-ai-state-label>{{ t("backtests.ai.beta") }}</span>
         </header>
         <p class="backtests-ai-notice" data-ai-notice>{{ t("backtests.ai.notice") }}</p>
+        <div class="backtests-ai-toolbar">
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-ai-new-chat disabled>{{ t("backtests.ai.new_chat") }}</button>
+          <span class="backtests-ai-toolbar__label">{{ t("backtests.ai.history") }}</span>
+        </div>
+        <div class="backtests-ai-history" data-ai-conversations aria-label="{{ t('backtests.ai.history') }}"></div>
         <output class="backtests-ai-status" data-ai-status aria-live="polite">{{ t("backtests.ai.status.disabled") }}</output>
         <ol class="backtests-ai-timeline" data-ai-timeline aria-label="{{ t('backtests.ai.timeline') }}"></ol>
         <div class="backtests-chat" data-ai-log aria-live="polite">

@@ -22,6 +22,8 @@ const REFRESH_PRESETS = {
   "1m": 60000,
   "5m": 300000,
 };
+const AI_TERMINAL_STAGES = ["queued", "preparing_context", "generating", "validating", "repairing", "ready"];
+const AI_ERROR_STAGES = new Set(["error", "failed", "blocked_by_policy", "needs_clarification", "input_too_large", "security_review"]);
 
 const state = {
   market: "binance",
@@ -67,6 +69,11 @@ const state = {
     enabled: false,
     activeToken: 0,
     isBusy: false,
+    initialized: false,
+    conversations: [],
+    conversationId: null,
+    currentStatus: null,
+    currentLoadAction: null,
   },
 };
 
@@ -393,6 +400,10 @@ function setAiControls(root) {
   if (submit instanceof HTMLButtonElement) {
     submit.disabled = disabled;
   }
+  const newChat = qs("[data-ai-new-chat]", root);
+  if (newChat instanceof HTMLButtonElement) {
+    newChat.disabled = !state.ai.enabled || state.ai.isBusy;
+  }
 }
 
 function setAiBusy(root, isBusy) {
@@ -414,6 +425,278 @@ function renderAiConfiguratorState(root, aiState) {
       root
     );
   }
+}
+
+function aiConversationsEndpoint(root) {
+  return root.dataset.aiConversationsEndpoint || "/api/backtests/ai-config/conversations";
+}
+
+function aiConversationMessagesEndpoint(root, conversationId) {
+  return endpointFromTemplate(
+    root.dataset.aiConversationMessagesEndpointTemplate ||
+      "/api/backtests/ai-config/conversations/{conversation_id}/messages",
+    { conversation_id: conversationId }
+  );
+}
+
+function aiConversationStatusEndpoint(root, conversationId) {
+  return endpointFromTemplate(
+    root.dataset.aiConversationStatusEndpointTemplate ||
+      "/api/backtests/ai-config/conversations/{conversation_id}/status",
+    { conversation_id: conversationId }
+  );
+}
+
+function aiConversationLoadActionEndpoint(root, conversationId) {
+  return endpointFromTemplate(
+    root.dataset.aiConversationLoadActionEndpointTemplate ||
+      "/api/backtests/ai-config/conversations/{conversation_id}/load-action",
+    { conversation_id: conversationId }
+  );
+}
+
+function platformLocale() {
+  const lang = String(document.documentElement.lang || "en").slice(0, 2).toLowerCase();
+  return lang === "ru" ? "ru" : "en";
+}
+
+function aiStageForStatus(status) {
+  const normalized = String(status || "idle").trim();
+  if (AI_TERMINAL_STAGES.includes(normalized)) {
+    return normalized;
+  }
+  if (normalized === "idle") {
+    return "queued";
+  }
+  if (normalized === "awaiting_model") {
+    return "generating";
+  }
+  if (AI_ERROR_STAGES.has(normalized)) {
+    return "error";
+  }
+  return normalized || "error";
+}
+
+function renderAiTimeline(root, status) {
+  const target = qs("[data-ai-timeline]", root);
+  if (!target) {
+    return;
+  }
+  const stage = aiStageForStatus(status);
+  const stages = stage === "error" ? [...AI_TERMINAL_STAGES.slice(0, 5), "error"] : AI_TERMINAL_STAGES;
+  const activeIndex = stages.indexOf(stage);
+  target.innerHTML = stages
+    .map((item, index) => `
+      <li class="${index < activeIndex ? "is-complete" : index === activeIndex ? "is-active" : ""}">
+        ${escapeHtml(item)}
+      </li>
+    `)
+    .join("");
+}
+
+function renderAiHistory(root) {
+  const target = qs("[data-ai-conversations]", root);
+  if (!target) {
+    return;
+  }
+  const rows = state.ai.conversations || [];
+  target.innerHTML = rows.length
+    ? rows
+        .map((conversation) => `
+          <button
+            class="backtests-ai-history__item ${conversation.conversation_id === state.ai.conversationId ? "is-active" : ""}"
+            type="button"
+            data-ai-open-conversation="${escapeHtml(conversation.conversation_id)}"
+          >
+            <strong>${escapeHtml(conversation.conversation_title || t("backtests.ai.new_chat"))}</strong>
+            <time>${escapeHtml(localTime(conversation.last_message_at))}</time>
+            <span>${escapeHtml(conversation.status || "idle")}</span>
+          </button>
+        `)
+        .join("")
+    : `<div class="backtests-muted">${escapeHtml(t("backtests.ai.history_empty"))}</div>`;
+}
+
+function renderAiMessages(root, messages) {
+  const target = qs("[data-ai-log]", root);
+  if (!target) {
+    return;
+  }
+  target.innerHTML = (messages || [])
+    .filter((message) => ["assistant", "user", "system"].includes(message?.role))
+    .map((message) => `
+      <article data-ai-message-role="${escapeHtml(message.role)}">
+        <div class="backtests-ai-message">${escapeHtml(message.content)}</div>
+        <time>${escapeHtml(localTime(message.created_at))}</time>
+      </article>
+    `)
+    .join("");
+  target.scrollTop = target.scrollHeight;
+}
+
+function renderAiLoadAction(root, loadAction) {
+  qsa("[data-ai-load-action]", root).forEach((item) => item.remove());
+  state.ai.currentLoadAction = loadAction || null;
+  if (!loadAction?.enabled || loadAction.state !== "ready" || !loadAction.config) {
+    return;
+  }
+  const log = qs("[data-ai-log]", root);
+  if (!log) {
+    return;
+  }
+  log.insertAdjacentHTML(
+    "beforeend",
+    `
+      <div class="backtests-ai-actions" data-ai-load-action>
+        <button class="rh-button rh-button--primary rh-button--compact backtests-ai-load" type="button" data-ai-apply-config>
+          ${escapeHtml(t("backtests.ai.apply_configuration"))}
+        </button>
+      </div>
+    `
+  );
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderAiConversation(root, payload) {
+  if (payload?.conversation?.conversation_id) {
+    state.ai.conversationId = payload.conversation.conversation_id;
+  }
+  if (payload?.conversation) {
+    const existing = state.ai.conversations.filter(
+      (item) => item.conversation_id !== payload.conversation.conversation_id
+    );
+    state.ai.conversations = [payload.conversation, ...existing];
+    renderAiHistory(root);
+  }
+  renderAiMessages(root, payload?.messages || []);
+  state.ai.currentStatus = payload?.status || null;
+  const status = payload?.status?.status || "idle";
+  setText("[data-ai-status]", status, root);
+  renderAiTimeline(root, status);
+  renderAiLoadAction(root, payload?.status?.load_action);
+}
+
+async function refreshAiConversations(root) {
+  if (!state.ai.enabled) {
+    return null;
+  }
+  const payload = await apiFetch(aiConversationsEndpoint(root));
+  state.ai.conversations = payload?.conversations || [];
+  renderAiHistory(root);
+  return payload;
+}
+
+async function createAiConversation(root) {
+  const payload = await apiFetch(aiConversationsEndpoint(root), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ locale: platformLocale() }),
+  });
+  renderAiConversation(root, payload);
+  return payload;
+}
+
+async function openAiConversation(root, conversationId) {
+  if (!conversationId) {
+    return null;
+  }
+  const payload = await apiFetch(aiConversationMessagesEndpoint(root, conversationId));
+  renderAiConversation(root, payload);
+  return payload;
+}
+
+async function initializeAiPanel(root) {
+  if (!state.ai.enabled || state.ai.initialized) {
+    return;
+  }
+  state.ai.initialized = true;
+  setAiControls(root);
+  try {
+    const list = await refreshAiConversations(root);
+    const first = list?.conversations?.[0];
+    if (first?.conversation_id) {
+      await openAiConversation(root, first.conversation_id);
+    } else {
+      await createAiConversation(root);
+    }
+  } catch (error) {
+    setText("[data-ai-status]", describeApiError(error), root);
+    renderAiTimeline(root, "error");
+  }
+}
+
+async function sendAiMessage(root) {
+  const field = qs("[data-ai-prompt]", root);
+  if (!(field instanceof HTMLInputElement)) {
+    return;
+  }
+  const message = field.value.trim();
+  if (!message) {
+    return;
+  }
+  if (!state.ai.conversationId) {
+    await createAiConversation(root);
+  }
+  const conversationId = state.ai.conversationId;
+  if (!conversationId) {
+    return;
+  }
+  setAiBusy(root, true);
+  setText("[data-ai-status]", "queued", root);
+  renderAiTimeline(root, "queued");
+  try {
+    const payload = await apiFetch(aiConversationMessagesEndpoint(root, conversationId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        message,
+        current_config: buildRequestPayload(root),
+        ui_context: {
+          locale: platformLocale(),
+          source_page: "/backtests",
+        },
+      }),
+      timeoutMs: 260000,
+    });
+    field.value = "";
+    await refreshAiConversations(root);
+    await openAiConversation(root, payload?.conversation?.conversation_id || conversationId);
+  } catch (error) {
+    setText("[data-ai-status]", describeApiError(error), root);
+    renderAiTimeline(root, "error");
+  } finally {
+    setAiBusy(root, false);
+  }
+}
+
+async function refreshAiStatus(root) {
+  const conversationId = state.ai.conversationId;
+  if (!conversationId) {
+    return;
+  }
+  const payload = await apiFetch(aiConversationStatusEndpoint(root, conversationId));
+  state.ai.currentStatus = payload;
+  setText("[data-ai-status]", payload?.status || "idle", root);
+  renderAiTimeline(root, payload?.status || "idle");
+  renderAiLoadAction(root, payload?.load_action);
+}
+
+async function loadAiConfigIntoForm(root) {
+  const conversationId = state.ai.conversationId;
+  const latest = conversationId
+    ? await apiFetch(aiConversationLoadActionEndpoint(root, conversationId))
+    : null;
+  const loadAction = latest?.load_action || state.ai.currentLoadAction;
+  state.ai.currentLoadAction = loadAction || null;
+  if (!loadAction?.enabled || loadAction.state !== "ready" || !loadAction.config) {
+    setText("[data-ai-feedback-status]", t("backtests.ai.status.error"), root);
+    return;
+  }
+  seedConfigDraft(root, loadAction.config, {
+    validateOptions: true,
+    includeIndicators: true,
+  });
+  setText("[data-ai-feedback-status]", t("backtests.ai.status.loaded"), root);
 }
 
 function formatFieldErrors(errors) {
@@ -662,15 +945,7 @@ function buildRequestPayload(root) {
   const slippagePercent = Number(qs("[data-config-field='slippage']", root)?.value || 0.01);
   const sizing = buildSizingPayload(root);
   const indicators = state.selectedIndicators.length
-    ? state.selectedIndicators.map((indicator) => ({
-        indicator_id: indicator.indicator_id,
-        sources: indicator.sources.length ? indicator.sources : undefined,
-        window: {
-          start: Number(indicator.window.start),
-          stop: Number(indicator.window.stop),
-          step: Number(indicator.window.step),
-        },
-      }))
+    ? state.selectedIndicators.map((indicator) => indicatorRequestFromState(indicator))
     : (state.runtimeDefaults?.config_draft?.indicators || [
         {
           indicator_id: "ma.dema",
@@ -727,6 +1002,30 @@ function buildRequestPayload(root) {
     },
     top_n: Number(state.runtimeDefaults?.runtime_defaults?.top_n_default || 10),
   };
+}
+
+function indicatorRequestFromState(indicator) {
+  const payload = {
+    indicator_id: indicator.indicator_id,
+  };
+  if (indicator.sources.length) {
+    payload.sources = indicator.sources;
+  }
+  if (indicator.window?.mode === "explicit") {
+    const value = Number(indicator.window.value);
+    if (Number.isFinite(value)) {
+      payload.window = { start: value, stop: value, step: 1 };
+    }
+    return payload;
+  }
+  if (indicator.window?.mode !== "none") {
+    payload.window = {
+      start: Number(indicator.window.start),
+      stop: Number(indicator.window.stop),
+      step: Number(indicator.window.step),
+    };
+  }
+  return payload;
 }
 
 function positiveSizingNumber(root, name, fallback) {
@@ -1141,9 +1440,7 @@ function renderIndicators(root, catalog) {
                 <strong>${escapeHtml(row.label)}</strong>
                 <small>${escapeHtml(row.indicator_id)}</small>
               </td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.unitStep)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
+              ${renderIndicatorAxisCells(row)}
               <td>
                 <div class="backtests-source-list">
                   ${row.availableSources.length
@@ -1176,6 +1473,34 @@ function renderIndicators(root, catalog) {
   updateCombinationsCount(root);
 }
 
+function renderIndicatorAxisCells(row) {
+  if (row.window.mode === "none") {
+    return `
+      <td class="backtests-indicator-axis-cell"><span class="backtests-indicator-axis-chip">${escapeHtml(t("backtests.indicators.no_window"))}</span></td>
+      <td class="backtests-indicator-axis-cell"><span class="backtests-muted">--</span></td>
+      <td class="backtests-indicator-axis-cell"><span class="backtests-muted">--</span></td>
+    `;
+  }
+  if (row.window.mode === "explicit") {
+    return `
+      <td class="backtests-indicator-axis-cell" colspan="3">
+        <select class="backtests-input backtests-indicator-axis-select" data-indicator-window="value" aria-label="${escapeHtml(row.label)} ${escapeHtml(t("backtests.indicators.value"))}">
+          ${row.window.values
+            .map((value) => `
+              <option value="${escapeHtml(value)}" ${Number(value) === Number(row.window.value) ? "selected" : ""}>${escapeHtml(value)}</option>
+            `)
+            .join("")}
+        </select>
+      </td>
+    `;
+  }
+  return `
+    <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
+    <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
+    <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.unitStep)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
+  `;
+}
+
 function indicatorStateFromDraft(draft) {
   const catalogItem = state.indicatorCatalog.get(draft?.indicator_id);
   if (!catalogItem) {
@@ -1183,6 +1508,33 @@ function indicatorStateFromDraft(draft) {
   }
   const spec = primaryWindowSpec(catalogItem);
   const draftWindow = draft?.window || draft?.params?.window || {};
+  const axisMode = spec?.mode === "explicit" ? "explicit" : spec?.mode === "none" || !Object.keys(spec).length ? "none" : "range";
+  if (axisMode === "explicit") {
+    const values = (spec.values || []).map(Number).filter(Number.isFinite);
+    const value = Number(draftWindow.start ?? draftWindow.stop ?? draftWindow ?? values[0]);
+    return {
+      indicator_id: catalogItem.indicator_id,
+      label: catalogItem.label,
+      family: catalogItem.family,
+      availableSources: catalogItem.sources || [],
+      sources: draft.sources || (catalogItem.sources?.[0] ? [catalogItem.sources[0]] : []),
+      window: {
+        mode: "explicit",
+        value: values.includes(value) ? value : values[0],
+        values,
+      },
+    };
+  }
+  if (axisMode === "none") {
+    return {
+      indicator_id: catalogItem.indicator_id,
+      label: catalogItem.label,
+      family: catalogItem.family,
+      availableSources: catalogItem.sources || [],
+      sources: draft.sources || (catalogItem.sources?.[0] ? [catalogItem.sources[0]] : []),
+      window: { mode: "none" },
+    };
+  }
   const start = draftWindow.start ?? rangeDefault(spec, "start", 5);
   const stop = draftWindow.stop ?? draftWindow.stop_incl ?? rangeDefault(spec, "stop_incl", 30);
   const step = draftWindow.step ?? rangeDefault(spec, "step", 1);
@@ -1193,6 +1545,7 @@ function indicatorStateFromDraft(draft) {
     availableSources: catalogItem.sources || [],
     sources: draft.sources || (catalogItem.sources?.[0] ? [catalogItem.sources[0]] : []),
     window: {
+      mode: "range",
       start,
       stop,
       step,
@@ -1255,7 +1608,9 @@ function renderIndicatorAddMenu(root, items) {
 
 function indicatorCombinationCount() {
   return state.selectedIndicators.reduce((total, indicator) => {
-    const windowCount = countRange(indicator.window.start, indicator.window.stop, indicator.window.step);
+    const windowCount = indicator.window.mode === "range"
+      ? countRange(indicator.window.start, indicator.window.stop, indicator.window.step)
+      : 1;
     const sourceCount = Math.max(1, indicator.sources.length);
     return total * Math.max(1, windowCount * sourceCount);
   }, 1);
@@ -2039,6 +2394,11 @@ function renderWorkstation(root, data, { append = false, preserveLoadedRows = fa
       : data;
   renderRuntimeControls(root, data);
   renderAiConfiguratorState(root, data?.ai_configurator_state || {});
+  renderAiTimeline(root, state.ai.currentStatus?.status || "idle");
+  initializeAiPanel(root).catch((error) => {
+    setText("[data-ai-status]", describeApiError(error), root);
+    renderAiTimeline(root, "error");
+  });
   renderSymbols(root, data?.instrument_universe);
   renderIndicators(root, data?.indicator_catalog);
   renderOptimization(root, data?.optimization_overview);
@@ -2548,6 +2908,45 @@ function bind(root) {
       });
       return;
     }
+    const newAiChat = event.target.closest("[data-ai-new-chat]");
+    if (newAiChat instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      createAiConversation(root).catch((error) => {
+        setText("[data-ai-status]", describeApiError(error), root);
+        renderAiTimeline(root, "error");
+      });
+      return;
+    }
+    const aiConversation = event.target.closest("[data-ai-open-conversation]");
+    if (aiConversation instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      openAiConversation(root, aiConversation.dataset.aiOpenConversation || "").catch((error) => {
+        setText("[data-ai-status]", describeApiError(error), root);
+        renderAiTimeline(root, "error");
+      });
+      return;
+    }
+    const aiSubmit = event.target.closest("[data-ai-submit]");
+    if (aiSubmit instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      sendAiMessage(root).catch((error) => {
+        setText("[data-ai-status]", describeApiError(error), root);
+        renderAiTimeline(root, "error");
+      });
+      return;
+    }
+    const aiApply = event.target.closest("[data-ai-apply-config]");
+    if (aiApply instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      loadAiConfigIntoForm(root).catch((error) => {
+        setText("[data-ai-feedback-status]", describeApiError(error), root);
+      });
+      return;
+    }
     const clearFiltersButton = event.target.closest("[data-clear-job-filters]");
     if (clearFiltersButton instanceof HTMLElement) {
       event.preventDefault();
@@ -2741,6 +3140,15 @@ function bind(root) {
     state.symbolQuery = event.target.value || "";
     filterSymbols(root, state.symbolQuery);
   });
+  qs("[data-ai-prompt]", root)?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendAiMessage(root).catch((error) => {
+        setText("[data-ai-status]", describeApiError(error), root);
+        renderAiTimeline(root, "error");
+      });
+    }
+  });
   root.addEventListener("input", (event) => {
     const configInput = event.target.closest("[data-config-field]");
     if (configInput instanceof HTMLInputElement) {
@@ -2790,7 +3198,7 @@ function bind(root) {
       return;
     }
     const axisInput = event.target.closest("[data-indicator-window]");
-    if (axisInput instanceof HTMLInputElement) {
+    if (axisInput instanceof HTMLInputElement || axisInput instanceof HTMLSelectElement) {
       const row = axisInput.closest("[data-selected-indicator-index]");
       const index = Number(row?.dataset.selectedIndicatorIndex);
       const indicator = state.selectedIndicators[index];

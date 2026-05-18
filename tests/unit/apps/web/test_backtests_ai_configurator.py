@@ -15,11 +15,13 @@ def test_backtests_template_keeps_ai_chat_shell_without_retired_job_routes() -> 
     assert "data-ai-log" in template
     assert "data-ai-prompt" in template
     assert "data-ai-submit" in template
+    assert "data-ai-new-chat" in template
+    assert "data-ai-conversations" in template
     assert "data-ai-timeline" in template
     assert "data-ai-mode" not in template
 
 
-def test_backtests_ai_js_does_not_call_retired_one_shot_jobs() -> None:
+def test_backtests_ai_js_uses_conversation_api_without_retired_one_shot_jobs() -> None:
     source = (WEB_ROOT / "dist/js/pages/backtests.js").read_text(encoding="utf-8")
     retired_endpoint = "/backtests" + "/ai-config" + "/jobs"
 
@@ -27,7 +29,8 @@ def test_backtests_ai_js_does_not_call_retired_one_shot_jobs() -> None:
     assert "EventSource" not in source
     assert "activeAiStatusRequest" not in source
     assert "currentAiPayload" not in source
-    assert "current_config: buildRequestPayload(root)" not in source
+    assert "current_config: buildRequestPayload(root)" in source
+    assert "/api/backtests/ai-config/conversations" in source
     assert "recordAiFeedback" not in source
     assert "data-ai-mode" not in source
 
@@ -37,9 +40,11 @@ def test_backtests_ai_load_configuration_does_not_auto_create_backtest_job() -> 
 
     assert "function applyAiConfiguration" not in source
     assert "recordAiFeedback" not in source
+    assert "data-ai-apply-config" in source
+    assert "createJob(root)" not in _function_body(source, "loadAiConfigIntoForm")
 
 
-def test_backtests_ai_locale_notice_and_load_action_copy_are_bilingual() -> None:
+def test_backtests_ai_single_chat_copy_is_bilingual() -> None:
     en = json.loads((WEB_ROOT / "locales/en.json").read_text(encoding="utf-8"))
     ru = json.loads((WEB_ROOT / "locales/ru.json").read_text(encoding="utf-8"))
 
@@ -47,9 +52,22 @@ def test_backtests_ai_locale_notice_and_load_action_copy_are_bilingual() -> None
     assert "Запросы и ответы AI могут сохраняться" in ru["backtests.ai.notice"]
     assert "exchange keys" in en["backtests.ai.notice"]
     assert "exchange keys" in ru["backtests.ai.notice"]
+    assert en["backtests.ai.apply_configuration"] == "Apply configuration"
+    assert ru["backtests.ai.apply_configuration"] == "Применить конфигурацию"
+    assert en["backtests.ai.new_chat"] == "New chat"
+    assert en["backtests.ai.history"] == "History"
     mode_prefix = "backtests.ai." + "mode"
     assert not any(key.startswith(mode_prefix) for key in en)
     assert not any(key.startswith(mode_prefix) for key in ru)
+
+
+def test_backtests_indicator_axes_render_discrete_and_no_window_controls() -> None:
+    source = (WEB_ROOT / "dist/js/pages/backtests.js").read_text(encoding="utf-8")
+
+    assert 'row.window.mode === "explicit"' in source
+    assert 'data-indicator-window="value"' in source
+    assert 'row.window.mode === "none"' in source
+    assert "backtests.indicators.no_window" in source
 
 
 def test_backtests_cancel_confirmation_is_site_modal_and_bilingual() -> None:

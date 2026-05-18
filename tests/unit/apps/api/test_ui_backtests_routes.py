@@ -107,7 +107,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert "trades" not in payload["job_table"]["items"][0]
 
 
-def test_get_backtest_workstation_exposes_ai_configurator_reset_state() -> None:
+def test_get_backtest_workstation_exposes_ai_configurator_unavailable_state() -> None:
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()),
     )
@@ -120,10 +120,9 @@ def test_get_backtest_workstation_exposes_ai_configurator_reset_state() -> None:
     assert response.status_code == 200
     state = response.json()["ai_configurator_state"]
     assert state["enabled"] is False
-    assert state["state"] == "reset"
-    assert state["stage"] == "assistant-v1-reset"
+    assert state["state"] == "unavailable"
+    assert state["stage"] == "assistant-v1-ui"
     assert state["endpoints"] == {}
-    assert state["modes"] == []
 
 
 def test_get_backtest_workstation_filters_jobs_by_exchange_market_symbol_date() -> None:
