@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: accepted locally, delivery pending.
+Статус: accepted, delivered to `origin/main`, verified on Mac Studio.
 
 ## Предварительный gate
 
@@ -74,7 +74,7 @@ Completed locally:
 uv run pytest -q tests/unit/contexts/backtest/application/ai_configurator tests/unit/contexts/backtest/application/services/v2
 ```
 
-Result: `275 passed`.
+Result: `276 passed`.
 
 ```text
 uv run ruff check src/trading/contexts/backtest/application/ai_configurator apps/api tests/unit/contexts/backtest/application/ai_configurator
@@ -94,14 +94,43 @@ uv run python -m tools.docs.generate_docs_index --check
 
 Result: passed.
 
+## Mac Studio
+
+Mac Studio runtime smoke:
+
+```text
+cd /opt/roehub/app
+PYTHONPATH=src:. .venv/bin/python scripts/backtest_ai/run_iteration_05_validation_repair_smoke.py \
+  --config configs/prod/backtest_ai_configurator.yaml \
+  --artifact /opt/roehub/state/backtest_ai_configurator/iteration_05_validation_repair_smoke.json \
+  --json
+```
+
+Result:
+
+- `accepted=true`;
+- `supported_prompt.status=ready`;
+- `load_action.enabled=true`;
+- `repair_probe.status=ready`;
+- `repair_attempts: 1`;
+- `auto_run_backtest_attempt=false`;
+- artifact: `/opt/roehub/state/backtest_ai_configurator/iteration_05_validation_repair_smoke.json`.
+
+Mac Studio source checkout synced to:
+
+```text
+607cd47e3075542052dab0046ce44525d8eac3d9
+```
+
 ## Delivery
 
-Direct-main delivery is pending.
+Direct-main delivery completed.
 
-Final acceptance still requires:
-
-- push to `origin/main`;
-- green main CI/deploy;
-- Mac Studio sync of the accepted commit;
-- `scripts/backtest_ai/run_iteration_05_validation_repair_smoke.py` from deployed runtime;
-- final evidence update with `pushed_to_main=true`, `macstudio_verified=true`, and `next_iteration_allowed=true`.
+- implementation commit: `607cd47e3075542052dab0046ce44525d8eac3d9`;
+- pushed to `origin/main`: true;
+- CI: `26022162463`, success;
+- Deploy Backend: `26022162413`, success;
+- Publish App Image: `26022162429`, success;
+- Deploy Web: `26022244801`, success;
+- Mac Studio verified: true;
+- `next_iteration_allowed=true`.

@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "iteration": "05-validation-repair",
-  "status": "accepted_local_delivery_pending",
-  "updated_at": "2026-05-18T08:05:54Z",
+  "status": "accepted",
+  "updated_at": "2026-05-18T08:31:22Z",
   "accepted": true,
   "blocking_reason": null,
-  "next_iteration_allowed": false,
-  "commit": null,
-  "implementation_commit": null,
+  "next_iteration_allowed": true,
+  "commit": "607cd47e3075542052dab0046ce44525d8eac3d9",
+  "implementation_commit": "607cd47e3075542052dab0046ce44525d8eac3d9",
   "host": "local",
-  "pushed_to_main": false,
-  "origin_main_commit": null,
-  "macstudio_verified": false,
-  "macstudio_commit": null,
+  "pushed_to_main": true,
+  "origin_main_commit": "607cd47e3075542052dab0046ce44525d8eac3d9",
+  "macstudio_verified": true,
+  "macstudio_commit": "607cd47e3075542052dab0046ce44525d8eac3d9",
   "previous_gate": {
     "iteration": "04-prompt-lmstudio",
     "accepted": true,
@@ -50,7 +50,7 @@
   "local_checks": [
     {
       "cmd": "uv run pytest -q tests/unit/contexts/backtest/application/ai_configurator tests/unit/contexts/backtest/application/services/v2",
-      "result": "275 passed"
+      "result": "276 passed"
     },
     {
       "cmd": "uv run ruff check src/trading/contexts/backtest/application/ai_configurator apps/api tests/unit/contexts/backtest/application/ai_configurator",
@@ -76,9 +76,45 @@
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "pending",
-    "ci": [],
-    "macstudio_sync": null
+    "status": "accepted",
+    "ci": [
+      {
+        "workflow": "CI",
+        "run_id": 26022162463,
+        "head_sha": "607cd47e3075542052dab0046ce44525d8eac3d9",
+        "conclusion": "success"
+      },
+      {
+        "workflow": "Deploy Backend",
+        "run_id": 26022162413,
+        "head_sha": "607cd47e3075542052dab0046ce44525d8eac3d9",
+        "conclusion": "success"
+      },
+      {
+        "workflow": "Publish App Image",
+        "run_id": 26022162429,
+        "head_sha": "607cd47e3075542052dab0046ce44525d8eac3d9",
+        "conclusion": "success"
+      },
+      {
+        "workflow": "Deploy Web",
+        "run_id": 26022244801,
+        "head_sha": "607cd47e3075542052dab0046ce44525d8eac3d9",
+        "conclusion": "success"
+      }
+    ],
+    "macstudio_sync": {
+      "source_checkout": "/Users/daniildegtyarev/Projects/roehub.com",
+      "runtime_path": "/opt/roehub/app",
+      "source_head": "607cd47e3075542052dab0046ce44525d8eac3d9",
+      "smoke_cmd": "PYTHONPATH=src:. .venv/bin/python scripts/backtest_ai/run_iteration_05_validation_repair_smoke.py --config configs/prod/backtest_ai_configurator.yaml --artifact /opt/roehub/state/backtest_ai_configurator/iteration_05_validation_repair_smoke.json --json",
+      "smoke_artifact": "/opt/roehub/state/backtest_ai_configurator/iteration_05_validation_repair_smoke.json",
+      "smoke_accepted": true,
+      "supported_prompt_status": "ready",
+      "repair_probe_status": "ready",
+      "load_action_enabled": true,
+      "auto_run_backtest_attempt": false
+    }
   },
   "evidence": {
     "markdown": "docs/architecture/backtest/benchmark_iterations/2026-05-17_ai_configurator_assistant_v1/iteration_05_validation_repair.md",

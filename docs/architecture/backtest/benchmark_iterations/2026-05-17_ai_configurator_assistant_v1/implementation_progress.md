@@ -11,7 +11,7 @@
 | 02B Context snapshot | accepted | `iteration_02b_context_snapshot.{md,json}` | true | none | true |
 | 03 Conversation API/storage | accepted | `iteration_03_conversation_api.{md,json}` | true | none | true |
 | 04 Prompt contract + LM Studio adapter | accepted | `iteration_04_prompt_lmstudio.{md,json}` | true | none | true |
-| 05 Validation/repair/load gate | accepted_local_delivery_pending | `iteration_05_validation_repair.{md,json}` | true | delivery pending | false |
+| 05 Validation/repair/load gate | accepted | `iteration_05_validation_repair.{md,json}` | true | none | true |
 | 06 UI redesign | planned | `iteration_06_ui.{md,json}` | false | not started | false |
 | 07 Ops/Monit/metrics | planned | `iteration_07_ops.{md,json}` | false | not started | false |
 | 08 Security eval | planned | `iteration_08_security.{md,json}` | false | not started | false |
