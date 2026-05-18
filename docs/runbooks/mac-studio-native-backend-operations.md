@@ -220,12 +220,10 @@ curl -fsS http://127.0.0.1:9205/metrics | rg 'backtest_ai_config_|process_reside
 ```
 
 `/health/ready` у worker не принимается как самостоятельный LM Studio readiness
-gate. После retirement single-shot prompt/blob контракта companion smoke
-проверяет только runtime lifecycle: configured `base_url`/port preflight,
-`lms ps --json` с `gemma-4-e2b-it-4bit` и `/api/v1/models` loaded instance.
-Он больше не является acceptance gate для конфигуратора: tool-agent acceptance
-должен появиться в новом контракте и не может опираться на старый
-`POST /v1/chat/completions` structured-generation probe.
+gate. Для assistant v1 readiness требует configured `base_url`/port preflight,
+`lms ps --json` с `gemma-4-e2b-it-4bit`, `/api/v1/models` loaded instance и
+lightweight `POST /v1/chat/completions` structured-generation probe. `/v1/models`
+без генерации не считается readiness.
 
 Training export is an internal ops/admin command only; it writes scrubbed JSONL and
 must not be exposed through the public API:

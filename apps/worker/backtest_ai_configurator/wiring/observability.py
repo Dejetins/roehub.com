@@ -62,13 +62,13 @@ class BacktestAiConfiguratorMetrics:
         self.jobs_total = Counter(
             "backtest_ai_config_jobs_total",
             "Backtest AI configurator jobs completed by terminal status.",
-            ("status", "mode", "tier", "model_id"),
+            ("status", "intent", "tier", "model_id"),
             registry=self.registry,
         )
         self.jobs_inflight = Gauge(
             "backtest_ai_config_jobs_inflight",
             "Backtest AI configurator jobs currently running in this worker.",
-            ("mode", "model_id"),
+            ("intent", "model_id"),
             registry=self.registry,
         )
         self.queue_depth = Gauge(
@@ -86,28 +86,28 @@ class BacktestAiConfiguratorMetrics:
         self.queue_wait_seconds = Histogram(
             "backtest_ai_config_queue_wait_seconds",
             "Backtest AI configurator queue wait in seconds.",
-            ("mode", "tier", "model_id"),
+            ("intent", "tier", "model_id"),
             buckets=_HISTOGRAM_LATENCY_BUCKETS,
             registry=self.registry,
         )
         self.stage_duration_seconds = Histogram(
             "backtest_ai_config_stage_duration_seconds",
             "Backtest AI configurator worker stage duration in seconds.",
-            ("stage", "mode", "model_id"),
+            ("stage", "intent", "model_id"),
             buckets=_HISTOGRAM_LATENCY_BUCKETS,
             registry=self.registry,
         )
         self.llm_latency_seconds = Histogram(
             "backtest_ai_config_llm_latency_seconds",
             "Backtest AI configurator LLM request latency in seconds.",
-            ("model_id",),
+            ("model_id", "attempt_kind"),
             buckets=_HISTOGRAM_LATENCY_BUCKETS,
             registry=self.registry,
         )
         self.total_latency_seconds = Histogram(
             "backtest_ai_config_total_latency_seconds",
             "Backtest AI configurator total job latency in seconds.",
-            ("mode", "tier", "model_id"),
+            ("intent", "tier", "model_id"),
             buckets=_HISTOGRAM_LATENCY_BUCKETS,
             registry=self.registry,
         )
@@ -164,7 +164,31 @@ class BacktestAiConfiguratorMetrics:
         self.applied_total = Counter(
             "backtest_ai_config_applied_total",
             "Backtest AI configurator applied feedback observed by worker.",
-            ("mode", "tier"),
+            ("intent", "tier"),
+            registry=self.registry,
+        )
+        self.load_action_total = Counter(
+            "backtest_ai_config_load_action_total",
+            "Backtest AI configurator load action availability and usage results.",
+            ("result",),
+            registry=self.registry,
+        )
+        self.high_load_responses_total = Counter(
+            "backtest_ai_config_high_load_responses_total",
+            "Backtest AI configurator user-facing high-load responses.",
+            ("reason",),
+            registry=self.registry,
+        )
+        self.conversations_total = Counter(
+            "backtest_ai_config_conversations_total",
+            "Backtest AI configurator conversation lifecycle events.",
+            ("status",),
+            registry=self.registry,
+        )
+        self.messages_total = Counter(
+            "backtest_ai_config_messages_total",
+            "Backtest AI configurator conversation messages.",
+            ("role", "intent"),
             registry=self.registry,
         )
         self.model_reload_total = Counter(
@@ -203,36 +227,41 @@ class BacktestAiConfiguratorMetrics:
         model_id = _model_id_from_job(job=job)
         self.jobs_total.labels(
             status=_bounded(status),
-            mode=_bounded(mode),
+            intent=_bounded(mode),
             tier=tier,
             model_id=model_id,
         ).inc()
         self.stage_duration_seconds.labels(
             stage="worker_iteration",
-            mode=_bounded(mode),
+            intent=_bounded(mode),
             model_id=model_id,
         ).observe(max(duration_seconds, 0.0))
         if job is not None and job.started_at is not None:
             self.queue_wait_seconds.labels(
-                mode=job.mode,
+                intent=job.mode,
                 tier=tier,
                 model_id=model_id,
             ).observe(max((job.started_at - job.queued_at).total_seconds(), 0.0))
         if job is not None and job.finished_at is not None:
             self.total_latency_seconds.labels(
-                mode=job.mode,
+                intent=job.mode,
                 tier=tier,
                 model_id=model_id,
             ).observe(max((job.finished_at - job.queued_at).total_seconds(), 0.0))
         else:
             self.total_latency_seconds.labels(
-                mode=_bounded(mode),
+                intent=_bounded(mode),
                 tier=tier,
                 model_id=model_id,
             ).observe(max(duration_seconds, 0.0))
         if job is not None and job.applied_at is not None:
-            self.applied_total.labels(mode=job.mode, tier=tier).inc()
+            self.applied_total.labels(intent=job.mode, tier=tier).inc()
+            self.load_action_total.labels(result="applied").inc()
         if job is not None:
+            if job.state == "ready" and job.validated_config_json is not None:
+                self.load_action_total.labels(result="enabled_ready").inc()
+            elif job.state in {"needs_clarification", "blocked_by_policy", "failed"}:
+                self.load_action_total.labels(result="disabled").inc()
             for item in job.validation_errors_json:
                 code = item.get("code")
                 if isinstance(code, str) and code.strip():
@@ -249,9 +278,10 @@ class BacktestAiConfiguratorMetrics:
     ) -> None:
         for attempt in attempts:
             if attempt.latency_ms is not None:
-                self.llm_latency_seconds.labels(model_id=model_id).observe(
-                    max(attempt.latency_ms / 1000, 0.0)
-                )
+                self.llm_latency_seconds.labels(
+                    model_id=model_id,
+                    attempt_kind=_bounded(attempt.attempt_kind),
+                ).observe(max(attempt.latency_ms / 1000, 0.0))
             if attempt.input_tokens_estimate is not None:
                 self.prompt_tokens_estimated.labels(model_id=model_id).observe(
                     max(attempt.input_tokens_estimate, 0)
@@ -274,7 +304,7 @@ class BacktestAiConfiguratorMetrics:
 
     def set_active_generation(self, *, model_id: str, active: bool) -> None:
         self.active_generations.labels(model_id=model_id).set(1 if active else 0)
-        self.jobs_inflight.labels(mode="unknown", model_id=model_id).set(
+        self.jobs_inflight.labels(intent="unknown", model_id=model_id).set(
             1 if active else 0
         )
 
@@ -329,7 +359,7 @@ class BacktestAiConfiguratorMetrics:
         ):
             self.jobs_total.labels(
                 status=status,
-                mode="unknown",
+                intent="unknown",
                 tier="unknown",
                 model_id="unknown",
             ).inc(0)
@@ -342,22 +372,34 @@ class BacktestAiConfiguratorMetrics:
             self.repair_attempts_total.labels(result=result, model_id="unknown").inc(0)
         self.quota_rejections_total.labels(tier="unknown", window="unknown").inc(0)
         self.capacity_rejections_total.labels(reason="unknown").inc(0)
-        self.applied_total.labels(mode="unknown", tier="unknown").inc(0)
-        self.jobs_inflight.labels(mode="unknown", model_id="unknown").set(0)
+        self.applied_total.labels(intent="unknown", tier="unknown").inc(0)
+        for result in ("enabled_ready", "disabled", "applied"):
+            self.load_action_total.labels(result=result).inc(0)
+        for reason in ("quota_exceeded", "capacity_delayed", "queue_full", "unknown"):
+            self.high_load_responses_total.labels(reason=reason).inc(0)
+        for status in ("created", "archived", "unknown"):
+            self.conversations_total.labels(status=status).inc(0)
+        for role in ("user", "assistant", "system"):
+            self.messages_total.labels(role=role, intent="unknown").inc(0)
+        self.jobs_inflight.labels(intent="unknown", model_id="unknown").set(0)
         self.active_generations.labels(model_id="unknown").set(0)
         self.queue_wait_seconds.labels(
-            mode="unknown",
+            intent="unknown",
             tier="unknown",
             model_id="unknown",
         ).observe(0)
         self.stage_duration_seconds.labels(
             stage="worker_iteration",
-            mode="unknown",
+            intent="unknown",
             model_id="unknown",
         ).observe(0)
-        self.llm_latency_seconds.labels(model_id="unknown").observe(0)
+        for attempt_kind in ("generate", "repair", "unknown"):
+            self.llm_latency_seconds.labels(
+                model_id="unknown",
+                attempt_kind=attempt_kind,
+            ).observe(0)
         self.total_latency_seconds.labels(
-            mode="unknown",
+            intent="unknown",
             tier="unknown",
             model_id="unknown",
         ).observe(0)

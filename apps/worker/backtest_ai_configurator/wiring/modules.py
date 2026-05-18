@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import socket
+import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -39,6 +42,8 @@ class BacktestAiConfiguratorWorkerRuntimeConfig:
     max_jobs_per_process: int
     metrics_port: int
     drain_mode: bool = False
+    readiness_smoke_timeout_seconds: float = 45.0
+    readiness_smoke_cache_seconds: float = 30.0
 
     def __post_init__(self) -> None:
         if self.poll_interval_seconds <= 0:
@@ -59,6 +64,16 @@ class BacktestAiConfiguratorWorkerRuntimeConfig:
             )
         if self.metrics_port <= 0:
             raise ValueError("ROEHUB_BACKTEST_AI_CONFIG_WORKER_METRICS_PORT must be > 0")
+        if self.readiness_smoke_timeout_seconds <= 0:
+            raise ValueError(
+                "ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_TIMEOUT_SECONDS "
+                "must be > 0"
+            )
+        if self.readiness_smoke_cache_seconds < 0:
+            raise ValueError(
+                "ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_CACHE_SECONDS "
+                "must be >= 0"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +105,7 @@ class BacktestAiConfiguratorWorkerApp:
                 except Exception:  # noqa: BLE001
                     self.metrics.jobs_total.labels(
                         status="worker_error",
-                        mode="unknown",
+                        intent="unknown",
                         tier="unknown",
                         model_id=self.health.model_id,
                     ).inc()
@@ -176,6 +191,16 @@ def load_backtest_ai_configurator_worker_runtime_config(
             key="ROEHUB_BACKTEST_AI_CONFIG_WORKER_DRAIN_MODE",
             default=False,
         ),
+        readiness_smoke_timeout_seconds=_env_float(
+            environ=environ,
+            key="ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_TIMEOUT_SECONDS",
+            default=45.0,
+        ),
+        readiness_smoke_cache_seconds=_env_float(
+            environ=environ,
+            key="ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_CACHE_SECONDS",
+            default=30.0,
+        ),
     )
 
 
@@ -215,7 +240,17 @@ def build_backtest_ai_configurator_worker_app(
             drain_mode=effective_worker_config.drain_mode,
             readiness_checks=(
                 _model_path_check(path=ai_runtime_config.model.model_path),
-                _assistant_runtime_pending_check(),
+                _lmstudio_smoke_readiness_check(
+                    config_path=ai_config_path,
+                    model_id=ai_runtime_config.model.model_id,
+                    metrics=metrics,
+                    timeout_seconds=(
+                        effective_worker_config.readiness_smoke_timeout_seconds
+                    ),
+                    cache_seconds=(
+                        effective_worker_config.readiness_smoke_cache_seconds
+                    ),
+                ),
                 _postgres_queue_audit_check(gateway=postgres_gateway),
             ),
     )
@@ -275,9 +310,72 @@ def _model_path_check(*, path: Path) -> Callable[[], tuple[bool, str]]:
     return _check
 
 
-def _assistant_runtime_pending_check() -> Callable[[], tuple[bool, str]]:
+def _lmstudio_smoke_readiness_check(
+    *,
+    config_path: Path,
+    model_id: str,
+    metrics: BacktestAiConfiguratorMetrics,
+    timeout_seconds: float,
+    cache_seconds: float,
+) -> Callable[[], tuple[bool, str]]:
+    script_path = Path("scripts/macos/lmstudio_backtest_ai_runtime.py")
+    last_checked = 0.0
+    last_ok = False
+
     def _check() -> tuple[bool, str]:
-        return False, "assistant_v1_runtime_pending"
+        nonlocal last_checked, last_ok
+        now = time.monotonic()
+        if cache_seconds > 0 and now - last_checked < cache_seconds:
+            return last_ok, "lmstudio_loaded_generation_smoke"
+        last_checked = now
+        command = [
+            sys.executable,
+            str(script_path),
+            "smoke",
+            "--config",
+            str(config_path),
+            "--json",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            last_ok = False
+            metrics.set_model_metadata(model_id=model_id, loaded=False)
+            return False, "lmstudio_loaded_generation_smoke"
+        last_ok = False
+        if result.returncode == 0:
+            try:
+                payload = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                payload = {}
+            smoke = payload.get("single_shot_chat_probe")
+            if not isinstance(smoke, Mapping) and isinstance(payload.get("smoke"), Mapping):
+                nested_smoke = payload["smoke"]
+                smoke = nested_smoke.get("single_shot_chat_probe")
+            last_ok = (
+                payload.get("accepted") is True
+                and (
+                    payload.get("assistant_v1_runtime_contract")
+                    == "chat_completions_ready"
+                    or (
+                        isinstance(payload.get("smoke"), Mapping)
+                        and payload["smoke"].get("assistant_v1_runtime_contract")
+                        == "chat_completions_ready"
+                    )
+                )
+                and isinstance(smoke, Mapping)
+                and smoke.get("endpoint") == "POST /v1/chat/completions"
+                and smoke.get("response_format") == "json_schema"
+            )
+        metrics.set_model_metadata(model_id=model_id, loaded=last_ok)
+        return last_ok, "lmstudio_loaded_generation_smoke"
 
     return _check
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import subprocess
 import threading
 import urllib.request
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from time import sleep
 from types import SimpleNamespace
 from typing import Any, Mapping, cast
@@ -11,6 +14,7 @@ from uuid import UUID
 
 from prometheus_client import generate_latest
 
+from apps.worker.backtest_ai_configurator.wiring import modules as worker_modules
 from apps.worker.backtest_ai_configurator.wiring.observability import (
     BacktestAiConfiguratorHealthState,
     BacktestAiConfiguratorMetrics,
@@ -179,6 +183,10 @@ def test_worker_metrics_expose_required_names_after_fake_job() -> None:
     assert "backtest_ai_config_validation_failures_total" in payload
     assert "backtest_ai_config_repair_attempts_total" in payload
     assert "backtest_ai_config_security_decisions_total" in payload
+    assert "backtest_ai_config_load_action_total" in payload
+    assert "backtest_ai_config_high_load_responses_total" in payload
+    assert "backtest_ai_config_conversations_total" in payload
+    assert "backtest_ai_config_messages_total" in payload
     assert "backtest_ai_config_quota_rejections_total" in payload
     assert "backtest_ai_config_capacity_rejections_total" in payload
     assert "backtest_ai_config_applied_total" in payload
@@ -258,6 +266,52 @@ def test_ops_http_server_exposes_health_ready_and_metrics() -> None:
     assert b'"status": "live"' in live
     assert b'"status": "ready"' in ready
     assert b"backtest_ai_config_jobs_total" in exported_metrics
+
+
+def test_worker_runtime_config_reads_readiness_smoke_settings() -> None:
+    config = worker_modules.load_backtest_ai_configurator_worker_runtime_config(
+        environ={
+            "ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_TIMEOUT_SECONDS": "7.5",
+            "ROEHUB_BACKTEST_AI_CONFIG_WORKER_READY_SMOKE_CACHE_SECONDS": "0",
+        }
+    )
+
+    assert config.readiness_smoke_timeout_seconds == 7.5
+    assert config.readiness_smoke_cache_seconds == 0
+
+
+def test_lmstudio_ready_check_requires_chat_completions_smoke(
+    monkeypatch: Any,
+) -> None:
+    metrics = BacktestAiConfiguratorMetrics()
+    stdout = json.dumps(
+        {
+            "accepted": True,
+            "assistant_v1_runtime_contract": "chat_completions_ready",
+            "single_shot_chat_probe": {
+                "endpoint": "POST /v1/chat/completions",
+                "response_format": "json_schema",
+            },
+        }
+    )
+
+    def _fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(worker_modules.subprocess, "run", _fake_run)
+    ready_check = worker_modules._lmstudio_smoke_readiness_check(
+        config_path=Path("configs/prod/backtest_ai_configurator.yaml"),
+        model_id="gemma-4-e2b-it-4bit",
+        metrics=metrics,
+        timeout_seconds=1.0,
+        cache_seconds=0.0,
+    )
+
+    assert ready_check() == (True, "lmstudio_loaded_generation_smoke")
+    exported_metrics = generate_latest(metrics.registry).decode("utf-8")
+    assert 'backtest_ai_config_model_loaded{model_id="gemma-4-e2b-it-4bit"} 1.0' in (
+        exported_metrics
+    )
 
 
 def _tracked_work(

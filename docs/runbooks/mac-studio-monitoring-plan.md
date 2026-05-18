@@ -29,9 +29,9 @@
 - `backtest-ai-configurator-worker` (`127.0.0.1:9205/metrics`)
 - `lmstudio-backtest-ai-runtime` контролируется Monit `check program`, а не
   Prometheus scrape job: check выполняет port preflight, `lms ps --json` и
-  `/api/v1/models` loaded instance. Старый structured
-  `POST /v1/chat/completions` smoke retired вместе с single-shot prompt/blob
-  контрактом.
+  `/api/v1/models` loaded instance, затем lightweight
+  `POST /v1/chat/completions` generation smoke с `json_schema`.
+  `/v1/models` сам по себе не считается readiness.
 
 ## Backtest runner target
 
@@ -134,7 +134,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - market-data worker: `ws_connected`, `ws_messages_total`, `ws_errors_total`, `insert_errors_total`, `ws_closed_to_insert_done_seconds`
 - market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
 - backtest job runner: `backtest_runner_tasks_claimed_total`, `backtest_runner_tasks_finished_total`, `backtest_runner_task_duration_seconds`, `backtest_runner_queue_wait_seconds`, `backtest_runner_active`, `backtest_runner_lease_lost_total`, `backtest_lazy_trades_cache_total`, `backtest_runner_last_success_unixtime`
-- backtest AI configurator worker: `backtest_ai_config_jobs_total`, `backtest_ai_config_jobs_inflight`, `backtest_ai_config_queue_depth`, `backtest_ai_config_active_generations`, `backtest_ai_config_queue_wait_seconds`, `backtest_ai_config_stage_duration_seconds`, `backtest_ai_config_llm_latency_seconds`, `backtest_ai_config_total_latency_seconds`, `backtest_ai_config_validation_failures_total`, `backtest_ai_config_repair_attempts_total`, `backtest_ai_config_security_decisions_total`, `backtest_ai_config_quota_rejections_total`, `backtest_ai_config_capacity_rejections_total`, `backtest_ai_config_applied_total`, `backtest_ai_config_model_reload_total`, `backtest_ai_config_model_loaded`
+- backtest AI configurator worker: `backtest_ai_config_jobs_total`, `backtest_ai_config_jobs_inflight`, `backtest_ai_config_queue_depth`, `backtest_ai_config_active_generations`, `backtest_ai_config_queue_wait_seconds`, `backtest_ai_config_stage_duration_seconds`, `backtest_ai_config_llm_latency_seconds`, `backtest_ai_config_total_latency_seconds`, `backtest_ai_config_validation_failures_total`, `backtest_ai_config_repair_attempts_total`, `backtest_ai_config_security_decisions_total`, `backtest_ai_config_quota_rejections_total`, `backtest_ai_config_capacity_rejections_total`, `backtest_ai_config_high_load_responses_total`, `backtest_ai_config_load_action_total`, `backtest_ai_config_conversations_total`, `backtest_ai_config_messages_total`, `backtest_ai_config_applied_total`, `backtest_ai_config_model_reload_total`, `backtest_ai_config_model_loaded`
 - auth API (через `http://127.0.0.1:8000/metrics`): `http_requests_total{path=~"/auth/(login|callback|logout|current-user)",status_code=~"5.."}`, `http_request_duration_seconds_count{path=~"/auth/(login|callback|logout|current-user)"}`.
 
 ## Вне scope
@@ -216,8 +216,7 @@ Monitoring считается в рабочем состоянии, когда �
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
 - Monit summary показывает `roehub_lmstudio_backtest_ai_runtime` в `Status ok`;
-  это доказывает loaded model lifecycle, а не готовность tool-agent
-  конфигуратора
+  это доказывает loopback lifecycle, loaded model и lightweight generation smoke
 - Monit summary показывает `roehub_backtest_ai_configurator_worker` в `Running/Accessible`
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)

@@ -66,6 +66,10 @@ async def _run_async(*, once: bool, metrics_port: int | None) -> int:
             max_jobs_per_process=1,
             metrics_port=runtime_config.metrics_port,
             drain_mode=runtime_config.drain_mode,
+            readiness_smoke_timeout_seconds=(
+                runtime_config.readiness_smoke_timeout_seconds
+            ),
+            readiness_smoke_cache_seconds=runtime_config.readiness_smoke_cache_seconds,
         )
     if metrics_port is not None and metrics_port <= 0:
         raise ValueError("--metrics-port must be > 0 when provided")

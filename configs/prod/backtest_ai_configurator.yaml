@@ -22,6 +22,15 @@ backtest_ai_configurator:
     base_url: http://127.0.0.1:8080
     request_timeout_seconds: 240
     active_generations: 1
+  worker:
+    host: 127.0.0.1
+    metrics_port: 9205
+    health_live_path: /health/live
+    health_ready_path: /health/ready
+    metrics_path: /metrics
+    readiness_check: loaded_model_lightweight_generation
+    readiness_smoke_timeout_seconds: 45
+    readiness_smoke_cache_seconds: 30
   context_snapshot:
     availability_summary_path: /opt/roehub/state/backtest_artifacts/v2/availability_summary.yaml
     max_prompt_indicators: 40
