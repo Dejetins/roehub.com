@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "iteration": "07-ops",
-  "status": "in_progress",
-  "accepted": false,
-  "blocking_reason": "pending local gates, main delivery, and Mac Studio lifecycle evidence",
-  "next_iteration_allowed": false,
-  "pushed_to_main": false,
-  "macstudio_verified": false,
+  "status": "accepted",
+  "accepted": true,
+  "blocking_reason": null,
+  "next_iteration_allowed": true,
+  "pushed_to_main": true,
+  "macstudio_verified": true,
   "previous_iteration_gate": {
     "iteration": "06-ui",
     "accepted": true,
@@ -45,8 +45,8 @@
       "backtest_ai_config_model_loaded",
       "backtest_ai_config_model_reload_total"
     ],
-    "local_scrape_verified": false,
-    "macstudio_scrape_verified": false
+    "local_scrape_verified": true,
+    "macstudio_scrape_verified": true
   },
   "local_checks": [
     {
@@ -71,19 +71,72 @@
   "macstudio_lifecycle": {
     "host": "MacStudioDaniil",
     "cycles_required": 2,
-    "cycles_passed": 0,
-    "no_restart_loop": false,
-    "health_live_passed": false,
-    "health_ready_passed": false,
-    "metrics_scrape_passed": false,
-    "prometheus_scrape_passed": false
+    "cycles_passed": 2,
+    "no_restart_loop": true,
+    "health_live_passed": true,
+    "health_ready_passed": true,
+    "metrics_scrape_passed": true,
+    "prometheus_scrape_passed": true,
+    "lmstudio_smoke": {
+      "accepted": true,
+      "model_id": "gemma-4-e2b-it-4bit",
+      "lms_ps_loaded": true,
+      "api_v1_models_loaded_instance": true,
+      "single_shot_chat_probe": {
+        "endpoint": "POST /v1/chat/completions",
+        "response_format": "json_schema",
+        "accepted": true
+      }
+    },
+    "worker_health_ready_checks": {
+      "config_loaded": true,
+      "drain_mode": true,
+      "lmstudio_loaded_generation_smoke": true,
+      "model_path": true,
+      "model_registry": true,
+      "postgres_queue_audit": true,
+      "queue_loop": true
+    },
+    "monit": {
+      "worker": "OK, Monitored, on reboot start",
+      "lmstudio_runtime": "OK, Monitored, on reboot start"
+    }
   },
   "delivery": {
     "mode": "direct_main",
-    "status": "pending",
-    "implementation_commit": null,
-    "ci": [],
-    "macstudio_sync": null
+    "status": "accepted",
+    "implementation_commit": "1890236f0a05499e91ad3197c7dcd844971bbd97",
+    "ci": [
+      {
+        "workflow": "CI",
+        "run_id": 26044314216,
+        "status": "success"
+      },
+      {
+        "workflow": "Publish App Image",
+        "run_id": 26044314218,
+        "status": "success"
+      },
+      {
+        "workflow": "Deploy Backend",
+        "run_id": 26044314673,
+        "status": "success"
+      },
+      {
+        "workflow": "Deploy Web",
+        "run_id": 26044361400,
+        "status": "success"
+      }
+    ],
+    "macstudio_sync": {
+      "host": "MacStudioDaniil",
+      "repo_path": "/Users/daniildegtyarev/projects/roehub.com",
+      "repo_commit": "1890236f0a05499e91ad3197c7dcd844971bbd97",
+      "runtime_path": "/opt/roehub/app",
+      "runtime_files_match_repo": true,
+      "production_smoke": "passed",
+      "prometheus_up": true
+    }
   },
   "contract_impact": {
     "public_api_contract": "compatible-change",
@@ -93,5 +146,5 @@
     "config_schema": "compatible-change",
     "request_hash_cache_identity": "none"
   },
-  "updated_at": "2026-05-18T15:00:00Z"
+  "updated_at": "2026-05-18T16:00:00Z"
 }

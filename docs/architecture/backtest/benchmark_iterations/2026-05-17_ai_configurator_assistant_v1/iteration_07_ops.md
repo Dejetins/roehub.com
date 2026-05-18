@@ -2,7 +2,7 @@
 
 Дата: 2026-05-18.
 
-Статус: in_progress.
+Статус: accepted.
 
 ## Предварительный gate
 
@@ -60,9 +60,23 @@ Result: passed.
 
 ## Mac Studio acceptance
 
-Pending. Acceptance requires two Monit stop/start/restart cycles, no restart loop,
-ready health, metrics scrape, Prometheus scrape, and exact delivered commit
-verification on Mac Studio.
+Mac Studio verification completed after direct-main deploy.
+
+- host: `MacStudioDaniil`;
+- repo path: `/Users/daniildegtyarev/projects/roehub.com`;
+- repo commit: `1890236f0a05499e91ad3197c7dcd844971bbd97`;
+- runtime path: `/opt/roehub/app`;
+- runtime worker file hashes match repo for `modules.py` and `observability.py`;
+- `scripts/macos/smoke_prod.sh`: passed;
+- LM Studio smoke: accepted, loaded `gemma-4-e2b-it-4bit`, `lms ps --json` matched context `8192` and parallel `1`;
+- lightweight generation smoke: `POST /v1/chat/completions`, `response_format=json_schema`, accepted;
+- `/health/live`: status `live`;
+- `/health/ready`: status `ready`, `lmstudio_loaded_generation_smoke=true`;
+- `/metrics`: scraped required `backtest_ai_config_*` series including `load_action`, `high_load`, and `model_loaded`;
+- Prometheus: `up{job="backtest-ai-configurator-worker"} == 1`;
+- Monit: `roehub_backtest_ai_configurator_worker` `OK`, `Monitored`, `on reboot start`;
+- Monit: `roehub_lmstudio_backtest_ai_runtime` `OK`, `Monitored`, `on reboot start`;
+- lifecycle: two stop/start/restart cycles passed without restart loop.
 
 ## Contract Impact
 
@@ -77,5 +91,18 @@ verification on Mac Studio.
 
 ## Delivery
 
-Pending direct-main delivery. Acceptance marker remains false until local gates,
-main CI/deploy, and Mac Studio lifecycle evidence pass.
+Direct-main delivery completed.
+
+- implementation commit: `1890236f0a05499e91ad3197c7dcd844971bbd97`;
+- pushed to `origin/main`: true;
+- `CI`: success, run `26044314216`;
+- `Publish App Image`: success, run `26044314218`;
+- `Deploy Backend`: success, run `26044314673`;
+- `Deploy Web`: success, run `26044361400`.
+
+Acceptance marker:
+
+- accepted: true;
+- pushed to `origin/main`: true;
+- Mac Studio verified: true;
+- next iteration allowed: true.
