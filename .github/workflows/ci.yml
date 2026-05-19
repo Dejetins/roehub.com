@@ -20,6 +20,9 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       docs: ${{ steps.filter.outputs.docs }}
+      run_migrations: ${{ steps.filter.outputs.run_migrations }}
+      has_tests: ${{ steps.filter.outputs.has_tests }}
+      test_matrix: ${{ steps.filter.outputs.test_matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -35,74 +38,27 @@ jobs:
           set -euo pipefail
 
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            {
-              echo "code=true"
-              echo "docs=true"
-            } >> "$GITHUB_OUTPUT"
+            python -m tools.ci.route_changes ci --changed-files /dev/null --all >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           zero_sha="0000000000000000000000000000000000000000"
           if [[ -z "$BASE_SHA" || "$BASE_SHA" == "$zero_sha" ]]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "docs=true" >> "$GITHUB_OUTPUT"
+            python -m tools.ci.route_changes ci --changed-files /dev/null --all >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git fetch --no-tags --depth=2 origin "$BASE_SHA" || true
           if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
             echo "Base commit $BASE_SHA is unavailable; running full CI."
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "docs=true" >> "$GITHUB_OUTPUT"
+            python -m tools.ci.route_changes ci --changed-files /dev/null --all >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git diff --name-only "$BASE_SHA" HEAD > changed-files.txt
           echo "Changed files:"
           sed 's/^/  /' changed-files.txt
-
-          code=false
-          docs=false
-
-          while IFS= read -r path; do
-            [[ -z "$path" ]] && continue
-
-            case "$path" in
-              .github/workflows/*|\
-              .python-version|\
-              pyproject.toml|\
-              uv.lock|\
-              alembic.ini|\
-              pyrightconfig.json|\
-              Dockerfile.api|\
-              apps/*|\
-              src/*|\
-              tests/*|\
-              tools/*|\
-              scripts/*|\
-              configs/*|\
-              alembic/*|\
-              migrations/*)
-                code=true
-                ;;
-            esac
-
-            case "$path" in
-              README.md|\
-              AGENTS.md|\
-              .codex/AGENTS.md|\
-              .codex/promt_template.md|\
-              docs/*)
-                docs=true
-                ;;
-            esac
-
-          done < changed-files.txt
-
-          {
-            echo "code=$code"
-            echo "docs=$docs"
-          } >> "$GITHUB_OUTPUT"
+          python -m tools.ci.route_changes ci --changed-files changed-files.txt >> "$GITHUB_OUTPUT"
 
   static:
     name: static
@@ -166,7 +122,7 @@ jobs:
   migrations:
     name: migrations
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.run_migrations == 'true'
     runs-on: ubuntu-latest
     env:
       POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
@@ -214,41 +170,11 @@ jobs:
   test_shards:
     name: test-shard (${{ matrix.name }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.has_tests == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: apps-platform
-            target: tests/test_smoke.py tests/unit/apps tests/unit/infra tests/unit/platform tests/unit/shared_kernel tests/unit/tools
-          - name: backtest
-            target: tests/unit/contexts/backtest
-          - name: indicators-engine
-            target: tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_engine.py
-          - name: indicators-kernels-a
-            target: >-
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_common_kernels.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_ma_kernels.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_trend_kernels.py
-          - name: indicators-kernels-b
-            target: >-
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_momentum_kernels.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_runtime_wiring.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_structure_kernels.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_volatility_kernels.py
-              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_volume_kernels.py
-          - name: indicators-api-domain
-            target: >-
-              tests/unit/contexts/indicators/adapters/outbound/compute_numpy
-              tests/unit/contexts/indicators/adapters/outbound/config
-              tests/unit/contexts/indicators/adapters/outbound/feeds
-              tests/unit/contexts/indicators/adapters/outbound/registry
-              tests/unit/contexts/indicators/api
-              tests/unit/contexts/indicators/application
-              tests/unit/contexts/indicators/domain
-          - name: market-identity-strategy
-            target: tests/unit/contexts/identity tests/unit/contexts/market_data tests/unit/contexts/strategy
+      matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     env:
       POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
       NUMBA_NUM_THREADS: "1"

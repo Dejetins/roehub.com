@@ -1,18 +1,10 @@
 name: Publish App Image
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: ["main"]
-    paths:
-      - "apps/**"
-      - "src/**"
-      - "configs/**"
-      - "alembic/**"
-      - "migrations/**"
-      - "alembic.ini"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "infra/docker/Dockerfile.market_data"
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -24,13 +16,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web_image_changed: ${{ steps.filter.outputs.web_image_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Detect web image changes
+        id: filter
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python -m tools.ci.route_changes web-image --changed-files /dev/null --all >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            git diff --name-only HEAD~1 HEAD > changed-files.txt
+          else
+            git ls-tree -r --name-only HEAD > changed-files.txt
+          fi
+          echo "Changed files:"
+          sed 's/^/  /' changed-files.txt
+          python -m tools.ci.route_changes web-image --changed-files changed-files.txt >> "$GITHUB_OUTPUT"
+
   publish:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      needs.changes.outputs.web_image_changed == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve image repo
         id: image_repo

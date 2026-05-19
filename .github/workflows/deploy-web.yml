@@ -1,13 +1,8 @@
 name: Deploy Web
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "infra/docker/docker-compose.web.prod.yml"
-      - "infra/caddy/Caddyfile.vps"
   workflow_run:
-    workflows: ["Publish App Image"]
+    workflows: ["CI", "Publish App Image"]
     branches: ["main"]
     types: [completed]
   workflow_dispatch:
@@ -26,8 +21,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web_image_changed: ${{ steps.filter.outputs.web_image_changed }}
+      web_deploy_config_changed: ${{ steps.filter.outputs.web_deploy_config_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Detect web deploy changes
+        id: filter
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            {
+              python -m tools.ci.route_changes web-image --changed-files /dev/null --all
+              python -m tools.ci.route_changes web-deploy-config --changed-files /dev/null --all
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            git diff --name-only HEAD~1 HEAD > changed-files.txt
+          else
+            git ls-tree -r --name-only HEAD > changed-files.txt
+          fi
+          echo "Changed files:"
+          sed 's/^/  /' changed-files.txt
+          {
+            python -m tools.ci.route_changes web-image --changed-files changed-files.txt
+            python -m tools.ci.route_changes web-deploy-config --changed-files changed-files.txt
+          } >> "$GITHUB_OUTPUT"
+
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'Publish App Image' &&
+      needs.changes.outputs.web_image_changed == 'true') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'CI' &&
+      needs.changes.outputs.web_deploy_config_changed == 'true' &&
+      needs.changes.outputs.web_image_changed != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -38,6 +79,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve image tag
         id: image
@@ -47,7 +90,7 @@ jobs:
           image_repo="ghcr.io/${owner_lc}/roehub-app"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
             image_tag='${{ inputs.image_tag }}'
-          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+          elif [ "${{ github.event_name }}" = "workflow_run" ] && [ "${{ github.event.workflow_run.name }}" = "Publish App Image" ]; then
             image_tag='${{ github.event.workflow_run.head_sha }}'
           else
             image_tag='main'
