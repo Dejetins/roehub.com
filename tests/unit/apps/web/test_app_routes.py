@@ -879,7 +879,9 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert ".backtests-modebar" in backtests_css
     assert ".backtests-ai-chat" in backtests_css
     assert "grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);" in backtests_css
-    assert "grid-column: 1 / -1;" in backtests_css
+    assert ".backtests-config {\n  grid-column: 1;\n  grid-row: 1 / 3;" in backtests_css
+    assert ".backtests-instruments {\n  grid-column: 2;\n  grid-row: 1 / 3;" in backtests_css
+    assert ".backtests-ai-chat {\n  grid-column: 3;\n  grid-row: 2;" in backtests_css
     assert ".backtests-config-summary" in backtests_css
     assert 'data-backtests-active-view="results"' in backtests_css
     assert "grid-template-columns: minmax(0, 1fr);" in backtests_css
