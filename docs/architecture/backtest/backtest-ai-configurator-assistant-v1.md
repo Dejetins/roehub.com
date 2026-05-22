@@ -1,6 +1,6 @@
 # AI-помощник конфигуратора `/backtests` v1
 
-Документ фиксирует целевое ТЗ и production-MVP архитектуру AI-помощника для формы `/backtests`: LM Studio запускает локальную MLX-модель как agent-runtime чата, модель сама ищет параметры через read-only MCP-инструмент контекста, Roehub валидирует итоговый JSON config и показывает пользователю кнопку применения только после backend-валидации.
+Документ фиксирует целевое ТЗ и production-MVP архитектуру AI-помощника для формы `/backtests`: LM Studio запускает локальную MLX-модель как agent-runtime чата, модель сама ищет параметры через read-only MCP-инструмент контекста, Roehub проверяет итоговый draft через контролируемый backend-контур валидации, валидирует JSON config и показывает пользователю кнопку применения только после backend-валидации.
 
 ## Статус
 
@@ -23,10 +23,11 @@
 1. Принять сообщение пользователя и текущий state формы `/backtests`.
 2. Передать запрос в LM Studio `/api/v1/chat` с подключенным read-only MCP context server.
 3. Дать модели возможность самой найти нужные symbols, indicators, params, periods и limits через MCP-инструмент.
-4. Получить от модели финальный JSON envelope, где `config` напрямую соответствует форме `/backtests`.
-5. Проверить JSON schema, бизнес-ограничения и validation-only preflight в Roehub backend.
-6. Если конфиг валиден, показать пользователю обычное сообщение ассистента и кнопку `Применить конфигурацию`.
-7. По нажатию кнопки заполнить текущую форму `/backtests`.
+4. Получить от модели JSON draft/envelope, где `config` напрямую соответствует форме `/backtests`.
+5. Проверить, что каждый `config_ready` подтвержден audited MCP tool evidence, а не догадкой модели.
+6. Проверить JSON schema, бизнес-ограничения и validation-only preflight в Roehub backend.
+7. Если конфиг валиден, показать пользователю обычное сообщение ассистента и кнопку `Применить конфигурацию`.
+8. По нажатию кнопки заполнить текущую форму `/backtests`.
 
 Модель не запускает бектесты, не получает произвольный доступ к filesystem, не вызывает shell/network/write tools и не является источником истины. Истина — подготовленный context artifact и backend validator/preflight.
 
@@ -45,7 +46,7 @@
 - UI без рассуждений модели, только этапы работы;
 - история чатов в Roehub storage;
 - Monit/autostart/readiness/metrics для LM Studio, MCP context server и AI assistant API/worker;
-- Stage 00 как feasibility gate до написания production-сервиса;
+- этап 00.1 как MVP-гейт контролируемой проверки до написания production-сервиса;
 - нагрузочное тестирование максимум до S10.
 
 ## Что не входит
@@ -116,6 +117,16 @@ Backend выполняет только:
 - storage/audit/UI state.
 
 Backend не решает, что такое “стратегия на RSI и EMA”. Это делает модель.
+
+Но модель не является финальным источником решения по безопасности и корректности. Backend обязан проверить, что `config_ready` построен на данных, реально полученных через MCP:
+
+- все `symbol/exchange/market/timeframe` в config присутствуют в audited MCP evidence;
+- каждый `indicator_id` и каждый параметр индикатора подтверждены MCP item evidence;
+- `explicit` values взяты только из listed values;
+- no-window indicators не получили synthetic `window`;
+- unsupported/security/offtopic/auto-run prompts не могут стать `config_ready`, даже если модель вернула такой статус.
+
+Это не является backend semantic selector: backend не выбирает релевантный контекст до вызова модели. Он только проверяет модельный draft после tool lookup.
 
 ### 3) Файл контекста вместо полного промпта
 
@@ -248,7 +259,7 @@ none
 - для `range` модель по умолчанию выбирает single conservative value, а range только если пользователь просит оптимизацию диапазона;
 - для `none` модель не придумывает `window`;
 - UI не должен показывать no-window indicators с synthetic `5..30`;
-- validator/preflight остается final authority.
+- validator/preflight остается финальным источником решения.
 
 ### 9) LM Studio остается runtime, agent loop выполняет LM Studio `/api/v1/chat`
 
@@ -258,7 +269,7 @@ none
 runtime:
   provider: lm_studio
   endpoint: /api/v1/chat
-  agent_mode: mcp_context_lookup
+  agent_mode: mcp_context_lookup_with_backend_verification
   min_lm_studio_version: "0.4.0"
   model_id: gemma-4-e2b-it-4bit
   model_path: /Users/daniildegtyarev/.lmstudio/models/mlx-community/gemma-4-e2b-it-4bit
@@ -274,7 +285,27 @@ runtime:
 - MCP можно ограничить через `allowed_tools`;
 - response содержит `tool_call`, `arguments`, `output`, финальный `message`;
 - structured JSON output официально описан для `/v1/chat/completions`;
-- строгий JSON schema вместе с `/api/v1/chat + MCP` должен быть доказан Stage 00, а не предположен.
+- строгий JSON/schema-safe финальный результат вместе с `/api/v1/chat + MCP`
+  должен быть доказан этапом 00.1 через контролируемый backend-контур валидации,
+  а не предположен.
+
+Факт по выведенному из активного плана Stage 00 от 2026-05-21:
+
+- Mac Studio LM Studio `0.4.13+1` и `/api/v1/chat` readiness работали;
+- модель `gemma-4-e2b-it-4bit` могла вызывать read-only MCP tools;
+- full context не передавался напрямую в prompt;
+- контракт одного вызова “модель сама ищет контекст и сама является финальным
+  источником решения для `config_ready`” не прошел acceptance;
+- были случаи `config_ready` для unsupported/security/auto-run запросов;
+- был invalid/disallowed tool call;
+- direct JSON output был нестабилен;
+- formatting-only fallback делал JSON parseable, но не доказывал
+  семантическую безопасность.
+
+Вывод: Stage 00 удален из активного плана. Активный первый gate — этап 00.1,
+который проверяет не “модель как единственный источник решения”, а минимальный
+рабочий контур “модель ищет контекст, backend проверяет tool evidence и только
+после этого разрешает `config_ready`”.
 
 Ссылки:
 
@@ -310,7 +341,11 @@ Backtest Context MCP Server
         ↓
 backtest_ai_context.json
         ↓
-LM Studio final message
+LM Studio draft/final message
+        ↓
+Аудитор tool evidence
+        ↓
+Гейт подтверждения config evidence
         ↓
 JSON extract/parse
         ↓
@@ -731,17 +766,30 @@ SYSTEM_PROMPT_LANGUAGE: en
 - `config=null`, если `status` не равен `config_ready`;
 - backend решает, разрешена ли кнопка `Применить конфигурацию`.
 
-Stage 00 должен доказать, может ли `/api/v1/chat + MCP` стабильно возвращать parseable JSON. Если нет, допустим fallback:
+Этап 00.1 должен доказать, может ли `/api/v1/chat + MCP` стабильно выполнять
+поиск контекста моделью, после чего контролируемый backend-контур валидации может
+получить безопасный финальный результат. Прямой JSON output модели не является
+самостоятельным acceptance-критерием.
+
+Если `/api/v1/chat + MCP` нашел контекст, но вернул нестрогий или
+неparseable draft, допустим fallback:
 
 ```text
 /api/v1/chat + MCP -> model draft with context lookups
         ↓
 /v1/chat/completions + response_format=json_schema -> formatting-only final JSON
         ↓
+гейт tool evidence
+        ↓
 validator/preflight
 ```
 
-Fallback не меняет продуктовую архитектуру: контекст всё равно ищет модель через MCP, а второй вызов только форматирует уже найденный draft.
+Fallback не меняет продуктовую архитектуру: контекст всё равно ищет модель
+через MCP, а второй вызов только форматирует уже найденный draft. Fallback
+не считается успешным, если итоговый JSON не прошел evidence gate,
+schema/business validation и validation-only preflight. Метрика
+`fallback_success_rate` должна означать финальный контролируемый успех, а не просто
+parseable JSON.
 
 ## Валидация и repair
 
@@ -754,16 +802,18 @@ Pipeline:
 4. create run + emit queued
 5. LM Studio /api/v1/chat with MCP integration
 6. audit LM Studio output items: tool_call/message/invalid_tool_call
-7. extract final message content
-8. JSON parse
-9. envelope schema validation
-10. config form schema validation
-11. allowed catalog validation
-12. explicit/no-window parameter validation
-13. artifact coverage validation
-14. preflight validation-only check
-15. if invalid: one repair attempt
-16. terminal state
+7. collect tool evidence summary from MCP calls
+8. extract final message content
+9. JSON parse or formatting-only fallback
+10. гейт tool evidence
+11. envelope schema validation
+12. config form schema validation
+13. allowed catalog validation
+14. explicit/no-window parameter validation
+15. artifact coverage validation
+16. preflight validation-only check
+17. if invalid: one repair attempt
+18. terminal state
 ```
 
 Repair:
@@ -779,6 +829,10 @@ Backend отклоняет:
 
 - любой final config с более чем одним symbol;
 - config, построенный без обязательного MCP lookup, если для запроса был нужен контекст;
+- config, где `symbol/exchange/market/timeframe`, `indicator_id`, sources или
+  params не подтверждены audited MCP evidence;
+- formatting-only fallback output, который добавляет факты, отсутствующие в
+  model draft или tool evidence;
 - invalid tool calls;
 - tool calls outside `allowed_tools`;
 - любой output с local paths, secrets или raw prompt fragments;
@@ -803,7 +857,7 @@ chat_history:
 Правила:
 
 - Roehub DB является источником истины для conversation history;
-- LM Studio `store=false` для production calls, если Stage 00 не докажет необходимость stateful `previous_response_id`;
+- LM Studio `store=false` для production calls, если Stage 00.1 не докажет необходимость stateful `previous_response_id`;
 - в prompt/input передаются только последние `prompt_context_last_messages`;
 - модель генерирует `conversation_title`;
 - backend валидирует title и может поставить fallback `New backtest chat`;
@@ -901,7 +955,7 @@ Lifecycle LM Studio:
   - native model list показывает нужную loaded model;
   - lightweight `/api/v1/chat` smoke проходит;
   - MCP integration smoke проходит;
-  - Stage 00 JSON smoke проходит для выбранной модели.
+  - Stage 00.1 smoke контролируемой проверки проходит для выбранной модели.
 
 Lifecycle MCP server:
 
@@ -1010,18 +1064,19 @@ Backend возвращает `capacity_delayed`, `estimated_wait_seconds`, `retr
 
 ## Бенчмарк и нагрузочное тестирование
 
-Бенчмарк запускается только после Stage 00.
+Бенчмарк запускается только после Stage 00.1.
 
 Проверочные ворота:
 
-1. LM Studio `/api/v1/chat + MCP` feasibility `10/10`.
+1. LM Studio `/api/v1/chat + MCP` feasibility контролируемой проверки `10/10`.
 2. Context MCP smoke `10/10`.
-3. JSON config parse `10/10`.
-4. One API run `ready`.
-5. One UI apply smoke.
-6. S1.
-7. S5.
-8. S10.
+3. Tool evidence gate success `10/10` для supported matrix.
+4. JSON config parse + schema validation `10/10`.
+5. One API run `ready`.
+6. One UI apply smoke.
+7. S1.
+8. S5.
+9. S10.
 
 S50/S100 не входят в MVP acceptance.
 
@@ -1067,7 +1122,7 @@ S10:  10 пользователей, realistic think time 20-120 sec
 
 | Метрика | S1 | S5 | S10 |
 | --- | ---: | ---: | ---: |
-| `/api/v1/chat + MCP` smoke | 10/10 | - | - |
+| `/api/v1/chat + MCP` smoke контролируемой проверки | 10/10 | - | - |
 | Supported prompt valid config rate | >= 95% | >= 95% | >= 95% |
 | Multi-indicator depth 1-9 valid config matrix | 9/9 | 9/9 | 9/9 |
 | Multi-symbol request produces one-symbol config | 10/10 | 10/10 | 10/10 |
@@ -1173,12 +1228,12 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
   "updated_at": "2026-05-20T00:00:00Z",
   "iterations": [
     {
-      "id": "00-lmstudio-mcp-feasibility",
+      "id": "00.1-controlled-agent-verification-mvp",
       "status": "planned|in_progress|accepted|blocked",
       "accepted": false,
       "next_iteration_allowed": false,
       "blocking_reason": "not started",
-      "evidence_json": "docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant_v1/iteration_00_lmstudio_mcp_feasibility.json"
+      "evidence_json": "docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant_v1/iteration_00_1_controlled_agent_verification.json"
     }
   ]
 }
@@ -1186,8 +1241,8 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
 
 | Итерация | Статус | Evidence | Accepted | Blocking reason | Следующий этап разрешен |
 | --- | --- | --- | --- | --- | --- |
-| 00 Проверка feasibility LM Studio MCP | запланировано | `iteration_00_lmstudio_mcp_feasibility.{md,json}` | false | не начато | false |
-| 01 Контракт и builder context file | запланировано | `iteration_01_context_file.{md,json}` | false | ожидает 00 | false |
+| 00.1 MVP контролируемой проверки | запланировано | `iteration_00_1_controlled_agent_verification.{md,json}` | false | не начато | false |
+| 01 Контракт и builder context file | запланировано | `iteration_01_context_file.{md,json}` | false | ожидает 00.1 | false |
 | 02 Read-only MCP server | запланировано | `iteration_02_mcp_context_server.{md,json}` | false | ожидает 01 | false |
 | 03 Agent runner / API shell | запланировано | `iteration_03_agent_runner_api.{md,json}` | false | ожидает 02 | false |
 | 04 Validation/repair/load gate | запланировано | `iteration_04_validation_repair.{md,json}` | false | ожидает 03 | false |
@@ -1212,7 +1267,7 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
 
 | Итерация | Создать документацию/evidence | Обновить current docs | Создать/редактировать код и config | Удалить/вывести из current path | Проверка закрытия |
 | --- | --- | --- | --- | --- | --- |
-| 00 Feasibility | `mcp_feasibility_report.md`, `iteration_00_lmstudio_mcp_feasibility.md/json` | assistant v1 doc, если факты API отличаются от плана | только экспериментальные scripts: sample context file, local MCP server, LM Studio probe | изменения production-кода запрещены | `/api/v1/chat + MCP` работает с выбранной моделью, модель вызывает только allowed tools, final JSON parseable или fallback документирован |
+| 00.1 MVP контролируемой проверки | `controlled_agent_verification_report.md`, `iteration_00_1_controlled_agent_verification.md/json` | assistant v1 doc, если факты API отличаются от плана | только экспериментальные scripts: sample context file, local MCP server, LM Studio probe, backend-controlled verifier | изменения production-кода запрещены | `/api/v1/chat + MCP` работает с выбранной моделью, модель вызывает только allowed tools, backend evidence gate не пропускает unsupported/security/auto-run configs, supported prompts дают финальный контролируемый `config_ready` |
 | 01 Context file | `context_file_contract.md`, `iteration_01_context_file.md/json` | artifact/backtest docs, если меняются source paths | context builder из artifact availability + indicators + form limits, unit tests | full context prompt dumps | generated `backtest_ai_context.json`, stable hash, coverage для BTCUSDT/RSI/EMA/PercentRank проверен |
 | 02 MCP server | `mcp_context_server_contract.md`, `iteration_02_mcp_context_server.md/json` | operations docs, если меняется shape сервиса | read-only MCP server, health/ready/metrics, tests | arbitrary file/network/shell tools | только allowed tools, max result limits, безопасная ошибка на malformed query |
 | 03 Agent runner/API | `agent_runner_contract.md`, `iteration_03_agent_runner_api.md/json` | active API docs | conversation message route shell, LM Studio `/api/v1/chat` adapter, run state/events snapshot/SSE contracts | backend semantic selector | API run вызывает LM Studio с MCP и возвращает parseable final response; run emits ordered stage events |
@@ -1222,11 +1277,35 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
 | 07 Ops | `ops_runbook.md`, `iteration_07_ops.md/json` | monitoring docs/config | launchd/Monit для LM Studio/MCP/worker, Prometheus/Grafana targets | readiness только по `/v1/models` | два restart cycles, loaded model + MCP smoke readiness, metrics scrape |
 | 08 Security/Benchmark | `security_eval.md`, `benchmark_report.md/json`, `iteration_08_security_benchmark.md/json` | benchmark/security sections, если меняются | security fixtures, S1/S5/S10 harness, Mac Studio runner | local-only acceptance | thresholds passed или blocked with reason |
 
-### Итерация 00 — Проверка жизнеспособности LM Studio MCP
+### Итерация 00.1 — MVP контролируемой проверки
 
-Цель: доказать рабочесть базовой идеи до production-кода.
+Цель: доказать рабочую MVP-схему до production-кода:
 
-Для Stage 00 достаточно одного executor prompt в prompt pack, но внутри он должен запускать не один пользовательский запрос к модели, а полный набор probes и fixed prompts. Этот prompt не должен менять production code; он готовит только экспериментальные scripts/fixtures/evidence и отвечает на вопрос “целевая схема LM Studio `/api/v1/chat + MCP` работает на Mac Studio или заблокирована”.
+```text
+LM Studio /api/v1/chat + MCP context lookup
+        ↓
+model draft
+        ↓
+backend-controlled гейт tool evidence
+        ↓
+formatting-only fallback if needed
+        ↓
+schema/business validation
+        ↓
+финальный контролируемый статус
+```
+
+Этап 00.1 заменяет выведенный из активного плана Stage 00. Старый Stage 00 проверял, может ли
+модель сама быть финальным источником решения для `config_ready`; это не прошло
+acceptance. Этап 00.1 проверяет более безопасный контракт: модель сама ищет
+контекст, но backend проверяет tool evidence и не пропускает unsupported,
+security или auto-run ответы в `config_ready`.
+
+Для Stage 00.1 достаточно одного executor prompt в prompt pack, но внутри он
+должен запускать полный набор probes и fixed prompts. Этот prompt не должен
+менять production code; он готовит только экспериментальные scripts/fixtures/
+evidence и отвечает на вопрос “целевая MVP-схема agentic lookup + backend
+verification работает на Mac Studio или заблокирована”.
 
 Охват:
 
@@ -1234,6 +1313,7 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
 - проверка версии LM Studio: `0.4.0+`;
 - минимальный read-only MCP server;
 - probe script, который вызывает LM Studio `/api/v1/chat` с MCP integration и `allowed_tools`;
+- backend-controlled verifier, который проверяет final config по audited MCP evidence;
 - 10-15 fixed prompts RU/EN/security/unsupported;
 - local JSON parser/validator fixture.
 
@@ -1241,12 +1321,14 @@ docs/architecture/backtest/benchmark_iterations/<date>_ai_configurator_assistant
 
 - LM Studio `/api/v1/chat` реально вызывает MCP tool;
 - модель не получает full context в prompt;
-- модель вызывает только allowed tools;
-- supported prompts дают parseable JSON config;
+- модель вызывает только allowed tools; invalid/disallowed tool calls не могут попасть в accepted run;
+- supported prompts дают финальный контролируемый `config_ready`;
+- каждый `config_ready` подтвержден tool evidence для symbol/timeframe/indicator/params;
 - `structure.percent_rank` использует только explicit allowed value;
-- unsupported/offtopic не возвращает config-ready;
-- auto-run backtest не возвращает config-ready;
-- если strict JSON невозможен на `/api/v1/chat`, evidence фиксирует fallback formatting call decision;
+- unsupported/offtopic/security не возвращают финальный контролируемый `config_ready`;
+- auto-run backtest не возвращает финальный контролируемый `config_ready`;
+- formatting-only fallback не считается успехом, если semantic/evidence validation failed;
+- evidence разделяет `parseable_json_rate` и `final_controlled_success_rate`;
 - `accepted=true` только после Mac Studio proof на целевой модели.
 
 ### Итерация 01 — Контракт и сборщик файла контекста
@@ -1313,7 +1395,7 @@ get_backtest_context_item(kind, id)
 
 ### Итерация 04 — Валидация, repair и load action gate
 
-Цель: backend является authority по корректности config.
+Цель: backend является источником решения по корректности config.
 
 Критерии приемки:
 
@@ -1385,7 +1467,7 @@ get_backtest_context_item(kind, id)
 | Context | breaking-change | Full prompt context и backend selector заменены на prepared context file + read-only MCP lookup. |
 | Storage | breaking-change | Новые conversation/message/run tables, старые job tables не являются текущим contract. |
 | Security | compatible-hardening | Tool access строго ограничен `allowed_tools`, без arbitrary actions. |
-| Benchmark | breaking-change | Acceptance начинается со Stage 00 MCP feasibility. |
+| Benchmark | breaking-change | Acceptance начинается с этапа 00.1 MVP контролируемой проверки. |
 
 ## Связанные файлы
 
@@ -1418,20 +1500,20 @@ uv run python -m tools.docs.generate_docs_index --check
 
 Документ считается достаточным для подготовки prompt pack, если:
 
-- Stage 00 стоит первым и запрещает production code до feasibility proof;
+- Этап 00.1 стоит первым и запрещает production code до proof контролируемой проверки;
 - целевая архитектура использует LM Studio `/api/v1/chat + MCP`;
 - backend semantic selector отсутствует;
 - full context prompt dump отсутствует;
 - MCP tools read-only and scoped;
-- validation/preflight остается backend authority;
-- старые AI mode buttons retired;
+- validation/preflight остается backend-источником решения;
+- старые AI mode buttons выведены из активного UI-контракта;
 - acceptance на Mac Studio обязательна.
 
 ## Риски и решения
 
-- Риск: `/api/v1/chat + MCP` не возвращает стабильный JSON. Решение: Stage 00 фиксирует это до production-кода; fallback — второй formatting-only call через `/v1/chat/completions` с JSON schema.
-- Риск: модель не вызывает MCP tool и пытается угадать. Решение: prompt policy требует lookup; validator блокирует unsupported/invented values; benchmark tracks tool usage.
+- Риск: `/api/v1/chat + MCP` не возвращает стабильный JSON. Решение: этап 00.1 фиксирует это до production-кода; fallback — второй formatting-only call через `/v1/chat/completions` с JSON schema, но только после tool evidence gate.
+- Риск: модель не вызывает MCP tool и пытается угадать. Решение: prompt policy требует lookup; backend evidence gate блокирует `config_ready` без tool evidence; benchmark tracks tool usage.
 - Риск: MCP tool отдает слишком много контекста. Решение: max result count/chars, no raw full file output, redaction/output gates.
 - Риск: context file stale. Решение: context hash/age readiness, context builder evidence, MCP readiness false при stale/missing/corrupt context.
-- Риск: маленькая модель не справится с agentic lookup. Решение: Stage 00 доказывает это на реальной модели Mac Studio до implementation.
+- Риск: маленькая модель не справится с agentic lookup. Решение: Stage 00.1 доказывает это на реальной модели Mac Studio до implementation.
 - Риск: explicit/no-window indicators снова ломают preflight. Решение: axis model является first-class в context, validator и UI gates покрывают `structure.percent_rank` и no-window cases.
