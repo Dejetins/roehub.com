@@ -2375,8 +2375,11 @@ function shouldLoadSelectedResultAfterRefresh(reason) {
   if (!variants.length && !isQualityGateEmptyResult(selectedRow, summary)) {
     return true;
   }
-  const details = state.resultDetails?.jobId === state.selectedJobId ? state.resultDetails : null;
-  return resultDetailNeedsRetry(details);
+  const details =
+    state.resultDetails?.jobId === state.selectedJobId && state.resultDetails?.variantKey === state.selectedVariantKey
+      ? state.resultDetails
+      : null;
+  return !details || resultDetailNeedsRetry(details);
 }
 
 function clearDelayedVariantOpen() {
