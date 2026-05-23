@@ -479,6 +479,7 @@ UI:
 
 Docs/Ops:
 
+- единый iteration ledger для facts/handoff между stages;
 - exchange-control runbook;
 - secret management runbook;
 - OpenBao/Vault deployment и backup/restore notes;
@@ -488,8 +489,9 @@ Docs/Ops:
 ## План Внедрения
 
 Каждый этап имеет обязательный gate. Следующий этап нельзя начинать, пока
-текущий этап не доказан на runtime/API/DB/ops evidence и не сохранен короткий
-stage report.
+текущий этап не доказан на runtime/API/DB/ops evidence, не сохранен короткий
+stage report, не обновлен единый iteration ledger и не выполнен publish/deploy
+handoff через `github:yeet`.
 
 Для каждого этапа фиксируются:
 
@@ -498,7 +500,18 @@ stage report.
 - DB evidence;
 - Prometheus/Monit evidence, если применимо;
 - grep-проверка отсутствия секретов в logs/browser/test artifacts;
-- короткий stage report.
+- короткий stage report;
+- обновление единого ledger:
+  `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`;
+- `github:yeet` handoff: проверка scope, targeted staging, commit, push,
+  draft PR, а также deploy/runtime status, если stage выполняет runtime deploy
+  или restart.
+
+`github:yeet` в рамках этого плана означает обязательную публикацию принятой
+итерации в GitHub через branch/commit/push/draft PR. Production deploy не
+подразумевается автоматически для stages, где deploy не является частью
+acceptance; такие stages записывают `Deploy/runtime status = not applicable` в
+ledger.
 
 ### Этап 0 — Фиксация Текущего Состояния
 
@@ -562,6 +575,8 @@ rg -n "TEST_SECRET|TEST_API_SECRET|TEST_PASSPHRASE" logs output .playwright-cli 
 Критерий выхода:
 
 - baseline report сохранен;
+- iteration ledger создан или обновлен;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - текущие contracts заморожены;
 - секреты не найдены в response/log/artifact evidence.
 
@@ -655,6 +670,8 @@ LIMIT 10;
 - CSRF fail-closed доказан;
 - Keycloak recent-auth доказан;
 - audit schema/event types работают;
+- iteration ledger обновлен фактами, нужными Stage 2;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - секреты не попадают в audit/logs.
 
 ### Этап 2 — Exchange-Control Process И Service Identity
@@ -703,6 +720,8 @@ curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
 - `exchange-control` process обязателен и наблюдаем;
 - service identity зафиксирована;
 - Transit ACL можно проектировать на конкретный runtime principal;
+- iteration ledger обновлен service identity, ports, Monit/Prometheus и restart evidence;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - внешний validation adapter не подключается до прохождения этого stage.
 
 ### Этап 3 — Secret Engine Foundation После Service Identity
@@ -759,6 +778,8 @@ rg -n "TEST_SECRET|TEST_API_SECRET|TEST_PASSPHRASE" logs output .playwright-cli 
 
 - secret backend доказан runtime-вызовами;
 - ACL behavior протестирован;
+- iteration ledger обновлен Transit policy/env/capability facts для Stage 4;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - product-ready режим не стартует с dev-only KEK.
 
 ### Этап 4 — Exchange Connections, Credential Versions, Backfill
@@ -845,6 +866,8 @@ SELECT COUNT(*) AS connection_rows FROM exchange_connections;
 - credential rotation не ломает connection;
 - compatibility endpoint остается рабочим.
 - backfill/dual-read/rollback evidence зафиксированы.
+- iteration ledger обновлен schema/backfill/rollback facts для Stage 5;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован.
 
 ### Этап 5 — Binance/Bybit Validation Без Ордеров
 
@@ -960,6 +983,8 @@ rg -n "$ROEHUB_TEST_BINANCE_READONLY_API_SECRET|$ROEHUB_TEST_BYBIT_READONLY_API_
 - validation доказана реальными или sandbox/testnet ключами из env;
 - ни один validation call не размещает ордера;
 - status виден в API и UI;
+- iteration ledger обновлен validation/env/status facts для Stage 6;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - Prometheus и audit отражают результат.
 
 ### Этап 6 — UI Completion На `/settings`
@@ -1009,6 +1034,8 @@ Browser acceptance:
 Критерий выхода:
 
 - пользовательский flow добавления/валидации/ротации/отключения принят в браузере;
+- iteration ledger обновлен UI/browser QA facts для Stage 7;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - секреты не попадают в browser-visible artifacts.
 
 ### Этап 7 — Production Readiness Для Хранения Ключей
@@ -1060,6 +1087,8 @@ curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" \
 
 - API/UI/storage/validation/metrics/audit работают;
 - все acceptance calls приложены к stage report;
+- iteration ledger обновлен финальным readiness verdict;
+- `github:yeet` publish handoff выполнен или stage явно заблокирован;
 - торговое исполнение остается явно вне scope;
 - future execution work заблокирован до отдельного signal-to-execution design.
 
@@ -1129,6 +1158,7 @@ development/fallback/migration bridge, но product-ready хранение кл�
 ## Связанные Файлы
 
 - `docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md`
+- `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`
 - `docs/runbooks/mac-studio-monitoring-plan.md`
 - `infra/macos/prometheus/prometheus.prod.yml`
 - `infra/monitoring/monitoring/prometheus/rules/mac-studio-monitoring.rules.yml`

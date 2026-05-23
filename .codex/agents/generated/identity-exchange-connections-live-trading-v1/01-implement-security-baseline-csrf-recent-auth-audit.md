@@ -14,6 +14,8 @@ context_sources:
       why: "repo contract and gates"
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 1 source of truth"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+      why: "shared iteration ledger and next-stage handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md
       why: "accepted Stage 0 evidence"
   task_entrypoints:
@@ -67,7 +69,18 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: mutation scenario, expected result, observed result, DB/audit evidence, blocker"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
+iteration_ledger:
+  path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  update_required: true
+  required_sections:
+    - "Stage status"
+    - "Facts for next stages"
+    - "Contracts and migrations"
+    - "Publish / deploy handoff"
+
 hard_requirements:
+  iteration_ledger_update_required: true
+  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   csrf_fail_closed_required: true
   recent_auth_required_for_secret_mutations: true
@@ -80,7 +93,7 @@ task_toggles:
   implement_code_changes: true
   implement_migration: true
   update_docs: true
-  publish_after_success: false
+  github_yeet_after_validation: true
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -95,6 +108,11 @@ skill_routing:
     use_when: "focused security tests fail unexpectedly"
     timing: "if blocker"
     reason: "avoid patching symptoms around auth/security"
+
+  - skill: github:yeet
+    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
+    timing: "before final report"
+    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -138,6 +156,9 @@ quality_gates:
   - cmd: "python -m tools.docs.generate_docs_index --check"
     expect: "passes after Markdown changes"
 
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+
 expected_primary_touches:
   - "src/trading/contexts/identity/adapters/inbound/api/routes/exchange_keys.py"
   - "apps/api/routes/ui_account.py"
@@ -177,6 +198,8 @@ Current known gap: `apps/api/routes/ui_account.py` has a same-origin guard patte
 
 ## Requirements (Must)
 
+- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
+- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
 - Require CSRF fail-closed for browser mutations carrying exchange credentials.
 - Reject mutation without valid CSRF when both `Origin` and `Referer` are absent.
 - Reject cross-origin mutation.
@@ -230,8 +253,15 @@ Skill routing for this task:
 4. Add route/use-case audit emission without secret values.
 5. Run focused gates and create the Stage 1 report.
 
+After the stage-specific implementation and validation steps:
+
+- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
+- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+
 # Acceptance criteria (Definition of Done)
 
+- Iteration ledger is updated with facts required by the next stage.
+- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - No-Origin/no-CSRF mutation is rejected.
 - Cross-origin mutation is rejected.
 - Same-origin/CSRF mutation without recent-auth returns `recent_auth_required`.
@@ -255,6 +285,7 @@ Skill routing for this task:
 
 ## Documentation
 
+- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
 - Create the Stage 1 report.
 - Update the architecture document only if implementation must deviate from it.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -294,6 +325,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py`
 - `uv run pytest -q tests/unit/apps/migrations` if migration/bootstrap changed
 - `uv run ruff check apps/api src/trading/contexts/identity tests/unit/apps/api tests/unit/apps/migrations`
@@ -304,6 +336,8 @@ Possible secondary touches:
 # Final output: report format (strict)
 
 Your final message MUST be in Russian and follow exactly:
+
+Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Security contract**

@@ -14,6 +14,8 @@ context_sources:
       why: "repo contract and migration rules"
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 4 source of truth"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+      why: "shared iteration ledger and next-stage handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/03-secret-engine-transit.md
       why: "accepted Stage 3 evidence"
   task_entrypoints:
@@ -68,7 +70,18 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: migration phase, source of truth, command/SQL, expected result, rollback"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
+iteration_ledger:
+  path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  update_required: true
+  required_sections:
+    - "Stage status"
+    - "Facts for next stages"
+    - "Contracts and migrations"
+    - "Publish / deploy handoff"
+
 hard_requirements:
+  iteration_ledger_update_required: true
+  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   market_type_v1_must_remain_spot_futures: true
   connection_id_stable_required: true
@@ -83,7 +96,7 @@ task_toggles:
   implement_backfill: true
   implement_account_endpoints: true
   preserve_legacy_endpoint: true
-  publish_after_success: false
+  github_yeet_after_validation: true
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -98,6 +111,11 @@ skill_routing:
     use_when: "before declaring backfill/rollback safe"
     timing: "before final report"
     reason: "credential attribution and rollback are production-risk sensitive"
+
+  - skill: github:yeet
+    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
+    timing: "before final report"
+    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -145,6 +163,9 @@ quality_gates:
   - cmd: "curl -fsS \"$ROEHUB_BASE_URL/api/exchange-keys\" -H \"Cookie: $ROEHUB_SESSION_COOKIE\""
     expect: "legacy compatibility projection still works"
 
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+
 expected_primary_touches:
   - "migrations/postgres/0008_*_exchange_connections_*.sql"
   - "src/trading/contexts/exchange_control/**"
@@ -187,6 +208,8 @@ The architecture says `identity_exchange_keys` remains as compatibility surface 
 
 ## Requirements (Must)
 
+- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
+- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
 - Preserve `market_type` v1 as `spot|futures`.
 - Add additive migrations for `exchange_connections` and `exchange_credential_versions`.
 - Implement stable `connection_id` and replaceable `credential_version_id`.
@@ -241,8 +264,15 @@ Skill routing for this task:
 4. Wire account endpoints and legacy compatibility projection.
 5. Run gates and create Stage 4 report.
 
+After the stage-specific implementation and validation steps:
+
+- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
+- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+
 # Acceptance criteria (Definition of Done)
 
+- Iteration ledger is updated with facts required by the next stage.
+- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Creating a connection returns `connection_id`.
 - List response contains masked key/status and no secret/ciphertext/HMAC.
 - Rotation changes `credential_version_id` but not `connection_id`.
@@ -267,6 +297,7 @@ Skill routing for this task:
 
 ## Documentation
 
+- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
 - Create Stage 4 report.
 - Update architecture doc only if implementation deviates.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -307,6 +338,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/apps/migrations tests/unit/contexts/exchange_control tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py`
 - `uv run ruff check src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`
 - `uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`
@@ -319,6 +351,8 @@ Possible secondary touches:
 # Final output: report format (strict)
 
 Your final message MUST be in Russian and follow exactly:
+
+Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Схема и совместимость**

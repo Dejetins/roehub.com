@@ -99,6 +99,13 @@ quality_gates:
   - cmd: "<optional_command_3_if_needed>"
     expect: "<expected_result_3>"
 
+stage_execution_ledger:
+  path: <stage_ledger_path_if_plan_or_prompt_pack>
+  plan_doc: <architecture_or_implementation_plan_path>
+  current_stage: <stage_id_or_name>
+  required_update: <true|false>
+  template: .codex/agents/stage_execution_ledger_template.md
+
 expected_primary_touches:
   - "<path_directly_likely_to_change_1>"
   - "<path_directly_likely_to_change_2>"
@@ -167,6 +174,8 @@ Additional context:
 - Add or update targeted tests where needed.
 - Update related exports / nearby docs when required.
 - Keep the implementation deterministic and reviewable.
+- If this prompt implements a plan stage, read the stage execution ledger before implementation and update it after validation and before the final report.
+- If a previous required stage is not accepted, stop unless this prompt explicitly repairs, supersedes, or unblocks that stage.
 - If browser-visible behavior is in scope, use an available runtime browser verification surface when available and relevant.
 - Distinguish runtime/browser verification from static code reasoning and test-only evidence.
 
@@ -284,6 +293,7 @@ If browser-visible behavior is in scope, also include acceptance criteria equiva
 - Update only directly relevant docs.
 - Keep docs aligned with the delivered change.
 - Do not turn local doc updates into repository-wide cleanup.
+- For plan-stage work, update the stage execution ledger with status, concise results, evidence, blockers, touched contracts, and next-stage notes. Do not write secrets, tokens, cookies, passphrases, ciphertext, raw provider errors, or credentials into the ledger.
 - If browser-visible routes, forms, defaults, or flows change, update the relevant docs or note the doc gap explicitly.
 
 ## Tests

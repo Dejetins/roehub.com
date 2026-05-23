@@ -14,6 +14,8 @@ context_sources:
       why: "repo contract and ops rules"
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 2 source of truth"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+      why: "shared iteration ledger and next-stage handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/01-security-baseline.md
       why: "accepted Stage 1 evidence"
   task_entrypoints:
@@ -69,7 +71,18 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: endpoint, command, expected result, observed result, blocker"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
+iteration_ledger:
+  path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  update_required: true
+  required_sections:
+    - "Stage status"
+    - "Facts for next stages"
+    - "Contracts and migrations"
+    - "Publish / deploy handoff"
+
 hard_requirements:
+  iteration_ledger_update_required: true
+  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   exchange_control_process_mandatory_before_validation: true
   service_identity_required: true
@@ -84,7 +97,7 @@ task_toggles:
   implement_metrics: true
   implement_ops_configs: true
   update_runbook: true
-  publish_after_success: false
+  github_yeet_after_validation: true
 
 skill_routing:
   - skill: architecture-design
@@ -99,6 +112,11 @@ skill_routing:
     use_when: "running service, metrics, lint, type, docs gates"
     timing: "during verification"
     reason: "backend and ops verification"
+
+  - skill: github:yeet
+    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
+    timing: "before final report"
+    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -147,6 +165,9 @@ quality_gates:
   - cmd: "/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | rg 'roehub_exchange_control'"
     expect: "Monit sees exchange-control on the target runtime"
 
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+
 expected_primary_touches:
   - "src/trading/contexts/exchange_control/**"
   - "apps/exchange_control/** or equivalent runtime entrypoint"
@@ -186,6 +207,8 @@ If Stage 1 evidence is missing or blocked, stop.
 
 ## Requirements (Must)
 
+- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
+- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
 - Add the smallest production-shaped `exchange-control` runtime boundary.
 - Expose `GET /health/ready` and `/metrics`.
 - Export `exchange_control_active`.
@@ -240,8 +263,15 @@ Skill routing for this task:
 4. Add Prometheus/Monit/launchd/runbook updates.
 5. Run quality gates and create Stage 2 report.
 
+After the stage-specific implementation and validation steps:
+
+- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
+- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+
 # Acceptance criteria (Definition of Done)
 
+- Iteration ledger is updated with facts required by the next stage.
+- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - `curl -fsS http://127.0.0.1:9205/health/ready` returns ready in local smoke when service is started.
 - `curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_'` finds expected metrics.
 - Prometheus config includes `job="exchange-control"`.
@@ -263,6 +293,7 @@ Skill routing for this task:
 
 ## Documentation
 
+- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
 - Create the Stage 2 report.
 - Update monitoring runbook and docs index if Markdown changes.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -300,6 +331,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api`
 - `uv run ruff check apps/api src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api`
 - `uv run pyright apps/api src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api`
@@ -312,6 +344,8 @@ Possible secondary touches:
 # Final output: report format (strict)
 
 Your final message MUST be in Russian and follow exactly:
+
+Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Runtime boundary**

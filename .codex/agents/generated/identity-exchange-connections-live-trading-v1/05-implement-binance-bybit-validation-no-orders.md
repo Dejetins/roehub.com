@@ -14,6 +14,8 @@ context_sources:
       why: "repo contract and secret safety"
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 5 source of truth"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+      why: "shared iteration ledger and next-stage handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/04-connections-credential-versions-backfill.md
       why: "accepted Stage 4 evidence"
   task_entrypoints:
@@ -67,7 +69,18 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: exchange, scenario, env vars, expected status, observed status, blocker"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
+iteration_ledger:
+  path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  update_required: true
+  required_sections:
+    - "Stage status"
+    - "Facts for next stages"
+    - "Contracts and migrations"
+    - "Publish / deploy handoff"
+
 hard_requirements:
+  iteration_ledger_update_required: true
+  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   stage2_process_required: true
   stage3_transit_acl_required: true
@@ -83,7 +96,7 @@ task_toggles:
   implement_sanitized_errors: true
   implement_validation_metrics: true
   implement_live_validation_optional_gate: true
-  publish_after_success: false
+  github_yeet_after_validation: true
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -98,6 +111,11 @@ skill_routing:
     use_when: "live exchange validation fails unexpectedly"
     timing: "if blocker"
     reason: "classify external, config, credential, or implementation failures"
+
+  - skill: github:yeet
+    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
+    timing: "before final report"
+    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -147,6 +165,9 @@ quality_gates:
   - cmd: "curl -fsS -X POST \"$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/validate\" -H \"Origin: $ROEHUB_BASE_URL\" -H \"Cookie: $ROEHUB_SESSION_COOKIE\" -H \"X-CSRF-Token: $ROEHUB_CSRF_TOKEN\""
     expect: "validates readonly Binance and Bybit env-backed connections when ROEHUB_EXCHANGE_VALIDATION_LIVE=1; otherwise Stage 5 is blocked for production acceptance"
 
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+
 expected_primary_touches:
   - "src/trading/contexts/exchange_control/**"
   - "apps/api/routes/ui_account.py"
@@ -186,6 +207,8 @@ The architecture rejects CCXT for production validation and requires native exch
 
 ## Requirements (Must)
 
+- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
+- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
 - Add Binance validation for API restrictions/permissions.
 - Add Bybit validation for API key information.
 - Normalize statuses: `valid_readonly`, `valid_trade_enabled`, `invalid_credentials`, `invalid_permissions`, `invalid_ip_restriction`, `unsupported_account_mode`.
@@ -242,8 +265,15 @@ Skill routing for this task:
 4. Wire validate endpoint/status/audit/metrics.
 5. Run gates, required readonly external validation when production acceptance is requested, secret grep, and Stage 5 report.
 
+After the stage-specific implementation and validation steps:
+
+- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
+- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+
 # Acceptance criteria (Definition of Done)
 
+- Iteration ledger is updated with facts required by the next stage.
+- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Invalid key returns `invalid_credentials`.
 - Readonly key returns `valid_readonly`.
 - Trade-enabled key returns `valid_trade_enabled` only as informational.
@@ -269,6 +299,7 @@ Skill routing for this task:
 
 ## Documentation
 
+- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
 - Create Stage 5 report.
 - Update architecture only if implementation deviates.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -308,6 +339,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py`
 - `uv run ruff check src/trading/contexts/exchange_control apps/api apps/web tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web`
 - `uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`
@@ -319,6 +351,8 @@ Possible secondary touches:
 # Final output: report format (strict)
 
 Your final message MUST be in Russian and follow exactly:
+
+Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Validation contract**

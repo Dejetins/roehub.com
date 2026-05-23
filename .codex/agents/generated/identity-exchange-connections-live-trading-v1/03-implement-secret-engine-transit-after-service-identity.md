@@ -14,6 +14,8 @@ context_sources:
       why: "repo contract and secret safety"
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 3 source of truth"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+      why: "shared iteration ledger and next-stage handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/02-exchange-control-process.md
       why: "accepted Stage 2 evidence"
   task_entrypoints:
@@ -69,7 +71,18 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: actor, Transit capability, command/test, expected result, observed result"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
+iteration_ledger:
+  path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  update_required: true
+  required_sections:
+    - "Stage status"
+    - "Facts for next stages"
+    - "Contracts and migrations"
+    - "Publish / deploy handoff"
+
 hard_requirements:
+  iteration_ledger_update_required: true
+  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   transit_acl_after_service_identity: true
   api_process_no_decrypt: true
@@ -83,7 +96,7 @@ task_toggles:
   implement_transit_adapter: true
   implement_dev_fallback_guarded: true
   update_secret_runbook: true
-  publish_after_success: false
+  github_yeet_after_validation: true
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -98,6 +111,11 @@ skill_routing:
     use_when: "before declaring Transit ACL/product-ready behavior complete"
     timing: "before final report"
     reason: "credential custody is production-risk sensitive"
+
+  - skill: github:yeet
+    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
+    timing: "before final report"
+    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -142,6 +160,9 @@ quality_gates:
   - cmd: "curl -i -X POST \"$OPENBAO_ADDR/v1/transit/decrypt/roehub-exchange-credentials\" -H \"X-Vault-Token: $ROEHUB_API_TRANSIT_TOKEN\" --data '{\"ciphertext\":\"vault:v1:example\"}'"
     expect: "apps/api identity is denied decrypt capability"
 
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+
 expected_primary_touches:
   - "src/trading/contexts/exchange_control/**"
   - "tests/unit/contexts/exchange_control/**"
@@ -179,6 +200,8 @@ This stage prepares secret custody. It does not yet migrate legacy keys into `ex
 
 ## Requirements (Must)
 
+- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
+- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
 - Implement a secret cipher port and Transit-compatible adapter.
 - Keep local/dev fallback explicit and blocked in product-ready mode.
 - Encode service capability separation: API no decrypt, exchange-control limited decrypt.
@@ -232,8 +255,15 @@ Skill routing for this task:
 4. Add fail-closed checks and redaction.
 5. Write runbook and Stage 3 report.
 
+After the stage-specific implementation and validation steps:
+
+- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
+- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+
 # Acceptance criteria (Definition of Done)
 
+- Iteration ledger is updated with facts required by the next stage.
+- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Transit encrypt acceptance call shape is documented.
 - API decrypt denial is documented and test-covered or manually evidenced.
 - Production startup without Transit config fails closed.
@@ -255,6 +285,7 @@ Skill routing for this task:
 
 ## Documentation
 
+- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
 - Create the secret-management runbook and Stage 3 report.
 - Update architecture only if implementation deviates from the plan.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -291,6 +322,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/migrations`
 - `uv run ruff check src/trading/contexts/exchange_control tests/unit/contexts/exchange_control`
 - `uv run pyright src/trading/contexts/exchange_control tests/unit/contexts/exchange_control`
@@ -303,6 +335,8 @@ Possible secondary touches:
 # Final output: report format (strict)
 
 Your final message MUST be in Russian and follow exactly:
+
+Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Secret boundary**

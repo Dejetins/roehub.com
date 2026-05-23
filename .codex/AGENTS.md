@@ -384,6 +384,23 @@ The agent SHOULD read `.codex/PLANS.md` when the task:
 
 The agent MUST NOT preload `.codex/PLANS.md` for ordinary implementation tasks with already bounded scope.
 
+### 3.9 Plan execution stage ledger
+
+Every implementation plan intended to be executed through a prompt pack or staged agent workflow MUST have a stage execution ledger before implementation starts.
+
+The ledger is the durable handoff document for the plan. It MUST record every stage, whether it is pending, in progress, accepted, blocked, skipped, or superseded; the reason for any non-accepted state; concise results; validation evidence; touched contracts; blockers; and context that the next stage must know.
+
+Default placement:
+- use a plan-local docs path next to the architecture or implementation plan;
+- for staged architecture work, prefer `docs/architecture/<area>/<plan-slug>-stage-reports/<plan-slug>-stage-ledger.md`;
+- if a local plan already uses an equivalent `iteration-ledger` path, continue that naming rather than creating a duplicate.
+
+The default template is `.codex/agents/stage_execution_ledger_template.md`. Agents MAY adapt headings to a local documentation convention, but MUST preserve the same information: update rules, stage status, next-stage handoff, contract/migration impact, verification evidence, publish/deploy handoff when applicable, blockers, and change log.
+
+For every generated prompt pack that implements a plan, `prompt-manager` MUST either create the stage ledger or reference the existing one, include it in the executor reading map, and require each stage executor to update it after validation and before the final report.
+
+If a previous required stage is blocked or not accepted, the next stage MUST NOT proceed unless its explicit task is to repair, supersede, or unblock that stage.
+
 ---
 
 ## 4) Change bounding and scope discipline

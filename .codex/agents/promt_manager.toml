@@ -83,6 +83,7 @@ The generated executor prompt MUST use the following front-matter keys when appl
 - `non_goals`
 - `final_report_format`
 - `quality_gates`
+- `stage_execution_ledger` (required for prompt packs or staged plan implementation)
 - `expected_primary_touches`
 - `possible_secondary_touches` (omit only when genuinely unnecessary)
 - `safety_notes`
@@ -293,6 +294,19 @@ Runtime browser verification policy (mandatory)
 - Do not rely on static reasoning alone for browser-visible behavior when runtime browser verification would materially reduce ambiguity.
 - Do not mention browser automation for pure backend, repository-only, static documentation, architecture-only, or non-browser tasks unless browser validation is genuinely relevant.
 
+Stage execution ledger policy (mandatory for prompt packs and staged plans)
+- Any prompt pack, staged rollout, migration plan, or implementation plan expected to be executed through agent prompts MUST create or reuse one stage execution ledger.
+- The default template is `.codex/agents/stage_execution_ledger_template.md`.
+- Default placement is `docs/architecture/<area>/<plan-slug>-stage-reports/<plan-slug>-stage-ledger.md`.
+- If an equivalent `iteration-ledger` already exists for the plan, reuse it instead of creating a duplicate.
+- Prompt artifacts remain English unless explicitly requested otherwise; architecture-stage ledgers follow repository documentation language rules and default to Russian.
+- Include the ledger in `stage_execution_ledger` front matter and in `context_sources.always_read` or the narrowest task entrypoint.
+- Require every stage executor to update the ledger after validation and before the final report.
+- Accepted stages must record concise result, evidence, touched contracts/files, publish/deploy handoff when applicable, and what the next stage must know.
+- Blocked stages must record blocker, severity, evidence, next action or owner, and whether later stages are allowed.
+- Later dependent stages must not proceed when the prior required stage is not accepted unless the prompt explicitly repairs, supersedes, or unblocks that stage.
+- Never put secrets, tokens, cookies, passphrases, ciphertext, raw provider error bodies, or credentials into the ledger.
+
 Web/UI task detection rules (mandatory)
 Treat the task as browser-visible if any of the following are true:
 - it mentions pages, routes, navigation, forms, buttons, inputs, rendered state, UI defaults, browser behavior, screenshots, or DOM behavior
@@ -364,6 +378,7 @@ Defaults when values are missing
 - `possible_secondary_touches`: omit only when the secondary blast radius is truly negligible.
 - `state`: if no previous iteration exists, set `initial_iteration`.
 - `skill_routing`: infer from `.codex/AGENTS.md`; include exact skill names, trigger conditions, and workflow timing.
+- `stage_execution_ledger`: include for prompt packs and staged plan implementation; set `required_update=true` for stage prompts.
 - For browser-visible tasks, default to including runtime browser verification requirements unless the user explicitly restricts the task to static analysis.
 
 Hard requirements to encode in generated prompts
@@ -375,6 +390,7 @@ Hard requirements to encode in generated prompts
 - If new `.md` files are added or changed, require `python -m tools.docs.generate_docs_index`.
 - Reading must be bounded and layered; no eager-loading of all listed docs.
 - Skill routing must be compact and conditional, with exact skill names and workflow timing.
+- Prompt packs and staged-plan prompts must create or update the stage execution ledger.
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
 
@@ -386,7 +402,7 @@ Generated prompt artifact storage (mandatory)
 - Use the user's requested folder name when provided, after removing unsafe path traversal.
 - If no folder name is provided, infer a concise lowercase slug from the task.
 - Use stable sortable filenames for packs, such as `01-implement-<topic>.md`, `02-review-<topic>.md`, or `<prompt_name>.md` when ordering is not relevant.
-- Do not create README, index, manifest, or auxiliary documentation files unless explicitly requested.
+- Do not create README, index, manifest, or auxiliary documentation files unless explicitly requested, except for the mandatory stage execution ledger required by prompt packs and staged plan implementation.
 - Do not paste full prompt contents in chat unless explicitly requested; report generated file paths and validation.
 
 Default quality gates to include (adapt only when justified)
