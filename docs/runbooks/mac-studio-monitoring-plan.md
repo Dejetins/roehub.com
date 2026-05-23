@@ -26,6 +26,7 @@
 - `market-data-scheduler` (`127.0.0.1:9202/metrics`)
 - `backtest-artifact-publisher` (`127.0.0.1:9203/metrics`)
 - `backtest-job-runner` (`127.0.0.1:9204/metrics`)
+- `exchange-control` (`127.0.0.1:9205/metrics`)
 
 ## Backtest runner target
 
@@ -49,6 +50,7 @@ execution and lazy trades cache miss/hit smoke остаются R5 acceptance и
 - `roehub_market_data_scheduler`
 - `roehub_backtest_job_runner`
 - `roehub_backtest_artifact_publisher`
+- `roehub_exchange_control`
 - `roehub_keycloak` (`127.0.0.1:19000/health/ready`)
 
 HTTP probes:
@@ -66,7 +68,7 @@ TCP probes:
 
 - `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
 - `node_exporter` — `brew services`
-- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner` — user `launchd` services
+- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner`, `exchange-control` — user `launchd` services
 
 ## Install and bootstrap commands
 
@@ -85,10 +87,12 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/macos/launchd/com.roehub.redis-exporter.plist`
 - `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
 - `infra/macos/launchd/com.roehub.backtest-job-runner.plist`
+- `infra/macos/launchd/com.roehub.exchange-control.plist`
 - `infra/scripts/monit/launchctl_service_control.sh`
 - `infra/scripts/monit/roehub-market-data.monitrc`
 - `infra/scripts/monit/roehub-backtest-job-runner.monitrc`
 - `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
+- `infra/scripts/monit/roehub-exchange-control.monitrc`
 - `infra/scripts/monit/roehub-keycloak.monitrc`
 - `scripts/macos/install_native_backend_prereqs.sh`
 - `scripts/macos/bootstrap_native_prod.sh`
@@ -105,6 +109,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - ClickHouse exporter метрики (`clickhouse_*`)
 - market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
 - backtest runner metrics (`backtest_runner_*`, `backtest_lazy_trades_cache_total`, `backtest_quota_rejections_total`)
+- exchange-control runtime metrics (`exchange_control_active`, `exchange_connection_validation_total`, `exchange_connection_status`)
 - API auth path health (`http_requests_total`, `http_request_duration_seconds`)
 - Prometheus self metrics
 
@@ -118,6 +123,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - market-data worker: `ws_connected`, `ws_messages_total`, `ws_errors_total`, `insert_errors_total`, `ws_closed_to_insert_done_seconds`
 - market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
 - backtest job runner: `backtest_runner_tasks_claimed_total`, `backtest_runner_tasks_finished_total`, `backtest_runner_task_duration_seconds`, `backtest_runner_queue_wait_seconds`, `backtest_runner_active`, `backtest_runner_lease_lost_total`, `backtest_lazy_trades_cache_total`, `backtest_runner_last_success_unixtime`
+- exchange-control: `exchange_control_active`, `exchange_connection_validation_total{exchange,result,reason}`, `exchange_connection_status{exchange,status}`
 - auth API (через `http://127.0.0.1:8000/metrics`): `http_requests_total{path=~"/auth/(login|callback|logout|current-user)",status_code=~"5.."}`, `http_request_duration_seconds_count{path=~"/auth/(login|callback|logout|current-user)"}`.
 
 ## Вне scope
@@ -161,14 +167,18 @@ curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 curl -fsS http://127.0.0.1:9201/metrics | rg 'ws_|insert_|rest_fill_|redis_publish_'
 curl -fsS http://127.0.0.1:9202/metrics | rg 'scheduler_(job_|tasks_|startup_scan_|rest_catchup_)'
 curl -fsS http://127.0.0.1:9204/metrics | rg 'backtest_runner_|backtest_lazy_trades_cache_total|backtest_quota_rejections_total'
+curl -fsS http://127.0.0.1:9205/health/ready
+curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
 ```
 
 ## 5) Проверка сервисов хоста
 
 ```bash
 brew services list
-launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner)'
+launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner|exchange-control)'
 launchctl print gui/$(id -u)/com.roehub.backtest-job-runner | grep -E 'state =|pid =|last exit code ='
+launchctl print gui/$(id -u)/com.roehub.exchange-control | grep -E 'state =|pid =|last exit code ='
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
 curl -I http://127.0.0.1:9100
@@ -178,7 +188,7 @@ curl -I http://127.0.0.1:9121
 curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:19000/health/ready
-/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|backtest_artifact)'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|backtest_artifact|exchange_control)'
 ```
 
 ## Minimum done state
@@ -191,8 +201,11 @@ Monitoring считается в рабочем состоянии, когда �
 - `market-data-ws-worker` и `market-data-scheduler` метрики доступны
 - `backtest-job-runner` parent target `127.0.0.1:9204` в `up` и endpoint `/metrics`
   отвечает независимо от active disposable full-job child process
+- `exchange-control` target `127.0.0.1:9205` в `up`, `/health/ready` возвращает
+  `ready`, а `/metrics` содержит `exchange_control_active`
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
+- Monit summary показывает `roehub_exchange_control` в `Running/Accessible` после включения Monit supervision
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)
 
