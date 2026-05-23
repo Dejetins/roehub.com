@@ -20,9 +20,11 @@ install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-job-runner.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-control.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-control.monitrc
 
 for plist in \
   com.roehub.api.plist \
+  com.roehub.exchange-control.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \
