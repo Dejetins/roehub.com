@@ -51,8 +51,27 @@ export async function apiFetch(path, options = {}) {
   const method = options.method || "GET";
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 15000;
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const externalSignal = options.signal || null;
+  let removeExternalAbort = null;
+  let abortKind = "";
+  const timeoutId = window.setTimeout(() => {
+    abortKind = "timeout";
+    controller.abort(new DOMException("Request timed out", "AbortError"));
+  }, timeoutMs);
   const headers = new Headers(options.headers || {});
+
+  if (externalSignal) {
+    const abortFromExternalSignal = () => {
+      abortKind = abortKind || "aborted";
+      controller.abort(new DOMException("Request aborted", "AbortError"));
+    };
+    if (externalSignal.aborted) {
+      abortFromExternalSignal();
+    } else {
+      externalSignal.addEventListener("abort", abortFromExternalSignal, { once: true });
+      removeExternalAbort = () => externalSignal.removeEventListener("abort", abortFromExternalSignal);
+    }
+  }
 
   if (isMutation(method)) {
     const token = csrf.get();
@@ -67,7 +86,7 @@ export async function apiFetch(path, options = {}) {
       method,
       headers,
       credentials: "include",
-      signal: options.signal || controller.signal,
+      signal: controller.signal,
     });
 
     const payload = await parsePayload(response);
@@ -98,10 +117,14 @@ export async function apiFetch(path, options = {}) {
       throw error;
     }
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new RoehubApiError("Request timed out", { code: "timeout" });
+      const isTimeout = abortKind === "timeout";
+      throw new RoehubApiError(isTimeout ? "Request timed out" : "Request aborted", {
+        code: isTimeout ? "timeout" : "aborted",
+      });
     }
     throw new RoehubApiError(error?.message || "Network request failed", { code: "network_error" });
   } finally {
     window.clearTimeout(timeoutId);
+    removeExternalAbort?.();
   }
 }

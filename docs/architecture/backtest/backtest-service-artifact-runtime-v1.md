@@ -796,6 +796,9 @@ Every benchmark record must expose notebook-compatible timer names:
 - recompute exact trades for one `variant_key`;
 - cache result for 14 days;
 - return chart-ready payload.
+- Web UI keeps a bounded in-tab memory cache for already opened variant details
+  and reuses in-flight requests for the same variant. This is a UX optimization
+  only; the backend 14-day lazy trades cache remains the durable source.
 
 Lazy trades is not part of `total_without_warmup`; it has its own benchmark gate:
 `lazy_trades_compute` and `lazy_trades_cache_hit`.

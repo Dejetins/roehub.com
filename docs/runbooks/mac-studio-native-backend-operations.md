@@ -133,6 +133,12 @@ Cache hit reads in API use the bounded bundle layout under
 - historical monolithic cache JSON files are migration-only/miss inputs and are
   not a public API cache-hit read path.
 
+The browser `/backtests` page also keeps a small in-tab memory cache for
+already opened variant details. That browser cache is only a UX accelerator:
+it is cleared on tab reload/close, is bounded by the web client, and is not an
+operator recovery source. The backend 14-day lazy trades file cache remains the
+durable source for repeated sessions and post-restart reads.
+
 Safe cleanup: remove only digest directories below the lazy trades cache root
 when invalidating lazy detail cache. Do not remove
 `/opt/roehub/state/backtest_artifacts/v2`; that is the artifact source used for

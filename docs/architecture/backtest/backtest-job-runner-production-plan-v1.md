@@ -172,6 +172,19 @@ sequenceDiagram
     end
 ```
 
+Browser-side UX contract:
+
+- Web UI keeps a bounded in-memory result-detail cache for the current tab,
+  keyed by `job_id + public variant_key`;
+- repeated clicks on a variant that is already loaded in the tab render from
+  browser memory and must not issue a new backend detail request;
+- concurrent requests for the same `job_id + variant_key + page` are reused;
+- stale in-flight variant-detail requests are aborted when the user switches to
+  another variant;
+- after opening a job, Web UI may prefetch the first few top variants from the
+  same public API. This is a latency optimization only; the durable 14-day
+  source remains the backend lazy trades cache.
+
 Target storage для cache-miss queue:
 
 ```text

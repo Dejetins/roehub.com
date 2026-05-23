@@ -986,6 +986,9 @@ stage, не меняет порядок notebook stages и не сравнива
 - cache miss материализуется через disposable `child process` под контролем
   `backtest-job-runner`, чтобы Web UI detail view не блокировал API process и
   чтобы RSS/physical footprint тяжелого recompute освобождались при exit child.
+- Web UI держит bounded in-tab memory cache для уже открытых variant details и
+  переиспользует in-flight requests для того же variant. Это только UX
+  оптимизация; durable source остается backend lazy trades cache на 14 дней.
 
 Lazy trades не является частью `total_without_warmup`; у него свой benchmark gate:
 `lazy_trades_compute` и `lazy_trades_cache_hit`.

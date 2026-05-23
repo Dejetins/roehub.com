@@ -8,6 +8,8 @@ const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 10;
+const DEFAULT_RESULT_DETAIL_PREFETCH_LIMIT = 3;
+const MAX_RESULT_DETAIL_CACHE_ENTRIES = 50;
 const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 50;
 const DEFAULT_TP_START_PCT = 5;
@@ -70,6 +72,9 @@ let activeRequest = null;
 let activeResultRequest = null;
 let activeVariantResultRequest = null;
 let activeVariantResultKey = "";
+let activeVariantAbortController = null;
+const resultDetailCache = new Map();
+const resultDetailRequests = new Map();
 let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
@@ -1966,38 +1971,95 @@ function summarizeResultState(payloads, rejectedCount) {
   };
 }
 
-async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1 } = {}) {
-  const jobId = state.selectedJobId;
-  const variantKey = state.selectedVariantKey;
-  if (!jobId || !variantKey) {
+function resultDetailCacheKey(jobId, variantKey) {
+  return `${jobId}:${variantKey}`;
+}
+
+function resultDetailRequestKey(jobId, variantKey, page) {
+  return `${resultDetailCacheKey(jobId, variantKey)}:${page}`;
+}
+
+function cachedResultDetails(jobId, variantKey, page) {
+  const cacheKey = resultDetailCacheKey(jobId, variantKey);
+  const entry = resultDetailCache.get(cacheKey);
+  const detail = entry?.pages?.get(page) || null;
+  if (!detail) {
     return null;
   }
-  const requestKey = `${jobId}:${variantKey}:${page}`;
-  if (activeVariantResultRequest && activeVariantResultKey === requestKey) {
-    return activeVariantResultRequest;
+  resultDetailCache.delete(cacheKey);
+  resultDetailCache.set(cacheKey, entry);
+  return detail;
+}
+
+function rememberResultDetails(detail, page) {
+  if (!detail?.jobId || !detail?.variantKey) {
+    return;
   }
-  state.resultDetails = {
-    jobId,
-    variantKey,
-    state: "pending",
-    message: t("backtests.result_detail.pending"),
-  };
-  renderJobs(root, { items: state.jobRows });
+  const cacheKey = resultDetailCacheKey(detail.jobId, detail.variantKey);
+  const entry = resultDetailCache.get(cacheKey) || { pages: new Map() };
+  entry.pages.set(page, detail);
+  resultDetailCache.delete(cacheKey);
+  resultDetailCache.set(cacheKey, entry);
+  while (resultDetailCache.size > MAX_RESULT_DETAIL_CACHE_ENTRIES) {
+    const oldest = resultDetailCache.keys().next().value;
+    resultDetailCache.delete(oldest);
+  }
+}
+
+function clearResultDetailCacheForJob(jobId) {
+  if (!jobId) {
+    return;
+  }
+  for (const cacheKey of Array.from(resultDetailCache.keys())) {
+    if (cacheKey.startsWith(`${jobId}:`)) {
+      resultDetailCache.delete(cacheKey);
+    }
+  }
+}
+
+function abortActiveVariantRequest(nextRequestKey) {
+  if (
+    activeVariantAbortController &&
+    activeVariantResultKey &&
+    activeVariantResultKey !== nextRequestKey &&
+    !activeVariantAbortController.signal.aborted
+  ) {
+    activeVariantAbortController.abort("variant_changed");
+  }
+}
+
+function variantDetailRequest(root, jobId, variantKey, page) {
+  const requestKey = resultDetailRequestKey(jobId, variantKey, page);
+  const existing = resultDetailRequests.get(requestKey);
+  if (existing) {
+    return existing;
+  }
+  const controller = new AbortController();
   const tradesPath = variantEndpoint(root, "trades", jobId, variantKey, {
     page,
     page_size: DEFAULT_TRADES_PAGE_SIZE,
   });
   const requests = {
-    variant: apiFetch(variantEndpoint(root, "variant", jobId, variantKey)),
-    equity: apiFetch(appendSearchParams(variantEndpoint(root, "equity", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
-    drawdown: apiFetch(appendSearchParams(variantEndpoint(root, "drawdown", jobId, variantKey), { points: DEFAULT_RESULT_POINTS })),
-    monthly: apiFetch(variantEndpoint(root, "monthly", jobId, variantKey)),
-    trades: apiFetch(tradesPath),
+    variant: apiFetch(variantEndpoint(root, "variant", jobId, variantKey), {
+      signal: controller.signal,
+    }),
+    equity: apiFetch(appendSearchParams(variantEndpoint(root, "equity", jobId, variantKey), { points: DEFAULT_RESULT_POINTS }), {
+      signal: controller.signal,
+    }),
+    drawdown: apiFetch(appendSearchParams(variantEndpoint(root, "drawdown", jobId, variantKey), { points: DEFAULT_RESULT_POINTS }), {
+      signal: controller.signal,
+    }),
+    monthly: apiFetch(variantEndpoint(root, "monthly", jobId, variantKey), {
+      signal: controller.signal,
+    }),
+    trades: apiFetch(tradesPath, {
+      signal: controller.signal,
+    }),
   };
-  const request = Promise.allSettled(Object.values(requests))
+  const promise = Promise.allSettled(Object.values(requests))
     .then((results) => {
-      if (state.selectedJobId !== jobId || state.selectedVariantKey !== variantKey) {
-        return state.resultDetails;
+      if (controller.signal.aborted) {
+        return null;
       }
       const keys = Object.keys(requests);
       const detail = { jobId, variantKey };
@@ -2014,11 +2076,57 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1 }
       const fulfilledPayloads = keys.map((key) => detail[key]).filter(Boolean);
       updateResultRetryHint(fulfilledPayloads);
       const summary = summarizeResultState(fulfilledPayloads, rejectedCount);
-      state.resultDetails = {
+      const nextDetail = {
         ...detail,
         state: summary.state,
         message: summary.message,
       };
+      rememberResultDetails(nextDetail, page);
+      return nextDetail;
+    })
+    .finally(() => {
+      resultDetailRequests.delete(requestKey);
+    });
+  const entry = { controller, promise };
+  resultDetailRequests.set(requestKey, entry);
+  return entry;
+}
+
+async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1, force = false } = {}) {
+  const jobId = state.selectedJobId;
+  const variantKey = state.selectedVariantKey;
+  if (!jobId || !variantKey) {
+    return null;
+  }
+  const requestKey = `${jobId}:${variantKey}:${page}`;
+  const cached = force ? null : cachedResultDetails(jobId, variantKey, page);
+  if (cached) {
+    state.resultDetails = cached;
+    state.tradesPage = page;
+    renderJobs(root, { items: state.jobRows });
+    return cached;
+  }
+  if (activeVariantResultRequest && activeVariantResultKey === requestKey) {
+    return activeVariantResultRequest;
+  }
+  abortActiveVariantRequest(requestKey);
+  state.resultDetails = {
+    jobId,
+    variantKey,
+    state: "pending",
+    message: t("backtests.result_detail.pending"),
+  };
+  renderJobs(root, { items: state.jobRows });
+  const requestEntry = variantDetailRequest(root, jobId, variantKey, page);
+  const request = requestEntry.promise
+    .then((detail) => {
+      if (!detail) {
+        return state.resultDetails;
+      }
+      if (state.selectedJobId !== jobId || state.selectedVariantKey !== variantKey) {
+        return state.resultDetails;
+      }
+      state.resultDetails = detail;
       state.tradesPage = page;
       renderJobs(root, { items: state.jobRows });
       return state.resultDetails;
@@ -2027,11 +2135,37 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1 }
       if (activeVariantResultRequest === request) {
         activeVariantResultRequest = null;
         activeVariantResultKey = "";
+        activeVariantAbortController = null;
       }
     });
   activeVariantResultRequest = request;
   activeVariantResultKey = requestKey;
+  activeVariantAbortController = requestEntry.controller;
   return activeVariantResultRequest;
+}
+
+function prefetchVariantDetails(root, summary) {
+  const jobId = summary?.job?.job_id || state.selectedJobId;
+  if (!jobId) {
+    return;
+  }
+  const variants = (summary?.top_variants?.items || []).slice(0, DEFAULT_RESULT_DETAIL_PREFETCH_LIMIT);
+  variants.forEach((variant, index) => {
+    const variantKey = variant?.variant_key;
+    if (!variantKey || cachedResultDetails(jobId, variantKey, 1)) {
+      return;
+    }
+    const requestKey = resultDetailRequestKey(jobId, variantKey, 1);
+    if (resultDetailRequests.has(requestKey)) {
+      return;
+    }
+    window.setTimeout(() => {
+      if (state.selectedJobId !== jobId) {
+        return;
+      }
+      variantDetailRequest(root, jobId, variantKey, 1).promise.catch(() => {});
+    }, index * 120);
+  });
 }
 
 function renderFooter(root, data) {
@@ -2155,7 +2289,10 @@ async function loadSelectedResult(root) {
   }
   setWorkspaceView(root, "results");
   activeResultRequest = loadResultSummary(root, state.selectedJobId)
-    .then(() => loadSelectedVariantDetails(root))
+    .then((summary) => loadSelectedVariantDetails(root).then((detail) => {
+      prefetchVariantDetails(root, summary);
+      return detail;
+    }))
     .finally(() => {
       activeResultRequest = null;
     });
@@ -2207,6 +2344,7 @@ async function openSelectedJob(root, jobId) {
     state.animateVariantJobId = state.selectedJobId;
     renderResultSummary(root, summary);
     await loadSelectedVariantDetails(root, { page: 1 });
+    prefetchVariantDetails(root, summary);
   } catch (error) {
     setText("[data-create-status]", error?.message || t("backtests.status.failed"), root);
   } finally {
@@ -2362,6 +2500,7 @@ async function cancelJob(root, jobId) {
       state.selectedJobId = null;
       state.selectedVariantKey = null;
     }
+    clearResultDetailCacheForJob(jobId);
     await refreshWorkstation(root, "manual");
   } catch (error) {
     setText("[data-create-status]", describeApiError(error), root);
@@ -2442,6 +2581,7 @@ async function deleteJob(root, jobId) {
       state.selectedVariantKey = null;
       state.resultSummary = null;
     }
+    clearResultDetailCacheForJob(jobId);
     state.jobRows = state.jobRows.filter((row) => row.job_id !== jobId);
     renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
     await refreshWorkstation(root, "auto");
@@ -2738,7 +2878,7 @@ function bind(root) {
         setText("[data-backtests-freshness]", t("dashboard.refresh.rate_limited", { seconds: manualRefreshRetrySeconds }));
         return;
       }
-      loadSelectedVariantDetails(root, { page: state.tradesPage || 1 }).catch(() => {});
+      loadSelectedVariantDetails(root, { page: state.tradesPage || 1, force: true }).catch(() => {});
       return;
     }
     const tradesPage = event.target.closest("[data-trades-page]");
