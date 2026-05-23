@@ -511,14 +511,20 @@ def _iter_sampled_series_points(
 
 
 def _view_base(payload: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "job_id": str(payload["job_id"]),
-        "variant_key": str(payload["variant_key"]),
-        "variant_hash": str(payload["variant_hash"]),
-        "summary_metrics": _mapping(payload.get("summary_metrics")),
-        "cache": _mapping(payload.get("cache")),
-        "timing": _mapping(payload.get("timing")),
-    }
+        return {
+            "job_id": str(payload["job_id"]),
+            "variant_key": str(payload["variant_key"]),
+            "variant_hash": str(payload["variant_hash"]),
+            "summary_metrics": _mapping(payload.get("summary_metrics")),
+            "cache": _cache_hit_payload(payload=payload),
+            "timing": _mapping(payload.get("timing")),
+        }
+
+
+def _cache_hit_payload(*, payload: Mapping[str, Any]) -> dict[str, Any]:
+    cache = _mapping(payload.get("cache"))
+    cache["status"] = "hit"
+    return cache
 
 
 def _trade_count(payload: Mapping[str, Any]) -> int:
