@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Callable
-from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -22,6 +21,9 @@ from apps.api.dto.ui_account import (
     UpdateAccountNotificationRequest,
     UpdateAccountPreferencesRequest,
     UpdateAccountProfileRequest,
+)
+from trading.contexts.identity.adapters.inbound.api.csrf import (
+    same_origin_rejection_reason,
 )
 from trading.contexts.identity.application.ports.account_settings_repository import (
     AccountAuditEvent,
@@ -358,18 +360,14 @@ def _validation_error(*, error: AccountSettingsValidationError) -> RoehubError:
 
 
 def _enforce_same_origin_mutation(*, request: Request) -> None:
-    origin = request.headers.get("origin")
-    referer = request.headers.get("referer")
-    if origin is None and referer is None:
+    rejection_reason = same_origin_rejection_reason(
+        request=request,
+        fail_closed_without_origin=False,
+    )
+    if rejection_reason is None:
         return
-    expected_host = request.headers.get("host", "")
-    for candidate in (origin, referer):
-        if candidate is None:
-            continue
-        parsed = urlparse(candidate)
-        if parsed.netloc and parsed.netloc != expected_host:
-            raise RoehubError(
-                code="forbidden",
-                message="Mutation origin is not allowed",
-                details={"reason": "csrf_origin_mismatch"},
-            )
+    raise RoehubError(
+        code="forbidden",
+        message="Mutation origin is not allowed",
+        details={"reason": rejection_reason},
+    )

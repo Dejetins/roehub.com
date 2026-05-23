@@ -120,4 +120,5 @@ class RoehubSessionCurrentUser(CurrentUser):
         return CurrentUserPrincipal(
             user_id=user.user_id,
             paid_level=paid_level,
+            session_created_at=session.created_at,
         )

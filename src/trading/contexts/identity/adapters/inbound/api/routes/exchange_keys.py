@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from trading.contexts.identity.adapters.inbound.api.csrf import (
+    same_origin_rejection_reason,
+)
 from trading.contexts.identity.adapters.inbound.api.deps.current_user import (
     RequireCurrentUserDependency,
 )
+from trading.contexts.identity.application.ports.account_settings_repository import (
+    AccountSettingsRepository,
+)
+from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.identity.application.use_cases.create_exchange_key import (
     CreateExchangeKeyUseCase,
@@ -24,6 +31,8 @@ from trading.contexts.identity.application.use_cases.exchange_keys_models import
 from trading.contexts.identity.application.use_cases.list_exchange_keys import (
     ListExchangeKeysUseCase,
 )
+
+_RECENT_AUTH_WINDOW = timedelta(minutes=10)
 
 
 class CreateExchangeKeyRequest(BaseModel):
@@ -75,6 +84,8 @@ def build_exchange_keys_router(
     list_use_case: ListExchangeKeysUseCase,
     delete_use_case: DeleteExchangeKeyUseCase,
     current_user_dependency: RequireCurrentUserDependency,
+    audit_events_repository: AccountSettingsRepository,
+    clock: IdentityClock,
 ) -> APIRouter:
     """
     Build router exposing exchange keys create/list/delete endpoints for authenticated users.
@@ -108,11 +119,16 @@ def build_exchange_keys_router(
         raise ValueError("build_exchange_keys_router requires delete_use_case")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_exchange_keys_router requires current_user_dependency")
+    if audit_events_repository is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_exchange_keys_router requires audit_events_repository")
+    if clock is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_exchange_keys_router requires clock")
 
     router = APIRouter(tags=["identity"])
 
     @router.post("/exchange-keys", response_model=ExchangeKeyResponse, status_code=201)
     def post_exchange_key(
+        http_request: Request,
         request: CreateExchangeKeyRequest,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> ExchangeKeyResponse:
@@ -131,6 +147,9 @@ def build_exchange_keys_router(
         Side Effects:
             Writes one exchange key row in storage.
         """
+        _enforce_exchange_mutation_csrf(request=http_request)
+        now = clock.now()
+        _enforce_recent_auth(principal=principal, now=now)
         try:
             result = create_use_case.create(
                 user_id=principal.user_id,
@@ -147,6 +166,19 @@ def build_exchange_keys_router(
                 status_code=error.status_code,
                 detail=error.payload(),
             ) from error
+        audit_events_repository.append_audit_event(
+            owner_user_id=principal.user_id,
+            event_type="exchange_key_created",
+            summary="Exchange API key created",
+            metadata={
+                "surface": "api",
+                "key_id": str(result.key_id),
+                "exchange_name": result.exchange_name,
+                "market_type": result.market_type,
+                "permissions": result.permissions,
+            },
+            created_at=now,
+        )
         return _to_exchange_key_response(view=result)
 
     @router.get("/exchange-keys", response_model=list[ExchangeKeyResponse])
@@ -178,6 +210,7 @@ def build_exchange_keys_router(
 
     @router.delete("/exchange-keys/{key_id}", status_code=204, response_model=None)
     def delete_exchange_key(
+        request: Request,
         key_id: UUID,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> Response:
@@ -196,6 +229,9 @@ def build_exchange_keys_router(
         Side Effects:
             Updates one exchange key row in storage.
         """
+        _enforce_exchange_mutation_csrf(request=request)
+        now = clock.now()
+        _enforce_recent_auth(principal=principal, now=now)
         try:
             delete_use_case.delete(user_id=principal.user_id, key_id=key_id)
         except ExchangeKeysOperationError as error:
@@ -203,9 +239,53 @@ def build_exchange_keys_router(
                 status_code=error.status_code,
                 detail=error.payload(),
             ) from error
+        audit_events_repository.append_audit_event(
+            owner_user_id=principal.user_id,
+            event_type="exchange_key_deleted",
+            summary="Exchange API key deleted",
+            metadata={
+                "surface": "api",
+                "key_id": str(key_id),
+            },
+            created_at=now,
+        )
         return Response(status_code=204)
 
     return router
+
+
+def _enforce_exchange_mutation_csrf(*, request: Request) -> None:
+    rejection_reason = same_origin_rejection_reason(
+        request=request,
+        fail_closed_without_origin=True,
+    )
+    if rejection_reason is None:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail={
+            "error": "csrf_required",
+            "message": "CSRF protection is required for exchange credential mutations.",
+            "reason": rejection_reason,
+        },
+    )
+
+
+def _enforce_recent_auth(*, principal: CurrentUserPrincipal, now: datetime) -> None:
+    if principal.session_created_at is None:
+        raise _recent_auth_required()
+    if principal.session_created_at + _RECENT_AUTH_WINDOW < now:
+        raise _recent_auth_required()
+
+
+def _recent_auth_required() -> HTTPException:
+    return HTTPException(
+        status_code=403,
+        detail={
+            "error": "recent_auth_required",
+            "message": "Recent Keycloak authentication is required.",
+        },
+    )
 
 
 

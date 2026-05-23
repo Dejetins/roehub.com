@@ -5,6 +5,9 @@ from trading.contexts.identity.adapters.outbound.security.current_user import (
     RoehubSessionCurrentUser,
 )
 
+_DEV_ONLY_EXCHANGE_KEYS_KEK_B64 = "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE="
+_PROD_TEST_EXCHANGE_KEYS_KEK_B64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+
 
 def test_identity_wiring_fail_fast_in_prod_requires_keycloak_base_url() -> None:
     """
@@ -28,7 +31,7 @@ def test_identity_wiring_fail_fast_in_prod_requires_keycloak_base_url() -> None:
         "KEYCLOAK_CLIENT_SECRET": "prod-client-secret",
         "KEYCLOAK_REDIRECT_URI": "https://roehub.com/auth/callback",
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _PROD_TEST_EXCHANGE_KEYS_KEK_B64,
     }
 
     with pytest.raises(ValueError, match="KEYCLOAK_BASE_URL"):
@@ -57,7 +60,7 @@ def test_identity_wiring_fail_fast_in_prod_requires_keycloak_client_secret() -> 
         "KEYCLOAK_CLIENT_ID": "roehub-api",
         "KEYCLOAK_REDIRECT_URI": "https://roehub.com/auth/callback",
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _PROD_TEST_EXCHANGE_KEYS_KEK_B64,
     }
 
     with pytest.raises(ValueError, match="KEYCLOAK_CLIENT_SECRET"):
@@ -122,7 +125,7 @@ def test_identity_wiring_does_not_require_notifier_secret_for_api_auth() -> None
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "http://127.0.0.1:8010/login",
         "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
         "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _DEV_ONLY_EXCHANGE_KEYS_KEK_B64,
     }
 
     router = build_identity_router(environ=environ)
@@ -159,7 +162,7 @@ def test_identity_wiring_fail_fast_in_prod_requires_session_idle_ttl() -> None:
         "KEYCLOAK_REDIRECT_URI": "https://roehub.com/auth/callback",
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
         "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _PROD_TEST_EXCHANGE_KEYS_KEK_B64,
     }
 
     with pytest.raises(ValueError, match="IDENTITY_SESSION_IDLE_TTL_SECONDS"):
@@ -190,7 +193,7 @@ def test_identity_wiring_fail_fast_in_prod_requires_session_absolute_ttl() -> No
         "KEYCLOAK_REDIRECT_URI": "https://roehub.com/auth/callback",
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
         "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _PROD_TEST_EXCHANGE_KEYS_KEK_B64,
     }
 
     with pytest.raises(ValueError, match="IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS"):
@@ -223,10 +226,43 @@ def test_identity_wiring_fail_fast_in_prod_requires_postgres_dsn() -> None:
         "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
         "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
         "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
-        "IDENTITY_EXCHANGE_KEYS_KEK_B64": "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _PROD_TEST_EXCHANGE_KEYS_KEK_B64,
     }
 
     with pytest.raises(ValueError, match="IDENTITY_PG_DSN"):
+        build_identity_router(environ=environ)
+
+
+def test_identity_wiring_prod_rejects_dev_only_exchange_keys_kek() -> None:
+    """
+    Verify product-ready identity config fails closed when the static dev-only KEK is used.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The checked KEK value is the repository's documented dev fallback only.
+    Raises:
+        AssertionError: If prod wiring accepts the dev-only exchange-key KEK.
+    Side Effects:
+        None.
+    """
+    environ = {
+        "ROEHUB_ENV": "prod",
+        "KEYCLOAK_BASE_URL": "https://auth.roehub.com",
+        "KEYCLOAK_REALM": "roehub",
+        "KEYCLOAK_CLIENT_ID": "roehub-api",
+        "KEYCLOAK_CLIENT_SECRET": "prod-client-secret",
+        "KEYCLOAK_REDIRECT_URI": "https://roehub.com/auth/callback",
+        "KEYCLOAK_LOGOUT_REDIRECT_URI": "https://roehub.com/login",
+        "IDENTITY_SESSION_IDLE_TTL_SECONDS": "1800",
+        "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS": "43200",
+        "IDENTITY_EXCHANGE_KEYS_KEK_B64": _DEV_ONLY_EXCHANGE_KEYS_KEK_B64,
+        "IDENTITY_PG_DSN": "postgresql://roehub:roehub@localhost:5432/roehub",
+    }
+
+    with pytest.raises(ValueError, match="dev-only KEK"):
         build_identity_router(environ=environ)
 
 

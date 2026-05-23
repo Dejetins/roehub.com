@@ -18,6 +18,14 @@ AuditEventType = Literal[
     "preferences_updated",
     "integration_updated",
     "notifications_updated",
+    "exchange_key_created",
+    "exchange_key_deleted",
+    "exchange_connection_created",
+    "exchange_connection_validated",
+    "exchange_connection_validation_failed",
+    "exchange_credential_rotated",
+    "exchange_connection_disabled",
+    "exchange_connection_deleted",
 ]
 
 

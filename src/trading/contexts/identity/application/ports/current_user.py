@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -22,6 +23,7 @@ class CurrentUserPrincipal:
 
     user_id: UserId
     paid_level: PaidLevel
+    session_created_at: datetime | None = None
 
 
 class CurrentUserUnauthorizedError(ValueError):

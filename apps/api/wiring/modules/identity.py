@@ -19,9 +19,11 @@ from trading.contexts.identity.adapters.inbound.api.deps import (
 )
 from trading.contexts.identity.adapters.outbound import (
     AesGcmEnvelopeExchangeKeysSecretCipher,
+    InMemoryAccountSettingsRepository,
     InMemoryIdentityExchangeKeysRepository,
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
+    PostgresAccountSettingsRepository,
     PostgresIdentityExchangeKeysRepository,
     PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
@@ -30,6 +32,7 @@ from trading.contexts.identity.adapters.outbound import (
     SystemIdentityClock,
 )
 from trading.contexts.identity.application import (
+    AccountSettingsRepository,
     ExchangeKeysRepository,
     SessionRepository,
     UserRepository,
@@ -204,6 +207,7 @@ class _IdentityPersistenceBundle:
     """
 
     exchange_keys_repository: ExchangeKeysRepository
+    account_settings_repository: AccountSettingsRepository
     user_repository: UserRepository
     session_repository: SessionRepository
 
@@ -297,6 +301,7 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
             keycloak_redirect_uri=settings.keycloak_redirect_uri,
             keycloak_logout_redirect_uri=settings.keycloak_logout_redirect_uri,
             current_user_dependency=current_user_dependency,
+            audit_events_repository=persistence.account_settings_repository,
             user_repository=persistence.user_repository,
             session_repository=persistence.session_repository,
             clock=clock,
@@ -332,6 +337,7 @@ def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _Identi
         gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
         return _IdentityPersistenceBundle(
             exchange_keys_repository=PostgresIdentityExchangeKeysRepository(gateway=gateway),
+            account_settings_repository=PostgresAccountSettingsRepository(gateway=gateway),
             user_repository=PostgresIdentityUserRepository(gateway=gateway),
             session_repository=PostgresIdentitySessionRepository(gateway=gateway),
         )
@@ -341,6 +347,7 @@ def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _Identi
         )
     return _IdentityPersistenceBundle(
         exchange_keys_repository=InMemoryIdentityExchangeKeysRepository(),
+        account_settings_repository=InMemoryAccountSettingsRepository(),
         user_repository=InMemoryIdentityUserRepository(),
         session_repository=InMemoryIdentitySessionRepository(),
     )
@@ -429,6 +436,13 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
                 f"{_IDENTITY_EXCHANGE_KEYS_KEK_B64_KEY} must be set when "
                 f"{_IDENTITY_FAIL_FAST_KEY}=true"
             )
+    if env_name == "prod" and identity_exchange_keys_kek_b64 == (
+        _DEFAULT_DEV_IDENTITY_EXCHANGE_KEYS_KEK_B64
+    ):
+        raise ValueError(
+            f"{_IDENTITY_EXCHANGE_KEYS_KEK_B64_KEY} must not use the dev-only KEK "
+            "when ROEHUB_ENV=prod"
+        )
 
     effective_keycloak_base_url = keycloak_base_url or _DEFAULT_DEV_KEYCLOAK_BASE_URL
     effective_keycloak_realm = keycloak_realm or _DEFAULT_DEV_KEYCLOAK_REALM

@@ -18,6 +18,9 @@ _IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE = "0003_identity_exchange_keys_v1.sql"
 _IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE = "0004_identity_exchange_keys_v2.sql"
 _IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE = "0005_identity_keycloak_cutover_v1.sql"
 _IDENTITY_ACCOUNT_SETTINGS_V1_SQL_FILE = "0006_identity_account_settings_v1.sql"
+_IDENTITY_EXCHANGE_AUDIT_EVENTS_V1_SQL_FILE = (
+    "0007_identity_exchange_audit_events_v1.sql"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +271,10 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         migrations_dir=migrations_dir,
         filenames=(_IDENTITY_ACCOUNT_SETTINGS_V1_SQL_FILE,),
     )[0]
+    exchange_audit_events_v1_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_IDENTITY_EXCHANGE_AUDIT_EVENTS_V1_SQL_FILE,),
+    )[0]
 
     with psycopg.connect(
         normalized_identity_dsn,
@@ -305,6 +312,8 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         _execute_sql_script(connection=connection, sql_path=keycloak_cutover_v1_path)
         print(f"Applying identity baseline SQL: {account_settings_v1_path.name}")
         _execute_sql_script(connection=connection, sql_path=account_settings_v1_path)
+        print(f"Applying identity baseline SQL: {exchange_audit_events_v1_path.name}")
+        _execute_sql_script(connection=connection, sql_path=exchange_audit_events_v1_path)
 
 
 def run_alembic_upgrade_head(

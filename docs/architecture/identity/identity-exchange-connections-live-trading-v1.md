@@ -458,10 +458,11 @@ Backend:
 - HMAC fingerprint вместо plain SHA-256 для новых ключей;
 - create/list/rotate/disable/validate use cases;
 - Binance/Bybit validation adapters;
-- audit events для credential actions;
-- migration для audit schema/event types `exchange_*`;
-- Keycloak recent-auth enforcement для add/rotate/delete/disable;
-- CSRF fail-closed hardening для exchange mutations;
+- new-model audit events beyond the Stage 1 legacy create/delete bridge;
+- Stage 1 already added audit schema event types `exchange_*`;
+- Stage 1 already added Keycloak-backed recent-auth enforcement for legacy
+  add/delete hooks; rotate/disable hooks must reuse it when introduced;
+- Stage 1 already added CSRF fail-closed hardening for exchange mutations;
 - rate-limit/error redaction around validation;
 - metrics endpoint и Prometheus metrics;
 - обязательные Monit/launchd configs для `exchange-control`;

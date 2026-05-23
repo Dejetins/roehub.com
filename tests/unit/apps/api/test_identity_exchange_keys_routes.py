@@ -11,6 +11,7 @@ from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
 )
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
+    InMemoryAccountSettingsRepository,
     InMemoryIdentityExchangeKeysRepository,
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
@@ -39,6 +40,10 @@ _KEYCLOAK_INTROSPECTION_URL = (
 )
 _SESSION_COOKIE_NAME = "roehub_session_id"
 _KEYCLOAK_SUBJECT = "keycloak-exchange-keys-user-1"
+_MUTATION_HEADERS = {
+    "origin": "http://testserver",
+    "x-csrf-token": "test-csrf-token",
+}
 
 
 class _MutableClock(IdentityClock):
@@ -114,7 +119,7 @@ def test_exchange_keys_routes_require_authenticated_user_on_all_operations() -> 
     Side Effects:
         None.
     """
-    client, _clock, _exchange_repository = _build_test_client()
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
     client.cookies.clear()
 
     responses = [
@@ -159,7 +164,7 @@ def test_exchange_keys_routes_reject_non_uuid_session_cookie_value() -> None:
     Side Effects:
         None.
     """
-    client, _clock, _exchange_repository = _build_test_client()
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
     client.cookies.set(_SESSION_COOKIE_NAME, "malformed-cookie-value")
 
     response = client.get("/exchange-keys")
@@ -188,7 +193,7 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
     Side Effects:
         None.
     """
-    client, clock, exchange_repository = _build_test_client()
+    client, clock, exchange_repository, account_repository = _build_test_client()
 
     create_response = client.post(
         "/exchange-keys",
@@ -201,6 +206,7 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
             "api_secret": "route-secret-2",
             "passphrase": "route-passphrase-2",
         },
+        headers=_MUTATION_HEADERS,
     )
 
     assert create_response.status_code == 201
@@ -242,7 +248,10 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
         assert forbidden_field not in list_payload[0]
 
     clock.set_now(now_value=clock.now() + timedelta(minutes=1))
-    delete_response = client.delete(f"/exchange-keys/{created_payload['key_id']}")
+    delete_response = client.delete(
+        f"/exchange-keys/{created_payload['key_id']}",
+        headers=_MUTATION_HEADERS,
+    )
     assert delete_response.status_code == 204
 
     empty_list_response = client.get("/exchange-keys")
@@ -256,6 +265,19 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
     assert stored_row.api_key_last4 == "1234"
     assert stored_row.is_deleted is True
     assert stored_row.deleted_at is not None
+    audit_events = account_repository._audit_events
+    assert [event.event_type for event in audit_events] == [
+        "exchange_key_created",
+        "exchange_key_deleted",
+    ]
+    assert all("route-secret" not in str(event.metadata) for event in audit_events)
+    assert audit_events[0].metadata == {
+        "surface": "api",
+        "key_id": created_payload["key_id"],
+        "exchange_name": "binance",
+        "market_type": "spot",
+        "permissions": "trade",
+    }
 
 
 def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplicate() -> None:
@@ -273,7 +295,7 @@ def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplica
     Side Effects:
         None.
     """
-    client, _clock, _exchange_repository = _build_test_client()
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
 
     first_response = client.post(
         "/exchange-keys",
@@ -286,6 +308,7 @@ def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplica
             "api_secret": "duplicate-secret-1",
             "passphrase": None,
         },
+        headers=_MUTATION_HEADERS,
     )
     assert first_response.status_code == 201
 
@@ -300,6 +323,7 @@ def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplica
             "api_secret": "duplicate-secret-2",
             "passphrase": None,
         },
+        headers=_MUTATION_HEADERS,
     )
 
     assert duplicate_response.status_code == 409
@@ -329,9 +353,12 @@ def test_exchange_keys_delete_route_returns_404_for_missing_key_id() -> None:
     Side Effects:
         None.
     """
-    client, _clock, _exchange_repository = _build_test_client()
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
 
-    response = client.delete("/exchange-keys/00000000-0000-0000-0000-00000000beef")
+    response = client.delete(
+        "/exchange-keys/00000000-0000-0000-0000-00000000beef",
+        headers=_MUTATION_HEADERS,
+    )
     assert response.status_code == 404
     payload = response.json()
     assert list(payload.keys()) == ["detail"]
@@ -340,6 +367,86 @@ def test_exchange_keys_delete_route_returns_404_for_missing_key_id() -> None:
         "detail": {
             "error": "exchange_key_not_found",
             "message": "Exchange API key was not found.",
+        }
+    }
+
+
+def test_exchange_keys_mutations_fail_closed_without_origin_or_referer() -> None:
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
+
+    response = client.post(
+        "/exchange-keys",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "label": "blocked",
+            "permissions": "read",
+            "api_key": "CSRF-BLOCKED-0001",
+            "api_secret": "csrf-blocked-secret",
+            "passphrase": None,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "error": "csrf_required",
+            "message": "CSRF protection is required for exchange credential mutations.",
+            "reason": "csrf_required",
+        }
+    }
+
+
+def test_exchange_keys_mutations_reject_cross_origin_requests() -> None:
+    client, _clock, _exchange_repository, _account_repository = _build_test_client()
+
+    response = client.post(
+        "/exchange-keys",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "label": "blocked",
+            "permissions": "read",
+            "api_key": "CSRF-CROSS-0001",
+            "api_secret": "csrf-cross-origin-secret",
+            "passphrase": None,
+        },
+        headers={"origin": "https://evil.example"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "error": "csrf_required",
+            "message": "CSRF protection is required for exchange credential mutations.",
+            "reason": "csrf_origin_mismatch",
+        }
+    }
+
+
+def test_exchange_keys_mutations_require_recent_auth_after_same_origin_check() -> None:
+    client, clock, _exchange_repository, _account_repository = _build_test_client()
+    clock.set_now(now_value=clock.now() + timedelta(minutes=11))
+
+    response = client.post(
+        "/exchange-keys",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "label": "needs-recent-auth",
+            "permissions": "read",
+            "api_key": "RECENT-AUTH-0001",
+            "api_secret": "recent-auth-secret",
+            "passphrase": None,
+        },
+        headers=_MUTATION_HEADERS,
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "error": "recent_auth_required",
+            "message": "Recent Keycloak authentication is required.",
         }
     }
 
@@ -359,7 +466,7 @@ def test_exchange_keys_list_route_is_deterministically_sorted() -> None:
     Side Effects:
         None.
     """
-    client, clock, _exchange_repository = _build_test_client()
+    client, clock, _exchange_repository, _account_repository = _build_test_client()
 
     first_response = client.post(
         "/exchange-keys",
@@ -372,6 +479,7 @@ def test_exchange_keys_list_route_is_deterministically_sorted() -> None:
             "api_secret": "order-secret-1",
             "passphrase": None,
         },
+        headers=_MUTATION_HEADERS,
     )
     assert first_response.status_code == 201
 
@@ -387,6 +495,7 @@ def test_exchange_keys_list_route_is_deterministically_sorted() -> None:
             "api_secret": "order-secret-2",
             "passphrase": None,
         },
+        headers=_MUTATION_HEADERS,
     )
     assert second_response.status_code == 201
 
@@ -400,6 +509,7 @@ def _build_test_client() -> tuple[
     TestClient,
     _MutableClock,
     InMemoryIdentityExchangeKeysRepository,
+    InMemoryAccountSettingsRepository,
 ]:
     """
     Build TestClient with identity router, Roehub session auth, and exchange key dependencies.
@@ -420,6 +530,7 @@ def _build_test_client() -> tuple[
     clock = _MutableClock(now_value=now)
 
     exchange_repository = InMemoryIdentityExchangeKeysRepository()
+    account_repository = InMemoryAccountSettingsRepository()
     user_repository = InMemoryIdentityUserRepository()
     session_repository = InMemoryIdentitySessionRepository()
 
@@ -468,6 +579,7 @@ def _build_test_client() -> tuple[
             keycloak_redirect_uri=_KEYCLOAK_REDIRECT_URI,
             keycloak_logout_redirect_uri=_KEYCLOAK_LOGOUT_REDIRECT_URI,
             current_user_dependency=current_user_dependency,
+            audit_events_repository=account_repository,
             user_repository=user_repository,
             session_repository=session_repository,
             clock=clock,
@@ -485,7 +597,7 @@ def _build_test_client() -> tuple[
 
     client = TestClient(app)
     client.cookies.set(_SESSION_COOKIE_NAME, str(session.session_id))
-    return client, clock, exchange_repository
+    return client, clock, exchange_repository, account_repository
 
 
 
