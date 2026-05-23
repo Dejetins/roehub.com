@@ -79,6 +79,7 @@ let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
 let variantAnimationFrame = null;
+let selectedVariantRetryTimer = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -1922,6 +1923,57 @@ function updateResultRetryHint(payloads) {
   }
 }
 
+function resultDetailPayloads(detail) {
+  return ["variant", "equity", "drawdown", "monthly", "trades"]
+    .map((key) => detail?.[key])
+    .filter(Boolean);
+}
+
+function resultDetailRetrySeconds(detail) {
+  const retryAfter = resultDetailPayloads(detail)
+    .map((payload) => Number(payload?.materialization?.retry_after_seconds || payload?.retry_after_seconds || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return retryAfter.length ? Math.max(...retryAfter) : 30;
+}
+
+function resultDetailNeedsRetry(detail) {
+  if (!detail) {
+    return false;
+  }
+  if (detail.state === "pending" || detail.state === "materializing") {
+    return true;
+  }
+  return resultDetailPayloads(detail).some(isMaterializationPayload);
+}
+
+function resultDetailCacheable(detail) {
+  return detail?.state === "available" && !resultDetailPayloads(detail).some(isMaterializationPayload);
+}
+
+function clearSelectedVariantRetry() {
+  if (selectedVariantRetryTimer) {
+    window.clearTimeout(selectedVariantRetryTimer);
+    selectedVariantRetryTimer = null;
+  }
+}
+
+function scheduleSelectedVariantRetry(root, detail, page) {
+  clearSelectedVariantRetry();
+  if (!resultDetailNeedsRetry(detail)) {
+    return;
+  }
+  const jobId = detail.jobId;
+  const variantKey = detail.variantKey;
+  const delaySeconds = Math.max(1, Math.min(60, resultDetailRetrySeconds(detail)));
+  selectedVariantRetryTimer = window.setTimeout(() => {
+    selectedVariantRetryTimer = null;
+    if (state.selectedJobId !== jobId || state.selectedVariantKey !== variantKey) {
+      return;
+    }
+    loadSelectedVariantDetails(root, { page, force: true }).catch(() => {});
+  }, delaySeconds * 1000);
+}
+
 function summarizeResultState(payloads, rejectedCount) {
   const fulfilled = payloads.filter(Boolean);
   if (!fulfilled.length && rejectedCount > 0) {
@@ -1993,6 +2045,9 @@ function cachedResultDetails(jobId, variantKey, page) {
 
 function rememberResultDetails(detail, page) {
   if (!detail?.jobId || !detail?.variantKey) {
+    return;
+  }
+  if (!resultDetailCacheable(detail)) {
     return;
   }
   const cacheKey = resultDetailCacheKey(detail.jobId, detail.variantKey);
@@ -2103,6 +2158,7 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1, 
   if (cached) {
     state.resultDetails = cached;
     state.tradesPage = page;
+    clearSelectedVariantRetry();
     renderJobs(root, { items: state.jobRows });
     return cached;
   }
@@ -2129,6 +2185,7 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1, 
       state.resultDetails = detail;
       state.tradesPage = page;
       renderJobs(root, { items: state.jobRows });
+      scheduleSelectedVariantRetry(root, detail, page);
       return state.resultDetails;
     })
     .finally(() => {
@@ -2299,6 +2356,29 @@ async function loadSelectedResult(root) {
   return activeResultRequest;
 }
 
+function shouldLoadSelectedResultAfterRefresh(reason) {
+  if (!state.selectedJobId || reason === "initial") {
+    return false;
+  }
+  if (reason !== "auto") {
+    return true;
+  }
+  const selectedRow = state.jobRows.find((row) => row.job_id === state.selectedJobId);
+  if (selectedRow?.state !== "succeeded") {
+    return false;
+  }
+  const summary = state.resultSummary?.job?.job_id === state.selectedJobId ? state.resultSummary : null;
+  if (!summary || summary.job?.state !== "succeeded") {
+    return true;
+  }
+  const variants = summary?.top_variants?.items || [];
+  if (!variants.length && !isQualityGateEmptyResult(selectedRow, summary)) {
+    return true;
+  }
+  const details = state.resultDetails?.jobId === state.selectedJobId ? state.resultDetails : null;
+  return resultDetailNeedsRetry(details);
+}
+
 function clearDelayedVariantOpen() {
   if (delayedVariantOpen) {
     window.clearTimeout(delayedVariantOpen);
@@ -2329,12 +2409,14 @@ async function openSelectedJob(root, jobId) {
     state.resultDetails = null;
     state.tradesPage = 1;
     state.animateVariantJobId = null;
+    clearSelectedVariantRetry();
     renderJobs(root, { items: state.jobRows, next_cursor: state.nextCursor });
     return;
   }
   state.closingVariantJobId = null;
   setWorkspaceView(root, "results");
   state.selectedVariantKey = null;
+  clearSelectedVariantRetry();
   renderJobPicker(root, state.jobRows);
   try {
     activeResultRequest = loadResultSummary(root, jobId, { render: false });
@@ -2417,7 +2499,7 @@ async function refreshWorkstation(root, reason = "manual", { append = false } = 
         append,
         preserveLoadedRows: !append && reason === "auto" && state.jobRows.length > 0,
       });
-      if (state.selectedJobId && reason !== "initial" && reason !== "auto") {
+      if (shouldLoadSelectedResultAfterRefresh(reason)) {
         loadSelectedResult(root).catch(() => {});
       }
       return data;
@@ -2499,6 +2581,7 @@ async function cancelJob(root, jobId) {
     if (state.selectedJobId === jobId) {
       state.selectedJobId = null;
       state.selectedVariantKey = null;
+      clearSelectedVariantRetry();
     }
     clearResultDetailCacheForJob(jobId);
     await refreshWorkstation(root, "manual");
@@ -2580,6 +2663,7 @@ async function deleteJob(root, jobId) {
       state.selectedJobId = null;
       state.selectedVariantKey = null;
       state.resultSummary = null;
+      clearSelectedVariantRetry();
     }
     clearResultDetailCacheForJob(jobId);
     state.jobRows = state.jobRows.filter((row) => row.job_id !== jobId);
@@ -2866,6 +2950,7 @@ function bind(root) {
       state.selectedVariantKey = variantButton.dataset.resultVariantKey || null;
       state.tradesPage = 1;
       state.resultDetails = null;
+      clearSelectedVariantRetry();
       renderJobs(root, { items: state.jobRows });
       loadSelectedVariantDetails(root, { page: 1 }).catch(() => {});
       return;
