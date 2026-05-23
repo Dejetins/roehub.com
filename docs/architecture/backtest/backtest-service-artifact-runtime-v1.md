@@ -269,7 +269,7 @@ Cache recommendation:
 
 - metadata в Postgres;
 - payload в локальном object/file cache под `/opt/roehub/state/backtest/trades_cache`;
-- TTL default: 48h;
+- TTL default: 14 days;
 - cache key включает `job_id`, `variant_key`, `variant_hash`, `request_hash`, `engine_params_hash`, `artifact_manifest_hash`.
 
 Postgres-only JSONB допустим для малых payloads, но v1 должен избегать неограниченного раздувания основной БД.
@@ -794,7 +794,7 @@ Every benchmark record must expose notebook-compatible timer names:
 ### Lazy trades
 
 - recompute exact trades for one `variant_key`;
-- cache result for 48h;
+- cache result for 14 days;
 - return chart-ready payload.
 
 Lazy trades is not part of `total_without_warmup`; it has its own benchmark gate:
@@ -1286,7 +1286,7 @@ Benchmark and correctness gate:
 
 - implement variant lookup;
 - implement lazy trades recompute;
-- implement 48h cache;
+- implement 14-day cache;
 - return chart-ready payload.
 
 Benchmark gate:
@@ -1408,7 +1408,7 @@ SHA-only column, можно сломать validation, indexes или lazy-trade
   это противоречит readable route contract.
 
 Риск: lazy trades cache зависит от deployment topology. В single-host v1 local
-file/object cache на 48h достаточен: cache miss запускает deterministic
+file/object cache на 14 days достаточен: cache miss запускает deterministic
 materialization для одного variant в disposable child process, а cache hit читает
 bounded bundle (`metadata.json` + `trades.jsonl`) без monolithic full-detail load
 в API. В multi-host deployment запрос `show trades` может

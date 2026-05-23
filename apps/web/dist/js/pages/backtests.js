@@ -1925,11 +1925,27 @@ function summarizeResultState(payloads, rejectedCount) {
       message: t("backtests.result_detail.unavailable"),
     };
   }
-  const states = fulfilled.map(resultPayloadState);
+  const detailPayloads = fulfilled.filter((payload) => {
+    if (!payload || typeof payload !== "object") {
+      return false;
+    }
+    if (payload.kind || payload.pagination || Array.isArray(payload.points) || Array.isArray(payload.items)) {
+      return true;
+    }
+    return isMaterializationPayload(payload);
+  });
+  const statePayloads = detailPayloads.length ? detailPayloads : fulfilled;
+  const states = statePayloads.map(resultPayloadState);
   if (states.includes("materializing")) {
     return {
       state: "materializing",
       message: t("backtests.result_detail.materializing"),
+    };
+  }
+  if (states.includes("failed") || states.includes("cancelled")) {
+    return {
+      state: "failed",
+      message: t("backtests.result_detail.failed"),
     };
   }
   if (rejectedCount > 0 || states.includes("degraded")) {

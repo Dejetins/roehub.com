@@ -247,6 +247,7 @@
   "backtests.result_detail.entry": "Entry",
   "backtests.result_detail.equity": "Equity",
   "backtests.result_detail.exit": "Exit",
+  "backtests.result_detail.failed": "Result data failed",
   "backtests.result_detail.materializing": "Materializing result data",
   "backtests.result_detail.monthly": "Monthly stats",
   "backtests.result_detail.page": "Page {page}/{total}",

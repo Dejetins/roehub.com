@@ -280,7 +280,7 @@ def _task() -> BacktestLazyTradesMaterializationTask:
         last_error_json=None,
         cache_status="miss",
         cache_path=None,
-        ttl_seconds=172800,
+        ttl_seconds=1209600,
     )
 
 

@@ -275,7 +275,7 @@ POST /backtests/jobs/{job_id}/variants/{variant_key}/trades
 
 - metadata в Postgres;
 - payload в локальном object/file cache под `/opt/roehub/state/backtest/trades_cache`;
-- TTL по умолчанию: 48h;
+- TTL по умолчанию: 14 дней;
 - cache key включает `job_id`, `variant_key`, `variant_hash`, `request_hash`, `engine_params_hash`, `artifact_manifest_hash`.
 
 Postgres-only JSONB допустим для малых payloads, но v1 должен избегать неограниченного раздувания основной БД.
@@ -981,7 +981,7 @@ stage, не меняет порядок notebook stages и не сравнива
 ### Lazy trades
 
 - recompute exact trades для одного `variant_key`;
-- cache result на 48h как bounded bundle, а не monolithic cache JSON;
+- cache result на 14 дней как bounded bundle, а не monolithic cache JSON;
 - cache hit возвращает page/series/stat/CSV views через bounded/chunked readers;
 - cache miss материализуется через disposable `child process` под контролем
   `backtest-job-runner`, чтобы Web UI detail view не блокировал API process и
@@ -1929,7 +1929,7 @@ summary-only top-N rows, `top_result_assembly`, `persist_top_n_io` и
 
 - реализовать variant lookup;
 - реализовать lazy trades recompute;
-- реализовать 48h cache;
+- реализовать cache на 14 дней;
 - возвращать chart-ready payload.
 
 Статус: `pass`, accepted Mac Studio evidence:
@@ -2058,7 +2058,7 @@ SHA-only column, можно сломать validation, indexes или lazy-trade
   это противоречит readable route contract.
 
 Риск: lazy trades cache зависит от deployment topology. В single-host v1 local
-file/object cache на 48h достаточен: cache miss запускает deterministic
+file/object cache на 14 дней достаточен: cache miss запускает deterministic
 materialization для одного variant через disposable runner child, а cache hit
 читает bounded bundle. В multi-host deployment запрос
 `show trades` может

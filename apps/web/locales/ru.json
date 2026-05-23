@@ -247,6 +247,7 @@
   "backtests.result_detail.entry": "Вход",
   "backtests.result_detail.equity": "Equity",
   "backtests.result_detail.exit": "Выход",
+  "backtests.result_detail.failed": "Не удалось подготовить данные результатов",
   "backtests.result_detail.materializing": "Материализация данных результатов",
   "backtests.result_detail.monthly": "Monthly stats",
   "backtests.result_detail.page": "Страница {page}/{total}",

@@ -40,7 +40,7 @@ from trading.platform.errors import RoehubError
 
 LAZY_TRADES_COMPUTE_STAGE_NAME = "lazy_trades_compute"
 LAZY_TRADES_CACHE_HIT_STAGE_NAME = "lazy_trades_cache_hit"
-DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS = 48 * 60 * 60
+DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS = 14 * 24 * 60 * 60
 BACKTEST_ERROR_VARIANT_CONFLICT = "backtest.variant_conflict"
 
 
@@ -363,15 +363,17 @@ class BacktestLazyTradesDetailService:
             hit_times=hit_times_result.hit_times,
             execution_settings=execution_settings,
         )
-        best_tp_idx = _level_index(
+        best_tp_idx = _level_index_for_requested_axis(
             values=hit_times_result.hit_times.tp_values,
             pct_value=row.best_tp_pct,
             axis="best_tp_pct",
+            enabled=_risk_axis_enabled(normalized_request, "tp"),
         )
-        best_sl_idx = _level_index(
+        best_sl_idx = _level_index_for_requested_axis(
             values=hit_times_result.hit_times.sl_values,
             pct_value=row.best_sl_pct,
             axis="best_sl_pct",
+            enabled=_risk_axis_enabled(normalized_request, "sl"),
         )
         entry_abs, dir_arr, sig_exit_abs = (
             tp_sl_module.build_trade_list_15m_for_indicator_rows_slow(
@@ -999,6 +1001,30 @@ def _level_index(*, values: np.ndarray, pct_value: float | None, axis: str) -> i
             details={"axis": axis, "pct_value": pct_value, "matches": int(matches.size)},
         )
     return int(matches[0])
+
+
+def _level_index_for_requested_axis(
+    *,
+    values: np.ndarray,
+    pct_value: float | None,
+    axis: str,
+    enabled: bool,
+) -> int:
+    if enabled:
+        return _level_index(values=values, pct_value=pct_value, axis=axis)
+    if int(values.shape[0]) < 1:
+        raise RoehubError(
+            code="backtest.tp_sl_grid_not_covered",
+            message="Disabled TP/SL axis has no sentinel level",
+            details={"axis": axis},
+        )
+    return 0
+
+
+def _risk_axis_enabled(request: Mapping[str, Any], axis: str) -> bool:
+    risk = _mapping(request.get("risk"))
+    axis_config = _mapping(risk.get(axis))
+    return axis_config.get("enabled") is not False
 
 
 def _risk_mode(request: Mapping[str, Any]) -> str:

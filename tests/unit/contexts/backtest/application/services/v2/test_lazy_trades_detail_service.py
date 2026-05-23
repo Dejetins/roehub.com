@@ -32,6 +32,7 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     BACKTEST_ERROR_VARIANT_CONFLICT,
+    DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
     LAZY_TRADES_CACHE_HIT_STAGE_NAME,
     LAZY_TRADES_COMPUTE_STAGE_NAME,
     BacktestLazyTradesDetailService,
@@ -192,6 +193,27 @@ def test_lazy_trades_tp_sl_payload_preserves_selected_cell(tmp_path: Path) -> No
         "stop_loss",
         "close_on_end",
     }
+
+
+def test_lazy_trades_tp_only_payload_uses_disabled_sl_sentinel(tmp_path: Path) -> None:
+    service, _cache, job, row = _service_fixture(
+        tmp_path=tmp_path,
+        risk_mode="tp_sl_grid_tp_only",
+    )
+
+    assert row.best_sl_pct is None
+
+    result = service.execute(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+
+    assert result.readable_params["best_sl_pct"] is None
+    assert result.summary_metrics["best_tp_pct"] == pytest.approx(2.0)
+    assert result.summary_metrics["best_sl_pct"] is None
+    assert result.cache["ttl_seconds"] == DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS
+    assert result.trades
 
 
 def test_tp_sl_detail_row_can_report_take_profit_exit_reason() -> None:
@@ -390,7 +412,7 @@ def _top_result(
     row_id: int = 1,
 ) -> BacktestNoRiskTopResult | BacktestTpSlTopResult:
     metadata = {"ma.ema.source": "close", "ma.ema.window": 5 + row_id}
-    if risk_mode == "tp_sl_grid":
+    if risk_mode in {"tp_sl_grid", "tp_sl_grid_tp_only"}:
         return BacktestTpSlTopResult(
             rank=1,
             score=1.0,
@@ -432,6 +454,12 @@ def _normalized_request(*, risk_mode: str) -> dict[str, Any]:
             "mode": "tp_sl_grid",
             "tp": {"start_pct": 2.0, "stop_pct": 2.0, "step_pct": 1.0},
             "sl": {"start_pct": 1.0, "stop_pct": 1.0, "step_pct": 1.0},
+        }
+    elif risk_mode == "tp_sl_grid_tp_only":
+        risk = {
+            "mode": "tp_sl_grid",
+            "tp": {"start_pct": 2.0, "stop_pct": 2.0, "step_pct": 1.0},
+            "sl": {"enabled": False},
         }
     return {
         "coordinates": {

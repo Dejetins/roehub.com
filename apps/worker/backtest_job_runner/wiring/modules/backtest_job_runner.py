@@ -41,6 +41,8 @@ from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestSchedulingClass,
 )
 from trading.contexts.backtest.application.services.v2.lazy_trades_detail import (
+    DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
+    BacktestLazyTradesDetailConfig,
     BacktestLazyTradesDetailService,
 )
 from trading.contexts.backtest.application.services.v2.preflight import (
@@ -628,6 +630,13 @@ def build_backtest_job_runner_app(
                     "ROEHUB_BACKTEST_TRADES_CACHE_ROOT",
                     str(DEFAULT_LAZY_TRADES_CACHE_ROOT),
                 )
+            )
+        ),
+        config=BacktestLazyTradesDetailConfig(
+            cache_ttl_seconds=_env_int(
+                environ=effective_environ,
+                key="ROEHUB_BACKTEST_DETAIL_CACHE_TTL_SECONDS",
+                default=DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
             )
         ),
     )

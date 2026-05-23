@@ -15,6 +15,8 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest.application.services.v2.lazy_trades_detail import (
+    DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
+    BacktestLazyTradesDetailConfig,
     BacktestLazyTradesDetailService,
 )
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
@@ -56,4 +58,14 @@ def build_lazy_trades_compute_service(
                 )
             )
         ),
+        config=BacktestLazyTradesDetailConfig(
+            cache_ttl_seconds=_lazy_trades_cache_ttl_seconds(environ=environ)
+        ),
     )
+
+
+def _lazy_trades_cache_ttl_seconds(*, environ: Mapping[str, str]) -> int:
+    raw = environ.get("ROEHUB_BACKTEST_DETAIL_CACHE_TTL_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS
+    return int(raw)
