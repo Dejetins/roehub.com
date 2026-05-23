@@ -136,6 +136,8 @@ Current intended routing:
 - full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
 - prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
 
+Architecture documents created or materially rewritten by `architecture-design` MUST default to Russian narrative, clear explanations, and a business-readable layer in addition to engineering detail. Prompt artifacts produced by `prompt-manager` MUST keep their own language contract and remain English unless a higher-priority user instruction explicitly says otherwise.
+
 When the user asks to apply, publish, ship, or carry repository changes through Git, GitHub, CI, deploy, and verification, the agent SHOULD prefer `publish-ci-deploy` as the single orchestration skill.
 
 `publish-ci-deploy` owns the end-to-end Git/GitHub delivery lifecycle and MAY internally use narrower verification helpers such as `backend-quality-gates` or `browser-qa-evidence` without asking the user to choose among them.
@@ -837,6 +839,19 @@ The agent SHOULD update nearby or directly affected docs, but SHOULD NOT perform
 
 ### 13.5 Browser/runtime docs
 If a task changes browser-visible workflows, routes, defaults, or operational web behavior, the agent SHOULD update the relevant docs or explicitly note the doc gap.
+
+### 13.6 Architecture document language and audience
+New or materially rewritten architecture documents, ADRs, integration designs, and rollout plans under `docs/architecture/**` MUST be written in Russian by default unless a higher-priority instruction explicitly requires another language.
+
+Architecture docs MUST keep code identifiers, API routes, env vars, config keys, schema names, metrics, file paths, and command examples in their original form.
+
+For non-trivial architecture docs, the agent MUST include both:
+- an engineering explanation: boundaries, dependency direction, contracts, data/storage impact, runtime behavior, operability, rollout, and verification;
+- a business explanation: which capability, user workflow, operational outcome, cost, risk, or delivery constraint the architecture decision affects, written in terms a non-engineering stakeholder can understand.
+
+Use short examples when they clarify a contract, data flow, rollout step, or operational failure mode. Do not add decorative examples when they do not make the decision easier to verify or use.
+
+This rule does not change the `prompt-manager` contract: executor prompts and prompt packs MUST remain in English unless the user explicitly asks for another language.
 
 ---
 
