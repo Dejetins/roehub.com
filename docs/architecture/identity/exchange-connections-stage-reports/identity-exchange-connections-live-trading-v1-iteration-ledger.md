@@ -70,7 +70,7 @@ environment, это фиксируется в колонке `Deploy/runtime sta
 
 | Stage | Branch | Commit | Draft PR | Checks before push | Deploy/runtime status | Notes |
 |---|---|---|---|---|---|---|
-| 00 | `pending github:yeet` | `pending github:yeet` | `pending github:yeet` | `gh --version && gh auth status`; focused pytest; docs index check; market-type grep; secret grep; authenticated runtime smoke | No production deploy; runtime smoke used existing public edge and logged out afterward. | To be finalized after targeted staging, push, and draft PR creation. |
+| 00 | `codex/identity-exchange-stage0-baseline` | `dda694b7` | [Draft PR #22](https://github.com/Dejetins/roehub.com/pull/22) | `gh --version && gh auth status`; focused pytest; docs index check; market-type grep; secret grep; authenticated runtime smoke | No production deploy; runtime smoke used existing public edge and logged out afterward. | Targeted staging included only Stage 00 docs/index files; unrelated `.codex/*` and architecture prompt-manager changes were left unstaged. |
 | 01 | TBD | TBD | TBD | TBD | TBD | TBD |
 | 02 | TBD | TBD | TBD | TBD | TBD | TBD |
 | 03 | TBD | TBD | TBD | TBD | TBD | TBD |
