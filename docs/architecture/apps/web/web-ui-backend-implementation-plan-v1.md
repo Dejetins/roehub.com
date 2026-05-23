@@ -10,7 +10,7 @@
 - baseline light UI больше не является целевым режимом; текущая реализация `apps/web` уже частично заменена новым terminal shell;
 - обновление 2026-05-04: функциональные страницы привязаны к canonical PNG-референсам через жесткий `reference fidelity contract`; текущие реализации после baseline commit `bae8bd88229ceec4736deee5d61ad178e1ab9060` считаются кандидатом на откат/замену, если не повторяют назначенный reference layout.
 - обновление 2026-05-05: login реализуется как branded modal, registration остается отдельной страницей, все dropdown/listbox/menu controls должны быть фирменными, а live-data страницы получают explicit data-source/refresh/autorefresh/rate-limit contracts.
-- обновление 2026-05-08: фактическая реализация ушла вперед от старого "предлагаемого" плана; в `main` уже присутствуют Stage 0-5 surfaces, а `/strategies`, `/backtests`, Stage 8.5 runtime hardening, AI, hardening и load validation остаются неисполненными этапами.
+- обновление 2026-05-08: фактическая реализация ушла вперед от старого "предлагаемого" плана; в `main` уже присутствуют Stage 0-5 surfaces, а `/strategies`, `/backtests`, Stage 8.5 runtime hardening, hardening и load validation остаются неисполненными этапами.
 - обновление 2026-05-11: текущая реализация уже содержит `/strategies` и `/backtests`
   workstation baseline, а также backend result/statistics endpoints для backtest jobs.
   Текущий `/backtests` Web UI ожидает только bounded workstation payload,
@@ -38,9 +38,8 @@
 | 08 | `08-implement-backtests-history-configurator.md` | Реализовано как current baseline: `/backtests`, `/backtests/new`, `/backtests/{job_id}` рендерят `pages/backtests.html`; есть reference-shaped workstation, branded dropdowns, config/preflight/create/history/job filters, delete/cancel markers, `GET /api/ui/backtests/workstation`, route/API/web tests, old `backtest_ui.js` не подключается. | Дальше только bugfix/read-model hardening; не возвращать generic history cards или native selects. |
 | 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Частично реализовано на уровне API boundary: create path возвращает queued/background semantics и использует execution trigger/worker use-case seam. Production `backtest-job-runner` service на Mac Studio и lazy trades materialization queue еще не реализованы; это вынесено в `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. | Выполнить отдельный runner prompt pack до публичной нагрузки `/backtests` create/results и до UI, который активно вызывает heavy result/stat endpoints. |
 | 09 | `09-implement-backtests-results.md` | Частично реализовано: backend endpoints `summary`, `equity`, `drawdown`, `monthly-stats`, `symbol-stats`, paginated `GET /trades` и `trades.csv` уже есть и покрыты API tests. Текущий Web UI потребляет только `summary` для variant expansion и CSV links; chart helpers, paginated trades table и stat panels не подключены и тестом зафиксированы как отсутствующие. | Следующий шаг - не повторная реализация endpoints, а hardening этих методов под async materialization/cache-status и затем UI-интеграция только после runner readiness. |
-| 10 | `10-implement-ai-backtest-configurator.md` | Не реализовано. | Требует отдельного AI backend design decision перед реализацией. |
-| 11 | `11-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 11. | Выполнять после завершения всех browser-visible страниц. |
-| 12 | `12-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 11 или перед публичным запуском live/autorefresh-heavy surfaces. |
+| 10 | `10-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 10. | Выполнять после завершения всех browser-visible страниц. |
+| 11 | `11-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 10 или перед публичным запуском live/autorefresh-heavy surfaces. |
 
 Практический resume point: если нужно продолжать Web UI v1 по этому plan/prompt-pack,
 стартовать не со старого Stage 6, а с production runner/materialization пакета для
@@ -1664,7 +1663,7 @@ flow, job cancel/delete markers и selected-job expansion. Old top-level
 `backtests.html` и `backtest_ui.js` не являются активной основой.
 
 Цель baseline уже выполнена: `/backtests` является единой reference-shaped backtest
-workstation строго по `stategy_backtest.png`: конфигурация, AI/config zone,
+workstation строго по `stategy_backtest.png`: конфигурация,
 instruments, indicators, optimization progress/status и таблица jobs/variants в
 одной плотной рабочей поверхности. Дальнейшие Stage 8 изменения должны быть только
 bugfix/read-model hardening поверх текущей UI модели; не делить UX на generic history
@@ -2053,50 +2052,7 @@ Playwright CLI:
   без смены public `variant_key`;
 - performance risk: chart/trades endpoints должны оставаться bounded.
 
-## Этап 10 - AI-конфигуратор backtest-задач
-
-Статус 2026-05-08: не реализовано. Не начинать до Stage 8/9 и отдельного AI backend design decision.
-
-Цель: добавить AI-assisted draft config только после стабилизации `/backtests` workstation и validation path. AI-панель живет внутри reference-shaped `stategy_backtest.png` layout, а не на отдельной generic странице.
-
-Область страницы:
-
-- primary: `/backtests` AI/config panel;
-- optional compatibility: `/backtests/new` redirect/alias на `/backtests` с открытым config/AI mode.
-
-Backend/API-добавления:
-
-- `POST /api/ai/backtest-config/chat`;
-- `GET /api/ai/backtest-config/stream/{session_id}`;
-- `POST /api/ai/backtest-config/validate`.
-
-Правила:
-
-- AI может создать только draft config;
-- AI не может напрямую вызывать `/api/backtests/jobs`;
-- пользователь должен явно применить draft, запустить preflight и submit job;
-- AI output должен пройти ту же валидацию, что и manual config;
-- prompt/session data не должны содержать секреты.
-
-Файлы:
-
-- добавить AI routes только после явного AI backend design decision;
-- добавить `apps/web/dist/js/pages/backtests_ai.js` или интегрировать в `apps/web/dist/js/pages/backtests.js`.
-
-Критерии приемки:
-
-- AI draft появляется в конфигураторе без запуска job;
-- invalid AI draft показывает детерминированные validation errors;
-- stream cancellation работает;
-- secret/account API key data не попадают в AI requests.
-
-Влияние на контракты:
-
-- public API contract: `compatible-change`;
-- DTO schema: `compatible-change`;
-- security risk: требуется отдельное review перед реализацией.
-
-## Этап 11 - security, performance и delivery hardening
+## Этап 10 - security, performance и delivery hardening
 
 Статус 2026-05-08: финальный sweep не выполнен. Отдельные элементы уже существуют в текущих этапах, но этот раздел остается обязательным перед production-ready завершением всего Web UI v1.
 
@@ -2249,7 +2205,6 @@ uv run python tools/load/web_capacity_smoke.py \
 - Registration: будет ли `/register` вызывать отдельный Keycloak registration action или существующий login/get-started flow, зависит от Keycloak realm/client configuration.
 - Refresh data sources: для каждой панели Stage 4/6/7 должен закрыть source inventory и решить, нужен ли persistent read-model или typed degraded state до первой production реализации.
 - Icons: добавить ли self-hosted Lucide delivery path или оставить text-only controls для v1.
-- AI assistant: provider, storage, redaction и rate limits требуют отдельного design decision перед Этап 10.
 - Backtest runtime: final queue/worker trigger shape должен быть подтвержден до публичного results/configurator rollout.
 - Capacity thresholds: жесткие p95/RSS/error thresholds можно зафиксировать только после первого capacity report на текущем host.
 - Dashboard data: точные KPIs зависят от того, какие strategy/backtest/account read models будут приняты после этапов 5-9.

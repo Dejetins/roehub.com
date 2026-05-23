@@ -233,7 +233,7 @@ Done means:
 
 - `/backtests` is reference-shaped against `stategy_backtest.png`;
 - final report lists reference and implemented panel inventory;
-- `/backtests` combines config, AI/config placeholder, instruments, indicators, optimization/progress, recent events and jobs/variants table as one workstation;
+- `/backtests` combines config, instruments, indicators, optimization/progress, recent events and jobs/variants table as one workstation;
 - `/backtests/new`, if preserved, is only a tested redirect/alias to the same workstation create/config mode;
 - create flow sends `Idempotency-Key`;
 - invalid requests never create jobs;

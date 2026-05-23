@@ -166,7 +166,6 @@
   "backtests.instruments.selected": "Selected: 3 of 58",
   "backtests.instruments.title": "Instruments",
   "backtests.loading": "Loading backtest workstation",
-  "backtests.ai_chat.title": "AI chat",
   "backtests.mode.configure": "Configure",
   "backtests.mode.label": "Backtest workspace mode",
   "backtests.mode.results": "Results",

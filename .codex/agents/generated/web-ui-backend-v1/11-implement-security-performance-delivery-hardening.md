@@ -110,7 +110,6 @@ package_contract:
     - "new product page features"
     - "domain context internals except security boundary integration"
     - "migration chains"
-    - "AI/backtest runtime feature work"
   integration_points:
     - "CSRF strategy"
     - "CSP policy"

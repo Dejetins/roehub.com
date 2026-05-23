@@ -534,7 +534,6 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'class="backtests-modebar"' in response.text
     assert 'data-backtests-view-button="configure"' in response.text
     assert 'data-backtests-view-button="results"' in response.text
-    assert 'data-backtests-panel="ai_chat"' in response.text
     assert 'data-backtests-panel="config_summary"' in response.text
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
@@ -548,7 +547,6 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         "config",
         "instruments",
         "indicators",
-        "ai_chat",
         "jobs_variants",
         "config_summary",
     ]:
@@ -571,9 +569,6 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         'data-backtests-panel="indicators"'
     )
     assert main_html.index('data-backtests-panel="indicators"') < main_html.index(
-        'data-backtests-panel="ai_chat"'
-    )
-    assert main_html.index('data-backtests-panel="ai_chat"') < main_html.index(
         'data-backtests-panel="jobs_variants"'
     )
     assert 'data-backtests-refresh-preset' in response.text
@@ -877,11 +872,10 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "height: var(--rh-workarea-height);" in backtests_css
     assert ".backtests-instrument-controls" in backtests_css
     assert ".backtests-modebar" in backtests_css
-    assert ".backtests-ai-chat" in backtests_css
     assert "grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);" in backtests_css
     assert ".backtests-config {\n  grid-column: 1;\n  grid-row: 1 / 3;" in backtests_css
     assert ".backtests-instruments {\n  grid-column: 2;\n  grid-row: 1 / 3;" in backtests_css
-    assert ".backtests-ai-chat {\n  grid-column: 3;\n  grid-row: 2;" in backtests_css
+    assert ".backtests-indicators {\n  grid-column: 3;\n  grid-row: 1 / 3;" in backtests_css
     assert ".backtests-config-summary" in backtests_css
     assert 'data-backtests-active-view="results"' in backtests_css
     assert "grid-template-columns: minmax(0, 1fr);" in backtests_css

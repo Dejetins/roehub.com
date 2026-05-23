@@ -44,7 +44,7 @@
 | `/dashboard` | `personal_dashboard.png` | dashboard по всем стратегиям/fleet workstation | полная панельная рабочая поверхность all-strategies monitoring, а не обзорные карточки. |
 | `/settings` | `personal_settings.png` | личный кабинет/account settings | профиль, биржевые подключения, лимиты, интеграции, уведомления, безопасность, сессии, аудит. |
 | `/strategies` | `strategy_statistic.png` | dashboard/statistics по конкретной выбранной стратегии | selected-strategy analytics workstation: strategy control, visual tabs, statistics tabs, trades history. |
-| `/backtests` | `stategy_backtest.png` | backtest workstation/configurator | конфигурация, AI/config zone, instruments, indicators, optimization progress/results в одной плотной рабочей поверхности. |
+| `/backtests` | `stategy_backtest.png` | backtest workstation/configurator | конфигурация, instruments, indicators, optimization progress/results в одной плотной рабочей поверхности. |
 | `/monitoring` | нет отдельного PNG в v1 map | compatibility/ops route only | не является primary strategy dashboard; если route сохраняется, он не должен забирать reference у `/strategies`. |
 | `/backtests/{job_id}` | нет отдельного PNG в v1 map | optional deep link/API state | не является шестой функциональной страницей v1; если route сохраняется, он должен открывать `/backtests` с выбранной job/result state или служить API-backed detail state без отдельного reference layout. |
 

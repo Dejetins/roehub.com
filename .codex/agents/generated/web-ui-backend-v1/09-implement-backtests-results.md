@@ -415,7 +415,6 @@ Use front matter touched paths.
 
 - Configurator/history.
 - Worker hardening.
-- AI assistant.
 
 # Quality gates (must run and pass)
 

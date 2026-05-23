@@ -53,9 +53,9 @@ flowchart LR
 
 - **Jinja2 SSR**: layout, nav, page shell, first paint, SEO/public pages, empty/error/skeleton states, simple forms, tables first page.
 - **HTMX**: только low-frequency HTML updates — settings fragments, filters, tabs, modal bodies, table refreshes, save/delete flows. Не использовать HTMX как transport для monitoring или backtest live progress.
-- **JS islands**: charts, canvas/SVG, SSE/polling manager, complex forms, instrument typeahead, AI assistant, local validation, client-side state coordination.
+- **JS islands**: charts, canvas/SVG, SSE/polling manager, complex forms, instrument typeahead, local validation, client-side state coordination.
 - **Backend API**: all JSON DTOs, pagination, chart data, job APIs, SSE endpoints, auth, audit, secrets policy.
-- **Workers/queues/jobs**: live strategy runtime, backtest execution, lazy trades recompute, AI orchestration if появится.
+- **Workers/queues/jobs**: live strategy runtime, backtest execution, lazy trades recompute.
 - **Web UI stateless**: no local secret storage, no backtest computation, no heavy joins/aggregations, no long-running CPU tasks, no persistent large cache.
 
 ### Почему не React / Next / full SPA сейчас
@@ -253,14 +253,14 @@ Repo не содержит фронтенд toolchain или Node-based delivery
 
 ### Backtest Configurator
 
-**Цель.** Собрать валидный backtest request, прогнать preflight, запустить job, optionally involve AI assistant — но никогда не вычислять ничего тяжёлого в browser.
+**Цель.** Собрать валидный backtest request, прогнать preflight и запустить job, но никогда не вычислять ничего тяжёлого в browser.
 
 **Найдено.** Current page already consumes `runtime-defaults`, `preflight`, `jobs`, `market-data` and `indicators`; current JS has client-side validation, sample request, AbortController for some calls and 1.5s polling. Но form state, jobs list и results сейчас слиты в один модуль. fileciteturn43file0L1-L1 fileciteturn35file0L1-L1 fileciteturn69file0L1-L1
 
 **Технологии.**
-- Jinja2: shell, preset list region, AI chat container, validation/error blocks.
+- Jinja2: shell, preset list region, validation/error blocks.
 - HTMX: save/load/delete preset, duplicate last request, small fragments.
-- JS: instrument search, indicator matrix, client validation, request serializer, AI chat UI, submit with idempotency key.
+- JS: instrument search, indicator matrix, client validation, request serializer, submit with idempotency key.
 
 **API.**
 - `GET /api/backtests/runtime-defaults` — current.
@@ -269,13 +269,10 @@ Repo не содержит фронтенд toolchain или Node-based delivery
 - `GET /api/market-data/markets` / `GET /api/market-data/instruments` — current.
 - `GET /api/indicators` — current.
 - `GET/POST/DELETE /api/ui/backtest-presets` — **proposed**.
-- `POST /api/ai/backtest-config/chat` + `GET /api/ai/backtest-config/stream/{session_id}` — **proposed**.
-- `POST /api/ai/backtest-config/validate` — **proposed**.
 
 **Validation.**
 - Start `<` end, timeframe supported, symbol required, indicator rows 1..N, `window.start <= window.stop`, `step > 0`, `top_n` within guardrails, `risk.mode` explicit.
 - Client validation helps UX; authoritative validation stays in `preflight` and `POST /jobs`.
-- AI can only produce draft config; it cannot call `/jobs` directly.
 
 **Acceptance / tests.**
 - Invalid request never launches job.
@@ -333,7 +330,6 @@ Current public API surface already covers auth, strategies, exchange keys, indic
 | Indicators | `/api/indicators`, `/estimate`, `/compute` | no change for UI-first |
 | Backtests jobs | `/api/backtests/runtime-defaults`, `/preflight`, `/jobs`, `/jobs/{id}`, `/top`, `/variant`, `/trades`, `/cancel` | `/api/ui/backtest-presets*`, `/api/backtests/jobs/{id}/summary`, chart/stats endpoints, paginated trades, `/api/backtests/jobs/{id}/events` |
 | Dashboard | none found | `/api/ui/dashboard/*` |
-| AI | none found | `/api/ai/backtest-config/chat`, `/stream/{session_id}`, `/validate` |
 
 ### Job lifecycle
 
@@ -456,7 +452,6 @@ stateDiagram-v2
 |---|---|---|---|
 | Strategy monitoring live state | SSE | snapshot polling | reconnect 2s/5s/15s; polling 3–5s |
 | Backtest job progress | SSE | job polling | reconnect 2s/5s/15s; polling 2.5–4s |
-| AI assistant token stream | SSE | none | reconnect only by explicit user action |
 | Dashboard summary cards | polling | n/a | 10–15s |
 | Settings audit/sessions | polling | n/a | 15–30s |
 | Instrument search | debounced fetch | n/a | 250 ms debounce |
@@ -646,7 +641,6 @@ Repo today runs one web container on port `8010`, fronted by Caddy with `zstd gz
 | Monitoring page | list + selected strategy, SSE bridge, fallback polling, stop/run controls | new monitoring template, `/api/ui/strategies/*`, `/api/stream/strategies` | run/stop + live update + reconnect | не строить monitoring на HTMX polling fragments |
 | Backtests split | `/backtests` history, `/backtests/new`, `/backtests/{job_id}` results | split current page/module, new routes/templates | history page stable, configurator isolated | не оставлять combined monolith |
 | Backtest runtime hardening | move create semantics toward queued/background worker, add paginated trades/stats/chart endpoints, job events SSE | backtest API/use case/wiring/services | async job flow, cancel, paginated trades | не вычислять backtests в web |
-| AI assistant + hardening | AI draft/validate/apply, CSP/CSRF, cache headers, asset versioning, performance smoke | `/api/ai/*`, edge headers, asset version param | security and perf checklist green | не давать AI прямой submit-to-run |
 
 ### Обязательные тесты для агента
 

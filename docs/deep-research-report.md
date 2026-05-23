@@ -44,7 +44,7 @@ Backtests backend тоже уже не пустой. Есть runtime defaults, 
 
 ### Что дают приложенные прототипы
 
-Прототипы подтверждают, что будущий продукт делится на четыре очень разные группы экранов. Landing/marketing — почти статический SSR. Account/settings — много таблиц, toggles, подключений, лимитов, сессий и event logs, то есть хороший HTMX territory. Monitoring — постоянные обновления, KPI, live list, PnL/equity chart, positions/trades/alerts/health blocks. Backtest configurator и results — самые сложные экраны: parameter grids, AI-config assistant, progress, top variants, trades overlay, drawdown/equity curves, monthly/hourly/symbol stats и большие табличные поверхности. Это очень сильный аргумент не за SPA вообще, а за **разные технологии на разных экранах**.
+Прототипы подтверждают, что будущий продукт делится на четыре очень разные группы экранов. Landing/marketing — почти статический SSR. Account/settings — много таблиц, toggles, подключений, лимитов, сессий и event logs, то есть хороший HTMX territory. Monitoring — постоянные обновления, KPI, live list, PnL/equity chart, positions/trades/alerts/health blocks. Backtest configurator и results — самые сложные экраны: parameter grids, progress, top variants, trades overlay, drawdown/equity curves, monthly/hourly/symbol stats и большие табличные поверхности. Это очень сильный аргумент не за SPA вообще, а за **разные технологии на разных экранах**.
 
 ## Целевая архитектура и выбор frontend-подхода
 
@@ -67,7 +67,6 @@ Backend API
   - auth / account / exchange keys
   - strategies / monitoring DTOs
   - backtests / jobs / results DTOs
-  - AI assistant
   ↓
 Workers
   - backtest execution
@@ -79,7 +78,7 @@ Postgres / ClickHouse / object/filesystem cache / optional Redis
 
 Эта схема прямо продолжает уже существующую production topology: public edge держится на VPS, web-процесс отдает HTML и принимает browser traffic, backend живёт отдельно и приватно, а same-origin contract уже зафиксирован. Менять надо не роли слоёв, а качество их наполнения. fileciteturn55file0L1-L1 fileciteturn45file0L1-L1 fileciteturn63file0L1-L1
 
-**Роли слоёв должны быть такими.** FastAPI Web UI: SSR, route guard, static assets, HTML fragments, ноль тяжёлых задач. Jinja2: layout, nav, first paint, empty/error/skeleton states, forms, tables, SEO/static sections. HTMX: partial table reloads, filters, tabs, modals, lightweight actions, save/update fragments. Plain JS islands: charts, polling/SSE, large dynamic forms, instrument pickers, AI chat, local validation, client ergonomics. Backend API: source of truth для всех DTO и side effects. Workers: long-running backtests/optimization/stat materialization. Database/storage: persistence и query backend. Reverse proxy: TLS, compression, cache policy, security headers. fileciteturn50file0L1-L1 citeturn4search2
+**Роли слоёв должны быть такими.** FastAPI Web UI: SSR, route guard, static assets, HTML fragments, ноль тяжёлых задач. Jinja2: layout, nav, first paint, empty/error/skeleton states, forms, tables, SEO/static sections. HTMX: partial table reloads, filters, tabs, modals, lightweight actions, save/update fragments. Plain JS islands: charts, polling/SSE, large dynamic forms, instrument pickers, local validation, client ergonomics. Backend API: source of truth для всех DTO и side effects. Workers: long-running backtests/optimization/stat materialization. Database/storage: persistence и query backend. Reverse proxy: TLS, compression, cache policy, security headers. fileciteturn50file0L1-L1 citeturn4search2
 
 ### Почему не React / Next / полный SPA сейчас
 
@@ -99,7 +98,7 @@ Postgres / ClickHouse / object/filesystem cache / optional Redis
 
 **Strategy monitoring.** Рекомендованный стек: Jinja initial shell + JS polling/SSE + charts + HTMX buttons/fragments. Под HTMX: start/stop/restart, settings modal, switching filters/tabs, small table fragments. Под JS: live PnL snapshot, chart, side list search/sort state, positions/executions refresh, hidden-tab pause, sparkline rendering. Acceptance: один selected strategy обновляется без full reload, при потере связи UI деградирует в stale-state/banner, а не ломается.
 
-**Backtest configuration.** Рекомендованный стек: Jinja shell + крупный page JS module + HTMX presets/fragments + SSE/polling for progress. Здесь чистый HTMX будет неудобен: instrument multi-select, indicators grid, local combination counter, AI chat, complex validation и interdependent form rules удобнее и дешевле как JS island. Acceptance: пользователь собирает config без JSON textarea, видит preflight, может сохранить draft/preset и запустить async job.
+**Backtest configuration.** Рекомендованный стек: Jinja shell + крупный page JS module + HTMX presets/fragments + SSE/polling for progress. Здесь чистый HTMX будет неудобен: instrument multi-select, indicators grid, local combination counter, complex validation и interdependent form rules удобнее и дешевле как JS island. Acceptance: пользователь собирает config без JSON textarea, видит preflight, может сохранить draft/preset и запустить async job.
 
 **Backtest results / strategy statistics.** Рекомендованный стек: Jinja shell + lazy-loaded chart modules + server-side pagination + partial fragments. Свечной chart/trades overlay и equity/drawdown — JS. KPI tables, filters, tabs, result sections — SSR + fragments. Acceptance: results page открывается быстро даже при больших backtests, а trades/history never arrive as “all rows into browser”.
 
@@ -148,13 +147,6 @@ Performance: selected strategy snapshot должен быть одним зап�
 `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats`, `symbol-stats`, `hourly-stats`, `best-worst-days`.  
 Ошибки: `401`, `403`, `404`, `409`, `422`, `429`, `503`. Performance: trade pages 50/100 max; charts 500–3000 points; cached summaries.
 
-**AI config assistant.**  
-`POST /api/ai/backtest-config/chat` — принять user prompt и current draft.  
-`GET /api/ai/backtest-config/conversations/{id}/events` — SSE stream chunks/tokens/status updates.  
-`POST /api/ai/backtest-config/validate` — вернуть `validated|invalid` + normalized config/errors.  
-`POST /api/ai/backtest-config/drafts` — save draft.  
-AI **не должен** вызывать `POST /api/backtests/jobs` напрямую. Он предлагает `proposed_config`, UI валидирует через API, пользователь нажимает Apply/Save/Run отдельно. Это один из самых правильных guardrail’ов для Roehub.
-
 ### Job-based flow для backtest и optimization
 
 Текущий код уже имеет `job_id`, job states, repository, progress model и terminal summary, но поверх sync-inline execution. Целевой flow должен быть таким: browser отправляет validated request → API создаёт job в `created/queued` → worker claim’ит job → пишет coarse-grained progress/stage → публикует terminal result + result refs → UI открывает results. Сами стадии можно фиксировать так: `created`, `queued`, `running`, `completed`, `failed`, `cancelled`. В response/status model должны быть `job_id`, `status`, `progress`, `stage`, `started_at`, `updated_at`, `estimated_remaining_sec`, `result_id`, `error`. fileciteturn33file0L1-L1 fileciteturn32file0L1-L1
@@ -165,10 +157,10 @@ AI **не должен** вызывать `POST /api/backtests/jobs` напря�
 
 ### SSE и controlled polling
 
-Для Roehub **SSE лучше WebSocket почти во всех нужных местах**, потому что у вас в основном односторонний server-to-browser поток: job progress, AI response stream, alerts/system events. MDN прямо описывает SSE как one-way server push, а WebSocket — как bidirectional API; при этом MDN отдельно отмечает, что у `WebSocket` API нет backpressure handling. Для Roehub это означает: если вам не нужен постоянный bidirectional messaging protocol, SSE проще, дешевле и безопаснее для архитектуры. citeturn3search4turn3search6turn3search2
+Для Roehub **SSE лучше WebSocket почти во всех нужных местах**, потому что у вас в основном односторонний server-to-browser поток: job progress, alerts/system events. MDN прямо описывает SSE как one-way server push, а WebSocket — как bidirectional API; при этом MDN отдельно отмечает, что у `WebSocket` API нет backpressure handling. Для Roehub это означает: если вам не нужен постоянный bidirectional messaging protocol, SSE проще, дешевле и безопаснее для архитектуры. citeturn3search4turn3search6turn3search2
 
 Рекомендованная стратегия:  
-SSE — `backtests/jobs/{id}/events`, AI assistant streaming, critical alerts/event feed.  
+SSE — `backtests/jobs/{id}/events`, critical alerts/event feed.
 Controlled polling — strategy list, selected strategy snapshot, account limits, non-critical counters, fallback если SSE недоступен.  
 Интервалы: selected monitoring snapshot 2–3s; strategy list 10s; jobs list 5s пока есть active jobs; limits/sessions 30–60s или manual refresh; hidden tab — pause или degrade до 30–60s. Backoff: 1x → 2x → 4x до потолка 30s. Каждый pollable resource должен иметь `AbortController`, защиту от overlapping requests и единый poll manager. В текущем `backtest_ui.js` уже есть и `POLL_INTERVAL_MS = 1500`, и `AbortController` — это хороший прототип foundation, но теперь его надо вынести в core. fileciteturn19file0L1-L1
 
@@ -348,8 +340,6 @@ CSP сейчас в reviewed web-слое строго не встанет, по
 **Этап job-based async flow.** Цель — убрать sync-inline create path и перевести backtests на queued worker execution. Acceptance: `POST /api/backtests/jobs` возвращает быстро с `job_id`, progress обновляется по SSE/polling, cancel работает, API request thread не держится до completion. Нельзя уносить worker execution на VPS web host.
 
 **Этап backtest results/statistics.** Цель — построить result screen из прототипа на summary endpoints, chart endpoints и paginated trades. Acceptance: страница statistics открывается быстро, trades/history не отдаются целиком, charts получают downsampled data. Нельзя оставлять full trades payload как текущий client-side pagination model.
-
-**Этап AI-config assistant.** Цель — SSE streaming, assistant states `draft/validated/invalid/applied/saved/submitted`, явный user confirmation. Acceptance: AI предлагает конфиг, UI валидирует, пользователь применяет/сохраняет/запускает сам. Нельзя давать AI право на direct run.
 
 **Этап performance/security hardening.** Цель — self-host scripts, CSP/HSTS/headers, CSRF, asset versioning, caching rules, response size budgets. Acceptance: security headers проверяются на edge, protected HTML no-store, static immutable, payload budgets соблюдаются. Нельзя переносить этот этап “на потом”, потому что login/logout/base template уже влияют на CSP design.
 
