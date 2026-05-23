@@ -2,9 +2,8 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: blocked on target-runtime supervision evidence. Local-dev runtime, tests,
-health и metrics приняты; Mac Studio Prometheus/Monit/restart evidence не получен
-в этой среде.
+Статус: accepted. Local-dev runtime, GitHub CI, deploy backend, Mac Studio
+Prometheus/Monit и controlled restart evidence получены.
 
 ## Scope
 
@@ -50,7 +49,7 @@ Stage 2 добавляет минимальный production-shaped runtime boun
 | Config / command | Expected result | Observed result | Blocker |
 |---|---|---|---|
 | `infra/macos/prometheus/prometheus.prod.yml` | Scrape job `exchange-control` targets `127.0.0.1:9205`. | Config contains `job_name: exchange-control` with target `127.0.0.1:9205`. | None |
-| `curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'` | Prometheus query returns target sample for `up{job="exchange-control"}` on target runtime. | Failed locally: `curl: (7) Failed to connect to 127.0.0.1 port 9090`. | Prometheus is not running in this local checkout/runtime, so target-runtime scrape evidence is blocked. |
+| `curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'` | Prometheus query returns target sample for `up{job="exchange-control"}` on target runtime. | Passed on Mac Studio after Prometheus restart: `up{job="exchange-control",instance="127.0.0.1:9205"} = 1`; `/api/v1/targets` shows `health="up"` and scrape URL `http://127.0.0.1:9205/metrics`. | None |
 
 ## Monit И Restart Evidence
 
@@ -58,8 +57,8 @@ Stage 2 добавляет минимальный production-shaped runtime boun
 |---|---|---|---|
 | `plutil -lint infra/macos/launchd/com.roehub.exchange-control.plist` | launchd plist is valid. | Passed: `OK`. | None |
 | `infra/scripts/monit/roehub-exchange-control.monitrc` | Monit service name is `roehub_exchange_control`; start/stop goes through `launchctl_service_control.sh`. | Config present with health and metrics probes on port `9205`. | None |
-| `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary \| rg 'roehub_exchange_control'` | Monit sees `roehub_exchange_control` as `Running/Accessible` on target runtime. | Failed locally: `/opt/homebrew/opt/monit/bin/monit` is absent. | Monit is not installed/configured in this local environment. |
-| Controlled restart | Monit or launchd restart succeeds and `/health/ready` returns ready afterward. | Not executed against production launchd/Monit because target supervision is unavailable here and `scripts/macos/reload_launchd_services.sh prod` would restart unrelated local services. | Stage 2 remains blocked for Mac Studio acceptance until deployed supervision is installed and restart evidence is captured. |
+| `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary \| rg 'roehub_exchange_control'` | Monit sees `roehub_exchange_control` as `OK` / monitored on target runtime. | Passed on Mac Studio after `monit reload`: `roehub_exchange_control OK`; `monit status roehub_exchange_control` shows `status OK`, `monitoring status Monitored`, `on reboot start`. | None |
+| Controlled restart | Monit or launchd restart succeeds and `/health/ready` returns ready afterward. | Passed on Mac Studio: `monit restart roehub_exchange_control` changed PID `22544 -> 23125`; `/health/ready` returned `ready`; `/metrics` returned `exchange_control_active 1.0`. | None |
 
 ## Verification Commands
 
@@ -73,8 +72,12 @@ Stage 2 добавляет минимальный production-shaped runtime boun
 | `python -m tools.docs.generate_docs_index --check` | Initial check failed because `docs/architecture/README.md` needed the Stage 2 report entry; `python -m tools.docs.generate_docs_index` updated it; rerun passed. |
 | `curl -fsS http://127.0.0.1:9205/health/ready` | Passed against local `uv run python -m apps.exchange_control.main.main --host 127.0.0.1 --port 9205`. |
 | `curl -fsS http://127.0.0.1:9205/metrics \| rg 'exchange_control_active\|exchange_connection_'` | Passed against local runtime. |
-| `curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'` | Blocked locally: Prometheus was not listening on `127.0.0.1:9090`. |
-| `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary \| rg 'roehub_exchange_control'` | Blocked locally: Monit binary path is absent. |
+| `gh run watch 26344578498 --exit-status` | Passed: `main` CI for commit `dc428a13` completed successfully. |
+| `gh run watch 26344611780 --exit-status` | Passed: Deploy Backend for commit `dc428a13` completed successfully. |
+| `ssh macstudio 'cd /opt/roehub/app; bash scripts/macos/smoke_prod.sh'` | Passed after deploy and reload; backend API smoke returned expected unauthenticated `401` on `/auth/current-user`, Redis `PONG`, Tailscale backend `Running`, and services listed including `com.roehub.exchange-control`. |
+| `curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'` | Passed on Mac Studio: `up{job="exchange-control"} = 1`. |
+| `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary \| rg 'roehub_exchange_control'` | Passed on Mac Studio: `roehub_exchange_control OK`. |
+| `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc restart roehub_exchange_control` | Passed on Mac Studio: PID changed `22544 -> 23125`, then `/health/ready` and `/metrics` passed. |
 
 ## Contract Impact Classification
 
@@ -98,5 +101,6 @@ Stage 2 добавляет минимальный production-shaped runtime boun
   present with bounded labels and currently encode disabled validation only.
 - Real exchange validation, decrypt, Binance and Bybit calls are absent from the
   Stage 2 runtime.
-- Stage 3 is blocked until Mac Studio Prometheus target evidence, Monit summary
-  evidence and controlled restart evidence are captured after deploy/install.
+- Stage 3 can start from accepted service-supervision evidence: Mac Studio
+  Prometheus target is `up`, Monit status is `OK`/`Monitored`, and controlled
+  restart preserves `/health/ready` plus `/metrics`.
