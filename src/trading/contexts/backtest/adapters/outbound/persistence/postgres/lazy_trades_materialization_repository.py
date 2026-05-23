@@ -163,7 +163,76 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         )
         ON CONFLICT (owner_user_id, job_id, public_variant_key, cache_key)
         DO UPDATE SET
-            updated_at = {self._table}.updated_at
+            status = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN 'queued'
+                ELSE {self._table}.status
+            END,
+            priority_class = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN EXCLUDED.priority_class
+                ELSE {self._table}.priority_class
+            END,
+            updated_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN EXCLUDED.updated_at
+                ELSE {self._table}.updated_at
+            END,
+            started_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.started_at
+            END,
+            finished_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.finished_at
+            END,
+            locked_by = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.locked_by
+            END,
+            locked_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.locked_at
+            END,
+            lease_expires_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.lease_expires_at
+            END,
+            heartbeat_at = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.heartbeat_at
+            END,
+            last_error = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.last_error
+            END,
+            last_error_json = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.last_error_json
+            END,
+            cache_status = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN EXCLUDED.cache_status
+                ELSE {self._table}.cache_status
+            END,
+            cache_path = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN NULL
+                ELSE {self._table}.cache_path
+            END,
+            ttl_seconds = CASE
+                WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
+                    THEN EXCLUDED.ttl_seconds
+                ELSE {self._table}.ttl_seconds
+            END
         RETURNING
             {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
         """

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -106,6 +106,72 @@ def test_trades_cache_miss_materialization_is_idempotent_by_request_identity() -
     assert isinstance(first, BacktestLazyTradesMaterializationReadModel)
     assert isinstance(replay, BacktestLazyTradesMaterializationReadModel)
     assert replay.materialization["task_id"] == first.materialization["task_id"]
+    assert len(materializations.tasks) == 1
+
+
+def test_trades_cache_miss_requeues_retryable_failed_materialization() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000315")
+    job, row = _job_and_row(user_id=user_id)
+    materializations = _MaterializationRepository()
+    use_case = _use_case(
+        repository=_Repository(job=job, top_rows=(row,)),
+        lazy_service=_LazyService(cache_hit=False),
+        materialization_repository=materializations,
+    )
+    public_key = str(row.payload_json["public_variant_key"])
+
+    first = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+    assert isinstance(first, BacktestLazyTradesMaterializationReadModel)
+    task_key = next(iter(materializations.tasks))
+    failed = replace(
+        materializations.tasks[task_key],
+        status="failed",
+        finished_at=datetime.now(UTC),
+        last_error="temporary failure",
+        last_error_json={"details": {"retryable": True}},
+        attempt=1,
+    )
+    materializations.tasks[task_key] = failed
+
+    replay = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+
+    assert isinstance(replay, BacktestLazyTradesMaterializationReadModel)
+    assert replay.status == "queued"
+    assert replay.materialization["task_id"] == str(failed.task_id)
+    assert replay.materialization["attempt"] == 1
+    assert replay.materialization["last_error"] is None
+    assert len(materializations.tasks) == 1
+
+
+def test_trades_cache_miss_keeps_non_retryable_failed_materialization_terminal() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000316")
+    job, row = _job_and_row(user_id=user_id)
+    materializations = _MaterializationRepository()
+    use_case = _use_case(
+        repository=_Repository(job=job, top_rows=(row,)),
+        lazy_service=_LazyService(cache_hit=False),
+        materialization_repository=materializations,
+    )
+    public_key = str(row.payload_json["public_variant_key"])
+    first = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+    assert isinstance(first, BacktestLazyTradesMaterializationReadModel)
+    task_key = next(iter(materializations.tasks))
+    failed = replace(
+        materializations.tasks[task_key],
+        status="failed",
+        finished_at=datetime.now(UTC),
+        last_error="variant removed",
+        last_error_json={"details": {"retryable": False}},
+        attempt=1,
+    )
+    materializations.tasks[task_key] = failed
+
+    replay = use_case.trades(user_id=user_id, job_id=job.job_id, variant_key=public_key)
+
+    assert isinstance(replay, BacktestLazyTradesMaterializationReadModel)
+    assert replay.status == "failed"
+    assert replay.materialization["task_id"] == str(failed.task_id)
+    assert replay.materialization["last_error"] == "variant removed"
     assert len(materializations.tasks) == 1
 
 
@@ -476,6 +542,25 @@ class _MaterializationRepository:
         )
         existing = self.tasks.get(key)
         if existing is not None:
+            if existing.status in {"completed", "failed", "cancelled"}:
+                queued = replace(
+                    existing,
+                    status="queued",
+                    updated_at=request.requested_at,
+                    started_at=None,
+                    finished_at=None,
+                    locked_by=None,
+                    locked_at=None,
+                    lease_expires_at=None,
+                    heartbeat_at=None,
+                    last_error=None,
+                    last_error_json=None,
+                    cache_status=request.cache_status,
+                    cache_path=None,
+                    ttl_seconds=request.ttl_seconds,
+                )
+                self.tasks[key] = queued
+                return queued
             return existing
         task = BacktestLazyTradesMaterializationTask(
             task_id=uuid4(),

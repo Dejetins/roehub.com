@@ -84,9 +84,12 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         request: BacktestLazyTradesMaterializationRequest,
     ) -> BacktestLazyTradesMaterializationTask:
         """
-        Create or replay one owner-scoped lazy trades materialization task.
+        Create, replay, or requeue one owner-scoped lazy trades materialization task.
 
-        The operation is idempotent for the same owner/job/public variant/cache identity.
+        The operation is idempotent for active tasks for the same
+        owner/job/public variant/cache identity. Terminal tasks may be requeued when
+        the application layer determined that cached detail is unavailable and the
+        terminal state is retryable.
         """
         ...
 

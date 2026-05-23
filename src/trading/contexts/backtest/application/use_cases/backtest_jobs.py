@@ -511,20 +511,39 @@ class BacktestJobsUseCase:
                 details={"reason": "lazy_trades_materialization_repository_unavailable"},
             )
         probe = context.probe
-        existing_task = None
-        if self.admission_service is not None and context.paid_level is not None:
-            existing_task = self.lazy_trades_materialization_repository.find_by_identity(
-                owner_user_id=context.user_id,
-                job_id=context.job.job_id,
-                public_variant_key=context.public_variant_key,
-                cache_key=probe.cache_key.digest,
+        existing_task = self.lazy_trades_materialization_repository.find_by_identity(
+            owner_user_id=context.user_id,
+            job_id=context.job.job_id,
+            public_variant_key=context.public_variant_key,
+            cache_key=probe.cache_key.digest,
+        )
+        if existing_task is not None and not _materialization_should_requeue(
+            task=existing_task
+        ):
+            return _materialization_read_model(
+                task=existing_task,
+                cache_warning=probe.cache_warning,
+                cache_lookup_s=probe.cache_lookup_s,
             )
-            if existing_task is not None:
-                return _materialization_read_model(
-                    task=existing_task,
-                    cache_warning=probe.cache_warning,
-                    cache_lookup_s=probe.cache_lookup_s,
-                )
+        requested_at = datetime.now(UTC)
+        request = BacktestLazyTradesMaterializationRequest(
+            owner_user_id=context.user_id,
+            job_id=context.job.job_id,
+            public_variant_key=context.public_variant_key,
+            variant_hash=context.row.variant_key,
+            request_hash=context.job.request_hash,
+            engine_params_hash=probe.cache_key.engine_params_hash,
+            artifact_manifest_hash=probe.cache_key.artifact_manifest_hash,
+            cache_key=probe.cache_key.digest,
+            cache_status=probe.cache_status,
+            ttl_seconds=probe.ttl_seconds,
+            requested_at=requested_at,
+        )
+        if (
+            existing_task is None
+            and self.admission_service is not None
+            and context.paid_level is not None
+        ):
             now = datetime.now(UTC)
             self.admission_service.ensure_lazy_detail_quota_allowed(
                 paid_level=context.paid_level,
@@ -546,19 +565,7 @@ class BacktestJobsUseCase:
                 ),
             )
         task = self.lazy_trades_materialization_repository.request_materialization(
-            request=BacktestLazyTradesMaterializationRequest(
-                owner_user_id=context.user_id,
-                job_id=context.job.job_id,
-                public_variant_key=context.public_variant_key,
-                variant_hash=context.row.variant_key,
-                request_hash=context.job.request_hash,
-                engine_params_hash=probe.cache_key.engine_params_hash,
-                artifact_manifest_hash=probe.cache_key.artifact_manifest_hash,
-                cache_key=probe.cache_key.digest,
-                cache_status=probe.cache_status,
-                ttl_seconds=probe.ttl_seconds,
-                requested_at=datetime.now(UTC),
-            )
+            request=request,
         )
         return _materialization_read_model(
             task=task,
@@ -811,6 +818,14 @@ def _materialization_retryable(*, task: BacktestLazyTradesMaterializationTask) -
         return False
     details = task.last_error_json.get("details")
     return isinstance(details, Mapping) and details.get("retryable") is True
+
+
+def _materialization_should_requeue(*, task: BacktestLazyTradesMaterializationTask) -> bool:
+    if task.status == "completed":
+        return True
+    if task.status == "cancelled":
+        return True
+    return task.status == "failed" and _materialization_retryable(task=task)
 
 
 def _validate_public_variant_key(*, variant_key: str) -> str:
