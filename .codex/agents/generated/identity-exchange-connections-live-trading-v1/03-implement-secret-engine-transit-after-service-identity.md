@@ -15,7 +15,7 @@ context_sources:
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 3 source of truth"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
-      why: "shared iteration ledger and next-stage handoff facts"
+      why: "shared stage execution ledger and direct-main delivery handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/02-exchange-control-process.md
       why: "accepted Stage 2 evidence"
   task_entrypoints:
@@ -71,18 +71,16 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: actor, Transit capability, command/test, expected result, observed result"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
-iteration_ledger:
+stage_execution_ledger:
   path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  plan_doc: "docs/architecture/identity/identity-exchange-connections-live-trading-v1.md"
+  current_stage: "03"
   update_required: true
-  required_sections:
-    - "Stage status"
-    - "Facts for next stages"
-    - "Contracts and migrations"
-    - "Publish / deploy handoff"
+  update_timing: "after validation, before direct-main push and final report"
+  direct_main_delivery_required: true
 
 hard_requirements:
   iteration_ledger_update_required: true
-  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   transit_acl_after_service_identity: true
   api_process_no_decrypt: true
@@ -90,15 +88,27 @@ hard_requirements:
   product_ready_fail_closed_without_transit: true
   no_secret_leak_required: true
   runtime_transit_acl_evidence_required: true
+  stage_execution_ledger_update_required: true
+  direct_main_push_after_validation_required: true
+  feature_branch_per_stage_forbidden: true
+  draft_pr_forbidden: true
+  work_on_main_from_start_required: true
 
 task_toggles:
   implement_secret_cipher_port: true
   implement_transit_adapter: true
   implement_dev_fallback_guarded: true
   update_secret_runbook: true
-  github_yeet_after_validation: true
+  publish_after_success: true
+  direct_main_push_after_validation: true
+  target_branch: main
+  draft_pr_after_success: false
 
 skill_routing:
+  - skill: publish-ci-deploy
+    use_when: "stage implementation, validation, stage report, and ledger update are complete"
+    timing: "after validation and before final report"
+    reason: "user requires direct push to main after accepted validation, with CI/deploy follow-through"
   - skill: contract-impact-analysis
     use_when: "changing config, secret cipher, storage metadata, or service capabilities"
     timing: "before implementation and final report"
@@ -112,10 +122,6 @@ skill_routing:
     timing: "before final report"
     reason: "credential custody is production-risk sensitive"
 
-  - skill: github:yeet
-    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
-    timing: "before final report"
-    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -143,6 +149,7 @@ final_report_format:
     - "ACL и fail-closed"
     - "Проверки"
     - "Stage 4 readiness"
+    - "Direct-main delivery"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/migrations"
@@ -159,11 +166,16 @@ quality_gates:
     expect: "exchange-control identity can encrypt"
   - cmd: "curl -i -X POST \"$OPENBAO_ADDR/v1/transit/decrypt/roehub-exchange-credentials\" -H \"X-Vault-Token: $ROEHUB_API_TRANSIT_TOKEN\" --data '{\"ciphertext\":\"vault:v1:example\"}'"
     expect: "apps/api identity is denied decrypt capability"
+  - cmd: 'test "$(git branch --show-current)" = main'
+    expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
   - cmd: "gh --version && gh auth status"
-    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
 expected_primary_touches:
+  - "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
   - "src/trading/contexts/exchange_control/**"
   - "tests/unit/contexts/exchange_control/**"
   - "docs/runbooks/exchange-secret-management.md"
@@ -200,8 +212,9 @@ This stage prepares secret custody. It does not yet migrate legacy keys into `ex
 
 ## Requirements (Must)
 
-- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
-- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
+- Before making changes, verify the current branch is `main` and `git pull --ff-only origin main` succeeds; if not, stop and mark the stage blocked instead of creating a side branch.
+- Update the shared stage execution ledger after validation and before delivery; include stage status, evidence, blockers, compatibility/rollback notes, CI/deploy status, and facts next stages must know.
+- After all required validation passes, deliver directly to `main`: stay/switch to `main`, run `git pull --ff-only origin main`, stage only scoped files, commit on `main`, push `origin main`, and follow CI/deploy status. Do not create a per-stage branch or draft PR.
 - Implement a secret cipher port and Transit-compatible adapter.
 - Keep local/dev fallback explicit and blocked in product-ready mode.
 - Encode service capability separation: API no decrypt, exchange-control limited decrypt.
@@ -243,6 +256,7 @@ Use front-matter `context_sources` as the canonical reading map. Do not preload 
 
 # Work plan (agent should follow)
 
+0. Verify the local checkout is on `main`, run `git pull --ff-only origin main`, and confirm there are no unrelated changes in scope. Stop if this cannot be proven.
 Skill routing for this task:
 
 - `contract-impact-analysis`: use before implementation and final report for secret/config contracts.
@@ -255,21 +269,24 @@ Skill routing for this task:
 4. Add fail-closed checks and redaction.
 5. Write runbook and Stage 3 report.
 
-After the stage-specific implementation and validation steps:
+After stage-specific verification:
 
-- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
-- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+- update `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` with accepted/blocked status, evidence, changed contracts, blockers, next-stage facts, and direct-main delivery status;
+- perform direct-main delivery only after successful validation: confirm the current branch is `main`, fast-forward from `origin/main`, stage only scoped files, commit, push `origin main`, and watch CI/deploy status;
+- if `main` cannot fast-forward, GitHub auth is unavailable, local gates fail, or unrelated worktree changes cannot be isolated, stop and mark the stage blocked in the ledger; do not create a stage branch or draft PR as a workaround.
 
 # Acceptance criteria (Definition of Done)
 
 - Iteration ledger is updated with facts required by the next stage.
-- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Transit encrypt acceptance call shape is documented.
 - API decrypt denial is documented and test-covered or manually evidenced.
 - Production startup without Transit config fails closed.
 - Runtime acceptance commands from the architecture document are executed, or the report marks production acceptance blocked because OpenBao/Vault is unavailable.
 - Secret grep finds no test secret markers in logs/output/artifacts.
 - Stage report includes exact commands, env names, and residual risks.
+- Shared ledger `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` is updated with stage status, evidence, blockers, next-stage facts, and direct-main delivery status.
+- Direct-main push to `origin/main` is completed after validation and CI/deploy status is recorded, or the stage is blocked with the exact reason.
+- No per-stage branch and no draft PR are created for this stage.
 
 # Implementation constraints
 
@@ -285,7 +302,8 @@ After the stage-specific implementation and validation steps:
 
 ## Documentation
 
-- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
+- Update the shared stage execution ledger before direct-main delivery; it is the canonical cross-stage handoff document.
+- Record direct-main delivery evidence in the ledger: commit SHA, `git push origin main` result, CI/deploy status, runtime status when applicable, or exact blocker.
 - Create the secret-management runbook and Stage 3 report.
 - Update architecture only if implementation deviates from the plan.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -300,6 +318,7 @@ After the stage-specific implementation and validation steps:
 
 Primary touches:
 
+- `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`
 - `src/trading/contexts/exchange_control/**`
 - `tests/unit/contexts/exchange_control/**`
 - `docs/runbooks/exchange-secret-management.md`
@@ -322,6 +341,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `test "$(git branch --show-current)" = main`
 - `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/migrations`
 - `uv run ruff check src/trading/contexts/exchange_control tests/unit/contexts/exchange_control`
@@ -336,10 +356,11 @@ Possible secondary touches:
 
 Your final message MUST be in Russian and follow exactly:
 
-Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
+Your final message MUST include direct-main commit SHA, `git push origin main` status, CI/deploy status, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Secret boundary**
 3. **ACL и fail-closed**
 4. **Проверки**
 5. **Stage 4 readiness**
+6. **Direct-main delivery**

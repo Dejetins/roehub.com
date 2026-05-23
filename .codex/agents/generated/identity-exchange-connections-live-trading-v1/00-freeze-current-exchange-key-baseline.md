@@ -15,7 +15,7 @@ context_sources:
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "source architecture and stage gates"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
-      why: "shared iteration ledger and next-stage handoff facts"
+      why: "shared stage execution ledger and direct-main delivery handoff facts"
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "latest compact state if present"
   task_entrypoints:
@@ -71,31 +71,41 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: route matrix, storage evidence, UI evidence, secret grep, blockers"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
-iteration_ledger:
+stage_execution_ledger:
   path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  plan_doc: "docs/architecture/identity/identity-exchange-connections-live-trading-v1.md"
+  current_stage: "00"
   update_required: true
-  required_sections:
-    - "Stage status"
-    - "Facts for next stages"
-    - "Contracts and migrations"
-    - "Publish / deploy handoff"
+  update_timing: "after validation, before direct-main push and final report"
+  direct_main_delivery_required: true
 
 hard_requirements:
   iteration_ledger_update_required: true
-  github_yeet_after_validation_required: true
   implementation_changes_allowed: false
   baseline_report_required: true
   no_secret_leak_required: true
   market_type_v1_must_remain_spot_futures: true
   do_not_design_execution: true
+  stage_execution_ledger_update_required: true
+  direct_main_push_after_validation_required: true
+  feature_branch_per_stage_forbidden: true
+  draft_pr_forbidden: true
+  work_on_main_from_start_required: true
 
 task_toggles:
   code_changes_allowed: false
   docs_patch_allowed_if_stage_table_or_index_drift_found: true
   runtime_calls_required_when_env_available: true
-  github_yeet_after_validation: true
+  publish_after_success: true
+  direct_main_push_after_validation: true
+  target_branch: main
+  draft_pr_after_success: false
 
 skill_routing:
+  - skill: publish-ci-deploy
+    use_when: "stage implementation, validation, stage report, and ledger update are complete"
+    timing: "after validation and before final report"
+    reason: "user requires direct push to main after accepted validation, with CI/deploy follow-through"
   - skill: architecture-review
     use_when: "checking current docs/code/API drift without implementation"
     timing: "during investigation"
@@ -109,10 +119,6 @@ skill_routing:
     timing: "during verification"
     reason: "baseline evidence must be reproducible"
 
-  - skill: github:yeet
-    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
-    timing: "before final report"
-    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -142,6 +148,7 @@ final_report_format:
     - "Секреты и утечки"
     - "Проверки"
     - "Блокеры к Stage 1"
+    - "Direct-main delivery"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py"
@@ -150,11 +157,16 @@ quality_gates:
     expect: "passes"
   - cmd: "rg -n \"spot|futures|linear|inverse\" migrations/postgres/0003_identity_exchange_keys_v1.sql src/trading/contexts/identity apps/api/routes apps/web/templates/fragments/account/exchange_keys.html apps/web/dist/js/pages/settings.js"
     expect: "confirms v1 contract and any drift is reported"
+  - cmd: 'test "$(git branch --show-current)" = main'
+    expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
   - cmd: "gh --version && gh auth status"
-    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
 expected_primary_touches:
+  - "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
   - "docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md"
 
 possible_secondary_touches:
@@ -190,8 +202,9 @@ Current expected facts to verify:
 
 ## Requirements (Must)
 
-- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
-- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
+- Before making changes, verify the current branch is `main` and `git pull --ff-only origin main` succeeds; if not, stop and mark the stage blocked instead of creating a side branch.
+- Update the shared stage execution ledger after validation and before delivery; include stage status, evidence, blockers, compatibility/rollback notes, CI/deploy status, and facts next stages must know.
+- After all required validation passes, deliver directly to `main`: stay/switch to `main`, run `git pull --ff-only origin main`, stage only scoped files, commit on `main`, push `origin main`, and follow CI/deploy status. Do not create a per-stage branch or draft PR.
 - Keep this stage evidence-only unless a narrow documentation drift correction is required.
 - Identify exact current request/response fields for `POST`, `GET`, and `DELETE /api/exchange-keys`.
 - Confirm that responses do not include `api_secret`, `passphrase`, ciphertext, fingerprint, or HMAC.
@@ -234,6 +247,7 @@ Use the front-matter `context_sources` as the canonical reading map. Do not dupl
 
 # Work plan (agent should follow)
 
+0. Verify the local checkout is on `main`, run `git pull --ff-only origin main`, and confirm there are no unrelated changes in scope. Stop if this cannot be proven.
 Skill routing for this task:
 
 - `architecture-review`: use during investigation for docs/code drift and baseline evidence.
@@ -246,19 +260,22 @@ Skill routing for this task:
 4. Write the Stage 0 evidence report as a Markdown table-led document.
 5. Report whether Stage 1 is unblocked.
 
-After the stage-specific implementation and validation steps:
+After stage-specific verification:
 
-- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
-- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+- update `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` with accepted/blocked status, evidence, changed contracts, blockers, next-stage facts, and direct-main delivery status;
+- perform direct-main delivery only after successful validation: confirm the current branch is `main`, fast-forward from `origin/main`, stage only scoped files, commit, push `origin main`, and watch CI/deploy status;
+- if `main` cannot fast-forward, GitHub auth is unavailable, local gates fail, or unrelated worktree changes cannot be isolated, stop and mark the stage blocked in the ledger; do not create a stage branch or draft PR as a workaround.
 
 # Acceptance criteria (Definition of Done)
 
 - Iteration ledger is updated with facts required by the next stage.
-- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Stage report exists at `docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md`.
 - Report includes route matrix, storage evidence, UI evidence, secret grep, and `market_type` contract.
 - No implementation behavior changed.
 - Quality gates pass or failures are classified as introduced, pre-existing, environmental, or skipped with reason.
+- Shared ledger `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` is updated with stage status, evidence, blockers, next-stage facts, and direct-main delivery status.
+- Direct-main push to `origin/main` is completed after validation and CI/deploy status is recorded, or the stage is blocked with the exact reason.
+- No per-stage branch and no draft PR are created for this stage.
 
 # Implementation constraints
 
@@ -274,7 +291,8 @@ After the stage-specific implementation and validation steps:
 
 ## Documentation
 
-- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
+- Update the shared stage execution ledger before direct-main delivery; it is the canonical cross-stage handoff document.
+- Record direct-main delivery evidence in the ledger: commit SHA, `git push origin main` result, CI/deploy status, runtime status when applicable, or exact blocker.
 - The stage report is the required new documentation artifact.
 - Update the architecture document only if its current text contradicts verified code.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -290,6 +308,7 @@ After the stage-specific implementation and validation steps:
 
 Primary touches:
 
+- `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`
 - `docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md`
 
 Possible secondary touches:
@@ -307,6 +326,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `test "$(git branch --show-current)" = main`
 - `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py`
 - `python -m tools.docs.generate_docs_index --check`
@@ -316,10 +336,11 @@ Possible secondary touches:
 
 Your final message MUST be in Russian and follow exactly:
 
-Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
+Your final message MUST include direct-main commit SHA, `git push origin main` status, CI/deploy status, and deploy/runtime status.
 
 1. **Что проверено**
 2. **Текущий контракт**
 3. **Секреты и утечки**
 4. **Проверки**
 5. **Блокеры к Stage 1**
+6. **Direct-main delivery**

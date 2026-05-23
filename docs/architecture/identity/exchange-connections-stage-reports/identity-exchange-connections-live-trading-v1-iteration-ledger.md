@@ -4,8 +4,7 @@
 
 Документ является единым handoff-источником между stages архитектуры
 `identity-exchange-connections-live-trading-v1`. Каждый executor обязан обновлять
-его после валидации своего stage и до publish/deploy handoff через
-`github:yeet`.
+его после валидации своего stage и до direct-main delivery в `main`.
 
 ## Правила Обновления
 
@@ -15,7 +14,8 @@
 | Источник фактов | Записываются только проверенные факты из тестов, runtime calls, DB evidence, browser QA, Prometheus/Monit или явно помеченные blockers. |
 | Секреты | Нельзя записывать API secrets, passphrase, ciphertext, HMAC, raw exchange error body, user tokens или session cookies. |
 | Следующие stages | Каждый stage обязан заполнить секцию "Что обязательно знать дальше". |
-| Publish/deploy | После успешной validation stage выполняет `github:yeet`; branch, commit, draft PR и deploy/runtime status записываются здесь. |
+| Direct-main delivery | После успешной validation stage доставляется напрямую в `main`: `git pull --ff-only origin main`, scoped staging, commit на `main`, `git push origin main`, контроль CI/deploy. |
+| Запрет stage-веток | Отдельная branch или draft PR на stage не создаются; если direct-main delivery невозможен, stage помечается `blocked`. |
 | Blocked state | Если stage не принят, следующий stage не стартует; blocker фиксируется в таблице и финальном отчете. |
 
 ## Stage Status
@@ -23,7 +23,7 @@
 | Stage | Статус | Stage report | Ключевой результат | Blocker |
 |---|---|---|---|---|
 | 00 baseline | accepted | `docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md` | Current `/api/exchange-keys`, `/settings`, `identity_exchange_keys`, secret-safe response shape, and `market_type=spot|futures` baseline frozen. | None |
-| 01 security baseline | accepted; draft PR handoff complete | `docs/architecture/identity/exchange-connections-stage-reports/01-security-baseline.md` | Legacy exchange-key mutations now fail closed on CSRF/same-origin, require recent Keycloak-backed Roehub session, write redacted exchange audit events, and extend audit event schema. | None |
+| 01 security baseline | accepted; direct-main chain delivered | `docs/architecture/identity/exchange-connections-stage-reports/01-security-baseline.md` | Legacy exchange-key mutations now fail closed on CSRF/same-origin, require recent Keycloak-backed Roehub session, write redacted exchange audit events, and extend audit event schema. | None |
 | 02 exchange-control process | accepted; direct-main deploy and Mac Studio supervision evidence complete | `docs/architecture/identity/exchange-connections-stage-reports/02-exchange-control-process.md` | `exchange-control` runtime boundary, service identity, `/health/ready`, `/metrics`, Prometheus target, launchd service, Monit service and controlled restart are implemented and verified on Mac Studio. | None |
 | 03 secret engine transit | pending | `docs/architecture/identity/exchange-connections-stage-reports/03-secret-engine-transit.md` | TBD | TBD |
 | 04 connections/backfill | pending | `docs/architecture/identity/exchange-connections-stage-reports/04-connections-credential-versions-backfill.md` | TBD | TBD |
@@ -60,7 +60,7 @@
 | Stage | API / DTO | Persistence | Config / env | Ops / runtime | Compatibility / rollback |
 |---|---|---|---|---|---|
 | 00 | `none`: no API/DTO behavior changed; baseline records existing `/api/exchange-keys`. | `none`: `identity_exchange_keys` remains current v1 table; no migrations added or modified. | `none`: no config/env changes. | Authenticated Keycloak smoke passed via public edge; no deploy/restart performed for docs-only Stage 00. | Legacy compatibility preserved; rollback is documentation-only because runtime behavior was not changed. |
-| 01 | `compatible-change`: legacy `POST/DELETE /api/exchange-keys` still exist, but mutation preconditions now reject missing/cross-origin CSRF context and stale sessions with deterministic payloads. DTO fields unchanged. | `compatible-change`: `0007_identity_exchange_audit_events_v1.sql` additively extends `identity_audit_events_type_check`; bootstrap applies it after `0006`. | `compatible-change`: `ROEHUB_ENV=prod` now rejects the static dev-only `IDENTITY_EXCHANGE_KEYS_KEK_B64`; dev/test fallback remains allowed. | No production deploy in this stage; local route, migration, lint, type, docs and GitHub handoff gates are the acceptance surface. | Legacy `/api/exchange-keys` response shape and duplicate/delete contracts are preserved; rollback removes Stage 1 code plus 0007 only if no exchange audit rows have been emitted. |
+| 01 | `compatible-change`: legacy `POST/DELETE /api/exchange-keys` still exist, but mutation preconditions now reject missing/cross-origin CSRF context and stale sessions with deterministic payloads. DTO fields unchanged. | `compatible-change`: `0007_identity_exchange_audit_events_v1.sql` additively extends `identity_audit_events_type_check`; bootstrap applies it after `0006`. | `compatible-change`: `ROEHUB_ENV=prod` now rejects the static dev-only `IDENTITY_EXCHANGE_KEYS_KEK_B64`; dev/test fallback remains allowed. | No production deploy in this stage; local route, migration, lint, type, docs and direct-main delivery gates are the acceptance surface. | Legacy `/api/exchange-keys` response shape and duplicate/delete contracts are preserved; rollback removes Stage 1 code plus 0007 only if no exchange audit rows have been emitted. |
 | 02 | `none`: existing `apps/api` public routes and DTOs are unchanged; new internal operational HTTP endpoints are additive. | `none`: no database migration or table shape changed. | `compatible-change`: new operational env vars `ROEHUB_EXCHANGE_CONTROL_SERVICE_IDENTITY`, `ROEHUB_EXCHANGE_CONTROL_BIND_HOST`, `ROEHUB_EXCHANGE_CONTROL_METRICS_PORT`, `ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED`; prod requires `127.0.0.1:9205` and disabled validation. | `compatible-change`: new `exchange-control` process, Prometheus job, launchd plist, Monit config and monitoring runbook checks. | Rollback removes the new process/config/docs/tests; no data rollback is required because no persistence changed. |
 | 03 | TBD | TBD | TBD | TBD | TBD |
 | 04 | TBD | TBD | TBD | TBD | TBD |
@@ -68,29 +68,29 @@
 | 06 | TBD | TBD | TBD | TBD | TBD |
 | 07 | TBD | TBD | TBD | TBD | TBD |
 
-## Publish / Deploy Handoff
+## Direct-Main Delivery
 
-`github:yeet` в этом плане означает обязательный GitHub publish handoff после
-успешной validation: scope review, targeted staging, commit, push и draft PR.
-Если конкретный stage также выполняет runtime deploy/restart/smoke на target
-environment, это фиксируется в колонке `Deploy/runtime status`. Если stage не
-выполняет production deploy, это явно записывается как `not applicable`.
+После успешной validation stage не создает отдельную ветку и не открывает
+draft PR. Доставка идет только в `main`. Если stage выполняет runtime
+deploy/restart/smoke на target environment, это фиксируется в колонке
+`Deploy/runtime status`. Если runtime deploy не относится к stage, пишется
+`not applicable`.
 
-| Stage | Branch | Commit | Draft PR | Checks before push | Deploy/runtime status | Notes |
+| Stage | Branch | Commit | Push status | CI/deploy status | Deploy/runtime status | Notes |
 |---|---|---|---|---|---|---|
-| 00 | `codex/identity-exchange-stage0-baseline` | `dda694b7` | [Draft PR #22](https://github.com/Dejetins/roehub.com/pull/22) | `gh --version && gh auth status`; focused pytest; docs index check; market-type grep; secret grep; authenticated runtime smoke | No production deploy; runtime smoke used existing public edge and logged out afterward. | Targeted staging included only Stage 00 docs/index files; unrelated `.codex/*` and architecture prompt-manager changes were left unstaged. |
-| 01 | `codex/identity-exchange-stage1-security-baseline` | `9d405202` | [Draft PR #23](https://github.com/Dejetins/roehub.com/pull/23) | `uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py`; `uv run pytest -q tests/unit/apps/migrations`; `uv run ruff check apps/api src/trading/contexts/identity tests/unit/apps/api tests/unit/apps/migrations`; `uv run pyright apps/api src/trading/contexts/identity tests/unit/apps/api`; `python -m tools.docs.generate_docs_index --check`; `rg -n "TEST_SECRET\|TEST_API_SECRET\|TEST_PASSPHRASE" logs output .playwright-cli \|\| true`; `gh --version && gh auth status`. | No production deploy; local-dev stage only. | Stacked on Stage 0 draft PR #22 because Stage 0 docs are not merged to `main` yet; targeted staging included only Stage 1 code, tests, migration, and docs/index files. |
-| 02 | `codex/identity-exchange-stage2-exchange-control` and direct `main` push | `dc428a13` | [Draft PR #24](https://github.com/Dejetins/roehub.com/pull/24); superseded by direct `main` delivery at `dc428a13` | `gh --version && gh auth status`; `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api`; `uv run ruff check apps/api apps/exchange_control src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api`; `uv run pyright apps/api apps/exchange_control src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api`; local `curl` health/metrics; `plutil -lint`; no-external-call grep; `python -m tools.docs.generate_docs_index --check`; `gh run watch 26344578498 --exit-status`; `gh run watch 26344611780 --exit-status`; Mac Studio `smoke_prod.sh`; `up{job="exchange-control"}`; Monit summary/status; controlled restart. | Deployed on Mac Studio: runtime bundle contains `apps/exchange_control` and `src/trading/contexts/exchange_control`; launchd `com.roehub.exchange-control` running; Prometheus target `127.0.0.1:9205` is `up`; Monit `roehub_exchange_control` is `OK`/`Monitored`; controlled restart passed. | Direct `main` delivery included Stage 0, Stage 1 and Stage 2 chain because stacked draft PRs were not merged before runtime acceptance. |
-| 03 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 04 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 05 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 06 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 07 | TBD | TBD | TBD | TBD | TBD | TBD |
+| 00 | `main` | `dda694b7`; present in `origin/main` at `0a5386fa` | pushed to `origin/main`; old stage branch deleted | covered by direct-main chain through `0a5386fa` | not applicable; docs/runtime-smoke baseline only | Previous draft PR handoff is superseded by direct-main history. |
+| 01 | `main` | `9d405202`; present in `origin/main` at `0a5386fa` | pushed to `origin/main`; old stage branch deleted | covered by direct-main chain through `0a5386fa` | not applicable; local-dev/security stage only | Previous draft PR handoff is superseded by direct-main history. |
+| 02 | `main` | `0a5386fa` | pushed to `origin/main`; old stage branch deleted | GitHub workflows watched in Stage 02 report; current local `main` is synchronized to `origin/main` | Deployed on Mac Studio: `exchange-control` launchd/Monit/Prometheus evidence accepted. | Direct `main` delivery includes Stage 0, Stage 1 and Stage 2 chain. |
+| 03 | `main` | TBD | TBD | TBD | TBD | TBD |
+| 04 | `main` | TBD | TBD | TBD | TBD | TBD |
+| 05 | `main` | TBD | TBD | TBD | TBD | TBD |
+| 06 | `main` | TBD | TBD | TBD | TBD | TBD |
+| 07 | `main` | TBD | TBD | TBD | TBD | TBD |
 
 ## Blockers
 
 | Stage | Blocker | Severity | Owner / next action | Resolved evidence |
 |---|---|---|---|---|
-| 00 | None | N/A | Stage 1 can start from frozen baseline after PR handoff. | Stage report plus passing gates. |
-| 01 | None | N/A | Stage 2 can start after GitHub draft PR handoff completes. | Stage 1 report plus focused route/migration/static gates. |
+| 00 | None | N/A | Stage 1 can start from frozen baseline after direct-main ledger handoff. | Stage report plus passing gates. |
+| 01 | None | N/A | Stage 2 can start after direct-main delivery evidence is recorded. | Stage 1 report plus focused route/migration/static gates. |
 | 02 | None | N/A | Stage 3 can start Transit ACL work from accepted `exchange-control` supervision boundary. | Stage 02 report plus Mac Studio Prometheus, Monit, restart and smoke evidence. |

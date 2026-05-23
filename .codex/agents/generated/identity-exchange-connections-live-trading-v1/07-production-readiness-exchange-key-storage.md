@@ -15,7 +15,7 @@ context_sources:
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 7 source of truth"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
-      why: "shared iteration ledger and next-stage handoff facts"
+      why: "shared stage execution ledger and direct-main delivery handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/06-settings-ui.md
       why: "accepted Stage 6 evidence"
   task_entrypoints:
@@ -78,18 +78,16 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: stage, required evidence, observed evidence, verdict, residual risk"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
-iteration_ledger:
+stage_execution_ledger:
   path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  plan_doc: "docs/architecture/identity/identity-exchange-connections-live-trading-v1.md"
+  current_stage: "07"
   update_required: true
-  required_sections:
-    - "Stage status"
-    - "Facts for next stages"
-    - "Contracts and migrations"
-    - "Publish / deploy handoff"
+  update_timing: "after validation, before direct-main push and final report"
+  direct_main_delivery_required: true
 
 hard_requirements:
   iteration_ledger_update_required: true
-  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   all_stage_reports_required: true
   no_trading_execution_required: true
@@ -97,14 +95,26 @@ hard_requirements:
   mac_studio_runtime_evidence_required: true
   secret_leak_grep_required: true
   docs_index_required: true
+  stage_execution_ledger_update_required: true
+  direct_main_push_after_validation_required: true
+  feature_branch_per_stage_forbidden: true
+  draft_pr_forbidden: true
+  work_on_main_from_start_required: true
 
 task_toggles:
   implementation_changes_allowed_only_for_readiness_fix: true
   run_full_focused_gates: true
   run_browser_qa_if_ui_changed_or_evidence_missing: true
-  github_yeet_after_validation: true
+  publish_after_success: true
+  direct_main_push_after_validation: true
+  target_branch: main
+  draft_pr_after_success: false
 
 skill_routing:
+  - skill: publish-ci-deploy
+    use_when: "stage implementation, validation, stage report, and ledger update are complete"
+    timing: "after validation and before final report"
+    reason: "user requires direct push to main after accepted validation, with CI/deploy follow-through"
   - skill: production-risk-review
     use_when: "assessing final readiness across secrets, schema, ops, UI, validation"
     timing: "before final report"
@@ -122,10 +132,6 @@ skill_routing:
     timing: "if blocker"
     reason: "avoid silent contract drift"
 
-  - skill: github:yeet
-    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
-    timing: "before final report"
-    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -145,8 +151,6 @@ non_goals:
   - "Do not implement signal-to-execution."
   - "Do not implement exchange-execution."
   - "Do not place live orders."
-  - "Do not merge the PR or perform production deploy outside the validated stage scope; `github:yeet` draft PR handoff is required after validation."
-
 final_report_format:
   language: ru
   sections:
@@ -155,6 +159,7 @@ final_report_format:
     - "Security и secrets"
     - "Ops и runtime"
     - "Residual risks"
+    - "Direct-main delivery"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/contexts/exchange_control tests/unit/apps/migrations"
@@ -167,11 +172,16 @@ quality_gates:
     expect: "passes"
   - cmd: "! rg -n \"/order|createOrder|submit_order|place_order|exchange-execution\" src/trading/contexts/exchange_control apps/api apps/web"
     expect: "no execution/order placement surface is included in this scope"
+  - cmd: 'test "$(git branch --show-current)" = main'
+    expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
   - cmd: "gh --version && gh auth status"
-    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
 expected_primary_touches:
+  - "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
   - "docs/architecture/identity/exchange-connections-stage-reports/07-production-readiness.md"
 
 possible_secondary_touches:
@@ -181,7 +191,7 @@ possible_secondary_touches:
   - "docs/architecture/README.md"
 
 safety_notes:
-  - "This is a readiness gate plus required `github:yeet` draft PR handoff after validation; it is not permission to merge or perform unrelated production deploy."
+  - "After accepted validation, deliver scoped report/ledger changes directly to main; do not create a per-stage branch or draft PR."
   - "Do not claim production-ready if any mandatory stage evidence is missing."
 ---
 
@@ -203,12 +213,13 @@ Done means:
 
 This prompt is not a broad implementation prompt. It is the final gate after stages 0-6. If any previous stage report is missing, stale, or says blocked, stop and report not-ready.
 
-After validation, run `github:yeet` for branch/commit/push/draft PR handoff. Do not merge the PR or perform unrelated production deploy.
+After accepted validation, deliver the scoped report/ledger changes directly to `main`: do not create a per-stage branch and do not open a draft PR.
 
 ## Requirements (Must)
 
-- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
-- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
+- Before making changes, verify the current branch is `main` and `git pull --ff-only origin main` succeeds; if not, stop and mark the stage blocked instead of creating a side branch.
+- Update the shared stage execution ledger after validation and before delivery; include stage status, evidence, blockers, compatibility/rollback notes, CI/deploy status, and facts next stages must know.
+- After all required validation passes, deliver directly to `main`: stay/switch to `main`, run `git pull --ff-only origin main`, stage only scoped files, commit on `main`, push `origin main`, and follow CI/deploy status. Do not create a per-stage branch or draft PR.
 - Verify stage evidence chain from 00 through 06.
 - Run the focused backend/API/UI/migration gates.
 - Verify docs index.
@@ -249,6 +260,7 @@ Use front-matter `context_sources` as the canonical reading map. Do not turn thi
 
 # Work plan (agent should follow)
 
+0. Verify the local checkout is on `main`, run `git pull --ff-only origin main`, and confirm there are no unrelated changes in scope. Stop if this cannot be proven.
 Skill routing for this task:
 
 - `production-risk-review`: use before final report to assess readiness.
@@ -262,20 +274,23 @@ Skill routing for this task:
 4. Run secret grep and no-order grep.
 5. Create Stage 7 readiness report with ready/not-ready verdict.
 
-After the stage-specific implementation and validation steps:
+After stage-specific verification:
 
-- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
-- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+- update `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` with accepted/blocked status, evidence, changed contracts, blockers, next-stage facts, and direct-main delivery status;
+- perform direct-main delivery only after successful validation: confirm the current branch is `main`, fast-forward from `origin/main`, stage only scoped files, commit, push `origin main`, and watch CI/deploy status;
+- if `main` cannot fast-forward, GitHub auth is unavailable, local gates fail, or unrelated worktree changes cannot be isolated, stop and mark the stage blocked in the ledger; do not create a stage branch or draft PR as a workaround.
 
 # Acceptance criteria (Definition of Done)
 
 - Iteration ledger is updated with facts required by the next stage.
-- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - Stage 7 report exists and includes an evidence matrix.
 - Backend/API/UI/migration gates pass or failures are classified.
 - Runtime health/metrics/Prometheus/Monit evidence is present from the target runtime; if unavailable, report `not-ready` with exact blocker.
 - Security acceptance calls and secret grep are recorded.
 - Report states that future execution work is blocked until separate signal-to-execution design.
+- Shared ledger `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` is updated with stage status, evidence, blockers, next-stage facts, and direct-main delivery status.
+- Direct-main push to `origin/main` is completed after validation and CI/deploy status is recorded, or the stage is blocked with the exact reason.
+- No per-stage branch and no draft PR are created for this stage.
 
 # Implementation constraints
 
@@ -290,7 +305,8 @@ After the stage-specific implementation and validation steps:
 
 ## Documentation
 
-- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
+- Update the shared stage execution ledger before direct-main delivery; it is the canonical cross-stage handoff document.
+- Record direct-main delivery evidence in the ledger: commit SHA, `git push origin main` result, CI/deploy status, runtime status when applicable, or exact blocker.
 - Create Stage 7 report.
 - Update architecture/runbooks only if readiness evidence proves drift.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -305,6 +321,7 @@ After the stage-specific implementation and validation steps:
 
 Primary touches:
 
+- `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`
 - `docs/architecture/identity/exchange-connections-stage-reports/07-production-readiness.md`
 
 Possible secondary touches:
@@ -316,14 +333,13 @@ Possible secondary touches:
 
 # Non-goals
 
-- Publishing.
-- Deployment.
 - Signal-to-execution design.
 - Exchange execution.
 - Order placement.
 
 # Quality gates (must run and pass)
 
+- `test "$(git branch --show-current)" = main`
 - `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/apps/api/test_identity_exchange_keys_routes.py tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/contexts/exchange_control tests/unit/apps/migrations`
 - `uv run ruff check apps/api apps/web src/trading/contexts/identity src/trading/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web tests/unit/contexts/exchange_control`
@@ -339,10 +355,11 @@ Possible secondary touches:
 
 Your final message MUST be in Russian and follow exactly:
 
-Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
+Your final message MUST include direct-main commit SHA, `git push origin main` status, CI/deploy status, and deploy/runtime status.
 
 1. **Вердикт**
 2. **Evidence matrix**
 3. **Security и secrets**
 4. **Ops и runtime**
 5. **Residual risks**
+6. **Direct-main delivery**

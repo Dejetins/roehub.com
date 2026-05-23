@@ -15,7 +15,7 @@ context_sources:
     - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
       why: "Stage 2 source of truth"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
-      why: "shared iteration ledger and next-stage handoff facts"
+      why: "shared stage execution ledger and direct-main delivery handoff facts"
     - path: docs/architecture/identity/exchange-connections-stage-reports/01-security-baseline.md
       why: "accepted Stage 1 evidence"
   task_entrypoints:
@@ -71,18 +71,16 @@ documentation_continuity:
   canonical_shape: "stage report with Markdown evidence tables: endpoint, command, expected result, observed result, blocker"
   docs_gate: "python -m tools.docs.generate_docs_index --check"
 
-iteration_ledger:
+stage_execution_ledger:
   path: "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
+  plan_doc: "docs/architecture/identity/identity-exchange-connections-live-trading-v1.md"
+  current_stage: "02"
   update_required: true
-  required_sections:
-    - "Stage status"
-    - "Facts for next stages"
-    - "Contracts and migrations"
-    - "Publish / deploy handoff"
+  update_timing: "after validation, before direct-main push and final report"
+  direct_main_delivery_required: true
 
 hard_requirements:
   iteration_ledger_update_required: true
-  github_yeet_after_validation_required: true
   previous_stage_must_be_accepted: true
   exchange_control_process_mandatory_before_validation: true
   service_identity_required: true
@@ -91,15 +89,27 @@ hard_requirements:
   controlled_restart_evidence_required: true
   no_real_exchange_calls: true
   no_secret_decrypt_required_in_this_stage: true
+  stage_execution_ledger_update_required: true
+  direct_main_push_after_validation_required: true
+  feature_branch_per_stage_forbidden: true
+  draft_pr_forbidden: true
+  work_on_main_from_start_required: true
 
 task_toggles:
   implement_runtime_boundary: true
   implement_metrics: true
   implement_ops_configs: true
   update_runbook: true
-  github_yeet_after_validation: true
+  publish_after_success: true
+  direct_main_push_after_validation: true
+  target_branch: main
+  draft_pr_after_success: false
 
 skill_routing:
+  - skill: publish-ci-deploy
+    use_when: "stage implementation, validation, stage report, and ledger update are complete"
+    timing: "after validation and before final report"
+    reason: "user requires direct push to main after accepted validation, with CI/deploy follow-through"
   - skill: architecture-design
     use_when: "service boundary or dependency direction is unclear"
     timing: "before implementation only if needed"
@@ -113,10 +123,6 @@ skill_routing:
     timing: "during verification"
     reason: "backend and ops verification"
 
-  - skill: github:yeet
-    use_when: "stage implementation, validation, stage report, and iteration ledger update are complete"
-    timing: "before final report"
-    reason: "user requires each validated iteration to be pushed/deployed through GitHub draft PR handoff"
 
 target_envs:
   - local-dev
@@ -146,6 +152,7 @@ final_report_format:
     - "Metrics и ops"
     - "Проверки"
     - "Stage 3 readiness"
+    - "Direct-main delivery"
 
 quality_gates:
   - cmd: "uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api"
@@ -164,11 +171,16 @@ quality_gates:
     expect: "Prometheus can query the exchange-control target on the target runtime"
   - cmd: "/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | rg 'roehub_exchange_control'"
     expect: "Monit sees exchange-control on the target runtime"
+  - cmd: 'test "$(git branch --show-current)" = main'
+    expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
+  - cmd: "gh --version && gh auth status"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
   - cmd: "gh --version && gh auth status"
-    expect: "GitHub CLI is installed/authenticated before github:yeet; otherwise publish handoff is blocked"
+    expect: "GitHub CLI is installed/authenticated for CI/deploy inspection after pushing main"
 
 expected_primary_touches:
+  - "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
   - "src/trading/contexts/exchange_control/**"
   - "apps/exchange_control/** or equivalent runtime entrypoint"
   - "infra/macos/prometheus/prometheus.prod.yml"
@@ -207,8 +219,9 @@ If Stage 1 evidence is missing or blocked, stop.
 
 ## Requirements (Must)
 
-- Update the iteration ledger with stage status, evidence paths, changed contracts, migrations/config/env, blockers, and facts required by following stages.
-- After validation and ledger update, run `github:yeet`: inspect mixed worktree, stage only intended changes, commit, push branch, and open a draft PR. Record branch, commit, PR URL, and deploy/runtime status in the ledger and final report.
+- Before making changes, verify the current branch is `main` and `git pull --ff-only origin main` succeeds; if not, stop and mark the stage blocked instead of creating a side branch.
+- Update the shared stage execution ledger after validation and before delivery; include stage status, evidence, blockers, compatibility/rollback notes, CI/deploy status, and facts next stages must know.
+- After all required validation passes, deliver directly to `main`: stay/switch to `main`, run `git pull --ff-only origin main`, stage only scoped files, commit on `main`, push `origin main`, and follow CI/deploy status. Do not create a per-stage branch or draft PR.
 - Add the smallest production-shaped `exchange-control` runtime boundary.
 - Expose `GET /health/ready` and `/metrics`.
 - Export `exchange_control_active`.
@@ -251,6 +264,7 @@ Use front-matter `context_sources` as the canonical reading map. Do not eagerly 
 
 # Work plan (agent should follow)
 
+0. Verify the local checkout is on `main`, run `git pull --ff-only origin main`, and confirm there are no unrelated changes in scope. Stop if this cannot be proven.
 Skill routing for this task:
 
 - `architecture-design`: use only if process boundary/dependency direction is unclear.
@@ -263,21 +277,24 @@ Skill routing for this task:
 4. Add Prometheus/Monit/launchd/runbook updates.
 5. Run quality gates and create Stage 2 report.
 
-After the stage-specific implementation and validation steps:
+After stage-specific verification:
 
-- Update the iteration ledger with stage status, evidence, blockers, and next-stage facts.
-- Run `github:yeet` for targeted staging, commit, push, and draft PR. Do not stage unrelated user changes.
+- update `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` with accepted/blocked status, evidence, changed contracts, blockers, next-stage facts, and direct-main delivery status;
+- perform direct-main delivery only after successful validation: confirm the current branch is `main`, fast-forward from `origin/main`, stage only scoped files, commit, push `origin main`, and watch CI/deploy status;
+- if `main` cannot fast-forward, GitHub auth is unavailable, local gates fail, or unrelated worktree changes cannot be isolated, stop and mark the stage blocked in the ledger; do not create a stage branch or draft PR as a workaround.
 
 # Acceptance criteria (Definition of Done)
 
 - Iteration ledger is updated with facts required by the next stage.
-- `github:yeet` publish/deploy handoff is completed after validation, or the stage is marked blocked with the exact reason.
 - `curl -fsS http://127.0.0.1:9205/health/ready` returns ready in local smoke when service is started.
 - `curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_'` finds expected metrics.
 - Prometheus config includes `job="exchange-control"`.
 - Monit config identifies `roehub_exchange_control`.
 - Controlled restart through Monit/launchd succeeds and service returns ready afterward, or Stage 2 is reported blocked.
 - Stage report proves no real exchange endpoints are called.
+- Shared ledger `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` is updated with stage status, evidence, blockers, next-stage facts, and direct-main delivery status.
+- Direct-main push to `origin/main` is completed after validation and CI/deploy status is recorded, or the stage is blocked with the exact reason.
+- No per-stage branch and no draft PR are created for this stage.
 
 # Implementation constraints
 
@@ -293,7 +310,8 @@ After the stage-specific implementation and validation steps:
 
 ## Documentation
 
-- Update the iteration ledger before running `github:yeet`; this is the canonical cross-stage handoff document.
+- Update the shared stage execution ledger before direct-main delivery; it is the canonical cross-stage handoff document.
+- Record direct-main delivery evidence in the ledger: commit SHA, `git push origin main` result, CI/deploy status, runtime status when applicable, or exact blocker.
 - Create the Stage 2 report.
 - Update monitoring runbook and docs index if Markdown changes.
 - Review old/current docs listed in `documentation_continuity.old_current_docs`; if they describe stale behavior as current, update them in the same change, otherwise state that no stale text was found.
@@ -307,6 +325,7 @@ After the stage-specific implementation and validation steps:
 
 Primary touches:
 
+- `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md`
 - `src/trading/contexts/exchange_control/**`
 - `apps/exchange_control/** or equivalent runtime entrypoint`
 - `infra/macos/prometheus/prometheus.prod.yml`
@@ -331,6 +350,7 @@ Possible secondary touches:
 
 # Quality gates (must run and pass)
 
+- `test "$(git branch --show-current)" = main`
 - `gh --version && gh auth status`
 - `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api`
 - `uv run ruff check apps/api src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api`
@@ -345,10 +365,11 @@ Possible secondary touches:
 
 Your final message MUST be in Russian and follow exactly:
 
-Your final message MUST include `github:yeet` branch, commit, draft PR URL, and deploy/runtime status.
+Your final message MUST include direct-main commit SHA, `git push origin main` status, CI/deploy status, and deploy/runtime status.
 
 1. **Что реализовано**
 2. **Runtime boundary**
 3. **Metrics и ops**
 4. **Проверки**
 5. **Stage 3 readiness**
+6. **Direct-main delivery**
