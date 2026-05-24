@@ -2,13 +2,13 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: accepted for implementation validation; direct-main delivery pending.
+Статус: accepted; direct-main delivered; Mac Studio post-deploy evidence complete.
 Stage 3A, Stage 3B and Stage 3C are accepted, so Stage 4 added the additive
 connection schema, compatibility backfill path, account API facade and
 `exchange-control` internal command handlers. The command handlers use
 Postgres persistence when `IDENTITY_PG_DSN` is configured and keep the
 in-memory repository as dev/test fallback only. Production delivery evidence is
-recorded in the shared ledger after push/deploy.
+recorded in this report and the shared ledger.
 
 ## Scope
 
@@ -48,6 +48,20 @@ execution.
 | Disable | Local-dev curl `POST /api/ui/account/exchange-connections/{connection_id}/disable` | Same-origin authenticated call | Connection status becomes disabled. | Passed: `status=disabled`, `status_reason=user_disabled`. | Re-enable by future explicit operation; no delete performed. |
 | Legacy compatibility | Local-dev curl `GET /api/exchange-keys` | Cookie-authenticated request | Legacy endpoint still responds without secrets. | Passed on seeded local-dev runtime: `[]`; unit projection covers new-table compatibility read. | Legacy table remains present. |
 | Stage 3C preflight | `curl http://127.0.0.1:9205/internal/v1/capabilities ... stage-4-preflight` | Internal boundary reachable. | Passed locally: returned `exchange_connections.create/list/rotate/disable` capabilities and Stage 5 validation pending. | Stop Stage 4 if internal boundary becomes unavailable. |
+
+## Direct-Main And Runtime Evidence
+
+| Surface | Command / call | Expected result | Observed result | Rollback |
+|---|---|---|---|---|
+| Direct-main push | `git push origin main` | Scoped Stage 4 commit reaches `origin/main`. | Passed: `b60a4aac..31d7751e main -> main`; no stage branch or draft PR. | Revert `31d7751e` if Stage 4 must be removed before new writes. |
+| CI | GitHub Actions `26363347670` | CI succeeds on pushed commit. | Success. | Do not continue deploy on failure. |
+| Deploy | GitHub Actions workflow runs | Backend/image/web workflows succeed. | Deploy Backend `26363388408` success; Publish App Image `26363388422` success; Deploy Web `26363388432` and `26363392042` success. | Use normal main rollback/deploy path. |
+| Bundle | `test -f /opt/roehub/app/migrations/postgres/0008_exchange_connections_v1.sql` and `test -f /opt/roehub/app/src/trading/contexts/exchange_control/adapters/outbound/postgres_connections.py` | Stage 4 migration and Postgres repository are present on Mac Studio. | Passed: `migration_0008_present`; `postgres_repo_present`. | Revert deploy bundle if files are missing or mismatched. |
+| Postgres schema | `/opt/homebrew/bin/psql "$IDENTITY_PG_DSN" -Atc "select to_regclass(...)"` | New tables exist after deploy bootstrap. | Passed: `exchange_connections\|exchange_credential_versions`. | Run rollback only with row-count evidence and reverse-backfill if needed. |
+| Runtime health | `curl -fsS http://127.0.0.1:9205/health/ready` | `exchange-control` remains ready. | Passed: service `exchange-control`, identity `exchange-control`, validation disabled until Stage 5. | Stop Stage 5 if ready check fails. |
+| Internal capabilities | `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities ... stage-4-postdeploy-after-openbao-recovery` | Stage 4 handlers are advertised. | Passed: response includes `exchange_connections.create/list/rotate/disable` and `exchange_connections.validate.stage_5_pending`. | Keep Stage 5 blocked if capability regresses. |
+| OpenBao recovery | `bash /opt/roehub/bin/provision_openbao_transit_stage3a.sh`; `curl -fsS "$OPENBAO_ADDR/v1/sys/health"` | OpenBao unsealed after deploy reload. | Deploy reload left OpenBao sealed; host-local recovery unsealed it. Health now reports `sealed=false`, version `2.5.4`. | Use Stage 3A recovery runbook; do not record unseal material. |
+| Monit | `/opt/homebrew/bin/monit -c /opt/homebrew/etc/monitrc summary` | Relevant services are monitored and OK. | Passed after recovery interval: `roehub_openbao OK`, `roehub_exchange_control OK`. | Investigate Monit health before Stage 5. |
 
 ## Secret-Safety Evidence
 
