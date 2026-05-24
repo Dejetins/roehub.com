@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
+from apps.api.exchange_control_client import (
+    ExchangeControlClientConfig,
+    ExchangeControlClientError,
+    HttpExchangeControlClient,
+    InMemoryExchangeControlClient,
+)
 from apps.api.routes.ui_account import build_ui_account_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
@@ -234,6 +242,95 @@ def test_ui_account_mutations_reject_cross_origin_requests() -> None:
 
     assert response.status_code == 403
     assert response.json()["error"]["details"] == {"reason": "csrf_origin_mismatch"}
+
+
+def test_exchange_control_client_config_fails_closed_when_public_routes_enabled() -> None:
+    with pytest.raises(ValueError, match="INTERNAL_BASE_URL"):
+        ExchangeControlClientConfig.from_environ(
+            {"ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED": "true"}
+        )
+    with pytest.raises(ValueError, match="INTERNAL_API_TOKEN"):
+        ExchangeControlClientConfig.from_environ(
+            {
+                "ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED": "true",
+                "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL": "http://127.0.0.1:9205",
+            }
+        )
+
+    config = ExchangeControlClientConfig.from_environ(
+        {
+            "ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED": "true",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL": "http://127.0.0.1:9205",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+
+    assert config.public_routes_enabled
+    assert config.base_url == "http://127.0.0.1:9205"
+    assert config.build_client() is not None
+
+
+def test_exchange_control_http_client_sends_internal_auth_headers() -> None:
+    captured_headers: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured_headers.update(dict(request.headers))
+        return httpx.Response(
+            status_code=200,
+            json={
+                "service": "exchange-control",
+                "service_identity": "exchange-control",
+                "contract_version": "internal-v1",
+                "capabilities": ["capabilities.read"],
+            },
+        )
+
+    client = HttpExchangeControlClient(
+        base_url="http://127.0.0.1:9205",
+        internal_api_token="internal-token",
+        transport=httpx.MockTransport(handler),
+    )
+
+    capabilities = client.get_capabilities(request_id="stage-3c-test")
+
+    assert capabilities.service == "exchange-control"
+    assert capabilities.service_identity == "exchange-control"
+    assert capabilities.contract_version == "internal-v1"
+    assert capabilities.capabilities == ("capabilities.read",)
+    assert captured_headers["authorization"] == "Bearer internal-token"
+    assert captured_headers["x-roehub-internal-service"] == "apps/api"
+    assert captured_headers["x-request-id"] == "stage-3c-test"
+
+
+def test_exchange_control_http_client_sanitizes_failures() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=403,
+            json={"error": {"message": "internal-token leaked"}},
+        )
+
+    client = HttpExchangeControlClient(
+        base_url="http://127.0.0.1:9205",
+        internal_api_token="internal-token",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ExchangeControlClientError) as exc_info:
+        client.get_capabilities(request_id="stage-3c-test")
+
+    message = str(exc_info.value)
+    assert "403" in message
+    assert "internal-token" not in message
+
+
+def test_exchange_control_fake_client_is_deterministic() -> None:
+    client = InMemoryExchangeControlClient()
+
+    first = client.get_capabilities(request_id="first")
+    second = client.get_capabilities(request_id="second")
+
+    assert first == second
+    assert first.service == "exchange-control"
 
 
 def _build_test_client() -> tuple[

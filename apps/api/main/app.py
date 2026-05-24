@@ -11,6 +11,7 @@ from typing import Mapping
 from fastapi import FastAPI
 
 from apps.api.common import register_api_error_handlers
+from apps.api.exchange_control_client import build_exchange_control_client_from_environ
 from apps.api.monitoring import install_metrics_middleware
 from apps.api.routes import build_indicators_router, build_operations_router
 from apps.api.wiring.modules import (
@@ -74,6 +75,9 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app = FastAPI(
         title="Roehub API",
         version="1.0.0",
+    )
+    app.state.exchange_control_client = build_exchange_control_client_from_environ(
+        environ=effective_environ
     )
     install_metrics_middleware(app=app)
     register_api_error_handlers(app=app)

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hmac
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -30,6 +31,18 @@ from trading.contexts.exchange_control.application.service_identity import (
 
 EXCHANGE_CONTROL_DEFAULT_HOST = "127.0.0.1"
 EXCHANGE_CONTROL_METRICS_PORT = 9205
+EXCHANGE_CONTROL_INTERNAL_SERVICE = "apps/api"
+EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION = "internal-v1"
+EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
+    "capabilities.read",
+    "exchange_credentials.encrypt",
+    "exchange_credentials.decrypt.exchange_control_only",
+    "exchange_credentials.fingerprint",
+    "exchange_connections.create.stage_4_pending",
+    "exchange_connections.rotate.stage_4_pending",
+    "exchange_connections.disable.stage_4_pending",
+    "exchange_connections.validate.stage_5_pending",
+)
 SECRET_CIPHER_IN_MEMORY_DEV = "in_memory_dev"
 SECRET_CIPHER_OPENBAO_TRANSIT_V1 = "openbao_transit_v1"
 SECRET_CIPHER_VAULT_TRANSIT_V1 = "vault_transit_v1"
@@ -50,6 +63,7 @@ class ExchangeControlRuntimeConfig:
     exchange_control_transit_token: str | None = None
     api_transit_token_configured: bool = False
     transit_key_name: str = TRANSIT_KEY_NAME
+    internal_api_token: str | None = None
 
     @classmethod
     def from_environ(
@@ -90,6 +104,9 @@ class ExchangeControlRuntimeConfig:
             "ROEHUB_EXCHANGE_CONTROL_TRANSIT_KEY",
             TRANSIT_KEY_NAME,
         ).strip()
+        internal_api_token = _read_optional_str(
+            environ.get("ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN")
+        )
         config = cls(
             service_identity_name=service_identity_name,
             bind_host=resolved_host,
@@ -100,6 +117,7 @@ class ExchangeControlRuntimeConfig:
             exchange_control_transit_token=exchange_control_transit_token,
             api_transit_token_configured=api_transit_token is not None,
             transit_key_name=transit_key_name,
+            internal_api_token=internal_api_token,
         )
         config.validate(environment_name=environment_name)
         return config
@@ -134,6 +152,10 @@ class ExchangeControlRuntimeConfig:
                 )
             if not self.api_transit_token_configured:
                 raise ValueError("prod exchange-control requires ROEHUB_API_TRANSIT_TOKEN")
+            if not self.internal_api_token:
+                raise ValueError(
+                    "prod exchange-control requires ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
+                )
 
     def build_secret_cipher(self) -> ExchangeSecretCipher:
         if self.secret_cipher_backend == SECRET_CIPHER_IN_MEMORY_DEV:
@@ -201,7 +223,86 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             media_type=CONTENT_TYPE_LATEST,
         )
 
+    @app.get("/internal/v1/capabilities", include_in_schema=False)
+    def get_internal_capabilities(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_roehub_internal_service: str | None = Header(
+            default=None,
+            alias="X-Roehub-Internal-Service",
+        ),
+        x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    ) -> dict[str, object]:
+        _require_local_request(request=request)
+        _require_internal_auth(
+            authorization=authorization,
+            expected_token=config.internal_api_token,
+        )
+        _require_internal_service_header(value=x_roehub_internal_service)
+        request_id = _require_request_id(value=x_request_id)
+        return {
+            "service": "exchange-control",
+            "service_identity": service_identity.name,
+            "contract_version": EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION,
+            "request_id": request_id,
+            "capabilities": list(EXCHANGE_CONTROL_INTERNAL_CAPABILITIES),
+            "error_model": {
+                "shape": "roe_internal_error_v1",
+                "secret_safe": True,
+            },
+            "timeout_policy": {
+                "default_timeout_seconds": 2.0,
+                "retry_policy": "no_implicit_retry",
+                "mutating_commands_require_idempotency_key": True,
+            },
+        }
+
     return app
+
+
+def _require_local_request(*, request: Request) -> None:
+    client_host = request.client.host if request.client else ""
+    if client_host in {"127.0.0.1", "::1", "testclient"}:
+        return
+    raise _internal_error(status_code=403, code="internal_local_only")
+
+
+def _require_internal_auth(*, authorization: str | None, expected_token: str | None) -> None:
+    if not expected_token:
+        raise _internal_error(status_code=503, code="internal_auth_not_configured")
+    prefix = "Bearer "
+    if not authorization or not authorization.startswith(prefix):
+        raise _internal_error(status_code=401, code="internal_auth_required")
+    supplied_token = authorization.removeprefix(prefix)
+    if not hmac.compare_digest(supplied_token, expected_token):
+        raise _internal_error(status_code=403, code="internal_auth_denied")
+
+
+def _require_internal_service_header(*, value: str | None) -> None:
+    if value == EXCHANGE_CONTROL_INTERNAL_SERVICE:
+        return
+    raise _internal_error(status_code=403, code="internal_service_denied")
+
+
+def _require_request_id(*, value: str | None) -> str:
+    if value is None or value.strip() == "":
+        raise _internal_error(status_code=400, code="request_id_required")
+    request_id = value.strip()
+    if len(request_id) > 128:
+        raise _internal_error(status_code=400, code="request_id_invalid")
+    return request_id
+
+
+def _internal_error(*, status_code: int, code: str) -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "error": {
+                "code": code,
+                "message": "Internal exchange-control request rejected",
+            }
+        },
+    )
 
 
 def _read_int(*, value: str | None, default: int, name: str) -> int:
@@ -228,6 +329,7 @@ def _read_optional_str(value: str | None) -> str | None:
 
 __all__ = [
     "EXCHANGE_CONTROL_DEFAULT_HOST",
+    "EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION",
     "EXCHANGE_CONTROL_METRICS_PORT",
     "ExchangeControlRuntimeConfig",
     "create_exchange_control_app",

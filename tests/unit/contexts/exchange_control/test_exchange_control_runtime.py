@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from trading.contexts.exchange_control.adapters.inbound.http.app import (
+    EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION,
     EXCHANGE_CONTROL_METRICS_PORT,
     ExchangeControlRuntimeConfig,
     create_exchange_control_app,
@@ -45,6 +46,7 @@ def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> 
         "OPENBAO_ADDR": "http://127.0.0.1:8200",
         "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
         "ROEHUB_API_TRANSIT_TOKEN": "api-token",
+        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
     }
     config = ExchangeControlRuntimeConfig.from_environ(environ=environ)
 
@@ -80,11 +82,16 @@ def test_prod_runtime_fails_closed_without_transit_config() -> None:
         "OPENBAO_ADDR": "http://127.0.0.1:8200",
         "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
         "ROEHUB_API_TRANSIT_TOKEN": "api-token",
+        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
     }
     for missing_name, expected in (
         ("OPENBAO_ADDR", "OPENBAO_ADDR"),
         ("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN"),
         ("ROEHUB_API_TRANSIT_TOKEN", "ROEHUB_API_TRANSIT_TOKEN"),
+        (
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
+        ),
     ):
         environ = dict(base_environ)
         del environ[missing_name]
@@ -129,6 +136,86 @@ def test_metrics_expose_secret_safe_exchange_control_series() -> None:
     assert 'exchange="none"' in response.text
     assert "api_key" not in response.text
     assert "connection_id" not in response.text
+
+
+def test_internal_capabilities_require_service_auth_and_headers() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+
+    missing_auth = client.get(
+        "/internal/v1/capabilities",
+        headers={
+            "X-Roehub-Internal-Service": "apps/api",
+            "X-Request-Id": "stage-3c-test",
+        },
+    )
+    invalid_auth = client.get(
+        "/internal/v1/capabilities",
+        headers={
+            "Authorization": "Bearer wrong-token",
+            "X-Roehub-Internal-Service": "apps/api",
+            "X-Request-Id": "stage-3c-test",
+        },
+    )
+    missing_service = client.get(
+        "/internal/v1/capabilities",
+        headers={
+            "Authorization": "Bearer internal-token",
+            "X-Request-Id": "stage-3c-test",
+        },
+    )
+    missing_request_id = client.get(
+        "/internal/v1/capabilities",
+        headers={
+            "Authorization": "Bearer internal-token",
+            "X-Roehub-Internal-Service": "apps/api",
+        },
+    )
+
+    assert missing_auth.status_code == 401
+    assert missing_auth.json()["detail"]["error"]["code"] == "internal_auth_required"
+    assert invalid_auth.status_code == 403
+    assert invalid_auth.json()["detail"]["error"]["code"] == "internal_auth_denied"
+    assert missing_service.status_code == 403
+    assert missing_service.json()["detail"]["error"]["code"] == "internal_service_denied"
+    assert missing_request_id.status_code == 400
+    assert missing_request_id.json()["detail"]["error"]["code"] == "request_id_required"
+
+
+def test_internal_capabilities_are_secret_safe() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+
+    response = client.get(
+        "/internal/v1/capabilities",
+        headers={
+            "Authorization": "Bearer internal-token",
+            "X-Roehub-Internal-Service": "apps/api",
+            "X-Request-Id": "stage-3c-test",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "exchange-control"
+    assert payload["service_identity"] == "exchange-control"
+    assert payload["contract_version"] == EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION
+    assert payload["request_id"] == "stage-3c-test"
+    assert "capabilities.read" in payload["capabilities"]
+    assert payload["timeout_policy"]["retry_policy"] == "no_implicit_retry"
+    assert "internal-token" not in response.text
+    assert "api_secret" not in response.text
+    assert "passphrase" not in response.text
 
 
 def test_secret_value_objects_redact_repr() -> None:

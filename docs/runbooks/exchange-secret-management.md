@@ -69,6 +69,48 @@ Expected result: startup succeeds only when `OPENBAO_ADDR`,
 and fixed key are available. Missing Transit config must fail startup before
 any credential operation can run.
 
+## Internal Command API
+
+Stage 3C adds the local-only `apps/api -> exchange-control` boundary. The
+internal API is for capabilities smoke only until Stage 4/5 add business
+handlers.
+
+| Runtime env var / header | Consumer | Required value / shape | Notes |
+|---|---|---|---|
+| `ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN` | `exchange-control`, `apps/api` | Shared service-to-service token stored only in host-local env. | Missing token fails `exchange-control` product startup and internal API auth. |
+| `ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL` | `apps/api` | `http://127.0.0.1:9205` on Mac Studio. | Launchd supplies the local default; future public exchange connection routes fail closed if enabled without it. |
+| `Authorization` | `apps/api -> exchange-control` | `Bearer <ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN>` | Never log or copy the token value. |
+| `X-Roehub-Internal-Service` | `apps/api -> exchange-control` | `apps/api` | Missing/wrong value is denied. |
+| `X-Request-Id` | `apps/api -> exchange-control` | Non-empty request id, for example `stage-3c-smoke`. | Echoed in capabilities response; do not put user, credential or secret values in it. |
+
+Smoke command shape:
+
+```bash
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+
+curl -fsS http://127.0.0.1:9205/internal/v1/capabilities \
+  -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" \
+  -H "X-Roehub-Internal-Service: apps/api" \
+  -H "X-Request-Id: stage-3c-smoke"
+
+curl -i http://127.0.0.1:9205/internal/v1/capabilities \
+  -H "X-Roehub-Internal-Service: apps/api"
+```
+
+Expected results:
+
+| Check | Expected result |
+|---|---|
+| Authenticated capabilities | `service=exchange-control`, `contract_version=internal-v1`, secret-free capabilities and `retry_policy=no_implicit_retry`. |
+| Missing auth | HTTP `401` with sanitized `internal_auth_required`. |
+| Wrong service/token | HTTP `403` with sanitized error code. |
+
+Timeout/retry policy: `apps/api` uses a short default timeout of 2 seconds and
+does not perform hidden retries. Future mutating commands must include explicit
+idempotency keys.
+
 ## Provisioning
 
 Use this only from the Mac Studio target runtime after the OpenBao launchd
