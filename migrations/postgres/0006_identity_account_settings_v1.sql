@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS identity_user_preferences (
 CREATE INDEX IF NOT EXISTS idx_identity_user_preferences_updated_at
     ON identity_user_preferences(updated_at DESC);
 
+ALTER TABLE identity_user_preferences
+    ADD COLUMN IF NOT EXISTS autorefresh_preset TEXT NOT NULL DEFAULT '15s';
+
+ALTER TABLE identity_user_preferences
+    ADD COLUMN IF NOT EXISTS refresh_interval_seconds INTEGER NOT NULL DEFAULT 15;
+
 CREATE TABLE IF NOT EXISTS identity_user_profile_overrides (
     owner_user_id UUID PRIMARY KEY REFERENCES identity_users(user_id) ON DELETE CASCADE,
     username TEXT,
@@ -93,5 +99,8 @@ CREATE TABLE IF NOT EXISTS identity_audit_events (
 
 CREATE INDEX IF NOT EXISTS idx_identity_audit_events_owner_created
     ON identity_audit_events(owner_user_id, created_at DESC, event_id DESC);
+
+ALTER TABLE identity_audit_events
+    ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT 'Account event';
 
 COMMIT;

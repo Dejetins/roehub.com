@@ -48,6 +48,7 @@ def _expected_origin_sources(*, request: Request) -> tuple[tuple[str, str | None
             index=index,
         )
         sources.append((forwarded_host, forwarded_proto))
+        sources.append((forwarded_host, None))
 
     sources.extend(_forwarded_header_sources(value=request.headers.get("forwarded")))
     return tuple(dict.fromkeys(sources))
@@ -112,6 +113,7 @@ def _forwarded_header_sources(*, value: str | None) -> tuple[tuple[str, str | No
         forwarded_host = params.get(_FORWARDED_HOST_KEY)
         if forwarded_host:
             sources.append((forwarded_host, params.get(_FORWARDED_PROTO_KEY)))
+            sources.append((forwarded_host, None))
     return tuple(sources)
 
 
