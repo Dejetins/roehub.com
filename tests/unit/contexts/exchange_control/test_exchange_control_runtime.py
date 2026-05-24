@@ -8,6 +8,16 @@ from trading.contexts.exchange_control.adapters.inbound.http.app import (
     ExchangeControlRuntimeConfig,
     create_exchange_control_app,
 )
+from trading.contexts.exchange_control.adapters.outbound.openbao_transit import (
+    OpenBaoTransitExchangeSecretCipher,
+)
+from trading.contexts.exchange_control.application.secret_cipher import (
+    TRANSIT_KEY_NAME,
+    DeterministicInMemoryExchangeSecretCipher,
+    ExchangeCredentialCiphertext,
+    ExchangeCredentialSecret,
+    ExchangeSecretCipherError,
+)
 from trading.contexts.exchange_control.application.service_identity import (
     EXCHANGE_CONTROL_SERVICE_IDENTITY,
     ExchangeControlServiceIdentity,
@@ -29,16 +39,25 @@ def test_service_identity_is_mandatory_exchange_control() -> None:
 
 
 def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(environ={"ROEHUB_ENV": "prod"})
+    environ = {
+        "ROEHUB_ENV": "prod",
+        "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
+        "OPENBAO_ADDR": "http://127.0.0.1:8200",
+        "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
+        "ROEHUB_API_TRANSIT_TOKEN": "api-token",
+    }
+    config = ExchangeControlRuntimeConfig.from_environ(environ=environ)
 
     assert config.service_identity_name == "exchange-control"
     assert config.bind_host == "127.0.0.1"
     assert config.metrics_port == EXCHANGE_CONTROL_METRICS_PORT
     assert not config.real_exchange_validation_enabled
+    assert config.secret_cipher_backend == "openbao_transit_v1"
+    assert config.transit_key_name == TRANSIT_KEY_NAME
 
     with pytest.raises(ValueError, match="port 9205"):
         ExchangeControlRuntimeConfig.from_environ(
-            environ={"ROEHUB_ENV": "prod"},
+            environ=environ,
             metrics_port=9206,
         )
 
@@ -47,6 +66,36 @@ def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> 
             environ={
                 "ROEHUB_ENV": "prod",
                 "ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED": "true",
+            }
+        )
+
+
+def test_prod_runtime_fails_closed_without_transit_config() -> None:
+    with pytest.raises(ValueError, match="requires OpenBao/Vault Transit"):
+        ExchangeControlRuntimeConfig.from_environ(environ={"ROEHUB_ENV": "prod"})
+
+    base_environ = {
+        "ROEHUB_ENV": "prod",
+        "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
+        "OPENBAO_ADDR": "http://127.0.0.1:8200",
+        "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
+        "ROEHUB_API_TRANSIT_TOKEN": "api-token",
+    }
+    for missing_name, expected in (
+        ("OPENBAO_ADDR", "OPENBAO_ADDR"),
+        ("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN"),
+        ("ROEHUB_API_TRANSIT_TOKEN", "ROEHUB_API_TRANSIT_TOKEN"),
+    ):
+        environ = dict(base_environ)
+        del environ[missing_name]
+        with pytest.raises(ValueError, match=expected):
+            ExchangeControlRuntimeConfig.from_environ(environ=environ)
+
+    with pytest.raises(ValueError, match="roehub-exchange-credentials"):
+        ExchangeControlRuntimeConfig.from_environ(
+            environ={
+                **base_environ,
+                "ROEHUB_EXCHANGE_CONTROL_TRANSIT_KEY": "wrong-key",
             }
         )
 
@@ -80,3 +129,61 @@ def test_metrics_expose_secret_safe_exchange_control_series() -> None:
     assert 'exchange="none"' in response.text
     assert "api_key" not in response.text
     assert "connection_id" not in response.text
+
+
+def test_secret_value_objects_redact_repr() -> None:
+    secret = ExchangeCredentialSecret(value="TEST_SECRET")
+    ciphertext = ExchangeCredentialCiphertext(value="vault:v1:test-ciphertext")
+    fingerprint = DeterministicInMemoryExchangeSecretCipher().fingerprint(secret)
+
+    assert "TEST_SECRET" not in repr(secret)
+    assert "test-ciphertext" not in repr(ciphertext)
+    assert fingerprint.value not in repr(fingerprint)
+
+
+def test_deterministic_test_cipher_encrypts_and_fingerprints_without_decrypt_path() -> None:
+    cipher = DeterministicInMemoryExchangeSecretCipher()
+    secret = ExchangeCredentialSecret(value="TEST_SECRET")
+
+    first = cipher.encrypt(secret)
+    second = cipher.encrypt(secret)
+    fingerprint = cipher.fingerprint(secret)
+
+    assert first == second
+    assert first.value.startswith("vault:v1:deterministic:")
+    assert fingerprint.value.startswith("hmac-sha256:")
+    with pytest.raises(ExchangeSecretCipherError, match="decrypt is unavailable"):
+        cipher.decrypt(first)
+
+
+def test_openbao_transit_adapter_sanitizes_http_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+    import urllib.request
+    from email.message import Message
+
+    def raise_http_error(
+        request: urllib.request.Request,
+        *,
+        timeout: float,
+    ) -> object:
+        raise urllib.error.HTTPError(
+            url=request.full_url,
+            code=403,
+            msg="permission denied: TEST_SECRET",
+            hdrs=Message(),
+            fp=None,
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", raise_http_error)
+    cipher = OpenBaoTransitExchangeSecretCipher(
+        address="http://127.0.0.1:8200",
+        token="exchange-control-token",
+    )
+
+    with pytest.raises(ExchangeSecretCipherError) as exc_info:
+        cipher.encrypt(ExchangeCredentialSecret(value="TEST_SECRET"))
+
+    message = str(exc_info.value)
+    assert "403" in message
+    assert "TEST_SECRET" not in message
+    assert "permission denied" not in message

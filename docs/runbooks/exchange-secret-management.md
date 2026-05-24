@@ -36,6 +36,39 @@ Transit key:
 - mount: `transit`
 - key: `roehub-exchange-credentials`
 
+## Application Integration
+
+Stage 3B wires only the `exchange-control` process to the Transit-compatible
+secret boundary. `apps/api` must not import `ExchangeSecretCipher`, the
+OpenBao/Vault adapter, or any decrypt-capable token.
+
+| Runtime env var | Consumer | Required value / shape | Notes |
+|---|---|---|---|
+| `ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER` | `exchange-control` | `openbao_transit_v1` on Mac Studio; `vault_transit_v1` is the compatible Vault selector. | `ROEHUB_ENV=prod` rejects the dev in-memory fake. |
+| `OPENBAO_ADDR` | `exchange-control` | `http://127.0.0.1:8200` on Mac Studio. | Sourced from host-local `roehub.env`; do not commit values from that file. |
+| `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN` | `exchange-control` | Scoped service token. | Used for Transit encrypt/decrypt/HMAC only inside `exchange-control`. |
+| `ROEHUB_API_TRANSIT_TOKEN` | deny evidence / future API boundary checks | Scoped API identity with no decrypt capability. | Stage 3B requires this env to be present in product mode only to prove separation; it must not be used as a decrypt token. |
+| `ROEHUB_EXCHANGE_CONTROL_TRANSIT_KEY` | `exchange-control` | `roehub-exchange-credentials` | Product config rejects any other key name. |
+
+Launchd injects the non-secret selector/key and sources address/token values
+from `/Users/daniildegtyarev/.config/roehub/roehub.env`:
+
+```bash
+export ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER=openbao_transit_v1
+export ROEHUB_EXCHANGE_CONTROL_TRANSIT_KEY=roehub-exchange-credentials
+```
+
+Product-mode fail-closed checks:
+
+```bash
+ROEHUB_ENV=prod python -m apps.exchange_control.main.main --host 127.0.0.1 --port 9205
+```
+
+Expected result: startup succeeds only when `OPENBAO_ADDR`,
+`ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN`, `ROEHUB_API_TRANSIT_TOKEN`, selector
+and fixed key are available. Missing Transit config must fail startup before
+any credential operation can run.
+
 ## Provisioning
 
 Use this only from the Mac Studio target runtime after the OpenBao launchd
@@ -119,6 +152,16 @@ bao write -f transit/keys/roehub-exchange-credentials/rotate
 Rotation adds a new key version without exposing plaintext. Stage 3B+ must keep
 stored ciphertexts as Transit ciphertext and use Transit rewrap/rotation flows
 instead of decrypting through `apps/api`.
+
+Future Stage 4+ stored ciphertext rewrap command shape:
+
+```bash
+bao write transit/rewrap/roehub-exchange-credentials ciphertext=<stored-transit-ciphertext>
+```
+
+The rewrapped ciphertext replaces the stored Transit ciphertext only after the
+owning application flow has recorded a redacted audit event. Do not print,
+commit or paste real ciphertexts while performing rewrap evidence.
 
 ## Emergency Disable
 
