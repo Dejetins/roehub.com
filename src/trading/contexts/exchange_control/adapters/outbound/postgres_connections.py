@@ -729,11 +729,18 @@ def _fingerprint_bytes(value: str) -> bytes:
 
 
 def _fingerprint_text(value: object) -> str:
+    if isinstance(value, str):
+        return value
     if isinstance(value, memoryview):
-        return value.tobytes().decode("utf-8")
-    if isinstance(value, bytes):
-        return value.decode("utf-8")
-    return bytes(value).decode("utf-8")  # type: ignore[arg-type]
+        raw_value = value.tobytes()
+    elif isinstance(value, bytes):
+        raw_value = value
+    else:
+        raw_value = bytes(value)  # type: ignore[arg-type]
+    try:
+        return raw_value.decode("utf-8")
+    except UnicodeDecodeError:
+        return f"legacy-bytea-sha256:{raw_value.hex()}"
 
 
 def _normalize_utc_datetime(*, value: object) -> datetime:
