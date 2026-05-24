@@ -238,6 +238,32 @@ def build_ui_account_router(
             raise _exchange_control_unavailable(error=error) from error
         return _exchange_connection_response(row=row)
 
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/validate",
+        response_model=ExchangeConnectionResponse,
+    )
+    def post_exchange_connection_validate(
+        connection_id: UUID,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request)
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            row = client.validate_connection(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                request_id="apps-api-validate-exchange-connection",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        account_settings.record_exchange_connection_validation(
+            owner_user_id=principal.user_id,
+            exchange_name=row.exchange_name,
+            validation_status=row.validation_status,
+        )
+        return _exchange_connection_response(row=row)
+
     @router.get("/ui/account/integrations", response_model=AccountIntegrationsResponse)
     def get_integrations(
         principal: CurrentUserPrincipal = Depends(require_account_user),
@@ -449,6 +475,10 @@ def _exchange_connection_response(
         api_key=row.api_key,
         status=_connection_status_literal(value=row.status),
         status_reason=row.status_reason,
+        validation_status=_validation_status_literal(value=row.validation_status),
+        validation_reason=row.validation_reason,
+        ip_restriction_status=row.ip_restriction_status,
+        last_validated_at=row.last_validated_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
         disabled_at=row.disabled_at,
@@ -609,3 +639,29 @@ def _connection_status_literal(*, value: str) -> Literal["active", "disabled"]:
     if value == "active" or value == "disabled":
         return value
     raise ValueError(f"Unsupported connection status value: {value!r}")
+
+
+def _validation_status_literal(
+    *,
+    value: str,
+) -> Literal[
+    "valid_readonly",
+    "valid_trade_enabled",
+    "invalid_credentials",
+    "invalid_permissions",
+    "invalid_ip_restriction",
+    "unsupported_account_mode",
+    "skipped_external_validation",
+]:
+    allowed = {
+        "valid_readonly",
+        "valid_trade_enabled",
+        "invalid_credentials",
+        "invalid_permissions",
+        "invalid_ip_restriction",
+        "unsupported_account_mode",
+        "skipped_external_validation",
+    }
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    raise ValueError(f"Unsupported validation status value: {value!r}")

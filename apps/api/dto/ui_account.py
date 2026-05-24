@@ -81,6 +81,18 @@ class ExchangeConnectionResponse(BaseModel):
     api_key: str
     status: Literal["active", "disabled"]
     status_reason: str | None
+    validation_status: Literal[
+        "valid_readonly",
+        "valid_trade_enabled",
+        "invalid_credentials",
+        "invalid_permissions",
+        "invalid_ip_restriction",
+        "unsupported_account_mode",
+        "skipped_external_validation",
+    ]
+    validation_reason: str | None
+    ip_restriction_status: str
+    last_validated_at: datetime | None
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None

@@ -7,8 +7,16 @@ from typing import Protocol
 from uuid import UUID, uuid4
 
 from trading.contexts.exchange_control.application.secret_cipher import (
+    ExchangeCredentialCiphertext,
     ExchangeCredentialSecret,
     ExchangeSecretCipher,
+    ExchangeSecretCipherError,
+)
+from trading.contexts.exchange_control.application.validation import (
+    ExchangeCredentialPlaintext,
+    ExchangeCredentialValidationRequest,
+    ExchangeCredentialValidationResult,
+    ExchangeCredentialValidator,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -42,6 +50,10 @@ class ExchangeConnectionView:
     api_key: str
     status: str
     status_reason: str | None
+    validation_status: str
+    validation_reason: str | None
+    ip_restriction_status: str
+    last_validated_at: datetime | None
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None = None
@@ -78,6 +90,10 @@ class ExchangeConnectionRecord:
     active_credential_version_id: UUID
     status: str
     status_reason: str | None
+    validation_status: str
+    validation_reason: str | None
+    ip_restriction_status: str
+    last_validated_at: datetime | None
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None = None
@@ -114,6 +130,15 @@ class ExchangeConnectionRepository(Protocol):
         connection_id: UUID,
         owner_user_id: UserId,
         disabled_at: datetime,
+    ) -> ExchangeConnectionRecord | None: ...
+
+    def record_validation(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        result: ExchangeCredentialValidationResult,
+        updated_at: datetime,
     ) -> ExchangeConnectionRecord | None: ...
 
 
@@ -198,6 +223,10 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         updated = replace(
             connection,
             active_credential_version_id=credential_version.credential_version_id,
+            validation_status="skipped_external_validation",
+            validation_reason="credential_rotated",
+            ip_restriction_status="unknown",
+            last_validated_at=None,
             updated_at=updated_at,
         )
         self._connections[connection_id] = updated
@@ -230,6 +259,30 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         )
         self._connections[connection_id] = disabled
         return disabled
+
+    def record_validation(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        result: ExchangeCredentialValidationResult,
+        updated_at: datetime,
+    ) -> ExchangeConnectionRecord | None:
+        connection = self._connections.get(connection_id)
+        if connection is None or connection.owner_user_id != owner_user_id:
+            return None
+        if connection.status == "disabled":
+            return None
+        updated = replace(
+            connection,
+            validation_status=result.status,
+            validation_reason=result.reason,
+            ip_restriction_status=result.ip_restriction_status,
+            last_validated_at=result.observed_at or updated_at,
+            updated_at=updated_at,
+        )
+        self._connections[connection_id] = updated
+        return updated
 
 
 class ExchangeConnectionService:
@@ -288,6 +341,10 @@ class ExchangeConnectionService:
             active_credential_version_id=credential_version.credential_version_id,
             status="active",
             status_reason=None,
+            validation_status="skipped_external_validation",
+            validation_reason="not_validated",
+            ip_restriction_status="unknown",
+            last_validated_at=None,
             created_at=now,
             updated_at=now,
         )
@@ -373,6 +430,71 @@ class ExchangeConnectionService:
             raise _not_found()
         return self._to_view(connection=disabled)
 
+    def validate_connection(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        validator: ExchangeCredentialValidator,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        connection = self._require_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        if bool(getattr(validator, "requires_plaintext", True)):
+            credential = self._repository.get_active_credential(connection_id=connection_id)
+            if credential is None:
+                raise _not_found()
+            try:
+                plaintext = ExchangeCredentialPlaintext(
+                    api_key=self._secret_cipher.decrypt(
+                        ExchangeCredentialCiphertext(value=credential.api_key_ciphertext)
+                    ).value,
+                    api_secret=self._secret_cipher.decrypt(
+                        ExchangeCredentialCiphertext(value=credential.api_secret_ciphertext)
+                    ).value,
+                    passphrase=(
+                        self._secret_cipher.decrypt(
+                            ExchangeCredentialCiphertext(
+                                value=credential.passphrase_ciphertext
+                            )
+                        ).value
+                        if credential.passphrase_ciphertext is not None
+                        else None
+                    ),
+                )
+            except ExchangeSecretCipherError as exc:
+                raise ExchangeConnectionError(
+                    code="exchange_connection_validation_unavailable",
+                    message="Exchange connection validation is unavailable.",
+                    status_code=503,
+                ) from exc
+        else:
+            plaintext = ExchangeCredentialPlaintext(
+                api_key="skipped_external_validation",
+                api_secret="skipped_external_validation",
+            )
+        result = validator.validate(
+            request=ExchangeCredentialValidationRequest(
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                environment=connection.environment,
+                requested_permissions=connection.permissions,
+                credential=plaintext,
+            ),
+            now=now,
+        )
+        updated = self._repository.record_validation(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            result=result,
+            updated_at=now,
+        )
+        if updated is None:
+            raise _not_found()
+        return self._to_view(connection=updated)
+
     def _require_owned_connection(
         self, *, owner_user_id: UserId, connection_id: UUID
     ) -> ExchangeConnectionRecord:
@@ -442,6 +564,10 @@ class ExchangeConnectionService:
             api_key=f"****{credential.api_key_last4}",
             status=connection.status,
             status_reason=connection.status_reason,
+            validation_status=connection.validation_status,
+            validation_reason=connection.validation_reason,
+            ip_restriction_status=connection.ip_restriction_status,
+            last_validated_at=connection.last_validated_at,
             created_at=connection.created_at,
             updated_at=connection.updated_at,
             disabled_at=connection.disabled_at,

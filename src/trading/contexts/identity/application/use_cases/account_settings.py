@@ -223,6 +223,24 @@ class AccountSettingsUseCase:
             limit=_normalize_limit(limit),
         )
 
+    def record_exchange_connection_validation(
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_name: str,
+        validation_status: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="exchange_connection_validated",
+            summary="Exchange connection validation completed",
+            metadata={
+                "exchange": exchange_name,
+                "validation_status": validation_status,
+            },
+            created_at=self.clock.now(),
+        )
+
 
 def _optional_trim(value: str | None) -> str | None:
     if value is None:

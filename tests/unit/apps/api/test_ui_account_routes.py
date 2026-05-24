@@ -116,6 +116,7 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     connection_id = created_payload["connection_id"]
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
+    assert created_payload["validation_status"] == "skipped_external_validation"
     for forbidden in ("TEST_SECRET_STAGE4", "TEST_PASSPHRASE_STAGE4", "ciphertext", "hmac"):
         assert forbidden not in created.text
 
@@ -147,6 +148,46 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert disabled.status_code == 200
     assert disabled.json()["connection_id"] == connection_id
     assert disabled.json()["status"] == "disabled"
+
+
+def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "readonly",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY5555",
+            "api_secret": "TEST_SECRET_STAGE5",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    connection_id = created.json()["connection_id"]
+
+    validated = client.post(
+        f"/ui/account/exchange-connections/{connection_id}/validate",
+        headers={"origin": "http://testserver"},
+    )
+
+    assert validated.status_code == 200
+    payload = validated.json()
+    assert payload["connection_id"] == connection_id
+    assert payload["validation_status"] == "valid_readonly"
+    assert payload["validation_reason"] == "fake_client_readonly"
+    assert payload["last_validated_at"] is not None
+    assert "TEST_SECRET_STAGE5" not in validated.text
+
+    audit = client.get("/ui/account/audit-events")
+    assert audit.status_code == 200
+    assert audit.json()["items"][0]["event_type"] == "exchange_connection_validated"
+    assert audit.json()["items"][0]["metadata"] == {
+        "exchange": "bybit",
+        "validation_status": "valid_readonly",
+    }
 
 
 def test_ui_account_exchange_connections_reject_linear_and_inverse_market_types() -> None:

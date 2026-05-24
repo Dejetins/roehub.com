@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Mapping, cast
 from uuid import UUID
@@ -12,6 +13,9 @@ from trading.contexts.exchange_control.application.connections import (
     ExchangeConnectionRecord,
     ExchangeConnectionRepository,
     ExchangeCredentialVersionRecord,
+)
+from trading.contexts.exchange_control.application.validation import (
+    ExchangeCredentialValidationResult,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -97,7 +101,11 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 %(active_credential_version_id)s,
                                 %(status)s,
                                 %(status_reason)s,
-                                jsonb_build_object('permissions', %(permissions)s),
+                                jsonb_build_object(
+                                    'permissions', %(permissions)s,
+                                    'validation_status', %(validation_status)s,
+                                    'validation_reason', %(validation_reason)s
+                                ),
                                 'unknown',
                                 %(created_at)s,
                                 %(updated_at)s,
@@ -114,6 +122,12 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 status,
                                 status_reason,
                                 permission_summary_json ->> 'permissions' AS permissions,
+                                permission_summary_json ->> 'validation_status'
+                                    AS validation_status,
+                                permission_summary_json ->> 'validation_reason'
+                                    AS validation_reason,
+                                ip_restriction_status,
+                                last_validated_at,
                                 created_at,
                                 updated_at,
                                 disabled_at
@@ -201,6 +215,12 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.status_reason,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
                             connection.disabled_at
@@ -340,6 +360,14 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         """
                         UPDATE exchange_connections AS connection
                         SET active_credential_version_id = %(credential_version_id)s,
+                            permission_summary_json =
+                                connection.permission_summary_json
+                                || jsonb_build_object(
+                                    'validation_status', 'skipped_external_validation',
+                                    'validation_reason', 'credential_rotated'
+                                ),
+                            ip_restriction_status = 'unknown',
+                            last_validated_at = NULL,
                             updated_at = %(updated_at)s
                         WHERE connection.connection_id = %(connection_id)s
                           AND connection.owner_user_id = %(owner_user_id)s
@@ -356,6 +384,12 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.status_reason,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
                             connection.disabled_at
@@ -447,6 +481,12 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.status_reason,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
                             connection.disabled_at
@@ -455,6 +495,77 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     {
                         "updated_at": disabled_at,
                         "disabled_at": disabled_at,
+                        "connection_id": str(connection_id),
+                        "owner_user_id": str(owner_user_id),
+                    },
+                )
+                row = cursor.fetchone()
+        return _map_connection(row=dict(row)) if row is not None else None
+
+    def record_validation(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        result: ExchangeCredentialValidationResult,
+        updated_at: datetime,
+    ) -> ExchangeConnectionRecord | None:
+        observed_at = result.observed_at or updated_at
+        with psycopg.connect(
+            self._dsn,
+            row_factory=cast(Any, dict_row),
+        ) as postgres_connection:
+            with postgres_connection.cursor() as cursor:
+                cursor.execute(
+                    cast(
+                        Any,
+                        """
+                        UPDATE exchange_connections AS connection
+                        SET permission_summary_json =
+                                connection.permission_summary_json
+                                || %(permission_summary_json)s::jsonb
+                                || jsonb_build_object(
+                                    'validation_status', %(validation_status)s,
+                                    'validation_reason', %(validation_reason)s
+                                ),
+                            ip_restriction_status = %(ip_restriction_status)s,
+                            last_validated_at = %(last_validated_at)s,
+                            updated_at = %(updated_at)s
+                        WHERE connection.connection_id = %(connection_id)s
+                          AND connection.owner_user_id = %(owner_user_id)s
+                          AND connection.status = 'active'
+                        RETURNING
+                            connection.connection_id,
+                            connection.owner_user_id,
+                            connection.exchange_name,
+                            connection.market_type,
+                            connection.environment,
+                            connection.label,
+                            connection.active_credential_version_id,
+                            connection.status,
+                            connection.status_reason,
+                            connection.permission_summary_json ->> 'permissions'
+                                AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
+                            connection.created_at,
+                            connection.updated_at,
+                            connection.disabled_at
+                        """,
+                    ),
+                    {
+                        "permission_summary_json": json.dumps(
+                            result.permission_summary or {}
+                        ),
+                        "validation_status": result.status,
+                        "validation_reason": result.reason,
+                        "ip_restriction_status": result.ip_restriction_status,
+                        "last_validated_at": observed_at,
+                        "updated_at": updated_at,
                         "connection_id": str(connection_id),
                         "owner_user_id": str(owner_user_id),
                     },
@@ -489,6 +600,12 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.status_reason,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
                             connection.disabled_at
@@ -517,6 +634,8 @@ def _connection_parameters(
         "status": connection.status,
         "status_reason": connection.status_reason,
         "permissions": connection.permissions,
+        "validation_status": connection.validation_status,
+        "validation_reason": connection.validation_reason,
         "created_at": connection.created_at,
         "updated_at": connection.updated_at,
         "disabled_at": connection.disabled_at,
@@ -562,6 +681,18 @@ def _map_connection(*, row: Mapping[str, Any]) -> ExchangeConnectionRecord:
         status=str(row["status"]),
         status_reason=(
             str(row["status_reason"]) if row["status_reason"] is not None else None
+        ),
+        validation_status=str(
+            row.get("validation_status") or "skipped_external_validation"
+        ),
+        validation_reason=(
+            str(row.get("validation_reason"))
+            if row.get("validation_reason") is not None
+            else "not_validated"
+        ),
+        ip_restriction_status=str(row.get("ip_restriction_status") or "unknown"),
+        last_validated_at=_normalize_optional_utc_datetime(
+            value=row.get("last_validated_at")
         ),
         created_at=_normalize_utc_datetime(value=row["created_at"]),
         updated_at=_normalize_utc_datetime(value=row["updated_at"]),

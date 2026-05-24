@@ -44,6 +44,10 @@ class ExchangeConnectionCommandResult:
     api_key: str
     status: str
     status_reason: str | None
+    validation_status: str
+    validation_reason: str | None
+    ip_restriction_status: str
+    last_validated_at: datetime | None
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None
@@ -85,6 +89,14 @@ class ExchangeControlClient(Protocol):
     ) -> ExchangeConnectionCommandResult: ...
 
     def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
+
+    def validate_connection(
         self,
         *,
         owner_user_id: str,
@@ -242,6 +254,21 @@ class HttpExchangeControlClient:
         )
         return _connection_from_payload(response.json())
 
+    def validate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/validate",
+            request_id=request_id,
+            json={"owner_user_id": owner_user_id},
+        )
+        return _connection_from_payload(response.json())
+
     def _request(
         self,
         method: str,
@@ -349,6 +376,10 @@ class InMemoryExchangeControlClient:
             api_key=f"****{api_key[-4:]}",
             status="active",
             status_reason=None,
+            validation_status="skipped_external_validation",
+            validation_reason="not_validated",
+            ip_restriction_status="unknown",
+            last_validated_at=None,
             created_at=now,
             updated_at=now,
             disabled_at=None,
@@ -384,6 +415,10 @@ class InMemoryExchangeControlClient:
             api_key=f"****{api_key[-4:]}",
             status=existing.status,
             status_reason=existing.status_reason,
+            validation_status="skipped_external_validation",
+            validation_reason="credential_rotated",
+            ip_restriction_status="unknown",
+            last_validated_at=None,
             created_at=existing.created_at,
             updated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
             disabled_at=existing.disabled_at,
@@ -414,12 +449,50 @@ class InMemoryExchangeControlClient:
             api_key=existing.api_key,
             status="disabled",
             status_reason="user_disabled",
+            validation_status=existing.validation_status,
+            validation_reason=existing.validation_reason,
+            ip_restriction_status=existing.ip_restriction_status,
+            last_validated_at=existing.last_validated_at,
             created_at=existing.created_at,
             updated_at=disabled_at,
             disabled_at=disabled_at,
         )
         self._connections_dict()[connection_id] = disabled
         return disabled
+
+    def validate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        validated_at = datetime.fromisoformat("2026-05-24T12:03:00+00:00")
+        validated = ExchangeConnectionCommandResult(
+            connection_id=existing.connection_id,
+            credential_version_id=existing.credential_version_id,
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            label=existing.label,
+            permissions=existing.permissions,
+            api_key=existing.api_key,
+            status=existing.status,
+            status_reason=existing.status_reason,
+            validation_status="valid_readonly",
+            validation_reason="fake_client_readonly",
+            ip_restriction_status="not_restricted_testnet",
+            last_validated_at=validated_at,
+            created_at=existing.created_at,
+            updated_at=validated_at,
+            disabled_at=existing.disabled_at,
+        )
+        self._connections_dict()[connection_id] = validated
+        return validated
 
     def _connections_dict(self) -> dict[str, ExchangeConnectionCommandResult]:
         if self._connections is None:
@@ -479,6 +552,20 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
             status_reason=(
                 str(payload["status_reason"])
                 if payload.get("status_reason") is not None
+                else None
+            ),
+            validation_status=str(
+                payload.get("validation_status") or "skipped_external_validation"
+            ),
+            validation_reason=(
+                str(payload["validation_reason"])
+                if payload.get("validation_reason") is not None
+                else None
+            ),
+            ip_restriction_status=str(payload.get("ip_restriction_status") or "unknown"),
+            last_validated_at=(
+                datetime.fromisoformat(str(payload["last_validated_at"]))
+                if payload.get("last_validated_at") is not None
                 else None
             ),
             created_at=datetime.fromisoformat(str(payload["created_at"])),

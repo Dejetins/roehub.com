@@ -151,6 +151,41 @@ Expected results:
 | Monit | `roehub_openbao OK`. |
 | Prometheus | `up{job="openbao",instance="127.0.0.1:8200"} = 1`. |
 
+## Exchange Credential Validation
+
+Stage 5 keeps exchange validation inside `exchange-control`. `apps/api` only
+calls the local internal command API and must not import native Binance/Bybit
+clients, Transit decrypt code or credential resolver code.
+
+| Runtime env var | Consumer | Required value / shape | Notes |
+|---|---|---|---|
+| `ROEHUB_EXCHANGE_VALIDATION_LIVE` | `exchange-control` | `1` enables live exchange calls. | Default is disabled and returns `skipped_external_validation` for local/CI evidence. |
+| `ROEHUB_TEST_BINANCE_READONLY_API_KEY` | Stage 5 live evidence | Read-only test credential. | Required for production acceptance, not for default CI. |
+| `ROEHUB_TEST_BINANCE_READONLY_API_SECRET` | Stage 5 live evidence | Secret for the read-only Binance credential. | Host-local only; never print or commit. |
+| `ROEHUB_TEST_BYBIT_READONLY_API_KEY` | Stage 5 live evidence | Read-only test credential. | Required for production acceptance, not for default CI. |
+| `ROEHUB_TEST_BYBIT_READONLY_API_SECRET` | Stage 5 live evidence | Secret for the read-only Bybit credential. | Host-local only; never print or commit. |
+
+Validation command shape:
+
+```bash
+curl -fsS -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/validate" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"
+```
+
+Expected production acceptance: at least one Binance and one Bybit read-only
+env-backed connection returns `valid_readonly`. If live env vars are absent or
+`ROEHUB_EXCHANGE_VALIDATION_LIVE` is not enabled, the stage is blocked for
+production acceptance even when deterministic local tests pass.
+
+Validation responses and audit metadata may contain only stable status/reason
+codes such as `valid_readonly`, `valid_trade_enabled`, `invalid_credentials`,
+`invalid_permissions`, `invalid_ip_restriction`,
+`unsupported_account_mode` or `skipped_external_validation`. Raw exchange
+response bodies, API keys, secrets, passphrases, ciphertexts, fingerprints and
+HMAC values must not be returned, logged, audited or used as metric labels.
+
 ## Backup And Restore
 
 | Operation | Procedure | Safety notes |

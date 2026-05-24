@@ -39,7 +39,7 @@ def test_service_identity_is_mandatory_exchange_control() -> None:
         ExchangeControlServiceIdentity(name="apps-api")
 
 
-def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> None:
+def test_prod_runtime_requires_localhost_port_9205_and_explicit_validation_flag() -> None:
     environ = {
         "ROEHUB_ENV": "prod",
         "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
@@ -55,6 +55,7 @@ def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> 
     assert config.bind_host == "127.0.0.1"
     assert config.metrics_port == EXCHANGE_CONTROL_METRICS_PORT
     assert not config.real_exchange_validation_enabled
+    assert not config.exchange_validation_live_enabled
     assert config.secret_cipher_backend == "openbao_transit_v1"
     assert config.transit_key_name == TRANSIT_KEY_NAME
 
@@ -64,13 +65,18 @@ def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> 
             metrics_port=9206,
         )
 
-    with pytest.raises(ValueError, match="real exchange validation"):
+    with pytest.raises(ValueError, match="ROEHUB_EXCHANGE_VALIDATION_LIVE"):
         ExchangeControlRuntimeConfig.from_environ(
             environ={
                 "ROEHUB_ENV": "prod",
                 "ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED": "true",
             }
         )
+
+    live_config = ExchangeControlRuntimeConfig.from_environ(
+        environ={**environ, "ROEHUB_EXCHANGE_VALIDATION_LIVE": "1"}
+    )
+    assert live_config.exchange_validation_live_enabled
 
 
 def test_prod_runtime_fails_closed_without_transit_config() -> None:
@@ -257,6 +263,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     connection_id = created_payload["connection_id"]
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
+    assert created_payload["validation_status"] == "skipped_external_validation"
     assert "TEST_SECRET_STAGE4" not in created.text
     assert "TEST_PASSPHRASE_STAGE4" not in created.text
     assert "vault:v1:" not in created.text
@@ -293,6 +300,57 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert disabled.status_code == 200
     assert disabled.json()["connection_id"] == connection_id
     assert disabled.json()["status"] == "disabled"
+
+
+def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": "stage-5-test",
+    }
+    owner_user_id = "00000000-0000-0000-0000-000000000501"
+
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "readonly",
+            "permissions": "read",
+            "api_key": "STAGE5KEY1234",
+            "api_secret": "TEST_SECRET_STAGE5",
+        },
+    )
+    assert created.status_code == 200
+    connection_id = created.json()["connection_id"]
+
+    validated = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/validate",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+
+    assert validated.status_code == 200
+    payload = validated.json()
+    assert payload["connection_id"] == connection_id
+    assert payload["validation_status"] == "skipped_external_validation"
+    assert payload["validation_reason"] == "live_validation_disabled"
+    assert payload["ip_restriction_status"] == "not_checked"
+    assert "TEST_SECRET_STAGE5" not in validated.text
+
+    metrics = client.get("/metrics")
+    assert 'result="skipped_external_validation"' in metrics.text
+    assert "connection_id" not in metrics.text
 
 
 def test_internal_exchange_connection_rejects_linear_market_type() -> None:
