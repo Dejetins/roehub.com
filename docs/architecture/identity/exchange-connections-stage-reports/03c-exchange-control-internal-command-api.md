@@ -2,10 +2,10 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: accepted for implementation validation. Stage 3A and Stage 3B evidence
-are accepted; Stage 3C adds the local-only authenticated internal API boundary
-and `apps/api` outbound client contract before schema/backfill or exchange
-validation.
+Статус: accepted; direct-main delivered; Mac Studio runtime evidence complete.
+Stage 3A and Stage 3B evidence are accepted; Stage 3C adds the local-only
+authenticated internal API boundary and `apps/api` outbound client contract
+before schema/backfill or exchange validation.
 
 ## Scope
 
@@ -42,6 +42,21 @@ or order execution.
 | Required request id | `X-Request-Id` | Missing request id is denied with sanitized error. | Passed in focused tests: HTTP `400` and code `request_id_required`. | None |
 | Missing auth runtime call | `curl -i http://127.0.0.1:9205/internal/v1/capabilities -H "X-Roehub-Internal-Service: apps/api"` | Missing token denied with `401`/`403`. | Passed locally: HTTP `401`, code `internal_auth_required`. | None |
 | Invalid token | Focused test with wrong bearer token | Invalid token is denied with `403`. | Passed: HTTP `403`, code `internal_auth_denied`. | None |
+
+## Runtime And Delivery Evidence
+
+| Boundary | Endpoint / call | Expected result | Observed result | Blocker |
+|---|---|---|---|---|
+| Direct-main commit | `git push origin main` | Scoped Stage 3C files are committed and pushed directly to `main`; no stage branch or draft PR. | Passed: commit `54e99b54452f` pushed to `origin/main` (`e37f35fe..54e99b54`). | None |
+| CI | GitHub Actions run `26362342903` | Repository checks pass after push. | Passed: `changes`, `static`, `migrations`, test shards and aggregate `ci` completed successfully. | None |
+| Deploy | GitHub deploy runs | App image, web and backend deploys complete successfully. | Passed: Publish App Image `26362381051`, Deploy Web `26362381077`, Deploy Backend `26362381076`. | None |
+| Mac Studio readiness | `curl -fsS http://127.0.0.1:9205/health/ready` on target runtime | `exchange-control` remains ready after deploy. | Passed after deploy. | None |
+| Mac Studio capabilities | Authenticated `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities ...` with host-local token | Authenticated internal call returns sanitized capabilities. | Passed after deploy: `service=exchange-control`, `service_identity=exchange-control`, `contract_version=internal-v1`, `retry_policy=no_implicit_retry`. | None |
+| Mac Studio missing auth | `curl -i http://127.0.0.1:9205/internal/v1/capabilities -H "X-Roehub-Internal-Service: apps/api"` | Missing token is denied with `401`/`403`. | Passed after deploy: HTTP `401`, code `internal_auth_required`. | None |
+| OpenBao recovery after deploy reload | `/opt/roehub/bin/provision_openbao_transit_stage3a.sh` | OpenBao is unsealed and Transit/key/policies remain present without printing secrets. | Passed: `openbao_unsealed=ok`, `transit_mount=already`, `transit_key=roehub-exchange-credentials`, tokens reused. | None |
+| OpenBao health and ACL | `/v1/sys/health`; `/opt/roehub/bin/smoke_openbao_transit_acl.sh` | Accepted Stage 3A runtime remains usable after Stage 3C deploy. | Passed: health `sealed=false`; ACL smoke `exchange_control_encrypt=ok`, `apps_api_decrypt_denied=403`. | None |
+| Monit | `monit validate`; `monit summary \| grep -Ei "exchange_control\|openbao"` | Supervised services are visible and OK. | Passed after validation refresh: `roehub_openbao OK`; `roehub_exchange_control OK`. | None |
+| Deployed bundle | Local and `/opt/roehub/app` SHA-256 for Stage 3C files | Target runtime runs the pushed source. | Passed: hashes match for `apps/api/exchange_control_client.py`, `apps/api/main/app.py`, exchange-control HTTP app and API launchd plist. | None |
 
 ## `apps/api` Client Evidence
 
@@ -98,5 +113,5 @@ or order execution.
 - Timeout policy is short default timeout `2.0` seconds and
   `no_implicit_retry`; future mutating create/rotate/disable commands must use
   explicit idempotency keys.
-- Stage 4 may add schema/backfill only after Stage 3C direct-main delivery and
-  runtime evidence complete. Stage 5 still waits for Stage 4 acceptance.
+- Stage 4 may now add schema/backfill from this accepted internal command
+  boundary. Stage 5 still waits for Stage 4 acceptance.
