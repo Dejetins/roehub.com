@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: accepted locally; direct-main delivery evidence is recorded in the shared
-iteration ledger after push/CI/deploy observation.
+Статус: accepted; direct-main delivery, GitHub CI/deploy and Mac Studio runtime
+evidence complete.
 
 Stage 6 completes the `/settings` exchange connection workstation flow for key
 storage and validation management. The browser UI now uses the account
@@ -66,7 +66,18 @@ disable actions without rendering raw secrets or exchange error bodies.
 | Focused tests | `uv run pytest -q tests/unit/apps/web/test_app_routes.py tests/unit/apps/api/test_ui_account_routes.py` | Passed: 44 passed, 3 pre-existing httpx cookie deprecation warnings. |
 | Lint | `uv run ruff check apps/web apps/api tests/unit/apps/web tests/unit/apps/api` | Passed. |
 | Type check | `uv run pyright apps/api tests/unit/apps/api` | Passed: 0 errors. |
-| Docs index | `python -m tools.docs.generate_docs_index --check` | To be run after this report and ledger update. |
+| Docs index | `python -m tools.docs.generate_docs_index --check` | Passed after report, ledger and docs-index update. |
+
+## Direct-Main Delivery Evidence
+
+| Item | Evidence | Result |
+|---|---|---|
+| Implementation commit | `168c26524d06d8842d804d852026d1bdef6ea33b` | Pushed directly to `origin/main` with no stage branch or draft PR. |
+| Push | `git push origin main` | Succeeded: `20cf8dce..168c2652 main -> main`. |
+| CI | GitHub Actions `26368517707` | Success. |
+| Deploy | Deploy Backend `26368558704`; Publish App Image `26368558739`; Deploy Web `26368558713` and `26368579632` | Success. |
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` on `/opt/roehub/app` | Passed; `com.roehub.api`, `com.roehub.exchange-control` and `com.roehub.openbao` were loaded. |
+| Mac Studio deployed files | `grep` evidence under `/opt/roehub/app` | Stage 6 web endpoint/default controls and exchange-panel grid fix are present; docs are not shipped in that deployed app bundle. |
 
 ## Contract Impact Classification
 
