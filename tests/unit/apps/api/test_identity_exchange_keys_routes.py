@@ -16,6 +16,9 @@ from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
 )
+from trading.contexts.identity.adapters.outbound.persistence.postgres import (
+    PostgresIdentityExchangeKeysRepository,
+)
 from trading.contexts.identity.adapters.outbound.security.current_user import (
     RoehubSessionCurrentUser,
 )
@@ -28,6 +31,7 @@ from trading.contexts.identity.application.use_cases import (
     DeleteExchangeKeyUseCase,
     ListExchangeKeysUseCase,
 )
+from trading.shared_kernel.primitives import UserId
 
 _KEYCLOAK_AUTH_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/auth"
 _KEYCLOAK_TOKEN_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token"
@@ -44,6 +48,39 @@ _MUTATION_HEADERS = {
     "origin": "http://testserver",
     "x-csrf-token": "test-csrf-token",
 }
+
+
+class _ProjectionGateway:
+    def fetch_one(self, *, query: str, parameters: dict[str, object]) -> None:
+        _ = query, parameters
+        return None
+
+    def execute(self, *, query: str, parameters: dict[str, object]) -> None:
+        _ = query, parameters
+
+    def fetch_all(
+        self,
+        *,
+        query: str,
+        parameters: dict[str, object],
+    ) -> tuple[dict[str, object], ...]:
+        _ = parameters
+        if "exchange_connections" not in query:
+            return ()
+        return (
+            {
+                "key_id": "00000000-0000-0000-0000-000000000444",
+                "user_id": "00000000-0000-0000-0000-000000000111",
+                "exchange_name": "binance",
+                "market_type": "spot",
+                "label": "backfilled",
+                "permissions": "read",
+                "api_key_last4": "1234",
+                "api_key_hash": b"1" * 32,
+                "created_at": datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc),
+                "updated_at": datetime(2026, 5, 24, 12, 1, tzinfo=timezone.utc),
+            },
+        )
 
 
 class _MutableClock(IdentityClock):
@@ -278,6 +315,22 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
         "market_type": "spot",
         "permissions": "trade",
     }
+
+
+def test_legacy_exchange_keys_projection_reads_exchange_connections_first() -> None:
+    repository = PostgresIdentityExchangeKeysRepository(
+        gateway=_ProjectionGateway(),  # type: ignore[arg-type]
+    )
+    rows = repository.list_active_for_user(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
+    )
+
+    assert len(rows) == 1
+    assert str(rows[0].key_id) == "00000000-0000-0000-0000-000000000444"
+    assert rows[0].exchange_name == "binance"
+    assert rows[0].market_type == "spot"
+    assert rows[0].api_key_last4 == "1234"
+    assert rows[0].api_key_enc == b"compatibility-projection"
 
 
 def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplicate() -> None:

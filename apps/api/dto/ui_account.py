@@ -47,6 +47,52 @@ class AccountLimitsResponse(BaseModel):
     webhook_events_limit: int
 
 
+class CreateExchangeConnectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exchange_name: Literal["binance", "bybit"]
+    market_type: Literal["spot", "futures"]
+    environment: Literal["mainnet", "testnet"] = "mainnet"
+    label: str | None = Field(default=None, max_length=80)
+    permissions: Literal["read", "trade"] = "read"
+    api_key: str = Field(min_length=1)
+    api_secret: str = Field(min_length=1)
+    passphrase: str | None = None
+
+
+class RotateExchangeConnectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    api_key: str = Field(min_length=1)
+    api_secret: str = Field(min_length=1)
+    passphrase: str | None = None
+
+
+class ExchangeConnectionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connection_id: str
+    credential_version_id: str
+    exchange_name: Literal["binance", "bybit"]
+    market_type: Literal["spot", "futures"]
+    environment: Literal["mainnet", "testnet"]
+    label: str | None
+    permissions: Literal["read", "trade"]
+    api_key: str
+    status: Literal["active", "disabled"]
+    status_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    disabled_at: datetime | None
+
+
+class ExchangeConnectionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ExchangeConnectionResponse]
+    next_cursor: str | None = None
+
+
 class AccountIntegrationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

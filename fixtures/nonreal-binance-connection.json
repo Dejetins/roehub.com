@@ -1,0 +1,10 @@
+{
+  "exchange_name": "binance",
+  "market_type": "spot",
+  "environment": "testnet",
+  "label": "stage-4-nonreal",
+  "permissions": "read",
+  "api_key": "NONREAL_STAGE4_BINANCE_KEY_1234",
+  "api_secret": "NONREAL_STAGE4_BINANCE_SECRET",
+  "passphrase": null
+}

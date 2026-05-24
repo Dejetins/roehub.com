@@ -93,6 +93,83 @@ def test_ui_account_profile_limits_integrations_and_notifications_contracts() ->
     assert len(notifications.json()["items"]) == 7
 
 
+def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_safe() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "readonly",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY1234",
+            "api_secret": "TEST_SECRET_STAGE4",
+            "passphrase": "TEST_PASSPHRASE_STAGE4",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 201
+    created_payload = created.json()
+    connection_id = created_payload["connection_id"]
+    first_version_id = created_payload["credential_version_id"]
+    assert created_payload["api_key"] == "****1234"
+    for forbidden in ("TEST_SECRET_STAGE4", "TEST_PASSPHRASE_STAGE4", "ciphertext", "hmac"):
+        assert forbidden not in created.text
+
+    listed = client.get("/ui/account/exchange-connections")
+    assert listed.status_code == 200
+    listed_payload = listed.json()
+    assert listed_payload["items"][0]["connection_id"] == connection_id
+    assert listed_payload["items"][0]["api_key"] == "****1234"
+
+    rotated = client.post(
+        f"/ui/account/exchange-connections/{connection_id}/rotate",
+        json={
+            "api_key": "ACCOUNTKEY9876",
+            "api_secret": "TEST_SECRET_ROTATED",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert rotated.status_code == 200
+    rotated_payload = rotated.json()
+    assert rotated_payload["connection_id"] == connection_id
+    assert rotated_payload["credential_version_id"] != first_version_id
+    assert rotated_payload["api_key"] == "****9876"
+    assert "TEST_SECRET_ROTATED" not in rotated.text
+
+    disabled = client.post(
+        f"/ui/account/exchange-connections/{connection_id}/disable",
+        headers={"origin": "http://testserver"},
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["connection_id"] == connection_id
+    assert disabled.json()["status"] == "disabled"
+
+
+def test_ui_account_exchange_connections_reject_linear_and_inverse_market_types() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    for market_type in ("linear", "inverse"):
+        response = client.post(
+            "/ui/account/exchange-connections",
+            json={
+                "exchange_name": "bybit",
+                "market_type": market_type,
+                "environment": "testnet",
+                "permissions": "read",
+                "api_key": "ACCOUNTKEY1234",
+                "api_secret": "TEST_SECRET_STAGE4",
+            },
+            headers={"origin": "http://testserver"},
+        )
+
+        assert response.status_code == 422
+        assert "TEST_SECRET_STAGE4" not in response.text
+
+
 def test_ui_account_preferences_persist_locale_theme_autorefresh_and_write_audit() -> None:
     client, _account_repository, _session_ids = _build_test_client()
 
@@ -428,6 +505,8 @@ def _build_test_client() -> tuple[
                 clock=clock,
             ),
             current_user_dependency=current_user_dependency,
+            clock=clock,
+            exchange_control_client=InMemoryExchangeControlClient(),
         )
     )
     client = TestClient(app)

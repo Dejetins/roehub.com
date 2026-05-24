@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Callable
+from datetime import datetime, timedelta
+from typing import Callable, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -17,10 +19,19 @@ from apps.api.dto.ui_account import (
     AccountProfileResponse,
     AccountSessionResponse,
     AccountSessionsResponse,
+    CreateExchangeConnectionRequest,
+    ExchangeConnectionResponse,
+    ExchangeConnectionsResponse,
+    RotateExchangeConnectionRequest,
     UpdateAccountIntegrationRequest,
     UpdateAccountNotificationRequest,
     UpdateAccountPreferencesRequest,
     UpdateAccountProfileRequest,
+)
+from apps.api.exchange_control_client import (
+    ExchangeConnectionCommandResult,
+    ExchangeControlClient,
+    ExchangeControlClientError,
 )
 from trading.contexts.identity.adapters.inbound.api.csrf import (
     same_origin_rejection_reason,
@@ -33,6 +44,7 @@ from trading.contexts.identity.application.ports.account_settings_repository imp
     AccountProfileSettings,
     AccountSessionView,
 )
+from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
@@ -41,17 +53,22 @@ from trading.contexts.identity.application.use_cases.account_settings import (
 from trading.platform.errors import RoehubError
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
+_RECENT_AUTH_WINDOW = timedelta(minutes=10)
 
 
 def build_ui_account_router(
     *,
     account_settings: AccountSettingsUseCase,
     current_user_dependency: CurrentUserDependency,
+    clock: IdentityClock,
+    exchange_control_client: ExchangeControlClient | None = None,
 ) -> APIRouter:
     if account_settings is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires account_settings")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires current_user_dependency")
+    if clock is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_ui_account_router requires clock")
 
     router = APIRouter(tags=["ui-account"])
 
@@ -119,6 +136,107 @@ def build_ui_account_router(
             webhook_events_used=88,
             webhook_events_limit=100,
         )
+
+    @router.get(
+        "/ui/account/exchange-connections",
+        response_model=ExchangeConnectionsResponse,
+    )
+    def get_exchange_connections(
+        cursor: str | None = Query(default=None),
+        limit: int = Query(default=20, ge=1, le=50),
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionsResponse:
+        _ = cursor, limit
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            rows = client.list_connections(
+                owner_user_id=str(principal.user_id),
+                request_id="apps-api-list-exchange-connections",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        return ExchangeConnectionsResponse(
+            items=[_exchange_connection_response(row=row) for row in rows],
+            next_cursor=None,
+        )
+
+    @router.post(
+        "/ui/account/exchange-connections",
+        response_model=ExchangeConnectionResponse,
+        status_code=201,
+    )
+    def post_exchange_connection(
+        request: Request,
+        payload: CreateExchangeConnectionRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            row = client.create_connection(
+                owner_user_id=str(principal.user_id),
+                exchange_name=payload.exchange_name,
+                market_type=payload.market_type,
+                environment=payload.environment,
+                label=payload.label,
+                permissions=payload.permissions,
+                api_key=payload.api_key,
+                api_secret=payload.api_secret,
+                passphrase=payload.passphrase,
+                request_id="apps-api-create-exchange-connection",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        return _exchange_connection_response(row=row)
+
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/rotate",
+        response_model=ExchangeConnectionResponse,
+    )
+    def post_exchange_connection_rotation(
+        connection_id: UUID,
+        request: Request,
+        payload: RotateExchangeConnectionRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            row = client.rotate_connection(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                api_key=payload.api_key,
+                api_secret=payload.api_secret,
+                passphrase=payload.passphrase,
+                request_id="apps-api-rotate-exchange-connection",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        return _exchange_connection_response(row=row)
+
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/disable",
+        response_model=ExchangeConnectionResponse,
+    )
+    def post_exchange_connection_disable(
+        connection_id: UUID,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            row = client.disable_connection(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                request_id="apps-api-disable-exchange-connection",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        return _exchange_connection_response(row=row)
 
     @router.get("/ui/account/integrations", response_model=AccountIntegrationsResponse)
     def get_integrations(
@@ -262,6 +380,81 @@ def _profile_response(
     )
 
 
+def _require_exchange_control_client(
+    *,
+    client: ExchangeControlClient | None,
+) -> ExchangeControlClient:
+    if client is None:
+        raise RoehubError(
+            code="exchange_control_unavailable",
+            message="Exchange-control internal client is not configured",
+            details={},
+        )
+    return client
+
+
+def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> RoehubError:
+    message = str(error)
+    if "exchange_connection_not_found" in message:
+        return RoehubError(
+            code="exchange_connection_not_found",
+            message="Exchange connection was not found.",
+            details={},
+        )
+    if "exchange_connection_not_owned" in message:
+        return RoehubError(
+            code="exchange_connection_not_owned",
+            message="Exchange connection is not owned by current user.",
+            details={},
+        )
+    if "exchange_connection_already_exists" in message:
+        return RoehubError(
+            code="exchange_connection_already_exists",
+            message="Exchange connection already exists.",
+            details={},
+        )
+    if "exchange_connection_invalid" in message:
+        return RoehubError(
+            code="validation_error",
+            message="Exchange connection request is invalid",
+            details={
+                "errors": [
+                    {
+                        "path": "exchange_connection",
+                        "code": "exchange_connection_invalid",
+                        "message": "Exchange connection request is invalid.",
+                    }
+                ]
+            },
+        )
+    return RoehubError(
+        code="exchange_control_unavailable",
+        message="Exchange-control internal request failed",
+        details={},
+    )
+
+
+def _exchange_connection_response(
+    *,
+    row: ExchangeConnectionCommandResult,
+) -> ExchangeConnectionResponse:
+    return ExchangeConnectionResponse(
+        connection_id=row.connection_id,
+        credential_version_id=row.credential_version_id,
+        exchange_name=_exchange_name_literal(value=row.exchange_name),
+        market_type=_market_type_literal(value=row.market_type),
+        environment=_environment_literal(value=row.environment),
+        label=row.label,
+        permissions=_permissions_literal(value=row.permissions),
+        api_key=row.api_key,
+        status=_connection_status_literal(value=row.status),
+        status_reason=row.status_reason,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        disabled_at=row.disabled_at,
+    )
+
+
 def _preferences_response(*, preferences: AccountPreferences) -> AccountPreferencesResponse:
     return AccountPreferencesResponse(
         theme=preferences.theme,
@@ -371,3 +564,48 @@ def _enforce_same_origin_mutation(*, request: Request) -> None:
         message="Mutation origin is not allowed",
         details={"reason": rejection_reason},
     )
+
+
+def _enforce_recent_auth(*, principal: CurrentUserPrincipal, now: datetime) -> None:
+    if principal.session_created_at is None:
+        raise RoehubError(
+            code="recent_auth_required",
+            message="Recent Keycloak authentication is required.",
+            details={},
+        )
+    if principal.session_created_at + _RECENT_AUTH_WINDOW < now:
+        raise RoehubError(
+            code="recent_auth_required",
+            message="Recent Keycloak authentication is required.",
+            details={},
+        )
+
+
+def _exchange_name_literal(*, value: str) -> Literal["binance", "bybit"]:
+    if value == "binance" or value == "bybit":
+        return value
+    raise ValueError(f"Unsupported exchange_name value: {value!r}")
+
+
+def _market_type_literal(*, value: str) -> Literal["spot", "futures"]:
+    if value == "spot" or value == "futures":
+        return value
+    raise ValueError(f"Unsupported market_type value: {value!r}")
+
+
+def _environment_literal(*, value: str) -> Literal["mainnet", "testnet"]:
+    if value == "mainnet" or value == "testnet":
+        return value
+    raise ValueError(f"Unsupported environment value: {value!r}")
+
+
+def _permissions_literal(*, value: str) -> Literal["read", "trade"]:
+    if value == "read" or value == "trade":
+        return value
+    raise ValueError(f"Unsupported permissions value: {value!r}")
+
+
+def _connection_status_literal(*, value: str) -> Literal["active", "disabled"]:
+    if value == "active" or value == "disabled":
+        return value
+    raise ValueError(f"Unsupported connection status value: {value!r}")

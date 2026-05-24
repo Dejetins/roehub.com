@@ -47,6 +47,7 @@ def test_prod_runtime_requires_localhost_port_9205_and_disabled_validation() -> 
         "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
         "ROEHUB_API_TRANSIT_TOKEN": "api-token",
         "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
     }
     config = ExchangeControlRuntimeConfig.from_environ(environ=environ)
 
@@ -83,6 +84,7 @@ def test_prod_runtime_fails_closed_without_transit_config() -> None:
         "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
         "ROEHUB_API_TRANSIT_TOKEN": "api-token",
         "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
     }
     for missing_name, expected in (
         ("OPENBAO_ADDR", "OPENBAO_ADDR"),
@@ -92,6 +94,7 @@ def test_prod_runtime_fails_closed_without_transit_config() -> None:
             "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
             "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
         ),
+        ("IDENTITY_PG_DSN", "IDENTITY_PG_DSN"),
     ):
         environ = dict(base_environ)
         del environ[missing_name]
@@ -216,6 +219,111 @@ def test_internal_capabilities_are_secret_safe() -> None:
     assert "internal-token" not in response.text
     assert "api_secret" not in response.text
     assert "passphrase" not in response.text
+
+
+def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": "stage-4-test",
+    }
+    owner_user_id = "00000000-0000-0000-0000-000000000401"
+
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "readonly",
+            "permissions": "read",
+            "api_key": "STAGE4KEY1234",
+            "api_secret": "TEST_SECRET_STAGE4",
+            "passphrase": "TEST_PASSPHRASE_STAGE4",
+        },
+    )
+
+    assert created.status_code == 200
+    created_payload = created.json()
+    connection_id = created_payload["connection_id"]
+    first_version_id = created_payload["credential_version_id"]
+    assert created_payload["api_key"] == "****1234"
+    assert "TEST_SECRET_STAGE4" not in created.text
+    assert "TEST_PASSPHRASE_STAGE4" not in created.text
+    assert "vault:v1:" not in created.text
+
+    listed = client.get(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        params={"owner_user_id": owner_user_id},
+    )
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["connection_id"] == connection_id
+
+    rotated = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/rotate",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "api_key": "ROTATEDKEY9876",
+            "api_secret": "TEST_SECRET_ROTATED",
+        },
+    )
+    assert rotated.status_code == 200
+    rotated_payload = rotated.json()
+    assert rotated_payload["connection_id"] == connection_id
+    assert rotated_payload["credential_version_id"] != first_version_id
+    assert rotated_payload["api_key"] == "****9876"
+    assert "TEST_SECRET_ROTATED" not in rotated.text
+
+    disabled = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/disable",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["connection_id"] == connection_id
+    assert disabled.json()["status"] == "disabled"
+
+
+def test_internal_exchange_connection_rejects_linear_market_type() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+
+    response = client.post(
+        "/internal/v1/exchange-connections",
+        headers={
+            "Authorization": "Bearer internal-token",
+            "X-Roehub-Internal-Service": "apps/api",
+            "X-Request-Id": "stage-4-test",
+        },
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000401",
+            "exchange_name": "bybit",
+            "market_type": "linear",
+            "environment": "testnet",
+            "permissions": "read",
+            "api_key": "STAGE4KEY1234",
+            "api_secret": "TEST_SECRET_STAGE4",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["error"]["code"] == "exchange_connection_invalid"
 
 
 def test_secret_value_objects_redact_repr() -> None:

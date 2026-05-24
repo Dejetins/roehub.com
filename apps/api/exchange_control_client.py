@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 import httpx
 
@@ -30,10 +32,65 @@ class ExchangeControlCapabilities:
     capabilities: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ExchangeConnectionCommandResult:
+    connection_id: str
+    credential_version_id: str
+    exchange_name: str
+    market_type: str
+    environment: str
+    label: str | None
+    permissions: str
+    api_key: str
+    status: str
+    status_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    disabled_at: datetime | None
+
+
 class ExchangeControlClient(Protocol):
     def get_capabilities(
         self, *, request_id: str | None = None
     ) -> ExchangeControlCapabilities: ...
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]: ...
+
+    def create_connection(
+        self,
+        *,
+        owner_user_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
+
+    def rotate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
+
+    def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
 
 
 @dataclass(frozen=True)
@@ -97,6 +154,103 @@ class HttpExchangeControlClient:
             raise ValueError("exchange-control internal timeout must be positive")
 
     def get_capabilities(self, *, request_id: str | None = None) -> ExchangeControlCapabilities:
+        response = self._request("GET", "/internal/v1/capabilities", request_id=request_id)
+        payload = response.json()
+        return _capabilities_from_payload(payload)
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]:
+        response = self._request(
+            "GET",
+            "/internal/v1/exchange-connections",
+            request_id=request_id,
+            params={"owner_user_id": owner_user_id},
+        )
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+            raise ExchangeControlClientError("exchange-control connections response is invalid")
+        return tuple(_connection_from_payload(item) for item in payload["items"])
+
+    def create_connection(
+        self,
+        *,
+        owner_user_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        response = self._request(
+            "POST",
+            "/internal/v1/exchange-connections",
+            request_id=request_id,
+            json={
+                "owner_user_id": owner_user_id,
+                "exchange_name": exchange_name,
+                "market_type": market_type,
+                "environment": environment,
+                "label": label,
+                "permissions": permissions,
+                "api_key": api_key,
+                "api_secret": api_secret,
+                "passphrase": passphrase,
+            },
+        )
+        return _connection_from_payload(response.json())
+
+    def rotate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/rotate",
+            request_id=request_id,
+            json={
+                "owner_user_id": owner_user_id,
+                "api_key": api_key,
+                "api_secret": api_secret,
+                "passphrase": passphrase,
+            },
+        )
+        return _connection_from_payload(response.json())
+
+    def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/disable",
+            request_id=request_id,
+            json={"owner_user_id": owner_user_id},
+        )
+        return _connection_from_payload(response.json())
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        request_id: str | None,
+        params: Mapping[str, str] | None = None,
+        json: Mapping[str, object] | None = None,
+    ) -> httpx.Response:
         effective_request_id = request_id or f"apps-api-{uuid.uuid4()}"
         try:
             with httpx.Client(
@@ -104,8 +258,11 @@ class HttpExchangeControlClient:
                 timeout=self.timeout_seconds,
                 transport=self.transport,
             ) as client:
-                response = client.get(
-                    "/internal/v1/capabilities",
+                response = client.request(
+                    method,
+                    path,
+                    params=params,
+                    json=json,
                     headers={
                         "Authorization": f"Bearer {self.internal_api_token}",
                         INTERNAL_SERVICE_HEADER: INTERNAL_SERVICE_NAME,
@@ -114,13 +271,15 @@ class HttpExchangeControlClient:
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            error_code = _safe_error_code(response=exc.response)
+            code_suffix = f" code {error_code}" if error_code else ""
             raise ExchangeControlClientError(
-                f"exchange-control internal request failed with status {exc.response.status_code}"
+                "exchange-control internal request failed with status "
+                f"{exc.response.status_code}{code_suffix}"
             ) from exc
         except httpx.HTTPError as exc:
             raise ExchangeControlClientError("exchange-control internal request failed") from exc
-        payload = response.json()
-        return _capabilities_from_payload(payload)
+        return response
 
 
 @dataclass(frozen=True)
@@ -131,10 +290,146 @@ class InMemoryExchangeControlClient:
         contract_version="internal-v1",
         capabilities=("capabilities.read",),
     )
+    _connections: dict[str, ExchangeConnectionCommandResult] | None = None
+    _owners: dict[str, str] | None = None
+    _next_id: int = 1
 
     def get_capabilities(self, *, request_id: str | None = None) -> ExchangeControlCapabilities:
         _ = request_id
         return self.capabilities
+
+    def __post_init__(self) -> None:
+        if self._connections is None:
+            object.__setattr__(self, "_connections", {})
+        if self._owners is None:
+            object.__setattr__(self, "_owners", {})
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]:
+        _ = request_id
+        owners = self._owners_dict()
+        rows = sorted(
+            (
+                connection
+                for connection_id, connection in self._connections_dict().items()
+                if owners.get(connection_id) == owner_user_id
+            ),
+            key=lambda item: (item.created_at, item.connection_id),
+        )
+        return tuple(rows)
+
+    def create_connection(
+        self,
+        *,
+        owner_user_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, api_secret, passphrase, request_id
+        now = datetime.fromisoformat("2026-05-24T12:00:00+00:00")
+        connection_id = str(UUID(int=self._next_id))
+        credential_version_id = str(UUID(int=self._next_id + 1000))
+        object.__setattr__(self, "_next_id", self._next_id + 1)
+        result = ExchangeConnectionCommandResult(
+            connection_id=connection_id,
+            credential_version_id=credential_version_id,
+            exchange_name=exchange_name,
+            market_type=market_type,
+            environment=environment,
+            label=label,
+            permissions=permissions,
+            api_key=f"****{api_key[-4:]}",
+            status="active",
+            status_reason=None,
+            created_at=now,
+            updated_at=now,
+            disabled_at=None,
+        )
+        self._connections_dict()[connection_id] = result
+        self._owners_dict()[connection_id] = owner_user_id
+        return result
+
+    def rotate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, api_secret, passphrase, request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        credential_version_id = str(UUID(int=self._next_id + 1000))
+        object.__setattr__(self, "_next_id", self._next_id + 1)
+        rotated = ExchangeConnectionCommandResult(
+            connection_id=existing.connection_id,
+            credential_version_id=credential_version_id,
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            label=existing.label,
+            permissions=existing.permissions,
+            api_key=f"****{api_key[-4:]}",
+            status=existing.status,
+            status_reason=existing.status_reason,
+            created_at=existing.created_at,
+            updated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
+            disabled_at=existing.disabled_at,
+        )
+        self._connections_dict()[connection_id] = rotated
+        return rotated
+
+    def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        disabled_at = datetime.fromisoformat("2026-05-24T12:02:00+00:00")
+        disabled = ExchangeConnectionCommandResult(
+            connection_id=existing.connection_id,
+            credential_version_id=existing.credential_version_id,
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            label=existing.label,
+            permissions=existing.permissions,
+            api_key=existing.api_key,
+            status="disabled",
+            status_reason="user_disabled",
+            created_at=existing.created_at,
+            updated_at=disabled_at,
+            disabled_at=disabled_at,
+        )
+        self._connections_dict()[connection_id] = disabled
+        return disabled
+
+    def _connections_dict(self) -> dict[str, ExchangeConnectionCommandResult]:
+        if self._connections is None:
+            raise ExchangeControlClientError("exchange-control fake client is uninitialized")
+        return self._connections
+
+    def _owners_dict(self) -> dict[str, str]:
+        if self._owners is None:
+            raise ExchangeControlClientError("exchange-control fake client is uninitialized")
+        return self._owners
 
 
 def build_exchange_control_client_from_environ(
@@ -165,6 +460,57 @@ def _capabilities_from_payload(payload: object) -> ExchangeControlCapabilities:
         contract_version=contract_version,
         capabilities=tuple(capabilities),
     )
+
+
+def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult:
+    if not isinstance(payload, dict):
+        raise ExchangeControlClientError("exchange-control connection response is invalid")
+    try:
+        return ExchangeConnectionCommandResult(
+            connection_id=str(UUID(str(payload["connection_id"]))),
+            credential_version_id=str(UUID(str(payload["credential_version_id"]))),
+            exchange_name=str(payload["exchange_name"]),
+            market_type=str(payload["market_type"]),
+            environment=str(payload["environment"]),
+            label=str(payload["label"]) if payload.get("label") is not None else None,
+            permissions=str(payload["permissions"]),
+            api_key=str(payload["api_key"]),
+            status=str(payload["status"]),
+            status_reason=(
+                str(payload["status_reason"])
+                if payload.get("status_reason") is not None
+                else None
+            ),
+            created_at=datetime.fromisoformat(str(payload["created_at"])),
+            updated_at=datetime.fromisoformat(str(payload["updated_at"])),
+            disabled_at=(
+                datetime.fromisoformat(str(payload["disabled_at"]))
+                if payload.get("disabled_at") is not None
+                else None
+            ),
+        )
+    except (KeyError, ValueError, TypeError) as exc:
+        raise ExchangeControlClientError(
+            "exchange-control connection response is invalid"
+        ) from exc
+
+
+def _safe_error_code(*, response: httpx.Response) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        error = detail.get("error")
+        if isinstance(error, dict) and isinstance(error.get("code"), str):
+            return error["code"]
+    error = payload.get("error")
+    if isinstance(error, dict) and isinstance(error.get("code"), str):
+        return error["code"]
+    return None
 
 
 def _read_optional_str(value: str | None) -> str | None:
@@ -200,6 +546,7 @@ __all__ = [
     "ExchangeControlClient",
     "ExchangeControlClientConfig",
     "ExchangeControlClientError",
+    "ExchangeConnectionCommandResult",
     "HttpExchangeControlClient",
     "InMemoryExchangeControlClient",
     "build_exchange_control_client_from_environ",

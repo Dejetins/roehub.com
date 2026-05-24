@@ -190,6 +190,34 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
         Side Effects:
             Executes one SQL select statement.
         """
+        projection_query = """
+        SELECT
+            connection.connection_id AS key_id,
+            connection.owner_user_id AS user_id,
+            connection.exchange_name,
+            connection.market_type,
+            connection.label,
+            connection.permission_summary_json ->> 'permissions' AS permissions,
+            credential.api_key_last4,
+            credential.api_key_fingerprint_hmac AS api_key_hash,
+            connection.created_at,
+            connection.updated_at
+        FROM exchange_connections AS connection
+        JOIN exchange_credential_versions AS credential
+          ON credential.credential_version_id = connection.active_credential_version_id
+        WHERE connection.owner_user_id = %(user_id)s
+          AND connection.status = 'active'
+        ORDER BY connection.created_at ASC, connection.connection_id ASC
+        """
+        projection_rows = self._gateway.fetch_all(
+            query=projection_query,
+            parameters={"user_id": str(user_id)},
+        )
+        if projection_rows:
+            return tuple(
+                _map_exchange_connection_projection(row=row) for row in projection_rows
+            )
+
         query = f"""
         SELECT
             key_id,
@@ -336,6 +364,36 @@ def _map_exchange_key_row(*, row: Mapping[str, Any]) -> ExchangeKey:
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError(
             "PostgresIdentityExchangeKeysRepository cannot map exchange key row"
+        ) from error
+
+
+def _map_exchange_connection_projection(*, row: Mapping[str, Any]) -> ExchangeKey:
+    try:
+        api_key_hash_raw = row["api_key_hash"]
+        if isinstance(api_key_hash_raw, memoryview):
+            api_key_hash = api_key_hash_raw.tobytes()
+        else:
+            api_key_hash = bytes(api_key_hash_raw)
+        return ExchangeKey(
+            key_id=UUID(str(row["key_id"])),
+            user_id=UserId.from_string(str(row["user_id"])),
+            exchange_name=str(row["exchange_name"]),
+            market_type=str(row["market_type"]),
+            label=str(row["label"]) if row["label"] is not None else None,
+            permissions=str(row["permissions"] or "read"),
+            api_key_enc=b"compatibility-projection",
+            api_key_hash=api_key_hash,
+            api_key_last4=str(row["api_key_last4"]),
+            api_secret_enc=b"compatibility-projection",
+            passphrase_enc=None,
+            created_at=_normalize_utc_datetime(value=row["created_at"], field_name="created_at"),
+            updated_at=_normalize_utc_datetime(value=row["updated_at"], field_name="updated_at"),
+            is_deleted=False,
+            deleted_at=None,
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            "PostgresIdentityExchangeKeysRepository cannot map exchange connection projection"
         ) from error
 
 
