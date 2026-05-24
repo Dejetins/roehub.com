@@ -268,6 +268,39 @@ echo "after_logout_status=${after_logout_status}"
 - `logout_status=204`;
 - `after_logout_status=401`.
 
+## 9B) Playwright acceptance for `/settings` exchange connections
+
+Используйте этот чек только со smoke Keycloak account из безопасного operator
+channel. Нельзя сохранять username/password, cookies, API keys, API secrets,
+tokens, ciphertext или raw provider responses в repo/docs/logs.
+
+Acceptance path:
+
+- открыть `https://roehub.com/settings`;
+- пройти login/callback через Keycloak;
+- проверить, что browser-visible calls к `/api/ui/account/profile`,
+  `/api/ui/account/integrations`, `/api/ui/account/limits` и
+  `/api/ui/account/exchange-connections` не возвращают production 500;
+- убедиться, что default permission на fresh add form равен `read`;
+- отправить только dummy Binance/Bybit API key/secret на
+  `/api/ui/account/exchange-connections`;
+- подтвердить, что response не содержит `Mutation origin is not allowed` и
+  `csrf_origin_mismatch`;
+- проверить, что secret inputs очищены после success/failure;
+- disable/delete dummy connection через поддержанный UI/API path;
+- сохранить sanitized screenshot/network summary under `output/playwright/`;
+- выполнить secret artifact grep перед финальным отчетом.
+
+Минимальные локальные prerequisites:
+
+```bash
+command -v npx >/dev/null 2>&1
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
+test -f "$PWCLI"
+npx playwright --version
+```
+
 ## 10) Monit supervision (рекомендуется)
 
 Keycloak имеет смысл добавить в Monit: это auth entrypoint для web login flow, и при падении `com.roehub.keycloak` вход в систему становится недоступен.

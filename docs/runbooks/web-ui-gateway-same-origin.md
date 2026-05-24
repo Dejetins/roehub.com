@@ -108,6 +108,41 @@ Browser auth-cookie хранит только opaque Roehub session id:
 
 В production эту же семантику на публичном edge реализует `VPS Caddy`.
 
+## Production Caddy `/api/*` forwarded-origin contract
+
+Production browser mutations depend on the backend seeing the public browser
+origin, not only the internal Mac Studio upstream host. The active VPS Caddy
+`/api/*` reverse proxy must forward:
+
+```caddy
+header_up X-Forwarded-Host {host}
+header_up X-Forwarded-Proto {scheme}
+```
+
+These headers are security-relevant. They let the backend accept a same-origin
+browser request that has `Referer: https://roehub.com/settings` but no `Origin`
+header, while true cross-origin requests remain rejected with
+`csrf_origin_mismatch`.
+
+Verification commands:
+
+```bash
+curl -fsS https://roehub.com/__edge_id
+
+grep -F 'header_up X-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
+grep -F 'header_up X-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
+
+ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
+  "grep -F 'header_up X-Forwarded-Host {host}' /etc/caddy/Caddyfile"
+ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
+  "grep -F 'header_up X-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
+ssh "$PROD_VPS_USER@$PROD_VPS_HOST" "caddy validate --config /etc/caddy/Caddyfile"
+```
+
+Do not repair this by weakening backend CSRF checks. If the active Caddy config
+is missing these headers, sync `infra/caddy/Caddyfile.vps`, validate it, reload
+Caddy, then prove the authenticated browser flow again.
+
 ## Связанные документы
 
 - `docs/architecture/identity/identity-keycloak-auth-model-v1.md`

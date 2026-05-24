@@ -363,7 +363,7 @@ function renderRotateRow(row, connectionId) {
   const cell = rotateRow.insertCell();
   cell.colSpan = 11;
   cell.innerHTML = `
-    <form class="settings-rotate-form" data-rotate-form="${connectionId}" autocomplete="off">
+    <form class="settings-rotate-form" data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
       <input class="settings-secret-input" name="rotate_public_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API key" aria-label="API key" aria-autocomplete="none" data-secret-input data-rotate-api-key-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
       <input class="settings-secret-input" name="rotate_private_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API secret" aria-label="API secret" aria-autocomplete="none" data-secret-input data-rotate-api-secret-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
       <button class="rh-button rh-button--primary rh-button--compact" type="submit">${t("settings.exchange.rotate_short")}</button>

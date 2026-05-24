@@ -41,6 +41,42 @@ CREATE TABLE IF NOT EXISTS identity_user_profile_overrides (
     updated_at TIMESTAMPTZ NOT NULL
 );
 
+ALTER TABLE identity_user_profile_overrides
+    ADD COLUMN IF NOT EXISTS username TEXT;
+
+ALTER TABLE identity_user_profile_overrides
+    ADD COLUMN IF NOT EXISTS email TEXT;
+
+ALTER TABLE identity_user_profile_overrides
+    ADD COLUMN IF NOT EXISTS telegram_discord TEXT;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'identity_user_profile_overrides'
+          AND column_name = 'display_name'
+    ) THEN
+        UPDATE identity_user_profile_overrides
+        SET username = COALESCE(username, display_name)
+        WHERE username IS NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'identity_user_profile_overrides'
+          AND column_name = 'created_at'
+    ) THEN
+        ALTER TABLE identity_user_profile_overrides
+            ALTER COLUMN created_at SET DEFAULT '1970-01-01 00:00:00+00'::timestamptz;
+    END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS identity_integrations (
     owner_user_id UUID NOT NULL REFERENCES identity_users(user_id) ON DELETE CASCADE,
     integration_key TEXT NOT NULL,
@@ -56,6 +92,113 @@ CREATE TABLE IF NOT EXISTS identity_integrations (
 
 CREATE INDEX IF NOT EXISTS idx_identity_integrations_updated_at
     ON identity_integrations(owner_user_id, updated_at DESC);
+
+ALTER TABLE identity_integrations
+    ADD COLUMN IF NOT EXISTS integration_key TEXT;
+
+ALTER TABLE identity_integrations
+    ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'off';
+
+ALTER TABLE identity_integrations
+    ADD COLUMN IF NOT EXISTS webhook_url_masked TEXT;
+
+DO $$
+DECLARE
+    pkey_definition TEXT;
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'identity_integrations'
+          AND column_name = 'provider'
+    ) THEN
+        UPDATE identity_integrations
+        SET integration_key = COALESCE(
+                integration_key,
+                CASE provider
+                    WHEN 'telegram' THEN 'telegram'
+                    WHEN 'webhook_alerts' THEN 'slack'
+                    ELSE 'discord'
+                END
+            ),
+            mode = CASE
+                WHEN integration_key IS NULL AND provider = 'email_digest' THEN 'off'
+                WHEN integration_key IS NULL AND enabled THEN 'alerts'
+                WHEN integration_key IS NULL THEN 'off'
+                WHEN mode IS NOT NULL THEN mode
+                ELSE 'off'
+            END
+        WHERE integration_key IS NULL
+           OR mode IS NULL;
+
+        ALTER TABLE identity_integrations
+            ALTER COLUMN provider SET DEFAULT 'telegram';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'identity_integrations'
+          AND column_name = 'created_at'
+    ) THEN
+        ALTER TABLE identity_integrations
+            ALTER COLUMN created_at SET DEFAULT '1970-01-01 00:00:00+00'::timestamptz;
+    END IF;
+
+    UPDATE identity_integrations
+    SET integration_key = 'telegram'
+    WHERE integration_key IS NULL;
+
+    ALTER TABLE identity_integrations
+        ALTER COLUMN integration_key SET NOT NULL;
+
+    SELECT pg_get_constraintdef(oid)
+    INTO pkey_definition
+    FROM pg_constraint
+    WHERE conrelid = 'identity_integrations'::regclass
+      AND conname = 'identity_integrations_pkey';
+
+    IF pkey_definition LIKE '%provider%' THEN
+        ALTER TABLE identity_integrations
+            DROP CONSTRAINT identity_integrations_pkey;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'identity_integrations'::regclass
+          AND conname = 'identity_integrations_pkey'
+    ) THEN
+        ALTER TABLE identity_integrations
+            ADD CONSTRAINT identity_integrations_pkey
+            PRIMARY KEY (owner_user_id, integration_key);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'identity_integrations'::regclass
+          AND conname = 'identity_integrations_key_check'
+    ) THEN
+        ALTER TABLE identity_integrations
+            ADD CONSTRAINT identity_integrations_key_check
+            CHECK (integration_key IN ('telegram', 'discord', 'slack'));
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'identity_integrations'::regclass
+          AND conname = 'identity_integrations_mode_check'
+    ) THEN
+        ALTER TABLE identity_integrations
+            ADD CONSTRAINT identity_integrations_mode_check
+            CHECK (mode IN ('off', 'alerts', 'critical'));
+    END IF;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS identity_notification_preferences (
     owner_user_id UUID NOT NULL REFERENCES identity_users(user_id) ON DELETE CASCADE,

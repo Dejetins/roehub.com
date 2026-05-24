@@ -108,7 +108,17 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ vars.PROD_VPS_HOST }}" >> ~/.ssh/known_hosts
+          test -n "${{ vars.PROD_VPS_ED25519_SHA256 }}"
+          ssh-keyscan -t ed25519 "${{ vars.PROD_VPS_HOST }}" > /tmp/prod_vps_known_hosts
+          actual_fingerprint="$(ssh-keygen -lf /tmp/prod_vps_known_hosts | awk '{print $2}')"
+          test "${actual_fingerprint}" = "${{ vars.PROD_VPS_ED25519_SHA256 }}"
+          cat /tmp/prod_vps_known_hosts >> ~/.ssh/known_hosts
+
+      - name: Inspect current VPS Caddy API headers
+        run: |
+          set -euxo pipefail
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
+            "awk '/handle_path \\/api\\/\\*/{flag=1} flag{print} flag && /^\\t}/{exit}' /etc/caddy/Caddyfile"
 
       - name: Sync web deploy files to VPS
         run: |
@@ -116,6 +126,16 @@ jobs:
           ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "install -d /opt/roehub-web"
           scp infra/docker/docker-compose.web.prod.yml "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}:/opt/roehub-web/docker-compose.web.yml"
           scp infra/caddy/Caddyfile.vps "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}:/etc/caddy/Caddyfile"
+
+      - name: Validate API forwarded headers in Caddy config
+        run: |
+          set -euxo pipefail
+          grep -Fq 'header_up X-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
+          grep -Fq 'header_up X-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
+            "grep -Fq 'header_up X-Forwarded-Host {host}' /etc/caddy/Caddyfile"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
+            "grep -Fq 'header_up X-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
 
       - name: Render web env file
         run: |

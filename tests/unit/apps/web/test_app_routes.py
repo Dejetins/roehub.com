@@ -341,6 +341,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'name="api_key"' not in main_html
     assert 'name="api_secret"' not in main_html
     assert "data-secret-input" in main_html
+    assert 'data-exchange-form hidden autocomplete="off" data-lpignore="true"' in main_html
     assert 'data-lpignore="true"' in main_html
     assert 'data-1p-ignore="true"' in main_html
     assert 'data-bwignore="true"' in main_html
@@ -359,6 +360,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'name="api_key"' not in settings_js
     assert 'name="api_secret"' not in settings_js
     assert "data-secret-input" in settings_js
+    assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
+        settings_js
+    )
     assert "128 ms" not in settings_js
     assert "needsAttention" not in settings_js
 

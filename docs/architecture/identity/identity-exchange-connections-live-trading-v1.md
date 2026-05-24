@@ -1,6 +1,8 @@
 # Идентификация + Биржевые Подключения — хранение API-ключей v1
 
-Статус: целевое архитектурное решение на согласование перед реализацией.
+Статус: staged rollout active. Stage 7 readiness was followed by Stage 8
+production-browser repair because the authenticated public `/settings` add-key
+flow was not proven by Stage 7.
 
 Документ фиксирует архитектуру первого production-этапа для Binance/Bybit
 API-ключей на `/settings`: добавление, безопасное хранение, валидация,
@@ -1282,6 +1284,50 @@ curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" \
 - direct-main push в `origin/main` выполнен или stage явно заблокирован;
 - торговое исполнение остается явно вне scope;
 - future execution work заблокирован до отдельного signal-to-execution design.
+
+### Этап 8 — Production Browser Repair Для `/settings`
+
+Цель: закрыть gap после Stage 7, где production readiness была принята без
+доказательства authenticated public browser flow добавления exchange connection
+через `https://roehub.com/settings`.
+
+Scope repair:
+
+- `/api/ui/account/exchange-connections` должен принимать Referer-only browser
+  mutation только если public edge передал trusted `X-Forwarded-Host` и
+  `X-Forwarded-Proto`;
+- true cross-origin mutation остается fail-closed с `csrf_origin_mismatch`;
+- `/api/ui/account/profile` и `/api/ui/account/integrations` должны переживать
+  legacy production schema drift через idempotent SQL repair;
+- API key/API secret поля на `/settings` не должны выглядеть как login/password
+  поля сайта для browser/password-manager heuristics;
+- `read` остается default permission, `trade` остается explicit opt-in;
+- production acceptance требует authenticated Playwright evidence against
+  `https://roehub.com/settings`, dummy credentials only, cleanup/disable/delete
+  evidence и secret artifact grep.
+
+Валидация:
+
+```bash
+uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations
+uv run ruff check apps/api apps/web src/trading/contexts/identity tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations
+uv run pyright apps/api src/trading/contexts/identity tests/unit/apps/api
+python -m tools.docs.generate_docs_index --check
+curl -fsS https://roehub.com/__edge_id
+```
+
+Runtime acceptance:
+
+- active VPS Caddy `/api/*` config contains `header_up X-Forwarded-Host {host}`
+  and `header_up X-Forwarded-Proto {scheme}`;
+- Mac Studio bootstrap applies `0006_identity_account_settings_v1.sql` and
+  repairs current account settings schema;
+- authenticated Playwright load shows `/api/ui/account/profile`,
+  `/api/ui/account/integrations`, `/api/ui/account/limits` and
+  `/api/ui/account/exchange-connections` without production 500s;
+- dummy Binance/Bybit add-key request returns not `Mutation origin is not
+  allowed` and not `csrf_origin_mismatch`;
+- any dummy connection is disabled or deleted before stage acceptance.
 
 ## Контрактное Влияние
 
