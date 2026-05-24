@@ -22,6 +22,8 @@ roehub.com {
 	handle_path /api/* {
 		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net {
 			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
 			transport http {
 				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
 			}

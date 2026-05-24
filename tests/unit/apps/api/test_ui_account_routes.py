@@ -164,6 +164,32 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert limits_after_disable.json()["api_keys_used"] == 0
 
 
+def test_ui_account_exchange_connections_allow_forwarded_public_same_origin() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    response = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "mainnet",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY1111",
+            "api_secret": "TEST_SECRET_PROXY_ORIGIN",
+        },
+        headers={
+            "host": "macstudio-daniil.tail0ebbbc.ts.net",
+            "origin": "https://roehub.com",
+            "x-forwarded-host": "roehub.com",
+            "x-forwarded-proto": "https",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["exchange_name"] == "bybit"
+    assert "TEST_SECRET_PROXY_ORIGIN" not in response.text
+
+
 def test_ui_account_exchange_connection_permissions_default_to_read() -> None:
     client, _account_repository, _session_ids = _build_test_client()
 

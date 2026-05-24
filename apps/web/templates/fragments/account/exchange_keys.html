@@ -44,8 +44,8 @@
         </div>
       </div>
       <input name="label" type="text" maxlength="80" placeholder="main_binance" aria-label="{{ t('settings.exchange.account') }}">
-      <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
-      <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
+      <input class="settings-secret-input" name="exchange_public_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API key" aria-label="API key" aria-autocomplete="none" data-secret-input data-exchange-api-key-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+      <input class="settings-secret-input" name="exchange_private_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API secret" aria-label="API secret" aria-autocomplete="none" data-secret-input data-exchange-api-secret-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
       <button class="rh-button rh-button--primary rh-button--compact" type="submit">{{ t("settings.exchange.add") }}</button>
     </div>
     <output class="settings-inline-status" data-exchange-form-status aria-live="polite"></output>

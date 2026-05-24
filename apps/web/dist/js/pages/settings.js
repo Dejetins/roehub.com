@@ -93,9 +93,14 @@ function formatTimestampToSeconds(value) {
 }
 
 function clearSecretInputs(form) {
-  form.querySelectorAll("input[type='password']").forEach((input) => {
+  form.querySelectorAll("[data-secret-input]").forEach((input) => {
     input.value = "";
   });
+}
+
+function secretInputValue(form, selector) {
+  const input = qs(selector, form);
+  return input instanceof HTMLInputElement ? input.value : "";
 }
 
 function exchangeItems(payload) {
@@ -359,8 +364,8 @@ function renderRotateRow(row, connectionId) {
   cell.colSpan = 11;
   cell.innerHTML = `
     <form class="settings-rotate-form" data-rotate-form="${connectionId}" autocomplete="off">
-      <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
-      <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
+      <input class="settings-secret-input" name="rotate_public_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API key" aria-label="API key" aria-autocomplete="none" data-secret-input data-rotate-api-key-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+      <input class="settings-secret-input" name="rotate_private_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API secret" aria-label="API secret" aria-autocomplete="none" data-secret-input data-rotate-api-secret-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
       <button class="rh-button rh-button--primary rh-button--compact" type="submit">${t("settings.exchange.rotate_short")}</button>
       <output class="settings-inline-status" data-rotate-status aria-live="polite"></output>
     </form>
@@ -577,8 +582,8 @@ function initForms(root) {
       environment: state.environment,
       label: data.get("label") || null,
       permissions: state.permissions,
-      api_key: data.get("api_key") || "",
-      api_secret: data.get("api_secret") || "",
+      api_key: secretInputValue(form, "[data-exchange-api-key-input]"),
+      api_secret: secretInputValue(form, "[data-exchange-api-secret-input]"),
     };
     const status = qs("[data-exchange-form-status]");
     try {
@@ -603,10 +608,9 @@ function initForms(root) {
     const connectionId = form.dataset.rotateForm;
     const status = qs("[data-rotate-status]", form);
     if (!connectionId) return;
-    const data = new FormData(form);
     const payload = {
-      api_key: data.get("api_key") || "",
-      api_secret: data.get("api_secret") || "",
+      api_key: secretInputValue(form, "[data-rotate-api-key-input]"),
+      api_secret: secretInputValue(form, "[data-rotate-api-secret-input]"),
     };
     try {
       await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/rotate`, {

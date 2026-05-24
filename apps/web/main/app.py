@@ -495,6 +495,13 @@ def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:
         if header_name.lower() in _HOP_BY_HOP_HEADERS:
             continue
         forwarded_headers[header_name] = header_value
+    existing_header_names = {header_name.lower() for header_name in forwarded_headers}
+    if "x-forwarded-host" not in existing_header_names:
+        forwarded_host = request.headers.get("host")
+        if forwarded_host:
+            forwarded_headers["x-forwarded-host"] = forwarded_host
+    if "x-forwarded-proto" not in existing_header_names:
+        forwarded_headers["x-forwarded-proto"] = request.url.scheme
     return forwarded_headers
 
 

@@ -51,6 +51,8 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
         captured["path"] = request.url.path
         captured["query"] = request.url.query.decode()
         captured["cookie"] = request.headers.get("cookie")
+        captured["forwarded_host"] = request.headers.get("x-forwarded-host")
+        captured["forwarded_proto"] = request.headers.get("x-forwarded-proto")
         return httpx.Response(
             status_code=200,
             headers={"content-type": "application/json"},
@@ -68,7 +70,7 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
 
     response = client.get(
         "/api/auth/current-user?verbose=1",
-        headers={"cookie": "session=abc; mode=dev"},
+        headers={"cookie": "session=abc; mode=dev", "host": "web.local"},
     )
 
     assert response.status_code == 200
@@ -77,6 +79,8 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
     assert captured["path"] == "/auth/current-user"
     assert captured["query"] == "verbose=1"
     assert captured["cookie"] == "session=abc; mode=dev"
+    assert captured["forwarded_host"] == "web.local"
+    assert captured["forwarded_proto"] == "http"
 
 
 def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
@@ -333,6 +337,13 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-permissions-option="trade"' in settings_response.text
     assert "Passphrase" not in main_html
     assert 'name="passphrase"' not in main_html
+    assert 'type="password"' not in main_html
+    assert 'name="api_key"' not in main_html
+    assert 'name="api_secret"' not in main_html
+    assert "data-secret-input" in main_html
+    assert 'data-lpignore="true"' in main_html
+    assert 'data-1p-ignore="true"' in main_html
+    assert 'data-bwignore="true"' in main_html
     assert "Latency" not in main_html
     assert "5 / 10" not in main_html
     assert "7 / 10" not in main_html
@@ -344,6 +355,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     settings_js = (_WEB_ROOT / "dist" / "js" / "pages" / "settings.js").read_text()
     assert 'permissions: "trade"' not in settings_js
     assert "passphrase" not in settings_js
+    assert 'type="password"' not in settings_js
+    assert 'name="api_key"' not in settings_js
+    assert 'name="api_secret"' not in settings_js
+    assert "data-secret-input" in settings_js
     assert "128 ms" not in settings_js
     assert "needsAttention" not in settings_js
 
