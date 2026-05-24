@@ -2,9 +2,8 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: accepted for direct-main delivery; final direct-main push, CI/deploy
-and post-push runtime evidence are recorded in the delivery section after this
-report was first validated.
+Статус: accepted; direct-main delivery, GitHub CI/deploy and Mac Studio
+post-push runtime evidence complete.
 
 Stage 7 is the final production-readiness gate for Exchange Control v1 key
 storage and validation. It does not change code, schemas, public API contracts,
@@ -85,10 +84,12 @@ Trading execution remains explicitly out of scope; future execution work
 | Item | Evidence | Result |
 |---|---|---|
 | Pre-delivery validation | Branch `main`, fast-forward from `origin/main`, focused gates, docs index, no-order grep, secret grep and Mac Studio runtime evidence all passed before staging. | Accepted. |
-| Stage 7 validation/report commit | `TBD after commit` | Pending until the scoped documentation commit is created. |
-| Push | `git push origin main` | Pending after the scoped documentation commit. |
-| CI/deploy | GitHub Actions for the pushed `main` revision | Pending after push. |
-| Deploy/runtime | Stage 7 changes are docs-only; target runtime was already checked before delivery and must stay healthy after CI/deploy. | Pending post-push check. |
+| Stage 7 validation/report commit | `de1ce3a0a57f` | Scoped documentation commit created on `main`; no stage branch or draft PR. |
+| Push | `git push origin main` | Succeeded: `6eb9c75b..de1ce3a0 main -> main`. |
+| CI | GitHub Actions `26369560811` | Success; docs-only CI path ran changes/static/docs-index and summary jobs. |
+| Deploy | Deploy Backend `26369568044`; Publish App Image `26369568053`; Deploy Web `26369568042` | Success. |
+| Deploy smoke | `bash scripts/macos/smoke_prod.sh` on `/opt/roehub/app` | Passed after deploy; `com.roehub.api`, `com.roehub.exchange-control`, `com.roehub.openbao`, Prometheus, Monit and Redis/Postgres surfaces were available. |
+| Post-push runtime | `stage-7-post-push` targeted checks on Mac Studio | Passed: `/health/ready` ready; capabilities returned `internal-v1` and validate capability; metrics exported `exchange_control_active` and `exchange_connection_validation_total`; Prometheus `up{job="exchange-control"}=1`; Monit `roehub_exchange_control OK`. |
 
 ## Next Prompt
 
