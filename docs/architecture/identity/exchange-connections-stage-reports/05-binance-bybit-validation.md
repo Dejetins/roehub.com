@@ -2,7 +2,7 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: accepted for direct-main delivery.
+Статус: accepted; direct-main delivery and Mac Studio runtime evidence complete.
 
 Stage 2, Stage 3A, Stage 3B, Stage 3C and Stage 4 are accepted. Stage 5
 implemented the validation boundary, deterministic status mapping, local API
@@ -36,7 +36,7 @@ amend or reconcile orders.
 | Bybit | API key information mapping | Native signed `GET /v5/user/query-api` | Map `readOnly`, `permissions`, `ips` and account mode to normalized statuses. | Implemented in `BybitExchangeCredentialValidator`; unit mapping covers all required status classes. | None for host-local readonly credential smoke. |
 | Invalid credentials | Native HTTP/auth rejection | Test fake payloads | Return `invalid_credentials` without raw exchange body. | Unit mapping returns `invalid_credentials`; raw `retMsg` is not copied into reason. | None for deterministic evidence. |
 | API facade | `POST /api/ui/account/exchange-connections/{connection_id}/validate` | Roehub session, same-origin headers | Route through `ExchangeControlClient` only. | Implemented and tested with deterministic fake client; response contains no secret fields. | None |
-| Internal boundary | `POST /internal/v1/exchange-connections/{connection_id}/validate` | Internal token headers | `exchange-control` owns decrypt and native exchange calls. | Implemented; default dev config returns `skipped_external_validation`; live external acceptance is proven by Mac Studio host-local readonly metadata smoke before delivery. | None |
+| Internal boundary | `POST /internal/v1/exchange-connections/{connection_id}/validate` | Internal token headers | `exchange-control` owns decrypt and native exchange calls. | Implemented; default dev config returns `skipped_external_validation`; post-deploy Mac Studio internal validation returned `valid_readonly` for Binance and Bybit. | None |
 | Metrics | `/metrics` | None | Increment bounded labels only: exchange/result/reason. | `exchange_connection_validation_total` and `exchange_connection_status` updated by internal validate flow. | None for deterministic evidence. |
 | Audit | Account audit events | None | Emit secret-free validation event. | `exchange_connection_validated` writes `exchange` and `validation_status` only. | None for deterministic evidence. |
 
@@ -75,7 +75,9 @@ Sources verified before implementation:
 | Artifact secret grep | Sentinel-safe grep over `logs output .playwright-cli` for live secret env names plus `TEST_PASSPHRASE`, `api_secret`, `passphrase` | No live secret markers. | Passed with sentinel values; `logs` directory absent and no matches. | None |
 | Live public validation curl | `curl -fsS -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/validate" ...` | `ROEHUB_BASE_URL`, session cookie, CSRF token, `CONNECTION_ID`, live exchange env vars | `valid_readonly` for readonly Binance and Bybit env-backed connections. | Public session/CSRF env is not available in the execution shell; route behavior is covered by deterministic facade tests, and live exchange acceptance is covered by host-local Mac Studio readonly metadata smoke. | None |
 | Mac Studio direct credential smoke | Host-local env plus signed Binance/Bybit readonly metadata calls | No secret values printed; values loaded from `/Users/daniildegtyarev/.config/roehub/roehub.env` | Binance and Bybit both return `valid_readonly`. | Passed: Binance returned `valid_readonly` with reading enabled, IP restricted and dangerous permission flags disabled; Bybit returned `valid_readonly` with `readOnly=true`, IP restricted and supported account mode. | None |
-| Stage 3C preflight | `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities ... stage-5-preflight` | Internal token and running Mac Studio target service | Internal boundary reachable. | Passed on Mac Studio: `/health/ready` returned ready and capabilities returned `contract_version=internal-v1`; Stage 5 validate capability is not deployed yet. | None for Stage 3C reachability |
+| Stage 3C preflight | `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities ... stage-5-preflight` | Internal token and running Mac Studio target service | Internal boundary reachable. | Passed on Mac Studio: `/health/ready` returned ready and capabilities returned `contract_version=internal-v1` with `exchange_connections.validate`. | None |
+| Post-deploy internal validation | `POST /internal/v1/exchange-connections/{connection_id}/validate` after creating temporary smoke connections | Host-local internal token, Transit/OpenBao env, readonly Binance/Bybit env | Binance and Bybit return `valid_readonly`; temporary connections are disabled after smoke. | Passed on Mac Studio: Binance `valid_readonly`, `ip_restriction_status=restricted`; Bybit `valid_readonly`, `ip_restriction_status=restricted`; both smoke connections disabled. | None |
+| Metrics | `curl -fsS http://127.0.0.1:9205/metrics | grep exchange_connection_validation_total` | None | Bounded metrics include exchange/result/reason only. | Passed: `exchange_connection_validation_total{exchange="binance",reason="readonly_permission_detected",result="valid_readonly"} 2.0`; Bybit same labels with value `1.0`. | None |
 
 ## Contract Impact Classification
 
@@ -108,3 +110,13 @@ Sources verified before implementation:
 - `apps/api` remains a facade and must not import native exchange adapters,
   Transit decrypt code or credential resolver code.
 - No order placement implementation exists in `exchange-control`.
+
+## Direct-Main Delivery Evidence
+
+| Item | Evidence | Result |
+|---|---|---|
+| Implementation commit | `d526940579fb71cb3bc7fcd81f5b7c2e3b1518ce` | Pushed to `origin/main`. |
+| Runtime persistence fix | `ab8f28e9bec258776fd36d74e48c08a80135b4fe` | Pushed to `origin/main`; fixes Postgres `jsonb_build_object` nullable parameter casts discovered during post-deploy smoke. |
+| CI | GitHub Actions `26367259189` and `26367582869` | Success. |
+| Deploy | Deploy Backend `26367298732`, `26367658704`; Publish App Image `26367298740`, `26367658694`; Deploy Web `26367301918`, `26367663544` | Success. |
+| Runtime | Mac Studio `exchange-control` restarted after fix deploy; `/health/ready` ready; OpenBao unsealed; Transit ACL smoke passed; internal validate smoke passed. | Accepted. |
