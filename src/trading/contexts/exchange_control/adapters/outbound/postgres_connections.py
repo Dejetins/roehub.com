@@ -102,9 +102,9 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 %(status)s,
                                 %(status_reason)s,
                                 jsonb_build_object(
-                                    'permissions', %(permissions)s,
-                                    'validation_status', %(validation_status)s,
-                                    'validation_reason', %(validation_reason)s
+                                    'permissions', %(permissions)s::text,
+                                    'validation_status', %(validation_status)s::text,
+                                    'validation_reason', %(validation_reason)s::text
                                 ),
                                 'unknown',
                                 %(created_at)s,
@@ -525,8 +525,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 connection.permission_summary_json
                                 || %(permission_summary_json)s::jsonb
                                 || jsonb_build_object(
-                                    'validation_status', %(validation_status)s,
-                                    'validation_reason', %(validation_reason)s
+                                    'validation_status', %(validation_status)s::text,
+                                    'validation_reason', %(validation_reason)s::text
                                 ),
                             ip_restriction_status = %(ip_restriction_status)s,
                             last_validated_at = %(last_validated_at)s,
