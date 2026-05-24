@@ -73,7 +73,6 @@ class ExchangeControlClient(Protocol):
         permissions: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
 
@@ -84,7 +83,6 @@ class ExchangeControlClient(Protocol):
         connection_id: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
 
@@ -195,7 +193,6 @@ class HttpExchangeControlClient:
         permissions: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
         response = self._request(
@@ -211,7 +208,6 @@ class HttpExchangeControlClient:
                 "permissions": permissions,
                 "api_key": api_key,
                 "api_secret": api_secret,
-                "passphrase": passphrase,
             },
         )
         return _connection_from_payload(response.json())
@@ -223,7 +219,6 @@ class HttpExchangeControlClient:
         connection_id: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
         response = self._request(
@@ -234,7 +229,6 @@ class HttpExchangeControlClient:
                 "owner_user_id": owner_user_id,
                 "api_key": api_key,
                 "api_secret": api_secret,
-                "passphrase": passphrase,
             },
         )
         return _connection_from_payload(response.json())
@@ -357,10 +351,9 @@ class InMemoryExchangeControlClient:
         permissions: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
-        _ = owner_user_id, api_secret, passphrase, request_id
+        _ = owner_user_id, api_secret, request_id
         now = datetime.fromisoformat("2026-05-24T12:00:00+00:00")
         connection_id = str(UUID(int=self._next_id))
         credential_version_id = str(UUID(int=self._next_id + 1000))
@@ -395,10 +388,9 @@ class InMemoryExchangeControlClient:
         connection_id: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
-        _ = owner_user_id, api_secret, passphrase, request_id
+        _ = owner_user_id, api_secret, request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
             raise ExchangeControlClientError("exchange_connection_not_found")

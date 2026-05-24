@@ -361,7 +361,6 @@ function renderRotateRow(row, connectionId) {
     <form class="settings-rotate-form" data-rotate-form="${connectionId}" autocomplete="off">
       <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
       <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
-      <input name="passphrase" type="password" autocomplete="off" placeholder="Passphrase" aria-label="Passphrase">
       <button class="rh-button rh-button--primary rh-button--compact" type="submit">${t("settings.exchange.rotate_short")}</button>
       <output class="settings-inline-status" data-rotate-status aria-live="polite"></output>
     </form>
@@ -580,7 +579,6 @@ function initForms(root) {
       permissions: state.permissions,
       api_key: data.get("api_key") || "",
       api_secret: data.get("api_secret") || "",
-      passphrase: data.get("passphrase") || null,
     };
     const status = qs("[data-exchange-form-status]");
     try {
@@ -609,7 +607,6 @@ function initForms(root) {
     const payload = {
       api_key: data.get("api_key") || "",
       api_secret: data.get("api_secret") || "",
-      passphrase: data.get("passphrase") || null,
     };
     try {
       await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/rotate`, {

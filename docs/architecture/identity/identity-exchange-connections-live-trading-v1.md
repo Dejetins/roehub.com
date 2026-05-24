@@ -363,6 +363,8 @@ CREATE TABLE exchange_credential_versions (
 
 Правила DTO:
 
+- create/rotate request в account facade для текущих Binance/Bybit принимает
+  `api_key` и `api_secret`, но не принимает `passphrase`;
 - без `api_secret`, `passphrase`, ciphertext, fingerprint, HMAC и raw exchange
   error body;
 - включать masked key suffix, status, permission summary, environment, последнюю
@@ -1182,6 +1184,7 @@ rg -n "$ROEHUB_TEST_BINANCE_READONLY_API_SECRET|$ROEHUB_TEST_BYBIT_READONLY_API_
 - добавить permissions selector с default `read`; `trade` выбирается только явно;
 - добавить validate/rotate/disable flows;
 - добавить IP allowlist guidance;
+- не показывать и не принимать passphrase для текущих Binance/Bybit flows;
 - заменить hardcoded account limits на backend read model;
 - добавить typed confirmation для destructive actions;
 - очистить password inputs после submit/failure.
