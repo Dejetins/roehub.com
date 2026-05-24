@@ -109,7 +109,6 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
             "permissions": "read",
             "api_key": "ACCOUNTKEY1234",
             "api_secret": "TEST_SECRET_STAGE4",
-            "passphrase": "TEST_PASSPHRASE_STAGE4",
         },
         headers={"origin": "http://testserver"},
     )
@@ -122,7 +121,7 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert created_payload["permissions"] == "read"
     assert created_payload["environment"] == "testnet"
     assert created_payload["validation_status"] == "skipped_external_validation"
-    for forbidden in ("TEST_SECRET_STAGE4", "TEST_PASSPHRASE_STAGE4", "ciphertext", "hmac"):
+    for forbidden in ("TEST_SECRET_STAGE4", "ciphertext", "hmac"):
         assert forbidden not in created.text
 
     listed = client.get("/ui/account/exchange-connections")
@@ -183,6 +182,39 @@ def test_ui_account_exchange_connection_permissions_default_to_read() -> None:
     assert created.status_code == 201
     assert created.json()["permissions"] == "read"
     assert "TEST_SECRET_DEFAULT_READ" not in created.text
+
+
+def test_ui_account_exchange_connections_reject_passphrase_for_supported_exchanges() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "environment": "testnet",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY1234",
+            "api_secret": "TEST_SECRET_STAGE4",
+            "passphrase": "SHOULD_NOT_BE_ACCEPTED",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    rotated = client.post(
+        "/ui/account/exchange-connections/00000000-0000-0000-0000-000000000001/rotate",
+        json={
+            "api_key": "ACCOUNTKEY9876",
+            "api_secret": "TEST_SECRET_ROTATED",
+            "passphrase": "SHOULD_NOT_BE_ACCEPTED",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 422
+    assert rotated.status_code == 422
+    for response in (created, rotated):
+        assert "SHOULD_NOT_BE_ACCEPTED" not in response.text
+        assert "TEST_SECRET" not in response.text
 
 
 def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() -> None:

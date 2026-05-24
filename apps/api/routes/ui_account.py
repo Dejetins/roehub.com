@@ -197,7 +197,6 @@ def build_ui_account_router(
                 permissions=payload.permissions,
                 api_key=payload.api_key,
                 api_secret=payload.api_secret,
-                passphrase=payload.passphrase,
                 request_id="apps-api-create-exchange-connection",
             )
         except ExchangeControlClientError as error:
@@ -223,7 +222,6 @@ def build_ui_account_router(
                 connection_id=str(connection_id),
                 api_key=payload.api_key,
                 api_secret=payload.api_secret,
-                passphrase=payload.passphrase,
                 request_id="apps-api-rotate-exchange-connection",
             )
         except ExchangeControlClientError as error:

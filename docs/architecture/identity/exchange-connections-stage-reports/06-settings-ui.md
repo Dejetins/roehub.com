@@ -9,7 +9,9 @@ Stage 6 completes the `/settings` exchange connection workstation flow for key
 storage and validation management. The browser UI now uses the account
 exchange-connections backend read model, sends explicit `environment` and
 `permissions`, defaults permissions to `read`, and exposes validate, rotate and
-disable actions without rendering raw secrets or exchange error bodies.
+disable actions without rendering raw secrets or exchange error bodies. For the
+current Binance/Bybit support set, the account UI/API facade collects only API
+key and API secret; it does not expose a passphrase field.
 
 ## Scope
 
@@ -18,6 +20,7 @@ disable actions without rendering raw secrets or exchange error bodies.
 | Exchange list source | `/settings` reads backend connection status, not legacy/synthetic UI rows. | Settings now uses `/api/ui/account/exchange-connections`; table renders `status`, `validation_status`, `ip_restriction_status`, masked `api_key`, and `last_validated_at`. | `apps/web/templates/pages/settings.html`; `apps/web/dist/js/pages/settings.js`; focused tests |
 | Add form defaults | `permissions` defaults to `read`; `trade` is opt-in only. | Initial browser state reports `defaultPermissions=read`; request capture shows first create sends `permissions=read`, second create sends `permissions=trade` only after explicit selector change. | Browser QA payload capture |
 | Environment control | User explicitly chooses `mainnet` or `testnet`. | Initial browser state reports `defaultEnvironment=mainnet`; opt-in trade create sends `environment=testnet` after selector change. | Browser QA payload capture |
+| Supported exchange credentials | Binance/Bybit add and rotate forms collect only API key and API secret. | `passphrase` is absent from the `/settings` fragment and JS payload path; the account facade DTO rejects extra `passphrase` input with `422`. | Focused web/API tests; static grep |
 | Secret handling | Add and rotate forms are write-only and clear password inputs on failure and success. | Failure path returned deterministic 422 and cleared password fields; success path and rotate path also cleared password fields. | Browser QA secret cleanup checks; artifact grep |
 | Management actions | Validate, rotate, and disable flows exist. | Browser flow validated a connection to `valid_readonly`, rotated to masked key suffix `****3333`, and disabled the selected connection after typed confirmation. | Browser QA workflow table |
 | Limits | Account counts are backend-derived, not hardcoded template/read-model counters. | Template no longer renders fixed used values; `/ui/account/limits` derives exchange/API-key used counts from the backend exchange connection list. | `apps/web/templates/fragments/account/limits.html`; `apps/api/routes/ui_account.py`; route tests |
@@ -83,9 +86,9 @@ disable actions without rendering raw secrets or exchange error bodies.
 
 | Dimension | Classification | Reason |
 |---|---|---|
-| Public API contract | `compatible-change` | `/ui/account/limits` response shape is unchanged, but exchange/API-key used counts now come from exchange-control read model instead of fixed placeholders. |
+| Public API contract | `breaking-change` | `/ui/account/exchange-connections` create/rotate requests now reject `passphrase`; Binance/Bybit do not use this field, and legacy/internal storage keeps optional future passphrase capacity. `/ui/account/limits` response shape remains unchanged. |
 | Browser-visible behavior | `compatible-change` | `/settings` default permission is explicit `read`; `trade` remains available only as an explicit selector value. |
-| DTO schema | `none` | Existing account/exchange DTO fields are reused. |
+| DTO schema | `breaking-change` | `passphrase` was removed from the account facade create/rotate request DTOs and extra input remains forbidden. |
 | Persisted schema | `none` | No migration or persisted shape changed. |
 | Config schema | `none` | No runtime config keys changed. |
 | Request hash/cache identity | `none` | No cache keys or request identity semantics changed. |
@@ -108,6 +111,9 @@ disable actions without rendering raw secrets or exchange error bodies.
 - UI-visible connection status now comes from backend fields:
   `status`, `validation_status`, `ip_restriction_status`, and
   `last_validated_at`.
+- Binance/Bybit `/settings` credential forms and account facade requests do not
+  include `passphrase`; future exchanges that need one require an explicit UI/API
+  contract extension.
 - Browser artifact grep passed for Stage 6 sentinel markers and secret field
   names.
 - The settings UI still uses existing session/recent-auth/API route gates; Stage

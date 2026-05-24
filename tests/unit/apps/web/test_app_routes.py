@@ -331,6 +331,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-environment-current>mainnet</span>' in settings_response.text
     assert 'data-permissions-current>read</span>' in settings_response.text
     assert 'data-permissions-option="trade"' in settings_response.text
+    assert "Passphrase" not in main_html
+    assert 'name="passphrase"' not in main_html
     assert "Latency" not in main_html
     assert "5 / 10" not in main_html
     assert "7 / 10" not in main_html
@@ -341,6 +343,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
     settings_js = (_WEB_ROOT / "dist" / "js" / "pages" / "settings.js").read_text()
     assert 'permissions: "trade"' not in settings_js
+    assert "passphrase" not in settings_js
     assert "128 ms" not in settings_js
     assert "needsAttention" not in settings_js
 

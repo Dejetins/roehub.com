@@ -57,7 +57,6 @@ class CreateExchangeConnectionRequest(BaseModel):
     permissions: Literal["read", "trade"] = "read"
     api_key: str = Field(min_length=1)
     api_secret: str = Field(min_length=1)
-    passphrase: str | None = None
 
 
 class RotateExchangeConnectionRequest(BaseModel):
@@ -65,7 +64,6 @@ class RotateExchangeConnectionRequest(BaseModel):
 
     api_key: str = Field(min_length=1)
     api_secret: str = Field(min_length=1)
-    passphrase: str | None = None
 
 
 class ExchangeConnectionResponse(BaseModel):
