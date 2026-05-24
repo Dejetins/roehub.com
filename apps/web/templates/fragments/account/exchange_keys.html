@@ -25,6 +25,24 @@
           <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="futures" data-market-option="futures">Futures</button>
         </div>
       </div>
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-environment-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-environment-menu" data-rh-dropdown-trigger>
+          {{ t("settings.exchange.environment") }} <span class="rh-dropdown__value" data-environment-current>mainnet</span>
+        </button>
+        <div class="rh-popover" id="exchange-environment-menu" role="listbox" hidden data-rh-dropdown-menu>
+          <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="mainnet" data-environment-option="mainnet">mainnet</button>
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="testnet" data-environment-option="testnet">testnet</button>
+        </div>
+      </div>
+      <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+        <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-permissions-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-permissions-menu" data-rh-dropdown-trigger>
+          {{ t("settings.exchange.permissions") }} <span class="rh-dropdown__value" data-permissions-current>read</span>
+        </button>
+        <div class="rh-popover" id="exchange-permissions-menu" role="listbox" hidden data-rh-dropdown-menu>
+          <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="read" data-permissions-option="read">read</button>
+          <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="trade" data-permissions-option="trade">trade</button>
+        </div>
+      </div>
       <input name="label" type="text" maxlength="80" placeholder="main_binance" aria-label="{{ t('settings.exchange.account') }}">
       <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
       <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
@@ -41,16 +59,17 @@
           <th>{{ t("settings.exchange.account") }}</th>
           <th>API</th>
           <th>{{ t("common.status") }}</th>
+          <th>{{ t("settings.exchange.validation") }}</th>
           <th>{{ t("settings.exchange.permissions") }}</th>
           <th>{{ t("settings.exchange.market") }}</th>
           <th>{{ t("settings.exchange.environment") }}</th>
+          <th>{{ t("settings.security.allowlist") }}</th>
           <th>{{ t("settings.exchange.updated") }}</th>
-          <th>Latency</th>
           <th>{{ t("settings.exchange.actions") }}</th>
         </tr>
       </thead>
       <tbody data-exchange-keys-body>
-        <tr><td colspan="10">{{ t("settings.loading") }}</td></tr>
+        <tr><td colspan="11">{{ t("settings.loading") }}</td></tr>
       </tbody>
     </table>
   </div>

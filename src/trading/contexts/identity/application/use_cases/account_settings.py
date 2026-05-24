@@ -120,17 +120,24 @@ class AccountSettingsUseCase:
         )
         return preferences
 
-    def get_limits(self, *, owner_user_id: UserId) -> dict[str, int | str]:
+    def get_limits(
+        self,
+        *,
+        owner_user_id: UserId,
+        plan: str,
+        exchange_connections_used: int,
+        api_keys_used: int,
+    ) -> dict[str, int | str]:
         _ = owner_user_id
         return {
-            "plan": "pro",
-            "exchange_connections_used": 0,
+            "plan": plan,
+            "exchange_connections_used": exchange_connections_used,
             "exchange_connections_limit": 10,
-            "api_keys_used": 0,
+            "api_keys_used": api_keys_used,
             "api_keys_limit": 10,
             "active_strategies_used": 0,
             "active_strategies_limit": 50,
-            "webhook_events_used": 88,
+            "webhook_events_used": 0,
             "webhook_events_limit": 100,
         }
 

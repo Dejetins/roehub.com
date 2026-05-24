@@ -15,6 +15,8 @@ const state = {
   },
   exchangeName: "binance",
   marketType: "futures",
+  environment: "mainnet",
+  permissions: "read",
   sessionsCursor: null,
   auditCursor: null,
 };
@@ -62,6 +64,21 @@ function setDropdownValue(selector, value) {
   }
 }
 
+function closeDropdownForItem(item) {
+  const dropdown = item.closest("[data-rh-dropdown]");
+  const trigger = dropdown?.querySelector("[data-rh-dropdown-trigger]");
+  const menu = dropdown?.querySelector("[data-rh-dropdown-menu]");
+  if (dropdown instanceof HTMLElement) {
+    dropdown.dataset.open = "false";
+  }
+  if (trigger instanceof HTMLElement) {
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  if (menu instanceof HTMLElement) {
+    menu.hidden = true;
+  }
+}
+
 function setText(selector, value) {
   const target = qs(selector);
   if (target) {
@@ -73,6 +90,35 @@ function formatTimestampToSeconds(value) {
   const text = String(value || "").trim();
   if (!text) return "--";
   return text.replace("T", " ").replace(/\.\d+/, "").replace(/Z$/, "");
+}
+
+function clearSecretInputs(form) {
+  form.querySelectorAll("input[type='password']").forEach((input) => {
+    input.value = "";
+  });
+}
+
+function exchangeItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function statusClass(item) {
+  if (item?.status === "disabled") return "is-warning";
+  const validationStatus = item?.validation_status || "";
+  if (validationStatus === "valid_readonly" || validationStatus === "valid_trade_enabled") {
+    return "is-positive";
+  }
+  if (validationStatus === "skipped_external_validation") return "is-warning";
+  if (validationStatus.startsWith("invalid_") || validationStatus === "unsupported_account_mode") {
+    return "is-negative";
+  }
+  return "";
+}
+
+function readableStatus(value) {
+  return String(value || "--").replaceAll("_", " ");
 }
 
 function formatPlan(value) {
@@ -247,60 +293,79 @@ function persistAutorefresh() {
   }
 }
 
-function renderExchangeKeys(items) {
+function renderExchangeKeys(payload) {
   const body = qs("[data-exchange-keys-body]");
   if (!body) return;
+  const items = exchangeItems(payload);
   body.replaceChildren();
   if (!items?.length) {
     const row = body.insertRow();
     const cell = row.insertCell();
-    cell.colSpan = 10;
+    cell.colSpan = 11;
     cell.textContent = t("settings.exchange.empty");
     return;
   }
-  items.forEach((item, index) => {
+  items.forEach((item) => {
     const row = body.insertRow();
-    const needsAttention = index === 3;
-    const status = needsAttention ? t("settings.exchange.needs_attention") : t("settings.state.active");
-    const latency = needsAttention ? "128 ms" : `${28 + index * 3} ms`;
+    const rowClass = statusClass(item);
     [
       item.exchange_name,
       item.label || "--",
       item.api_key,
-      status,
-      item.permissions,
+      readableStatus(item.status),
+      readableStatus(item.validation_status),
+      item.permissions || "--",
       item.market_type,
-      item.environment || "Prod",
-      item.updated_at,
-      latency,
+      item.environment || "--",
+      readableStatus(item.ip_restriction_status),
+      formatTimestampToSeconds(item.last_validated_at),
     ].forEach((value, cellIndex) => {
       const cell = row.insertCell();
       cell.textContent = String(value || "--");
-      if (cellIndex === 3) {
-        cell.className = needsAttention ? "is-warning" : "is-positive";
-      }
-      if (cellIndex === 8) {
-        cell.className = needsAttention ? "is-negative" : "is-positive";
+      if (cellIndex === 3 || cellIndex === 4 || cellIndex === 8) {
+        cell.className = rowClass;
       }
     });
     const action = row.insertCell();
     action.className = "settings-exchange-actions";
-    ["refresh"].forEach((actionKey) => {
+    [
+      ["validate", "settings.exchange.validate", "settings.exchange.validate_short"],
+      ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],
+      ["disable", "settings.exchange.disable", "settings.exchange.disable_short"],
+    ].forEach(([actionKey, labelKey, shortLabelKey]) => {
       const button = document.createElement("button");
       button.className = "rh-button rh-button--secondary rh-button--compact";
       button.type = "button";
-      button.setAttribute("aria-label", t(`settings.exchange.${actionKey}`));
-      button.textContent = t(`settings.exchange.${actionKey}_short`);
+      button.dataset[`exchange${actionKey.charAt(0).toUpperCase()}${actionKey.slice(1)}`] =
+        item.connection_id || item.key_id || "";
+      button.disabled = actionKey !== "validate" && item.status === "disabled";
+      button.setAttribute("aria-label", t(labelKey));
+      button.textContent = t(shortLabelKey);
       action.append(button);
     });
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "rh-button rh-button--secondary rh-button--compact";
-    deleteButton.type = "button";
-    deleteButton.dataset.exchangeDelete = item.key_id;
-    deleteButton.setAttribute("aria-label", t("settings.exchange.disconnect"));
-    deleteButton.textContent = t("settings.exchange.disconnect_short");
-    action.append(deleteButton);
   });
+}
+
+function renderRotateRow(row, connectionId) {
+  const existing = qs(`[data-rotate-row="${connectionId}"]`);
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  const rotateRow = row.parentElement?.insertRow(row.sectionRowIndex + 1);
+  if (!rotateRow) return;
+  rotateRow.dataset.rotateRow = connectionId;
+  const cell = rotateRow.insertCell();
+  cell.colSpan = 11;
+  cell.innerHTML = `
+    <form class="settings-rotate-form" data-rotate-form="${connectionId}" autocomplete="off">
+      <input name="api_key" type="password" autocomplete="off" placeholder="API key" aria-label="API key">
+      <input name="api_secret" type="password" autocomplete="off" placeholder="API secret" aria-label="API secret">
+      <input name="passphrase" type="password" autocomplete="off" placeholder="Passphrase" aria-label="Passphrase">
+      <button class="rh-button rh-button--primary rh-button--compact" type="submit">${t("settings.exchange.rotate_short")}</button>
+      <output class="settings-inline-status" data-rotate-status aria-live="polite"></output>
+    </form>
+  `;
 }
 
 function renderSessions(payload, append = false) {
@@ -409,15 +474,30 @@ function initEvents(root) {
     renderNotifications(notifications);
     setStatus(t("settings.state.saved"), true);
   });
-  on(root, "click", "[data-exchange-delete]", async (_event, item) => {
-    const keyId = item.dataset.exchangeDelete;
-    if (!keyId || !window.confirm(t("settings.exchange.confirm_delete"))) return;
-    try {
-      await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${keyId}`, { method: "DELETE" });
-    } catch (error) {
-      if (error.status !== 404) throw error;
-    }
-    const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), []);
+  on(root, "click", "[data-exchange-validate]", async (_event, item) => {
+    const connectionId = item.dataset.exchangeValidate;
+    if (!connectionId) return;
+    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/validate`, {
+      method: "POST",
+    });
+    const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+    renderExchangeKeys(exchangeKeys);
+  });
+  on(root, "click", "[data-exchange-rotate]", (_event, item) => {
+    const connectionId = item.dataset.exchangeRotate;
+    const row = item.closest("tr");
+    if (!connectionId || !(row instanceof HTMLTableRowElement)) return;
+    renderRotateRow(row, connectionId);
+  });
+  on(root, "click", "[data-exchange-disable]", async (_event, item) => {
+    const connectionId = item.dataset.exchangeDisable;
+    if (!connectionId) return;
+    const confirmation = window.prompt(t("settings.exchange.confirm_disable"));
+    if (confirmation !== "DISABLE") return;
+    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/disable`, {
+      method: "POST",
+    });
+    const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
     renderExchangeKeys(exchangeKeys);
   });
   on(root, "click", "[data-sessions-more]", async () => {
@@ -452,10 +532,22 @@ function initEvents(root) {
   on(root, "click", "[data-exchange-name-option]", (_event, item) => {
     state.exchangeName = item.dataset.exchangeNameOption || "binance";
     setDropdownValue("[data-exchange-name-current]", state.exchangeName);
+    closeDropdownForItem(item);
   });
   on(root, "click", "[data-market-option]", (_event, item) => {
     state.marketType = item.dataset.marketOption || "futures";
     setDropdownValue("[data-market-current]", state.marketType);
+    closeDropdownForItem(item);
+  });
+  on(root, "click", "[data-environment-option]", (_event, item) => {
+    state.environment = item.dataset.environmentOption || "mainnet";
+    setDropdownValue("[data-environment-current]", state.environment);
+    closeDropdownForItem(item);
+  });
+  on(root, "click", "[data-permissions-option]", (_event, item) => {
+    state.permissions = item.dataset.permissionsOption || "read";
+    setDropdownValue("[data-permissions-current]", state.permissions);
+    closeDropdownForItem(item);
   });
 }
 
@@ -483,8 +575,9 @@ function initForms(root) {
     const payload = {
       exchange_name: state.exchangeName,
       market_type: state.marketType,
+      environment: state.environment,
       label: data.get("label") || null,
-      permissions: "trade",
+      permissions: state.permissions,
       api_key: data.get("api_key") || "",
       api_secret: data.get("api_secret") || "",
       passphrase: data.get("passphrase") || null,
@@ -496,14 +589,39 @@ function initForms(root) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
+      clearSecretInputs(form);
       form.reset();
-      const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), []);
+      const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
       renderExchangeKeys(exchangeKeys);
       if (status) status.textContent = t("settings.exchange.saved");
     } catch (error) {
-      form.querySelectorAll("input[type='password']").forEach((input) => {
-        input.value = "";
+      clearSecretInputs(form);
+      if (status) status.textContent = errorMessage(error);
+    }
+  });
+
+  on(root, "submit", "[data-rotate-form]", async (event, form) => {
+    event.preventDefault();
+    const connectionId = form.dataset.rotateForm;
+    const status = qs("[data-rotate-status]", form);
+    if (!connectionId) return;
+    const data = new FormData(form);
+    const payload = {
+      api_key: data.get("api_key") || "",
+      api_secret: data.get("api_secret") || "",
+      passphrase: data.get("passphrase") || null,
+    };
+    try {
+      await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/rotate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      clearSecretInputs(form);
+      const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+      renderExchangeKeys(exchangeKeys);
+    } catch (error) {
+      clearSecretInputs(form);
       if (status) status.textContent = errorMessage(error);
     }
   });

@@ -36,8 +36,9 @@ runtime-вызовами. Нельзя переходить к следующе�
 - `identity_exchange_keys` хранит API-учетные данные для `binance`/`bybit`.
 - Storage policy v2 уже запрещает возврат `api_secret`/`passphrase` через API и
   использует зашифрованные blobs для API key/secret.
-- `/settings` уже содержит видимую в браузере панель биржевых ключей и вызывает
-  `/api/exchange-keys`.
+- `/settings` содержит видимую в браузере панель биржевых ключей; после Stage 6
+  основная UI-панель использует `/api/ui/account/exchange-connections`, а
+  `/api/exchange-keys` остается legacy compatibility endpoint.
 - `apps/api/routes/ui_account.py` уже содержит account/preferences/sessions/audit
   API и шаблон защиты мутаций same-origin.
 - `strategy_live_runner` сейчас обрабатывает свечи, сигналы и realtime-вывод, но

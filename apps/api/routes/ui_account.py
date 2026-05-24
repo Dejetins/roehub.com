@@ -124,17 +124,31 @@ def build_ui_account_router(
     def get_limits(
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> AccountLimitsResponse:
-        _ = principal
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            connections = client.list_connections(
+                owner_user_id=str(principal.user_id),
+                request_id="apps-api-account-limits-exchange-connections",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        active_connections = tuple(row for row in connections if row.status != "disabled")
+        base_limits = account_settings.get_limits(
+            owner_user_id=principal.user_id,
+            plan=str(principal.paid_level),
+            exchange_connections_used=len(active_connections),
+            api_keys_used=len(active_connections),
+        )
         return AccountLimitsResponse(
-            plan="pro",
-            exchange_connections_used=0,
-            exchange_connections_limit=10,
-            api_keys_used=0,
-            api_keys_limit=10,
-            active_strategies_used=0,
-            active_strategies_limit=50,
-            webhook_events_used=88,
-            webhook_events_limit=100,
+            plan=str(base_limits["plan"]),
+            exchange_connections_used=int(base_limits["exchange_connections_used"]),
+            exchange_connections_limit=int(base_limits["exchange_connections_limit"]),
+            api_keys_used=int(base_limits["api_keys_used"]),
+            api_keys_limit=int(base_limits["api_keys_limit"]),
+            active_strategies_used=int(base_limits["active_strategies_used"]),
+            active_strategies_limit=int(base_limits["active_strategies_limit"]),
+            webhook_events_used=int(base_limits["webhook_events_used"]),
+            webhook_events_limit=int(base_limits["webhook_events_limit"]),
         )
 
     @router.get(

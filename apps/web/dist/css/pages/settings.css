@@ -122,6 +122,10 @@
     min-height: 0;
     overflow: auto;
   }
+
+  .settings-panel[data-settings-panel="exchange_keys"].terminal-panel {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
 }
 
 .settings-panel[data-settings-panel="profile"] {
@@ -260,6 +264,7 @@
 
 .settings-form input,
 .settings-exchange-form input,
+.settings-rotate-form input,
 .dashboard-search {
   min-height: 24px;
   border: 1px solid var(--rh-line-muted);
@@ -363,20 +368,29 @@
 .settings-exchange .settings-table th:nth-child(8),
 .settings-exchange .settings-table td:nth-child(8),
 .settings-exchange .settings-table th:nth-child(9),
-.settings-exchange .settings-table td:nth-child(9) {
+.settings-exchange .settings-table td:nth-child(9),
+.settings-exchange .settings-table th:nth-child(10),
+.settings-exchange .settings-table td:nth-child(10) {
   max-width: 62px;
 }
 
-.settings-exchange .settings-table th:nth-child(10),
-.settings-exchange .settings-table td:nth-child(10) {
-  width: 106px;
-  max-width: 106px;
+.settings-exchange .settings-table th:nth-child(11),
+.settings-exchange .settings-table td:nth-child(11) {
+  width: 122px;
+  max-width: 122px;
 }
 
 .settings-exchange-form {
   margin-bottom: 5px;
   padding-top: 5px;
   border-top: 1px solid var(--rh-divider);
+}
+
+.settings-rotate-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto minmax(90px, 0.5fr);
+  gap: 5px;
+  align-items: center;
 }
 
 .settings-exchange-actions {
@@ -545,6 +559,7 @@
   .settings-profile__body,
   .settings-form--inline,
   .settings-form-grid,
+  .settings-rotate-form,
   .settings-preference-grid,
   .settings-list-row,
   .settings-limit,

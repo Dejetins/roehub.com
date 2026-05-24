@@ -280,6 +280,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     client = _build_test_client()
 
     settings_response = client.get("/settings")
+    main_html = settings_response.text.split('<main id="main-content"', maxsplit=1)[1].split(
+        "</main>", maxsplit=1
+    )[0]
 
     assert settings_response.status_code == 200
     assert 'data-page="settings"' in settings_response.text
@@ -287,7 +290,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'nav-tab--active"' in settings_response.text
     assert 'data-profile-endpoint="/api/ui/account/profile"' in settings_response.text
     assert 'data-preferences-endpoint="/api/ui/account/preferences"' in settings_response.text
-    assert 'data-exchange-keys-endpoint="/api/exchange-keys"' in settings_response.text
+    assert 'data-exchange-keys-endpoint="/api/ui/account/exchange-connections"' in (
+        settings_response.text
+    )
     assert '<div class="command-bar"' not in settings_response.text
     assert '<footer class="status-bar">' not in settings_response.text
     assert "shell-status-panel app-bottom-status shell-global-status" in settings_response.text
@@ -323,11 +328,21 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "data-settings-refresh-option" not in settings_response.text
     assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
+    assert 'data-environment-current>mainnet</span>' in settings_response.text
+    assert 'data-permissions-current>read</span>' in settings_response.text
+    assert 'data-permissions-option="trade"' in settings_response.text
+    assert "Latency" not in main_html
+    assert "5 / 10" not in main_html
+    assert "7 / 10" not in main_html
     assert '<select' not in settings_response.text
     assert '<meter' not in settings_response.text
     assert "settings-cli-meter" in settings_response.text
     assert 'data-security-focus' not in settings_response.text
     assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
+    settings_js = (_WEB_ROOT / "dist" / "js" / "pages" / "settings.js").read_text()
+    assert 'permissions: "trade"' not in settings_js
+    assert "128 ms" not in settings_js
+    assert "needsAttention" not in settings_js
 
 
 def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> None:

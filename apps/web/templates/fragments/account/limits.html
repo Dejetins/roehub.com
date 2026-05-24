@@ -4,10 +4,10 @@
   </header>
   <div class="settings-limits">
     {% for item in [
-      {"key": "exchange_connections", "label": "settings.limits.exchanges", "value": "5 / 10"},
-      {"key": "api_keys", "label": "settings.limits.api_keys", "value": "7 / 10"},
-      {"key": "active_strategies", "label": "settings.limits.strategies", "value": "12 / 50"},
-      {"key": "webhook_events", "label": "settings.limits.webhooks", "value": "88 / 100"}
+      {"key": "exchange_connections", "label": "settings.limits.exchanges"},
+      {"key": "api_keys", "label": "settings.limits.api_keys"},
+      {"key": "active_strategies", "label": "settings.limits.strategies"},
+      {"key": "webhook_events", "label": "settings.limits.webhooks"}
     ] %}
       <div class="settings-limit" data-limit-key="{{ item.key }}">
         <span>{{ t(item.label) }}</span>
@@ -15,15 +15,15 @@
           class="settings-cli-meter"
           role="meter"
           aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow="55"
+          aria-valuemax="0"
+          aria-valuenow="0"
           data-limit-meter="{{ item.key }}"
         >
           {% for step in range(10) %}
-            <span class="settings-cli-meter__cell{% if step < 5 %} settings-cli-meter__cell--fill{% endif %}" aria-hidden="true"></span>
+            <span class="settings-cli-meter__cell" aria-hidden="true"></span>
           {% endfor %}
         </span>
-        <strong data-limit-value="{{ item.key }}">{{ item.value }}</strong>
+        <strong data-limit-value="{{ item.key }}">-- / --</strong>
       </div>
     {% endfor %}
   </div>
