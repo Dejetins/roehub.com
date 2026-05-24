@@ -5,25 +5,32 @@ PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
 
-mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/state/backups /opt/roehub/clickhouse
+mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/config/openbao /opt/roehub/config/openbao/policies /opt/roehub/state/backups /opt/roehub/state/openbao/data /opt/roehub/clickhouse
 mkdir -p /opt/roehub/state/backtest_artifacts/v2
 mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clickhouse/logs /opt/roehub/clickhouse/backups /opt/roehub/clickhouse/access
 mkdir -p /Users/daniildegtyarev/.config/roehub /Users/daniildegtyarev/.local/bin /Users/daniildegtyarev/Library/Logs/roehub "$LAUNCH_AGENTS_DIR"
 mkdir -p /opt/homebrew/etc/monit.d/scripts
 
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
+install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
+install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
+install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl" /opt/roehub/config/openbao/policies/roehub-api-transit-deny-decrypt.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/blackbox/blackbox.yml" /opt/roehub/config/blackbox.yml
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/config.xml" /opt/roehub/config/clickhouse.config.xml
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/users.d/roehub.xml" /opt/roehub/config/clickhouse.users.roehub.xml
+install -m 0755 "$REPO_ROOT/scripts/macos/provision_openbao_transit_stage3a.sh" /opt/roehub/bin/provision_openbao_transit_stage3a.sh
+install -m 0755 "$REPO_ROOT/scripts/macos/smoke_openbao_transit_acl.sh" /opt/roehub/bin/smoke_openbao_transit_acl.sh
 install -m 0755 "$REPO_ROOT/infra/scripts/monit/launchctl_service_control.sh" /opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt/homebrew/etc/monit.d/roehub-market-data.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-job-runner.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-control.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-control.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-openbao.monitrc" /opt/homebrew/etc/monit.d/roehub-openbao.monitrc
 
 for plist in \
   com.roehub.api.plist \
+  com.roehub.openbao.plist \
   com.roehub.exchange-control.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \

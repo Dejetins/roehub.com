@@ -27,6 +27,7 @@
 - `backtest-artifact-publisher` (`127.0.0.1:9203/metrics`)
 - `backtest-job-runner` (`127.0.0.1:9204/metrics`)
 - `exchange-control` (`127.0.0.1:9205/metrics`)
+- `openbao` (`127.0.0.1:8200/v1/sys/metrics?format=prometheus`)
 
 ## Backtest runner target
 
@@ -51,6 +52,7 @@ execution and lazy trades cache miss/hit smoke остаются R5 acceptance и
 - `roehub_backtest_job_runner`
 - `roehub_backtest_artifact_publisher`
 - `roehub_exchange_control`
+- `roehub_openbao`
 - `roehub_keycloak` (`127.0.0.1:19000/health/ready`)
 
 HTTP probes:
@@ -68,7 +70,7 @@ TCP probes:
 
 - `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
 - `node_exporter` — `brew services`
-- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner`, `exchange-control` — user `launchd` services
+- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*`, `backtest-job-runner`, `exchange-control`, `openbao` — user `launchd` services
 
 ## Install and bootstrap commands
 
@@ -86,13 +88,18 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/macos/launchd/com.roehub.postgres-exporter.plist`
 - `infra/macos/launchd/com.roehub.redis-exporter.plist`
 - `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
+- `infra/macos/launchd/com.roehub.openbao.plist`
 - `infra/macos/launchd/com.roehub.backtest-job-runner.plist`
 - `infra/macos/launchd/com.roehub.exchange-control.plist`
+- `infra/macos/openbao/openbao.prod.hcl`
+- `infra/macos/openbao/policies/roehub-exchange-control-transit.hcl`
+- `infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl`
 - `infra/scripts/monit/launchctl_service_control.sh`
 - `infra/scripts/monit/roehub-market-data.monitrc`
 - `infra/scripts/monit/roehub-backtest-job-runner.monitrc`
 - `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
 - `infra/scripts/monit/roehub-exchange-control.monitrc`
+- `infra/scripts/monit/roehub-openbao.monitrc`
 - `infra/scripts/monit/roehub-keycloak.monitrc`
 - `scripts/macos/install_native_backend_prereqs.sh`
 - `scripts/macos/bootstrap_native_prod.sh`
@@ -170,6 +177,8 @@ curl -fsS http://127.0.0.1:9204/metrics | rg 'backtest_runner_|backtest_lazy_tra
 curl -fsS http://127.0.0.1:9205/health/ready
 curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_'
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
+curl -fsS http://127.0.0.1:8200/v1/sys/health
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="openbao"}'
 ```
 
 ## 5) Проверка сервисов хоста
@@ -179,6 +188,7 @@ brew services list
 launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data|backtest-job-runner|exchange-control)'
 launchctl print gui/$(id -u)/com.roehub.backtest-job-runner | grep -E 'state =|pid =|last exit code ='
 launchctl print gui/$(id -u)/com.roehub.exchange-control | grep -E 'state =|pid =|last exit code ='
+launchctl print gui/$(id -u)/com.roehub.openbao | grep -E 'state =|pid =|last exit code ='
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
 curl -I http://127.0.0.1:9100
@@ -189,6 +199,7 @@ curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:19000/health/ready
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_job_runner|backtest_artifact|exchange_control)'
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_openbao'
 ```
 
 ## Minimum done state
@@ -203,9 +214,12 @@ Monitoring считается в рабочем состоянии, когда �
   отвечает независимо от active disposable full-job child process
 - `exchange-control` target `127.0.0.1:9205` в `up`, `/health/ready` возвращает
   `ready`, а `/metrics` содержит `exchange_control_active`
+- `openbao` target `127.0.0.1:8200` в `up`, `/v1/sys/health` возвращает
+  `initialized=true` и `sealed=false`
 - Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - Monit summary показывает `roehub_backtest_job_runner` в `Running/Accessible` после включения Monit supervision
 - Monit summary показывает `roehub_exchange_control` в `Running/Accessible` после включения Monit supervision
+- Monit summary показывает `roehub_openbao` в `Running/Accessible` после включения Monit supervision
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)
 

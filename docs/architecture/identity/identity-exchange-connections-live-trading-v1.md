@@ -111,7 +111,8 @@ runtime-вызовами. Нельзя переходить к следующе�
 flowchart LR
     U["Пользователь /settings"] --> WEB["apps/web SSR"]
     WEB --> API["apps/api /api/*"]
-    API --> CTRL["exchange-control use cases"]
+    API --> CTRLAPI["exchange-control internal command API"]
+    CTRLAPI --> CTRL["exchange-control use cases"]
     CTRL --> PG["Postgres metadata + ciphertext"]
     CTRL --> SECRET["OpenBao/Vault Transit или dev fallback"]
     CTRL --> VALID["Binance/Bybit validation adapters"]
@@ -126,6 +127,9 @@ flowchart LR
 - `exchange_control` владеет подключениями, версиями credentials, validation
   state и политикой шифрования секретов.
 - `apps/api` валидирует/authenticates HTTP, вызывает use cases и мапит DTO.
+- Для write/secret/validation операций `apps/api` вызывает только local-only
+  `exchange-control` internal command API/client. Он не импортирует Transit
+  cipher, credential resolver или Binance/Bybit SDK напрямую.
 - `apps/web` рендерит masked read models и write-only forms.
 - Биржевые validation adapters живут только на outbound-краю.
 - OpenBao/Vault client живет только за портами secret cipher и credential
@@ -396,6 +400,9 @@ healthcheck, launchd и Monit. Это не optional optimization, а gate без
 
 - `exchange-control` на `127.0.0.1:9205/metrics`;
 - health/readiness endpoint: `127.0.0.1:9205/health/ready`;
+- local-only internal command API на том же `127.0.0.1:9205` для команд
+  create/rotate/disable/validate, закрытый service-to-service auth и
+  недоступный из public edge;
 - launchd: `infra/macos/launchd/com.roehub.exchange-control.plist`;
 - Monit: `infra/scripts/monit/roehub-exchange-control.monitrc`;
 - Prometheus scrape job в `infra/macos/prometheus/prometheus.prod.yml`;
@@ -455,6 +462,9 @@ Backend:
 - отдельная модель `exchange_connections`;
 - отдельные `exchange_credential_versions`;
 - Transit/OpenBao secret backend и ACL model;
+- local-only internal command API между `apps/api` и `exchange-control`;
+- `apps/api` outbound client для `exchange-control`, чтобы public routes не
+  импортировали secret/decrypt/exchange adapters напрямую;
 - HMAC fingerprint вместо plain SHA-256 для новых ключей;
 - create/list/rotate/disable/validate use cases;
 - Binance/Bybit validation adapters;
@@ -464,8 +474,10 @@ Backend:
   add/delete hooks; rotate/disable hooks must reuse it when introduced;
 - Stage 1 already added CSRF fail-closed hardening for exchange mutations;
 - rate-limit/error redaction around validation;
-- metrics endpoint и Prometheus metrics;
-- обязательные Monit/launchd configs для `exchange-control`;
+- business metrics для create/rotate/disable/validation поверх уже принятого
+  Stage 2 `/metrics`;
+- Stage 2 уже добавил обязательные Monit/launchd configs для
+  `exchange-control`; Stage 3C/5 должны не обходить этот runtime boundary;
 - runbook для secret rotation и emergency disable.
 
 UI:
@@ -725,18 +737,95 @@ curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
 - direct-main push в `origin/main` выполнен или stage явно заблокирован;
 - внешний validation adapter не подключается до прохождения этого stage.
 
-### Этап 3 — Secret Engine Foundation После Service Identity
+### Этап 3A — OpenBao/Vault Runtime Provisioning
 
-Цель: ввести production-grade secret boundary для хранения API-ключей.
+Цель: поднять и доказать живой Transit-compatible secret backend до того, как
+application code начнет считаться production-ready.
+
+Этот этап отделяет инфраструктурное provision/recovery от application
+integration. Stage 3B нельзя принимать, если Stage 3A не доказал runtime,
+Transit key, ACL и токены.
 
 Работа:
 
-- добавить Transit implementation для `ExchangeSecretCipher`;
-- оставить local/dev fallback только за явной non-production config;
-- определить OpenBao/Vault policies для уже созданной service identity
-  `exchange-control`;
-- добавить config fail-closed checks;
-- описать rewrap/rotation command.
+- развернуть OpenBao или Vault-compatible Transit service на target runtime;
+- закрепить service owner, storage path, bind address, launchd/Monit unit,
+  health endpoint и restart policy;
+- описать init/unseal или выбранную recovery-модель, backup/restore notes и
+  emergency access path;
+- включить Transit secret engine;
+- создать Transit key `roehub-exchange-credentials`;
+- создать ACL/policies и выдать отдельные tokens:
+  - `exchange-control`: encrypt, HMAC/fingerprint и ограниченный decrypt для
+    validation workflow;
+  - `apps/api`: без decrypt capability; API не должен получать plaintext path;
+  - admin/operator token: только для rotation/rewrap, не для app runtime env;
+- зафиксировать runtime env names без значений секретов:
+  `OPENBAO_ADDR`, `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN`,
+  `ROEHUB_API_TRANSIT_TOKEN`;
+- добавить Prometheus/Monit health checks и runbook для secret backend.
+
+Валидация:
+
+```bash
+curl -fsS "$OPENBAO_ADDR/v1/sys/health"
+
+curl -fsS -X POST "$OPENBAO_ADDR/v1/transit/encrypt/roehub-exchange-credentials" \
+  -H "X-Vault-Token: $ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN" \
+  --data '{"plaintext":"VEVTVF9TRUNSRVQ="}'
+
+curl -i -X POST "$OPENBAO_ADDR/v1/transit/decrypt/roehub-exchange-credentials" \
+  -H "X-Vault-Token: $ROEHUB_API_TRANSIT_TOKEN" \
+  --data '{"ciphertext":"vault:v1:example"}'
+
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | rg 'openbao|vault|transit'
+```
+
+Ожидаемо:
+
+- OpenBao/Vault health endpoint healthy;
+- Transit key `roehub-exchange-credentials` существует;
+- `exchange-control` token может выполнить encrypt;
+- `apps/api` token получает `403`/permission denied на decrypt;
+- secret backend находится под process supervision;
+- tokens, unseal material и admin credentials не попадают в repo, logs,
+  stage reports или browser artifacts.
+
+Критерий выхода:
+
+- secret backend доказан runtime-вызовами;
+- ACL behavior доказан direct Transit calls;
+- service supervision и restart/health evidence сохранены;
+- runbook содержит install/init/unseal/backup/restore/rotation notes;
+- iteration ledger обновлен runtime endpoint, policy names, token roles,
+  env contract и blockers для Stage 3B;
+- direct-main push в `origin/main` выполнен или stage явно заблокирован.
+
+### Этап 3B — Transit Application Integration
+
+Цель: подключить `exchange-control` application code к уже принятому
+OpenBao/Vault Transit runtime без выдачи decrypt path в `apps/api`.
+
+Prerequisites:
+
+- этап 2 `exchange-control` process/service identity принят;
+- этап 3A OpenBao/Vault runtime provisioning принят;
+- `OPENBAO_ADDR`, `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN`,
+  `ROEHUB_API_TRANSIT_TOKEN` доступны в target runtime config.
+
+Работа:
+
+- добавить `ExchangeSecretCipher` port;
+- добавить Transit-compatible adapter для OpenBao/Vault;
+- оставить deterministic in-memory fake только для tests/non-production;
+- добавить redacted secret DTOs, чтобы plaintext/ciphertext/HMAC/fingerprint не
+  попадали в `repr`, logs или audit metadata;
+- добавить product config fail-closed checks:
+  - `ROEHUB_ENV=prod` не принимает dev/in-memory secret engine;
+  - product mode требует `openbao_transit_v1` или `vault_transit_v1`;
+  - key name должен быть `roehub-exchange-credentials`;
+- нормализовать внешние Transit errors в sanitized internal errors;
+- обновить secret-management runbook application-level командами.
 
 Валидация:
 
@@ -744,19 +833,18 @@ curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
 uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/migrations
 uv run ruff check src/trading/contexts/exchange_control tests/unit/contexts/exchange_control
 uv run pyright src/trading/contexts/exchange_control tests/unit/contexts/exchange_control
+python -m tools.docs.generate_docs_index --check
 ```
 
-Acceptance calls:
+Runtime acceptance:
 
 ```bash
 curl -fsS "$OPENBAO_ADDR/v1/sys/health"
 
-# exchange-control identity: encrypt allowed
 curl -fsS -X POST "$OPENBAO_ADDR/v1/transit/encrypt/roehub-exchange-credentials" \
   -H "X-Vault-Token: $ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN" \
   --data '{"plaintext":"VEVTVF9TRUNSRVQ="}'
 
-# apps/api identity: decrypt denied
 curl -i -X POST "$OPENBAO_ADDR/v1/transit/decrypt/roehub-exchange-credentials" \
   -H "X-Vault-Token: $ROEHUB_API_TRANSIT_TOKEN" \
   --data '{"ciphertext":"vault:v1:example"}'
@@ -777,15 +865,106 @@ rg -n "TEST_SECRET|TEST_API_SECRET|TEST_PASSPHRASE" logs output .playwright-cli 
 
 Критерий выхода:
 
-- secret backend доказан runtime-вызовами;
-- ACL behavior протестирован;
-- iteration ledger обновлен Transit policy/env/capability facts для Stage 4;
+- Stage 3A принят и не superseded;
+- application adapter и config fail-closed checks протестированы;
+- runtime ACL calls повторно приложены к Stage 3B report;
+- `apps/api` не получает decrypt capability и не содержит decrypt path;
+- iteration ledger обновлен Transit policy/env/capability facts для Stage 3C;
 - direct-main push в `origin/main` выполнен или stage явно заблокирован;
 - product-ready режим не стартует с dev-only KEK.
+
+### Этап 3C — Exchange-Control Internal Command API Boundary
+
+Цель: зафиксировать реальный service-to-service путь между `apps/api` и
+`exchange-control`, чтобы следующие stages не реализовали secret-bearing
+create/rotate/validate операции внутри API-процесса.
+
+Этот этап закрывает gap между "есть supervised process" и "public API вызывает
+именно этот process". Stage 2 дал только `/health/ready` и `/metrics`.
+Stage 3C должен добавить internal command API contract и `apps/api` client до
+schema/backfill и Binance/Bybit validation.
+
+Prerequisites:
+
+- этап 2 `exchange-control` process/service identity принят;
+- этап 3A OpenBao/Vault runtime provisioning принят;
+- этап 3B Transit application integration принят.
+
+Работа:
+
+- добавить local-only internal command API namespace, например
+  `/internal/v1/exchange-control/*`, на `127.0.0.1:9205`;
+- добавить service-to-service auth для `apps/api -> exchange-control`:
+  `ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN` без записи значения в repo;
+- добавить request envelope с `actor_user_id`, `session_id`/`session_age`,
+  `request_id`, idempotency key для mutating commands и sanitized error model;
+- добавить `apps/api` outbound client/port для `exchange-control`;
+- запретить public routes импортировать Transit/decrypt/native exchange
+  adapters напрямую;
+- добавить capabilities/contract-smoke endpoint, который доказывает, что
+  `apps/api` может reach `exchange-control` по internal API;
+- зафиксировать timeout/retry policy: короткие таймауты, без скрытого retry для
+  non-idempotent commands, explicit idempotency для create/rotate/disable;
+- оставить реальные create/rotate/disable/validate handlers для Stage 4/5.
+
+Валидация:
+
+```bash
+uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py
+uv run ruff check apps/api apps/exchange_control src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api
+uv run pyright apps/api apps/exchange_control src/trading/contexts/exchange_control tests/unit/contexts/exchange_control tests/unit/apps/api
+python -m tools.docs.generate_docs_index --check
+```
+
+Acceptance calls:
+
+```bash
+curl -fsS http://127.0.0.1:9205/health/ready
+
+curl -fsS http://127.0.0.1:9205/internal/v1/capabilities \
+  -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" \
+  -H "X-Roehub-Internal-Service: apps/api" \
+  -H "X-Request-Id: stage-3c-smoke"
+
+curl -i http://127.0.0.1:9205/internal/v1/capabilities \
+  -H "X-Roehub-Internal-Service: apps/api"
+```
+
+Ожидаемо:
+
+- health остается ready;
+- authenticated internal call возвращает service identity, supported contract
+  version и список capabilities без секретов;
+- missing/invalid internal token возвращает `401`/`403`;
+- `apps/api` имеет client/port, но не импортирует Transit/decrypt/native exchange
+  adapters;
+- production config fail closed, если public exchange connection routes включены
+  без `ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN` или internal base URL.
+
+Secret/import grep:
+
+```bash
+rg -n "ExchangeSecretCipher|decrypt|openbao|vault|binance|bybit|pybit|api_secret|passphrase" apps/api || true
+```
+
+Критерий выхода:
+
+- internal command API boundary доказан runtime-вызовами;
+- service-to-service auth fail-closed доказан;
+- `apps/api` client contract готов для Stage 4/5;
+- iteration ledger обновлен internal API endpoint, auth env, timeout/retry и
+  no-direct-import facts для Stage 4;
+- direct-main push в `origin/main` выполнен или stage явно заблокирован.
 
 ### Этап 4 — Exchange Connections, Credential Versions, Backfill
 
 Цель: отделить стабильное подключение от версии секретного материала.
+
+Prerequisites:
+
+- этап 3A OpenBao/Vault runtime provisioning принят;
+- этап 3B Transit application integration принят;
+- этап 3C exchange-control internal command API boundary принят;
 
 Работа:
 
@@ -794,7 +973,8 @@ rg -n "TEST_SECRET|TEST_API_SECRET|TEST_PASSPHRASE" logs output .playwright-cli 
 - сохранить `market_type` v1 как `spot|futures`;
 - выполнить backfill текущих rows из `identity_exchange_keys`;
 - раскрыть additive `connection_id`, сохранив compatibility `key_id`;
-- добавить create/list/rotate/disable use cases;
+- добавить create/list/rotate/disable use cases за `exchange-control`
+  internal command API; `apps/api` остается public facade/client;
 - реализовать compatibility read strategy:
   - phase A: schema deploy без смены поведения;
   - phase B: backfill legacy rows в новые таблицы;
@@ -877,7 +1057,9 @@ SELECT COUNT(*) AS connection_rows FROM exchange_connections;
 Prerequisites:
 
 - этап 2 `exchange-control` process/service identity принят;
-- этап 3 Transit ACL принят;
+- этап 3A OpenBao/Vault runtime provisioning принят;
+- этап 3B Transit application integration принят;
+- этап 3C exchange-control internal command API boundary принят;
 - этап 4 connection/credential model принят;
 - validation adapters включаются только через explicit config flag.
 
@@ -1057,6 +1239,10 @@ Runtime acceptance:
 
 ```bash
 curl -fsS http://127.0.0.1:9205/health/ready
+curl -fsS http://127.0.0.1:9205/internal/v1/capabilities \
+  -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" \
+  -H "X-Roehub-Internal-Service: apps/api" \
+  -H "X-Request-Id: stage-7-readiness"
 curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_validation_total'
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job="exchange-control"}'
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | rg 'roehub_exchange_control'
@@ -1100,7 +1286,7 @@ curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" \
 | Публичное API | `compatible-change` | Добавляется `/api/ui/account/exchange-connections/*`; legacy `/exchange-keys` сохраняется. |
 | Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. |
 | Граница секретов | `compatible-change` | Граница усиливается; plaintext consumers намеренно запрещены. |
-| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets и runbooks для `exchange-control`. |
+| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`. |
 | Поведение в браузере | `compatible-change` | Settings получает real status, validation, rotate/disable и warnings. |
 | Trading execution | `none` | Размещение ордеров намеренно вне scope этого документа. |
 
@@ -1144,6 +1330,8 @@ development/fallback/migration bridge, но product-ready хранение кл�
 
 - OpenBao Transit принят как основной secret engine или выбрана
   Vault-compatible альтернатива.
+- Для Stage 3A подготовлен target runtime, где можно развернуть OpenBao/Vault,
+  хранить recovery material вне repo и доказать Transit ACL runtime-вызовами.
 - Начальный exchange/product scope зафиксирован в терминах v1:
   `exchange_name=binance|bybit`, `market_type=spot|futures`,
   exchange-specific category только в validation metadata.
