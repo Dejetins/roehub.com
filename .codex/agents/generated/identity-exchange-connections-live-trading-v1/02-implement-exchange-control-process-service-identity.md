@@ -151,7 +151,7 @@ final_report_format:
     - "Runtime boundary"
     - "Metrics и ops"
     - "Проверки"
-    - "Stage 3 readiness"
+    - "Stage 3A/3B readiness"
     - "Direct-main delivery"
 
 quality_gates:
@@ -208,7 +208,7 @@ Done means:
 - `exchange-control` has a supervised runtime entrypoint;
 - readiness and metrics endpoints exist on `127.0.0.1:9205`;
 - Prometheus and Monit configuration are present;
-- service identity is explicitly named `exchange-control` and documented for Stage 3 Transit ACL work;
+- service identity is explicitly named `exchange-control` and documented for Stage 3A/3B Transit work;
 - no real exchange validation is called.
 
 ## Context / Current State
@@ -371,5 +371,5 @@ Your final message MUST include direct-main commit SHA, `git push origin main` s
 2. **Runtime boundary**
 3. **Metrics и ops**
 4. **Проверки**
-5. **Stage 3 readiness**
+5. **Stage 3A/3B readiness**
 6. **Direct-main delivery**

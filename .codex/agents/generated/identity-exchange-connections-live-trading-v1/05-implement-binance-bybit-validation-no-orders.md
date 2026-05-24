@@ -16,6 +16,12 @@ context_sources:
       why: "Stage 5 source of truth"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
       why: "shared stage execution ledger and direct-main delivery handoff facts"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03a-openbao-vault-runtime-provisioning.md
+      why: "accepted Stage 3A OpenBao/Vault runtime provisioning evidence"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03b-transit-application-integration.md
+      why: "accepted Stage 3B Transit application integration evidence"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03c-exchange-control-internal-command-api.md
+      why: "accepted Stage 3C internal command API/client boundary evidence"
     - path: docs/architecture/identity/exchange-connections-stage-reports/04-connections-credential-versions-backfill.md
       why: "accepted Stage 4 evidence"
   task_entrypoints:
@@ -81,7 +87,9 @@ hard_requirements:
   iteration_ledger_update_required: true
   previous_stage_must_be_accepted: true
   stage2_process_required: true
-  stage3_transit_acl_required: true
+  stage3a_runtime_provisioning_required: true
+  stage3b_transit_application_integration_required: true
+  stage3c_internal_command_api_required: true
   stage4_connection_model_required: true
   no_order_placement_required: true
   validation_feature_flag_required: true
@@ -171,6 +179,10 @@ quality_gates:
     expect: "passes after Markdown changes"
   - cmd: "curl -fsS -X POST \"$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/validate\" -H \"Origin: $ROEHUB_BASE_URL\" -H \"Cookie: $ROEHUB_SESSION_COOKIE\" -H \"X-CSRF-Token: $ROEHUB_CSRF_TOKEN\""
     expect: "validates readonly Binance and Bybit env-backed connections when ROEHUB_EXCHANGE_VALIDATION_LIVE=1; otherwise Stage 5 is blocked for production acceptance"
+  - cmd: "curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H \"Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN\" -H \"X-Roehub-Internal-Service: apps/api\" -H \"X-Request-Id: stage-5-preflight\""
+    expect: "accepted Stage 3C internal boundary is reachable before live validation evidence"
+  - cmd: "rg -n \"ExchangeSecretCipher|decrypt|openbao|vault|binance|bybit|pybit|api_secret|passphrase\" apps/api || true"
+    expect: "apps/api does not import direct secret/decrypt/native exchange adapters for Stage 5"
   - cmd: 'test "$(git branch --show-current)" = main'
     expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
   - cmd: "gh --version && gh auth status"
@@ -213,7 +225,7 @@ Done means:
 
 ## Context / Current State
 
-Stage 5 has hard prerequisites: Stage 2 `exchange-control`, Stage 3 Transit ACL, and Stage 4 connection/credential model. If any report is missing or blocked, stop.
+Stage 5 has hard prerequisites: Stage 2 `exchange-control`, Stage 3A OpenBao/Vault runtime provisioning, Stage 3B Transit application integration, Stage 3C internal command API/client boundary, and Stage 4 connection/credential model. If any report is missing or blocked, stop.
 
 The architecture rejects CCXT for production validation and requires native exchange endpoints. Use direct HTTP/native SDK only for metadata/permission validation, not order placement. Before implementing adapter mapping, verify current official Binance/Bybit documentation or native SDK docs; do not rely on stale memory for endpoint fields.
 
@@ -227,6 +239,7 @@ The architecture rejects CCXT for production validation and requires native exch
 - Normalize statuses: `valid_readonly`, `valid_trade_enabled`, `invalid_credentials`, `invalid_permissions`, `invalid_ip_restriction`, `unsupported_account_mode`.
 - Add sanitized error mapping.
 - Add validation metrics and audit events.
+- Route validation through the accepted `exchange-control` internal command API/client boundary; `apps/api` must not import native exchange SDKs, Transit decrypt, or credential resolver code directly.
 - Implement env contract and skip policy:
   - `ROEHUB_EXCHANGE_VALIDATION_LIVE=1` enables live validation.
   - readonly Binance and Bybit env vars are required for production acceptance.
@@ -248,7 +261,7 @@ The architecture rejects CCXT for production validation and requires native exch
 Read only in this order and stop once sufficient:
 
 1. `.codex/AGENTS.md`
-2. Stage 4 report and prerequisite reports if needed
+2. Stage 3A, Stage 3B, Stage 3C, Stage 4 reports and prerequisite reports if needed
 3. architecture document Stage 5
 4. task entrypoints
 5. conditional bundles only for UI/metrics surfaces touched
@@ -366,6 +379,8 @@ Possible secondary touches:
 - `! rg -n "/order|createOrder|submit_order|place_order" src/trading/contexts/exchange_control`
 - `python -m tools.docs.generate_docs_index --check`
 - `curl -fsS -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/validate" -H "Origin: $ROEHUB_BASE_URL" -H "Cookie: $ROEHUB_SESSION_COOKIE" -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"`
+- `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" -H "X-Roehub-Internal-Service: apps/api" -H "X-Request-Id: stage-5-preflight"`
+- `rg -n "ExchangeSecretCipher|decrypt|openbao|vault|binance|bybit|pybit|api_secret|passphrase" apps/api || true`
 - `rg -n "$ROEHUB_TEST_BINANCE_READONLY_API_SECRET|$ROEHUB_TEST_BYBIT_READONLY_API_SECRET|TEST_PASSPHRASE|api_secret|passphrase" logs output .playwright-cli || true`
 
 # Final output: report format (strict)

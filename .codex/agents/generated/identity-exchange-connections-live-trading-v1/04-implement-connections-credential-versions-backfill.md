@@ -16,8 +16,12 @@ context_sources:
       why: "Stage 4 source of truth"
     - path: docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
       why: "shared stage execution ledger and direct-main delivery handoff facts"
-    - path: docs/architecture/identity/exchange-connections-stage-reports/03-secret-engine-transit.md
-      why: "accepted Stage 3 evidence"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03a-openbao-vault-runtime-provisioning.md
+      why: "accepted Stage 3A OpenBao/Vault runtime provisioning evidence"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03b-transit-application-integration.md
+      why: "accepted Stage 3B Transit application integration evidence"
+    - path: docs/architecture/identity/exchange-connections-stage-reports/03c-exchange-control-internal-command-api.md
+      why: "accepted Stage 3C internal command API/client boundary evidence"
   task_entrypoints:
     - path: migrations/postgres/0003_identity_exchange_keys_v1.sql
       why: "legacy source table and market_type contract"
@@ -81,6 +85,9 @@ stage_execution_ledger:
 hard_requirements:
   iteration_ledger_update_required: true
   previous_stage_must_be_accepted: true
+  stage3a_runtime_provisioning_required: true
+  stage3b_transit_application_integration_required: true
+  stage3c_internal_command_api_required: true
   market_type_v1_must_remain_spot_futures: true
   connection_id_stable_required: true
   credential_versions_required: true
@@ -169,6 +176,10 @@ quality_gates:
     expect: "lists masked connections without secrets"
   - cmd: "curl -fsS \"$ROEHUB_BASE_URL/api/exchange-keys\" -H \"Cookie: $ROEHUB_SESSION_COOKIE\""
     expect: "legacy compatibility projection still works"
+  - cmd: "curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H \"Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN\" -H \"X-Roehub-Internal-Service: apps/api\" -H \"X-Request-Id: stage-4-preflight\""
+    expect: "accepted Stage 3C internal boundary is reachable before create/rotate/disable evidence"
+  - cmd: "rg -n \"ExchangeSecretCipher|decrypt|openbao|vault|binance|bybit|pybit|api_secret|passphrase\" apps/api || true"
+    expect: "apps/api does not import direct secret/decrypt/native exchange adapters for Stage 4"
   - cmd: 'test "$(git branch --show-current)" = main'
     expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
   - cmd: "gh --version && gh auth status"
@@ -214,7 +225,7 @@ Done means:
 
 ## Context / Current State
 
-Stage 3 must be accepted. If Stage 3 evidence is missing or blocked, stop.
+Stage 3A, Stage 3B, and Stage 3C must all be accepted. If any evidence report is missing, blocked, or superseded, stop.
 
 The architecture says `identity_exchange_keys` remains as compatibility surface during migration. Do not delete it in this stage.
 
@@ -226,6 +237,7 @@ The architecture says `identity_exchange_keys` remains as compatibility surface 
 - Preserve `market_type` v1 as `spot|futures`.
 - Add additive migrations for `exchange_connections` and `exchange_credential_versions`.
 - Implement stable `connection_id` and replaceable `credential_version_id`.
+- Implement create/rotate/disable through the accepted `exchange-control` internal command API/client boundary; `apps/api` remains a public facade and must not import secret/decrypt adapters directly.
 - Implement compatibility read strategy: new tables first, fallback to `identity_exchange_keys` until fallback is explicitly retired in a later evidence report.
 - Avoid long-term dual-write as a source of truth.
 - Implement account endpoints for create/list/rotate/disable where this stage requires them.
@@ -247,7 +259,7 @@ The architecture says `identity_exchange_keys` remains as compatibility surface 
 Read only in this order and stop once sufficient:
 
 1. `.codex/AGENTS.md`
-2. Stage 3 report
+2. Stage 3A, Stage 3B, and Stage 3C reports
 3. architecture document Stage 4
 4. task entrypoints
 5. conditional bundles only for migration/API/domain ambiguity
@@ -272,7 +284,7 @@ Skill routing for this task:
 - `backend-quality-gates`: use during verification.
 - `production-risk-review`: use before final report for migration/rollback safety.
 
-1. Confirm Stage 3 accepted.
+1. Confirm Stage 3A, Stage 3B, and Stage 3C are accepted.
 2. Add schema and backfill migration tests.
 3. Implement exchange-control connection/credential use cases and persistence.
 4. Wire account endpoints and legacy compatibility projection.
@@ -366,6 +378,8 @@ Possible secondary touches:
 - `curl -fsS -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" -H "Origin: $ROEHUB_BASE_URL" -H "Cookie: $ROEHUB_RECENT_AUTH_SESSION_COOKIE" -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN" -H "Content-Type: application/json" --data @fixtures/nonreal-binance-connection.json`
 - `curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" -H "Cookie: $ROEHUB_SESSION_COOKIE"`
 - `curl -fsS "$ROEHUB_BASE_URL/api/exchange-keys" -H "Cookie: $ROEHUB_SESSION_COOKIE"`
+- `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" -H "X-Roehub-Internal-Service: apps/api" -H "X-Request-Id: stage-4-preflight"`
+- `rg -n "ExchangeSecretCipher|decrypt|openbao|vault|binance|bybit|pybit|api_secret|passphrase" apps/api || true`
 - `rg -n "TEST_SECRET|TEST_API_SECRET|TEST_PASSPHRASE" logs output .playwright-cli || true`
 
 # Final output: report format (strict)

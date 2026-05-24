@@ -25,7 +25,9 @@ context_sources:
         - 00 baseline
         - 01 security
         - 02 process
-        - 03 transit
+        - 03A OpenBao/Vault runtime
+        - 03B Transit application integration
+        - 03C internal command API
         - 04 backfill
         - 05 validation
         - 06 UI
@@ -144,6 +146,8 @@ required_literals:
   - "exchange_connection_validation_total"
   - "up{job=\"exchange-control\"}"
   - "roehub_exchange_control"
+  - "/internal/v1/capabilities"
+  - "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
   - "future execution work заблокирован"
   - "signal-to-execution"
 
@@ -172,6 +176,10 @@ quality_gates:
     expect: "passes"
   - cmd: "! rg -n \"/order|createOrder|submit_order|place_order|exchange-execution\" src/trading/contexts/exchange_control apps/api apps/web"
     expect: "no execution/order placement surface is included in this scope"
+  - cmd: "curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H \"Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN\" -H \"X-Roehub-Internal-Service: apps/api\" -H \"X-Request-Id: stage-7-readiness\""
+    expect: "exchange-control internal command API capabilities are reachable with service auth"
+  - cmd: "curl -i http://127.0.0.1:9205/internal/v1/capabilities -H \"X-Roehub-Internal-Service: apps/api\""
+    expect: "missing internal auth is denied with 401/403"
   - cmd: 'test "$(git branch --show-current)" = main'
     expect: "passes before direct-main push; otherwise stop and do not create a stage branch"
   - cmd: "gh --version && gh auth status"
@@ -201,7 +209,7 @@ Run the final production-readiness gate for Exchange Control v1 key storage and 
 
 Done means:
 
-- all stage reports 00-06 are present and accepted;
+- all stage reports 00-06 are present and accepted, including 03A, 03B, and 03C;
 - API/UI/storage/validation/metrics/audit evidence is coherent;
 - focused gates pass;
 - runtime ops evidence exists for `exchange-control`;
@@ -224,6 +232,7 @@ After accepted validation, deliver the scoped report/ledger changes directly to 
 - Run the focused backend/API/UI/migration gates.
 - Verify docs index.
 - Verify `exchange-control` health/metrics/Prometheus/Monit evidence on the target runtime. If Mac Studio/runtime access is unavailable, the verdict must be `not-ready`, not accepted.
+- Verify `exchange-control` internal command API capabilities and service auth denial evidence on the target runtime.
 - Verify security acceptance: CSRF/recent-auth, no secret fields, secret grep.
 - Confirm no `exchange-execution`, order placement, order ledger, or signal-to-execution implementation is included.
 - Create `docs/architecture/identity/exchange-connections-stage-reports/07-production-readiness.md`.
@@ -286,6 +295,7 @@ After stage-specific verification:
 - Stage 7 report exists and includes an evidence matrix.
 - Backend/API/UI/migration gates pass or failures are classified.
 - Runtime health/metrics/Prometheus/Monit evidence is present from the target runtime; if unavailable, report `not-ready` with exact blocker.
+- Internal command API capabilities and missing-auth denial evidence are present from the target runtime.
 - Security acceptance calls and secret grep are recorded.
 - Report states that future execution work is blocked until separate signal-to-execution design.
 - Shared ledger `docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md` is updated with stage status, evidence, blockers, next-stage facts, and direct-main delivery status.
@@ -347,6 +357,8 @@ Possible secondary touches:
 - `python -m tools.docs.generate_docs_index --check`
 - `! rg -n "/order|createOrder|submit_order|place_order|exchange-execution" src/trading/contexts/exchange_control apps/api apps/web`
 - `curl -fsS http://127.0.0.1:9205/health/ready`
+- `curl -fsS http://127.0.0.1:9205/internal/v1/capabilities -H "Authorization: Bearer $ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN" -H "X-Roehub-Internal-Service: apps/api" -H "X-Request-Id: stage-7-readiness"`
+- `curl -i http://127.0.0.1:9205/internal/v1/capabilities -H "X-Roehub-Internal-Service: apps/api"`
 - `curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_control_active|exchange_connection_validation_total'`
 - `curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job=\"exchange-control\"}'`
 - `/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | rg 'roehub_exchange_control'`
