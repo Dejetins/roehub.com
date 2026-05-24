@@ -132,10 +132,16 @@ jobs:
           set -euxo pipefail
           grep -Fq 'header_up X-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
           grep -Fq 'header_up X-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
+          grep -Fq 'header_up X-Roehub-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
+          grep -Fq 'header_up X-Roehub-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
           ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
             "grep -Fq 'header_up X-Forwarded-Host {host}' /etc/caddy/Caddyfile"
           ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
             "grep -Fq 'header_up X-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
+            "grep -Fq 'header_up X-Roehub-Forwarded-Host {host}' /etc/caddy/Caddyfile"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" \
+            "grep -Fq 'header_up X-Roehub-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
 
       - name: Render web env file
         run: |

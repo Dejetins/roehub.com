@@ -117,12 +117,20 @@ origin, not only the internal Mac Studio upstream host. The active VPS Caddy
 ```caddy
 header_up X-Forwarded-Host {host}
 header_up X-Forwarded-Proto {scheme}
+header_up X-Roehub-Forwarded-Host {host}
+header_up X-Roehub-Forwarded-Proto {scheme}
 ```
 
 These headers are security-relevant. They let the backend accept a same-origin
 browser request that has `Referer: https://roehub.com/settings` but no `Origin`
 header, while true cross-origin requests remain rejected with
 `csrf_origin_mismatch`.
+
+`X-Forwarded-Host` and `X-Forwarded-Proto` are the standard proxy context.
+`X-Roehub-Forwarded-Host` and `X-Roehub-Forwarded-Proto` are the edge-owned copy
+used after the VPS -> Tailscale Serve hop, where standard forwarded headers can
+be rewritten to the Mac Studio upstream host. Caddy must overwrite these values;
+do not pass through client-provided values.
 
 Verification commands:
 
@@ -131,11 +139,17 @@ curl -fsS https://roehub.com/__edge_id
 
 grep -F 'header_up X-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
 grep -F 'header_up X-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
+grep -F 'header_up X-Roehub-Forwarded-Host {host}' infra/caddy/Caddyfile.vps
+grep -F 'header_up X-Roehub-Forwarded-Proto {scheme}' infra/caddy/Caddyfile.vps
 
 ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
   "grep -F 'header_up X-Forwarded-Host {host}' /etc/caddy/Caddyfile"
 ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
   "grep -F 'header_up X-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
+ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
+  "grep -F 'header_up X-Roehub-Forwarded-Host {host}' /etc/caddy/Caddyfile"
+ssh "$PROD_VPS_USER@$PROD_VPS_HOST" \
+  "grep -F 'header_up X-Roehub-Forwarded-Proto {scheme}' /etc/caddy/Caddyfile"
 ssh "$PROD_VPS_USER@$PROD_VPS_HOST" "caddy validate --config /etc/caddy/Caddyfile"
 ```
 

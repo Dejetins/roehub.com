@@ -1295,7 +1295,9 @@ Scope repair:
 
 - `/api/ui/account/exchange-connections` должен принимать Referer-only browser
   mutation только если public edge передал trusted `X-Forwarded-Host` и
-  `X-Forwarded-Proto`;
+  `X-Forwarded-Proto`; через VPS -> Tailscale Serve hop дополнительно требуется
+  edge-owned copy `X-Roehub-Forwarded-Host` и `X-Roehub-Forwarded-Proto`,
+  потому что стандартные forwarded headers могут быть переписаны upstream hop;
 - true cross-origin mutation остается fail-closed с `csrf_origin_mismatch`;
 - `/api/ui/account/profile` и `/api/ui/account/integrations` должны переживать
   legacy production schema drift через idempotent SQL repair;
@@ -1319,7 +1321,9 @@ curl -fsS https://roehub.com/__edge_id
 Runtime acceptance:
 
 - active VPS Caddy `/api/*` config contains `header_up X-Forwarded-Host {host}`
-  and `header_up X-Forwarded-Proto {scheme}`;
+  and `header_up X-Forwarded-Proto {scheme}`, plus
+  `header_up X-Roehub-Forwarded-Host {host}` and
+  `header_up X-Roehub-Forwarded-Proto {scheme}`;
 - Mac Studio bootstrap applies `0006_identity_account_settings_v1.sql` and
   repairs current account settings schema;
 - authenticated Playwright load shows `/api/ui/account/profile`,

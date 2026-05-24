@@ -217,6 +217,34 @@ def test_ui_account_exchange_connections_allow_referer_only_forwarded_public_sam
     assert "TEST_SECRET_PROXY_REFERER" not in response.text
 
 
+def test_ui_account_exchange_connections_allow_referer_only_edge_forwarded_public_origin() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    response = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "mainnet",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY4444",
+            "api_secret": "TEST_SECRET_EDGE_REFERER",
+        },
+        headers={
+            "host": "macstudio-daniil.tail0ebbbc.ts.net",
+            "referer": "https://roehub.com/settings",
+            "x-forwarded-host": "macstudio-daniil.tail0ebbbc.ts.net",
+            "x-forwarded-proto": "https",
+            "x-roehub-forwarded-host": "roehub.com",
+            "x-roehub-forwarded-proto": "https",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["exchange_name"] == "bybit"
+    assert "TEST_SECRET_EDGE_REFERER" not in response.text
+
+
 def test_ui_account_exchange_connections_reject_referer_only_cross_origin() -> None:
     client, _account_repository, _session_ids = _build_test_client()
 
@@ -241,6 +269,34 @@ def test_ui_account_exchange_connections_reject_referer_only_cross_origin() -> N
     assert response.status_code == 403
     assert response.json()["error"]["details"] == {"reason": "csrf_origin_mismatch"}
     assert "TEST_SECRET_PROXY_CROSS_ORIGIN" not in response.text
+
+
+def test_ui_account_exchange_connections_reject_edge_forwarded_cross_origin() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    response = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "mainnet",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY5555",
+            "api_secret": "TEST_SECRET_EDGE_CROSS_ORIGIN",
+        },
+        headers={
+            "host": "macstudio-daniil.tail0ebbbc.ts.net",
+            "referer": "https://evil.example/settings",
+            "x-forwarded-host": "macstudio-daniil.tail0ebbbc.ts.net",
+            "x-forwarded-proto": "https",
+            "x-roehub-forwarded-host": "roehub.com",
+            "x-roehub-forwarded-proto": "https",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["details"] == {"reason": "csrf_origin_mismatch"}
+    assert "TEST_SECRET_EDGE_CROSS_ORIGIN" not in response.text
 
 
 def test_ui_account_exchange_connection_permissions_default_to_read() -> None:

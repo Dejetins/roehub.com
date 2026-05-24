@@ -6,6 +6,8 @@ from starlette.requests import Request
 
 _FORWARDED_HOST_KEY = "host"
 _FORWARDED_PROTO_KEY = "proto"
+_EDGE_FORWARDED_HOST_HEADER = "x-roehub-forwarded-host"
+_EDGE_FORWARDED_PROTO_HEADER = "x-roehub-forwarded-proto"
 
 
 def same_origin_rejection_reason(
@@ -42,6 +44,36 @@ def _expected_origin_sources(*, request: Request) -> tuple[tuple[str, str | None
 
     forwarded_hosts = _split_forwarded_values(request.headers.get("x-forwarded-host"))
     forwarded_protos = _split_forwarded_values(request.headers.get("x-forwarded-proto"))
+    sources.extend(
+        _forwarded_host_proto_sources(
+            forwarded_hosts=forwarded_hosts,
+            forwarded_protos=forwarded_protos,
+        )
+    )
+
+    edge_forwarded_hosts = _split_forwarded_values(
+        request.headers.get(_EDGE_FORWARDED_HOST_HEADER)
+    )
+    edge_forwarded_protos = _split_forwarded_values(
+        request.headers.get(_EDGE_FORWARDED_PROTO_HEADER)
+    )
+    sources.extend(
+        _forwarded_host_proto_sources(
+            forwarded_hosts=edge_forwarded_hosts,
+            forwarded_protos=edge_forwarded_protos,
+        )
+    )
+
+    sources.extend(_forwarded_header_sources(value=request.headers.get("forwarded")))
+    return tuple(dict.fromkeys(sources))
+
+
+def _forwarded_host_proto_sources(
+    *,
+    forwarded_hosts: tuple[str, ...],
+    forwarded_protos: tuple[str, ...],
+) -> tuple[tuple[str, str | None], ...]:
+    sources: list[tuple[str, str | None]] = []
     for index, forwarded_host in enumerate(forwarded_hosts):
         forwarded_proto = _select_forwarded_proto(
             forwarded_protos=forwarded_protos,
@@ -49,9 +81,7 @@ def _expected_origin_sources(*, request: Request) -> tuple[tuple[str, str | None
         )
         sources.append((forwarded_host, forwarded_proto))
         sources.append((forwarded_host, None))
-
-    sources.extend(_forwarded_header_sources(value=request.headers.get("forwarded")))
-    return tuple(dict.fromkeys(sources))
+    return tuple(sources)
 
 
 def _matches_expected_origin(
