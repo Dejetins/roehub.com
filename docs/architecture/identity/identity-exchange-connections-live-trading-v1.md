@@ -1,8 +1,8 @@
 # Идентификация + Биржевые Подключения — хранение API-ключей v1
 
-Статус: staged rollout active. Stage 7 readiness was followed by Stage 8
-production-browser repair because the authenticated public `/settings` add-key
-flow was not proven by Stage 7.
+Статус: staged rollout active. Stage 8 production-browser repair is accepted
+and supersedes the incomplete Stage 7 readiness claim for the authenticated
+public `/settings` add-key flow.
 
 Документ фиксирует архитектуру первого production-этапа для Binance/Bybit
 API-ключей на `/settings`: добавление, безопасное хранение, валидация,
@@ -1326,12 +1326,29 @@ Runtime acceptance:
   `header_up X-Roehub-Forwarded-Proto {scheme}`;
 - Mac Studio bootstrap applies `0006_identity_account_settings_v1.sql` and
   repairs current account settings schema;
+- OpenBao must be unsealed before add/rotate flows; if `/v1/sys/health`
+  reports `sealed=true`, `exchange-control` Transit encrypt fails closed with
+  `exchange_control_unavailable` until the host-local unseal/provision smoke is
+  rerun;
 - authenticated Playwright load shows `/api/ui/account/profile`,
   `/api/ui/account/integrations`, `/api/ui/account/limits` and
   `/api/ui/account/exchange-connections` without production 500s;
 - dummy Binance/Bybit add-key request returns not `Mutation origin is not
   allowed` and not `csrf_origin_mismatch`;
 - any dummy connection is disabled or deleted before stage acceptance.
+
+Accepted Stage 8 evidence:
+
+- direct-main commits `0b77d6e1` and `7a7d40b3`;
+- CI/deploy passed for the second edge-hop repair: CI `26374180601`, Deploy
+  Backend `26374257097`, Publish App Image `26374257127`, Deploy Web
+  `26374257112`;
+- production Playwright artifact:
+  `output/playwright/settings-stage08-production-sanitized-20260524T222715Z.json`;
+- scoped screenshot:
+  `output/playwright/settings-stage08-exchange-panel-only-2026-05-24T22-28-34-016Z.png`;
+- console artifact:
+  `output/playwright/settings-stage08-console-20260524T222742Z.txt`.
 
 ## Контрактное Влияние
 

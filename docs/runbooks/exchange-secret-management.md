@@ -208,6 +208,24 @@ curl -fsS "$OPENBAO_ADDR/v1/sys/health"
 ```
 
 If `/v1/sys/health` reports `sealed=true`, do not start Stage 3B/3C/4/5 work.
+For browser-visible exchange connection add/rotate acceptance, also treat
+`sealed=true` as a production blocker: `apps/api` will surface
+`exchange_control_unavailable` because `exchange-control` cannot encrypt new
+credentials through Transit. Recover with the host-local provisioning/unseal
+script and the ACL smoke; do not print unseal material or token values.
+
+```bash
+bash /opt/roehub/bin/provision_openbao_transit_stage3a.sh
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+bash /opt/roehub/bin/smoke_openbao_transit_acl.sh
+curl -fsS "$OPENBAO_ADDR/v1/sys/health"
+```
+
+Expected safe evidence: `openbao_unsealed=ok` or `openbao_unsealed=already`,
+`exchange_control_encrypt=ok`, `apps_api_decrypt_denied=403`, and
+`"sealed":false`.
 
 ## Token Rotation
 

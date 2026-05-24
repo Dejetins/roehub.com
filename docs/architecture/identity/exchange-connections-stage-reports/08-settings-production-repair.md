@@ -2,76 +2,77 @@
 
 Дата проверки: 2026-05-24.
 
-Статус: in progress; local repair gates passed, production deploy and
-authenticated Playwright acceptance pending direct-main delivery.
+Статус: accepted. Stage 8 supersedes the incomplete Stage 7 readiness claim for
+the concrete production-browser `/settings` add-key flow.
 
-Stage 8 supersedes the incomplete Stage 7 readiness claim for the concrete
-production-browser `/settings` add-key flow. Scope is limited to the public edge
-same-origin context, account-settings schema drift, exchange credential form
-password-manager hardening, runtime evidence, and documentation continuity.
+Scope was limited to public edge same-origin context, account-settings schema
+drift, exchange credential form password-manager hardening, runtime evidence,
+and documentation continuity. Trading execution, live orders and direct secret
+custody in `apps/api` remained out of scope.
 
 ## Verdict
 
 | Area | Expected result | Observed evidence | Verdict | Residual risk |
 |---|---|---|---|---|
-| Root cause | Explain why production returned `Mutation origin is not allowed` and account settings 500s. | Mac Studio deployed copy of `infra/caddy/Caddyfile.vps` lacked standard forwarded headers; after VPS Caddy was corrected, Playwright still proved `csrf_origin_mismatch` because the VPS -> Tailscale Serve hop did not preserve the public host in backend-visible standard `X-Forwarded-*` context. API logs also showed missing account settings columns: `username`, `integration_key`, `autorefresh_preset`, `summary`. | Confirmed. | Final production acceptance still pending the second deploy with `X-Roehub-Forwarded-*`. |
-| Local repair | Keep CSRF fail-closed and repair legacy schema without manual DB edits. | Focused tests cover standard forwarded public same-origin, edge-owned `X-Roehub-Forwarded-*` public origin, Referer-only browser mutation, and cross-origin rejection with `csrf_origin_mismatch`; `0006` now repairs legacy profile/integration table shapes idempotently. | Passed locally. | Production DB repair passed first deploy; final browser acceptance pending second edge/backend deploy. |
-| Browser hardening | API key/API secret fields should not look like site login/password fields. | Add and rotate forms use non-login field names, `type="text"`, `autocomplete="off"`, password-manager ignore attributes, and form-level `data-form-type="other"`. | Passed locally. | Final browser run must confirm no save-password prompt. |
-| Production acceptance | Prove authenticated `https://roehub.com/settings` add flow. | Pending after direct-main deploy. | Pending. | Stage remains not accepted until Playwright evidence passes. |
+| Root cause | Explain production `Mutation origin is not allowed`, account settings 500s and browser credential-form prompt risk before fixing. | Confirmed three defects: public-origin context was lost through the VPS -> Tailscale Serve hop; production account settings tables had legacy columns; exchange credential forms needed form-level password-manager ignore hints. A fourth runtime blocker was found after deploy: OpenBao restarted sealed, so Transit encrypt returned 503 until operator unseal. | Accepted. | None. |
+| Local repair | Keep CSRF fail-closed, repair schema idempotently and harden form defaults. | Focused tests cover Referer-only browser mutation with trusted public forwarded context, edge-owned `X-Roehub-Forwarded-*` headers, and true cross-origin rejection with `csrf_origin_mismatch`; migration tests cover legacy `integration_key` repair; web tests cover `autocomplete`/password-manager hardening. | Accepted. | None. |
+| Runtime repair | Public edge and Mac Studio runtime must match the production browser path. | Deploy Web `26374257112` validated active VPS Caddy with `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Roehub-Forwarded-Host`, `X-Roehub-Forwarded-Proto`; Deploy Backend `26374257097` applied schema bootstrap; OpenBao was unsealed and Transit ACL smoke passed. | Accepted. | None. |
+| Browser acceptance | Prove authenticated `https://roehub.com/settings` add flow with dummy credentials only and cleanup. | Playwright accepted artifact shows settings GETs 200, default permission `read`, POST `/api/ui/account/exchange-connections` returned 201, secret inputs cleared, dummy connection disabled with 200, console warnings/errors 0. | Accepted. | None. |
 
 ## Issue / Root Cause / Fix
 
 | Issue | Root cause | Fix | Validation command | Observed evidence | Verdict |
 |---|---|---|---|---|---|
-| `POST /api/ui/account/exchange-connections` returned `403` with `Mutation origin is not allowed` and `csrf_origin_mismatch`. | Browser POST carried `Referer: https://roehub.com/settings` but no visible `Origin`; after standard VPS Caddy headers were deployed, the backend still saw upstream context through Tailscale Serve instead of the public host. | Keep CSRF logic fail-closed; add exact Referer-only tests for both standard `X-Forwarded-*` and edge-owned `X-Roehub-Forwarded-*`; deploy-web checks that `/api/*` Caddy config contains all four forwarded-origin headers. | `uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py` | Passed inside the focused suite: Referer-only standard and edge-forwarded public host accepted; Referer-only cross-origin rejected with `csrf_origin_mismatch`. | Local pass; second production deploy pending. |
-| `/api/ui/account/profile` returned production 500. | Production `identity_user_profile_overrides` had legacy columns `display_name`, `created_at`, `updated_at`; repository selected `username`, `email`, `telegram_discord`. | `0006_identity_account_settings_v1.sql` additively adds current columns, maps `display_name -> username`, and sets a safe default for legacy `created_at`. | Mac Studio log grep and schema introspection; focused migration static test. | Logs captured `psycopg.errors.UndefinedColumn: column "username" does not exist`; schema introspection confirmed legacy shape. | Local repair ready; production bootstrap pending. |
-| `/api/ui/account/integrations` returned production 500. | Production `identity_integrations` had legacy `provider/enabled/settings_json` shape and primary key `(owner_user_id, provider)`; repository expects `integration_key`, `mode`, `webhook_url_masked` and upsert on `(owner_user_id, integration_key)`. | `0006` adds current columns, maps legacy providers to safe current keys, switches primary key to `(owner_user_id, integration_key)` when needed, and preserves old columns as inert compatibility baggage. | Mac Studio log grep and schema introspection; focused migration static test. | Logs captured `psycopg.errors.UndefinedColumn: column "integration_key" does not exist`; constraints showed legacy primary key. | Local repair ready; production bootstrap pending. |
-| Browser/password manager treated exchange credential form like site credentials. | Credential inputs were already renamed away from `api_key`/`api_secret`, but form-level ignore hints were absent. | Add form-level `data-lpignore`, `data-1p-ignore`, `data-bwignore`, and `data-form-type="other"` to add and rotate forms; keep secret inputs cleared on success and failure. | `uv run pytest -q tests/unit/apps/web/test_app_routes.py` | Static route test asserts non-login names and form/input password-manager hints. | Local pass; production browser pending. |
+| `POST /api/ui/account/exchange-connections` returned `403` with `Mutation origin is not allowed` and `csrf_origin_mismatch`. | Browser POST had same-origin `Referer: https://roehub.com/settings` but no visible `Origin`; standard VPS `X-Forwarded-*` headers were not enough because the VPS -> Tailscale Serve hop rewrote backend-visible public context. | Kept CSRF fail-closed; added trusted edge-owned `X-Roehub-Forwarded-Host` / `X-Roehub-Forwarded-Proto`; added deploy-web drift checks for all four Caddy headers. | `uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py` | Referer-only public same-origin mutations pass only with trusted public forwarded context; true cross-origin requests remain rejected with `csrf_origin_mismatch`. First post-standard-header Playwright still failed with 403; second edge-owned-header deploy passed. | Accepted. |
+| `/api/ui/account/profile` returned production 500. | Production `identity_user_profile_overrides` still had legacy `display_name`, while current repository selected `username`, `email`, `telegram_discord`. | `0006_identity_account_settings_v1.sql` additively adds current columns and maps `display_name -> username` without dropping old columns. | Mac Studio schema introspection and `uv run pytest -q tests/unit/apps/migrations` | Post-deploy authenticated settings load returned `/api/ui/account/profile` 200. | Accepted. |
+| `/api/ui/account/integrations` returned production 500. | Production `identity_integrations` still had legacy `provider/enabled/settings_json` and primary key `(owner_user_id, provider)` while current code expects `integration_key`, `mode`, `webhook_url_masked`, and `(owner_user_id, integration_key)`. | `0006` additively repairs current columns, maps legacy providers, and switches the primary key when needed. | Mac Studio schema introspection and `uv run pytest -q tests/unit/apps/migrations` | Post-deploy authenticated settings load returned `/api/ui/account/integrations` 200 and integration rows include `integration_key`. | Accepted. |
+| Browser/password manager treated exchange credential form like site credentials. | Add/rotate forms had secret-looking credential inputs but lacked form-level password-manager ignore hints. | Add and rotate forms now use non-login field names, `autocomplete="off"`, `data-lpignore`, `data-1p-ignore`, `data-bwignore`, and `data-form-type="other"`; secret fields clear after success and failure. | `uv run pytest -q tests/unit/apps/web/test_app_routes.py`; Playwright artifact field attrs. | Playwright artifact records `exchange_public_token` / `exchange_private_token`, `autocomplete=off`, all ignore attrs, and zero-length secret fields after submit. | Accepted. |
+| POST advanced past CSRF/recent-auth but returned `503 exchange_control_unavailable`. | OpenBao file-storage runtime was sealed after deploy/restart, so `exchange-control` Transit encrypt raised `ExchangeSecretCipherError: transit request failed with status 503`. | Used existing host-local `/opt/roehub/bin/provision_openbao_transit_stage3a.sh` to unseal without printing keys; reran Transit ACL smoke. | `bash /opt/roehub/bin/smoke_openbao_transit_acl.sh` | `openbao_sealed=False`, `exchange_control_encrypt=ok`, `apps_api_decrypt_denied=403`; subsequent Playwright POST returned 201 and cleanup disable returned 200. | Accepted. |
 
 ## Runtime Evidence
 
 | Check | Command / source | Observed evidence | Verdict |
 |---|---|---|---|
 | Public edge identity | `curl -fsS https://roehub.com/__edge_id` | Returned `vps-edge`. | Pass. |
-| Mac Studio deployed Caddy source copy | `ssh macstudio 'cd /opt/roehub/app && sed -n "1,80p" infra/caddy/Caddyfile.vps'` | `/api/*` block lacked `header_up X-Forwarded-Host {host}` and `header_up X-Forwarded-Proto {scheme}` before Stage 8 repair. | Confirmed deployed-source drift. |
-| First VPS Caddy deploy | Deploy Web `26372595761` | Pinned ED25519 host-key check passed; active `/etc/caddy/Caddyfile` contained standard `X-Forwarded-Host` and `X-Forwarded-Proto`; Caddy validate/reload and public edge smoke passed. | Standard headers present, but Playwright still failed through Tailscale Serve. |
-| Tailscale Serve hop | Authenticated Playwright POST after first deploy | Request had `Referer: https://roehub.com/settings`, no visible `Origin`, and response remained `403 csrf_origin_mismatch`. | Confirms backend-visible public context needs edge-owned `X-Roehub-Forwarded-*` copy. |
-| Production API logs | `ssh macstudio 'tail ... api.err.log | grep ...'` | Captured stack traces for missing `username`, `integration_key`, `autorefresh_preset`, and `summary`; latest open items are profile/integrations. | Confirms schema drift. |
-| Production schema | `information_schema.columns` and `pg_constraint` on Mac Studio Postgres. | `identity_user_profile_overrides` had `display_name`; `identity_integrations` had `provider`, `enabled`, `settings_json`, primary key `(owner_user_id, provider)`. | Confirms repair target. |
-| VPS SSH host key | Local known_hosts for `155.212.170.144`. | ED25519 fingerprint was pinned locally; local root SSH auth was not available. GitHub deploy workflow now checks the pinned fingerprint before trusting the host key. | Local direct VPS inspection blocked; deploy path hardened. |
+| Active VPS Caddy config | Deploy Web `26374257112` | Pinned ED25519 fingerprint matched `SHA256:MQPcAz0ewaAU5IvqU1AMJ1ba+NCjoF4gY7u9hgpP+lY`; active `/etc/caddy/Caddyfile` contained standard and `X-Roehub-Forwarded-*` headers; `caddy validate` and reload passed. | Pass. |
+| Mac Studio schema bootstrap | Deploy Backend `26374257097` plus Postgres introspection | `0006_identity_account_settings_v1.sql` applied; `identity_integrations` has `integration_key`, `mode`, `webhook_url_masked` and PK `(owner_user_id, integration_key)`; profile overrides have `username`, `email`, `telegram_discord`. | Pass. |
+| Mac Studio runtime smoke | `bash scripts/macos/smoke_prod.sh` on target runtime | Backend smoke passed after deploy; expected unauthenticated API 401 remained intact; metrics and Tailscale checks passed. | Pass. |
+| OpenBao / Transit | Host-local unseal/provision script and ACL smoke | `openbao_unsealed=ok`, `openbao_sealed=False`, `exchange_control_encrypt=ok`, `apps_api_decrypt_denied=403`. | Pass. |
+| Secret artifact safety | `rg -n "TEST_SECRET\|TEST_API_SECRET\|TEST_PASSPHRASE\|dummy-secret\|dummy_api_secret" logs output .playwright-cli 2>/dev/null \|\| true` plus sanity grep for smoke credential/dummy prefixes. | No matches. | Pass. |
 
 ## Quality Gates
 
-| Gate | Expected result | Observed result |
-|---|---|---|
-| Focused tests | `uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations` | Passed: `65 passed, 3 warnings`. |
-| Ruff | `uv run ruff check apps/api apps/web src/trading/contexts/identity tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations` | Passed. |
-| Pyright | `uv run pyright apps/api src/trading/contexts/identity tests/unit/apps/api` | Passed: `0 errors`. |
-| Scratch SQL execution | Mac Studio scratch DB using production Postgres. | Not run: production DB role cannot create scratch database. | Environmental limitation; production bootstrap will be the execution gate. |
-| Docs index | `python -m tools.docs.generate_docs_index --check` | Passed after updating `docs/architecture/README.md`. |
-| Edge id | `curl -fsS https://roehub.com/__edge_id` | Returned `vps-edge`. |
-| Playwright prerequisite | `command -v npx >/dev/null 2>&1 && npx playwright --version` | Passed; Playwright `1.60.0`. |
-| Secret artifact grep | `rg -n "TEST_SECRET\|TEST_API_SECRET\|TEST_PASSPHRASE\|dummy-secret\|dummy_api_secret" logs output .playwright-cli 2>/dev/null \|\| true` | Passed; no matches. |
+| Gate | Observed result |
+|---|---|
+| `uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations` | Passed: `65 passed, 3 warnings`. |
+| `uv run ruff check apps/api apps/web src/trading/contexts/identity tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations` | Passed. |
+| `uv run pyright apps/api src/trading/contexts/identity tests/unit/apps/api` | Passed: `0 errors`. |
+| `python -m tools.docs.generate_docs_index --check` | Passed after final report and docs-index update. |
+| `command -v npx >/dev/null 2>&1 && npx playwright --version` | Passed; Playwright `1.60.0`. |
+| `test "$(git branch --show-current)" = main` and `git pull --ff-only origin main` | Passed before direct-main push. |
+| `gh --version && gh auth status` | Passed. |
 
 ## Playwright Evidence
 
 | Workflow | Required evidence | Observed evidence | Verdict |
 |---|---|---|---|
-| Authenticated load | `https://roehub.com/settings` opens with smoke Keycloak account; `/api/ui/account/profile` and `/api/ui/account/integrations` return 200. | Pending post-deploy Playwright. | Pending. |
-| Add dummy connection | Submit dummy Binance or Bybit credentials to `/api/ui/account/exchange-connections`; response is not `Mutation origin is not allowed` and not `csrf_origin_mismatch`. | Pending post-deploy Playwright. | Pending. |
-| Secret handling | Secret fields clear after submit; artifacts contain no dummy or real secret values. | Pending post-deploy Playwright and secret grep. | Pending. |
-| Cleanup | Disable/delete any dummy connection created by the proof. | Pending post-deploy Playwright. | Pending. |
+| Authenticated load | `https://roehub.com/settings` opens with smoke Keycloak account; settings APIs return no 500s. | `output/playwright/settings-stage08-production-sanitized-20260524T222715Z.json` records 200 for `/api/ui/account/profile`, `/api/ui/account/integrations`, `/api/ui/account/limits`, `/api/ui/account/exchange-connections`. | Pass. |
+| Add dummy connection | Submit dummy Binance/Bybit credentials to `/api/ui/account/exchange-connections`; response is not `Mutation origin is not allowed` and not `csrf_origin_mismatch`. | Same artifact records POST `https://roehub.com/api/ui/account/exchange-connections`, request `referer=https://roehub.com/settings`, response status 201, permission `read`, validation `skipped_external_validation`; API key/secret redacted. | Pass. |
+| Secret handling | Secret fields clear after submit; artifacts contain no dummy or real secret values. | Same artifact records `secretLengthsAfterSubmit.api_key=0` and `api_secret=0`; secret grep and sanity grep had no matches. | Pass. |
+| Cleanup | Disable/delete any dummy connection created by the proof. | Same artifact records cleanup POST status 200 and post-cleanup list status `disabled`, `status_reason=user_disabled`. | Pass. |
+| Browser console and screenshot | Capture console summary and final screenshot. | `output/playwright/settings-stage08-console-20260524T222742Z.txt` shows `Errors: 0, Warnings: 0`; scoped screenshot is `output/playwright/settings-stage08-exchange-panel-only-2026-05-24T22-28-34-016Z.png`. | Pass. |
 
 ## Contract Impact Classification
 
 | Dimension | Classification | Reason |
 |---|---|---|
-| Public API / DTO | `none` | Route names and request/response fields are unchanged; behavior is a bug fix for same-origin production context and schema availability. |
-| Persistence | `compatible-change` | `0006` additively repairs legacy account-settings columns and primary-key shape required by current repository code; old columns are not dropped. |
+| Public API / DTO | `none` | Route names and request/response fields are unchanged; behavior is a bug fix for production same-origin context and schema availability. |
+| Persistence | `compatible-change` | `0006` additively repairs legacy account-settings columns and primary-key shape required by current repository code; old columns are preserved. |
 | Config / runtime | `compatible-change` | Deploy workflow now requires pinned VPS ED25519 fingerprint and validates standard plus `X-Roehub-Forwarded-*` Caddy forwarded-origin headers before reload. Public URLs and upstreams are unchanged. |
 | UI/browser defaults | `compatible-change` | Exchange credential fields keep the same submitted DTO mapping but add password-manager ignore metadata; default permission remains `read`. |
 | Secret custody | `none` | `apps/api` still calls `exchange-control`; no decrypt, Transit, native exchange SDK, or order placement path is added. |
 | Trading execution | `none` | No signal-to-execution, order placement, order ledger, or live order path is introduced. |
+| Docs | `compatible-change` | Stage 8 supersession, edge header contract, OpenBao unseal handoff and Playwright evidence are documented. |
 
 ## Troubleshooting
 
@@ -81,14 +82,15 @@ password-manager hardening, runtime evidence, and documentation continuity.
 | `/api/ui/account/profile` 500 | Check `identity_user_profile_overrides` columns and API logs for `username`. | Current columns `username`, `email`, `telegram_discord` exist. |
 | `/api/ui/account/integrations` 500 | Check `identity_integrations` columns and primary key. | `integration_key`, `mode`, `webhook_url_masked` exist and primary key is `(owner_user_id, integration_key)`. |
 | Browser save-password prompt after exchange key submit | Inspect `/settings` add and rotate forms for non-login names and password-manager ignore attributes. | Forms and inputs have ignore attributes; secret inputs clear after submit. |
+| `exchange_control_unavailable` during add-key | Check OpenBao health on Mac Studio. | `/v1/sys/health` reports `sealed=false`; Transit ACL smoke returns `exchange_control_encrypt=ok`. |
 
 ## Direct-Main Delivery Evidence
 
 | Item | Evidence | Result |
 |---|---|---|
-| Branch | `test "$(git branch --show-current)" = main` | Pending final pre-push check. |
-| Fast-forward | `git pull --ff-only origin main` | Pending before scoped staging. |
-| Commit | Pending. | Pending. |
-| Push | Pending. | Pending. |
-| CI/deploy | Pending. | Pending. |
-| Post-deploy smoke/Playwright | Pending. | Pending. |
+| Branch | `test "$(git branch --show-current)" = main` | Passed; no stage branch or draft PR. |
+| Fast-forward | `git pull --ff-only origin main` | Passed before scoped staging and direct push. |
+| Implementation commits | `0b77d6e1 Repair settings exchange production flow`; `7a7d40b3 Preserve public origin through Tailscale edge hop`. | Pushed to `origin/main`. |
+| CI / deploy for first repair | CI `26372497555`, Deploy Backend `26372572180`, Publish App Image `26372572170`, Deploy Web `26372595761` / `26372591033`. | Succeeded; schema repair applied; standard Caddy headers deployed; first Playwright proved edge-owned header copy was still required. |
+| CI / deploy for edge-hop repair | CI `26374180601`, Deploy Backend `26374257097`, Publish App Image `26374257127`, Deploy Web `26374257112`. | Succeeded; active VPS Caddy validated with standard and `X-Roehub-Forwarded-*` headers; backend deploy and schema bootstrap succeeded. |
+| Post-deploy runtime | Mac Studio smoke, OpenBao unseal/Transit ACL smoke, production Playwright. | Passed; final accepted Playwright artifact stored under `output/playwright/`. |
