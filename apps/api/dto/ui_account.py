@@ -76,12 +76,17 @@ class ExchangeConnectionResponse(BaseModel):
     environment: Literal["mainnet", "testnet"]
     label: str | None
     permissions: Literal["read", "trade"]
+    requested_permissions: Literal["read", "trade"]
+    exchange_permissions: Literal["unknown", "read", "trade", "withdraw_or_transfer"]
+    effective_permissions: Literal["none", "read", "trade"]
+    permission_warnings: list[Literal["exchange_permissions_exceed_requested"]]
     api_key: str
     status: Literal["active", "disabled", "archived"]
     status_reason: str | None
     validation_status: Literal[
         "valid_readonly",
         "valid_trade_enabled",
+        "permission_mismatch",
         "invalid_credentials",
         "invalid_permissions",
         "invalid_ip_restriction",

@@ -102,11 +102,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 %(active_credential_version_id)s,
                                 %(status)s,
                                 %(status_reason)s,
-                                jsonb_build_object(
-                                    'permissions', %(permissions)s::text,
-                                    'validation_status', %(validation_status)s::text,
-                                    'validation_reason', %(validation_reason)s::text
-                                ),
+                                %(permission_summary_json)s::jsonb,
                                 'unknown',
                                 %(created_at)s,
                                 %(updated_at)s,
@@ -123,6 +119,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 active_credential_version_id,
                                 status,
                                 status_reason,
+                                permission_summary_json,
                                 permission_summary_json ->> 'permissions' AS permissions,
                                 permission_summary_json ->> 'validation_status'
                                     AS validation_status,
@@ -216,6 +213,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -366,10 +364,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         SET active_credential_version_id = %(credential_version_id)s,
                             permission_summary_json =
                                 connection.permission_summary_json
-                                || jsonb_build_object(
-                                    'validation_status', 'skipped_external_validation',
-                                    'validation_reason', 'credential_rotated'
-                                ),
+                                || %(permission_summary_json)s::jsonb,
                             ip_restriction_status = 'unknown',
                             last_validated_at = NULL,
                             updated_at = %(updated_at)s
@@ -386,6 +381,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -405,6 +401,15 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             credential_version.credential_version_id
                         ),
                         "updated_at": updated_at,
+                        "permission_summary_json": json.dumps(
+                            {
+                                "validation_status": "skipped_external_validation",
+                                "validation_reason": "credential_rotated",
+                                "exchange_permissions": "unknown",
+                                "effective_permissions": "none",
+                                "permission_warnings": [],
+                            }
+                        ),
                         "connection_id": str(connection_id),
                         "owner_user_id": str(owner_user_id),
                     },
@@ -484,6 +489,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -567,6 +573,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -633,6 +640,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -688,6 +696,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.active_credential_version_id,
                             connection.status,
                             connection.status_reason,
+                            connection.permission_summary_json,
                             connection.permission_summary_json ->> 'permissions'
                                 AS permissions,
                             connection.permission_summary_json ->> 'validation_status'
@@ -727,6 +736,18 @@ def _connection_parameters(
         "permissions": connection.permissions,
         "validation_status": connection.validation_status,
         "validation_reason": connection.validation_reason,
+        "permission_summary_json": json.dumps(
+            connection.permission_summary
+            or {
+                "permissions": connection.permissions,
+                "requested_permissions": connection.permissions,
+                "exchange_permissions": "unknown",
+                "effective_permissions": "none",
+                "permission_warnings": [],
+                "validation_status": connection.validation_status,
+                "validation_reason": connection.validation_reason,
+            }
+        ),
         "created_at": connection.created_at,
         "updated_at": connection.updated_at,
         "disabled_at": connection.disabled_at,
@@ -790,7 +811,21 @@ def _map_connection(*, row: Mapping[str, Any]) -> ExchangeConnectionRecord:
         updated_at=_normalize_utc_datetime(value=row["updated_at"]),
         disabled_at=_normalize_optional_utc_datetime(value=row["disabled_at"]),
         archived_at=_normalize_optional_utc_datetime(value=row.get("archived_at")),
+        permission_summary=_permission_summary(value=row.get("permission_summary_json")),
     )
+
+
+def _permission_summary(*, value: object) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(payload, dict):
+            return payload
+    return None
 
 
 def _map_credential(*, row: Mapping[str, Any]) -> ExchangeCredentialVersionRecord:

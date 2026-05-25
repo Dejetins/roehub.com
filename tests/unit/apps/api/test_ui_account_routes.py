@@ -197,6 +197,10 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
     assert created_payload["permissions"] == "read"
+    assert created_payload["requested_permissions"] == "read"
+    assert created_payload["exchange_permissions"] == "unknown"
+    assert created_payload["effective_permissions"] == "none"
+    assert created_payload["permission_warnings"] == []
     assert created_payload["environment"] == "testnet"
     assert created_payload["validation_status"] == "skipped_external_validation"
     for forbidden in ("TEST_SECRET_STAGE4", "ciphertext", "hmac"):
@@ -588,6 +592,10 @@ def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() ->
     assert payload["connection_id"] == connection_id
     assert payload["validation_status"] == "valid_readonly"
     assert payload["validation_reason"] == "fake_client_readonly"
+    assert payload["requested_permissions"] == "read"
+    assert payload["exchange_permissions"] == "read"
+    assert payload["effective_permissions"] == "read"
+    assert payload["permission_warnings"] == []
     assert payload["last_validated_at"] is not None
     assert "TEST_SECRET_STAGE5" not in validated.text
 

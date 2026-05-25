@@ -141,6 +141,7 @@ function exchangeItems(payload) {
 function statusClass(item) {
   if (item?.status === "disabled" || item?.status === "archived") return "is-warning";
   const validationStatus = item?.validation_status || "";
+  if (validationStatus === "permission_mismatch") return "is-negative";
   if (validationStatus === "valid_readonly" || validationStatus === "valid_trade_enabled") {
     return "is-positive";
   }
@@ -163,6 +164,16 @@ function setExchangeStatusFilter(root, status) {
 
 function readableStatus(value) {
   return String(value || "--").replaceAll("_", " ");
+}
+
+function permissionDisplay(item) {
+  const requested = item?.requested_permissions || item?.permissions || "--";
+  const exchange = item?.exchange_permissions || "unknown";
+  const effective = item?.effective_permissions || "none";
+  const warnings = Array.isArray(item?.permission_warnings) && item.permission_warnings.length
+    ? ` · ${item.permission_warnings.map(readableStatus).join(", ")}`
+    : "";
+  return `requested ${requested} / exchange ${exchange} / effective ${effective}${warnings}`;
 }
 
 function formatPlan(value) {
@@ -358,7 +369,7 @@ function renderExchangeKeys(payload) {
       item.api_key,
       readableStatus(item.status),
       readableStatus(item.validation_status),
-      item.permissions || "--",
+      permissionDisplay(item),
       item.market_type,
       item.environment || "--",
       readableStatus(item.ip_restriction_status),

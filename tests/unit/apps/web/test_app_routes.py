@@ -378,6 +378,12 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "data-exchange-archive" not in settings_response.text
     assert "exchangeArchive" in settings_js
     assert "/archive" in settings_js
+    assert "permission_mismatch" in settings_js
+    assert "requested ${requested} / exchange ${exchange} / effective ${effective}" in (
+        settings_js
+    )
+    assert "effective_permissions" in settings_js
+    assert "permission_warnings" in settings_js
     assert "DELETE" not in settings_js
     assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
         settings_js

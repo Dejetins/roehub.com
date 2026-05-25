@@ -538,6 +538,13 @@ def _exchange_connection_response(
         environment=_environment_literal(value=row.environment),
         label=row.label,
         permissions=_permissions_literal(value=row.permissions),
+        requested_permissions=_permissions_literal(value=row.requested_permissions),
+        exchange_permissions=_exchange_permissions_literal(value=row.exchange_permissions),
+        effective_permissions=_effective_permissions_literal(value=row.effective_permissions),
+        permission_warnings=[
+            _permission_warning_literal(value=value)
+            for value in row.permission_warnings
+        ],
         api_key=row.api_key,
         status=_connection_status_literal(value=row.status),
         status_reason=row.status_reason,
@@ -706,6 +713,32 @@ def _permissions_literal(*, value: str) -> Literal["read", "trade"]:
     raise ValueError(f"Unsupported permissions value: {value!r}")
 
 
+def _exchange_permissions_literal(
+    *,
+    value: str,
+) -> Literal["unknown", "read", "trade", "withdraw_or_transfer"]:
+    allowed = {"unknown", "read", "trade", "withdraw_or_transfer"}
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    raise ValueError(f"Unsupported exchange_permissions value: {value!r}")
+
+
+def _effective_permissions_literal(*, value: str) -> Literal["none", "read", "trade"]:
+    allowed = {"none", "read", "trade"}
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    raise ValueError(f"Unsupported effective_permissions value: {value!r}")
+
+
+def _permission_warning_literal(
+    *,
+    value: str,
+) -> Literal["exchange_permissions_exceed_requested"]:
+    if value == "exchange_permissions_exceed_requested":
+        return value
+    raise ValueError(f"Unsupported permission warning value: {value!r}")
+
+
 def _matches_connection_status_filter(
     *,
     row: ExchangeConnectionCommandResult,
@@ -728,6 +761,7 @@ def _validation_status_literal(
 ) -> Literal[
     "valid_readonly",
     "valid_trade_enabled",
+    "permission_mismatch",
     "invalid_credentials",
     "invalid_permissions",
     "invalid_ip_restriction",
@@ -737,6 +771,7 @@ def _validation_status_literal(
     allowed = {
         "valid_readonly",
         "valid_trade_enabled",
+        "permission_mismatch",
         "invalid_credentials",
         "invalid_permissions",
         "invalid_ip_restriction",

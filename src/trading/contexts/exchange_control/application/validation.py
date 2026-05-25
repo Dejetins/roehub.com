@@ -7,6 +7,7 @@ from typing import Literal, Protocol, runtime_checkable
 VALIDATION_STATUSES = {
     "valid_readonly",
     "valid_trade_enabled",
+    "permission_mismatch",
     "invalid_credentials",
     "invalid_permissions",
     "invalid_ip_restriction",
@@ -17,12 +18,18 @@ VALIDATION_STATUSES = {
 ExchangeValidationStatus = Literal[
     "valid_readonly",
     "valid_trade_enabled",
+    "permission_mismatch",
     "invalid_credentials",
     "invalid_permissions",
     "invalid_ip_restriction",
     "unsupported_account_mode",
     "skipped_external_validation",
 ]
+
+RequestedPermissions = Literal["read", "trade"]
+ExchangePermissions = Literal["unknown", "read", "trade", "withdraw_or_transfer"]
+EffectivePermissions = Literal["none", "read", "trade"]
+PermissionWarning = Literal["exchange_permissions_exceed_requested"]
 
 
 class ExchangeCredentialValidationError(RuntimeError):
@@ -79,12 +86,18 @@ class SkippedExchangeCredentialValidator:
         request: ExchangeCredentialValidationRequest,
         now: datetime,
     ) -> ExchangeCredentialValidationResult:
-        _ = request
         return ExchangeCredentialValidationResult(
             status="skipped_external_validation",
             reason=self.reason,
             ip_restriction_status="not_checked",
-            permission_summary={"validation_live": False},
+            permission_summary={
+                "validation_live": False,
+                "requested_permissions": request.requested_permissions,
+                "permissions": request.requested_permissions,
+                "exchange_permissions": "unknown",
+                "effective_permissions": "none",
+                "permission_warnings": [],
+            },
             observed_at=now,
         )
 
@@ -96,6 +109,10 @@ __all__ = [
     "ExchangeCredentialValidationRequest",
     "ExchangeCredentialValidationResult",
     "ExchangeCredentialValidator",
+    "EffectivePermissions",
+    "ExchangePermissions",
     "ExchangeValidationStatus",
+    "PermissionWarning",
+    "RequestedPermissions",
     "SkippedExchangeCredentialValidator",
 ]

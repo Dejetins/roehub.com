@@ -47,6 +47,10 @@ class ExchangeConnectionView:
     environment: str
     label: str | None
     permissions: str
+    requested_permissions: str
+    exchange_permissions: str
+    effective_permissions: str
+    permission_warnings: tuple[str, ...]
     api_key: str
     status: str
     status_reason: str | None
@@ -99,6 +103,7 @@ class ExchangeConnectionRecord:
     updated_at: datetime
     disabled_at: datetime | None = None
     archived_at: datetime | None = None
+    permission_summary: dict[str, object] | None = None
 
 
 class ExchangeConnectionRepository(Protocol):
@@ -238,6 +243,11 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             ip_restriction_status="unknown",
             last_validated_at=None,
             updated_at=updated_at,
+            permission_summary=_initial_permission_summary(
+                requested_permissions=connection.permissions,
+                validation_status="skipped_external_validation",
+                validation_reason="credential_rotated",
+            ),
         )
         self._connections[connection_id] = updated
         return updated
@@ -314,6 +324,12 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             ip_restriction_status=result.ip_restriction_status,
             last_validated_at=result.observed_at or updated_at,
             updated_at=updated_at,
+            permission_summary={
+                **(connection.permission_summary or {}),
+                **(result.permission_summary or {}),
+                "validation_status": result.status,
+                "validation_reason": result.reason,
+            },
         )
         self._connections[connection_id] = updated
         return updated
@@ -381,6 +397,11 @@ class ExchangeConnectionService:
             last_validated_at=None,
             created_at=now,
             updated_at=now,
+            permission_summary=_initial_permission_summary(
+                requested_permissions=normalized.permissions,
+                validation_status="skipped_external_validation",
+                validation_reason="not_validated",
+            ),
         )
         created = self._repository.create(
             connection=connection,
@@ -623,6 +644,25 @@ class ExchangeConnectionService:
         )
         if credential is None:
             raise RuntimeError("active exchange credential version is missing")
+        permission_summary = connection.permission_summary or {}
+        requested_permissions = _summary_string(
+            summary=permission_summary,
+            key="requested_permissions",
+            default=connection.permissions,
+            allowed=ALLOWED_PERMISSIONS,
+        )
+        exchange_permissions = _summary_string(
+            summary=permission_summary,
+            key="exchange_permissions",
+            default="unknown",
+            allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+        )
+        effective_permissions = _summary_string(
+            summary=permission_summary,
+            key="effective_permissions",
+            default="none",
+            allowed={"none", "read", "trade"},
+        )
         return ExchangeConnectionView(
             connection_id=connection.connection_id,
             credential_version_id=connection.active_credential_version_id,
@@ -632,6 +672,10 @@ class ExchangeConnectionService:
             environment=connection.environment,
             label=connection.label,
             permissions=connection.permissions,
+            requested_permissions=requested_permissions,
+            exchange_permissions=exchange_permissions,
+            effective_permissions=effective_permissions,
+            permission_warnings=_summary_warnings(summary=permission_summary),
             api_key=f"****{credential.api_key_last4}",
             status=connection.status,
             status_reason=connection.status_reason,
@@ -759,6 +803,52 @@ def _required_secret(*, value: str, field_name: str) -> str:
             status_code=422,
         )
     return stripped
+
+
+def _initial_permission_summary(
+    *,
+    requested_permissions: str,
+    validation_status: str,
+    validation_reason: str,
+) -> dict[str, object]:
+    return {
+        "permissions": requested_permissions,
+        "requested_permissions": requested_permissions,
+        "exchange_permissions": "unknown",
+        "effective_permissions": "none",
+        "permission_warnings": [],
+        "validation_status": validation_status,
+        "validation_reason": validation_reason,
+    }
+
+
+def _summary_string(
+    *,
+    summary: dict[str, object],
+    key: str,
+    default: str,
+    allowed: set[str],
+) -> str:
+    value = summary.get(key)
+    if isinstance(value, str) and value in allowed:
+        return value
+    if key == "requested_permissions":
+        alias = summary.get("permissions")
+        if isinstance(alias, str) and alias in allowed:
+            return alias
+    return default
+
+
+def _summary_warnings(*, summary: dict[str, object]) -> tuple[str, ...]:
+    warnings = summary.get("permission_warnings")
+    if not isinstance(warnings, list):
+        return ()
+    return tuple(
+        warning
+        for warning in warnings
+        if isinstance(warning, str)
+        and warning in {"exchange_permissions_exceed_requested"}
+    )
 
 
 def _optional_secret(*, value: str | None) -> str | None:

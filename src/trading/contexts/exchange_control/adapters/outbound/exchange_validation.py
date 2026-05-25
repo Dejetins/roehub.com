@@ -12,9 +12,14 @@ from datetime import datetime
 from typing import Any
 
 from trading.contexts.exchange_control.application.validation import (
+    EffectivePermissions,
     ExchangeCredentialValidationRequest,
     ExchangeCredentialValidationResult,
     ExchangeCredentialValidator,
+    ExchangePermissions,
+    ExchangeValidationStatus,
+    PermissionWarning,
+    RequestedPermissions,
 )
 
 _BINANCE_MAINNET_URL = "https://api.binance.com"
@@ -84,17 +89,28 @@ class BinanceExchangeCredentialValidator:
                 timeout_seconds=self.timeout_seconds,
             )
         except urllib.error.HTTPError as exc:
-            return _invalid_credentials_from_http(status_code=exc.code)
+            return _invalid_credentials_from_http(
+                status_code=exc.code,
+                exchange="binance",
+                requested_permissions=request.requested_permissions,
+            )
         except (OSError, ValueError):
             return ExchangeCredentialValidationResult(
                 status="invalid_credentials",
                 reason="exchange_request_failed",
                 ip_restriction_status="unknown",
-                permission_summary={"exchange": "binance"},
+                permission_summary=_permission_summary(
+                    base={"exchange": "binance"},
+                    requested_permissions=request.requested_permissions,
+                    exchange_permissions="unknown",
+                    effective_permissions="none",
+                    permission_warnings=(),
+                ),
             )
         return normalize_binance_api_restrictions(
             payload=payload,
             environment=request.environment,
+            requested_permissions=request.requested_permissions,
         )
 
 
@@ -130,17 +146,28 @@ class BybitExchangeCredentialValidator:
                 timeout_seconds=self.timeout_seconds,
             )
         except urllib.error.HTTPError as exc:
-            return _invalid_credentials_from_http(status_code=exc.code)
+            return _invalid_credentials_from_http(
+                status_code=exc.code,
+                exchange="bybit",
+                requested_permissions=request.requested_permissions,
+            )
         except (OSError, ValueError):
             return ExchangeCredentialValidationResult(
                 status="invalid_credentials",
                 reason="exchange_request_failed",
                 ip_restriction_status="unknown",
-                permission_summary={"exchange": "bybit"},
+                permission_summary=_permission_summary(
+                    base={"exchange": "bybit"},
+                    requested_permissions=request.requested_permissions,
+                    exchange_permissions="unknown",
+                    effective_permissions="none",
+                    permission_warnings=(),
+                ),
             )
         return normalize_bybit_api_key_info(
             payload=payload,
             environment=request.environment,
+            requested_permissions=request.requested_permissions,
         )
 
 
@@ -148,48 +175,66 @@ def normalize_binance_api_restrictions(
     *,
     payload: dict[str, Any],
     environment: str,
+    requested_permissions: str = "read",
 ) -> ExchangeCredentialValidationResult:
+    requested = _requested_permissions(value=requested_permissions)
+    ip_status = _ip_status(payload=payload, environment=environment)
     if not bool(payload.get("enableReading")):
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="invalid_permissions",
             reason="reading_permission_disabled",
-            ip_restriction_status=_ip_status(payload=payload, environment=environment),
-            permission_summary=_binance_summary(payload=payload),
+            ip_restriction_status=ip_status,
+            base_summary=_binance_summary(payload=payload),
+            requested_permissions=requested,
+            exchange_permissions="unknown",
         )
     if _binance_withdraw_or_transfer_enabled(payload=payload):
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="invalid_permissions",
             reason="withdraw_or_transfer_enabled",
-            ip_restriction_status=_ip_status(payload=payload, environment=environment),
-            permission_summary=_binance_summary(payload=payload),
+            ip_restriction_status=ip_status,
+            base_summary=_binance_summary(payload=payload),
+            requested_permissions=requested,
+            exchange_permissions="withdraw_or_transfer",
         )
-    if _ip_status(payload=payload, environment=environment) == "missing_mainnet_restriction":
-        return ExchangeCredentialValidationResult(
+    exchange_permissions: ExchangePermissions = (
+        "trade" if _binance_trade_enabled(payload=payload) else "read"
+    )
+    if ip_status == "missing_mainnet_restriction":
+        return _with_permission_policy(
             status="invalid_ip_restriction",
             reason="mainnet_ip_restriction_missing",
             ip_restriction_status="missing_mainnet_restriction",
-            permission_summary=_binance_summary(payload=payload),
+            base_summary=_binance_summary(payload=payload),
+            requested_permissions=requested,
+            exchange_permissions=exchange_permissions,
         )
     if bool(payload.get("enablePortfolioMarginTrading")):
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="unsupported_account_mode",
             reason="portfolio_margin_enabled",
-            ip_restriction_status=_ip_status(payload=payload, environment=environment),
+            ip_restriction_status=ip_status,
             account_mode="portfolio_margin",
-            permission_summary=_binance_summary(payload=payload),
+            base_summary=_binance_summary(payload=payload),
+            requested_permissions=requested,
+            exchange_permissions=exchange_permissions,
         )
     if _binance_trade_enabled(payload=payload):
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="valid_trade_enabled",
             reason="trade_permission_detected",
-            ip_restriction_status=_ip_status(payload=payload, environment=environment),
-            permission_summary=_binance_summary(payload=payload),
+            ip_restriction_status=ip_status,
+            base_summary=_binance_summary(payload=payload),
+            requested_permissions=requested,
+            exchange_permissions="trade",
         )
-    return ExchangeCredentialValidationResult(
+    return _with_permission_policy(
         status="valid_readonly",
         reason="readonly_permission_detected",
-        ip_restriction_status=_ip_status(payload=payload, environment=environment),
-        permission_summary=_binance_summary(payload=payload),
+        ip_restriction_status=ip_status,
+        base_summary=_binance_summary(payload=payload),
+        requested_permissions=requested,
+        exchange_permissions="read",
     )
 
 
@@ -197,13 +242,21 @@ def normalize_bybit_api_key_info(
     *,
     payload: dict[str, Any],
     environment: str,
+    requested_permissions: str = "read",
 ) -> ExchangeCredentialValidationResult:
+    requested = _requested_permissions(value=requested_permissions)
     if int(payload.get("retCode", 0)) != 0:
         return ExchangeCredentialValidationResult(
             status="invalid_credentials",
             reason="exchange_rejected_credentials",
             ip_restriction_status="unknown",
-            permission_summary={"exchange": "bybit"},
+            permission_summary=_permission_summary(
+                base={"exchange": "bybit"},
+                requested_permissions=requested,
+                exchange_permissions="unknown",
+                effective_permissions="none",
+                permission_warnings=(),
+            ),
         )
     result = payload.get("result")
     if not isinstance(result, dict):
@@ -211,49 +264,66 @@ def normalize_bybit_api_key_info(
             status="invalid_credentials",
             reason="exchange_response_invalid",
             ip_restriction_status="unknown",
-            permission_summary={"exchange": "bybit"},
+            permission_summary=_permission_summary(
+                base={"exchange": "bybit"},
+                requested_permissions=requested,
+                exchange_permissions="unknown",
+                effective_permissions="none",
+                permission_warnings=(),
+            ),
         )
     account_mode = _bybit_account_mode(result=result)
-    if account_mode == "unsupported":
-        return ExchangeCredentialValidationResult(
-            status="unsupported_account_mode",
-            reason="unsupported_account_mode",
-            ip_restriction_status=_bybit_ip_status(result=result, environment=environment),
-            account_mode=account_mode,
-            permission_summary=_bybit_summary(result=result),
-        )
     read_only = int(result.get("readOnly", 0)) == 1
     ip_status = _bybit_ip_status(result=result, environment=environment)
+    exchange_permissions: ExchangePermissions = "read" if read_only else "trade"
+    if account_mode == "unsupported":
+        return _with_permission_policy(
+            status="unsupported_account_mode",
+            reason="unsupported_account_mode",
+            ip_restriction_status=ip_status,
+            account_mode=account_mode,
+            base_summary=_bybit_summary(result=result),
+            requested_permissions=requested,
+            exchange_permissions=exchange_permissions,
+        )
     if not read_only and _bybit_transfer_enabled(result=result):
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="invalid_permissions",
             reason="transfer_permission_enabled",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            permission_summary=_bybit_summary(result=result),
+            base_summary=_bybit_summary(result=result),
+            requested_permissions=requested,
+            exchange_permissions="withdraw_or_transfer",
         )
     if ip_status == "missing_mainnet_restriction":
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="invalid_ip_restriction",
             reason="mainnet_ip_restriction_missing",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            permission_summary=_bybit_summary(result=result),
+            base_summary=_bybit_summary(result=result),
+            requested_permissions=requested,
+            exchange_permissions=exchange_permissions,
         )
     if read_only:
-        return ExchangeCredentialValidationResult(
+        return _with_permission_policy(
             status="valid_readonly",
             reason="readonly_permission_detected",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            permission_summary=_bybit_summary(result=result),
+            base_summary=_bybit_summary(result=result),
+            requested_permissions=requested,
+            exchange_permissions="read",
         )
-    return ExchangeCredentialValidationResult(
+    return _with_permission_policy(
         status="valid_trade_enabled",
         reason="write_permission_detected",
         ip_restriction_status=ip_status,
         account_mode=account_mode,
-        permission_summary=_bybit_summary(result=result),
+        base_summary=_bybit_summary(result=result),
+        requested_permissions=requested,
+        exchange_permissions="trade",
     )
 
 
@@ -271,18 +341,99 @@ def _get_json(
     return payload
 
 
-def _invalid_credentials_from_http(*, status_code: int) -> ExchangeCredentialValidationResult:
+def _invalid_credentials_from_http(
+    *,
+    status_code: int,
+    exchange: str,
+    requested_permissions: str,
+) -> ExchangeCredentialValidationResult:
+    requested = _requested_permissions(value=requested_permissions)
     if status_code in {400, 401, 403}:
         return ExchangeCredentialValidationResult(
             status="invalid_credentials",
             reason=f"exchange_rejected_credentials_{status_code}",
             ip_restriction_status="unknown",
+            permission_summary=_permission_summary(
+                base={"exchange": exchange},
+                requested_permissions=requested,
+                exchange_permissions="unknown",
+                effective_permissions="none",
+                permission_warnings=(),
+            ),
         )
     return ExchangeCredentialValidationResult(
         status="invalid_credentials",
         reason="exchange_request_failed",
         ip_restriction_status="unknown",
+        permission_summary=_permission_summary(
+            base={"exchange": exchange},
+            requested_permissions=requested,
+            exchange_permissions="unknown",
+            effective_permissions="none",
+            permission_warnings=(),
+        ),
     )
+
+
+def _with_permission_policy(
+    *,
+    status: ExchangeValidationStatus,
+    reason: str,
+    ip_restriction_status: str,
+    base_summary: dict[str, object],
+    requested_permissions: RequestedPermissions,
+    exchange_permissions: ExchangePermissions,
+    account_mode: str | None = None,
+) -> ExchangeCredentialValidationResult:
+    effective_permissions: EffectivePermissions = "none"
+    permission_warnings: tuple[PermissionWarning, ...] = ()
+    resolved_status = status
+    resolved_reason = reason
+    if status in {"valid_readonly", "valid_trade_enabled"}:
+        if requested_permissions == "trade" and exchange_permissions == "read":
+            resolved_status = "permission_mismatch"
+            resolved_reason = "requested_trade_but_exchange_readonly"
+            effective_permissions = "read"
+        elif requested_permissions == "read" and exchange_permissions == "trade":
+            effective_permissions = "read"
+            permission_warnings = ("exchange_permissions_exceed_requested",)
+        else:
+            effective_permissions = "trade" if exchange_permissions == "trade" else "read"
+    return ExchangeCredentialValidationResult(
+        status=resolved_status,
+        reason=resolved_reason,
+        ip_restriction_status=ip_restriction_status,
+        account_mode=account_mode,
+        permission_summary=_permission_summary(
+            base=base_summary,
+            requested_permissions=requested_permissions,
+            exchange_permissions=exchange_permissions,
+            effective_permissions=effective_permissions,
+            permission_warnings=permission_warnings,
+        ),
+    )
+
+
+def _permission_summary(
+    *,
+    base: dict[str, object],
+    requested_permissions: RequestedPermissions | str,
+    exchange_permissions: ExchangePermissions,
+    effective_permissions: EffectivePermissions,
+    permission_warnings: tuple[PermissionWarning, ...],
+) -> dict[str, object]:
+    return {
+        **base,
+        "permissions": requested_permissions,
+        "requested_permissions": requested_permissions,
+        "exchange_permissions": exchange_permissions,
+        "effective_permissions": effective_permissions,
+        "permission_warnings": list(permission_warnings),
+    }
+
+
+def _requested_permissions(*, value: str) -> RequestedPermissions:
+    return "trade" if value == "trade" else "read"
 
 
 def _ip_status(*, payload: dict[str, Any], environment: str) -> str:

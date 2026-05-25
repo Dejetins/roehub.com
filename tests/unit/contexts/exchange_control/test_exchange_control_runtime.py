@@ -309,6 +309,11 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     connection_id = created_payload["connection_id"]
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
+    assert created_payload["permissions"] == "read"
+    assert created_payload["requested_permissions"] == "read"
+    assert created_payload["exchange_permissions"] == "unknown"
+    assert created_payload["effective_permissions"] == "none"
+    assert created_payload["permission_warnings"] == []
     assert created_payload["validation_status"] == "skipped_external_validation"
     assert "TEST_SECRET_STAGE4" not in created.text
     assert "TEST_PASSPHRASE_STAGE4" not in created.text
@@ -493,10 +498,15 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
     assert payload["validation_status"] == "skipped_external_validation"
     assert payload["validation_reason"] == "live_validation_disabled"
     assert payload["ip_restriction_status"] == "not_checked"
+    assert payload["requested_permissions"] == "read"
+    assert payload["exchange_permissions"] == "unknown"
+    assert payload["effective_permissions"] == "none"
+    assert payload["permission_warnings"] == []
     assert "TEST_SECRET_STAGE5" not in validated.text
 
     metrics = client.get("/metrics")
     assert 'result="skipped_external_validation"' in metrics.text
+    assert "exchange_permission_mismatch_total" in metrics.text
     assert "connection_id" not in metrics.text
 
 

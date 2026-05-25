@@ -245,6 +245,12 @@ class ExchangeControlMetrics:
             ("source", "result"),
             registry=self.registry,
         )
+        self.permission_mismatch_total = Counter(
+            "exchange_permission_mismatch_total",
+            "Exchange permission mismatch observations by bounded permission labels.",
+            ("exchange", "requested", "effective"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -264,6 +270,11 @@ class ExchangeControlMetrics:
             source="none",
             result="stage_09a_no_cleanup_attempt",
         ).inc(0)
+        self.permission_mismatch_total.labels(
+            exchange="none",
+            requested="read",
+            effective="none",
+        ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
         self.connection_validation_total.labels(
@@ -280,6 +291,19 @@ class ExchangeControlMetrics:
             reason=reason,
         ).inc()
         self.connection_status.labels(exchange=exchange, status=result).set(1)
+
+    def record_permission_mismatch(
+        self,
+        *,
+        exchange: str,
+        requested: str,
+        effective: str,
+    ) -> None:
+        self.permission_mismatch_total.labels(
+            exchange=exchange,
+            requested=requested,
+            effective=effective,
+        ).inc()
 
 
 class CreateExchangeConnectionInternalRequest(BaseModel):
@@ -598,6 +622,12 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             result=view.validation_status,
             reason=view.validation_reason or "none",
         )
+        if view.validation_status == "permission_mismatch":
+            metrics.record_permission_mismatch(
+                exchange=view.exchange_name,
+                requested=view.requested_permissions,
+                effective=view.effective_permissions,
+            )
         return _exchange_connection_response(view=view)
 
     return app
@@ -692,6 +722,10 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
         "environment": view.environment,
         "label": view.label,
         "permissions": view.permissions,
+        "requested_permissions": view.requested_permissions,
+        "exchange_permissions": view.exchange_permissions,
+        "effective_permissions": view.effective_permissions,
+        "permission_warnings": list(view.permission_warnings),
         "api_key": view.api_key,
         "status": view.status,
         "status_reason": view.status_reason,

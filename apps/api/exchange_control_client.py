@@ -41,6 +41,10 @@ class ExchangeConnectionCommandResult:
     environment: str
     label: str | None
     permissions: str
+    requested_permissions: str
+    exchange_permissions: str
+    effective_permissions: str
+    permission_warnings: tuple[str, ...]
     api_key: str
     status: str
     status_reason: str | None
@@ -390,6 +394,10 @@ class InMemoryExchangeControlClient:
             environment=environment,
             label=label,
             permissions=permissions,
+            requested_permissions=permissions,
+            exchange_permissions="unknown",
+            effective_permissions="none",
+            permission_warnings=(),
             api_key=f"****{api_key[-4:]}",
             status="active",
             status_reason=None,
@@ -431,6 +439,10 @@ class InMemoryExchangeControlClient:
             environment=existing.environment,
             label=existing.label,
             permissions=existing.permissions,
+            requested_permissions=existing.requested_permissions,
+            exchange_permissions="unknown",
+            effective_permissions="none",
+            permission_warnings=(),
             api_key=f"****{api_key[-4:]}",
             status=existing.status,
             status_reason=existing.status_reason,
@@ -468,6 +480,10 @@ class InMemoryExchangeControlClient:
             environment=existing.environment,
             label=existing.label,
             permissions=existing.permissions,
+            requested_permissions=existing.requested_permissions,
+            exchange_permissions=existing.exchange_permissions,
+            effective_permissions=existing.effective_permissions,
+            permission_warnings=existing.permission_warnings,
             api_key=existing.api_key,
             status="disabled",
             status_reason="user_disabled",
@@ -507,6 +523,10 @@ class InMemoryExchangeControlClient:
             environment=existing.environment,
             label=existing.label,
             permissions=existing.permissions,
+            requested_permissions=existing.requested_permissions,
+            exchange_permissions=existing.exchange_permissions,
+            effective_permissions=existing.effective_permissions,
+            permission_warnings=existing.permission_warnings,
             api_key=existing.api_key,
             status="archived",
             status_reason="user_archived",
@@ -544,6 +564,10 @@ class InMemoryExchangeControlClient:
             environment=existing.environment,
             label=existing.label,
             permissions=existing.permissions,
+            requested_permissions=existing.requested_permissions,
+            exchange_permissions="read",
+            effective_permissions="read",
+            permission_warnings=(),
             api_key=existing.api_key,
             status=existing.status,
             status_reason=existing.status_reason,
@@ -612,6 +636,14 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
             environment=str(payload["environment"]),
             label=str(payload["label"]) if payload.get("label") is not None else None,
             permissions=str(payload["permissions"]),
+            requested_permissions=str(
+                payload.get("requested_permissions") or payload["permissions"]
+            ),
+            exchange_permissions=str(payload.get("exchange_permissions") or "unknown"),
+            effective_permissions=str(payload.get("effective_permissions") or "none"),
+            permission_warnings=_permission_warnings_from_payload(
+                payload.get("permission_warnings")
+            ),
             api_key=str(payload["api_key"]),
             status=str(payload["status"]),
             status_reason=(
@@ -668,6 +700,17 @@ def _safe_error_code(*, response: httpx.Response) -> str | None:
     if isinstance(error, dict) and isinstance(error.get("code"), str):
         return error["code"]
     return None
+
+
+def _permission_warnings_from_payload(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(
+        warning
+        for warning in value
+        if isinstance(warning, str)
+        and warning in {"exchange_permissions_exceed_requested"}
+    )
 
 
 def _read_optional_str(value: str | None) -> str | None:
