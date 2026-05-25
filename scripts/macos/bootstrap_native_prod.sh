@@ -11,6 +11,13 @@ mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clic
 mkdir -p /Users/daniildegtyarev/.config/roehub /Users/daniildegtyarev/.local/bin /Users/daniildegtyarev/Library/Logs/roehub "$LAUNCH_AGENTS_DIR"
 mkdir -p /opt/homebrew/etc/monit.d/scripts
 
+artifact_publisher_label="com.roehub.backtest-artifact-publisher"
+launchctl disable "gui/$(id -u)/${artifact_publisher_label}" >/dev/null 2>&1 || true
+launchctl bootout "gui/$(id -u)/${artifact_publisher_label}" >/dev/null 2>&1 || true
+rm -f \
+  "$LAUNCH_AGENTS_DIR/${artifact_publisher_label}.plist" \
+  /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
+
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
@@ -20,10 +27,10 @@ install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/config.xml" /opt/roehub/confi
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/users.d/roehub.xml" /opt/roehub/config/clickhouse.users.roehub.xml
 install -m 0755 "$REPO_ROOT/scripts/macos/provision_openbao_transit_stage3a.sh" /opt/roehub/bin/provision_openbao_transit_stage3a.sh
 install -m 0755 "$REPO_ROOT/scripts/macos/smoke_openbao_transit_acl.sh" /opt/roehub/bin/smoke_openbao_transit_acl.sh
+install -m 0755 "$REPO_ROOT/scripts/macos/recover_openbao_transit.sh" /opt/roehub/bin/recover_openbao_transit.sh
 install -m 0755 "$REPO_ROOT/infra/scripts/monit/launchctl_service_control.sh" /opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt/homebrew/etc/monit.d/roehub-market-data.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-job-runner.monitrc
-install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-control.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-control.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-openbao.monitrc" /opt/homebrew/etc/monit.d/roehub-openbao.monitrc
@@ -31,11 +38,11 @@ install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-openbao.monitrc" /opt/hom
 for plist in \
   com.roehub.api.plist \
   com.roehub.openbao.plist \
+  com.roehub.openbao-recover.plist \
   com.roehub.exchange-control.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \
-  com.roehub.backtest-artifact-publisher.plist \
   com.roehub.clickhouse.plist \
   com.roehub.blackbox-exporter.plist \
   com.roehub.postgres-exporter.plist \

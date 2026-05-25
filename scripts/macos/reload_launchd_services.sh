@@ -14,9 +14,28 @@ prod_services=(
   com.roehub.postgres-exporter.plist
   com.roehub.redis-exporter.plist
   com.roehub.clickhouse-exporter.plist
-  com.roehub.api.plist
   com.roehub.openbao.plist
+  com.roehub.openbao-recover.plist
   com.roehub.exchange-control.plist
+  com.roehub.api.plist
+  com.roehub.backtest-job-runner.plist
+  com.roehub.market-data-ws-worker.plist
+  com.roehub.market-data-scheduler.plist
+)
+
+prod_pre_openbao_services=(
+  com.roehub.clickhouse.plist
+  com.roehub.blackbox-exporter.plist
+  com.roehub.tailscale-runtime.plist
+  com.roehub.postgres-exporter.plist
+  com.roehub.redis-exporter.plist
+  com.roehub.clickhouse-exporter.plist
+)
+
+prod_post_openbao_services=(
+  com.roehub.openbao-recover.plist
+  com.roehub.exchange-control.plist
+  com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist
   com.roehub.market-data-scheduler.plist
@@ -116,6 +135,16 @@ bootstrap_service() {
   launchctl bootstrap "gui/${UID_VALUE}" "${plist_path}"
 }
 
+recover_openbao_transit() {
+  local recovery_script="/opt/roehub/bin/recover_openbao_transit.sh"
+  if [[ ! -x "$recovery_script" ]]; then
+    echo "missing OpenBao recovery script: ${recovery_script}" >&2
+    return 1
+  fi
+  echo "recover OpenBao transit"
+  "$recovery_script"
+}
+
 reload_profile() {
   local profile="$1"
   local -a static_services=()
@@ -151,9 +180,20 @@ reload_profile() {
     done
   fi
 
-  for service in "${static_services[@]}"; do
-    bootstrap_service "${service}"
-  done
+  if [[ "$profile" == "prod" ]]; then
+    for service in "${prod_pre_openbao_services[@]}"; do
+      bootstrap_service "${service}"
+    done
+    bootstrap_service com.roehub.openbao.plist
+    recover_openbao_transit
+    for service in "${prod_post_openbao_services[@]}"; do
+      bootstrap_service "${service}"
+    done
+  else
+    for service in "${static_services[@]}"; do
+      bootstrap_service "${service}"
+    done
+  fi
 }
 
 case "$PROFILE" in

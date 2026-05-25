@@ -163,25 +163,24 @@ Keycloak auth operations (realm/client/OTP/local setup):
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
-В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc`,
-`infra/scripts/monit/roehub-backtest-job-runner.monitrc` и
-`infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`.
+В production baseline сюда входят `infra/scripts/monit/roehub-keycloak.monitrc` и
+`infra/scripts/monit/roehub-backtest-job-runner.monitrc`.
 `reload_launchd_services.sh` сначала выгружает текущие static services и legacy
 numbered `backtest-job-runner.*` plists, затем bootstrap-ит static services для profile.
 Exact labels `com.roehub.backtest-job-runner` and
 `com.roehub.test.backtest-job-runner` are static services and must not be removed by
 the legacy cleanup step.
-`backtest-artifact-publisher` временно исключён из automatic reload/deploy path:
-его единственная operational control point — Monit wrapper, который явно делает
-`launchctl enable/bootstrap/kickstart` на `start` и `launchctl disable/bootout` на `stop`.
+`backtest-artifact-publisher` исключён из automatic reload/deploy path:
+production bootstrap принудительно удаляет его launchd plist и Monit snippet, чтобы
+сервис не стартовал после deploy или reboot.
 
 GitHub Actions workflow `deploy-backend` должен использовать этот же install/reload path:
 сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
 `bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest теперь
 возвращается в production reload baseline через standalone
 `com.roehub.backtest-job-runner`; отдельный detail-runner process не запускается.
-Automatic `backtest-artifact-publisher` launchd bootstrap по-прежнему не входит в
-production reload baseline.
+Automatic `backtest-artifact-publisher` launchd bootstrap и Monit control больше не
+входят в production baseline.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
 
 Возврат `backtest-job-runner` в production baseline описан отдельно:

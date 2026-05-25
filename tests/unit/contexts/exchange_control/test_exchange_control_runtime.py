@@ -16,6 +16,7 @@ from trading.contexts.exchange_control.application.secret_cipher import (
     TRANSIT_KEY_NAME,
     DeterministicInMemoryExchangeSecretCipher,
     ExchangeCredentialCiphertext,
+    ExchangeCredentialFingerprint,
     ExchangeCredentialSecret,
     ExchangeSecretCipherError,
 )
@@ -129,6 +130,48 @@ def test_health_ready_exposes_service_identity_and_disabled_external_validation(
         "checks": [
             {"name": "service_identity", "status": "ready"},
             {"name": "external_exchange_validation", "status": "ready"},
+        ],
+    }
+
+
+def test_health_ready_fails_closed_when_transit_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_transit_error(
+        self: OpenBaoTransitExchangeSecretCipher,
+        secret: ExchangeCredentialSecret,
+    ) -> ExchangeCredentialFingerprint:
+        raise ExchangeSecretCipherError("transit request failed with status 503")
+
+    monkeypatch.setattr(
+        OpenBaoTransitExchangeSecretCipher,
+        "fingerprint",
+        raise_transit_error,
+    )
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "prod",
+            "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
+            "OPENBAO_ADDR": "http://127.0.0.1:8200",
+            "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
+            "ROEHUB_API_TRANSIT_TOKEN": "api-token",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+            "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "not_ready",
+        "service": "exchange-control",
+        "service_identity": "exchange-control",
+        "checks": [
+            {"name": "service_identity", "status": "ready"},
+            {"name": "external_exchange_validation", "status": "ready"},
+            {"name": "secret_cipher_transit", "status": "not_ready"},
         ],
     }
 

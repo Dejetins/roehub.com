@@ -294,7 +294,11 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         secret_cipher=secret_cipher,
     )
     credential_validator = config.build_credential_validator()
-    readiness_probe = ExchangeControlReadinessProbe(service_identity=service_identity)
+    readiness_probe = ExchangeControlReadinessProbe(
+        service_identity=service_identity,
+        secret_cipher=secret_cipher,
+        transit_required=config.secret_cipher_backend in SUPPORTED_TRANSIT_SECRET_CIPHERS,
+    )
     metrics = ExchangeControlMetrics()
     metrics.mark_active()
 
@@ -304,8 +308,11 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
     app.state.exchange_credential_validator = credential_validator
 
     @app.get("/health/ready")
-    def get_readiness() -> dict[str, object]:
-        return readiness_probe.check().as_response_payload()
+    def get_readiness(response: Response) -> dict[str, object]:
+        readiness = readiness_probe.check()
+        if readiness.status != "ready":
+            response.status_code = 503
+        return readiness.as_response_payload()
 
     @app.get("/metrics", include_in_schema=False)
     def get_metrics() -> Response:

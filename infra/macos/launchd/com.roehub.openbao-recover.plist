@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.roehub.openbao-recover</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+
+  <key>WorkingDirectory</key>
+  <string>/opt/roehub</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>exec /opt/roehub/bin/recover_openbao_transit.sh</string>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/openbao-recover.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/openbao-recover.err.log</string>
+</dict>
+</plist>
