@@ -292,6 +292,12 @@ class ExchangeControlMetrics:
         ).inc()
         self.connection_status.labels(exchange=exchange, status=result).set(1)
 
+    def record_cleanup(self, *, source: str, result: str) -> None:
+        self.connection_cleanup_total.labels(
+            source=source,
+            result=result,
+        ).inc()
+
     def record_permission_mismatch(
         self,
         *,
@@ -339,6 +345,7 @@ class ArchiveExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     owner_user_id: str
+    cleanup_source: str | None = Field(default=None, max_length=40)
 
 
 class ValidateExchangeConnectionInternalRequest(BaseModel):
@@ -578,12 +585,22 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                 result="rejected",
                 reason=error.code,
             )
+            if payload.cleanup_source:
+                metrics.record_cleanup(
+                    source=_cleanup_metric_source(value=payload.cleanup_source),
+                    result="rejected",
+                )
             raise _exchange_connection_http_error(error=error) from error
         metrics.record_archive(
             exchange=view.exchange_name,
             result=view.status,
             reason=view.status_reason or "none",
         )
+        if payload.cleanup_source:
+            metrics.record_cleanup(
+                source=_cleanup_metric_source(value=payload.cleanup_source),
+                result=view.status,
+            )
         return _exchange_connection_response(view=view)
 
     @app.post(
@@ -711,6 +728,20 @@ def _parse_user_id(*, raw_value: str) -> UserId:
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _cleanup_metric_source(*, value: str) -> str:
+    stripped = value.strip().lower()
+    if not stripped:
+        return "unknown"
+    normalized = "".join(
+        character
+        if character.isascii()
+        and (character.isalnum() or character in {"_", "-"})
+        else "_"
+        for character in stripped
+    )
+    return normalized[:40] or "unknown"
 
 
 def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, object]:

@@ -357,7 +357,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     archived = client.post(
         f"/internal/v1/exchange-connections/{connection_id}/archive",
         headers=headers,
-        json={"owner_user_id": owner_user_id},
+        json={"owner_user_id": owner_user_id, "cleanup_source": "stage09d"},
     )
     assert archived.status_code == 200
     archived_payload = archived.json()
@@ -406,6 +406,8 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     metrics = client.get("/metrics")
     assert "exchange_connection_archive_total" in metrics.text
     assert 'result="archived"' in metrics.text
+    assert "exchange_connection_cleanup_total" in metrics.text
+    assert 'result="archived",source="stage09d"' in metrics.text
     assert "connection_id" not in metrics.text
 
 

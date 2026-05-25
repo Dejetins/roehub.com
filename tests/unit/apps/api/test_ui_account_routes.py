@@ -106,9 +106,10 @@ class _ArchiveShouldNotRunClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        cleanup_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
-        _ = owner_user_id, connection_id, request_id
+        _ = owner_user_id, connection_id, cleanup_source, request_id
         self.archive_calls += 1
         raise AssertionError("archive_connection must not run")
 

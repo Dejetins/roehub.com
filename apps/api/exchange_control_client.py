@@ -104,6 +104,7 @@ class ExchangeControlClient(Protocol):
         *,
         owner_user_id: str,
         connection_id: str,
+        cleanup_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
 
@@ -266,13 +267,17 @@ class HttpExchangeControlClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        cleanup_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
+        payload: dict[str, object] = {"owner_user_id": owner_user_id}
+        if cleanup_source is not None:
+            payload["cleanup_source"] = cleanup_source
         response = self._request(
             "POST",
             f"/internal/v1/exchange-connections/{connection_id}/archive",
             request_id=request_id,
-            json={"owner_user_id": owner_user_id},
+            json=payload,
         )
         return _connection_from_payload(response.json())
 
@@ -504,9 +509,10 @@ class InMemoryExchangeControlClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        cleanup_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
-        _ = request_id
+        _ = cleanup_source, request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
             raise ExchangeControlClientError("exchange_connection_not_found")
