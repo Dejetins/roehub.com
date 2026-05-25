@@ -1,12 +1,13 @@
 # Идентификация + Биржевые Подключения — хранение API-ключей v1
 
-Статус: staged rollout active. Stage 8 production-browser repair is accepted
-and supersedes the incomplete Stage 7 readiness claim for the authenticated
-public `/settings` add-key flow.
+Статус: staged rollout active. Этап 8 принят как production-browser repair и
+заменяет неполное readiness-утверждение Этапа 7 для authenticated public
+`/settings` add-key flow. Этап 9 запланирован как hardening lifecycle,
+архивирования и permission semantics перед любыми будущими execution stages.
 
 Документ фиксирует архитектуру первого production-этапа для Binance/Bybit
 API-ключей на `/settings`: добавление, безопасное хранение, валидация,
-ротация, отключение, audit, метрики и операционный контроль.
+ротация, отключение, архивирование, audit, метрики и операционный контроль.
 
 Этот документ намеренно не проектирует торговое исполнение. Размещение ордеров,
 `exchange-execution`, order ledger, hot path сигнала и native order adapters
@@ -175,11 +176,16 @@ market taxonomy, после явной миграции API, схемы БД, UI
 - `environment`: `testnet`, `mainnet`, опциональный exchange-specific demo mode;
 - `label`;
 - `active_credential_version_id`;
-- `status`;
+- `status`: lifecycle state `active`, `disabled`, `archived`;
+- `status_reason`;
 - `permission_summary`;
+- `requested_permissions`;
+- `exchange_permissions`;
+- `effective_permissions`;
 - `ip_restriction_status`;
 - `last_validated_at`;
 - `disabled_at`;
+- `archived_at`;
 - без секретных полей.
 
 ### Версия Учетных Данных
@@ -266,18 +272,28 @@ Fallback для локальной разработки:
 - egress region разрешен для биржи;
 - rate-limit headers/errors нормализованы.
 
-Статусы подключения:
+Validation statuses описывают результат проверки ключа на бирже и не должны
+смешиваться с lifecycle state подключения:
 
-- `pending_validation`;
 - `valid_readonly`;
 - `valid_trade_enabled`;
+- `permission_mismatch`;
 - `invalid_credentials`;
 - `invalid_permissions`;
 - `invalid_ip_restriction`;
 - `unsupported_account_mode`;
-- `disabled_by_user`;
-- `disabled_by_policy`;
+- `skipped_external_validation`;
 - `stale_validation`.
+
+`permission_mismatch` является status. Конкретная причина, например
+`requested_trade_but_exchange_readonly`, хранится в `validation_reason`, а не в
+`validation_status`.
+
+Lifecycle states описывают, участвует ли подключение в продуктовых workflows:
+
+- `active`;
+- `disabled`;
+- `archived`.
 
 Важно: `valid_trade_enabled` не означает, что Roehub готов торговать. Это только
 подтверждает, что ключ имеет торговые права. Торговля остается заблокированной,
@@ -306,7 +322,18 @@ CREATE TABLE exchange_connections (
     last_used_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    disabled_at TIMESTAMPTZ NULL
+    disabled_at TIMESTAMPTZ NULL,
+    archived_at TIMESTAMPTZ NULL,
+    CONSTRAINT exchange_connections_lifecycle_state_chk
+        CHECK (status IN ('active', 'disabled', 'archived')),
+    CONSTRAINT exchange_connections_lifecycle_timestamps_chk
+        CHECK (
+            (status = 'active' AND disabled_at IS NULL AND archived_at IS NULL)
+            OR
+            (status = 'disabled' AND disabled_at IS NOT NULL AND archived_at IS NULL)
+            OR
+            (status = 'archived' AND disabled_at IS NOT NULL AND archived_at IS NOT NULL)
+        )
 );
 ```
 
@@ -357,11 +384,16 @@ CREATE TABLE exchange_credential_versions (
 Целевые account endpoints:
 
 - `GET /api/ui/account/exchange-connections?cursor=&limit=`;
+- `GET /api/ui/account/exchange-connections?status=active|disabled|archived|all&cursor=&limit=`;
 - `POST /api/ui/account/exchange-connections`;
 - `POST /api/ui/account/exchange-connections/{connection_id}/validate`;
 - `POST /api/ui/account/exchange-connections/{connection_id}/rotate`;
 - `POST /api/ui/account/exchange-connections/{connection_id}/disable`;
-- `DELETE /api/ui/account/exchange-connections/{connection_id}`.
+- `POST /api/ui/account/exchange-connections/{connection_id}/archive`;
+
+`DELETE /api/ui/account/exchange-connections/{connection_id}` не вводится в
+Stage 9, чтобы не создавать ложное ожидание physical deletion. В v1 используется
+только явный `POST .../archive`; physical hard delete запрещен.
 
 Правила DTO:
 
@@ -371,25 +403,37 @@ CREATE TABLE exchange_credential_versions (
   error body;
 - включать masked key suffix, status, permission summary, environment, последнюю
   валидацию, доступность действий и risk warnings;
+- default list возвращает только `active`; `disabled` и `archived` доступны
+  только по явному фильтру/status tab;
 - cursor pagination для connections и audit events;
 - deterministic errors: `exchange_connection_not_found`,
   `exchange_connection_not_owned`, `exchange_connection_invalid`,
   `exchange_connection_validation_failed`, `recent_auth_required`,
-  `csrf_required`.
+  `csrf_required`, `exchange_connection_not_disabled`,
+  `exchange_connection_already_archived`.
 
 Требования UI:
 
 - `/settings` показывает реальный validation status, а не синтетические
   latency/status;
+- основная таблица `Connected Exchange APIs` показывает только `active`
+  подключения;
+- `disabled`/`archived` доступны через отдельный фильтр/history и не занимают
+  визуальное место в основном списке;
 - выбор environment явный;
 - выбор permissions явный: `read` по умолчанию, `trade` только как осознанное
   повышение capability; hardcoded `trade` запрещен;
+- UI различает `requested_permissions`, `exchange_permissions` и
+  `effective_permissions`; mismatch не отображается как успешное нормальное
+  состояние;
 - IP allowlist guidance показывает Roehub outbound IP/runbook state;
 - add/rotate credentials работают через write-only forms;
 - destructive actions требуют typed confirmation;
 - после submit/failure password inputs очищаются;
 - account limits/counts берутся из backend read model, без hardcoded
   `exchange_connections_used=0` или `api_keys_used=0`;
+- `exchange_connections_used` и `api_keys_used` считаются только по
+  `status='active'`; `disabled` и `archived` не занимают лимиты;
 - browser QA обязан выполнять grep artifacts на secret-like markers.
 
 ## Операционный Дизайн
@@ -422,6 +466,9 @@ healthcheck, launchd и Monit. Это не optional optimization, а gate без
 - `exchange_connection_status{exchange,status}`;
 - `exchange_credential_rotation_total{exchange,result}`;
 - `exchange_credential_disable_total{exchange,result}`;
+- `exchange_connection_archive_total{exchange,result,reason}`;
+- `exchange_connection_cleanup_total{source,result}`;
+- `exchange_permission_mismatch_total{exchange,requested,effective}`;
 - `exchange_credential_decrypt_total{service,result}`;
 - `exchange_api_requests_total{exchange,api_group,result}`;
 - `exchange_api_rate_limited_total{exchange,api_group}`.
@@ -1350,15 +1397,336 @@ Accepted Stage 8 evidence:
 - console artifact:
   `output/playwright/settings-stage08-console-20260524T222742Z.txt`.
 
+### Этап 9 — Lifecycle И Permission Semantics Hardening
+
+Цель: закрыть production gaps, выявленные после Stage 8: отключенные e2e/test
+connections остаются в основном пользовательском списке, а `permissions=trade`
+может отображаться рядом с `validation_status=valid_readonly` без явного
+бизнес-смысла. Stage 9 не добавляет торговое исполнение; он делает управление
+подключениями безопасным, чистым для UI и готовым к будущим execution stages.
+
+Бизнес-смысл:
+
+- пользователь видит только реально подключенные API в основном списке;
+- тестовые и отключенные записи не выглядят как рабочие подключения;
+- cleanup после e2e становится обязательным и доказуемым;
+- Roehub не вводит пользователя в заблуждение: запрошенные права, права на
+  бирже и фактически разрешенные права платформы разделены;
+- будущий execution-контур сможет опираться на `effective_permissions`, а не на
+  сырой пользовательский выбор.
+
+Что не входит в Этап 9:
+
+- не размещать ордера;
+- не проектировать `exchange-execution`;
+- не удалять физически secret/audit trail;
+- не переносить custody из OpenBao Transit;
+- не менять Binance/Bybit native validation endpoints, кроме нормализации
+  permission summary и mismatch semantics;
+- не добавлять новую биржу.
+
+#### Целевая Lifecycle-Модель
+
+Lifecycle state хранится отдельно от validation status.
+
+| State | Значение | Участвует в default list | Можно валидировать | Можно rotate | Можно archive | Участвует в лимитах |
+|---|---|---:|---:|---:|---:|---:|
+| `active` | Подключение доступно для product workflows. | Да | Да | Да | Нет, сначала disable | Да |
+| `disabled` | Подключение отключено пользователем/политикой, secrets больше не используются. | Нет | Нет | Нет | Да | Нет |
+| `archived` | Запись скрыта из операционного UI, сохранена для audit/history. | Нет | Нет | Нет | Idempotent no-op | Нет |
+
+Разрешенные переходы:
+
+| Команда | From | To | Правило |
+|---|---|---|---|
+| `create` | N/A | `active` | Только owner user, recent-auth, CSRF/same-origin, write-only secrets. |
+| `disable` | `active` | `disabled` | Требует owner user и recent-auth; active credential version получает `disabled_at`. |
+| `archive` | `disabled` | `archived` | Требует owner user и recent-auth; physical delete не выполняется. |
+| `archive` | `archived` | `archived` | Idempotent success или deterministic already-archived response. |
+| `rotate` | `active` | `active` | Новый credential version, старый `rotated`; `connection_id` сохраняется. |
+| `validate` | `active` | `active` | Обновляет validation/permission summary; lifecycle не меняет. |
+
+Запрещенные переходы:
+
+- `archive active` без предварительного `disable`;
+- `rotate disabled|archived`;
+- `validate disabled|archived`;
+- physical hard delete в product v1;
+- восстановление `archived -> active` без отдельного будущего решения.
+
+#### Семантика Прав Доступа
+
+Stage 9 вводит три разных понятия:
+
+| Поле | Источник | Что означает |
+|---|---|---|
+| `requested_permissions` | Пользовательский выбор в Roehub UI/API: `read` или `trade`. | Что пользователь хочет разрешить платформе. |
+| `exchange_permissions` | Нормализованный результат Binance/Bybit validation. | Что реально разрешает API key на бирже: `read`, `trade`, `withdraw_or_transfer`, `unknown`. |
+| `effective_permissions` | Решение Roehub policy engine внутри `exchange-control`. | Что Roehub реально разрешает использовать дальше: `none`, `read`, `trade`. |
+
+`effective_permissions` вычисляется только внутри `exchange-control`.
+`apps/api` и UI могут отображать это поле, но не принимают самостоятельное
+решение о фактически разрешенной capability.
+
+Правила вычисления v1:
+
+| Requested | Exchange validation | Effective | Validation status / reason |
+|---|---|---|---|
+| `read` | readonly key | `read` | `valid_readonly` |
+| `read` | trade-enabled key без dangerous permissions | `read` | `valid_trade_enabled`, но UI показывает warning, что фактические права шире запрошенных |
+| `trade` | trade-enabled key без dangerous permissions и с допустимой IP policy | `trade` | `valid_trade_enabled` |
+| `trade` | readonly key | `read` | `permission_mismatch` / `requested_trade_but_exchange_readonly` |
+| любое | withdrawal/transfer enabled | `none` | `invalid_permissions` |
+| любое | missing mainnet IP restriction | `none` или `read` только если policy явно разрешает | `invalid_ip_restriction` |
+| любое | invalid credentials | `none` | `invalid_credentials` |
+
+Для v1 предпочтительное решение: если `requested_permissions=trade`, но биржа
+вернула readonly, connection не считается trade-ready и не отображается как
+успешный `trade`. UI должен показать mismatch, а будущий execution-контур обязан
+читать только `effective_permissions`.
+
+Если `requested_permissions=read`, а биржа вернула trade-enabled key без
+dangerous permissions, Roehub оставляет `effective_permissions=read` и добавляет
+warning `exchange_permissions_exceed_requested`. Это предотвращает скрытое
+повышение capability.
+
+`permission_summary_json` может оставаться техническим контейнером, но public
+DTO должен отдавать явные поля:
+
+- `requested_permissions`;
+- `exchange_permissions`;
+- `effective_permissions`;
+- `validation_status`;
+- `validation_reason`;
+- `permission_warnings`.
+
+Совместимость:
+
+- старое поле `permissions` остается alias к `requested_permissions` на время
+  перехода;
+- новые consumers используют только явные поля;
+- legacy rows получают `requested_permissions` из текущего `permissions`;
+- `exchange_permissions='unknown'` и `effective_permissions='none'` до
+  успешной validation, если policy не разрешает fallback.
+
+#### API/UI Контракт Этапа 9
+
+Целевые account endpoints:
+
+```text
+GET  /api/ui/account/exchange-connections?status=active|disabled|archived|all&cursor=&limit=
+POST /api/ui/account/exchange-connections/{connection_id}/disable
+POST /api/ui/account/exchange-connections/{connection_id}/archive
+```
+
+Правила:
+
+- `GET` без `status` возвращает только `active`;
+- `status=disabled` возвращает отключенные, но не archived;
+- `status=archived` возвращает архив;
+- `status=all` доступен только если это явно принято для user-facing history; по
+  умолчанию UI не использует `all`;
+- `POST .../archive` является единственным archive endpoint Stage 9;
+- `DELETE` endpoint в Stage 9 не добавляется;
+- physical delete запрещен;
+- archive разрешен только для owned disabled connection;
+- ошибки deterministic:
+  - `exchange_connection_not_found`;
+  - `exchange_connection_not_owned`;
+  - `exchange_connection_not_disabled`;
+  - `exchange_connection_already_archived`;
+  - `recent_auth_required`;
+  - `csrf_origin_mismatch`.
+
+UI:
+
+- `Connected Exchange APIs`: только `active`;
+- отдельный фильтр/history для `disabled` и `archived`;
+- action set:
+  - `active`: validate, rotate, disable;
+  - `disabled`: archive;
+  - `archived`: no secret-bearing actions, только read-only audit/history view;
+- disabled/archived records не занимают лимиты и не засоряют default list;
+- e2e/test labels вида `stage08_*`, `e2e_*`, `smoke_*` не получают особых прав,
+  но могут быть найдены operator cleanup tooling по prefix/request metadata.
+
+#### Backfill И Controlled Cleanup
+
+Stage 9 должен убрать уже созданные development/e2e artifacts без ручного
+удаления из БД.
+
+Правила controlled cleanup:
+
+- script/command работает только через repository/use-case или internal command
+  API, а не через ad hoc `DELETE FROM`;
+- выбирает только owner/test records по безопасному predicate:
+  - label prefix: `stage08_%`, `e2e_%`, `smoke_%`;
+  - owner user id smoke account, если он подтвержден;
+  - created_at window Stage 8;
+  - status `disabled`;
+- active user-created records, включая `bybit_test_2`, не трогает;
+- перед изменением печатает dry-run summary без секретов;
+- после выполнения доказывает:
+  - records стали `archived`;
+  - default API/UI list их не показывает;
+  - audit events записаны;
+  - secret grep чистый.
+
+#### Audit И Метрики Этапа 9
+
+Audit events:
+
+- `exchange_connection_disabled`;
+- `exchange_connection_archived` добавляется отдельной audit migration и
+  используется для soft archive;
+- `exchange_connection_deleted` остается legacy/future event name и не
+  используется для Stage 9 archive, чтобы не смешивать archive с physical delete;
+- metadata только redacted:
+  - `connection_id`;
+  - `exchange_name`;
+  - `market_type`;
+  - `environment`;
+  - `previous_status`;
+  - `new_status`;
+  - `reason`;
+  - без API key suffix, ciphertext, fingerprint, HMAC, raw exchange body.
+
+Metrics:
+
+- `exchange_connection_archive_total{exchange,result,reason}`;
+- `exchange_connection_cleanup_total{source,result}`;
+- `exchange_permission_mismatch_total{exchange,requested,effective}`;
+- existing lifecycle metrics должны различать `active`, `disabled`,
+  `archived`;
+- labels не содержат `user_id`, `connection_id`, `credential_version_id`,
+  `api_key`, raw error text или secret-like values.
+
+#### Разбиение На Prompt Stages
+
+Этап 9 выполняется отдельным prompt pack только после согласования этой секции.
+Единый ledger остается:
+
+```text
+docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+```
+
+Предлагаемое разбиение:
+
+| Stage | Содержание | Gate |
+|---|---|---|
+| `09A` | Persistence/domain lifecycle: `archived_at`, status constraints, archive command, audit/metrics contracts. | Unit + migration tests; DB evidence; no hard delete path. |
+| `09B` | API/UI list semantics: default active list, filters/history, archive action. | API tests + browser route tests; disabled/archived hidden from default UI; limits count only `active`. |
+| `09C` | Permission semantics: requested/exchange/effective fields, mismatch status, DTO compatibility. | Validator tests for readonly/trade/mismatch/dangerous permissions. |
+| `09D` | E2E cleanup + controlled backfill/archive old `stage08_*` records. | Dry-run, execution evidence, default list hidden assertion, audit evidence. |
+| `09E` | Production readiness for lifecycle hardening. | Authenticated Playwright: create -> validate -> disable -> archive -> assert hidden; metrics/audit/docs evidence; direct-main delivery. |
+
+#### Валидация Этапа 9
+
+Local gates:
+
+```bash
+uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations
+uv run ruff check src/trading/contexts/exchange_control apps/api apps/web tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations
+uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api
+python -m tools.docs.generate_docs_index --check
+```
+
+API acceptance:
+
+```bash
+# default list shows active only
+curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" | jq '.items[] | .status'
+
+# disabled list is explicit
+curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections?status=disabled" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE"
+
+# archive requires disabled owned connection
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$ACTIVE_CONNECTION_ID/archive" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_RECENT_AUTH_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"
+
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$DISABLED_CONNECTION_ID/archive" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_RECENT_AUTH_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"
+```
+
+Ожидаемо:
+
+- default list не содержит `disabled`/`archived`;
+- archive active возвращает deterministic rejection;
+- archive disabled возвращает archived state;
+- archived connection исчезает из default list;
+- `status=archived` явно показывает archived record;
+- responses не содержат secrets/ciphertext/HMAC/fingerprint.
+
+Playwright acceptance:
+
+- authenticated `/settings` открывается;
+- создать dummy connection с label prefix `e2e_stage09_`;
+- validate выполняется или deterministic skip/failure фиксируется согласно env;
+- disable проходит;
+- archive проходит;
+- default UI list больше не содержит dummy connection;
+- history/filter показывает archived record, если UI поддерживает history view;
+- secret inputs cleared;
+- console errors/warnings отсутствуют или объяснены;
+- artifact grep не находит secret-like markers.
+
+DB evidence:
+
+```sql
+SELECT connection_id, owner_user_id, label, status, status_reason,
+       created_at, disabled_at, archived_at
+FROM exchange_connections
+WHERE label LIKE 'stage08_%' OR label LIKE 'e2e_%' OR label LIKE 'smoke_%'
+ORDER BY created_at DESC;
+
+SELECT event_type, target_id, metadata_json, created_at
+FROM identity_audit_events
+WHERE event_type IN (
+  'exchange_connection_disabled',
+  'exchange_connection_archived'
+)
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
+Metrics evidence:
+
+```bash
+curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_connection_archive_total|exchange_connection_cleanup_total|exchange_permission_mismatch_total'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=exchange_connection_archive_total'
+```
+
+Критерий выхода:
+
+- lifecycle `active -> disabled -> archived` принят в API, persistence,
+  domain service, UI и docs;
+- default UI/API list показывает только active;
+- disabled/archived доступны только явно;
+- requested/exchange/effective permissions отражены в DTO и UI;
+- permission mismatch не выглядит как успешный нормальный status;
+- старые `stage08_*` disabled records архивированы controlled cleanup stage или
+  явно перечислены как blocked с причиной;
+- e2e cleanup доказывает `create -> validate -> disable -> archive -> assert hidden`;
+- audit и metrics не содержат секретов;
+- iteration ledger обновлен по каждому Stage 09 sub-stage;
+- после acceptance каждого sub-stage выполнен direct-main delivery или stage
+  явно помечен blocked.
+
 ## Контрактное Влияние
 
 | Измерение | Классификация | Примечания |
 |---|---|---|
-| Публичное API | `compatible-change` | Добавляется `/api/ui/account/exchange-connections/*`; legacy `/exchange-keys` сохраняется. |
-| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. |
+| Публичное API | `compatible-change` | Добавляется `/api/ui/account/exchange-connections/*`; legacy `/exchange-keys` сохраняется. Stage 9 добавляет explicit status filter и archive endpoint/alias без удаления legacy routes. |
+| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. Stage 9 добавляет `archived_at`, lifecycle status `archived` и explicit permission fields/metadata без hard delete. |
 | Граница секретов | `compatible-change` | Граница усиливается; plaintext consumers намеренно запрещены. |
-| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`. |
-| Поведение в браузере | `compatible-change` | Settings получает real status, validation, rotate/disable и warnings. |
+| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`; Stage 9 добавляет archive/cleanup/mismatch metrics. |
+| Поведение в браузере | `compatible-change` | Settings получает real status, validation, rotate/disable и warnings; Stage 9 скрывает disabled/archived из default list и добавляет history/filter. |
 | Trading execution | `none` | Размещение ордеров намеренно вне scope этого документа. |
 
 ## Отклоненные Альтернативы
