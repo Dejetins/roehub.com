@@ -132,7 +132,14 @@ bootstrap_service() {
     wait_until_unloaded "$label"
   fi
   echo "bootstrap ${label}"
-  launchctl bootstrap "gui/${UID_VALUE}" "${plist_path}"
+  if launchctl bootstrap "gui/${UID_VALUE}" "${plist_path}"; then
+    return 0
+  fi
+  if service_is_loaded "$label"; then
+    echo "bootstrap ${label}: launchctl reported failure but service is loaded"
+    return 0
+  fi
+  return 1
 }
 
 recover_openbao_transit() {
