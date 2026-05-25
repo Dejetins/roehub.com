@@ -19,6 +19,7 @@ def test_identity_exchange_audit_events_migration_extends_check_constraint() -> 
         "exchange_connection_validation_failed",
         "exchange_credential_rotated",
         "exchange_connection_disabled",
+        "exchange_connection_archived",
         "exchange_connection_deleted",
     ):
         assert event_type in sql

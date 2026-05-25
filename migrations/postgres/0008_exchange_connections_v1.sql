@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS exchange_connections (
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     disabled_at TIMESTAMPTZ NULL,
+    archived_at TIMESTAMPTZ NULL,
     CONSTRAINT exchange_connections_exchange_name_chk
         CHECK (exchange_name IN ('binance', 'bybit')),
     CONSTRAINT exchange_connections_market_type_chk
@@ -25,14 +26,66 @@ CREATE TABLE IF NOT EXISTS exchange_connections (
     CONSTRAINT exchange_connections_environment_chk
         CHECK (environment IN ('mainnet', 'testnet')),
     CONSTRAINT exchange_connections_status_chk
-        CHECK (status IN ('active', 'disabled')),
-    CONSTRAINT exchange_connections_disabled_state_chk
+        CHECK (status IN ('active', 'disabled', 'archived')),
+    CONSTRAINT exchange_connections_lifecycle_timestamps_chk
         CHECK (
-            (status = 'disabled' AND disabled_at IS NOT NULL)
+            (
+                status = 'active'
+                AND disabled_at IS NULL
+                AND archived_at IS NULL
+            )
             OR
-            (status = 'active' AND disabled_at IS NULL)
+            (
+                status = 'disabled'
+                AND disabled_at IS NOT NULL
+                AND archived_at IS NULL
+            )
+            OR
+            (
+                status = 'archived'
+                AND disabled_at IS NOT NULL
+                AND archived_at IS NOT NULL
+            )
         )
 );
+
+ALTER TABLE exchange_connections
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ NULL;
+
+ALTER TABLE exchange_connections
+    DROP CONSTRAINT IF EXISTS exchange_connections_status_chk;
+
+ALTER TABLE exchange_connections
+    ADD CONSTRAINT exchange_connections_status_chk
+        CHECK (status IN ('active', 'disabled', 'archived'));
+
+ALTER TABLE exchange_connections
+    DROP CONSTRAINT IF EXISTS exchange_connections_disabled_state_chk;
+
+ALTER TABLE exchange_connections
+    DROP CONSTRAINT IF EXISTS exchange_connections_lifecycle_timestamps_chk;
+
+ALTER TABLE exchange_connections
+    ADD CONSTRAINT exchange_connections_lifecycle_timestamps_chk
+        CHECK (
+            (
+                status = 'active'
+                AND disabled_at IS NULL
+                AND archived_at IS NULL
+            )
+            OR
+            (
+                status = 'disabled'
+                AND disabled_at IS NOT NULL
+                AND archived_at IS NULL
+            )
+            OR
+            (
+                status = 'archived'
+                AND disabled_at IS NOT NULL
+                AND archived_at IS NOT NULL
+            )
+        );
 
 CREATE TABLE IF NOT EXISTS exchange_credential_versions (
     credential_version_id UUID PRIMARY KEY,
@@ -99,7 +152,8 @@ INSERT INTO exchange_connections (
     ip_restriction_status,
     created_at,
     updated_at,
-    disabled_at
+    disabled_at,
+    archived_at
 )
 SELECT
     key_id AS connection_id,
@@ -115,7 +169,8 @@ SELECT
     'unknown' AS ip_restriction_status,
     created_at,
     updated_at,
-    deleted_at AS disabled_at
+    deleted_at AS disabled_at,
+    NULL AS archived_at
 FROM identity_exchange_keys
 ON CONFLICT (connection_id) DO NOTHING;
 

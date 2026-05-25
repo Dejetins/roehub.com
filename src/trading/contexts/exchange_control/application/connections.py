@@ -57,6 +57,7 @@ class ExchangeConnectionView:
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None = None
+    archived_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +98,7 @@ class ExchangeConnectionRecord:
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None = None
+    archived_at: datetime | None = None
 
 
 class ExchangeConnectionRepository(Protocol):
@@ -132,6 +134,14 @@ class ExchangeConnectionRepository(Protocol):
         disabled_at: datetime,
     ) -> ExchangeConnectionRecord | None: ...
 
+    def archive(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        archived_at: datetime,
+    ) -> ExchangeConnectionRecord | None: ...
+
     def record_validation(
         self,
         *,
@@ -154,7 +164,7 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         credential_version: ExchangeCredentialVersionRecord,
     ) -> ExchangeConnectionRecord | None:
         for existing in self._connections.values():
-            if existing.status == "disabled":
+            if existing.status != "active":
                 continue
             if existing.owner_user_id != connection.owner_user_id:
                 continue
@@ -209,7 +219,7 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         connection = self._connections.get(connection_id)
         if connection is None or connection.owner_user_id != owner_user_id:
             return None
-        if connection.status == "disabled":
+        if connection.status != "active":
             return None
         previous = self._credential_versions[connection.active_credential_version_id]
         self._credential_versions[previous.credential_version_id] = replace(
@@ -242,8 +252,8 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         connection = self._connections.get(connection_id)
         if connection is None or connection.owner_user_id != owner_user_id:
             return None
-        if connection.status == "disabled":
-            return connection
+        if connection.status != "active":
+            return None
         credential = self._credential_versions[connection.active_credential_version_id]
         self._credential_versions[credential.credential_version_id] = replace(
             credential,
@@ -260,6 +270,30 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         self._connections[connection_id] = disabled
         return disabled
 
+    def archive(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        archived_at: datetime,
+    ) -> ExchangeConnectionRecord | None:
+        connection = self._connections.get(connection_id)
+        if connection is None or connection.owner_user_id != owner_user_id:
+            return None
+        if connection.status == "archived":
+            return connection
+        if connection.status != "disabled" or connection.disabled_at is None:
+            return None
+        archived = replace(
+            connection,
+            status="archived",
+            status_reason="user_archived",
+            updated_at=archived_at,
+            archived_at=archived_at,
+        )
+        self._connections[connection_id] = archived
+        return archived
+
     def record_validation(
         self,
         *,
@@ -271,7 +305,7 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         connection = self._connections.get(connection_id)
         if connection is None or connection.owner_user_id != owner_user_id:
             return None
-        if connection.status == "disabled":
+        if connection.status != "active":
             return None
         updated = replace(
             connection,
@@ -376,7 +410,7 @@ class ExchangeConnectionService:
         passphrase: str | None,
         now: datetime,
     ) -> ExchangeConnectionView:
-        connection = self._require_owned_connection(
+        connection = self._require_active_owned_connection(
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -417,7 +451,7 @@ class ExchangeConnectionService:
         connection_id: UUID,
         now: datetime,
     ) -> ExchangeConnectionView:
-        self._require_owned_connection(
+        self._require_active_owned_connection(
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -430,6 +464,34 @@ class ExchangeConnectionService:
             raise _not_found()
         return self._to_view(connection=disabled)
 
+    def archive_connection(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        connection = self._require_existing_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        if connection.status == "active":
+            raise ExchangeConnectionError(
+                code="exchange_connection_not_disabled",
+                message="Exchange connection must be disabled before archive.",
+                status_code=409,
+            )
+        if connection.status not in {"disabled", "archived"}:
+            raise _not_found()
+        archived = self._repository.archive(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            archived_at=now,
+        )
+        if archived is None:
+            raise _not_found()
+        return self._to_view(connection=archived)
+
     def validate_connection(
         self,
         *,
@@ -438,7 +500,7 @@ class ExchangeConnectionService:
         validator: ExchangeCredentialValidator,
         now: datetime,
     ) -> ExchangeConnectionView:
-        connection = self._require_owned_connection(
+        connection = self._require_active_owned_connection(
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -495,7 +557,18 @@ class ExchangeConnectionService:
             raise _not_found()
         return self._to_view(connection=updated)
 
-    def _require_owned_connection(
+    def _require_active_owned_connection(
+        self, *, owner_user_id: UserId, connection_id: UUID
+    ) -> ExchangeConnectionRecord:
+        connection = self._require_existing_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        if connection.status != "active":
+            raise _not_found()
+        return connection
+
+    def _require_existing_owned_connection(
         self, *, owner_user_id: UserId, connection_id: UUID
     ) -> ExchangeConnectionRecord:
         connection = self._repository.get(connection_id=connection_id)
@@ -507,8 +580,6 @@ class ExchangeConnectionService:
                 message="Exchange connection is not owned by current user.",
                 status_code=404,
             )
-        if connection.status == "disabled":
-            raise _not_found()
         return connection
 
     def _build_credential_version(
@@ -571,6 +642,7 @@ class ExchangeConnectionService:
             created_at=connection.created_at,
             updated_at=connection.updated_at,
             disabled_at=connection.disabled_at,
+            archived_at=connection.archived_at,
         )
 
 

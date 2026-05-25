@@ -89,7 +89,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 ip_restriction_status,
                                 created_at,
                                 updated_at,
-                                disabled_at
+                                disabled_at,
+                                archived_at
                             )
                             VALUES (
                                 %(connection_id)s,
@@ -109,7 +110,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 'unknown',
                                 %(created_at)s,
                                 %(updated_at)s,
-                                %(disabled_at)s
+                                %(disabled_at)s,
+                                %(archived_at)s
                             )
                             RETURNING
                                 connection_id,
@@ -130,7 +132,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 last_validated_at,
                                 created_at,
                                 updated_at,
-                                disabled_at
+                                disabled_at,
+                                archived_at
                             """,
                         ),
                         _connection_parameters(connection=connection),
@@ -223,7 +226,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
-                            connection.disabled_at
+                            connection.disabled_at,
+                            connection.archived_at
                         FROM exchange_connections AS connection
                         WHERE connection.owner_user_id = %(owner_user_id)s
                         ORDER BY connection.created_at ASC, connection.connection_id ASC
@@ -392,7 +396,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
-                            connection.disabled_at
+                            connection.disabled_at,
+                            connection.archived_at
                         """,
                     ),
                     {
@@ -439,7 +444,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                 if current is None:
                     return None
                 current_row = dict(current)
-                if str(current_row["status"]) == "disabled":
+                if str(current_row["status"]) != "active":
                     return None
                 cursor.execute(
                     cast(
@@ -489,12 +494,96 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
-                            connection.disabled_at
+                            connection.disabled_at,
+                            connection.archived_at
                         """,
                     ),
                     {
                         "updated_at": disabled_at,
                         "disabled_at": disabled_at,
+                        "connection_id": str(connection_id),
+                        "owner_user_id": str(owner_user_id),
+                    },
+                )
+                row = cursor.fetchone()
+        return _map_connection(row=dict(row)) if row is not None else None
+
+    def archive(
+        self,
+        *,
+        connection_id: UUID,
+        owner_user_id: UserId,
+        archived_at: datetime,
+    ) -> ExchangeConnectionRecord | None:
+        with psycopg.connect(
+            self._dsn,
+            row_factory=cast(Any, dict_row),
+        ) as postgres_connection:
+            with postgres_connection.cursor() as cursor:
+                cursor.execute(
+                    cast(
+                        Any,
+                        """
+                        SELECT status, disabled_at
+                        FROM exchange_connections
+                        WHERE connection_id = %(connection_id)s
+                          AND owner_user_id = %(owner_user_id)s
+                        FOR UPDATE
+                        """,
+                    ),
+                    {
+                        "connection_id": str(connection_id),
+                        "owner_user_id": str(owner_user_id),
+                    },
+                )
+                current = cursor.fetchone()
+                if current is None:
+                    return None
+                current_row = dict(current)
+                current_status = str(current_row["status"])
+                if current_status == "archived":
+                    return self.get(connection_id=connection_id)
+                if current_status != "disabled" or current_row["disabled_at"] is None:
+                    return None
+                cursor.execute(
+                    cast(
+                        Any,
+                        """
+                        UPDATE exchange_connections AS connection
+                        SET status = 'archived',
+                            status_reason = 'user_archived',
+                            updated_at = %(updated_at)s,
+                            archived_at = %(archived_at)s
+                        WHERE connection.connection_id = %(connection_id)s
+                          AND connection.owner_user_id = %(owner_user_id)s
+                          AND connection.status = 'disabled'
+                        RETURNING
+                            connection.connection_id,
+                            connection.owner_user_id,
+                            connection.exchange_name,
+                            connection.market_type,
+                            connection.environment,
+                            connection.label,
+                            connection.active_credential_version_id,
+                            connection.status,
+                            connection.status_reason,
+                            connection.permission_summary_json ->> 'permissions'
+                                AS permissions,
+                            connection.permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            connection.permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            connection.ip_restriction_status,
+                            connection.last_validated_at,
+                            connection.created_at,
+                            connection.updated_at,
+                            connection.disabled_at,
+                            connection.archived_at
+                        """,
+                    ),
+                    {
+                        "updated_at": archived_at,
+                        "archived_at": archived_at,
                         "connection_id": str(connection_id),
                         "owner_user_id": str(owner_user_id),
                     },
@@ -554,7 +643,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
-                            connection.disabled_at
+                            connection.disabled_at,
+                            connection.archived_at
                         """,
                     ),
                     {
@@ -608,7 +698,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.last_validated_at,
                             connection.created_at,
                             connection.updated_at,
-                            connection.disabled_at
+                            connection.disabled_at,
+                            connection.archived_at
                         FROM exchange_connections AS connection
                         WHERE {where}
                         """,
@@ -639,6 +730,7 @@ def _connection_parameters(
         "created_at": connection.created_at,
         "updated_at": connection.updated_at,
         "disabled_at": connection.disabled_at,
+        "archived_at": connection.archived_at,
     }
 
 
@@ -697,6 +789,7 @@ def _map_connection(*, row: Mapping[str, Any]) -> ExchangeConnectionRecord:
         created_at=_normalize_utc_datetime(value=row["created_at"]),
         updated_at=_normalize_utc_datetime(value=row["updated_at"]),
         disabled_at=_normalize_optional_utc_datetime(value=row["disabled_at"]),
+        archived_at=_normalize_optional_utc_datetime(value=row.get("archived_at")),
     )
 
 

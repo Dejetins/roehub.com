@@ -248,6 +248,34 @@ class AccountSettingsUseCase:
             created_at=self.clock.now(),
         )
 
+    def record_exchange_connection_archive(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        previous_status: str,
+        new_status: str,
+        reason: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="exchange_connection_archived",
+            summary="Exchange connection archived",
+            metadata={
+                "connection_id": connection_id,
+                "exchange_name": exchange_name,
+                "market_type": market_type,
+                "environment": environment,
+                "previous_status": previous_status,
+                "new_status": new_status,
+                "reason": reason,
+            },
+            created_at=self.clock.now(),
+        )
+
 
 def _optional_trim(value: str | None) -> str | None:
     if value is None:

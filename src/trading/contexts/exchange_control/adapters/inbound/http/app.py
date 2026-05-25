@@ -59,6 +59,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_connections.list",
     "exchange_connections.rotate",
     "exchange_connections.disable",
+    "exchange_connections.archive",
     "exchange_connections.validate",
 )
 SECRET_CIPHER_IN_MEMORY_DEV = "in_memory_dev"
@@ -232,6 +233,18 @@ class ExchangeControlMetrics:
             ("exchange", "status"),
             registry=self.registry,
         )
+        self.connection_archive_total = Counter(
+            "exchange_connection_archive_total",
+            "Exchange connection archive attempts by exchange, result, and reason.",
+            ("exchange", "result", "reason"),
+            registry=self.registry,
+        )
+        self.connection_cleanup_total = Counter(
+            "exchange_connection_cleanup_total",
+            "Exchange connection cleanup attempts by source and result.",
+            ("source", "result"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -241,9 +254,27 @@ class ExchangeControlMetrics:
             reason="stage_2_no_real_exchange_calls",
         ).inc(0)
         self.connection_status.labels(exchange="none", status="validation_disabled").set(0)
+        self.connection_status.labels(exchange="none", status="archived").set(0)
+        self.connection_archive_total.labels(
+            exchange="none",
+            result="archived",
+            reason="stage_09a_no_archive_attempt",
+        ).inc(0)
+        self.connection_cleanup_total.labels(
+            source="none",
+            result="stage_09a_no_cleanup_attempt",
+        ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
         self.connection_validation_total.labels(
+            exchange=exchange,
+            result=result,
+            reason=reason,
+        ).inc()
+        self.connection_status.labels(exchange=exchange, status=result).set(1)
+
+    def record_archive(self, *, exchange: str, result: str, reason: str) -> None:
+        self.connection_archive_total.labels(
             exchange=exchange,
             result=result,
             reason=reason,
@@ -275,6 +306,12 @@ class RotateExchangeConnectionInternalRequest(BaseModel):
 
 
 class DisableExchangeConnectionInternalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_user_id: str
+
+
+class ArchiveExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     owner_user_id: str
@@ -484,6 +521,48 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         return _exchange_connection_response(view=view)
 
     @app.post(
+        "/internal/v1/exchange-connections/{connection_id}/archive",
+        include_in_schema=False,
+    )
+    def archive_internal_exchange_connection(
+        connection_id: UUID,
+        payload: ArchiveExchangeConnectionInternalRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_roehub_internal_service: str | None = Header(
+            default=None,
+            alias="X-Roehub-Internal-Service",
+        ),
+        x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    ) -> dict[str, object]:
+        _require_internal_request(
+            request=request,
+            authorization=authorization,
+            expected_token=config.internal_api_token,
+            internal_service=x_roehub_internal_service,
+            request_id=x_request_id,
+        )
+        try:
+            view = connection_service.archive_connection(
+                owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                connection_id=connection_id,
+                now=_utc_now(),
+            )
+        except ExchangeConnectionError as error:
+            metrics.record_archive(
+                exchange="unknown",
+                result="rejected",
+                reason=error.code,
+            )
+            raise _exchange_connection_http_error(error=error) from error
+        metrics.record_archive(
+            exchange=view.exchange_name,
+            result=view.status,
+            reason=view.status_reason or "none",
+        )
+        return _exchange_connection_response(view=view)
+
+    @app.post(
         "/internal/v1/exchange-connections/{connection_id}/validate",
         include_in_schema=False,
     )
@@ -625,6 +704,7 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
         "created_at": view.created_at.isoformat(),
         "updated_at": view.updated_at.isoformat(),
         "disabled_at": view.disabled_at.isoformat() if view.disabled_at else None,
+        "archived_at": view.archived_at.isoformat() if view.archived_at else None,
     }
 
 

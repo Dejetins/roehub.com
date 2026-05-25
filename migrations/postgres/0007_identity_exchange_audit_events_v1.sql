@@ -18,6 +18,7 @@ ALTER TABLE identity_audit_events
                 'exchange_connection_validation_failed',
                 'exchange_credential_rotated',
                 'exchange_connection_disabled',
+                'exchange_connection_archived',
                 'exchange_connection_deleted'
             )
         );

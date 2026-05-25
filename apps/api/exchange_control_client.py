@@ -51,6 +51,7 @@ class ExchangeConnectionCommandResult:
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None
+    archived_at: datetime | None
 
 
 class ExchangeControlClient(Protocol):
@@ -87,6 +88,14 @@ class ExchangeControlClient(Protocol):
     ) -> ExchangeConnectionCommandResult: ...
 
     def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
+
+    def archive_connection(
         self,
         *,
         owner_user_id: str,
@@ -248,6 +257,21 @@ class HttpExchangeControlClient:
         )
         return _connection_from_payload(response.json())
 
+    def archive_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/archive",
+            request_id=request_id,
+            json={"owner_user_id": owner_user_id},
+        )
+        return _connection_from_payload(response.json())
+
     def validate_connection(
         self,
         *,
@@ -376,6 +400,7 @@ class InMemoryExchangeControlClient:
             created_at=now,
             updated_at=now,
             disabled_at=None,
+            archived_at=None,
         )
         self._connections_dict()[connection_id] = result
         self._owners_dict()[connection_id] = owner_user_id
@@ -393,6 +418,8 @@ class InMemoryExchangeControlClient:
         _ = owner_user_id, api_secret, request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.status != "active":
             raise ExchangeControlClientError("exchange_connection_not_found")
         credential_version_id = str(UUID(int=self._next_id + 1000))
         object.__setattr__(self, "_next_id", self._next_id + 1)
@@ -414,6 +441,7 @@ class InMemoryExchangeControlClient:
             created_at=existing.created_at,
             updated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
             disabled_at=existing.disabled_at,
+            archived_at=existing.archived_at,
         )
         self._connections_dict()[connection_id] = rotated
         return rotated
@@ -428,6 +456,8 @@ class InMemoryExchangeControlClient:
         _ = owner_user_id, request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.status != "active":
             raise ExchangeControlClientError("exchange_connection_not_found")
         disabled_at = datetime.fromisoformat("2026-05-24T12:02:00+00:00")
         disabled = ExchangeConnectionCommandResult(
@@ -448,9 +478,49 @@ class InMemoryExchangeControlClient:
             created_at=existing.created_at,
             updated_at=disabled_at,
             disabled_at=disabled_at,
+            archived_at=None,
         )
         self._connections_dict()[connection_id] = disabled
         return disabled
+
+    def archive_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.status == "active":
+            raise ExchangeControlClientError("exchange_connection_not_disabled")
+        if existing.status == "archived":
+            return existing
+        archived_at = datetime.fromisoformat("2026-05-24T12:03:00+00:00")
+        archived = ExchangeConnectionCommandResult(
+            connection_id=existing.connection_id,
+            credential_version_id=existing.credential_version_id,
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            label=existing.label,
+            permissions=existing.permissions,
+            api_key=existing.api_key,
+            status="archived",
+            status_reason="user_archived",
+            validation_status=existing.validation_status,
+            validation_reason=existing.validation_reason,
+            ip_restriction_status=existing.ip_restriction_status,
+            last_validated_at=existing.last_validated_at,
+            created_at=existing.created_at,
+            updated_at=archived_at,
+            disabled_at=existing.disabled_at,
+            archived_at=archived_at,
+        )
+        self._connections_dict()[connection_id] = archived
+        return archived
 
     def validate_connection(
         self,
@@ -462,6 +532,8 @@ class InMemoryExchangeControlClient:
         _ = request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.status != "active":
             raise ExchangeControlClientError("exchange_connection_not_found")
         validated_at = datetime.fromisoformat("2026-05-24T12:03:00+00:00")
         validated = ExchangeConnectionCommandResult(
@@ -482,6 +554,7 @@ class InMemoryExchangeControlClient:
             created_at=existing.created_at,
             updated_at=validated_at,
             disabled_at=existing.disabled_at,
+            archived_at=existing.archived_at,
         )
         self._connections_dict()[connection_id] = validated
         return validated
@@ -565,6 +638,11 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
             disabled_at=(
                 datetime.fromisoformat(str(payload["disabled_at"]))
                 if payload.get("disabled_at") is not None
+                else None
+            ),
+            archived_at=(
+                datetime.fromisoformat(str(payload["archived_at"]))
+                if payload.get("archived_at") is not None
                 else None
             ),
         )

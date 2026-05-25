@@ -185,6 +185,8 @@ def test_metrics_expose_secret_safe_exchange_control_series() -> None:
     assert "text/plain" in response.headers["content-type"]
     assert "exchange_control_active 1.0" in response.text
     assert "exchange_connection_validation_total" in response.text
+    assert "exchange_connection_archive_total" in response.text
+    assert "exchange_connection_cleanup_total" in response.text
     assert 'exchange="none"' in response.text
     assert "api_key" not in response.text
     assert "connection_id" not in response.text
@@ -264,6 +266,7 @@ def test_internal_capabilities_are_secret_safe() -> None:
     assert payload["contract_version"] == EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION
     assert payload["request_id"] == "stage-3c-test"
     assert "capabilities.read" in payload["capabilities"]
+    assert "exchange_connections.archive" in payload["capabilities"]
     assert payload["timeout_policy"]["retry_policy"] == "no_implicit_retry"
     assert "internal-token" not in response.text
     assert "api_secret" not in response.text
@@ -343,6 +346,107 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert disabled.status_code == 200
     assert disabled.json()["connection_id"] == connection_id
     assert disabled.json()["status"] == "disabled"
+    assert disabled.json()["disabled_at"] is not None
+    assert disabled.json()["archived_at"] is None
+
+    archived = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/archive",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+    assert archived.status_code == 200
+    archived_payload = archived.json()
+    assert archived_payload["connection_id"] == connection_id
+    assert archived_payload["credential_version_id"] == rotated_payload["credential_version_id"]
+    assert archived_payload["status"] == "archived"
+    assert archived_payload["status_reason"] == "user_archived"
+    assert archived_payload["disabled_at"] is not None
+    assert archived_payload["archived_at"] is not None
+    assert "TEST_SECRET_ROTATED" not in archived.text
+
+    archive_again = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/archive",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+    assert archive_again.status_code == 200
+    assert archive_again.json()["status"] == "archived"
+
+    rotate_archived = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/rotate",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "api_key": "AFTERARCHIVE1234",
+            "api_secret": "TEST_SECRET_AFTER_ARCHIVE",
+        },
+    )
+    assert rotate_archived.status_code == 404
+    assert (
+        rotate_archived.json()["detail"]["error"]["code"]
+        == "exchange_connection_not_found"
+    )
+
+    validate_archived = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/validate",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+    assert validate_archived.status_code == 404
+    assert (
+        validate_archived.json()["detail"]["error"]["code"]
+        == "exchange_connection_not_found"
+    )
+
+    metrics = client.get("/metrics")
+    assert "exchange_connection_archive_total" in metrics.text
+    assert 'result="archived"' in metrics.text
+    assert "connection_id" not in metrics.text
+
+
+def test_internal_exchange_connection_archive_rejects_active_connection() -> None:
+    config = ExchangeControlRuntimeConfig.from_environ(
+        environ={
+            "ROEHUB_ENV": "dev",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+        }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": "stage-09a-test",
+    }
+    owner_user_id = "00000000-0000-0000-0000-000000000901"
+
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "active",
+            "permissions": "read",
+            "api_key": "STAGE09AKEY1234",
+            "api_secret": "TEST_SECRET_STAGE09A",
+        },
+    )
+    assert created.status_code == 200
+
+    archived = client.post(
+        f"/internal/v1/exchange-connections/{created.json()['connection_id']}/archive",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+
+    assert archived.status_code == 409
+    assert (
+        archived.json()["detail"]["error"]["code"]
+        == "exchange_connection_not_disabled"
+    )
+    assert "TEST_SECRET_STAGE09A" not in archived.text
 
 
 def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> None:
