@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: validation complete locally; direct-main delivery evidence is recorded in
-the shared iteration ledger after publish/CI/deploy.
+Статус: accepted; direct-main delivered; CI/deploy and Mac Studio runtime
+evidence complete for implementation commit `80b1dacf`.
 
 Scope ограничен public account facade и `/settings` list semantics. Stage 09B
 exposes the Stage 09A lifecycle foundation through active-only defaults,
@@ -75,9 +75,11 @@ cleanup of old `stage08_*` rows, and trading execution remain out of scope.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before implementation. |
-| Commit / push | Pending. | To be recorded in ledger after validation. |
-| CI / deploy | Pending. | To be recorded after direct-main push and GitHub workflow observation. |
-| Runtime | Not required for Stage 09B before 09E production readiness; browser evidence is local-dev. | Stage 09E owns production create -> validate -> disable -> archive proof. |
+| Commit / push | `80b1dacf Add exchange connection archive UI semantics`; pushed `3141d402..80b1dacf` to `origin/main`. | Pass. |
+| CI / deploy | CI `26422618351` success; Deploy Backend `26422665374` success; Publish App Image `26422665365` success; Deploy Web `26422665361` and `26422695699` success. | Pass. |
+| Mac Studio runtime smoke | `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh`. | Pass; backend API smoke, expected unauthenticated 401, Redis PONG and Tailscale state were healthy. |
+| Exchange-control readiness | `curl -fsS http://127.0.0.1:9205/health/ready`. | Pass; service ready, service identity ready, external validation ready, Transit secret cipher ready. |
+| Deployed archive route evidence | `/opt/roehub/app/apps/api/routes/ui_account.py` contains `/ui/account/exchange-connections/{connection_id}/archive`. | Pass. |
 
 ## Residual Risk And Stage 09C Handoff
 
