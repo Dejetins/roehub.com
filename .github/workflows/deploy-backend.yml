@@ -6,6 +6,21 @@ on:
     branches: ["main"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      exchange_connection_cleanup_mode:
+        description: "Optional Stage 09D exchange connection cleanup mode"
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - "none"
+          - "dry-run"
+          - "execute"
+      exchange_connection_cleanup_repair_audit:
+        description: "Repair missing archive audit events for already archived eligible cleanup rows"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -211,3 +226,36 @@ jobs:
             test "${ok}" = '1'
           done
           tailscale serve status
+
+      - name: Stage 09D exchange connection cleanup
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          inputs.exchange_connection_cleanup_mode != 'none'
+        run: |
+          set -euo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+          cd /opt/roehub/app
+          set -a
+          source /Users/daniildegtyarev/.config/roehub/roehub.env
+          set +a
+          common_args=(
+            --limit 100
+            --source stage09d
+            --exchange-control-url "${ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL:-http://127.0.0.1:9205}"
+          )
+          /opt/roehub/app/.venv/bin/python -m tools.exchange_connection_cleanup \
+            --dry-run \
+            "${common_args[@]}"
+          if [ "${{ inputs.exchange_connection_cleanup_mode }}" = "execute" ]; then
+            repair_args=()
+            if [ "${{ inputs.exchange_connection_cleanup_repair_audit }}" = "true" ]; then
+              repair_args=(--repair-archived-audit)
+            fi
+            /opt/roehub/app/.venv/bin/python -m tools.exchange_connection_cleanup \
+              --execute \
+              "${common_args[@]}" \
+              "${repair_args[@]}"
+            /opt/roehub/app/.venv/bin/python -m tools.exchange_connection_cleanup \
+              --dry-run \
+              "${common_args[@]}"
+          fi

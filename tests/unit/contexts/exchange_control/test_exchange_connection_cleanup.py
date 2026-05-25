@@ -6,10 +6,13 @@ from uuid import UUID
 
 from apps.api.exchange_control_client import ExchangeConnectionCommandResult
 from tools.exchange_connection_cleanup import (
+    ExchangeConnectionArchivedAuditRepairCandidate,
     ExchangeConnectionCleanupCandidate,
     execute_cleanup,
     normalize_cleanup_source,
+    repair_archived_audit_events,
     select_cleanup_candidates,
+    summarize_audit_repairs,
     summarize_candidates,
 )
 from trading.shared_kernel.primitives import UserId
@@ -109,6 +112,44 @@ def test_cleanup_source_is_bounded_for_metrics() -> None:
     assert normalize_cleanup_source("Stage 09D Cleanup!") == "stage_09d_cleanup_"
     assert normalize_cleanup_source("") == "stage09d"
     assert len(normalize_cleanup_source("x" * 80)) == 40
+
+
+def test_repair_archived_audit_records_missing_archive_events_only() -> None:
+    candidate = ExchangeConnectionArchivedAuditRepairCandidate(
+        connection_id=UUID("00000000-0000-0000-0000-000000000111"),
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000211"),
+        exchange_name="bybit",
+        market_type="spot",
+        environment="testnet",
+        label="stage08_partial_archive",
+        status="archived",
+        status_reason="stage09d_cleanup",
+        created_at=datetime(2026, 5, 26, 9, 0, tzinfo=timezone.utc),
+        disabled_at=datetime(2026, 5, 26, 10, 0, tzinfo=timezone.utc),
+        archived_at=datetime(2026, 5, 26, 11, 0, tzinfo=timezone.utc),
+    )
+    audit_recorder = _RecordingAuditRecorder()
+
+    repaired = repair_archived_audit_events(
+        candidates=(candidate,),
+        audit_recorder=audit_recorder,
+    )
+
+    assert repaired == 1
+    assert audit_recorder.events == [
+        {
+            "owner_user_id": "00000000-0000-0000-0000-000000000211",
+            "connection_id": "00000000-0000-0000-0000-000000000111",
+            "event": "exchange_connection_archived",
+            "previous_status": "disabled",
+            "new_status": "archived",
+            "reason": "stage09d_cleanup",
+        }
+    ]
+    evidence = summarize_audit_repairs(candidates=(candidate,))
+    assert evidence["mode"] == "audit-repair"
+    assert evidence["count"] == 1
+    assert "00000000-0000-0000-0000-000000000111" not in str(evidence)
 
 
 def _row(

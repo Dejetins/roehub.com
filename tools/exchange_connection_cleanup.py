@@ -58,6 +58,21 @@ class ExchangeConnectionCleanupResult:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeConnectionArchivedAuditRepairCandidate:
+    connection_id: UUID
+    owner_user_id: UserId
+    exchange_name: str
+    market_type: str
+    environment: str
+    label: str
+    status: str
+    status_reason: str | None
+    created_at: datetime
+    disabled_at: datetime
+    archived_at: datetime
+
+
 class ExchangeConnectionArchiveClient(Protocol):
     def archive_connection(
         self,
@@ -181,6 +196,92 @@ def load_cleanup_candidates(
     )
 
 
+def load_archived_audit_repair_candidates(
+    *,
+    dsn: str,
+    label_prefixes: Sequence[str] = DEFAULT_LABEL_PREFIXES,
+    owner_user_id: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    limit: int = DEFAULT_LIMIT,
+) -> tuple[ExchangeConnectionArchivedAuditRepairCandidate, ...]:
+    normalized_prefixes = _normalize_label_prefixes(label_prefixes)
+    parameters: dict[str, object] = {
+        "limit": limit,
+    }
+    prefix_predicates = []
+    for index, prefix in enumerate(normalized_prefixes):
+        key = f"prefix_{index}"
+        parameters[key] = prefix
+        prefix_predicates.append(f"left(c.label, char_length(%({key})s)) = %({key})s")
+    predicates = [
+        "c.status = 'archived'",
+        "c.disabled_at IS NOT NULL",
+        "c.archived_at IS NOT NULL",
+        "c.label IS NOT NULL",
+        f"({' OR '.join(prefix_predicates)})",
+        """
+        NOT EXISTS (
+            SELECT 1
+            FROM identity_audit_events AS audit
+            WHERE audit.owner_user_id = c.owner_user_id
+              AND audit.event_type = 'exchange_connection_archived'
+              AND audit.metadata_json->>'connection_id' = c.connection_id::text
+        )
+        """,
+    ]
+    if owner_user_id:
+        parameters["owner_user_id"] = str(UserId.from_string(owner_user_id))
+        predicates.append("c.owner_user_id = %(owner_user_id)s")
+    if created_after is not None:
+        parameters["created_after"] = created_after
+        predicates.append("c.created_at >= %(created_after)s")
+    if created_before is not None:
+        parameters["created_before"] = created_before
+        predicates.append("c.created_at < %(created_before)s")
+
+    query = f"""
+        SELECT
+            c.connection_id,
+            c.owner_user_id,
+            c.exchange_name,
+            c.market_type,
+            c.environment,
+            c.label,
+            c.status,
+            c.status_reason,
+            c.created_at,
+            c.disabled_at,
+            c.archived_at
+        FROM exchange_connections AS c
+        WHERE {' AND '.join(predicates)}
+        ORDER BY c.archived_at ASC, c.connection_id ASC
+        LIMIT %(limit)s
+    """
+    with psycopg.connect(dsn, row_factory=cast(Any, dict_row)) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(cast(Any, query), parameters)
+            rows = cursor.fetchall()
+    return tuple(
+        ExchangeConnectionArchivedAuditRepairCandidate(
+            connection_id=UUID(str(row["connection_id"])),
+            owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+            exchange_name=str(row["exchange_name"]),
+            market_type=str(row["market_type"]),
+            environment=str(row["environment"]),
+            label=str(row["label"]),
+            status=str(row["status"]),
+            status_reason=(
+                None if row.get("status_reason") is None else str(row["status_reason"])
+            ),
+            created_at=_coerce_datetime(row["created_at"]),
+            disabled_at=_coerce_datetime(row["disabled_at"]),
+            archived_at=_coerce_datetime(row["archived_at"]),
+        )
+        for row in cast(Iterable[Mapping[str, object]], rows)
+    )
+
+
 def execute_cleanup(
     *,
     candidates: Sequence[ExchangeConnectionCleanupCandidate],
@@ -226,6 +327,25 @@ def execute_cleanup(
             )
         )
     return tuple(results)
+
+
+def repair_archived_audit_events(
+    *,
+    candidates: Sequence[ExchangeConnectionArchivedAuditRepairCandidate],
+    audit_recorder: ExchangeConnectionArchiveAuditRecorder,
+) -> int:
+    for candidate in candidates:
+        audit_recorder.record_exchange_connection_archive(
+            owner_user_id=candidate.owner_user_id,
+            connection_id=str(candidate.connection_id),
+            exchange_name=candidate.exchange_name,
+            market_type=candidate.market_type,
+            environment=candidate.environment,
+            previous_status="disabled",
+            new_status="archived",
+            reason=candidate.status_reason or "stage09d_cleanup_audit_repair",
+        )
+    return len(candidates)
 
 
 def redacted_uuid(value: UUID) -> str:
@@ -302,6 +422,29 @@ def summarize_results(
     }
 
 
+def summarize_audit_repairs(
+    *,
+    candidates: Sequence[ExchangeConnectionArchivedAuditRepairCandidate],
+) -> dict[str, object]:
+    return {
+        "mode": "audit-repair",
+        "count": len(candidates),
+        "items": [
+            {
+                "connection_ref": redacted_uuid(candidate.connection_id),
+                "owner_ref": redacted_uuid(candidate.owner_user_id.value),
+                "label_prefix": _matched_prefix(candidate.label, DEFAULT_LABEL_PREFIXES),
+                "exchange_name": candidate.exchange_name,
+                "market_type": candidate.market_type,
+                "environment": candidate.environment,
+                "status": candidate.status,
+                "archived_at": candidate.archived_at.isoformat(),
+            }
+            for candidate in candidates
+        ],
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -332,6 +475,15 @@ def build_parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", default=True)
     mode.add_argument("--execute", action="store_true", default=False)
+    parser.add_argument(
+        "--repair-archived-audit",
+        action="store_true",
+        default=False,
+        help=(
+            "When executing, record missing archive audit events for already "
+            "archived eligible cleanup rows. This does not change lifecycle state."
+        ),
+    )
     return parser
 
 
@@ -381,7 +533,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         audit_recorder=audit_recorder,
         source=args.source,
     )
-    print(json.dumps(summarize_results(results=results, source=args.source)))
+    payload = summarize_results(results=results, source=args.source)
+    if args.repair_archived_audit:
+        repair_candidates = load_archived_audit_repair_candidates(
+            dsn=args.dsn,
+            label_prefixes=label_prefixes,
+            owner_user_id=args.owner_user_id,
+            created_after=args.created_after,
+            created_before=args.created_before,
+            limit=args.limit,
+        )
+        repair_archived_audit_events(
+            candidates=repair_candidates,
+            audit_recorder=audit_recorder,
+        )
+        payload["audit_repairs"] = summarize_audit_repairs(
+            candidates=repair_candidates,
+        )
+    print(json.dumps(payload))
     return 0 if all(result.result == "archived" for result in results) else 1
 
 
