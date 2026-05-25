@@ -7,7 +7,7 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID
 
 import psycopg
@@ -171,11 +171,14 @@ def load_cleanup_candidates(
         ORDER BY created_at ASC, connection_id ASC
         LIMIT %(limit)s
     """
-    with psycopg.connect(dsn, row_factory=dict_row) as connection:
+    with psycopg.connect(dsn, row_factory=cast(Any, dict_row)) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(query, parameters)
+            cursor.execute(cast(Any, query), parameters)
             rows = cursor.fetchall()
-    return select_cleanup_candidates(rows=rows, label_prefixes=normalized_prefixes)
+    return select_cleanup_candidates(
+        rows=cast(Iterable[Mapping[str, object]], rows),
+        label_prefixes=normalized_prefixes,
+    )
 
 
 def execute_cleanup(
