@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: accepted locally; direct-main delivery pending push, CI/deploy and
-Mac Studio runtime evidence.
+Статус: accepted; direct-main delivered; CI/deploy and Mac Studio runtime
+evidence complete for implementation commit `e2b7bf71`.
 
 Scope ограничен permission semantics внутри `exchange-control`, API DTO
 проекцией и отображением в `/settings`. Stage 09C не добавляет trading
@@ -87,9 +87,15 @@ execution, order placement, permission cleanup/backfill or public DELETE.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before implementation. |
-| Commit / push | Pending. | Will be recorded after validation and direct-main delivery. |
-| CI / deploy | Pending. | Will be recorded after push. |
-| Mac Studio runtime | Pending. | Will be recorded after deploy/runtime follow-through. |
+| Commit / push | `e2b7bf71 Add exchange connection permission semantics`; pushed `ec3797d2..e2b7bf71` to `origin/main`. | Pass. |
+| CI | GitHub Actions CI `26423205080`. | Success. |
+| Deploy Backend | GitHub Actions `26423239203`. | Success; DB bootstrap/migrations and backend smoke passed. |
+| Publish App Image | GitHub Actions `26423239181`. | Success. |
+| Deploy Web | GitHub Actions `26423239192` and downstream `26423270182`. | Success; public edge smoke passed. |
+| Mac Studio smoke | `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh`. | Pass; backend API smoke, expected unauthenticated 401, Redis PONG and Tailscale state were healthy. |
+| Exchange-control readiness | `curl -fsS http://127.0.0.1:9205/health/ready`. | Pass; service identity, external validation and Transit secret cipher are ready. |
+| Runtime metrics | `/metrics` contains `exchange_permission_mismatch_total{exchange,requested,effective}` and validation counters. | Pass; no user/connection/credential labels. |
+| Deployed code evidence | `/opt/roehub/app` contains `permission_mismatch`, `requested_trade_but_exchange_readonly`, and `effective_permissions` in exchange-control/API/UI files. | Pass. |
 
 ## Residual Risk And Stage 09D Handoff
 
