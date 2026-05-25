@@ -90,7 +90,7 @@ jobs:
       - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          for required_path in apps src configs alembic alembic.ini migrations scripts/backtest scripts/macos infra/macos infra/scripts/monit .python-version pyproject.toml uv.lock; do
+          for required_path in apps src configs alembic alembic.ini migrations tools scripts/backtest scripts/macos infra/macos infra/scripts/monit .python-version pyproject.toml uv.lock; do
             test -e "${required_path}"
           done
 
@@ -105,14 +105,15 @@ jobs:
             rsync "${rsync_flags[@]}" configs/ /opt/roehub/app/configs/
             rsync "${rsync_flags[@]}" alembic/ /opt/roehub/app/alembic/
             rsync "${rsync_flags[@]}" migrations/ /opt/roehub/app/migrations/
+            rsync "${rsync_flags[@]}" tools/ /opt/roehub/app/tools/
             rsync "${rsync_flags[@]}" scripts/backtest/ /opt/roehub/app/scripts/backtest/
             rsync "${rsync_flags[@]}" scripts/macos/ /opt/roehub/app/scripts/macos/
             rsync "${rsync_flags[@]}" infra/macos/ /opt/roehub/app/infra/macos/
             rsync "${rsync_flags[@]}" infra/scripts/ /opt/roehub/app/infra/scripts/
           else
-            rm -rf /opt/roehub/app/apps /opt/roehub/app/src /opt/roehub/app/configs /opt/roehub/app/alembic /opt/roehub/app/migrations /opt/roehub/app/scripts/backtest /opt/roehub/app/scripts/macos /opt/roehub/app/infra/macos /opt/roehub/app/infra/scripts
+            rm -rf /opt/roehub/app/apps /opt/roehub/app/src /opt/roehub/app/configs /opt/roehub/app/alembic /opt/roehub/app/migrations /opt/roehub/app/tools /opt/roehub/app/scripts/backtest /opt/roehub/app/scripts/macos /opt/roehub/app/infra/macos /opt/roehub/app/infra/scripts
             mkdir -p /opt/roehub/app/scripts /opt/roehub/app/infra
-            tar -C . -cf - apps src configs alembic migrations scripts/backtest scripts/macos infra/macos infra/scripts | tar -C /opt/roehub/app -xf -
+            tar -C . -cf - apps src configs alembic migrations tools scripts/backtest scripts/macos infra/macos infra/scripts | tar -C /opt/roehub/app -xf -
           fi
           install -m 0644 .python-version /opt/roehub/app/.python-version
           install -m 0644 alembic.ini /opt/roehub/app/alembic.ini
