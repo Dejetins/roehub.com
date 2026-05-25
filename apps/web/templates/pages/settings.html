@@ -19,15 +19,72 @@
     data-exchange-keys-endpoint="/api/ui/account/exchange-connections"
     aria-label="{{ t('settings.aria') }}"
   >
+    <header class="settings-modebar" role="tablist" aria-label="{{ t('settings.tabs.label') }}">
+      {% for tab in [
+        ("profile", "settings.tabs.profile"),
+        ("api", "settings.tabs.api"),
+        ("integrations", "settings.tabs.integrations"),
+        ("security", "settings.tabs.security")
+      ] %}
+        <button
+          class="settings-modebar__button{{ ' is-active' if loop.first else '' }}"
+          type="button"
+          role="tab"
+          aria-selected="{{ 'true' if loop.first else 'false' }}"
+          aria-controls="settings-tab-{{ tab[0] }}"
+          id="settings-tab-button-{{ tab[0] }}"
+          data-settings-tab-button="{{ tab[0] }}"
+        >{{ t(tab[1]) }}</button>
+      {% endfor %}
+    </header>
+
     <div class="settings-grid">
-      {% include "fragments/account/profile.html" %}
-      {% include "fragments/account/exchange_keys.html" %}
-      {% include "fragments/account/limits.html" %}
-      {% include "fragments/account/integrations.html" %}
-      {% include "fragments/account/notifications.html" %}
-      {% include "fragments/account/security.html" %}
-      {% include "fragments/account/sessions.html" %}
-      {% include "fragments/account/audit.html" %}
+      <section
+        class="settings-tab-panel settings-tab-panel--profile"
+        id="settings-tab-profile"
+        role="tabpanel"
+        aria-labelledby="settings-tab-button-profile"
+        data-settings-tab-panel="profile"
+      >
+        {% include "fragments/account/profile.html" %}
+        {% include "fragments/account/limits.html" %}
+        {% include "fragments/account/audit.html" %}
+      </section>
+
+      <section
+        class="settings-tab-panel settings-tab-panel--api"
+        id="settings-tab-api"
+        role="tabpanel"
+        aria-labelledby="settings-tab-button-api"
+        data-settings-tab-panel="api"
+        hidden
+      >
+        {% include "fragments/account/exchange_keys.html" %}
+      </section>
+
+      <section
+        class="settings-tab-panel settings-tab-panel--integrations"
+        id="settings-tab-integrations"
+        role="tabpanel"
+        aria-labelledby="settings-tab-button-integrations"
+        data-settings-tab-panel="integrations"
+        hidden
+      >
+        {% include "fragments/account/integrations.html" %}
+        {% include "fragments/account/notifications.html" %}
+      </section>
+
+      <section
+        class="settings-tab-panel settings-tab-panel--security"
+        id="settings-tab-security"
+        role="tabpanel"
+        aria-labelledby="settings-tab-button-security"
+        data-settings-tab-panel="security"
+        hidden
+      >
+        {% include "fragments/account/security.html" %}
+        {% include "fragments/account/sessions.html" %}
+      </section>
     </div>
   </section>
 {% endblock %}

@@ -76,23 +76,80 @@
   color: var(--rh-financial-negative);
 }
 
+.settings-modebar {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--rh-line-muted);
+  padding: 3px;
+  background: var(--rh-workstation-panel-bg);
+}
+
+.settings-modebar__button {
+  min-width: 132px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--rh-muted);
+  font: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.settings-modebar__button.is-active,
+.settings-modebar__button[aria-selected="true"] {
+  border-color: var(--rh-accent);
+  background: color-mix(in srgb, var(--rh-accent) 16%, transparent);
+  color: var(--rh-accent-2);
+}
+
 .settings-grid {
-  display: grid;
-  grid-template-columns: minmax(520px, 0.78fr) minmax(0, 1.22fr);
-  grid-template-rows:
-    minmax(clamp(168px, 21vh, 280px), 1fr)
-    minmax(clamp(116px, 15vh, 220px), 0.76fr)
-    minmax(clamp(154px, 19vh, 260px), 0.88fr)
-    minmax(clamp(148px, 18vh, 260px), 0.84fr);
-  grid-template-areas:
-    "profile exchange"
-    "limits integrations"
-    "notifications security"
-    "sessions audit";
+  display: block;
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+.settings-tab-panel {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings-tab-panel[hidden] {
+  display: none !important;
+}
+
+.settings-tab-panel--profile {
+  grid-template-columns: minmax(430px, 0.78fr) minmax(0, 1.22fr);
+  grid-template-rows: minmax(clamp(188px, 25vh, 320px), 0.72fr) minmax(0, 1fr);
+  grid-template-areas:
+    "profile audit"
+    "limits audit";
+}
+
+.settings-tab-panel--api {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.settings-tab-panel--integrations {
+  grid-template-columns: minmax(420px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "integrations notifications";
+}
+
+.settings-tab-panel--security {
+  grid-template-columns: minmax(420px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "security sessions";
 }
 
 .settings-panel {
@@ -133,7 +190,7 @@
 }
 
 .settings-panel[data-settings-panel="exchange_keys"] {
-  grid-area: exchange;
+  grid-area: auto;
 }
 
 .settings-panel[data-settings-panel="limits"] {
@@ -534,20 +591,22 @@
   }
 
   .settings-grid {
+    overflow: visible;
+  }
+
+  .settings-tab-panel,
+  .settings-tab-panel--profile,
+  .settings-tab-panel--api,
+  .settings-tab-panel--integrations,
+  .settings-tab-panel--security {
     grid-template-columns: 1fr;
     grid-template-rows: none;
-    grid-template-areas:
-      "profile"
-      "exchange"
-      "limits"
-      "integrations"
-      "notifications"
-      "security"
-      "sessions"
-      "audit";
+    grid-template-areas: none;
+    height: auto;
   }
 
   .settings-panel {
+    grid-area: auto !important;
     height: auto;
   }
 
@@ -561,6 +620,16 @@
 }
 
 @media (max-width: 640px) {
+  .settings-modebar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-self: stretch;
+  }
+
+  .settings-modebar__button {
+    min-width: 0;
+  }
+
   .settings-command {
     align-items: flex-start;
     flex-direction: column;

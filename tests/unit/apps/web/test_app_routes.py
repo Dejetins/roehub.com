@@ -306,6 +306,15 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "/assets/js/pages/settings.js" in settings_response.text
     assert ">Home</a>" in settings_response.text
     assert ">HOME</a>" not in settings_response.text
+    assert 'class="settings-modebar"' in settings_response.text
+    assert 'data-settings-tab-button="profile"' in settings_response.text
+    assert 'data-settings-tab-button="api"' in settings_response.text
+    assert 'data-settings-tab-button="integrations"' in settings_response.text
+    assert 'data-settings-tab-button="security"' in settings_response.text
+    assert 'data-settings-tab-panel="profile"' in settings_response.text
+    assert 'data-settings-tab-panel="api"' in settings_response.text
+    assert 'data-settings-tab-panel="integrations"' in settings_response.text
+    assert 'data-settings-tab-panel="security"' in settings_response.text
     for panel in [
         "profile",
         "profile_actions",

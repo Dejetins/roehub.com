@@ -6,6 +6,7 @@ import { initDropdowns } from "../components/dropdown.js";
 const AUTOREFRESH_STORAGE_KEY = "roehub_autorefresh_defaults";
 
 const state = {
+  activeTab: "profile",
   preferences: {
     theme: "terminal-orange",
     locale: document.documentElement.dataset.locale || "en",
@@ -20,6 +21,8 @@ const state = {
   sessionsCursor: null,
   auditCursor: null,
 };
+
+const SETTINGS_TABS = new Set(["profile", "api", "integrations", "security"]);
 
 function endpoint(root, name) {
   return root.dataset[name] || "";
@@ -84,6 +87,25 @@ function setText(selector, value) {
   if (target) {
     target.textContent = value;
   }
+}
+
+function initialSettingsTab() {
+  const hashTab = window.location.hash.replace(/^#/, "");
+  return SETTINGS_TABS.has(hashTab) ? hashTab : "profile";
+}
+
+function setSettingsTab(root, tab) {
+  const nextTab = SETTINGS_TABS.has(tab) ? tab : "profile";
+  state.activeTab = nextTab;
+  root.dataset.settingsActiveTab = nextTab;
+  root.querySelectorAll("[data-settings-tab-button]").forEach((button) => {
+    const selected = button.dataset.settingsTabButton === nextTab;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  root.querySelectorAll("[data-settings-tab-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.settingsTabPanel !== nextTab;
+  });
 }
 
 function formatTimestampToSeconds(value) {
@@ -438,6 +460,14 @@ async function initSettings(root) {
 }
 
 function initEvents(root) {
+  on(root, "click", "[data-settings-tab-button]", (event, item) => {
+    event.preventDefault();
+    const tab = item.dataset.settingsTabButton || "profile";
+    setSettingsTab(root, tab);
+    if (window.location.hash.replace(/^#/, "") !== tab) {
+      window.history.replaceState(null, "", `#${tab}`);
+    }
+  });
   on(root, "click", "[data-integration-mode-option]", async (_event, item) => {
     const row = item.closest("[data-integration-key]");
     const integrationKey = row?.dataset.integrationKey;
@@ -631,6 +661,7 @@ function initForms(root) {
 function initSettingsPage() {
   const root = qs("[data-settings-root]");
   if (!root) return;
+  setSettingsTab(root, initialSettingsTab());
   initEvents(root);
   initForms(root);
   void initSettings(root);
