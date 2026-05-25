@@ -50,6 +50,17 @@
     </div>
     <output class="settings-inline-status" data-exchange-form-status aria-live="polite"></output>
   </form>
+  <div class="settings-exchange-filters" role="tablist" aria-label="{{ t('settings.exchange.filters') }}">
+    <button class="settings-modebar__button is-active" type="button" role="tab" aria-selected="true" data-exchange-status-filter="active">
+      {{ t("settings.exchange.filter_active") }}
+    </button>
+    <button class="settings-modebar__button" type="button" role="tab" aria-selected="false" data-exchange-status-filter="disabled">
+      {{ t("settings.exchange.filter_disabled") }}
+    </button>
+    <button class="settings-modebar__button" type="button" role="tab" aria-selected="false" data-exchange-status-filter="archived">
+      {{ t("settings.exchange.filter_archived") }}
+    </button>
+  </div>
   <div class="settings-table-wrap">
     <table class="settings-table">
       <thead>

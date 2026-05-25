@@ -9,6 +9,9 @@ from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
 from apps.api.exchange_control_client import (
+    ExchangeConnectionCommandResult,
+    ExchangeControlCapabilities,
+    ExchangeControlClient,
     ExchangeControlClientConfig,
     ExchangeControlClientError,
     HttpExchangeControlClient,
@@ -42,6 +45,81 @@ class _MutableClock(IdentityClock):
 
     def now(self) -> datetime:
         return self._now
+
+
+class _ArchiveShouldNotRunClient:
+    def __init__(self) -> None:
+        self.archive_calls = 0
+
+    def get_capabilities(self, *, request_id: str | None = None) -> ExchangeControlCapabilities:
+        _ = request_id
+        return ExchangeControlCapabilities(
+            service="exchange-control",
+            service_identity="exchange-control",
+            contract_version="internal-v1",
+            capabilities=("capabilities.read",),
+        )
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]:
+        _ = owner_user_id, request_id
+        return ()
+
+    def create_connection(
+        self,
+        *,
+        owner_user_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        raise AssertionError("create_connection must not run")
+
+    def rotate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        api_key: str,
+        api_secret: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        raise AssertionError("rotate_connection must not run")
+
+    def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        raise AssertionError("disable_connection must not run")
+
+    def archive_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, connection_id, request_id
+        self.archive_calls += 1
+        raise AssertionError("archive_connection must not run")
+
+    def validate_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        raise AssertionError("validate_connection must not run")
 
 
 def test_ui_account_routes_require_authenticated_user() -> None:
@@ -162,6 +240,136 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert limits_after_disable.status_code == 200
     assert limits_after_disable.json()["exchange_connections_used"] == 0
     assert limits_after_disable.json()["api_keys_used"] == 0
+
+
+def test_ui_account_exchange_connections_default_active_filter_archive_and_limits() -> None:
+    client, account_repository, _session_ids = _build_test_client()
+
+    active = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "active",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY1234",
+            "api_secret": "TEST_SECRET_ACTIVE",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    disabled_source = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "futures",
+            "environment": "mainnet",
+            "label": "disabled",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY9876",
+            "api_secret": "TEST_SECRET_DISABLED",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert active.status_code == 201
+    assert disabled_source.status_code == 201
+    active_id = active.json()["connection_id"]
+    disabled_id = disabled_source.json()["connection_id"]
+
+    disabled = client.post(
+        f"/ui/account/exchange-connections/{disabled_id}/disable",
+        headers={"origin": "http://testserver"},
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["status"] == "disabled"
+    assert disabled.json()["archived_at"] is None
+
+    default_list = client.get("/ui/account/exchange-connections")
+    active_list = client.get("/ui/account/exchange-connections?status=active")
+    disabled_list = client.get("/ui/account/exchange-connections?status=disabled")
+
+    assert default_list.status_code == 200
+    assert [item["connection_id"] for item in default_list.json()["items"]] == [active_id]
+    assert default_list.json()["items"] == active_list.json()["items"]
+    assert [item["connection_id"] for item in disabled_list.json()["items"]] == [disabled_id]
+
+    active_archive = client.post(
+        f"/ui/account/exchange-connections/{active_id}/archive",
+        headers={"origin": "http://testserver"},
+    )
+    assert active_archive.status_code == 409
+    assert active_archive.json()["error"]["code"] == "exchange_connection_not_disabled"
+
+    archived = client.post(
+        f"/ui/account/exchange-connections/{disabled_id}/archive",
+        headers={"origin": "http://testserver"},
+    )
+    assert archived.status_code == 200
+    archived_payload = archived.json()
+    assert archived_payload["status"] == "archived"
+    assert archived_payload["disabled_at"] is not None
+    assert archived_payload["archived_at"] is not None
+    assert "TEST_SECRET_DISABLED" not in archived.text
+
+    assert client.get("/ui/account/exchange-connections?status=disabled").json()["items"] == []
+    archived_list = client.get("/ui/account/exchange-connections?status=archived")
+    all_list = client.get("/ui/account/exchange-connections?status=all")
+    assert [item["connection_id"] for item in archived_list.json()["items"]] == [disabled_id]
+    assert {item["connection_id"] for item in all_list.json()["items"]} == {active_id, disabled_id}
+
+    limits_after_archive = client.get("/ui/account/limits")
+    assert limits_after_archive.status_code == 200
+    assert limits_after_archive.json()["exchange_connections_used"] == 1
+    assert limits_after_archive.json()["api_keys_used"] == 1
+
+    validate_archived = client.post(
+        f"/ui/account/exchange-connections/{disabled_id}/validate",
+        headers={"origin": "http://testserver"},
+    )
+    rotate_archived = client.post(
+        f"/ui/account/exchange-connections/{disabled_id}/rotate",
+        json={
+            "api_key": "ACCOUNTKEY0000",
+            "api_secret": "TEST_SECRET_ARCHIVED_ROTATE",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert validate_archived.status_code == 404
+    assert rotate_archived.status_code == 404
+
+    audit = account_repository.list_audit_events(
+        owner_user_id=_session_ids["first_user_id"],
+        cursor=None,
+        limit=10,
+    )
+    archived_events = [
+        event for event in audit.items if event.event_type == "exchange_connection_archived"
+    ]
+    assert len(archived_events) == 1
+    assert archived_events[0].metadata == {
+        "connection_id": disabled_id,
+        "exchange_name": "bybit",
+        "market_type": "futures",
+        "environment": "mainnet",
+        "previous_status": "disabled",
+        "new_status": "archived",
+        "reason": "user_archived",
+    }
+
+
+def test_ui_account_exchange_connection_archive_requires_same_origin_before_command() -> None:
+    exchange_control_client = _ArchiveShouldNotRunClient()
+    client, _account_repository, _session_ids = _build_test_client(
+        exchange_control_client=exchange_control_client,
+    )
+
+    response = client.post(
+        "/ui/account/exchange-connections/00000000-0000-0000-0000-000000000001/archive",
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["details"] == {"reason": "csrf_required"}
+    assert exchange_control_client.archive_calls == 0
 
 
 def test_ui_account_exchange_connections_allow_forwarded_public_same_origin() -> None:
@@ -653,7 +861,10 @@ def test_exchange_control_fake_client_is_deterministic() -> None:
     assert first.service == "exchange-control"
 
 
-def _build_test_client() -> tuple[
+def _build_test_client(
+    *,
+    exchange_control_client: ExchangeControlClient | None = None,
+) -> tuple[
     TestClient,
     InMemoryAccountSettingsRepository,
     dict[str, UserId],
@@ -749,7 +960,7 @@ def _build_test_client() -> tuple[
             ),
             current_user_dependency=current_user_dependency,
             clock=clock,
-            exchange_control_client=InMemoryExchangeControlClient(),
+            exchange_control_client=exchange_control_client or InMemoryExchangeControlClient(),
         )
     )
     client = TestClient(app)

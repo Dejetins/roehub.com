@@ -54,6 +54,7 @@ from trading.platform.errors import RoehubError
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
+ExchangeConnectionStatusFilter = Literal["active", "disabled", "archived", "all"]
 
 
 def build_ui_account_router(
@@ -132,7 +133,7 @@ def build_ui_account_router(
             )
         except ExchangeControlClientError as error:
             raise _exchange_control_unavailable(error=error) from error
-        active_connections = tuple(row for row in connections if row.status != "disabled")
+        active_connections = tuple(row for row in connections if row.status == "active")
         base_limits = account_settings.get_limits(
             owner_user_id=principal.user_id,
             plan=str(principal.paid_level),
@@ -158,6 +159,7 @@ def build_ui_account_router(
     def get_exchange_connections(
         cursor: str | None = Query(default=None),
         limit: int = Query(default=20, ge=1, le=50),
+        status: ExchangeConnectionStatusFilter = Query(default="active"),
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> ExchangeConnectionsResponse:
         _ = cursor, limit
@@ -169,8 +171,13 @@ def build_ui_account_router(
             )
         except ExchangeControlClientError as error:
             raise _exchange_control_unavailable(error=error) from error
+        filtered_rows = tuple(
+            row
+            for row in rows
+            if _matches_connection_status_filter(row=row, status=status)
+        )
         return ExchangeConnectionsResponse(
-            items=[_exchange_connection_response(row=row) for row in rows],
+            items=[_exchange_connection_response(row=row) for row in filtered_rows],
             next_cursor=None,
         )
 
@@ -248,6 +255,47 @@ def build_ui_account_router(
             )
         except ExchangeControlClientError as error:
             raise _exchange_control_unavailable(error=error) from error
+        return _exchange_connection_response(row=row)
+
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/archive",
+        response_model=ExchangeConnectionResponse,
+    )
+    def post_exchange_connection_archive(
+        connection_id: UUID,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request, fail_closed_without_origin=True)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            before_rows = client.list_connections(
+                owner_user_id=str(principal.user_id),
+                request_id="apps-api-archive-exchange-connection-read",
+            )
+            row = client.archive_connection(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                request_id="apps-api-archive-exchange-connection",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        previous_row = next(
+            (item for item in before_rows if item.connection_id == str(connection_id)),
+            None,
+        )
+        if previous_row is None or previous_row.status != "archived":
+            account_settings.record_exchange_connection_archive(
+                owner_user_id=principal.user_id,
+                connection_id=row.connection_id,
+                exchange_name=row.exchange_name,
+                market_type=row.market_type,
+                environment=row.environment,
+                previous_status=previous_row.status if previous_row else "disabled",
+                new_status=row.status,
+                reason=row.status_reason or "user_archived",
+            )
         return _exchange_connection_response(row=row)
 
     @router.post(
@@ -451,6 +499,12 @@ def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> Roehu
             message="Exchange connection already exists.",
             details={},
         )
+    if "exchange_connection_not_disabled" in message:
+        return RoehubError(
+            code="exchange_connection_not_disabled",
+            message="Exchange connection must be disabled before archive.",
+            details={},
+        )
     if "exchange_connection_invalid" in message:
         return RoehubError(
             code="validation_error",
@@ -494,6 +548,7 @@ def _exchange_connection_response(
         created_at=row.created_at,
         updated_at=row.updated_at,
         disabled_at=row.disabled_at,
+        archived_at=row.archived_at,
     )
 
 
@@ -594,10 +649,14 @@ def _validation_error(*, error: AccountSettingsValidationError) -> RoehubError:
     )
 
 
-def _enforce_same_origin_mutation(*, request: Request) -> None:
+def _enforce_same_origin_mutation(
+    *,
+    request: Request,
+    fail_closed_without_origin: bool = False,
+) -> None:
     rejection_reason = same_origin_rejection_reason(
         request=request,
-        fail_closed_without_origin=False,
+        fail_closed_without_origin=fail_closed_without_origin,
     )
     if rejection_reason is None:
         return
@@ -647,8 +706,18 @@ def _permissions_literal(*, value: str) -> Literal["read", "trade"]:
     raise ValueError(f"Unsupported permissions value: {value!r}")
 
 
-def _connection_status_literal(*, value: str) -> Literal["active", "disabled"]:
-    if value == "active" or value == "disabled":
+def _matches_connection_status_filter(
+    *,
+    row: ExchangeConnectionCommandResult,
+    status: ExchangeConnectionStatusFilter,
+) -> bool:
+    if status == "all":
+        return True
+    return row.status == status
+
+
+def _connection_status_literal(*, value: str) -> Literal["active", "disabled", "archived"]:
+    if value == "active" or value == "disabled" or value == "archived":
         return value
     raise ValueError(f"Unsupported connection status value: {value!r}")
 

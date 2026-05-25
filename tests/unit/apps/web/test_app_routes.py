@@ -351,6 +351,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'name="api_secret"' not in main_html
     assert "data-secret-input" in main_html
     assert 'data-exchange-form hidden autocomplete="off" data-lpignore="true"' in main_html
+    assert 'data-exchange-status-filter="active"' in main_html
+    assert 'data-exchange-status-filter="disabled"' in main_html
+    assert 'data-exchange-status-filter="archived"' in main_html
+    assert 'role="tablist" aria-label="Exchange connection status"' in main_html
     assert 'data-lpignore="true"' in main_html
     assert 'data-1p-ignore="true"' in main_html
     assert 'data-bwignore="true"' in main_html
@@ -369,6 +373,12 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'name="api_key"' not in settings_js
     assert 'name="api_secret"' not in settings_js
     assert "data-secret-input" in settings_js
+    assert "?status=${encodeURIComponent(effectiveStatus)}" in settings_js
+    assert 'loadJson(exchangeKeysPath(root, "active"), [])' in settings_js
+    assert "data-exchange-archive" not in settings_response.text
+    assert "exchangeArchive" in settings_js
+    assert "/archive" in settings_js
+    assert "DELETE" not in settings_js
     assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
         settings_js
     )

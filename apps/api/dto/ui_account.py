@@ -77,7 +77,7 @@ class ExchangeConnectionResponse(BaseModel):
     label: str | None
     permissions: Literal["read", "trade"]
     api_key: str
-    status: Literal["active", "disabled"]
+    status: Literal["active", "disabled", "archived"]
     status_reason: str | None
     validation_status: Literal[
         "valid_readonly",
@@ -94,6 +94,7 @@ class ExchangeConnectionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     disabled_at: datetime | None
+    archived_at: datetime | None
 
 
 class ExchangeConnectionsResponse(BaseModel):

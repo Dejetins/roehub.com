@@ -18,6 +18,7 @@ const state = {
   marketType: "futures",
   environment: "mainnet",
   permissions: "read",
+  exchangeStatusFilter: "active",
   sessionsCursor: null,
   auditCursor: null,
 };
@@ -26,6 +27,12 @@ const SETTINGS_TABS = new Set(["profile", "api", "integrations", "security"]);
 
 function endpoint(root, name) {
   return root.dataset[name] || "";
+}
+
+function exchangeKeysPath(root, status = state.exchangeStatusFilter) {
+  const base = endpoint(root, "exchangeKeysEndpoint");
+  const effectiveStatus = status || "active";
+  return `${base}?status=${encodeURIComponent(effectiveStatus)}`;
 }
 
 function setStatus(message, ok = true) {
@@ -132,7 +139,7 @@ function exchangeItems(payload) {
 }
 
 function statusClass(item) {
-  if (item?.status === "disabled") return "is-warning";
+  if (item?.status === "disabled" || item?.status === "archived") return "is-warning";
   const validationStatus = item?.validation_status || "";
   if (validationStatus === "valid_readonly" || validationStatus === "valid_trade_enabled") {
     return "is-positive";
@@ -142,6 +149,16 @@ function statusClass(item) {
     return "is-negative";
   }
   return "";
+}
+
+function setExchangeStatusFilter(root, status) {
+  const effectiveStatus = ["active", "disabled", "archived"].includes(status) ? status : "active";
+  state.exchangeStatusFilter = effectiveStatus;
+  root.querySelectorAll("[data-exchange-status-filter]").forEach((button) => {
+    const selected = button.dataset.exchangeStatusFilter === effectiveStatus;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
 }
 
 function readableStatus(value) {
@@ -355,21 +372,29 @@ function renderExchangeKeys(payload) {
     });
     const action = row.insertCell();
     action.className = "settings-exchange-actions";
-    [
-      ["validate", "settings.exchange.validate", "settings.exchange.validate_short"],
-      ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],
-      ["disable", "settings.exchange.disable", "settings.exchange.disable_short"],
-    ].forEach(([actionKey, labelKey, shortLabelKey]) => {
+    const actions =
+      item.status === "active"
+        ? [
+            ["validate", "settings.exchange.validate", "settings.exchange.validate_short"],
+            ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],
+            ["disable", "settings.exchange.disable", "settings.exchange.disable_short"],
+          ]
+        : item.status === "disabled"
+          ? [["archive", "settings.exchange.archive", "settings.exchange.archive_short"]]
+          : [];
+    actions.forEach(([actionKey, labelKey, shortLabelKey]) => {
       const button = document.createElement("button");
       button.className = "rh-button rh-button--secondary rh-button--compact";
       button.type = "button";
       button.dataset[`exchange${actionKey.charAt(0).toUpperCase()}${actionKey.slice(1)}`] =
         item.connection_id || item.key_id || "";
-      button.disabled = actionKey !== "validate" && item.status === "disabled";
       button.setAttribute("aria-label", t(labelKey));
       button.textContent = t(shortLabelKey);
       action.append(button);
     });
+    if (!actions.length) {
+      action.textContent = "--";
+    }
   });
 }
 
@@ -444,7 +469,7 @@ async function initSettings(root) {
     loadJson(endpoint(root, "integrationsEndpoint"), { items: [] }),
     loadJson(endpoint(root, "notificationsEndpoint"), { items: [] }),
     loadJson(endpoint(root, "preferencesEndpoint"), null),
-    loadJson(endpoint(root, "exchangeKeysEndpoint"), []),
+    loadJson(exchangeKeysPath(root, "active"), []),
     loadJson(`${endpoint(root, "sessionsEndpoint")}?limit=5`, { items: [], next_cursor: null }),
     loadJson(`${endpoint(root, "auditEndpoint")}?limit=5`, { items: [], next_cursor: null }),
   ]);
@@ -453,6 +478,7 @@ async function initSettings(root) {
   renderIntegrations(integrations);
   renderNotifications(notifications);
   renderPreferences(preferences);
+  setExchangeStatusFilter(root, "active");
   renderExchangeKeys(exchangeKeys);
   renderSessions(sessions);
   renderAudit(audit);
@@ -514,7 +540,7 @@ function initEvents(root) {
     await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/validate`, {
       method: "POST",
     });
-    const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+    const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
     renderExchangeKeys(exchangeKeys);
   });
   on(root, "click", "[data-exchange-rotate]", (_event, item) => {
@@ -531,7 +557,24 @@ function initEvents(root) {
     await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/disable`, {
       method: "POST",
     });
-    const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+    const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
+    renderExchangeKeys(exchangeKeys);
+  });
+  on(root, "click", "[data-exchange-archive]", async (_event, item) => {
+    const connectionId = item.dataset.exchangeArchive;
+    if (!connectionId) return;
+    const confirmation = window.prompt(t("settings.exchange.confirm_archive"));
+    if (confirmation !== "ARCHIVE") return;
+    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/archive`, {
+      method: "POST",
+    });
+    const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
+    renderExchangeKeys(exchangeKeys);
+  });
+  on(root, "click", "[data-exchange-status-filter]", async (_event, item) => {
+    const status = item.dataset.exchangeStatusFilter || "active";
+    setExchangeStatusFilter(root, status);
+    const exchangeKeys = await loadJson(exchangeKeysPath(root, status), { items: [] });
     renderExchangeKeys(exchangeKeys);
   });
   on(root, "click", "[data-sessions-more]", async () => {
@@ -624,7 +667,8 @@ function initForms(root) {
       });
       clearSecretInputs(form);
       form.reset();
-      const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+      setExchangeStatusFilter(root, "active");
+      const exchangeKeys = await loadJson(exchangeKeysPath(root, "active"), { items: [] });
       renderExchangeKeys(exchangeKeys);
       if (status) status.textContent = t("settings.exchange.saved");
     } catch (error) {
@@ -649,7 +693,7 @@ function initForms(root) {
         body: JSON.stringify(payload),
       });
       clearSecretInputs(form);
-      const exchangeKeys = await loadJson(endpoint(root, "exchangeKeysEndpoint"), { items: [] });
+      const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
       renderExchangeKeys(exchangeKeys);
     } catch (error) {
       clearSecretInputs(form);

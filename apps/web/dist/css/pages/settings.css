@@ -105,6 +105,17 @@
   color: var(--rh-accent-2);
 }
 
+.settings-exchange-filters {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 5px;
+  border: 1px solid var(--rh-line-muted);
+  padding: 3px;
+  background: var(--rh-workstation-panel-bg);
+}
+
 .settings-grid {
   display: block;
   gap: 6px;
