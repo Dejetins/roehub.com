@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: local validation complete; direct-main, CI/deploy and Mac Studio cleanup
-evidence pending.
+Статус: accepted; direct-main delivered; CI/deploy and Mac Studio cleanup
+evidence complete.
 
 Scope ограничен mandatory cleanup/backfill path for old disabled development
 exchange connections. Stage 09D does not add public DELETE, does not physically
@@ -15,10 +15,10 @@ change permission semantics or trading execution.
 | Area | Expected result | Observed evidence | Verdict | Residual risk |
 |---|---|---|---|---|
 | 09C prerequisite | Stage 09C must be accepted before 09D starts. | Iteration ledger marks 09C as `accepted; direct-main delivered; CI/deploy and Mac Studio runtime evidence complete`; 09C report is accepted. | Accepted. | None. |
-| Cleanup predicate | Only disabled old test/development rows with label prefix `stage08_`, `e2e_` or `smoke_` are eligible. | `select_cleanup_candidates` requires matching label prefix, `status='disabled'`, `disabled_at IS NOT NULL`, and `archived_at IS NULL`; tests prove active, already archived and manual labels are skipped. | Accepted locally. | Production execution must use dry-run output before mutation. |
-| Supported lifecycle path | Cleanup execution must archive through the existing archive command, not ad hoc SQL mutation. | `tools/exchange_connection_cleanup.py --execute` calls `HttpExchangeControlClient.archive_connection(..., cleanup_source='stage09d')`; SQL is read-only for candidate discovery. | Accepted locally. | Requires exchange-control internal token on target runtime. |
-| Audit and metrics | Cleanup archives must emit `exchange_connection_archived` audit evidence and `exchange_connection_cleanup_total` metric evidence. | Execution path records audit via `AccountSettingsUseCase.record_exchange_connection_archive`; internal archive request accepts bounded `cleanup_source` and records `exchange_connection_cleanup_total{source,result}` in exchange-control. | Accepted locally. | Production metric increments after Mac Studio execution. |
-| Default visibility | Archived cleanup rows must be hidden from the default account/API/UI list. | Existing 09B API/web tests still pass; default list remains `status=active`, and explicit history filters expose disabled/archived. | Accepted locally. | Production-browser proof remains 09E; 09D can use API/runtime evidence. |
+| Cleanup predicate | Only disabled old test/development rows with label prefix `stage08_`, `e2e_` or `smoke_` are eligible. | `select_cleanup_candidates` requires matching label prefix, `status='disabled'`, `disabled_at IS NOT NULL`, and `archived_at IS NULL`; tests prove active, already archived and manual labels are skipped; Mac Studio post-execute dry-run returned count `0`. | Accepted. | Future operator runs must keep dry-run first and avoid broadening the predicate. |
+| Supported lifecycle path | Cleanup execution must archive through the existing archive command, not ad hoc SQL mutation. | `tools/exchange_connection_cleanup.py --execute` calls `HttpExchangeControlClient.archive_connection(..., cleanup_source='stage09d')`; Mac Studio workflow dispatch `26424231044` archived two remaining candidates through `/archive`. | Accepted. | None. |
+| Audit and metrics | Cleanup archives must emit `exchange_connection_archived` audit evidence and `exchange_connection_cleanup_total` metric evidence. | Execution path records audit via `AccountSettingsUseCase.record_exchange_connection_archive`; Mac Studio execution recorded two archive results and one audit repair for a partial prior archive; metrics scrape `26424288608` returned `exchange_connection_cleanup_total{result="archived",source="stage09d"} 2.0`. | Accepted. | Counter is process-local Prometheus state and resets on service restart. |
+| Default visibility | Archived cleanup rows must be hidden from the default account/API/UI list. | Existing 09B API/web tests still pass; default list remains `status=active`; Mac Studio post-execute cleanup dry-run `26424299613` returned count `0` for eligible disabled rows. | Accepted. | Full authenticated browser proof remains Stage 09E. |
 | No hard delete | physical hard delete запрещен. | No `DELETE` route or SQL delete added; cleanup tool performs SELECT for candidates and archive command for execution. | Accepted. | Archived rows are forward-only history. |
 
 ## Cleanup Predicate
@@ -49,8 +49,10 @@ change permission semantics or trading execution.
 |---|---|---|---|---|
 | local-dev | unit dry-run | `select_cleanup_candidates` and `summarize_candidates` over mixed rows. | Selected only disabled `stage08_` and `e2e_` rows; active/manual/already-archived rows skipped. | Redacted refs only; full UUID absent from evidence string. |
 | local-dev | execution simulation | `execute_cleanup` with fake archive client and audit recorder. | Archive client called once with `cleanup_source='stage09d'`; `exchange_connection_archived` audit path recorded. | No secret-bearing fields in candidate/result model. |
-| Mac Studio | dry-run | Pending after direct-main deploy. | Pending. | Pending. |
-| Mac Studio | execution | Pending after dry-run acceptance. | Pending. | Pending. |
+| Mac Studio | pre-execution dry-run | Deploy Backend workflow dispatch `26424231044`, Stage 09D cleanup step. | Count `2`: one `stage08_` disabled candidate and one `e2e_` disabled candidate; both refs redacted. | Redacted `connection_ref` / `owner_ref` only; no tokens, ciphertext, HMAC or raw exchange bodies. |
+| Mac Studio | execution | Same dispatch `26424231044`, `--execute --repair-archived-audit`. | Archived count `2`, both status `archived`; audit repair count `1` for the earlier partial archive after the JSONB audit-binding fix. | Redacted refs only. |
+| Mac Studio | post-execution dry-run | Same dispatch `26424231044` plus ops dry-run `26424299613`. | Count `0`; no remaining disabled `stage08_`/`e2e_`/`smoke_` candidates. | Redacted empty result. |
+| Mac Studio | metrics scrape | Exchange Cleanup Ops workflow dispatch `26424288608`. | `exchange_connection_cleanup_total{result="archived",source="stage09d"} 2.0`; baseline `source="none"` counter remains `0.0`. | Metric labels are bounded and contain no user, connection or credential IDs. |
 
 ## Contract Impact
 
@@ -70,10 +72,12 @@ change permission semantics or trading execution.
 
 | Gate | Result | Evidence |
 |---|---|---|
-| `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations` | Passed: `92 passed`, 3 known httpx cookie deprecation warnings. | Local run on 2026-05-26. |
+| `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations` | Passed: `93 passed`, 3 known httpx cookie deprecation warnings. | Local run on 2026-05-26 after final evidence updates. |
 | `uv run ruff check src/trading/contexts/exchange_control apps/api apps/web tools tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations` | Passed. | Local run on 2026-05-26. |
 | `uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api` | Passed: `0 errors`. | Local run on 2026-05-26. |
 | `python -m tools.docs.generate_docs_index --check` | Passed. | Docs index updated for the 09D report and checked on 2026-05-26. |
+| Focused post-audit-fix checks | Passed: `uv run pytest -q tests/unit/contexts/exchange_control/test_exchange_connection_cleanup.py tests/unit/apps/api/test_ui_account_routes.py::test_ui_account_exchange_connections_default_active_filter_archive_and_limits`; `uv run ruff check src/trading/contexts/identity/adapters/outbound/persistence/postgres/account_settings_repository.py`; `uv run pyright src/trading/contexts/identity/adapters/outbound/persistence/postgres/account_settings_repository.py`. | Proved the JSONB audit metadata binding fix after the first Mac Studio execution exposed the adapter bug. |
+| Full CI | Passed. | CI `26423687719`, `26423802550`, `26423982825`, `26424113040`, and final ops-workflow CI `26424285533` succeeded. |
 
 ## Direct-Main Delivery
 
@@ -81,10 +85,10 @@ change permission semantics or trading execution.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before implementation. |
-| Commit / push | Pending. | Pending. |
-| CI / deploy | Pending. | Pending. |
-| Mac Studio smoke | Pending. | Pending. |
-| Mac Studio cleanup dry-run/execution | Pending. | Pending. |
+| Commit / push | `df67923d`, `31c3085a`, `9f815535`, `783d7f8b`, `67356f0a`, `9f165bbf` pushed to `origin/main`. | Complete. |
+| CI / deploy | CI runs `26423687719`, `26423802550`, `26423982825`, `26424113040`, `26424285533` passed; Deploy Backend `26424203508` passed; cleanup dispatch `26424231044` passed. | Complete. |
+| Mac Studio smoke | Deploy Backend `26424203508` completed native deploy, DB bootstrap/migrations, launchd reload and backend smoke. | Complete. |
+| Mac Studio cleanup dry-run/execution | Dispatch `26424231044` did dry-run -> execute -> dry-run; ops dispatches `26424288608` and `26424299613` proved metrics and post-cleanup count `0`. | Complete. |
 
 ## Residual Risk And Stage 09E Handoff
 
@@ -93,3 +97,4 @@ change permission semantics or trading execution.
 | Archived cleanup rows are forward-only history. | 09D/09E operators | Recovery is explicit archived history view or a future unarchive design, not silent unarchive. |
 | Production authenticated browser proof remains separate. | 09E | Prove create -> validate or deterministic skip/failure -> disable -> archive -> default hidden with real authenticated browser flow. |
 | Cleanup predicate must remain conservative. | Future cleanup runs | Keep `--dry-run` first and use owner/time filters whenever available; never archive active or manually created user records. |
+| Operator execution should avoid local SSH-key dependence. | Future cleanup runs | Prefer the dispatch-only `Exchange Connection Cleanup Ops` workflow for dry-run/execute/metrics on Mac Studio; it runs on the self-hosted runner and prints redacted evidence only. |
