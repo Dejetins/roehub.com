@@ -128,11 +128,12 @@
 }
 
 .settings-tab-panel--profile {
-  grid-template-columns: minmax(430px, 0.78fr) minmax(0, 1.22fr);
-  grid-template-rows: minmax(clamp(188px, 25vh, 320px), 0.72fr) minmax(0, 1fr);
+  grid-template-columns: minmax(500px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: max-content max-content minmax(0, 1fr);
   grid-template-areas:
     "profile audit"
-    "limits audit";
+    "limits audit"
+    ". audit";
 }
 
 .settings-tab-panel--api {
@@ -141,6 +142,7 @@
 }
 
 .settings-tab-panel--integrations {
+  align-items: start;
   grid-template-columns: minmax(420px, 0.9fr) minmax(0, 1.1fr);
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "integrations notifications";
@@ -246,9 +248,10 @@
 
 .settings-profile__body {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 24px;
   align-items: center;
+  padding: 24px 10px 26px;
 }
 
 .settings-avatar {
@@ -268,7 +271,7 @@
 .settings-kv--two {
   display: grid;
   grid-template-columns: minmax(112px, 0.88fr) minmax(0, 1.12fr);
-  gap: 4px 14px;
+  gap: 7px 20px;
   margin: 0;
 }
 
@@ -343,6 +346,7 @@
 
 .settings-limits {
   display: grid;
+  align-content: start;
   grid-template-columns: 1fr;
   gap: 0;
   max-height: 100%;
@@ -355,7 +359,8 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-  padding: 2px 0;
+  min-height: 32px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--rh-divider);
 }
 
@@ -472,6 +477,7 @@
 
 .settings-list {
   display: grid;
+  align-content: start;
   gap: 3px;
 }
 
@@ -487,6 +493,22 @@
   min-width: 0;
   min-height: 20px;
   border-top: 1px solid var(--rh-divider);
+}
+
+.settings-tab-panel--integrations .settings-panel.terminal-panel {
+  align-self: start;
+  grid-template-rows: auto max-content;
+}
+
+.settings-tab-panel--integrations .settings-list-row {
+  grid-template-columns: minmax(0, 1fr) minmax(88px, auto) minmax(92px, auto);
+  min-height: 42px;
+  padding: 7px 0;
+  row-gap: 6px;
+}
+
+.settings-panel[data-settings-panel="integrations"] .settings-list-row > div:first-child {
+  grid-column: 1 / -1;
 }
 
 .settings-list-row strong {
