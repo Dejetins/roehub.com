@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Mapping
 from uuid import UUID, uuid4
 
+from psycopg.types.json import Jsonb
+
 from trading.contexts.identity.adapters.outbound.persistence.postgres.gateway import (
     IdentityPostgresGateway,
 )
@@ -363,7 +365,7 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
                 "created_at": created_at,
                 "event_type": event_type,
                 "summary": summary,
-                "metadata_json": metadata,
+                "metadata_json": Jsonb(metadata),
             },
         )
         if row is None:
