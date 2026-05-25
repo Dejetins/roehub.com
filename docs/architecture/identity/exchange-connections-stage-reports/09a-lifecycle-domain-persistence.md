@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: accepted locally; direct-main delivery evidence is recorded after push,
-CI/deploy and target-runtime checks.
+Статус: accepted; direct-main delivered; CI/deploy and Mac Studio runtime
+evidence complete for implementation commit `884637fb`.
 
 Scope ограничен persistence/domain foundation для lifecycle state `archived`.
 Public `/settings` UI, default account list semantics, public archive endpoint,
@@ -73,9 +73,13 @@ Stage 09B-09D.
 |---|---|---|
 | Branch | `git branch --show-current` | `main`. |
 | Fast-forward | `git pull --ff-only origin main` | Already up to date before implementation. |
-| Commit / push | Pending. | To be updated after direct-main delivery. |
-| CI / deploy | Pending. | To be updated after GitHub Actions/deploy observation. |
-| Mac Studio runtime | Pending. | To be updated after shipped revision is deployed and smoke checked. |
+| Commit / push | `884637fb Add exchange connection archive lifecycle`; pushed `a3ee17cd..884637fb` to `origin/main`. | Pass. |
+| CI / deploy | CI `26422094742` success; Deploy Backend `26422145417` success; Publish App Image `26422145427` success; Deploy Web `26422145412` success. | Pass. |
+| Mac Studio runtime smoke | `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh`. | Pass; backend API smoke, expected unauthenticated 401, Redis PONG and Tailscale state were healthy. |
+| Exchange-control readiness | `curl -fsS http://127.0.0.1:9205/health/ready`. | Pass; service ready, service identity ready, external validation ready, Transit secret cipher ready. |
+| Internal capabilities | Authenticated local `/internal/v1/capabilities`. | Pass; `contract_version=internal-v1`, `exchange_connections.archive=True`. |
+| Runtime metrics | Local `/metrics` grep for archive/cleanup/status series. | Pass; `exchange_connection_archive_total`, `exchange_connection_cleanup_total`, and `exchange_connection_status{status="archived"}` are present with bounded labels. |
+| Runtime schema | Postgres introspection via host-local `IDENTITY_PG_DSN`. | Pass; `archived_at`, `exchange_connections_lifecycle_timestamps_chk`, and `identity_audit_events_type_check` are present. |
 
 ## Residual Risk And Stage 09B Handoff
 
