@@ -6,9 +6,11 @@ from uuid import UUID
 
 from apps.api.exchange_control_client import ExchangeConnectionCommandResult
 from tools.exchange_connections.reclassify_non_trading_active import (
+    ExchangeConnectionReclassificationAuditRepairCandidate,
     ExchangeConnectionReclassificationCandidate,
     execute_reclassification,
     normalize_source,
+    repair_reclassification_audit_events,
     select_reclassification_candidates,
     summarize_candidates,
     summarize_results,
@@ -143,6 +145,42 @@ def test_reclassification_source_is_bounded_for_metrics() -> None:
     assert normalize_source("Stage 10D Reclassification!") == "stage_10d_reclassification_"
     assert normalize_source("") == "stage10d"
     assert len(normalize_source("x" * 80)) == 40
+
+
+def test_reclassification_audit_repair_records_missing_event_only() -> None:
+    candidate = ExchangeConnectionReclassificationAuditRepairCandidate(
+        connection_id=UUID("00000000-0000-0000-0000-000000000103"),
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000203"),
+        exchange_name="bybit",
+        market_type="spot",
+        environment="mainnet",
+        label="partially_reclassified",
+        status="disabled",
+        status_reason=RECLASSIFIED_NON_TRADING_STATUS_REASON,
+        connection_readiness_reason="read_only_not_supported",
+        created_at=datetime(2026, 5, 27, 10, 0, tzinfo=timezone.utc),
+        disabled_at=datetime(2026, 5, 27, 10, 5, tzinfo=timezone.utc),
+    )
+    audit_recorder = _RecordingReclassificationAuditRecorder()
+
+    repaired = repair_reclassification_audit_events(
+        candidates=(candidate,),
+        audit_recorder=audit_recorder,
+        source="stage10d",
+    )
+
+    assert repaired == 1
+    assert audit_recorder.events == [
+        {
+            "owner_user_id": "00000000-0000-0000-0000-000000000203",
+            "connection_id": "00000000-0000-0000-0000-000000000103",
+            "event": "exchange_connection_reclassified",
+            "previous_status": "active",
+            "new_status": "disabled",
+            "reason": "read_only_not_supported",
+            "source": "stage10d",
+        }
+    ]
 
 
 def _row(

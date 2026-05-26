@@ -128,6 +128,7 @@ def test_apply_identity_baseline_sql_skips_0003_and_0004_when_v2_layout_is_preex
         "0006_identity_account_settings_v1.sql",
         "0007_identity_exchange_audit_events_v1.sql",
         "0008_exchange_connections_v1.sql",
+        "0009_identity_exchange_reclassification_audit_v1.sql",
     ]
 
 
@@ -208,4 +209,5 @@ def test_apply_identity_baseline_sql_runs_0003_and_guarded_0004_for_v1_flow(
         "0006_identity_account_settings_v1.sql",
         "0007_identity_exchange_audit_events_v1.sql",
         "0008_exchange_connections_v1.sql",
+        "0009_identity_exchange_reclassification_audit_v1.sql",
     ]

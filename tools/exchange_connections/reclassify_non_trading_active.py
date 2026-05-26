@@ -67,6 +67,21 @@ class ExchangeConnectionReclassificationResult:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeConnectionReclassificationAuditRepairCandidate:
+    connection_id: UUID
+    owner_user_id: UserId
+    exchange_name: str
+    market_type: str
+    environment: str
+    label: str | None
+    status: str
+    status_reason: str
+    connection_readiness_reason: str
+    created_at: datetime
+    disabled_at: datetime
+
+
 class ExchangeConnectionReclassificationClient(Protocol):
     def disable_connection(
         self,
@@ -208,6 +223,75 @@ def load_reclassification_candidates(
     )
 
 
+def load_reclassification_audit_repair_candidates(
+    *,
+    dsn: str,
+    owner_user_id: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+) -> tuple[ExchangeConnectionReclassificationAuditRepairCandidate, ...]:
+    parameters: dict[str, object] = {"limit": limit}
+    predicates = [
+        "c.status = 'disabled'",
+        "c.status_reason = %(status_reason)s",
+        "c.disabled_at IS NOT NULL",
+        """
+        NOT EXISTS (
+            SELECT 1
+            FROM identity_audit_events AS audit
+            WHERE audit.owner_user_id = c.owner_user_id
+              AND audit.event_type = 'exchange_connection_reclassified'
+              AND audit.metadata_json->>'connection_id' = c.connection_id::text
+        )
+        """,
+    ]
+    parameters["status_reason"] = RECLASSIFIED_NON_TRADING_STATUS_REASON
+    if owner_user_id:
+        parameters["owner_user_id"] = str(UserId.from_string(owner_user_id))
+        predicates.append("c.owner_user_id = %(owner_user_id)s")
+    query = f"""
+        SELECT
+            c.connection_id,
+            c.owner_user_id,
+            c.exchange_name,
+            c.market_type,
+            c.environment,
+            c.label,
+            c.status,
+            c.status_reason,
+            c.permission_summary_json,
+            c.created_at,
+            c.disabled_at
+        FROM exchange_connections AS c
+        WHERE {' AND '.join(predicates)}
+        ORDER BY c.disabled_at ASC, c.connection_id ASC
+        LIMIT %(limit)s
+    """
+    with psycopg.connect(dsn, row_factory=cast(Any, dict_row)) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(cast(Any, query), parameters)
+            rows = cursor.fetchall()
+    return tuple(
+        ExchangeConnectionReclassificationAuditRepairCandidate(
+            connection_id=UUID(str(row["connection_id"])),
+            owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+            exchange_name=str(row["exchange_name"]),
+            market_type=str(row["market_type"]),
+            environment=str(row["environment"]),
+            label=_optional_string(row.get("label")),
+            status=str(row["status"]),
+            status_reason=str(row["status_reason"]),
+            connection_readiness_reason=_summary_string(
+                summary=_summary_dict(row.get("permission_summary_json")),
+                key="connection_readiness_reason",
+                default="reclassified",
+            ),
+            created_at=_coerce_datetime(row["created_at"]),
+            disabled_at=_coerce_datetime(row["disabled_at"]),
+        )
+        for row in cast(Iterable[Mapping[str, object]], rows)
+    )
+
+
 def execute_reclassification(
     *,
     candidates: Sequence[ExchangeConnectionReclassificationCandidate],
@@ -259,6 +343,28 @@ def execute_reclassification(
     return tuple(results)
 
 
+def repair_reclassification_audit_events(
+    *,
+    candidates: Sequence[ExchangeConnectionReclassificationAuditRepairCandidate],
+    audit_recorder: ExchangeConnectionReclassificationAuditRecorder,
+    source: str,
+) -> int:
+    normalized_source = normalize_source(source)
+    for candidate in candidates:
+        audit_recorder.record_exchange_connection_reclassification(
+            owner_user_id=candidate.owner_user_id,
+            connection_id=str(candidate.connection_id),
+            exchange_name=candidate.exchange_name,
+            market_type=candidate.market_type,
+            environment=candidate.environment,
+            previous_status="active",
+            new_status=candidate.status,
+            reason=candidate.connection_readiness_reason,
+            source=normalized_source,
+        )
+    return len(candidates)
+
+
 def summarize_candidates(
     *,
     candidates: Sequence[ExchangeConnectionReclassificationCandidate],
@@ -277,12 +383,14 @@ def summarize_results(
     *,
     results: Sequence[ExchangeConnectionReclassificationResult],
     source: str,
+    audit_repairs: Sequence[ExchangeConnectionReclassificationAuditRepairCandidate] = (),
 ) -> dict[str, object]:
     return {
         "mode": "execute",
         "source": normalize_source(source),
         "candidate_count": len(results),
         "reclassified_count": sum(1 for result in results if result.result == "reclassified"),
+        "audit_repair_count": len(audit_repairs),
         "safety": "physical hard delete запрещен",
         "items": [
             {
@@ -293,6 +401,25 @@ def summarize_results(
                 "error": result.error,
             }
             for result in results
+        ],
+        "audit_repairs": [
+            {
+                "connection_ref": redacted_uuid(candidate.connection_id),
+                "owner_ref": redacted_uuid(candidate.owner_user_id.value),
+                "label_ref": (
+                    hashlib.sha256(candidate.label.encode("utf-8")).hexdigest()[:12]
+                    if candidate.label
+                    else None
+                ),
+                "exchange_name": candidate.exchange_name,
+                "market_type": candidate.market_type,
+                "environment": candidate.environment,
+                "status": candidate.status,
+                "status_reason": candidate.status_reason,
+                "reason": candidate.connection_readiness_reason,
+                "disabled_at": candidate.disabled_at.isoformat(),
+            }
+            for candidate in audit_repairs
         ],
     }
 
@@ -377,7 +504,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         audit_recorder=audit_recorder,
         source=args.source,
     )
-    print(json.dumps(summarize_results(results=results, source=args.source)))
+    audit_repairs = load_reclassification_audit_repair_candidates(
+        dsn=args.dsn,
+        owner_user_id=args.owner_user_id,
+        limit=args.limit,
+    )
+    repair_reclassification_audit_events(
+        candidates=audit_repairs,
+        audit_recorder=audit_recorder,
+        source=args.source,
+    )
+    print(
+        json.dumps(
+            summarize_results(
+                results=results,
+                source=args.source,
+                audit_repairs=audit_repairs,
+            )
+        )
+    )
     return 0 if all(result.result == "reclassified" for result in results) else 1
 
 
