@@ -2,7 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: accepted; direct-main delivery pending after this readiness report commit.
+Статус: accepted; direct-main delivered; CI/deploy and Mac Studio runtime
+evidence complete.
 
 Scope: production readiness for accepted Stage 09 lifecycle hardening. Stage 09E
 does not add public API, persistence schema, trading execution, order placement,
@@ -74,9 +75,9 @@ exchange-execution, physical delete, or new exchange support.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before evidence collection. |
-| Commit / push | Pending. | Stage 09E docs will be committed and pushed directly to `origin/main`; no stage branch or PR. |
-| CI / deploy | Pending. | Must be watched after direct-main push. |
-| Post-deploy runtime | Pending. | Must confirm Mac Studio deployed revision and smoke after push. |
+| Commit / push | `e0e1b1f8` report commit pushed to `origin/main`; delivery-evidence update follows the same direct-main path. | Complete; no stage branch or PR. |
+| CI / deploy | CI `26468968227` success; Deploy Backend `26468989879` success; Publish App Image `26468989880` success; Deploy Web `26468989881` and `26469000960` success. | Complete. |
+| Post-deploy runtime | `bash scripts/macos/smoke_prod.sh` on Mac Studio passed after deploy; targeted `/health/ready` and metrics checks still passed. | Complete. |
 
 ## Residual Risk And Handoff
 
