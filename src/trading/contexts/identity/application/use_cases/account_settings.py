@@ -259,10 +259,11 @@ class AccountSettingsUseCase:
     ) -> None:
         self.repository.append_audit_event(
             owner_user_id=owner_user_id,
-            event_type="exchange_connection_auto_validation",
+            event_type="exchange_connection_validated",
             summary="Exchange connection auto-validation completed",
             metadata={
                 "exchange": exchange_name,
+                "validation_mode": "auto_validation",
                 "operation": operation,
                 "result": result,
                 "reason": reason,

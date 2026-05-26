@@ -20,7 +20,7 @@ exchange-execution behavior.
 | Rotate | New credential version must validate before replacing the active version. | `rotate_connection_with_validation` validates the new plaintext first; non-ready validation raises deterministic code and does not call `replace_active_credential`. | Accepted locally. | Runtime rotate proof is not required by 10B acceptance commands but remains covered by unit tests. |
 | Non-ready outcomes | Readonly, unsafe, invalid, missing IP restriction and validation unavailable must not be active/limit-consuming. | Domain truth-table tests cover all outcomes; public facade tests prove readonly create is `disabled`, absent from Active, and not counted in limits. | Accepted locally. | Existing pre-10B active rows are not repaired until 10D. |
 | Secret boundary | Secret-bearing validation stays in exchange-control, not apps/api. | apps/api still forwards plaintext only to local internal exchange-control command API after CSRF/recent-auth; validation and encryption remain in exchange-control. | Accepted locally. | Runtime secret-safe curl evidence pending. |
-| Metrics/audit | Auto-validation outcomes need bounded, secret-free observability. | Added `exchange_connection_auto_validation_total{exchange,result,reason}` and `exchange_connection_auto_validation` account audit event metadata with bounded operation/result/reason labels. | Accepted locally. | Runtime metric scrape pending. |
+| Metrics/audit | Auto-validation outcomes need bounded, secret-free observability. | Added `exchange_connection_auto_validation_total{exchange,result,reason}` and existing `exchange_connection_validated` account audit entries with `validation_mode=auto_validation` plus bounded operation/result/reason metadata. | Accepted locally. | Runtime metric scrape pending. |
 
 ## Create/Rotate Decision Table
 
@@ -44,7 +44,7 @@ exchange-execution behavior.
 | Persistence | Failed create attempts are durable `disabled` rows with `status_reason=auto_validation_failed`; no new columns or migration. | `permission_summary_json` stores auto-validation readiness/capability metadata. |
 | Internal command API | Internal create/rotate routes call auto-validation methods and emit validation/readiness/auto-validation metrics. | `src/trading/contexts/exchange_control/adapters/inbound/http/app.py`; runtime unit tests. |
 | Public account facade | Public create/rotate still enforce same-origin and recent-auth before mutation; public DTO shape remains Stage 10A compatible. | `apps/api/routes/ui_account.py`; `apps/api/exchange_control_client.py`; API route tests. |
-| Audit | Account audit records `exchange_connection_auto_validation` for create/rotate outcomes without secrets. | `src/trading/contexts/identity/application/use_cases/account_settings.py`; API route tests. |
+| Audit | Account audit records auto-validation outcomes on the existing `exchange_connection_validated` event type with `validation_mode=auto_validation`, without secrets. | `src/trading/contexts/identity/application/use_cases/account_settings.py`; API route tests. |
 
 ## Runtime Evidence
 
@@ -69,7 +69,7 @@ exchange-execution behavior.
 | Persistence semantics | `compatible-change` | Failed create attempts use accepted lifecycle state `disabled` and existing `permission_summary_json`; failed rotate leaves current active credential untouched. |
 | Config / env | `none` | No new runtime env key; Stage 10B acceptance requires existing env-backed readonly credentials. |
 | Metrics / ops | `compatible-change` | Adds bounded `exchange_connection_auto_validation_total{exchange,result,reason}`. |
-| Audit | `compatible-change` | Adds bounded account audit event type `exchange_connection_auto_validation`; no secrets or raw exchange bodies. |
+| Audit | `compatible-change` | Reuses existing `exchange_connection_validated` audit event type with additive bounded metadata `validation_mode=auto_validation`; no secrets or raw exchange bodies. |
 | Trading execution | `none` | No order placement, order simulation, exchange execution or order ledger code added. |
 
 ## Validation
