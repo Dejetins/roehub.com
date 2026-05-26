@@ -396,6 +396,17 @@ class InMemoryExchangeControlClient:
         connection_id = str(UUID(int=self._next_id))
         credential_version_id = str(UUID(int=self._next_id + 1000))
         object.__setattr__(self, "_next_id", self._next_id + 1)
+        readiness = _fake_auto_validation_result(
+            permissions=permissions,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        status = (
+            "active"
+            if readiness["connection_readiness"] == "ready_for_trading"
+            else "disabled"
+        )
+        status_reason = None if status == "active" else "auto_validation_failed"
         result = ExchangeConnectionCommandResult(
             connection_id=connection_id,
             credential_version_id=credential_version_id,
@@ -405,24 +416,24 @@ class InMemoryExchangeControlClient:
             label=label,
             permissions=permissions,
             requested_permissions=permissions,
-            exchange_permissions="unknown",
-            effective_permissions="none",
+            exchange_permissions=readiness["exchange_permissions"],
+            effective_permissions=readiness["effective_permissions"],
             permission_warnings=(),
             api_key=f"****{api_key[-4:]}",
-            status="active",
-            status_reason=None,
-            validation_status="skipped_external_validation",
-            validation_reason="not_validated",
-            ip_restriction_status="unknown",
-            last_validated_at=None,
+            status=status,
+            status_reason=status_reason,
+            validation_status=readiness["validation_status"],
+            validation_reason=readiness["validation_reason"],
+            ip_restriction_status=readiness["ip_restriction_status"],
+            last_validated_at=now,
             created_at=now,
             updated_at=now,
-            disabled_at=None,
+            disabled_at=now if status == "disabled" else None,
             archived_at=None,
             requested_capability="trading",
-            effective_capability="none",
-            connection_readiness="needs_action",
-            connection_readiness_reason="validation_required",
+            effective_capability=readiness["effective_capability"],
+            connection_readiness=readiness["connection_readiness"],
+            connection_readiness_reason=readiness["connection_readiness_reason"],
             permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = result
@@ -444,6 +455,16 @@ class InMemoryExchangeControlClient:
             raise ExchangeControlClientError("exchange_connection_not_found")
         if existing.status != "active":
             raise ExchangeControlClientError("exchange_connection_not_found")
+        readiness = _fake_auto_validation_result(
+            permissions=existing.permissions,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        if readiness["connection_readiness"] != "ready_for_trading":
+            raise ExchangeControlClientError(
+                "exchange-control internal request failed with status 422 code "
+                f"{readiness['connection_readiness_reason']}"
+            )
         credential_version_id = str(UUID(int=self._next_id + 1000))
         object.__setattr__(self, "_next_id", self._next_id + 1)
         rotated = ExchangeConnectionCommandResult(
@@ -455,24 +476,24 @@ class InMemoryExchangeControlClient:
             label=existing.label,
             permissions=existing.permissions,
             requested_permissions=existing.requested_permissions,
-            exchange_permissions="unknown",
-            effective_permissions="none",
+            exchange_permissions=readiness["exchange_permissions"],
+            effective_permissions=readiness["effective_permissions"],
             permission_warnings=(),
             api_key=f"****{api_key[-4:]}",
             status=existing.status,
             status_reason=existing.status_reason,
-            validation_status="skipped_external_validation",
-            validation_reason="credential_rotated",
-            ip_restriction_status="unknown",
-            last_validated_at=None,
+            validation_status=readiness["validation_status"],
+            validation_reason=readiness["validation_reason"],
+            ip_restriction_status=readiness["ip_restriction_status"],
+            last_validated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
             created_at=existing.created_at,
             updated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
             disabled_at=existing.disabled_at,
             archived_at=existing.archived_at,
             requested_capability="trading",
-            effective_capability="none",
-            connection_readiness="needs_action",
-            connection_readiness_reason="validation_required",
+            effective_capability=readiness["effective_capability"],
+            connection_readiness=readiness["connection_readiness"],
+            connection_readiness_reason=readiness["connection_readiness_reason"],
             permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = rotated
@@ -745,6 +766,57 @@ def _safe_error_code(*, response: httpx.Response) -> str | None:
     if isinstance(error, dict) and isinstance(error.get("code"), str):
         return error["code"]
     return None
+
+
+def _fake_auto_validation_result(
+    *,
+    permissions: str,
+    api_key: str,
+    api_secret: str,
+) -> dict[str, str]:
+    if api_key == "INVALID" or api_secret == "INVALID":
+        return {
+            "exchange_permissions": "unknown",
+            "effective_permissions": "none",
+            "validation_status": "invalid_credentials",
+            "validation_reason": "fake_client_invalid_credentials",
+            "ip_restriction_status": "unknown",
+            "effective_capability": "none",
+            "connection_readiness": "rejected",
+            "connection_readiness_reason": "invalid_credentials",
+        }
+    if "UNAVAILABLE" in api_secret:
+        return {
+            "exchange_permissions": "unknown",
+            "effective_permissions": "none",
+            "validation_status": "skipped_external_validation",
+            "validation_reason": "fake_client_validation_unavailable",
+            "ip_restriction_status": "not_checked",
+            "effective_capability": "none",
+            "connection_readiness": "needs_action",
+            "connection_readiness_reason": "validation_unavailable",
+        }
+    if permissions != "trade" or "READONLY" in api_secret:
+        return {
+            "exchange_permissions": "read",
+            "effective_permissions": "read",
+            "validation_status": "valid_readonly",
+            "validation_reason": "fake_client_readonly",
+            "ip_restriction_status": "not_restricted_testnet",
+            "effective_capability": "none",
+            "connection_readiness": "rejected",
+            "connection_readiness_reason": "read_only_not_supported",
+        }
+    return {
+        "exchange_permissions": "trade",
+        "effective_permissions": "trade",
+        "validation_status": "valid_trade_enabled",
+        "validation_reason": "fake_client_trade_ready",
+        "ip_restriction_status": "restricted",
+        "effective_capability": "trading",
+        "connection_readiness": "ready_for_trading",
+        "connection_readiness_reason": "trading_policy_ok",
+    }
 
 
 def _permission_warnings_from_payload(value: object) -> tuple[str, ...]:

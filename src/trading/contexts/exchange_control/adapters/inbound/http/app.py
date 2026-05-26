@@ -58,6 +58,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_connections.create",
     "exchange_connections.list",
     "exchange_connections.rotate",
+    "exchange_connections.auto_validate",
     "exchange_connections.disable",
     "exchange_connections.archive",
     "exchange_connections.validate",
@@ -257,6 +258,12 @@ class ExchangeControlMetrics:
             ("exchange", "result", "reason"),
             registry=self.registry,
         )
+        self.auto_validation_total = Counter(
+            "exchange_connection_auto_validation_total",
+            "Exchange connection auto-validation outcomes by exchange, result, and reason.",
+            ("exchange", "result", "reason"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -285,6 +292,11 @@ class ExchangeControlMetrics:
             exchange="none",
             result="needs_action",
             reason="stage_10a_no_readiness_observation",
+        ).inc(0)
+        self.auto_validation_total.labels(
+            exchange="none",
+            result="needs_action",
+            reason="stage_10b_no_auto_validation_attempt",
         ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
@@ -330,6 +342,19 @@ class ExchangeControlMetrics:
         reason: str,
     ) -> None:
         self.trading_readiness_total.labels(
+            exchange=exchange,
+            result=result,
+            reason=reason,
+        ).inc()
+
+    def record_auto_validation(
+        self,
+        *,
+        exchange: str,
+        result: str,
+        reason: str,
+    ) -> None:
+        self.auto_validation_total.labels(
             exchange=exchange,
             result=result,
             reason=reason,
@@ -492,7 +517,7 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         try:
-            view = connection_service.create_connection(
+            view = connection_service.create_connection_with_validation(
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 exchange_name=payload.exchange_name,
                 market_type=payload.market_type,
@@ -502,10 +527,17 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                 api_key=payload.api_key,
                 api_secret=payload.api_secret,
                 passphrase=payload.passphrase,
+                validator=credential_validator,
                 now=_utc_now(),
             )
         except ExchangeConnectionError as error:
             raise _exchange_connection_http_error(error=error) from error
+        _record_validation_observation(metrics=metrics, view=view)
+        metrics.record_auto_validation(
+            exchange=view.exchange_name,
+            result=view.connection_readiness,
+            reason=view.connection_readiness_reason,
+        )
         return _exchange_connection_response(view=view)
 
     @app.post(
@@ -531,16 +563,28 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         try:
-            view = connection_service.rotate_connection(
+            view = connection_service.rotate_connection_with_validation(
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 api_key=payload.api_key,
                 api_secret=payload.api_secret,
                 passphrase=payload.passphrase,
+                validator=credential_validator,
                 now=_utc_now(),
             )
         except ExchangeConnectionError as error:
+            metrics.record_auto_validation(
+                exchange="unknown",
+                result="rejected" if error.code != "validation_unavailable" else "needs_action",
+                reason=error.code,
+            )
             raise _exchange_connection_http_error(error=error) from error
+        _record_validation_observation(metrics=metrics, view=view)
+        metrics.record_auto_validation(
+            exchange=view.exchange_name,
+            result=view.connection_readiness,
+            reason=view.connection_readiness_reason,
+        )
         return _exchange_connection_response(view=view)
 
     @app.post(
@@ -658,25 +702,33 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             )
         except ExchangeConnectionError as error:
             raise _exchange_connection_http_error(error=error) from error
-        metrics.record_validation(
-            exchange=view.exchange_name,
-            result=view.validation_status,
-            reason=view.validation_reason or "none",
-        )
-        metrics.record_trading_readiness(
-            exchange=view.exchange_name,
-            result=view.connection_readiness,
-            reason=view.connection_readiness_reason,
-        )
-        if view.validation_status == "permission_mismatch":
-            metrics.record_permission_mismatch(
-                exchange=view.exchange_name,
-                requested=view.requested_permissions,
-                effective=view.effective_permissions,
-            )
+        _record_validation_observation(metrics=metrics, view=view)
         return _exchange_connection_response(view=view)
 
     return app
+
+
+def _record_validation_observation(
+    *,
+    metrics: ExchangeControlMetrics,
+    view: ExchangeConnectionView,
+) -> None:
+    metrics.record_validation(
+        exchange=view.exchange_name,
+        result=view.validation_status,
+        reason=view.validation_reason or "none",
+    )
+    metrics.record_trading_readiness(
+        exchange=view.exchange_name,
+        result=view.connection_readiness,
+        reason=view.connection_readiness_reason,
+    )
+    if view.validation_status == "permission_mismatch":
+        metrics.record_permission_mismatch(
+            exchange=view.exchange_name,
+            requested=view.requested_permissions,
+            effective=view.effective_permissions,
+        )
 
 
 def _require_internal_request(

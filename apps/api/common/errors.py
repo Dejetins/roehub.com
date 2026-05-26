@@ -40,9 +40,16 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "exchange_connection_already_exists": 409,
     "exchange_connection_not_disabled": 409,
     "exchange_control_unavailable": 503,
+    "invalid_credentials": 422,
+    "invalid_permissions": 422,
+    "ip_restriction_required": 422,
     "recent_auth_required": 403,
+    "read_only_not_supported": 422,
+    "unsafe_permissions": 422,
     "unauthorized": 401,
     "unexpected_error": 500,
+    "unsupported_account_mode": 422,
+    "validation_unavailable": 503,
 }
 
 

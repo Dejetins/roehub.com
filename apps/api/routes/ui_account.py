@@ -208,6 +208,13 @@ def build_ui_account_router(
             )
         except ExchangeControlClientError as error:
             raise _exchange_control_unavailable(error=error) from error
+        account_settings.record_exchange_connection_auto_validation(
+            owner_user_id=principal.user_id,
+            exchange_name=row.exchange_name,
+            operation="create",
+            result=row.connection_readiness,
+            reason=row.connection_readiness_reason,
+        )
         return _exchange_connection_response(row=row)
 
     @router.post(
@@ -223,6 +230,12 @@ def build_ui_account_router(
         _enforce_same_origin_mutation(request=request)
         _enforce_recent_auth(principal=principal, now=clock.now())
         client = _require_exchange_control_client(client=exchange_control_client)
+        before_row = _find_exchange_connection_before_mutation(
+            client=client,
+            owner_user_id=str(principal.user_id),
+            connection_id=str(connection_id),
+            request_id="apps-api-rotate-exchange-connection-read",
+        )
         try:
             row = client.rotate_connection(
                 owner_user_id=str(principal.user_id),
@@ -232,7 +245,21 @@ def build_ui_account_router(
                 request_id="apps-api-rotate-exchange-connection",
             )
         except ExchangeControlClientError as error:
+            account_settings.record_exchange_connection_auto_validation(
+                owner_user_id=principal.user_id,
+                exchange_name=before_row.exchange_name if before_row else "unknown",
+                operation="rotate",
+                result="rejected",
+                reason=_exchange_control_client_error_code(error=error) or "unknown",
+            )
             raise _exchange_control_unavailable(error=error) from error
+        account_settings.record_exchange_connection_auto_validation(
+            owner_user_id=principal.user_id,
+            exchange_name=row.exchange_name,
+            operation="rotate",
+            result=row.connection_readiness,
+            reason=row.connection_readiness_reason,
+        )
         return _exchange_connection_response(row=row)
 
     @router.post(
@@ -479,6 +506,23 @@ def _require_exchange_control_client(
     return client
 
 
+def _find_exchange_connection_before_mutation(
+    *,
+    client: ExchangeControlClient,
+    owner_user_id: str,
+    connection_id: str,
+    request_id: str,
+) -> ExchangeConnectionCommandResult | None:
+    try:
+        rows = client.list_connections(
+            owner_user_id=owner_user_id,
+            request_id=request_id,
+        )
+    except ExchangeControlClientError:
+        return None
+    return next((row for row in rows if row.connection_id == connection_id), None)
+
+
 def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> RoehubError:
     message = str(error)
     if "exchange_connection_not_found" in message:
@@ -519,11 +563,38 @@ def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> Roehu
                 ]
             },
         )
+    auto_validation_code = _exchange_control_client_error_code(error=error)
+    if auto_validation_code in {
+        "read_only_not_supported",
+        "unsafe_permissions",
+        "ip_restriction_required",
+        "invalid_credentials",
+        "validation_unavailable",
+        "invalid_permissions",
+        "unsupported_account_mode",
+    }:
+        return RoehubError(
+            code=auto_validation_code,
+            message="Exchange credentials did not pass auto-validation.",
+            details={"reason": auto_validation_code},
+        )
     return RoehubError(
         code="exchange_control_unavailable",
         message="Exchange-control internal request failed",
         details={},
     )
+
+
+def _exchange_control_client_error_code(
+    *,
+    error: ExchangeControlClientError,
+) -> str | None:
+    message = str(error)
+    marker = " code "
+    if marker not in message:
+        return None
+    code = message.rsplit(marker, maxsplit=1)[-1].strip()
+    return code or None
 
 
 def _exchange_connection_response(

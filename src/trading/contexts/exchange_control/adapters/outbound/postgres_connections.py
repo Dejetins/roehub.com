@@ -431,6 +431,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         connection_id: UUID,
         owner_user_id: UserId,
         disabled_at: datetime,
+        status_reason: str = "user_disabled",
     ) -> ExchangeConnectionRecord | None:
         with psycopg.connect(
             self._dsn,
@@ -492,7 +493,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         """
                         UPDATE exchange_connections AS connection
                         SET status = 'disabled',
-                            status_reason = 'user_disabled',
+                            status_reason = %(status_reason)s,
                             permission_summary_json =
                                 connection.permission_summary_json
                                 || %(permission_summary_json)s::jsonb,
@@ -528,6 +529,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     {
                         "updated_at": disabled_at,
                         "disabled_at": disabled_at,
+                        "status_reason": status_reason,
                         "permission_summary_json": json.dumps(
                             trading_capability_summary(
                                 status="disabled",
@@ -547,6 +549,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 exchange_permissions=str(
                                     current_row.get("exchange_permissions") or "unknown"
                                 ),
+                                status_reason=status_reason,
                             )
                         ),
                         "connection_id": str(connection_id),

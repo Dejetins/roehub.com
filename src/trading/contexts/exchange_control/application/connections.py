@@ -32,6 +32,8 @@ ALLOWED_CONNECTION_READINESS = {
     "disconnected",
     "archived",
 }
+AUTO_VALIDATION_FAILED_STATUS_REASON = "auto_validation_failed"
+VALIDATION_UNAVAILABLE_REASON = "validation_unavailable"
 
 
 class ExchangeConnectionError(RuntimeError):
@@ -150,6 +152,7 @@ class ExchangeConnectionRepository(Protocol):
         connection_id: UUID,
         owner_user_id: UserId,
         disabled_at: datetime,
+        status_reason: str = "user_disabled",
     ) -> ExchangeConnectionRecord | None: ...
 
     def archive(
@@ -271,6 +274,7 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         connection_id: UUID,
         owner_user_id: UserId,
         disabled_at: datetime,
+        status_reason: str = "user_disabled",
     ) -> ExchangeConnectionRecord | None:
         connection = self._connections.get(connection_id)
         if connection is None or connection.owner_user_id != owner_user_id:
@@ -286,13 +290,14 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         disabled = replace(
             connection,
             status="disabled",
-            status_reason="user_disabled",
+            status_reason=status_reason,
             updated_at=disabled_at,
             disabled_at=disabled_at,
             permission_summary={
                 **(connection.permission_summary or {}),
                 **trading_capability_summary(
                     status="disabled",
+                    status_reason=status_reason,
                     validation_status=connection.validation_status,
                     validation_reason=connection.validation_reason,
                     ip_restriction_status=connection.ip_restriction_status,
@@ -473,6 +478,103 @@ class ExchangeConnectionService:
             )
         return self._to_view(connection=created)
 
+    def create_connection_with_validation(
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        validator: ExchangeCredentialValidator,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        normalized = _NormalizedConnectionInput.from_raw(
+            exchange_name=exchange_name,
+            market_type=market_type,
+            environment=environment,
+            label=label,
+            permissions=permissions,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=passphrase,
+        )
+        result = self._validate_plaintext(
+            exchange_name=normalized.exchange_name,
+            market_type=normalized.market_type,
+            environment=normalized.environment,
+            requested_permissions=normalized.permissions,
+            normalized=_NormalizedCredentialInput(
+                api_key=normalized.api_key,
+                api_secret=normalized.api_secret,
+                passphrase=normalized.passphrase,
+            ),
+            validator=validator,
+            now=now,
+        )
+        permission_summary = _validated_permission_summary(
+            requested_permissions=normalized.permissions,
+            result=result,
+            status="active",
+            status_reason=None,
+            auto_validation=True,
+        )
+        is_ready = _is_trading_ready_summary(summary=permission_summary)
+        status = "active" if is_ready else "disabled"
+        status_reason = None if is_ready else AUTO_VALIDATION_FAILED_STATUS_REASON
+        connection_id = uuid4()
+        credential_version = self._build_credential_version(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            normalized=normalized,
+            now=now,
+            status=status,
+            disabled_at=now if status == "disabled" else None,
+        )
+        if not is_ready:
+            permission_summary = _validated_permission_summary(
+                requested_permissions=normalized.permissions,
+                result=result,
+                status=status,
+                status_reason=status_reason,
+                auto_validation=True,
+            )
+        connection = ExchangeConnectionRecord(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            exchange_name=normalized.exchange_name,
+            market_type=normalized.market_type,
+            environment=normalized.environment,
+            label=normalized.label,
+            permissions=normalized.permissions,
+            active_credential_version_id=credential_version.credential_version_id,
+            status=status,
+            status_reason=status_reason,
+            validation_status=result.status,
+            validation_reason=result.reason,
+            ip_restriction_status=result.ip_restriction_status,
+            last_validated_at=result.observed_at or now,
+            created_at=now,
+            updated_at=now,
+            disabled_at=now if status == "disabled" else None,
+            permission_summary=permission_summary,
+        )
+        created = self._repository.create(
+            connection=connection,
+            credential_version=credential_version,
+        )
+        if created is None:
+            raise ExchangeConnectionError(
+                code="exchange_connection_already_exists",
+                message="Exchange connection already exists.",
+                status_code=409,
+            )
+        return self._to_view(connection=created)
+
     def list_connections(self, *, owner_user_id: UserId) -> tuple[ExchangeConnectionView, ...]:
         return tuple(
             self._to_view(connection=connection)
@@ -522,6 +624,91 @@ class ExchangeConnectionService:
         if updated is None:
             raise _not_found()
         return self._to_view(connection=updated)
+
+    def rotate_connection_with_validation(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        api_key: str,
+        api_secret: str,
+        passphrase: str | None,
+        validator: ExchangeCredentialValidator,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        connection = self._require_active_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        normalized = _NormalizedCredentialInput.from_raw(
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=passphrase,
+        )
+        result = self._validate_plaintext(
+            exchange_name=connection.exchange_name,
+            market_type=connection.market_type,
+            environment=connection.environment,
+            requested_permissions=connection.permissions,
+            normalized=normalized,
+            validator=validator,
+            now=now,
+        )
+        readiness = trading_capability_summary(
+            status="active",
+            validation_status=result.status,
+            validation_reason=result.reason,
+            ip_restriction_status=result.ip_restriction_status,
+            exchange_permissions=_summary_string(
+                summary=result.permission_summary or {},
+                key="exchange_permissions",
+                default="unknown",
+                allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+            ),
+            auto_validation=True,
+        )
+        if (
+            readiness["effective_capability"] != "trading"
+            or readiness["connection_readiness"] != "ready_for_trading"
+        ):
+            reason = str(readiness["connection_readiness_reason"])
+            raise ExchangeConnectionError(
+                code=reason,
+                message="Exchange credential rotation failed validation.",
+                status_code=422 if reason != VALIDATION_UNAVAILABLE_REASON else 503,
+            )
+        credential_version = self._build_credential_version(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            normalized=_NormalizedConnectionInput(
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                environment=connection.environment,
+                label=connection.label,
+                permissions=connection.permissions,
+                api_key=normalized.api_key,
+                api_secret=normalized.api_secret,
+                passphrase=normalized.passphrase,
+            ),
+            now=now,
+        )
+        updated = self._repository.replace_active_credential(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            credential_version=credential_version,
+            updated_at=now,
+        )
+        if updated is None:
+            raise _not_found()
+        recorded = self._repository.record_validation(
+            connection_id=connection_id,
+            owner_user_id=owner_user_id,
+            result=result,
+            updated_at=now,
+        )
+        if recorded is None:
+            raise _not_found()
+        return self._to_view(connection=recorded)
 
     def disable_connection(
         self,
@@ -668,6 +855,8 @@ class ExchangeConnectionService:
         owner_user_id: UserId,
         normalized: "_NormalizedConnectionInput",
         now: datetime,
+        status: str = "active",
+        disabled_at: datetime | None = None,
     ) -> ExchangeCredentialVersionRecord:
         api_key_secret = ExchangeCredentialSecret(value=normalized.api_key)
         api_secret_secret = ExchangeCredentialSecret(value=normalized.api_secret)
@@ -691,9 +880,36 @@ class ExchangeConnectionService:
             secret_cipher="exchange_control_transit_v1",
             transit_key_id="roehub-exchange-credentials",
             credential_scheme="api_key_secret_v1",
-            status="active",
+            status=status,
             created_by_user_id=owner_user_id,
             created_at=now,
+            disabled_at=disabled_at,
+        )
+
+    def _validate_plaintext(
+        self,
+        *,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        requested_permissions: str,
+        normalized: "_NormalizedCredentialInput",
+        validator: ExchangeCredentialValidator,
+        now: datetime,
+    ) -> ExchangeCredentialValidationResult:
+        return validator.validate(
+            request=ExchangeCredentialValidationRequest(
+                exchange_name=exchange_name,
+                market_type=market_type,
+                environment=environment,
+                requested_permissions=requested_permissions,
+                credential=ExchangeCredentialPlaintext(
+                    api_key=normalized.api_key,
+                    api_secret=normalized.api_secret,
+                    passphrase=normalized.passphrase,
+                ),
+            ),
+            now=now,
         )
 
     def _to_view(self, *, connection: ExchangeConnectionRecord) -> ExchangeConnectionView:
@@ -727,6 +943,10 @@ class ExchangeConnectionService:
             validation_reason=connection.validation_reason,
             ip_restriction_status=connection.ip_restriction_status,
             exchange_permissions=exchange_permissions,
+            status_reason=connection.status_reason,
+            auto_validation=(
+                connection.status_reason == AUTO_VALIDATION_FAILED_STATUS_REASON
+            ),
         )
         return ExchangeConnectionView(
             connection_id=connection.connection_id,
@@ -918,6 +1138,50 @@ def _initial_permission_summary(
     }
 
 
+def _validated_permission_summary(
+    *,
+    requested_permissions: str,
+    result: ExchangeCredentialValidationResult,
+    status: str,
+    status_reason: str | None,
+    auto_validation: bool,
+) -> dict[str, object]:
+    summary = {
+        "permissions": requested_permissions,
+        "requested_permissions": requested_permissions,
+        "exchange_permissions": "unknown",
+        "effective_permissions": "none",
+        "permission_warnings": [],
+        **(result.permission_summary or {}),
+        "validation_status": result.status,
+        "validation_reason": result.reason,
+    }
+    return {
+        **summary,
+        **trading_capability_summary(
+            status=status,
+            validation_status=result.status,
+            validation_reason=result.reason,
+            ip_restriction_status=result.ip_restriction_status,
+            exchange_permissions=_summary_string(
+                summary=summary,
+                key="exchange_permissions",
+                default="unknown",
+                allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+            ),
+            status_reason=status_reason,
+            auto_validation=auto_validation,
+        ),
+    }
+
+
+def _is_trading_ready_summary(*, summary: dict[str, object]) -> bool:
+    return (
+        summary.get("effective_capability") == "trading"
+        and summary.get("connection_readiness") == "ready_for_trading"
+    )
+
+
 def trading_capability_summary(
     *,
     status: str,
@@ -925,13 +1189,17 @@ def trading_capability_summary(
     validation_reason: str | None,
     ip_restriction_status: str,
     exchange_permissions: str,
+    status_reason: str | None = None,
+    auto_validation: bool = False,
 ) -> dict[str, object]:
     effective_capability, readiness, readiness_reason = _resolve_trading_readiness(
         status=status,
+        status_reason=status_reason,
         validation_status=validation_status,
         validation_reason=validation_reason,
         ip_restriction_status=ip_restriction_status,
         exchange_permissions=exchange_permissions,
+        auto_validation=auto_validation,
     )
     return {
         "requested_capability": "trading",
@@ -945,14 +1213,16 @@ def trading_capability_summary(
 def _resolve_trading_readiness(
     *,
     status: str,
+    status_reason: str | None,
     validation_status: str,
     validation_reason: str | None,
     ip_restriction_status: str,
     exchange_permissions: str,
+    auto_validation: bool,
 ) -> tuple[str, str, str]:
     if status == "archived":
         return "none", "archived", "archived"
-    if status == "disabled":
+    if status == "disabled" and status_reason != AUTO_VALIDATION_FAILED_STATUS_REASON:
         return "none", "disconnected", "user_disconnected"
     if (
         validation_status == "valid_trade_enabled"
@@ -978,6 +1248,8 @@ def _resolve_trading_readiness(
         return "none", "rejected", "invalid_permissions"
     if validation_status == "unsupported_account_mode":
         return "none", "rejected", "unsupported_account_mode"
+    if auto_validation and validation_status == "skipped_external_validation":
+        return "none", "needs_action", VALIDATION_UNAVAILABLE_REASON
     return "none", "needs_action", "validation_required"
 
 

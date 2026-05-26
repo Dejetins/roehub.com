@@ -96,9 +96,9 @@ class BinanceExchangeCredentialValidator:
             )
         except (OSError, ValueError):
             return ExchangeCredentialValidationResult(
-                status="invalid_credentials",
+                status="skipped_external_validation",
                 reason="exchange_request_failed",
-                ip_restriction_status="unknown",
+                ip_restriction_status="not_checked",
                 permission_summary=_permission_summary(
                     base={"exchange": "binance"},
                     requested_permissions=request.requested_permissions,
@@ -153,9 +153,9 @@ class BybitExchangeCredentialValidator:
             )
         except (OSError, ValueError):
             return ExchangeCredentialValidationResult(
-                status="invalid_credentials",
+                status="skipped_external_validation",
                 reason="exchange_request_failed",
-                ip_restriction_status="unknown",
+                ip_restriction_status="not_checked",
                 permission_summary=_permission_summary(
                     base={"exchange": "bybit"},
                     requested_permissions=request.requested_permissions,

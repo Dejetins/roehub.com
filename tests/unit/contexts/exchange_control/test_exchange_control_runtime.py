@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,11 +26,85 @@ from trading.contexts.exchange_control.application.service_identity import (
     EXCHANGE_CONTROL_SERVICE_IDENTITY,
     ExchangeControlServiceIdentity,
 )
+from trading.contexts.exchange_control.application.validation import (
+    ExchangeCredentialValidationRequest,
+    ExchangeCredentialValidationResult,
+)
 
 
 def _build_client() -> TestClient:
     config = ExchangeControlRuntimeConfig.from_environ(environ={"ROEHUB_ENV": "dev"})
     return TestClient(create_exchange_control_app(config=config))
+
+
+class _RuntimeConfigWithValidator(ExchangeControlRuntimeConfig):
+    _validator: _SequenceValidator | _StaticValidator
+
+    @classmethod
+    def from_validator(
+        cls,
+        *,
+        validator: "_SequenceValidator | _StaticValidator",
+    ) -> "_RuntimeConfigWithValidator":
+        base = ExchangeControlRuntimeConfig.from_environ(
+            environ={
+                "ROEHUB_ENV": "dev",
+                "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+            }
+        )
+        config = cls(**base.__dict__)
+        object.__setattr__(config, "_validator", validator)
+        return config
+
+    def build_credential_validator(self) -> "_SequenceValidator | _StaticValidator":
+        return self._validator
+
+
+class _StaticValidator:
+    requires_plaintext = False
+
+    def __init__(self, result: ExchangeCredentialValidationResult) -> None:
+        self._result = result
+
+    def validate(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+        now: datetime,
+    ) -> ExchangeCredentialValidationResult:
+        _ = request, now
+        return self._result
+
+
+class _SequenceValidator:
+    requires_plaintext = False
+
+    def __init__(self, results: tuple[ExchangeCredentialValidationResult, ...]) -> None:
+        self._results = list(results)
+
+    def validate(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+        now: datetime,
+    ) -> ExchangeCredentialValidationResult:
+        _ = request, now
+        return self._results.pop(0)
+
+
+def _trade_ready_result() -> ExchangeCredentialValidationResult:
+    return ExchangeCredentialValidationResult(
+        status="valid_trade_enabled",
+        reason="trade_permission_detected",
+        ip_restriction_status="restricted",
+        permission_summary={
+            "requested_permissions": "trade",
+            "permissions": "trade",
+            "exchange_permissions": "trade",
+            "effective_permissions": "trade",
+            "permission_warnings": [],
+        },
+    )
 
 
 def test_service_identity_is_mandatory_exchange_control() -> None:
@@ -194,11 +270,24 @@ def test_metrics_expose_secret_safe_exchange_control_series() -> None:
 
 
 def test_internal_capabilities_require_service_auth_and_headers() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_SequenceValidator(
+            results=(
+                _trade_ready_result(),
+                ExchangeCredentialValidationResult(
+                    status="skipped_external_validation",
+                    reason="live_validation_disabled",
+                    ip_restriction_status="not_checked",
+                    permission_summary={
+                        "requested_permissions": "trade",
+                        "permissions": "trade",
+                        "exchange_permissions": "unknown",
+                        "effective_permissions": "none",
+                        "permission_warnings": [],
+                    },
+                ),
+            )
+        )
     )
     client = TestClient(create_exchange_control_app(config=config))
 
@@ -275,11 +364,8 @@ def test_internal_capabilities_are_secret_safe() -> None:
 
 
 def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(result=_trade_ready_result())
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
@@ -298,7 +384,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
             "market_type": "spot",
             "environment": "testnet",
             "label": "readonly",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "STAGE4KEY1234",
             "api_secret": "TEST_SECRET_STAGE4",
             "passphrase": "TEST_PASSPHRASE_STAGE4",
@@ -310,17 +396,17 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     connection_id = created_payload["connection_id"]
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
-    assert created_payload["permissions"] == "read"
-    assert created_payload["requested_permissions"] == "read"
-    assert created_payload["exchange_permissions"] == "unknown"
-    assert created_payload["effective_permissions"] == "none"
+    assert created_payload["permissions"] == "trade"
+    assert created_payload["requested_permissions"] == "trade"
+    assert created_payload["exchange_permissions"] == "trade"
+    assert created_payload["effective_permissions"] == "trade"
     assert created_payload["requested_capability"] == "trading"
-    assert created_payload["effective_capability"] == "none"
-    assert created_payload["connection_readiness"] == "needs_action"
-    assert created_payload["connection_readiness_reason"] == "validation_required"
+    assert created_payload["effective_capability"] == "trading"
+    assert created_payload["connection_readiness"] == "ready_for_trading"
+    assert created_payload["connection_readiness_reason"] == "trading_policy_ok"
     assert created_payload["permissions_deprecated"] is True
     assert created_payload["permission_warnings"] == []
-    assert created_payload["validation_status"] == "skipped_external_validation"
+    assert created_payload["validation_status"] == "valid_trade_enabled"
     assert "TEST_SECRET_STAGE4" not in created.text
     assert "TEST_PASSPHRASE_STAGE4" not in created.text
     assert "vault:v1:" not in created.text
@@ -417,12 +503,52 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert "connection_id" not in metrics.text
 
 
-def test_internal_exchange_connection_archive_rejects_active_connection() -> None:
+def test_internal_exchange_connection_auto_validation_unavailable_is_not_active() -> None:
     config = ExchangeControlRuntimeConfig.from_environ(
         environ={
             "ROEHUB_ENV": "dev",
             "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
         }
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": "stage-10b-unavailable-test",
+    }
+
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000001010",
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "mainnet",
+            "label": "validation-unavailable",
+            "permissions": "trade",
+            "api_key": "STAGE10BKEY1234",
+            "api_secret": "TEST_SECRET_STAGE10B",
+        },
+    )
+
+    assert created.status_code == 200
+    payload = created.json()
+    assert payload["status"] == "disabled"
+    assert payload["status_reason"] == "auto_validation_failed"
+    assert payload["effective_capability"] == "none"
+    assert payload["connection_readiness"] == "needs_action"
+    assert payload["connection_readiness_reason"] == "validation_unavailable"
+    assert "TEST_SECRET_STAGE10B" not in created.text
+
+    metrics = client.get("/metrics")
+    assert "exchange_connection_auto_validation_total" in metrics.text
+    assert 'reason="validation_unavailable"' in metrics.text
+
+
+def test_internal_exchange_connection_archive_rejects_active_connection() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(result=_trade_ready_result())
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
@@ -441,7 +567,7 @@ def test_internal_exchange_connection_archive_rejects_active_connection() -> Non
             "market_type": "spot",
             "environment": "testnet",
             "label": "active",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "STAGE09AKEY1234",
             "api_secret": "TEST_SECRET_STAGE09A",
         },
@@ -463,11 +589,24 @@ def test_internal_exchange_connection_archive_rejects_active_connection() -> Non
 
 
 def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_SequenceValidator(
+            results=(
+                _trade_ready_result(),
+                ExchangeCredentialValidationResult(
+                    status="skipped_external_validation",
+                    reason="live_validation_disabled",
+                    ip_restriction_status="not_checked",
+                    permission_summary={
+                        "requested_permissions": "trade",
+                        "permissions": "trade",
+                        "exchange_permissions": "unknown",
+                        "effective_permissions": "none",
+                        "permission_warnings": [],
+                    },
+                ),
+            )
+        )
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
@@ -486,7 +625,7 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
             "market_type": "spot",
             "environment": "testnet",
             "label": "readonly",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "STAGE5KEY1234",
             "api_secret": "TEST_SECRET_STAGE5",
         },
@@ -506,7 +645,7 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
     assert payload["validation_status"] == "skipped_external_validation"
     assert payload["validation_reason"] == "live_validation_disabled"
     assert payload["ip_restriction_status"] == "not_checked"
-    assert payload["requested_permissions"] == "read"
+    assert payload["requested_permissions"] == "trade"
     assert payload["exchange_permissions"] == "unknown"
     assert payload["effective_permissions"] == "none"
     assert payload["requested_capability"] == "trading"

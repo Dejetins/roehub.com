@@ -184,8 +184,8 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
             "exchange_name": "binance",
             "market_type": "spot",
             "environment": "testnet",
-            "label": "readonly",
-            "permissions": "read",
+            "label": "trading",
+            "permissions": "trade",
             "api_key": "ACCOUNTKEY1234",
             "api_secret": "TEST_SECRET_STAGE4",
         },
@@ -197,18 +197,18 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     connection_id = created_payload["connection_id"]
     first_version_id = created_payload["credential_version_id"]
     assert created_payload["api_key"] == "****1234"
-    assert created_payload["permissions"] == "read"
-    assert created_payload["requested_permissions"] == "read"
-    assert created_payload["exchange_permissions"] == "unknown"
-    assert created_payload["effective_permissions"] == "none"
+    assert created_payload["permissions"] == "trade"
+    assert created_payload["requested_permissions"] == "trade"
+    assert created_payload["exchange_permissions"] == "trade"
+    assert created_payload["effective_permissions"] == "trade"
     assert created_payload["requested_capability"] == "trading"
-    assert created_payload["effective_capability"] == "none"
-    assert created_payload["connection_readiness"] == "needs_action"
-    assert created_payload["connection_readiness_reason"] == "validation_required"
+    assert created_payload["effective_capability"] == "trading"
+    assert created_payload["connection_readiness"] == "ready_for_trading"
+    assert created_payload["connection_readiness_reason"] == "trading_policy_ok"
     assert created_payload["permissions_deprecated"] is True
     assert created_payload["permission_warnings"] == []
     assert created_payload["environment"] == "testnet"
-    assert created_payload["validation_status"] == "skipped_external_validation"
+    assert created_payload["validation_status"] == "valid_trade_enabled"
     for forbidden in ("TEST_SECRET_STAGE4", "ciphertext", "hmac"):
         assert forbidden not in created.text
 
@@ -252,6 +252,47 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert limits_after_disable.json()["api_keys_used"] == 0
 
 
+def test_ui_account_exchange_connection_readonly_create_is_not_active_or_limit_counted() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "mainnet",
+            "label": "readonly-rejected",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY4321",
+            "api_secret": "TEST_SECRET_READONLY",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 201
+    payload = created.json()
+    assert payload["status"] == "disabled"
+    assert payload["status_reason"] == "auto_validation_failed"
+    assert payload["requested_capability"] == "trading"
+    assert payload["effective_capability"] == "none"
+    assert payload["connection_readiness"] == "rejected"
+    assert payload["connection_readiness_reason"] == "read_only_not_supported"
+    assert payload["permissions_deprecated"] is True
+    assert "TEST_SECRET_READONLY" not in created.text
+
+    active_list = client.get("/ui/account/exchange-connections?status=active")
+    disabled_list = client.get("/ui/account/exchange-connections?status=disabled")
+    limits = client.get("/ui/account/limits")
+
+    assert active_list.status_code == 200
+    assert active_list.json()["items"] == []
+    assert disabled_list.status_code == 200
+    assert disabled_list.json()["items"][0]["connection_id"] == payload["connection_id"]
+    assert limits.status_code == 200
+    assert limits.json()["exchange_connections_used"] == 0
+    assert limits.json()["api_keys_used"] == 0
+
+
 def test_ui_account_exchange_connections_default_active_filter_archive_and_limits() -> None:
     client, account_repository, _session_ids = _build_test_client()
 
@@ -262,7 +303,7 @@ def test_ui_account_exchange_connections_default_active_filter_archive_and_limit
             "market_type": "spot",
             "environment": "testnet",
             "label": "active",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "ACCOUNTKEY1234",
             "api_secret": "TEST_SECRET_ACTIVE",
         },
@@ -275,7 +316,7 @@ def test_ui_account_exchange_connections_default_active_filter_archive_and_limit
             "market_type": "futures",
             "environment": "mainnet",
             "label": "disabled",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "ACCOUNTKEY9876",
             "api_secret": "TEST_SECRET_DISABLED",
         },
@@ -580,7 +621,7 @@ def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() ->
             "market_type": "spot",
             "environment": "testnet",
             "label": "readonly",
-            "permissions": "read",
+            "permissions": "trade",
             "api_key": "ACCOUNTKEY5555",
             "api_secret": "TEST_SECRET_STAGE5",
         },
@@ -598,7 +639,7 @@ def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() ->
     assert payload["connection_id"] == connection_id
     assert payload["validation_status"] == "valid_readonly"
     assert payload["validation_reason"] == "fake_client_readonly"
-    assert payload["requested_permissions"] == "read"
+    assert payload["requested_permissions"] == "trade"
     assert payload["exchange_permissions"] == "read"
     assert payload["effective_permissions"] == "read"
     assert payload["requested_capability"] == "trading"

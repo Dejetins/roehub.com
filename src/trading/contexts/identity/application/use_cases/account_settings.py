@@ -248,6 +248,28 @@ class AccountSettingsUseCase:
             created_at=self.clock.now(),
         )
 
+    def record_exchange_connection_auto_validation(
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_name: str,
+        operation: str,
+        result: str,
+        reason: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="exchange_connection_auto_validation",
+            summary="Exchange connection auto-validation completed",
+            metadata={
+                "exchange": exchange_name,
+                "operation": operation,
+                "result": result,
+                "reason": reason,
+            },
+            created_at=self.clock.now(),
+        )
+
     def record_exchange_connection_archive(
         self,
         *,
