@@ -541,6 +541,17 @@ def _exchange_connection_response(
         requested_permissions=_permissions_literal(value=row.requested_permissions),
         exchange_permissions=_exchange_permissions_literal(value=row.exchange_permissions),
         effective_permissions=_effective_permissions_literal(value=row.effective_permissions),
+        requested_capability=_requested_capability_literal(
+            value=row.requested_capability
+        ),
+        effective_capability=_effective_capability_literal(
+            value=row.effective_capability
+        ),
+        connection_readiness=_connection_readiness_literal(
+            value=row.connection_readiness
+        ),
+        connection_readiness_reason=row.connection_readiness_reason,
+        permissions_deprecated=row.permissions_deprecated,
         permission_warnings=[
             _permission_warning_literal(value=value)
             for value in row.permission_warnings
@@ -728,6 +739,35 @@ def _effective_permissions_literal(*, value: str) -> Literal["none", "read", "tr
     if value in allowed:
         return value  # type: ignore[return-value]
     raise ValueError(f"Unsupported effective_permissions value: {value!r}")
+
+
+def _requested_capability_literal(*, value: str) -> Literal["trading"]:
+    if value == "trading":
+        return value
+    raise ValueError(f"Unsupported requested_capability value: {value!r}")
+
+
+def _effective_capability_literal(*, value: str) -> Literal["none", "trading"]:
+    allowed = {"none", "trading"}
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    raise ValueError(f"Unsupported effective_capability value: {value!r}")
+
+
+def _connection_readiness_literal(
+    *,
+    value: str,
+) -> Literal["ready_for_trading", "needs_action", "rejected", "disconnected", "archived"]:
+    allowed = {
+        "ready_for_trading",
+        "needs_action",
+        "rejected",
+        "disconnected",
+        "archived",
+    }
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    raise ValueError(f"Unsupported connection_readiness value: {value!r}")
 
 
 def _permission_warning_literal(

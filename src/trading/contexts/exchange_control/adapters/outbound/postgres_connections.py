@@ -13,6 +13,7 @@ from trading.contexts.exchange_control.application.connections import (
     ExchangeConnectionRecord,
     ExchangeConnectionRepository,
     ExchangeCredentialVersionRecord,
+    trading_capability_summary,
 )
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
@@ -408,6 +409,13 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 "exchange_permissions": "unknown",
                                 "effective_permissions": "none",
                                 "permission_warnings": [],
+                                **trading_capability_summary(
+                                    status="active",
+                                    validation_status="skipped_external_validation",
+                                    validation_reason="credential_rotated",
+                                    ip_restriction_status="unknown",
+                                    exchange_permissions="unknown",
+                                ),
                             }
                         ),
                         "connection_id": str(connection_id),
@@ -433,7 +441,17 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     cast(
                         Any,
                         """
-                        SELECT active_credential_version_id, status
+                        SELECT
+                            active_credential_version_id,
+                            status,
+                            permission_summary_json,
+                            permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            permission_summary_json ->> 'exchange_permissions'
+                                AS exchange_permissions,
+                            ip_restriction_status
                         FROM exchange_connections
                         WHERE connection_id = %(connection_id)s
                           AND owner_user_id = %(owner_user_id)s
@@ -475,6 +493,9 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         UPDATE exchange_connections AS connection
                         SET status = 'disabled',
                             status_reason = 'user_disabled',
+                            permission_summary_json =
+                                connection.permission_summary_json
+                                || %(permission_summary_json)s::jsonb,
                             updated_at = %(updated_at)s,
                             disabled_at = %(disabled_at)s
                         WHERE connection.connection_id = %(connection_id)s
@@ -507,6 +528,27 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     {
                         "updated_at": disabled_at,
                         "disabled_at": disabled_at,
+                        "permission_summary_json": json.dumps(
+                            trading_capability_summary(
+                                status="disabled",
+                                validation_status=str(
+                                    current_row.get("validation_status")
+                                    or "skipped_external_validation"
+                                ),
+                                validation_reason=(
+                                    str(current_row["validation_reason"])
+                                    if current_row.get("validation_reason") is not None
+                                    else None
+                                ),
+                                ip_restriction_status=str(
+                                    current_row.get("ip_restriction_status")
+                                    or "unknown"
+                                ),
+                                exchange_permissions=str(
+                                    current_row.get("exchange_permissions") or "unknown"
+                                ),
+                            )
+                        ),
                         "connection_id": str(connection_id),
                         "owner_user_id": str(owner_user_id),
                     },
@@ -530,7 +572,17 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     cast(
                         Any,
                         """
-                        SELECT status, disabled_at
+                        SELECT
+                            status,
+                            disabled_at,
+                            permission_summary_json,
+                            permission_summary_json ->> 'validation_status'
+                                AS validation_status,
+                            permission_summary_json ->> 'validation_reason'
+                                AS validation_reason,
+                            permission_summary_json ->> 'exchange_permissions'
+                                AS exchange_permissions,
+                            ip_restriction_status
                         FROM exchange_connections
                         WHERE connection_id = %(connection_id)s
                           AND owner_user_id = %(owner_user_id)s
@@ -558,6 +610,9 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         UPDATE exchange_connections AS connection
                         SET status = 'archived',
                             status_reason = 'user_archived',
+                            permission_summary_json =
+                                connection.permission_summary_json
+                                || %(permission_summary_json)s::jsonb,
                             updated_at = %(updated_at)s,
                             archived_at = %(archived_at)s
                         WHERE connection.connection_id = %(connection_id)s
@@ -591,6 +646,27 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     {
                         "updated_at": archived_at,
                         "archived_at": archived_at,
+                        "permission_summary_json": json.dumps(
+                            trading_capability_summary(
+                                status="archived",
+                                validation_status=str(
+                                    current_row.get("validation_status")
+                                    or "skipped_external_validation"
+                                ),
+                                validation_reason=(
+                                    str(current_row["validation_reason"])
+                                    if current_row.get("validation_reason") is not None
+                                    else None
+                                ),
+                                ip_restriction_status=str(
+                                    current_row.get("ip_restriction_status")
+                                    or "unknown"
+                                ),
+                                exchange_permissions=str(
+                                    current_row.get("exchange_permissions") or "unknown"
+                                ),
+                            )
+                        ),
                         "connection_id": str(connection_id),
                         "owner_user_id": str(owner_user_id),
                     },
@@ -607,6 +683,18 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         updated_at: datetime,
     ) -> ExchangeConnectionRecord | None:
         observed_at = result.observed_at or updated_at
+        result_summary = dict(result.permission_summary or {})
+        result_summary.update(
+            trading_capability_summary(
+                status="active",
+                validation_status=result.status,
+                validation_reason=result.reason,
+                ip_restriction_status=result.ip_restriction_status,
+                exchange_permissions=str(
+                    result_summary.get("exchange_permissions") or "unknown"
+                ),
+            )
+        )
         with psycopg.connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
@@ -657,7 +745,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     ),
                     {
                         "permission_summary_json": json.dumps(
-                            result.permission_summary or {}
+                            result_summary
                         ),
                         "validation_status": result.status,
                         "validation_reason": result.reason,

@@ -251,6 +251,12 @@ class ExchangeControlMetrics:
             ("exchange", "requested", "effective"),
             registry=self.registry,
         )
+        self.trading_readiness_total = Counter(
+            "exchange_connection_trading_readiness_total",
+            "Exchange connection trading readiness observations by exchange, result, and reason.",
+            ("exchange", "result", "reason"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -274,6 +280,11 @@ class ExchangeControlMetrics:
             exchange="none",
             requested="read",
             effective="none",
+        ).inc(0)
+        self.trading_readiness_total.labels(
+            exchange="none",
+            result="needs_action",
+            reason="stage_10a_no_readiness_observation",
         ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
@@ -309,6 +320,19 @@ class ExchangeControlMetrics:
             exchange=exchange,
             requested=requested,
             effective=effective,
+        ).inc()
+
+    def record_trading_readiness(
+        self,
+        *,
+        exchange: str,
+        result: str,
+        reason: str,
+    ) -> None:
+        self.trading_readiness_total.labels(
+            exchange=exchange,
+            result=result,
+            reason=reason,
         ).inc()
 
 
@@ -639,6 +663,11 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             result=view.validation_status,
             reason=view.validation_reason or "none",
         )
+        metrics.record_trading_readiness(
+            exchange=view.exchange_name,
+            result=view.connection_readiness,
+            reason=view.connection_readiness_reason,
+        )
         if view.validation_status == "permission_mismatch":
             metrics.record_permission_mismatch(
                 exchange=view.exchange_name,
@@ -756,6 +785,11 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
         "requested_permissions": view.requested_permissions,
         "exchange_permissions": view.exchange_permissions,
         "effective_permissions": view.effective_permissions,
+        "requested_capability": view.requested_capability,
+        "effective_capability": view.effective_capability,
+        "connection_readiness": view.connection_readiness,
+        "connection_readiness_reason": view.connection_readiness_reason,
+        "permissions_deprecated": view.permissions_deprecated,
         "permission_warnings": list(view.permission_warnings),
         "api_key": view.api_key,
         "status": view.status,

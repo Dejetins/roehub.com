@@ -187,6 +187,7 @@ def test_metrics_expose_secret_safe_exchange_control_series() -> None:
     assert "exchange_connection_validation_total" in response.text
     assert "exchange_connection_archive_total" in response.text
     assert "exchange_connection_cleanup_total" in response.text
+    assert "exchange_connection_trading_readiness_total" in response.text
     assert 'exchange="none"' in response.text
     assert "api_key" not in response.text
     assert "connection_id" not in response.text
@@ -313,6 +314,11 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert created_payload["requested_permissions"] == "read"
     assert created_payload["exchange_permissions"] == "unknown"
     assert created_payload["effective_permissions"] == "none"
+    assert created_payload["requested_capability"] == "trading"
+    assert created_payload["effective_capability"] == "none"
+    assert created_payload["connection_readiness"] == "needs_action"
+    assert created_payload["connection_readiness_reason"] == "validation_required"
+    assert created_payload["permissions_deprecated"] is True
     assert created_payload["permission_warnings"] == []
     assert created_payload["validation_status"] == "skipped_external_validation"
     assert "TEST_SECRET_STAGE4" not in created.text
@@ -503,11 +509,18 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
     assert payload["requested_permissions"] == "read"
     assert payload["exchange_permissions"] == "unknown"
     assert payload["effective_permissions"] == "none"
+    assert payload["requested_capability"] == "trading"
+    assert payload["effective_capability"] == "none"
+    assert payload["connection_readiness"] == "needs_action"
+    assert payload["connection_readiness_reason"] == "validation_required"
+    assert payload["permissions_deprecated"] is True
     assert payload["permission_warnings"] == []
     assert "TEST_SECRET_STAGE5" not in validated.text
 
     metrics = client.get("/metrics")
     assert 'result="skipped_external_validation"' in metrics.text
+    assert "exchange_connection_trading_readiness_total" in metrics.text
+    assert 'reason="validation_required"' in metrics.text
     assert "exchange_permission_mismatch_total" in metrics.text
     assert "connection_id" not in metrics.text
 

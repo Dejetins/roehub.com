@@ -79,6 +79,17 @@ class ExchangeConnectionResponse(BaseModel):
     requested_permissions: Literal["read", "trade"]
     exchange_permissions: Literal["unknown", "read", "trade", "withdraw_or_transfer"]
     effective_permissions: Literal["none", "read", "trade"]
+    requested_capability: Literal["trading"]
+    effective_capability: Literal["none", "trading"]
+    connection_readiness: Literal[
+        "ready_for_trading",
+        "needs_action",
+        "rejected",
+        "disconnected",
+        "archived",
+    ]
+    connection_readiness_reason: str
+    permissions_deprecated: bool
     permission_warnings: list[Literal["exchange_permissions_exceed_requested"]]
     api_key: str
     status: Literal["active", "disabled", "archived"]

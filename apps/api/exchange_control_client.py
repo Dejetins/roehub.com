@@ -56,6 +56,11 @@ class ExchangeConnectionCommandResult:
     updated_at: datetime
     disabled_at: datetime | None
     archived_at: datetime | None
+    requested_capability: str = "trading"
+    effective_capability: str = "none"
+    connection_readiness: str = "needs_action"
+    connection_readiness_reason: str = "validation_required"
+    permissions_deprecated: bool = True
 
 
 class ExchangeControlClient(Protocol):
@@ -414,6 +419,11 @@ class InMemoryExchangeControlClient:
             updated_at=now,
             disabled_at=None,
             archived_at=None,
+            requested_capability="trading",
+            effective_capability="none",
+            connection_readiness="needs_action",
+            connection_readiness_reason="validation_required",
+            permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = result
         self._owners_dict()[connection_id] = owner_user_id
@@ -459,6 +469,11 @@ class InMemoryExchangeControlClient:
             updated_at=datetime.fromisoformat("2026-05-24T12:01:00+00:00"),
             disabled_at=existing.disabled_at,
             archived_at=existing.archived_at,
+            requested_capability="trading",
+            effective_capability="none",
+            connection_readiness="needs_action",
+            connection_readiness_reason="validation_required",
+            permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = rotated
         return rotated
@@ -500,6 +515,11 @@ class InMemoryExchangeControlClient:
             updated_at=disabled_at,
             disabled_at=disabled_at,
             archived_at=None,
+            requested_capability="trading",
+            effective_capability="none",
+            connection_readiness="disconnected",
+            connection_readiness_reason="user_disconnected",
+            permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = disabled
         return disabled
@@ -544,6 +564,11 @@ class InMemoryExchangeControlClient:
             updated_at=archived_at,
             disabled_at=existing.disabled_at,
             archived_at=archived_at,
+            requested_capability="trading",
+            effective_capability="none",
+            connection_readiness="archived",
+            connection_readiness_reason="archived",
+            permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = archived
         return archived
@@ -585,6 +610,11 @@ class InMemoryExchangeControlClient:
             updated_at=validated_at,
             disabled_at=existing.disabled_at,
             archived_at=existing.archived_at,
+            requested_capability="trading",
+            effective_capability="none",
+            connection_readiness="rejected",
+            connection_readiness_reason="read_only_not_supported",
+            permissions_deprecated=True,
         )
         self._connections_dict()[connection_id] = validated
         return validated
@@ -683,6 +713,15 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
                 if payload.get("archived_at") is not None
                 else None
             ),
+            requested_capability=str(payload.get("requested_capability") or "trading"),
+            effective_capability=str(payload.get("effective_capability") or "none"),
+            connection_readiness=str(
+                payload.get("connection_readiness") or "needs_action"
+            ),
+            connection_readiness_reason=str(
+                payload.get("connection_readiness_reason") or "validation_required"
+            ),
+            permissions_deprecated=bool(payload.get("permissions_deprecated", True)),
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise ExchangeControlClientError(

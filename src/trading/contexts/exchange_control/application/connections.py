@@ -24,6 +24,14 @@ ALLOWED_EXCHANGES = {"binance", "bybit"}
 ALLOWED_MARKET_TYPES = {"spot", "futures"}
 ALLOWED_ENVIRONMENTS = {"mainnet", "testnet"}
 ALLOWED_PERMISSIONS = {"read", "trade"}
+ALLOWED_EFFECTIVE_CAPABILITIES = {"none", "trading"}
+ALLOWED_CONNECTION_READINESS = {
+    "ready_for_trading",
+    "needs_action",
+    "rejected",
+    "disconnected",
+    "archived",
+}
 
 
 class ExchangeConnectionError(RuntimeError):
@@ -50,6 +58,11 @@ class ExchangeConnectionView:
     requested_permissions: str
     exchange_permissions: str
     effective_permissions: str
+    requested_capability: str
+    effective_capability: str
+    connection_readiness: str
+    connection_readiness_reason: str
+    permissions_deprecated: bool
     permission_warnings: tuple[str, ...]
     api_key: str
     status: str
@@ -276,6 +289,21 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             status_reason="user_disabled",
             updated_at=disabled_at,
             disabled_at=disabled_at,
+            permission_summary={
+                **(connection.permission_summary or {}),
+                **trading_capability_summary(
+                    status="disabled",
+                    validation_status=connection.validation_status,
+                    validation_reason=connection.validation_reason,
+                    ip_restriction_status=connection.ip_restriction_status,
+                    exchange_permissions=_summary_string(
+                        summary=connection.permission_summary or {},
+                        key="exchange_permissions",
+                        default="unknown",
+                        allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+                    ),
+                ),
+            },
         )
         self._connections[connection_id] = disabled
         return disabled
@@ -300,6 +328,21 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             status_reason="user_archived",
             updated_at=archived_at,
             archived_at=archived_at,
+            permission_summary={
+                **(connection.permission_summary or {}),
+                **trading_capability_summary(
+                    status="archived",
+                    validation_status=connection.validation_status,
+                    validation_reason=connection.validation_reason,
+                    ip_restriction_status=connection.ip_restriction_status,
+                    exchange_permissions=_summary_string(
+                        summary=connection.permission_summary or {},
+                        key="exchange_permissions",
+                        default="unknown",
+                        allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+                    ),
+                ),
+            },
         )
         self._connections[connection_id] = archived
         return archived
@@ -317,6 +360,12 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             return None
         if connection.status != "active":
             return None
+        merged_summary = {
+            **(connection.permission_summary or {}),
+            **(result.permission_summary or {}),
+            "validation_status": result.status,
+            "validation_reason": result.reason,
+        }
         updated = replace(
             connection,
             validation_status=result.status,
@@ -325,10 +374,19 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
             last_validated_at=result.observed_at or updated_at,
             updated_at=updated_at,
             permission_summary={
-                **(connection.permission_summary or {}),
-                **(result.permission_summary or {}),
-                "validation_status": result.status,
-                "validation_reason": result.reason,
+                **merged_summary,
+                **trading_capability_summary(
+                    status=connection.status,
+                    validation_status=result.status,
+                    validation_reason=result.reason,
+                    ip_restriction_status=result.ip_restriction_status,
+                    exchange_permissions=_summary_string(
+                        summary=merged_summary,
+                        key="exchange_permissions",
+                        default="unknown",
+                        allowed={"unknown", "read", "trade", "withdraw_or_transfer"},
+                    ),
+                ),
             },
         )
         self._connections[connection_id] = updated
@@ -663,6 +721,13 @@ class ExchangeConnectionService:
             default="none",
             allowed={"none", "read", "trade"},
         )
+        capability_summary = trading_capability_summary(
+            status=connection.status,
+            validation_status=connection.validation_status,
+            validation_reason=connection.validation_reason,
+            ip_restriction_status=connection.ip_restriction_status,
+            exchange_permissions=exchange_permissions,
+        )
         return ExchangeConnectionView(
             connection_id=connection.connection_id,
             credential_version_id=connection.active_credential_version_id,
@@ -675,6 +740,30 @@ class ExchangeConnectionService:
             requested_permissions=requested_permissions,
             exchange_permissions=exchange_permissions,
             effective_permissions=effective_permissions,
+            requested_capability=_summary_string(
+                summary={**permission_summary, **capability_summary},
+                key="requested_capability",
+                default="trading",
+                allowed={"trading"},
+            ),
+            effective_capability=_summary_string(
+                summary={**permission_summary, **capability_summary},
+                key="effective_capability",
+                default=str(capability_summary["effective_capability"]),
+                allowed=ALLOWED_EFFECTIVE_CAPABILITIES,
+            ),
+            connection_readiness=_summary_string(
+                summary={**permission_summary, **capability_summary},
+                key="connection_readiness",
+                default=str(capability_summary["connection_readiness"]),
+                allowed=ALLOWED_CONNECTION_READINESS,
+            ),
+            connection_readiness_reason=_summary_string_unbounded(
+                summary={**permission_summary, **capability_summary},
+                key="connection_readiness_reason",
+                default=str(capability_summary["connection_readiness_reason"]),
+            ),
+            permissions_deprecated=True,
             permission_warnings=_summary_warnings(summary=permission_summary),
             api_key=f"****{credential.api_key_last4}",
             status=connection.status,
@@ -819,7 +908,77 @@ def _initial_permission_summary(
         "permission_warnings": [],
         "validation_status": validation_status,
         "validation_reason": validation_reason,
+        **trading_capability_summary(
+            status="active",
+            validation_status=validation_status,
+            validation_reason=validation_reason,
+            ip_restriction_status="unknown",
+            exchange_permissions="unknown",
+        ),
     }
+
+
+def trading_capability_summary(
+    *,
+    status: str,
+    validation_status: str,
+    validation_reason: str | None,
+    ip_restriction_status: str,
+    exchange_permissions: str,
+) -> dict[str, object]:
+    effective_capability, readiness, readiness_reason = _resolve_trading_readiness(
+        status=status,
+        validation_status=validation_status,
+        validation_reason=validation_reason,
+        ip_restriction_status=ip_restriction_status,
+        exchange_permissions=exchange_permissions,
+    )
+    return {
+        "requested_capability": "trading",
+        "effective_capability": effective_capability,
+        "connection_readiness": readiness,
+        "connection_readiness_reason": readiness_reason,
+        "permissions_deprecated": True,
+    }
+
+
+def _resolve_trading_readiness(
+    *,
+    status: str,
+    validation_status: str,
+    validation_reason: str | None,
+    ip_restriction_status: str,
+    exchange_permissions: str,
+) -> tuple[str, str, str]:
+    if status == "archived":
+        return "none", "archived", "archived"
+    if status == "disabled":
+        return "none", "disconnected", "user_disconnected"
+    if (
+        validation_status == "valid_trade_enabled"
+        and exchange_permissions == "trade"
+        and ip_restriction_status != "missing_mainnet_restriction"
+    ):
+        return "trading", "ready_for_trading", "trading_policy_ok"
+    if validation_status in {"valid_readonly", "permission_mismatch"}:
+        return "none", "rejected", "read_only_not_supported"
+    if exchange_permissions == "withdraw_or_transfer" or validation_reason in {
+        "withdraw_or_transfer_enabled",
+        "transfer_permission_enabled",
+    }:
+        return "none", "rejected", "unsafe_permissions"
+    if (
+        validation_status == "invalid_ip_restriction"
+        or ip_restriction_status == "missing_mainnet_restriction"
+    ):
+        return "none", "needs_action", "ip_restriction_required"
+    if validation_status == "invalid_credentials":
+        return "none", "rejected", "invalid_credentials"
+    if validation_status == "invalid_permissions":
+        return "none", "rejected", "invalid_permissions"
+    if validation_status == "unsupported_account_mode":
+        return "none", "rejected", "unsupported_account_mode"
+    return "none", "needs_action", "validation_required"
 
 
 def _summary_string(
@@ -836,6 +995,18 @@ def _summary_string(
         alias = summary.get("permissions")
         if isinstance(alias, str) and alias in allowed:
             return alias
+    return default
+
+
+def _summary_string_unbounded(
+    *,
+    summary: dict[str, object],
+    key: str,
+    default: str,
+) -> str:
+    value = summary.get(key)
+    if isinstance(value, str) and value:
+        return value
     return default
 
 

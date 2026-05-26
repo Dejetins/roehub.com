@@ -201,6 +201,11 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert created_payload["requested_permissions"] == "read"
     assert created_payload["exchange_permissions"] == "unknown"
     assert created_payload["effective_permissions"] == "none"
+    assert created_payload["requested_capability"] == "trading"
+    assert created_payload["effective_capability"] == "none"
+    assert created_payload["connection_readiness"] == "needs_action"
+    assert created_payload["connection_readiness_reason"] == "validation_required"
+    assert created_payload["permissions_deprecated"] is True
     assert created_payload["permission_warnings"] == []
     assert created_payload["environment"] == "testnet"
     assert created_payload["validation_status"] == "skipped_external_validation"
@@ -596,6 +601,11 @@ def test_ui_account_exchange_connection_validate_is_secret_safe_and_audited() ->
     assert payload["requested_permissions"] == "read"
     assert payload["exchange_permissions"] == "read"
     assert payload["effective_permissions"] == "read"
+    assert payload["requested_capability"] == "trading"
+    assert payload["effective_capability"] == "none"
+    assert payload["connection_readiness"] == "rejected"
+    assert payload["connection_readiness_reason"] == "read_only_not_supported"
+    assert payload["permissions_deprecated"] is True
     assert payload["permission_warnings"] == []
     assert payload["last_validated_at"] is not None
     assert "TEST_SECRET_STAGE5" not in validated.text
