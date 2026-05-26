@@ -99,6 +99,14 @@ quality_gates:
   - cmd: "<optional_command_3_if_needed>"
     expect: "<expected_result_3>"
 
+validation_strategy:
+  depth: <tests_only|integration|e2e|browser_runtime|target_runtime|benchmark|ci_deploy>
+  e2e_required: <true|false>
+  acceptance_surfaces:
+    - "<api|database|browser|target-host|adapter|benchmark|ci-deploy|none>"
+  tests_only_allowed_reason: "<required if depth is tests_only>"
+  evidence_target: "<stage_ledger_path_or_report_path>"
+
 stage_execution_ledger:
   path: <stage_ledger_path_if_plan_or_prompt_pack>
   plan_doc: <architecture_or_implementation_plan_path>
@@ -174,6 +182,7 @@ Additional context:
 - Add or update targeted tests where needed.
 - Update related exports / nearby docs when required.
 - Keep the implementation deterministic and reviewable.
+- For non-trivial implementation, run local gates plus the nearest meaningful real-boundary or end-to-end validation surface. Tests-only acceptance requires an explicit safe reason.
 - If this prompt implements a plan stage, read the stage execution ledger before implementation and update it after validation and before the final report.
 - If a previous required stage is not accepted, stop unless this prompt explicitly repairs, supersedes, or unblocks that stage.
 - If browser-visible behavior is in scope, use an available runtime browser verification surface when available and relevant.
@@ -302,6 +311,13 @@ If browser-visible behavior is in scope, also include acceptance criteria equiva
 - Prefer targeted tests over broad unrelated test churn.
 - If config or DTO surfaces change, add parsing / compatibility coverage.
 - If browser-visible behavior is in scope, do not rely on tests alone when runtime browser verification is relevant and available.
+
+## Validation depth
+
+- Treat lint/type/unit tests as local gates, not as sufficient acceptance for non-trivial stages.
+- Validate through the nearest changed boundary: API/use-case, persistence/migration, browser runtime, target runtime, external adapter, benchmark/profile, CI/deploy, or production-safe smoke.
+- If tests-only is sufficient, state why no contract, persistence, browser-visible, runtime, ops, performance, integration, or delivery surface is affected.
+- Record validation evidence in the stage ledger or final report.
 
 ## Browser/runtime verification
 

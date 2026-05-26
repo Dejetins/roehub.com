@@ -2,8 +2,10 @@
 
 Статус: staged rollout active. Этап 8 принят как production-browser repair и
 заменяет неполное readiness-утверждение Этапа 7 для authenticated public
-`/settings` add-key flow. Этап 9 запланирован как hardening lifecycle,
-архивирования и permission semantics перед любыми будущими execution stages.
+`/settings` add-key flow. Этап 9 принят как lifecycle/permission hardening.
+Этап 10 запланирован как продуктовая доработка CJM: пользователь подключает
+биржевой аккаунт для торговли стратегиями, а не выбирает технический режим
+`read`/`trade`.
 
 Документ фиксирует архитектуру первого production-этапа для Binance/Bybit
 API-ключей на `/settings`: добавление, безопасное хранение, валидация,
@@ -1725,15 +1727,474 @@ curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=exchange_connection_archive_
 - после acceptance каждого sub-stage выполнен direct-main delivery или stage
   явно помечен blocked.
 
+### Этап 10 — Trading-Only CJM И Auto-Validation
+
+Stage 10 меняет пользовательскую модель с "добавить API key с выбранными
+permissions" на "подключить биржевой аккаунт, пригодный для торговли
+стратегиями". Это продуктовая доработка поверх принятого Stage 09.
+
+#### Проблема
+
+После Stage 09 система безопасно различает:
+
+- `requested_permissions`;
+- `exchange_permissions`;
+- `effective_permissions`;
+- `permission_mismatch`.
+
+Но пользовательский CJM все еще заставляет пользователя выбирать `read` или
+`trade` при добавлении ключа. Для Roehub это лишний и потенциально
+дезориентирующий выбор: платформа не планирует отдельный read-only продуктовый
+сценарий вроде портфельного мониторинга или аналитики. Биржевое подключение
+нужно для будущей торговли стратегиями, поэтому read-only ключ не является
+частично успешным подключением.
+
+#### Бизнес-Смысл
+
+- пользователь добавляет "биржевой аккаунт для торговли", а не технический
+  API-key mode;
+- Roehub сам проверяет права ключа, IP restriction, account mode и окружение;
+- read-only ключ не выглядит рабочим подключением;
+- `active` в UI означает "готово для продуктового trading workflow", а не
+  просто "секрет сохранен";
+- ручная валидация перестает быть обязательным пользовательским шагом;
+- отключенные записи остаются backend/security state, но не становятся отдельным
+  пользовательским этапом.
+
+#### Новая Пользовательская Модель
+
+Целевой flow на `/settings`:
+
+| Шаг | Пользователь | Roehub |
+|---|---|---|
+| 1 | Выбирает биржу: Binance или Bybit. | Показывает требования к ключу для trading-ready подключения. |
+| 2 | Оставляет `Mainnet` по умолчанию или открывает advanced `Testnet`. | Выбирает правильный validation endpoint. |
+| 3 | Вводит API key и API secret. | Принимает secrets write-only, не предлагает выбор `read`/`trade`. |
+| 4 | Нажимает `Connect and validate`. | Сразу выполняет validation через `exchange-control`. |
+| 5 | Получает итог. | Создает active connection только если ключ trading-ready по Roehub policy. |
+
+`testnet` остается поддерживаемым режимом для тестовой среды биржи с виртуальным
+балансом и отдельными API keys, но в UI он должен быть явно отделен от обычного
+mainnet сценария: advanced/dev control, а не равноценный default choice.
+
+#### Trading-Only Capability
+
+Пользователь больше не выбирает `requested_permissions=read|trade`.
+
+Целевой public/product contract:
+
+| Поле | Роль после Stage 10 |
+|---|---|
+| `requested_capability` | Внутреннее product intent поле. Для `/settings` v1 всегда `trading`. |
+| `exchange_permissions` | Нормализованный факт от Binance/Bybit: `read`, `trade`, `withdraw_or_transfer`, `unknown`. |
+| `effective_capability` | Решение Roehub policy: `trading` или `none`. |
+| `connection_readiness` | Пользовательский итог: `ready_for_trading`, `needs_action`, `rejected`, `disconnected`, `archived`. |
+| `permissions` / `requested_permissions` | Deprecated compatibility fields; не являются пользовательским выбором в `/settings`. |
+
+Stage 10 не обязан физически удалить старые поля сразу. Для совместимости можно
+оставить `permissions` как deprecated alias, но новый UI и новые tests не должны
+опираться на пользовательский выбор `read`/`trade`.
+
+Правила policy v1:
+
+| Exchange validation | Effective capability | User-facing result | Durable state |
+|---|---|---|---|
+| trade-enabled, no dangerous permissions, required IP policy OK | `trading` | `Ready for trading` | `active` |
+| readonly key | `none` | `Key is read-only and cannot be used for Roehub trading` | не active; не занимает лимит |
+| withdrawal/transfer enabled | `none` | `Unsafe permissions: remove withdrawal/transfer permissions` | не active; не занимает лимит |
+| invalid credentials | `none` | `Invalid API key or secret` | не active; не занимает лимит |
+| missing mainnet IP restriction | `none` | `IP restriction required` | не active; не занимает лимит |
+| validation unavailable | `none` | `Validation unavailable, try again later` | не active; не занимает лимит |
+
+Ключевое правило: read-only key может быть audit/debug фактом, но не является
+успешным продуктовым подключением. Если implementation технически вынужден
+создать промежуточную запись до validation, итоговая durable запись после
+неуспешной validation не должна оставаться `active`.
+
+#### Auto-Validation И Ручная Re-Check
+
+Stage 10 меняет смысл validation:
+
+- create и rotate автоматически запускают validation;
+- manual `Validate` в основном happy path не нужен;
+- manual action остается только как `Re-check` для уже существующего
+  подключения, если пользователь изменил права/IP на стороне биржи или validation
+  устарела;
+- `Re-check` не размещает orders и не доказывает execution readiness.
+
+`Re-check` разрешен только для записей, где это безопасно:
+
+- active trading-ready connection;
+- history/needs-action запись, если implementation сохраняет ее без
+  использования secrets в product workflows;
+- не для archived, если archived semantics остается final history state.
+
+#### Lifecycle UI После Stage 10
+
+Backend lifecycle остается:
+
+```text
+active -> disabled -> archived
+```
+
+Но пользовательский UI больше не должен показывать `disabled` как отдельный
+основной этап.
+
+Целевой UI:
+
+| UI view | Содержимое | Действия |
+|---|---|---|
+| `Active` | Только trading-ready `active` connections. | `Re-check`, `Rotate`, `Disconnect`. |
+| `History` | `disabled` и `archived`, плюс rejected/needs-action records если они сохраняются. | `Archive` для disabled, read-only details для archived. |
+
+`Disable` в UI переименовывается в `Disconnect`, потому что пользовательский
+смысл действия: "Roehub больше не использует этот ключ". Backend command может
+оставаться `disable`, если контракт уже принят.
+
+Отдельная вкладка `Disabled` убирается. `disabled` остается backend/security
+state, а не пользовательским шагом CJM.
+
+#### Обработка Существующих Записей
+
+После Stage 09 в production могут существовать active записи с:
+
+- `permission_mismatch`;
+- `effective_permissions=read`;
+- `exchange_permissions=read`;
+- `requested_permissions=trade`;
+- read-only validation history.
+
+Stage 10 должен выполнить controlled reclassification/backfill:
+
+- dry-run сначала;
+- выбрать только active records, которые не являются trading-ready по новым
+  правилам;
+- не трогать archived records;
+- не выполнять physical delete;
+- перевести не-trading-ready active records в `disabled`/History через
+  supported lifecycle command или repair path;
+- зафиксировать audit event и metric;
+- доказать, что Active UI/API после backfill содержит только trading-ready
+  подключения.
+
+#### Метрики И Audit Stage 10
+
+Новые или уточненные metrics:
+
+- `exchange_connection_auto_validation_total{exchange,result,reason}`;
+- `exchange_connection_trading_readiness_total{exchange,result,reason}`;
+- `exchange_connection_reclassification_total{source,result,reason}`;
+
+Audit metadata остается redacted и не содержит secrets/ciphertext/HMAC/raw
+exchange body.
+
+Рекомендуемые audit event types:
+
+- `exchange_connection_auto_validated`;
+- `exchange_connection_rejected`;
+- `exchange_connection_reclassified`;
+- existing `exchange_connection_disabled` для `Disconnect`.
+
+Если audit schema уже не может безопасно расширяться в том же stage, event type
+добавляется отдельной additive migration с tests.
+
+#### Разбиение Stage 10 На Prompt Stages
+
+Единый ledger остается:
+
+```text
+docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
+```
+
+| Stage | Содержание | Gate |
+|---|---|---|
+| `10A` | Backend capability/readiness model: `requested_capability=trading`, `effective_capability`, `connection_readiness`, deprecated permissions compatibility. | Concrete API read-model call + DB evidence for readiness fields + metrics/capabilities check; tests are only supporting evidence. |
+| `10B` | Auto-validation on create/rotate and non-ready handling: active only when trading-ready. | Concrete create/rotate API calls with env-backed readonly/invalid credentials; Active list assertion; audit/metrics evidence; tests are only supporting evidence. |
+| `10C` | `/settings` CJM: remove read/trade selector, mainnet default + advanced testnet, Active/History only, `Disconnect`, `Re-check`. | Authenticated browser/Playwright proof + real `/settings` HTML/API checks; tests are only supporting evidence. |
+| `10D` | Controlled reclassification/backfill of existing non-trading active records. | Dry-run command -> execute command -> DB/API/metrics/audit evidence; tests are only supporting evidence. |
+| `10E` | Production readiness. | Authenticated Playwright: readonly rejected/not active, trading-ready env proof when credentials exist, no secret artifacts, metrics/audit/docs/direct-main. |
+
+#### Валидация Stage 10
+
+Правило acceptance: unit tests, route tests, lint и type checks не являются
+достаточным доказательством stage. Каждый Stage 10 sub-stage считается принятым
+только после конкретных вызовов к работающему runtime/API/browser/DB/metrics
+surface. Tests остаются обязательным quality gate, но не заменяют runtime
+evidence.
+
+Local quality gates:
+
+```bash
+uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/web/test_app_routes.py tests/unit/apps/migrations
+uv run ruff check src/trading/contexts/exchange_control apps/api apps/web tools tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web tests/unit/apps/migrations
+uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api
+python -m tools.docs.generate_docs_index --check
+```
+
+Stage-specific runtime acceptance:
+
+| Stage | Обязательные реальные вызовы |
+|---|---|
+| `10A` | `GET /api/ui/account/exchange-connections?status=active` должен вернуть DTO с `requested_capability`, `effective_capability`, `connection_readiness`; DB query должен показать, где эти поля persist/read-model sourced; `/metrics` или `/internal/v1/capabilities` должен подтвердить runtime surface после deploy. |
+| `10B` | `POST /api/ui/account/exchange-connections` с env-backed readonly key должен вернуть deterministic not-active result/reason; затем `GET ...?status=active` не должен содержать label этой попытки; DB/audit query и `/metrics` должны подтвердить auto-validation outcome. Invalid credential call также обязателен. |
+| `10C` | Authenticated `/settings` Playwright должен доказать: нет read/trade selector, есть `Connect and validate`, default mainnet, testnet advanced, Active/History only, `Disconnect`, `Re-check`; network calls должны показать create payload без user-selected permissions. |
+| `10D` | Reclassification dry-run command должен показать кандидатов и причины; execute command должен пройти только после dry-run; DB/API после execution должны доказать, что Active содержит только trading-ready; audit/metrics должны показать reclassification event/counter. |
+| `10E` | Production authenticated Playwright + API/DB/audit/metrics/Prometheus/Monit/OpenBao evidence. Если trade-enabled env credentials отсутствуют, trading-ready success часть помечается `blocked` или `partial`, а не считается принятой. |
+
+Required env var names for external validation evidence:
+
+```text
+ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_KEY
+ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_SECRET
+ROEHUB_E2E_BINANCE_MAINNET_READONLY_API_KEY
+ROEHUB_E2E_BINANCE_MAINNET_READONLY_API_SECRET
+ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_KEY
+ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_SECRET
+ROEHUB_E2E_BINANCE_MAINNET_TRADE_API_KEY
+ROEHUB_E2E_BINANCE_MAINNET_TRADE_API_SECRET
+ROEHUB_E2E_BYBIT_TESTNET_TRADE_API_KEY
+ROEHUB_E2E_BYBIT_TESTNET_TRADE_API_SECRET
+```
+
+Skip/block policy:
+
+- readonly rejection proof is mandatory for Stage 10B and 10E; if no readonly
+  env-backed key is available, stage is `blocked`, not accepted;
+- trade-ready proof is mandatory only for full Stage 10E acceptance; if no
+  trade-enabled env-backed key is available, Stage 10E may be `partial` for
+  readonly-rejection readiness but not full trading-ready acceptance;
+- no stage may use fake/in-memory validation as production acceptance.
+
+API acceptance examples:
+
+```bash
+# create no longer requires user-selected permissions
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_RECENT_AUTH_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN" \
+  --data "{\"exchange_name\":\"bybit\",\"market_type\":\"spot\",\"environment\":\"mainnet\",\"label\":\"stage10_readonly_reject\",\"api_key\":\"$ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_KEY\",\"api_secret\":\"$ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_SECRET\"}"
+
+# default active list must contain only trading-ready connections
+curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections?status=active" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  | jq '.items[] | {status, exchange_permissions, effective_capability, connection_readiness}'
+
+# runtime metrics must expose Stage 10 counters after relevant calls
+curl -fsS http://127.0.0.1:9205/metrics \
+  | rg 'exchange_connection_auto_validation_total|exchange_connection_trading_readiness_total|exchange_connection_reclassification_total'
+```
+
+Playwright acceptance:
+
+- `/settings` add form has no `read`/`trade` selector;
+- default environment is mainnet;
+- testnet control is advanced/dev-only visible;
+- read-only key returns clear "not usable for trading" result and does not
+  appear in Active;
+- active tab contains only `Ready for trading`;
+- history contains disconnected/rejected/archived records as applicable;
+- active row action is `Disconnect`, not a separate user-facing `Disabled` step;
+- `Re-check` exists only as revalidation action, not as required creation step;
+- password manager does not offer to save API key/secret as site login;
+- secret artifact grep is clean.
+
+Production readiness can use optional env-backed exchange credentials:
+
+```text
+ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_KEY
+ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_SECRET
+ROEHUB_E2E_BINANCE_MAINNET_TRADE_API_KEY
+ROEHUB_E2E_BINANCE_MAINNET_TRADE_API_SECRET
+ROEHUB_E2E_BYBIT_TESTNET_TRADE_API_KEY
+ROEHUB_E2E_BYBIT_TESTNET_TRADE_API_SECRET
+```
+
+Если trade-enabled test credentials отсутствуют, Stage 10E не должен делать
+ложный вывод о trading-ready success. Он может принять readonly rejection path,
+но full trading-ready production acceptance помечается blocked или partial с
+явной причиной.
+
+### Этап 11 — Strategy Binding Guard Без Exchange Execution
+
+Stage 11 закрывает lifecycle-gap: пользователь не должен иметь возможность
+отключить биржевое подключение, если оно уже назначено активной стратегии.
+Это не требует `exchange-execution` и не размещает orders. Речь только о
+конфигурационной связи "стратегия использует это exchange connection".
+
+#### Проблема
+
+После Stage 10 `Active` означает "готово для торговли стратегиями", а кнопка
+`Disconnect` означает "Roehub больше не использует этот ключ". Но если ключ уже
+выбран в стратегии, отключение без проверки приведет к скрытому product break:
+стратегия останется настроенной на connection, который больше нельзя использовать.
+
+Фактического execution-модуля пока нет, но это не блокирует защиту. Нам нужен
+не runtime order-path, а реестр назначений стратегий на exchange connection.
+
+#### Бизнес-Смысл
+
+- пользователь видит, что подключение используется стратегиями;
+- отключение не ломает будущую торговую конфигурацию молча;
+- поддержка будущего execution строится на стабильном `connection_id`, а не на
+  конкретной версии ключа;
+- ключ можно ротировать без переназначения стратегий;
+- lifecycle остается безопасным: сначала pause/reassign стратегии, потом
+  disconnect/archive connection.
+
+#### Целевая Модель Usage Registry
+
+Stage 11 добавляет отдельную модель usage/binding рядом со strategy bounded
+context, но lifecycle enforcement остается на стороне exchange connections.
+
+| Поле | Назначение | Контракт |
+|---|---|---|
+| `binding_id` | Стабильный id связи. | UUID, не раскрывает секреты. |
+| `owner_user_id` | Владелец связи. | Должен совпадать с владельцем strategy и exchange connection. |
+| `strategy_id` / `strategy_instance_id` | Какая стратегия использует connection. | Используется только как ссылка на конфигурацию стратегии, не на execution run. |
+| `exchange_connection_id` | Стабильный connection handle. | Не меняется при rotation credential version. |
+| `usage_mode` | Как стратегия планирует использовать connection. | В v1 только `trading`; read-only usage не вводится. |
+| `binding_status` | Lifecycle связи. | `active`, `paused`, `disabled`, `archived`. |
+| `created_at`, `updated_at`, `disabled_at`, `archived_at` | Audit-friendly timestamps. | UTC, без секретов. |
+
+`strategy_exchange_bindings` является конфигурационным read/write model, а не
+частью hot-path исполнения orders. Будущий execution сможет читать только
+принятые active bindings, но Stage 11 не проектирует order placement.
+
+#### Правила Guard
+
+| Команда | Правило Stage 11 | Почему |
+|---|---|---|
+| `Bind strategy to connection` | Разрешено только владельцу strategy и connection; connection должен быть `active` и `ready_for_trading`. | Нельзя назначить стратегию на read-only, rejected, disabled или чужой ключ. |
+| `Pause/disable binding` | Разрешено владельцу стратегии. | Это освобождает connection для disconnect/archive. |
+| `Disconnect connection` | Запрещено, если есть `active` binding с `usage_mode=trading`. Возвращает deterministic `409 exchange_connection_in_use`. | Нельзя молча сломать стратегию. |
+| `Archive connection` | Запрещено, если есть `active` binding с `usage_mode=trading`. | Archive является history/final state и не должен прятать используемое подключение. |
+| `Rotate credential` | Разрешено при active binding, потому что `connection_id` стабилен. Новая версия ключа обязана пройти trading-ready validation. | Ротация должна быть обслуживаемой операцией без переназначения стратегий. |
+| `Re-check validation` | Разрешено, но не размещает orders. Если readiness падает, связь должна стать `blocked/needs_action` в будущей стратегии UI, без execution-side effects. | Validation не является trading execution. |
+
+Канонический user-facing текст:
+
+```text
+Cannot disconnect. This exchange account is used by N active strategies. Pause or reassign strategies first.
+```
+
+#### API/UI Контракт Stage 11
+
+Минимальный API contract:
+
+| Surface | Изменение |
+|---|---|
+| Account exchange connections DTO | Добавить `active_strategy_bindings_count` или `used_by_strategies_count`. Не добавлять user/secret-bearing labels. |
+| Disconnect/disable endpoint | Перед lifecycle mutation вызывает usage guard; при active binding возвращает `409 exchange_connection_in_use`. |
+| Archive endpoint | Использует тот же guard; active binding блокирует archive. |
+| Strategy binding API | Primary target: `GET /api/ui/strategies/{strategy_id}/exchange-bindings`, `POST /api/ui/strategies/{strategy_id}/exchange-bindings`, `POST /api/ui/strategies/{strategy_id}/exchange-bindings/{binding_id}/disable`. Эти endpoints управляют только конфигурационной связью, не execution. |
+| `/settings` Active list | Показывает "Used by N strategies" и блокирует/объясняет `Disconnect`, если `N > 0`. |
+| `/settings` History | Не обязан показывать disabled как отдельный этап; archived/history view может показывать прошлые bindings без возможности реактивации connection. |
+
+Stage 11 не должен вводить кнопку "Start trading", "Place order" или
+интерпретировать binding как разрешение на execution.
+
+Если существующий strategy router не позволяет безопасно добавить эти endpoints
+в Stage 11, допускается временный local/admin command tool для acceptance, но
+только как явно задокументированный fallback. В этом случае stage report должен
+объяснить, почему HTTP endpoint отложен, и все равно доказать guard через
+реальные lifecycle API calls. Прямой ad hoc DB insert не является acceptance.
+
+#### Audit И Метрики Stage 11
+
+Audit event types:
+
+| Event | Когда пишется | Metadata |
+|---|---|---|
+| `strategy_exchange_binding_created` | Strategy назначена на connection. | `strategy_id`, `exchange_connection_id`, `usage_mode`, без секретов. |
+| `strategy_exchange_binding_disabled` | Binding paused/disabled. | `strategy_id`, `exchange_connection_id`, reason code. |
+| `strategy_exchange_binding_archived` | Binding переведен в history. | Stable ids and reason only. |
+| `exchange_connection_disconnect_blocked` | Disconnect/archive заблокирован guard. | `connection_id`, `active_bindings_count`, `action`, без strategy internals beyond IDs. |
+
+Metrics:
+
+| Metric | Labels | Назначение |
+|---|---|---|
+| `exchange_connection_usage_guard_total` | `action`, `result`, `reason` | Сколько disconnect/archive попыток разрешено или заблокировано. |
+| `exchange_connection_active_strategy_bindings` | `exchange`, `status` | Gauge/read-model count без user_id, connection_id, strategy_id labels. |
+| `strategy_exchange_binding_total` | `action`, `result` | Создание/disable/archive binding. |
+
+#### Валидация Stage 11
+
+Acceptance не может быть основан только на tests. Нужны конкретные runtime/API/
+DB/browser/metrics вызовы.
+
+Stage-specific runtime acceptance:
+
+| Проверка | Обязательный вызов / доказательство |
+|---|---|
+| Create binding | Через `POST /api/ui/strategies/{strategy_id}/exchange-bindings` создать binding к active trading-ready connection; затем `GET /api/ui/strategies/{strategy_id}/exchange-bindings` и account read-model должны показать active binding и `used_by_strategies_count=1`. |
+| Guard blocks disconnect | `POST .../exchange-connections/{connection_id}/disable` должен вернуть `409` и error code `exchange_connection_in_use`. |
+| Guard blocks archive | `POST .../exchange-connections/{connection_id}/archive` должен вернуть `409` с тем же reason, если active binding существует. |
+| Rotate allowed | `POST .../{connection_id}/rotate` остается разрешенным для используемого connection при env-backed valid credentials и проходит auto-validation; если credentials отсутствуют, case фиксируется `blocked`, не имитируется fake success. |
+| Release then disconnect | После `POST /api/ui/strategies/{strategy_id}/exchange-bindings/{binding_id}/disable` повторный `Disconnect` проходит, connection исчезает из Active. |
+| UI proof | Authenticated Playwright `/settings` показывает "Used by 1 strategy" или эквивалент, а `Disconnect` недоступен или возвращает понятную ошибку. |
+| DB evidence | Query по `strategy_exchange_bindings` показывает owner-scoped binding и status transitions без секретов. |
+| Audit/metrics | Audit events и `/metrics` показывают create/block/release без secret-bearing labels или raw exchange body. |
+
+Пример acceptance-команд должен использовать реальные env/session values, но не
+записывать их в report:
+
+```bash
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/strategies/$STRATEGY_ID/exchange-bindings" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN" \
+  --data "{\"exchange_connection_id\":\"$CONNECTION_ID\",\"usage_mode\":\"trading\"}"
+
+curl -fsS "$ROEHUB_BASE_URL/api/ui/strategies/$STRATEGY_ID/exchange-bindings" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  | CONNECTION_ID="$CONNECTION_ID" jq -e '.items[] | select(.exchange_connection_id == env.CONNECTION_ID and .binding_status == "active")'
+
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections/$CONNECTION_ID/disable" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"
+
+curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections?status=active" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  | jq '.items[] | {connection_id, used_by_strategies_count, connection_readiness}'
+
+curl -i -X POST "$ROEHUB_BASE_URL/api/ui/strategies/$STRATEGY_ID/exchange-bindings/$BINDING_ID/disable" \
+  -H "Origin: $ROEHUB_BASE_URL" \
+  -H "Cookie: $ROEHUB_SESSION_COOKIE" \
+  -H "X-CSRF-Token: $ROEHUB_CSRF_TOKEN"
+
+psql "$ROEHUB_PG_DSN" -c "
+SELECT binding_id, owner_user_id, strategy_id, exchange_connection_id,
+       usage_mode, binding_status, created_at, disabled_at, archived_at
+FROM strategy_exchange_bindings
+ORDER BY created_at DESC
+LIMIT 20;"
+
+curl -fsS http://127.0.0.1:9205/metrics \
+  | rg 'exchange_connection_usage_guard_total|strategy_exchange_binding_total|exchange_connection_active_strategy_bindings'
+```
+
+Критерий выхода:
+
+- active strategy binding блокирует `Disconnect` и `Archive`;
+- ошибка deterministic: `409 exchange_connection_in_use`;
+- rotate не блокируется самим фактом использования connection стратегией;
+- UI объясняет причину блокировки без отдельного execution-сценария;
+- audit/metrics и DB evidence не содержат секретов;
+- stage report и iteration ledger обновлены;
+- после acceptance выполнен direct-main delivery.
+
 ## Контрактное Влияние
 
 | Измерение | Классификация | Примечания |
 |---|---|---|
-| Публичное API | `compatible-change` | Добавляется `/api/ui/account/exchange-connections/*`; legacy `/exchange-keys` сохраняется. Stage 9 добавляет explicit status filter и archive endpoint/alias без удаления legacy routes. |
-| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. Stage 9 добавляет `archived_at`, lifecycle status `archived` и explicit permission fields/metadata без hard delete. |
+| Публичное API | `compatible-change` до Stage 9; `breaking-change`/intentional product change для Stage 10 account facade; `compatible-change` + deterministic conflict для Stage 11 | Stage 9 добавляет explicit status filter и archive endpoint/alias без удаления legacy routes. Stage 10 убирает пользовательский выбор `read`/`trade` из `/settings` и делает `trading` единственным product capability; legacy fields остаются deprecated compatibility surface, но read-only key больше не считается успешным active подключением. Stage 11 добавляет usage count/read-model поля и возвращает `409 exchange_connection_in_use` при попытке disconnect/archive используемого connection. |
+| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. Stage 9 добавляет `archived_at`, lifecycle status `archived` и explicit permission fields/metadata без hard delete. Stage 10 может добавить capability/readiness metadata или хранить их в существующем JSON, но не удаляет secret/audit history. Stage 11 добавляет `strategy_exchange_bindings` или эквивалентный usage registry без хранения секретов. |
 | Граница секретов | `compatible-change` | Граница усиливается; plaintext consumers намеренно запрещены. |
-| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`; Stage 9 добавляет archive/cleanup/mismatch metrics. |
-| Поведение в браузере | `compatible-change` | Settings получает real status, validation, rotate/disable и warnings; Stage 9 скрывает disabled/archived из default list и добавляет history/filter. |
+| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`; Stage 9 добавляет archive/cleanup/mismatch metrics; Stage 10 добавляет auto-validation/readiness/reclassification metrics; Stage 11 добавляет usage-guard/binding metrics. |
+| Поведение в браузере | `compatible-change` до Stage 9; intentional product change в Stage 10; `compatible-change` в Stage 11 | Settings получает real status, validation, rotate/disable и warnings; Stage 9 скрывает disabled/archived из default list и добавляет history/filter. Stage 10 меняет CJM: нет permissions selector, Active/History вместо Active/Disabled/Archived, `Disconnect` вместо user-facing `Disable`, validation auto-run on create/rotate. Stage 11 показывает usage count и объясняет, почему используемое подключение нельзя отключить. |
 | Trading execution | `none` | Размещение ордеров намеренно вне scope этого документа. |
 
 ## Отклоненные Альтернативы

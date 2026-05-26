@@ -22,13 +22,14 @@
 | Blocked state | Если stage не принят, следующий зависимый stage не стартует, кроме repair/unblock/supersede prompt. |
 | Секреты | Не записывайте secrets, tokens, cookies, passphrases, ciphertext, raw provider errors, HMAC, API keys или credentials. |
 | Publish/deploy | Если stage публикуется, деплоится или проверяется на runtime, фиксируйте branch/commit/PR/checks/deploy/smoke. |
+| Validation depth | Для нетривиального stage тесты являются локальным gate, но не acceptance. Фиксируйте real-boundary или end-to-end evidence. |
 
 ## Stage Status
 
-| Stage | Статус | Prompt / task | Stage report | Ключевой результат | Blocker | Next stage allowed |
-|---|---|---|---|---|---|---|
-| 00 <name> | pending | `.codex/agents/generated/<pack>/00-...md` | `docs/architecture/<area>/<stage-reports>/00-...md` | TBD | TBD | no |
-| 01 <name> | pending | `.codex/agents/generated/<pack>/01-...md` | `docs/architecture/<area>/<stage-reports>/01-...md` | TBD | TBD | no |
+| Stage | Статус | Prompt / task | Stage report | Validation depth | Ключевой результат | Blocker | Next stage allowed |
+|---|---|---|---|---|---|---|---|
+| 00 <name> | pending | `.codex/agents/generated/<pack>/00-...md` | `docs/architecture/<area>/<stage-reports>/00-...md` | TBD | TBD | TBD | no |
+| 01 <name> | pending | `.codex/agents/generated/<pack>/01-...md` | `docs/architecture/<area>/<stage-reports>/01-...md` | TBD | TBD | TBD | no |
 
 ## Что Обязательно Знать Дальше
 
@@ -46,10 +47,10 @@
 
 ## Проверки И Evidence
 
-| Stage | Gate / command / runtime check | Result | Evidence path / note | Residual risk |
-|---|---|---|---|---|
-| 00 | TBD | TBD | TBD | TBD |
-| 01 | TBD | TBD | TBD | TBD |
+| Stage | Local gates | Real-boundary / e2e evidence | Result | Evidence path / note | Tests-only exception | Residual risk |
+|---|---|---|---|---|---|---|
+| 00 | TBD | TBD | TBD | TBD | TBD | TBD |
+| 01 | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## Publish / Deploy Handoff
 

@@ -83,6 +83,7 @@ The generated executor prompt MUST use the following front-matter keys when appl
 - `non_goals`
 - `final_report_format`
 - `quality_gates`
+- `validation_strategy` (required for implementation prompts and prompt-pack stages)
 - `stage_execution_ledger` (required for prompt packs or staged plan implementation)
 - `expected_primary_touches`
 - `possible_secondary_touches` (omit only when genuinely unnecessary)
@@ -307,6 +308,15 @@ Stage execution ledger policy (mandatory for prompt packs and staged plans)
 - Later dependent stages must not proceed when the prior required stage is not accepted unless the prompt explicitly repairs, supersedes, or unblocks that stage.
 - Never put secrets, tokens, cookies, passphrases, ciphertext, raw provider error bodies, or credentials into the ledger.
 
+Validation depth policy (mandatory for implementation prompts)
+- Local lint/type/unit tests are local gates, not sufficient acceptance evidence for non-trivial implementation stages.
+- Generated prompts MUST include `validation_strategy` for implementation prompts and prompt-pack stages.
+- Use `depth=tests_only` only for trivial internal-only changes with no contract, persistence, browser-visible, runtime, ops, performance, integration, or delivery impact; require `tests_only_allowed_reason`.
+- Otherwise select the nearest real-boundary or end-to-end acceptance surface: API/use-case smoke, database/migration integration, browser runtime QA, target-host runtime smoke, external adapter safe smoke, benchmark/profile, CI/deploy status, or production-safe smoke.
+- Acceptance criteria must require the selected validation evidence before marking the stage accepted.
+- For staged work, require the executor to record validation depth, evidence path, residual risk, and next-stage allowance in the stage execution ledger.
+- If the selected real-boundary validation cannot be collected, the stage must be marked blocked or accepted-with-explicit-residual-risk only when the prompt allows that state.
+
 Web/UI task detection rules (mandatory)
 Treat the task as browser-visible if any of the following are true:
 - it mentions pages, routes, navigation, forms, buttons, inputs, rendered state, UI defaults, browser behavior, screenshots, or DOM behavior
@@ -378,6 +388,7 @@ Defaults when values are missing
 - `possible_secondary_touches`: omit only when the secondary blast radius is truly negligible.
 - `state`: if no previous iteration exists, set `initial_iteration`.
 - `skill_routing`: infer from `.codex/AGENTS.md`; include exact skill names, trigger conditions, and workflow timing.
+- `validation_strategy`: include for every implementation prompt; avoid tests-only except for explicitly safe internal-only changes.
 - `stage_execution_ledger`: include for prompt packs and staged plan implementation; set `required_update=true` for stage prompts.
 - For browser-visible tasks, default to including runtime browser verification requirements unless the user explicitly restricts the task to static analysis.
 
@@ -390,6 +401,7 @@ Hard requirements to encode in generated prompts
 - If new `.md` files are added or changed, require `python -m tools.docs.generate_docs_index`.
 - Reading must be bounded and layered; no eager-loading of all listed docs.
 - Skill routing must be compact and conditional, with exact skill names and workflow timing.
+- Non-trivial implementation prompts must require real-boundary or end-to-end validation in addition to local tests.
 - Prompt packs and staged-plan prompts must create or update the stage execution ledger.
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
@@ -410,6 +422,11 @@ Default quality gates to include (adapt only when justified)
 - `pyright`
 - `pytest -q`
 - `python -m tools.docs.generate_docs_index` (only when markdown docs are added or changed)
+
+Default validation strategy to include (adapt to task surface)
+- Local gates first: lint/type/focused tests.
+- Then one nearest acceptance surface: API/use-case, database/migration, browser runtime, target-host runtime, external adapter, benchmark/profile, CI/deploy, or production-safe smoke.
+- Never mark a non-trivial stage accepted from tests alone.
 
 For browser-visible tasks, also include one of:
 - a runtime browser verification step in Work plan and Acceptance criteria, or

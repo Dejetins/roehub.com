@@ -808,6 +808,22 @@ For this Python repository, prefer project wrappers when running quality gates:
 
 Use focused targets first, then broaden only when risk or repository policy requires it. For concrete check ordering, selection, and failing-gate triage, the agent SHOULD use the global `backend-quality-gates` skill.
 
+### 12.2.1 Stage validation depth
+For non-trivial prompt-pack stages, rollout stages, migrations, runtime changes, or architecture-plan implementation, lint/type/unit tests are necessary but not sufficient acceptance evidence.
+
+Each stage MUST define the nearest meaningful end-to-end or real-boundary validation surface for the changed behavior. Depending on scope, this can be one or more of:
+- API route or use-case smoke through the real request/DTO boundary;
+- persistence or migration verification against the relevant database boundary;
+- browser/runtime QA for browser-visible flows;
+- deployed runtime smoke, Mac Studio service smoke, file-hash parity, metrics, Monit/launchd checks, or production health checks for runtime/ops changes;
+- benchmark/profile evidence for performance-sensitive or hot-path changes;
+- safe real-adapter/runtime smoke for external integrations, with secrets and destructive actions excluded;
+- CI/deploy verification when the stage is meant to ship.
+
+Tests-only acceptance is allowed only for trivial, internal-only changes with no contract, persistence, browser-visible, runtime, ops, performance, or delivery impact. The agent MUST state why tests alone are sufficient when using this exception.
+
+For staged work, the chosen validation depth and observed evidence MUST be recorded in the stage execution ledger and final report.
+
 ### 12.3 Speed Mode minimum bar
 In Speed Mode, the agent MUST still provide at least one meaningful verification step or explicit manual verification instructions with expected outcomes.
 
