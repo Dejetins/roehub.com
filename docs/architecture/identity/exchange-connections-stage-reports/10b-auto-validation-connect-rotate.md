@@ -2,8 +2,8 @@
 
 Дата проверки: 2026-05-26.
 
-Статус: implementation validated locally; runtime acceptance and direct-main
-delivery pending.
+Статус: accepted; implementation commits `c1c8e234` and `b3f0c1cc`
+direct-main delivered; CI/deploy and Mac Studio runtime evidence complete.
 
 Scope: backend/domain/API command semantics for auto-validation on exchange
 connection create and credential rotate. Stage 10B does not change `/settings`
@@ -16,11 +16,11 @@ exchange-execution behavior.
 | Area | Expected result | Observed evidence | Verdict | Residual risk |
 |---|---|---|---|---|
 | Stage prerequisite | Stage 10A must be accepted before 10B starts. | Iteration ledger marks 10A accepted with direct-main CI/deploy and runtime evidence complete; 10A report is accepted. | Accepted. | None. |
-| Create/connect | New connection create must validate before a row can be active/trading-ready. | `create_connection_with_validation` validates plaintext inside exchange-control before persistence and creates either `active/ready_for_trading` or `disabled/status_reason=auto_validation_failed`. | Accepted locally. | Runtime readonly proof pending. |
-| Rotate | New credential version must validate before replacing the active version. | `rotate_connection_with_validation` validates the new plaintext first; non-ready validation raises deterministic code and does not call `replace_active_credential`. | Accepted locally. | Runtime rotate proof is not required by 10B acceptance commands but remains covered by unit tests. |
-| Non-ready outcomes | Readonly, unsafe, invalid, missing IP restriction and validation unavailable must not be active/limit-consuming. | Domain truth-table tests cover all outcomes; public facade tests prove readonly create is `disabled`, absent from Active, and not counted in limits. | Accepted locally. | Existing pre-10B active rows are not repaired until 10D. |
-| Secret boundary | Secret-bearing validation stays in exchange-control, not apps/api. | apps/api still forwards plaintext only to local internal exchange-control command API after CSRF/recent-auth; validation and encryption remain in exchange-control. | Accepted locally. | Runtime secret-safe curl evidence pending. |
-| Metrics/audit | Auto-validation outcomes need bounded, secret-free observability. | Added `exchange_connection_auto_validation_total{exchange,result,reason}` and existing `exchange_connection_validated` account audit entries with `validation_mode=auto_validation` plus bounded operation/result/reason metadata. | Accepted locally. | Runtime metric scrape pending. |
+| Create/connect | New connection create must validate before a row can be active/trading-ready. | `create_connection_with_validation` validates plaintext inside exchange-control before persistence and creates either `active/ready_for_trading` or `disabled/status_reason=auto_validation_failed`; runtime readonly create returned disabled. | Accepted. | None for new writes. |
+| Rotate | New credential version must validate before replacing the active version. | `rotate_connection_with_validation` validates the new plaintext first; non-ready validation raises deterministic code and does not call `replace_active_credential`; unit test proves credential version preservation. | Accepted. | Runtime rotate proof is not required by 10B acceptance commands. |
+| Non-ready outcomes | Readonly, unsafe, invalid, missing IP restriction and validation unavailable must not be active/limit-consuming. | Domain truth-table tests cover all outcomes; public facade tests prove readonly create is `disabled`, absent from Active, and not counted in limits; runtime readonly and invalid creates were absent from Active. | Accepted. | Existing pre-10B active rows are not repaired until 10D. |
+| Secret boundary | Secret-bearing validation stays in exchange-control, not apps/api. | apps/api still forwards plaintext only to local internal exchange-control command API after CSRF/recent-auth; validation and encryption remain in exchange-control; runtime evidence output selected only bounded fields. | Accepted. | None. |
+| Metrics/audit | Auto-validation outcomes need bounded, secret-free observability. | Runtime metrics exposed `exchange_connection_auto_validation_total{exchange="bybit",result="rejected",reason="read_only_not_supported"}` and `reason="invalid_credentials"`; audit rows use existing `exchange_connection_validated` with `validation_mode=auto_validation`. | Accepted. | None. |
 
 ## Create/Rotate Decision Table
 
@@ -50,12 +50,14 @@ exchange-execution behavior.
 
 | Surface | Command | Sanitized result | Verdict |
 |---|---|---|---|
-| Required env | Presence check for `ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_KEY`, `ROEHUB_E2E_BYBIT_MAINNET_READONLY_API_SECRET`, public session/CSRF and PG DSN env. | Local execution shell did not contain the required runtime env at implementation time. | Pending. |
-| Readonly create | `curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" ... label=stage10b_readonly_reject ...` | Pending direct runtime execution with env-backed readonly Bybit credentials. | Pending. |
-| Active exclusion | `curl -fsS "$ROEHUB_BASE_URL/api/ui/account/exchange-connections?status=active" ... | jq -e 'all(.items[]; .label != "stage10b_readonly_reject")'` | Pending. | Pending. |
-| Invalid create | `curl -i -X POST "$ROEHUB_BASE_URL/api/ui/account/exchange-connections" ... label=stage10b_invalid_reject ... INVALID ...` | Pending. | Pending. |
-| Metrics | `curl -fsS http://127.0.0.1:9205/metrics | rg 'exchange_connection_auto_validation_total|exchange_connection_trading_readiness_total'` | Pending. | Pending. |
-| Postgres read model | `psql "$ROEHUB_PG_DSN" -c "SELECT label, status, status_reason, permission_summary_json FROM exchange_connections WHERE label IN ('stage10b_readonly_reject','stage10b_invalid_reject') ORDER BY created_at DESC;"` | Pending. | Pending. |
+| Required env | Host-local presence check for readonly Bybit credential env. | Mac Studio did not expose the exact `ROEHUB_E2E_BYBIT_MAINNET_READONLY_*` aliases, but did expose existing readonly Bybit secret env `ROEHUB_TEST_BYBIT_READONLY_API_KEY/SECRET`; the runtime command shell exported those values into the required E2E variable names without printing values. | Pass; env-backed readonly credentials were used. |
+| Readonly create | Equivalent Mac Studio app-local command: `curl -X POST "$ROEHUB_BASE_URL/ui/account/exchange-connections" ... label=stage10b_readonly_reject ...` with `ROEHUB_BASE_URL=http://127.0.0.1:8000`. Public `https://roehub.com/api/...` hairpin from Mac Studio timed out, so the same deployed FastAPI route was exercised directly. | `readonly_http=201`; sanitized body: `status=disabled`, `status_reason=auto_validation_failed`, `validation_status=valid_readonly`, `connection_readiness=rejected`, `connection_readiness_reason=read_only_not_supported`, `effective_capability=none`, `permissions_deprecated=true`. | Pass. |
+| Active exclusion | `curl -fsS "$ROEHUB_BASE_URL/ui/account/exchange-connections?status=active" ... | jq -e 'all(.items[]; .label != "stage10b_readonly_reject")'` | `active_exclusion=true`. | Pass. |
+| Invalid create | `curl -X POST "$ROEHUB_BASE_URL/ui/account/exchange-connections" ... label=stage10b_invalid_reject ... INVALID ...` | `invalid_http=201`; sanitized body: `status=disabled`, `status_reason=auto_validation_failed`, `validation_status=invalid_credentials`, `connection_readiness=rejected`, `connection_readiness_reason=invalid_credentials`, `effective_capability=none`, `permissions_deprecated=true`. | Pass. |
+| Metrics | `curl -fsS http://127.0.0.1:9205/metrics | grep -E 'exchange_connection_auto_validation_total|exchange_connection_trading_readiness_total'` | Metrics included `exchange_connection_trading_readiness_total{exchange="bybit",reason="read_only_not_supported",result="rejected"} 1.0`, `reason="invalid_credentials" 1.0`, and matching `exchange_connection_auto_validation_total` series. | Pass. |
+| Postgres read model | `psql "$PG_DSN" -c "SELECT label, status, status_reason, permission_summary_json ..."` without secret-bearing columns. | `stage10b_readonly_reject` and `stage10b_invalid_reject` rows are `disabled`, `status_reason=auto_validation_failed`; JSON stores `requested_capability=trading`, `effective_capability=none`, `connection_readiness=rejected`, reasons `read_only_not_supported` and `invalid_credentials`, and `permissions_deprecated=true`. | Pass. |
+| Audit | `psql "$PG_DSN" -c "SELECT event_type, metadata_json ... WHERE metadata_json ->> 'validation_mode' = 'auto_validation'"`. | Latest audit rows use `event_type=exchange_connection_validated`, `validation_mode=auto_validation`, `operation=create`, `result=rejected`, reasons `read_only_not_supported` and `invalid_credentials`; no secret-bearing metadata. | Pass. |
+| Cleanup | Smoke session revocation query. | `smoke_session_revoked=true`; failed connection attempts remain durable disabled records, not physically deleted. | Pass. |
 
 ## Contract Impact
 
@@ -80,7 +82,12 @@ exchange-execution behavior.
 | Focused public API pytest | Passed: `24 passed`. | `uv run pytest -q tests/unit/apps/api/test_ui_account_routes.py`. |
 | Focused ruff | Passed. | `uv run ruff check src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`. |
 | Focused pyright | Passed: `0 errors`. | `uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`. |
-| Required gates | Pending final full run after report/ledger/docs-index update. | Pending. |
+| Required pytest | Passed: `81 passed`. | `uv run pytest -q tests/unit/contexts/exchange_control tests/unit/apps/api/test_ui_account_routes.py tests/unit/apps/migrations`. |
+| Required ruff | Passed. | `uv run ruff check src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/migrations`. |
+| Required pyright | Passed: `0 errors`. | `uv run pyright src/trading/contexts/exchange_control apps/api tests/unit/contexts/exchange_control tests/unit/apps/api`; additionally `uv run pyright` passed after CI exposed the identity audit type surface. |
+| Docs index | Passed. | `python -m tools.docs.generate_docs_index --check`; docs index regenerated with `python -m tools.docs.generate_docs_index`. |
+| No-order grep | Passed. | `rg -n "place_order|create_order|order placement|exchange-execution|exchange_execution|submit_order|cancel_order" ...`; matches were only Stage 10B non-goal text. |
+| Runtime acceptance | Passed. | Mac Studio readonly, invalid, Active-list, metrics, DB and audit evidence above. |
 
 ## Direct-Main Delivery
 
@@ -88,9 +95,9 @@ exchange-execution behavior.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before implementation. |
-| Commit / push | Pending. | Pending local gates, runtime acceptance and direct-main push. |
-| CI / deploy | Pending. | Pending. |
-| Post-deploy runtime | Pending. | Pending. |
+| Commit / push | `c1c8e234 Add exchange connection auto validation`; `b3f0c1cc Fix auto validation audit contract`; pushed to `origin/main`. | Pass; no stage branch or PR. |
+| CI / deploy | CI `26475706403` success; Deploy Backend `26475748728` success; Publish App Image `26475748616` success; Deploy Web `26475748610` success. Earlier CI `26475554720` failed static type check on a new audit enum and was fixed by `b3f0c1cc`. | Pass. |
+| Post-deploy runtime | Mac Studio backend deploy smoke passed; `/health/ready` returned `ready`; deployed bundle contains `create_connection_with_validation`; runtime acceptance table above passed. | Pass. |
 
 ## Residual Risk And Stage 10C Handoff
 
