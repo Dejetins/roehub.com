@@ -17,7 +17,6 @@ const state = {
   exchangeName: "binance",
   marketType: "futures",
   environment: "mainnet",
-  permissions: "read",
   exchangeStatusFilter: "active",
   sessionsCursor: null,
   auditCursor: null,
@@ -31,7 +30,7 @@ function endpoint(root, name) {
 
 function exchangeKeysPath(root, status = state.exchangeStatusFilter) {
   const base = endpoint(root, "exchangeKeysEndpoint");
-  const effectiveStatus = status || "active";
+  const effectiveStatus = status === "history" ? "all" : status || "active";
   return `${base}?status=${encodeURIComponent(effectiveStatus)}`;
 }
 
@@ -132,10 +131,23 @@ function secretInputValue(form, selector) {
   return input instanceof HTMLInputElement ? input.value : "";
 }
 
-function exchangeItems(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
+function isTradingReady(item) {
+  return (
+    item?.status === "active" &&
+    item?.effective_capability === "trading" &&
+    item?.connection_readiness === "ready_for_trading"
+  );
+}
+
+function exchangeItems(payload, status = state.exchangeStatusFilter) {
+  const items = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
+  if (status === "active") {
+    return items.filter(isTradingReady);
+  }
+  if (status === "history") {
+    return items.filter((item) => !isTradingReady(item));
+  }
+  return items;
 }
 
 function statusClass(item) {
@@ -153,7 +165,7 @@ function statusClass(item) {
 }
 
 function setExchangeStatusFilter(root, status) {
-  const effectiveStatus = ["active", "disabled", "archived"].includes(status) ? status : "active";
+  const effectiveStatus = ["active", "history"].includes(status) ? status : "active";
   state.exchangeStatusFilter = effectiveStatus;
   root.querySelectorAll("[data-exchange-status-filter]").forEach((button) => {
     const selected = button.dataset.exchangeStatusFilter === effectiveStatus;
@@ -166,14 +178,21 @@ function readableStatus(value) {
   return String(value || "--").replaceAll("_", " ");
 }
 
-function permissionDisplay(item) {
-  const requested = item?.requested_permissions || item?.permissions || "--";
-  const exchange = item?.exchange_permissions || "unknown";
-  const effective = item?.effective_permissions || "none";
-  const warnings = Array.isArray(item?.permission_warnings) && item.permission_warnings.length
-    ? ` · ${item.permission_warnings.map(readableStatus).join(", ")}`
-    : "";
-  return `requested ${requested} / exchange ${exchange} / effective ${effective}${warnings}`;
+function readinessMessage(item) {
+  const readiness = item?.connection_readiness || "";
+  const reason = item?.connection_readiness_reason || item?.validation_reason || "";
+  const reasonKey = reason ? `settings.exchange.reason.${reason}` : "";
+  if (readiness === "ready_for_trading") return t("settings.exchange.ready_for_trading");
+  if (reasonKey) return t(reasonKey);
+  if (readiness) return readableStatus(readiness);
+  return readableStatus(item?.status);
+}
+
+function capabilityDisplay(item) {
+  const effective = item?.effective_capability || "none";
+  const requested = item?.requested_capability || "trading";
+  if (effective === "trading") return t("settings.exchange.capability_trading");
+  return `${readableStatus(requested)} / ${readableStatus(effective)} · ${readinessMessage(item)}`;
 }
 
 function formatPlan(value) {
@@ -367,9 +386,9 @@ function renderExchangeKeys(payload) {
       item.exchange_name,
       item.label || "--",
       item.api_key,
-      readableStatus(item.status),
+      readinessMessage(item),
       readableStatus(item.validation_status),
-      permissionDisplay(item),
+      capabilityDisplay(item),
       item.market_type,
       item.environment || "--",
       readableStatus(item.ip_restriction_status),
@@ -384,11 +403,11 @@ function renderExchangeKeys(payload) {
     const action = row.insertCell();
     action.className = "settings-exchange-actions";
     const actions =
-      item.status === "active"
+      isTradingReady(item)
         ? [
-            ["validate", "settings.exchange.validate", "settings.exchange.validate_short"],
+            ["validate", "settings.exchange.recheck", "settings.exchange.recheck_short"],
             ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],
-            ["disable", "settings.exchange.disable", "settings.exchange.disable_short"],
+            ["disable", "settings.exchange.disconnect", "settings.exchange.disconnect_short"],
           ]
         : item.status === "disabled"
           ? [["archive", "settings.exchange.archive", "settings.exchange.archive_short"]]
@@ -564,7 +583,7 @@ function initEvents(root) {
     const connectionId = item.dataset.exchangeDisable;
     if (!connectionId) return;
     const confirmation = window.prompt(t("settings.exchange.confirm_disable"));
-    if (confirmation !== "DISABLE") return;
+    if (confirmation !== "DISCONNECT") return;
     await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/disable`, {
       method: "POST",
     });
@@ -630,11 +649,7 @@ function initEvents(root) {
   on(root, "click", "[data-environment-option]", (_event, item) => {
     state.environment = item.dataset.environmentOption || "mainnet";
     setDropdownValue("[data-environment-current]", state.environment);
-    closeDropdownForItem(item);
-  });
-  on(root, "click", "[data-permissions-option]", (_event, item) => {
-    state.permissions = item.dataset.permissionsOption || "read";
-    setDropdownValue("[data-permissions-current]", state.permissions);
+    setDropdownValue("[data-environment-menu-current]", state.environment);
     closeDropdownForItem(item);
   });
 }
@@ -665,23 +680,23 @@ function initForms(root) {
       market_type: state.marketType,
       environment: state.environment,
       label: data.get("label") || null,
-      permissions: state.permissions,
       api_key: secretInputValue(form, "[data-exchange-api-key-input]"),
       api_secret: secretInputValue(form, "[data-exchange-api-secret-input]"),
     };
     const status = qs("[data-exchange-form-status]");
     try {
-      await apiFetch(endpoint(root, "exchangeKeysEndpoint"), {
+      const saved = await apiFetch(endpoint(root, "exchangeKeysEndpoint"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
       clearSecretInputs(form);
       form.reset();
-      setExchangeStatusFilter(root, "active");
-      const exchangeKeys = await loadJson(exchangeKeysPath(root, "active"), { items: [] });
+      const nextStatus = isTradingReady(saved) ? "active" : "history";
+      setExchangeStatusFilter(root, nextStatus);
+      const exchangeKeys = await loadJson(exchangeKeysPath(root, nextStatus), { items: [] });
       renderExchangeKeys(exchangeKeys);
-      if (status) status.textContent = t("settings.exchange.saved");
+      if (status) status.textContent = isTradingReady(saved) ? t("settings.exchange.saved") : readinessMessage(saved);
     } catch (error) {
       clearSecretInputs(form);
       if (status) status.textContent = errorMessage(error);

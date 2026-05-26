@@ -342,8 +342,12 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
     assert 'data-environment-current>mainnet</span>' in settings_response.text
-    assert 'data-permissions-current>read</span>' in settings_response.text
-    assert 'data-permissions-option="trade"' in settings_response.text
+    assert "Connect and validate" in settings_response.text
+    assert "Advanced testnet" in settings_response.text
+    assert 'data-exchange-environment-advanced' in settings_response.text
+    assert 'data-permissions-current' not in settings_response.text
+    assert 'data-permissions-option' not in settings_response.text
+    assert 'name="permissions"' not in settings_response.text
     assert "Passphrase" not in main_html
     assert 'name="passphrase"' not in main_html
     assert 'type="password"' not in main_html
@@ -352,8 +356,11 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "data-secret-input" in main_html
     assert 'data-exchange-form hidden autocomplete="off" data-lpignore="true"' in main_html
     assert 'data-exchange-status-filter="active"' in main_html
-    assert 'data-exchange-status-filter="disabled"' in main_html
-    assert 'data-exchange-status-filter="archived"' in main_html
+    assert 'data-exchange-status-filter="history"' in main_html
+    assert 'data-exchange-status-filter="disabled"' not in main_html
+    assert 'data-exchange-status-filter="archived"' not in main_html
+    assert ">Disabled<" not in main_html
+    assert "History" in main_html
     assert 'role="tablist" aria-label="Exchange connection status"' in main_html
     assert 'data-lpignore="true"' in main_html
     assert 'data-1p-ignore="true"' in main_html
@@ -367,7 +374,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-security-focus' not in settings_response.text
     assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
     settings_js = (_WEB_ROOT / "dist" / "js" / "pages" / "settings.js").read_text()
-    assert 'permissions: "trade"' not in settings_js
+    assert "permissions:" not in settings_js
+    assert "dataPermissions" not in settings_js
     assert "passphrase" not in settings_js
     assert 'type="password"' not in settings_js
     assert 'name="api_key"' not in settings_js
@@ -379,11 +387,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "exchangeArchive" in settings_js
     assert "/archive" in settings_js
     assert "permission_mismatch" in settings_js
-    assert "requested ${requested} / exchange ${exchange} / effective ${effective}" in (
-        settings_js
-    )
-    assert "effective_permissions" in settings_js
-    assert "permission_warnings" in settings_js
+    assert "effective_capability" in settings_js
+    assert "connection_readiness" in settings_js
+    assert "settings.exchange.recheck" in settings_js
+    assert "settings.exchange.disconnect" in settings_js
     assert "DELETE" not in settings_js
     assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
         settings_js

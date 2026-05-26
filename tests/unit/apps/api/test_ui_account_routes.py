@@ -558,7 +558,7 @@ def test_ui_account_exchange_connections_reject_edge_forwarded_cross_origin() ->
     assert "TEST_SECRET_EDGE_CROSS_ORIGIN" not in response.text
 
 
-def test_ui_account_exchange_connection_permissions_default_to_read() -> None:
+def test_ui_account_exchange_connection_omitted_permissions_remain_compatibility_default() -> None:
     client, _account_repository, _session_ids = _build_test_client()
 
     created = client.post(
@@ -575,6 +575,11 @@ def test_ui_account_exchange_connection_permissions_default_to_read() -> None:
 
     assert created.status_code == 201
     assert created.json()["permissions"] == "read"
+    assert created.json()["requested_capability"] == "trading"
+    assert created.json()["effective_capability"] == "none"
+    assert created.json()["connection_readiness"] == "rejected"
+    assert created.json()["connection_readiness_reason"] == "read_only_not_supported"
+    assert created.json()["permissions_deprecated"] is True
     assert "TEST_SECRET_DEFAULT_READ" not in created.text
 
 

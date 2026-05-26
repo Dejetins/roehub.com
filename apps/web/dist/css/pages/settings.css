@@ -345,6 +345,35 @@
   font: inherit;
 }
 
+.settings-exchange-advanced {
+  position: relative;
+  min-width: 0;
+}
+
+.settings-exchange-advanced summary {
+  min-height: 24px;
+  border: 1px solid var(--rh-line-muted);
+  background: var(--rh-surface-2);
+  color: var(--rh-text);
+  padding: 3px 7px;
+  font: inherit;
+  cursor: pointer;
+  list-style: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-exchange-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-exchange-advanced__body {
+  position: absolute;
+  z-index: 29;
+  margin-top: 4px;
+}
+
 .settings-secret-input {
   -webkit-text-security: disc;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
