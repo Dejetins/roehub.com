@@ -3,8 +3,9 @@
 Дата проверки: 2026-05-27.
 
 Статус: accepted; implementation commits `08e9ba5f`, `e7b6b0af`,
-`cd207388`, `5e8b2083` direct-main delivered; CI/deploy and Mac Studio
-runtime dry-run/execute/API/DB/audit/metrics evidence complete.
+`cd207388`, `5e8b2083` and evidence commit `62abe1a9` direct-main
+delivered; CI/deploy and Mac Studio runtime dry-run/execute/API/DB/audit/metrics
+evidence complete.
 
 Scope: controlled reclassification/backfill of existing `active` exchange
 connections that are not trading-ready under Stage 10 semantics. Stage 10D does
@@ -89,9 +90,9 @@ not design reactivation, and physical hard delete запрещен.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before implementation. |
-| Commits / push | `08e9ba5f Add exchange connection reclassification tool`; `e7b6b0af Apply reclassification audit migration in bootstrap`; `cd207388 Make reclassification metric repair idempotent`; `5e8b2083 Keep audit event check idempotent`; all pushed to `origin/main`. | Pass. |
-| CI | `26477834060`, `26478061441`, `26478357900`, `26478477763`. | Success; latest CI `26478477763` success. |
-| Deploy | Final deploys for `5e8b2083`: Deploy Backend `26478530468` success; Publish App Image `26478530410` success; Deploy Web `26478530397` success. Earlier backend deploy for `cd207388` failed on idempotent audit check and was repaired by `5e8b2083`. | Pass. |
+| Commits / push | `08e9ba5f Add exchange connection reclassification tool`; `e7b6b0af Apply reclassification audit migration in bootstrap`; `cd207388 Make reclassification metric repair idempotent`; `5e8b2083 Keep audit event check idempotent`; `62abe1a9 Record stage 10d runtime evidence`; all pushed to `origin/main`. | Pass. |
+| CI | `26477834060`, `26478061441`, `26478357900`, `26478477763`, `26478732920`. | Success; latest CI `26478732920` success. |
+| Deploy | Final implementation deploys for `5e8b2083`: Deploy Backend `26478530468` success; Publish App Image `26478530410` success; Deploy Web `26478530397` success. Evidence commit `62abe1a9` also passed Publish App Image `26478747432`, Deploy Web `26478747433`, and Deploy Backend `26478747474`. Earlier backend deploy for `cd207388` failed on idempotent audit check and was repaired by `5e8b2083`. | Pass. |
 | Runtime | Mac Studio `/opt/roehub/app` deployed bundle ran Stage 10D tool and acceptance calls successfully. | Pass. |
 
 ## Stage 10E Handoff
