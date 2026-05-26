@@ -95,9 +95,9 @@ Implementation changes were not required.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before evidence collection. |
-| Commit / push | `dd93c736 Record stage 10e production readiness` and final trade-ready acceptance update, pushed to `origin/main`. | Pass. |
-| CI | GitHub Actions CI `26479411653` passed for the original Stage 10E report; final docs-only acceptance update follows direct-main docs gate and CI/deploy observation. | Pass / pending final update. |
-| Deploy | Deploy Backend `26479427111`, Deploy Web `26479427098`, Publish App Image `26479427110` passed for the original Stage 10E report; final docs-only acceptance update follows direct-main deploy observation. | Pass / pending final update. |
+| Commit / push | `dd93c736 Record stage 10e production readiness`; `f3ffebc9 Accept stage 10e trade-ready proof`, pushed to `origin/main`. | Pass. |
+| CI | GitHub Actions CI `26479411653` passed for the original Stage 10E report; CI `26481386938` passed for the trade-ready acceptance update. | Pass. |
+| Deploy | Original deploys passed: Backend `26479427111`, Web `26479427098`, App Image `26479427110`; trade-ready acceptance update deploys passed: Backend `26481397199`, Web `26481397201` / `26481402893`, App Image `26481397198`. | Pass. |
 
 ## Residual Risk / Handoff
 
