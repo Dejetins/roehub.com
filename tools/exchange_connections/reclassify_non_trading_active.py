@@ -228,23 +228,27 @@ def load_reclassification_audit_repair_candidates(
     dsn: str,
     owner_user_id: str | None = None,
     limit: int = DEFAULT_LIMIT,
+    missing_audit_only: bool = True,
 ) -> tuple[ExchangeConnectionReclassificationAuditRepairCandidate, ...]:
     parameters: dict[str, object] = {"limit": limit}
     predicates = [
         "c.status = 'disabled'",
         "c.status_reason = %(status_reason)s",
         "c.disabled_at IS NOT NULL",
-        """
-        NOT EXISTS (
-            SELECT 1
-            FROM identity_audit_events AS audit
-            WHERE audit.owner_user_id = c.owner_user_id
-              AND audit.event_type = 'exchange_connection_reclassified'
-              AND audit.metadata_json->>'connection_id' = c.connection_id::text
-        )
-        """,
     ]
     parameters["status_reason"] = RECLASSIFIED_NON_TRADING_STATUS_REASON
+    if missing_audit_only:
+        predicates.append(
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM identity_audit_events AS audit
+                WHERE audit.owner_user_id = c.owner_user_id
+                  AND audit.event_type = 'exchange_connection_reclassified'
+                  AND audit.metadata_json->>'connection_id' = c.connection_id::text
+            )
+            """
+        )
     if owner_user_id:
         parameters["owner_user_id"] = str(UserId.from_string(owner_user_id))
         predicates.append("c.owner_user_id = %(owner_user_id)s")
@@ -363,6 +367,29 @@ def repair_reclassification_audit_events(
             source=normalized_source,
         )
     return len(candidates)
+
+
+def emit_reclassification_metrics_for_repaired_rows(
+    *,
+    candidates: Sequence[ExchangeConnectionReclassificationAuditRepairCandidate],
+    client: ExchangeConnectionReclassificationClient,
+    source: str,
+) -> int:
+    normalized_source = normalize_source(source)
+    emitted = 0
+    for candidate in candidates:
+        try:
+            client.disable_connection(
+                owner_user_id=str(candidate.owner_user_id),
+                connection_id=str(candidate.connection_id),
+                status_reason=RECLASSIFIED_NON_TRADING_STATUS_REASON,
+                reclassification_source=normalized_source,
+                request_id=f"stage10d-metric-{redacted_uuid(candidate.connection_id)}",
+            )
+        except ExchangeControlClientError:
+            continue
+        emitted += 1
+    return emitted
 
 
 def summarize_candidates(
@@ -514,14 +541,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         audit_recorder=audit_recorder,
         source=args.source,
     )
+    metric_repairs = load_reclassification_audit_repair_candidates(
+        dsn=args.dsn,
+        owner_user_id=args.owner_user_id,
+        limit=args.limit,
+        missing_audit_only=False,
+    )
+    metric_repair_count = emit_reclassification_metrics_for_repaired_rows(
+        candidates=metric_repairs,
+        client=client,
+        source=args.source,
+    )
+    payload = summarize_results(
+        results=results,
+        source=args.source,
+        audit_repairs=audit_repairs,
+    )
+    payload["metric_repair_count"] = metric_repair_count
     print(
-        json.dumps(
-            summarize_results(
-                results=results,
-                source=args.source,
-                audit_repairs=audit_repairs,
-            )
-        )
+        json.dumps(payload)
     )
     return 0 if all(result.result == "reclassified" for result in results) else 1
 

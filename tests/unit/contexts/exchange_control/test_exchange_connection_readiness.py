@@ -466,6 +466,15 @@ def test_reclassification_moves_active_readonly_to_history_without_losing_reason
     assert reclassified.connection_readiness == "rejected"
     assert reclassified.connection_readiness_reason == "read_only_not_supported"
 
+    repeated = service.reclassify_non_trading_active_connection(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        connection_id=validated.connection_id,
+        now=datetime(2026, 5, 26, 15, 2, tzinfo=timezone.utc),
+    )
+
+    assert repeated.status == "disabled"
+    assert repeated.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON
+
 
 def test_reclassification_refuses_active_trading_ready_connection() -> None:
     service = _service()

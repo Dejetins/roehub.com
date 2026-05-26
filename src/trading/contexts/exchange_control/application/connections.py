@@ -740,10 +740,17 @@ class ExchangeConnectionService:
         connection_id: UUID,
         now: datetime,
     ) -> ExchangeConnectionView:
-        connection = self._require_active_owned_connection(
+        connection = self._require_existing_owned_connection(
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
+        if (
+            connection.status == "disabled"
+            and connection.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON
+        ):
+            return self._to_view(connection=connection)
+        if connection.status != "active":
+            raise _not_found()
         view = self._to_view(connection=connection)
         if (
             view.effective_capability == "trading"
