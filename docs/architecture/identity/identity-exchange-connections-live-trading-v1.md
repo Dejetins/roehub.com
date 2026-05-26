@@ -1620,6 +1620,13 @@ docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-
 | `09D` | E2E cleanup + controlled backfill/archive old `stage08_*` records. | Dry-run, execution evidence, default list hidden assertion, audit evidence. |
 | `09E` | Production readiness for lifecycle hardening. | Authenticated Playwright: create -> validate -> disable -> archive -> assert hidden; metrics/audit/docs evidence; direct-main delivery. |
 
+Stage 09E readiness evidence is recorded in
+`docs/architecture/identity/exchange-connections-stage-reports/09e-lifecycle-production-readiness.md`.
+The accepted production proof used an authenticated `/settings` browser flow,
+archived the deterministic `e2e_stage09_` connection through supported disable
+and archive actions, and confirmed the archived row is hidden from the default
+UI/API list while visible through the explicit archived filter.
+
 #### Валидация Этапа 9
 
 Local gates:
