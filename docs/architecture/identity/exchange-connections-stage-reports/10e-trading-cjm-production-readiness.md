@@ -82,8 +82,9 @@ Implementation changes were not required.
 |---|---|---|
 | Branch | `git branch --show-current`. | `main`. |
 | Fast-forward | `git pull --ff-only origin main`. | Already up to date before evidence collection. |
-| Commit / push | Pending docs/ledger evidence commit. | Pending. |
-| CI / deploy | Pending direct-main evidence commit. | Pending. |
+| Commit / push | `dd93c736 Record stage 10e production readiness`, pushed to `origin/main`. | Pass. |
+| CI | GitHub Actions CI `26479411653`. | Success; docs-only path ran docs index drift check and skipped non-applicable broad jobs. |
+| Deploy | Deploy Backend `26479427111`, Deploy Web `26479427098`, Publish App Image `26479427110`. | Success. |
 
 ## Residual Risk / Handoff
 
