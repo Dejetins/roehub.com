@@ -27,6 +27,7 @@ AuditEventType = Literal[
     "exchange_connection_disabled",
     "exchange_connection_archived",
     "exchange_connection_deleted",
+    "exchange_connection_reclassified",
 ]
 
 

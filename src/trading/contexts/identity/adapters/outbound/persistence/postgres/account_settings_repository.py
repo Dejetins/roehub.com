@@ -353,10 +353,18 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
         row = self._gateway.fetch_one(
             query="""
             INSERT INTO identity_audit_events
-              (event_id, owner_user_id, created_at, event_type, summary, metadata_json)
+              (
+                event_id,
+                owner_user_id,
+                created_at,
+                event_type,
+                summary,
+                target_id,
+                metadata_json
+              )
             VALUES
               (%(event_id)s, %(owner_user_id)s, %(created_at)s, %(event_type)s,
-               %(summary)s, %(metadata_json)s)
+               %(summary)s, %(target_id)s, %(metadata_json)s)
             RETURNING event_id, owner_user_id, created_at, event_type, summary, metadata_json
             """,
             parameters={
@@ -365,6 +373,7 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
                 "created_at": created_at,
                 "event_type": event_type,
                 "summary": summary,
+                "target_id": metadata.get("connection_id"),
                 "metadata_json": Jsonb(metadata),
             },
         )

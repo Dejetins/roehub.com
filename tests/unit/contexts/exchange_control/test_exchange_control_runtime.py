@@ -659,6 +659,7 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
     metrics = client.get("/metrics")
     assert 'result="skipped_external_validation"' in metrics.text
     assert "exchange_connection_trading_readiness_total" in metrics.text
+    assert "exchange_connection_reclassification_total" in metrics.text
     assert 'reason="validation_required"' in metrics.text
     assert "exchange_permission_mismatch_total" in metrics.text
     assert "connection_id" not in metrics.text

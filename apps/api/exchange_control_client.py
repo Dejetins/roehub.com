@@ -101,6 +101,8 @@ class ExchangeControlClient(Protocol):
         *,
         owner_user_id: str,
         connection_id: str,
+        status_reason: str | None = None,
+        reclassification_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
 
@@ -257,13 +259,20 @@ class HttpExchangeControlClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        status_reason: str | None = None,
+        reclassification_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
+        payload: dict[str, object] = {"owner_user_id": owner_user_id}
+        if status_reason is not None:
+            payload["status_reason"] = status_reason
+        if reclassification_source is not None:
+            payload["reclassification_source"] = reclassification_source
         response = self._request(
             "POST",
             f"/internal/v1/exchange-connections/{connection_id}/disable",
             request_id=request_id,
-            json={"owner_user_id": owner_user_id},
+            json=payload,
         )
         return _connection_from_payload(response.json())
 
@@ -504,9 +513,11 @@ class InMemoryExchangeControlClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        status_reason: str | None = None,
+        reclassification_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
-        _ = owner_user_id, request_id
+        _ = owner_user_id, reclassification_source, request_id
         existing = self._connections_dict().get(connection_id)
         if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
             raise ExchangeControlClientError("exchange_connection_not_found")
@@ -527,7 +538,7 @@ class InMemoryExchangeControlClient:
             permission_warnings=existing.permission_warnings,
             api_key=existing.api_key,
             status="disabled",
-            status_reason="user_disabled",
+            status_reason=status_reason or "user_disabled",
             validation_status=existing.validation_status,
             validation_reason=existing.validation_reason,
             ip_restriction_status=existing.ip_restriction_status,

@@ -23,3 +23,17 @@ def test_identity_exchange_audit_events_migration_extends_check_constraint() -> 
         "exchange_connection_deleted",
     ):
         assert event_type in sql
+
+
+def test_identity_exchange_reclassification_audit_migration_is_additive() -> None:
+    sql_path = (
+        Path(__file__).resolve().parents[4]
+        / "migrations"
+        / "postgres"
+        / "0009_identity_exchange_reclassification_audit_v1.sql"
+    )
+    sql = sql_path.read_text(encoding="utf-8")
+
+    assert "ADD COLUMN IF NOT EXISTS target_id TEXT" in sql
+    assert "exchange_connection_reclassified" in sql
+    assert "idx_identity_audit_events_target_created" in sql

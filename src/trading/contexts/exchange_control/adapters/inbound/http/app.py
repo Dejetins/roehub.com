@@ -22,6 +22,7 @@ from trading.contexts.exchange_control.adapters.outbound import (
     PostgresExchangeConnectionRepository,
 )
 from trading.contexts.exchange_control.application.connections import (
+    RECLASSIFIED_NON_TRADING_STATUS_REASON,
     ExchangeConnectionError,
     ExchangeConnectionRepository,
     ExchangeConnectionService,
@@ -264,6 +265,12 @@ class ExchangeControlMetrics:
             ("exchange", "result", "reason"),
             registry=self.registry,
         )
+        self.reclassification_total = Counter(
+            "exchange_connection_reclassification_total",
+            "Exchange connection reclassification outcomes by source, result, and reason.",
+            ("source", "result", "reason"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -297,6 +304,11 @@ class ExchangeControlMetrics:
             exchange="none",
             result="needs_action",
             reason="stage_10b_no_auto_validation_attempt",
+        ).inc(0)
+        self.reclassification_total.labels(
+            source="none",
+            result="disabled",
+            reason="stage_10d_no_reclassification_attempt",
         ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
@@ -360,6 +372,19 @@ class ExchangeControlMetrics:
             reason=reason,
         ).inc()
 
+    def record_reclassification(
+        self,
+        *,
+        source: str,
+        result: str,
+        reason: str,
+    ) -> None:
+        self.reclassification_total.labels(
+            source=source,
+            result=result,
+            reason=reason,
+        ).inc()
+
 
 class CreateExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -388,6 +413,8 @@ class DisableExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     owner_user_id: str
+    status_reason: str | None = Field(default=None, max_length=80)
+    reclassification_source: str | None = Field(default=None, max_length=40)
 
 
 class ArchiveExchangeConnectionInternalRequest(BaseModel):
@@ -610,13 +637,42 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         try:
-            view = connection_service.disable_connection(
-                owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
-                connection_id=connection_id,
-                now=_utc_now(),
-            )
+            if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
+                view = connection_service.reclassify_non_trading_active_connection(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                    connection_id=connection_id,
+                    now=_utc_now(),
+                )
+            else:
+                view = connection_service.disable_connection(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                    connection_id=connection_id,
+                    now=_utc_now(),
+                    status_reason=payload.status_reason or "user_disabled",
+                )
         except ExchangeConnectionError as error:
+            if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
+                metrics.record_reclassification(
+                    source=_cleanup_metric_source(
+                        value=payload.reclassification_source or "stage10d"
+                    ),
+                    result="rejected",
+                    reason=error.code,
+                )
             raise _exchange_connection_http_error(error=error) from error
+        if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
+            metrics.record_reclassification(
+                source=_cleanup_metric_source(
+                    value=payload.reclassification_source or "stage10d"
+                ),
+                result=view.status,
+                reason=view.connection_readiness_reason,
+            )
+            metrics.record_trading_readiness(
+                exchange=view.exchange_name,
+                result=view.connection_readiness,
+                reason=view.connection_readiness_reason,
+            )
         return _exchange_connection_response(view=view)
 
     @app.post(

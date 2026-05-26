@@ -33,6 +33,7 @@ ALLOWED_CONNECTION_READINESS = {
     "archived",
 }
 AUTO_VALIDATION_FAILED_STATUS_REASON = "auto_validation_failed"
+RECLASSIFIED_NON_TRADING_STATUS_REASON = "reclassified_non_trading_ready"
 VALIDATION_UNAVAILABLE_REASON = "validation_unavailable"
 
 
@@ -716,6 +717,7 @@ class ExchangeConnectionService:
         owner_user_id: UserId,
         connection_id: UUID,
         now: datetime,
+        status_reason: str = "user_disabled",
     ) -> ExchangeConnectionView:
         self._require_active_owned_connection(
             owner_user_id=owner_user_id,
@@ -725,10 +727,39 @@ class ExchangeConnectionService:
             connection_id=connection_id,
             owner_user_id=owner_user_id,
             disabled_at=now,
+            status_reason=status_reason,
         )
         if disabled is None:
             raise _not_found()
         return self._to_view(connection=disabled)
+
+    def reclassify_non_trading_active_connection(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        connection = self._require_active_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        view = self._to_view(connection=connection)
+        if (
+            view.effective_capability == "trading"
+            and view.connection_readiness == "ready_for_trading"
+        ):
+            raise ExchangeConnectionError(
+                code="exchange_connection_trading_ready",
+                message="Trading-ready active exchange connection cannot be reclassified.",
+                status_code=409,
+            )
+        return self.disable_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+            now=now,
+            status_reason=RECLASSIFIED_NON_TRADING_STATUS_REASON,
+        )
 
     def archive_connection(
         self,
@@ -1222,7 +1253,10 @@ def _resolve_trading_readiness(
 ) -> tuple[str, str, str]:
     if status == "archived":
         return "none", "archived", "archived"
-    if status == "disabled" and status_reason != AUTO_VALIDATION_FAILED_STATUS_REASON:
+    if status == "disabled" and status_reason not in {
+        AUTO_VALIDATION_FAILED_STATUS_REASON,
+        RECLASSIFIED_NON_TRADING_STATUS_REASON,
+    }:
         return "none", "disconnected", "user_disconnected"
     if (
         validation_status == "valid_trade_enabled"

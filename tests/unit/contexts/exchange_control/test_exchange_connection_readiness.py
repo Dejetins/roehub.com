@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from trading.contexts.exchange_control.application.connections import (
+    RECLASSIFIED_NON_TRADING_STATUS_REASON,
     ExchangeConnectionError,
     ExchangeConnectionService,
     InMemoryExchangeConnectionRepository,
@@ -428,6 +429,81 @@ def test_auto_validation_rotate_failure_preserves_active_credential_version() ->
     assert listed[0].api_key == "****1234"
     assert listed[0].status == "active"
     assert listed[0].connection_readiness == "ready_for_trading"
+
+
+def test_reclassification_moves_active_readonly_to_history_without_losing_reason() -> None:
+    service = _service()
+    created = _create_connection(service=service, permissions="trade")
+    validated = service.validate_connection(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        connection_id=created.connection_id,
+        validator=_StaticValidator(
+            result=ExchangeCredentialValidationResult(
+                status="valid_readonly",
+                reason="readonly_permission_detected",
+                ip_restriction_status="not_restricted_testnet",
+                permission_summary={
+                    "requested_permissions": "trade",
+                    "permissions": "trade",
+                    "exchange_permissions": "read",
+                    "effective_permissions": "read",
+                    "permission_warnings": [],
+                },
+            )
+        ),
+        now=datetime(2026, 5, 26, 15, 0, tzinfo=timezone.utc),
+    )
+
+    reclassified = service.reclassify_non_trading_active_connection(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        connection_id=validated.connection_id,
+        now=datetime(2026, 5, 26, 15, 1, tzinfo=timezone.utc),
+    )
+
+    assert reclassified.status == "disabled"
+    assert reclassified.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON
+    assert reclassified.effective_capability == "none"
+    assert reclassified.connection_readiness == "rejected"
+    assert reclassified.connection_readiness_reason == "read_only_not_supported"
+
+
+def test_reclassification_refuses_active_trading_ready_connection() -> None:
+    service = _service()
+    created = service.create_connection_with_validation(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        exchange_name="bybit",
+        market_type="spot",
+        environment="mainnet",
+        label="ready",
+        permissions="trade",
+        api_key="ACCOUNTKEY1234",
+        api_secret="TEST_SECRET",
+        passphrase=None,
+        validator=_StaticValidator(
+            result=ExchangeCredentialValidationResult(
+                status="valid_trade_enabled",
+                reason="trade_permission_detected",
+                ip_restriction_status="restricted",
+                permission_summary={
+                    "requested_permissions": "trade",
+                    "permissions": "trade",
+                    "exchange_permissions": "trade",
+                    "effective_permissions": "trade",
+                    "permission_warnings": [],
+                },
+            )
+        ),
+        now=datetime(2026, 5, 26, 16, 0, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(ExchangeConnectionError) as error:
+        service.reclassify_non_trading_active_connection(
+            owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+            connection_id=created.connection_id,
+            now=datetime(2026, 5, 26, 16, 1, tzinfo=timezone.utc),
+        )
+
+    assert error.value.code == "exchange_connection_trading_ready"
 
 
 def _service() -> ExchangeConnectionService:

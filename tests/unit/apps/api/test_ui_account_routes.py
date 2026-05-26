@@ -97,8 +97,11 @@ class _ArchiveShouldNotRunClient:
         *,
         owner_user_id: str,
         connection_id: str,
+        status_reason: str | None = None,
+        reclassification_source: str | None = None,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
+        _ = status_reason, reclassification_source
         raise AssertionError("disable_connection must not run")
 
     def archive_connection(
