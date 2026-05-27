@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any, Mapping, Sequence, cast
 from uuid import UUID
 
@@ -398,11 +399,17 @@ def _map_run_row(*, row: Mapping[str, Any]) -> StrategyRun:
             user_id=UserId.from_string(str(row["user_id"])),
             strategy_id=UUID(str(row["strategy_id"])),
             state=state,
-            started_at=row["started_at"],
-            stopped_at=row["stopped_at"],
-            checkpoint_ts_open=row["checkpoint_ts_open"],
+            started_at=_coerce_utc_datetime(value=row["started_at"], field_name="started_at"),
+            stopped_at=_coerce_optional_utc_datetime(
+                value=row["stopped_at"],
+                field_name="stopped_at",
+            ),
+            checkpoint_ts_open=_coerce_optional_utc_datetime(
+                value=row["checkpoint_ts_open"],
+                field_name="checkpoint_ts_open",
+            ),
             last_error=row["last_error"],
-            updated_at=row["updated_at"],
+            updated_at=_coerce_utc_datetime(value=row["updated_at"], field_name="updated_at"),
             metadata_json=_parse_metadata_json(value=row.get("metadata_json")),
         )
     except Exception as error:  # noqa: BLE001
@@ -491,3 +498,17 @@ def _parse_run_state(*, value: Any) -> StrategyRunState:
     if normalized not in allowed_states:
         raise StrategyStorageError(f"Unexpected run state value from storage: {normalized!r}")
     return cast(StrategyRunState, normalized)
+
+
+def _coerce_optional_utc_datetime(*, value: Any, field_name: str) -> datetime | None:
+    if value is None:
+        return None
+    return _coerce_utc_datetime(value=value, field_name=field_name)
+
+
+def _coerce_utc_datetime(*, value: Any, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise StrategyStorageError(f"{field_name} must be datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise StrategyStorageError(f"{field_name} must be timezone-aware")
+    return value.astimezone(UTC)

@@ -283,6 +283,72 @@ def test_run_repository_list_active_runs_uses_deterministic_ordering() -> None:
     assert "ORDER BY started_at ASC, run_id ASC" in gateway.fetch_all_queries[0]
 
 
+def test_run_repository_normalizes_postgres_session_timezone_to_utc() -> None:
+    """
+    Verify run timestamp fields are normalized from Postgres session timezone.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Production Postgres may return `timestamptz` in Europe/Moscow.
+    Raises:
+        AssertionError: If non-UTC offsets leak into StrategyRun domain.
+    Side Effects:
+        None.
+    """
+    run_row = dict(_build_run_row(state="stopped"))
+    run_row["started_at"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        20,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    run_row["stopped_at"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        25,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    run_row["checkpoint_ts_open"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        24,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    run_row["updated_at"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        25,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    gateway = _FakeGateway(fetch_all_results=[(run_row,)])
+    repository = PostgresStrategyRunRepository(gateway=gateway)
+
+    rows = repository.list_active_runs()
+
+    assert rows[0].started_at == datetime(2026, 5, 27, 0, 20, tzinfo=timezone.utc)
+    assert rows[0].stopped_at == datetime(2026, 5, 27, 0, 25, tzinfo=timezone.utc)
+    assert rows[0].checkpoint_ts_open == datetime(
+        2026,
+        5,
+        27,
+        0,
+        24,
+        tzinfo=timezone.utc,
+    )
+    assert rows[0].updated_at == datetime(2026, 5, 27, 0, 25, tzinfo=timezone.utc)
+
+
 def test_run_repository_update_persists_metadata_json_field() -> None:
     """
     Verify run update SQL persists `metadata_json` together with checkpoint/state fields.
@@ -388,6 +454,41 @@ def test_event_repository_list_for_strategy_uses_deterministic_ordering() -> Non
     assert len(events) == 1
     assert events[0].run_id is None
     assert "ORDER BY ts ASC, event_id ASC" in gateway.fetch_all_queries[0]
+
+
+def test_event_repository_normalizes_postgres_session_timezone_to_utc() -> None:
+    """
+    Verify event timestamps are normalized from Postgres session timezone.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Production Postgres may return `timestamptz` in Europe/Moscow.
+    Raises:
+        AssertionError: If non-UTC offsets leak into StrategyEvent domain.
+    Side Effects:
+        None.
+    """
+    event_row = dict(_build_event_row())
+    event_row["ts"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        30,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    gateway = _FakeGateway(fetch_all_results=[(event_row,)])
+    repository = PostgresStrategyEventRepository(gateway=gateway)
+
+    events = repository.list_for_strategy(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000001013"),
+        strategy_id=UUID("00000000-0000-0000-0000-00000000A113"),
+    )
+
+    assert events[0].ts == datetime(2026, 5, 27, 0, 30, tzinfo=timezone.utc)
 
 
 
