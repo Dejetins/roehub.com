@@ -61,6 +61,8 @@ class ExchangeConnectionCommandResult:
     connection_readiness: str = "needs_action"
     connection_readiness_reason: str = "validation_required"
     permissions_deprecated: bool = True
+    used_by_strategies_count: int = 0
+    active_strategy_bindings_count: int = 0
 
 
 class ExchangeControlClient(Protocol):
@@ -754,6 +756,10 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
                 payload.get("connection_readiness_reason") or "validation_required"
             ),
             permissions_deprecated=bool(payload.get("permissions_deprecated", True)),
+            used_by_strategies_count=int(payload.get("used_by_strategies_count") or 0),
+            active_strategy_bindings_count=int(
+                payload.get("active_strategy_bindings_count") or 0
+            ),
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise ExchangeControlClientError(

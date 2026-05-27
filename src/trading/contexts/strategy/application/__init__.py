@@ -13,6 +13,7 @@ from .ports import (
     RealtimeOutputKindV1,
     StrategyClock,
     StrategyEventRepository,
+    StrategyExchangeBindingRepository,
     StrategyLiveCandleMessage,
     StrategyLiveCandleStream,
     StrategyRealtimeEventV1,
@@ -44,6 +45,8 @@ from .use_cases import (
     ListMyStrategiesUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
+    StrategyExchangeBindingService,
+    StrategyExchangeBindingView,
 )
 
 __all__ = [
@@ -74,12 +77,15 @@ __all__ = [
     "ListMyStrategiesUseCase",
     "RunStrategyUseCase",
     "StopStrategyUseCase",
+    "StrategyExchangeBindingService",
+    "StrategyExchangeBindingView",
     "StrategyLiveRunner",
     "StrategyLiveRunnerIterationReport",
     "StrategyLiveCandleMessage",
     "StrategyLiveCandleStream",
     "StrategyClock",
     "StrategyEventRepository",
+    "StrategyExchangeBindingRepository",
     "StrategyRepository",
     "StrategyRunnerSleeper",
     "StrategyRunRepository",

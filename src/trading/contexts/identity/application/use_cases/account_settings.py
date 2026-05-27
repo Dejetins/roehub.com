@@ -329,6 +329,72 @@ class AccountSettingsUseCase:
             created_at=self.clock.now(),
         )
 
+    def record_strategy_exchange_binding_created(
+        self,
+        *,
+        owner_user_id: UserId,
+        binding_id: str,
+        strategy_id: str,
+        exchange_connection_id: str,
+        usage_mode: str,
+        exchange_name: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="strategy_exchange_binding_created",
+            summary="Strategy exchange binding created",
+            metadata={
+                "binding_id": binding_id,
+                "strategy_id": strategy_id,
+                "exchange_connection_id": exchange_connection_id,
+                "usage_mode": usage_mode,
+                "exchange": exchange_name,
+            },
+            created_at=self.clock.now(),
+        )
+
+    def record_strategy_exchange_binding_disabled(
+        self,
+        *,
+        owner_user_id: UserId,
+        binding_id: str,
+        strategy_id: str,
+        exchange_connection_id: str,
+        usage_mode: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="strategy_exchange_binding_disabled",
+            summary="Strategy exchange binding disabled",
+            metadata={
+                "binding_id": binding_id,
+                "strategy_id": strategy_id,
+                "exchange_connection_id": exchange_connection_id,
+                "usage_mode": usage_mode,
+            },
+            created_at=self.clock.now(),
+        )
+
+    def record_exchange_connection_disconnect_blocked(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: str,
+        action: str,
+        reason: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="exchange_connection_disconnect_blocked",
+            summary="Exchange connection lifecycle action blocked",
+            metadata={
+                "connection_id": connection_id,
+                "action": action,
+                "reason": reason,
+            },
+            created_at=self.clock.now(),
+        )
+
 
 def _optional_trim(value: str | None) -> str | None:
     if value is None:

@@ -508,11 +508,19 @@
 .settings-exchange-actions {
   display: flex;
   gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .settings-exchange-actions .rh-button {
   padding-inline: 3px;
   font-size: 9px;
+}
+
+.settings-exchange-usage {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .settings-list {

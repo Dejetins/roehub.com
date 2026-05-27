@@ -12,6 +12,7 @@ from psycopg.rows import dict_row
 from trading.contexts.exchange_control.application.connections import (
     ExchangeConnectionRecord,
     ExchangeConnectionRepository,
+    ExchangeConnectionUsageGuard,
     ExchangeCredentialVersionRecord,
     trading_capability_summary,
 )
@@ -19,6 +20,44 @@ from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
 )
 from trading.shared_kernel.primitives import UserId
+
+
+class PostgresExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
+    def __init__(self, *, dsn: str) -> None:
+        normalized_dsn = dsn.strip()
+        if not normalized_dsn:
+            raise ValueError("PostgresExchangeConnectionUsageGuard requires non-empty dsn")
+        self._dsn = normalized_dsn
+
+    def active_trading_bindings_count(
+        self, *, owner_user_id: UserId, connection_id: UUID
+    ) -> int:
+        with psycopg.connect(
+            self._dsn,
+            row_factory=cast(Any, dict_row),
+        ) as postgres_connection:
+            with postgres_connection.cursor() as cursor:
+                cursor.execute(
+                    cast(
+                        Any,
+                        """
+                        SELECT COUNT(*) AS active_count
+                        FROM strategy_exchange_bindings
+                        WHERE owner_user_id = %(owner_user_id)s
+                          AND exchange_connection_id = %(connection_id)s
+                          AND usage_mode = 'trading'
+                          AND binding_status = 'active'
+                        """,
+                    ),
+                    {
+                        "owner_user_id": str(owner_user_id),
+                        "connection_id": str(connection_id),
+                    },
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return 0
+        return int(dict(row)["active_count"])
 
 
 class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
@@ -976,4 +1015,4 @@ def _normalize_optional_utc_datetime(*, value: object) -> datetime | None:
     return _normalize_utc_datetime(value=value)
 
 
-__all__ = ["PostgresExchangeConnectionRepository"]
+__all__ = ["PostgresExchangeConnectionRepository", "PostgresExchangeConnectionUsageGuard"]

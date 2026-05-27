@@ -15,7 +15,12 @@ from .realtime_output_publisher import (
     StrategyRealtimeOutputRecordV1,
     serialize_realtime_event_payload_json,
 )
-from .repositories import StrategyEventRepository, StrategyRepository, StrategyRunRepository
+from .repositories import (
+    StrategyEventRepository,
+    StrategyExchangeBindingRepository,
+    StrategyRepository,
+    StrategyRunRepository,
+)
 from .sleeper import StrategyRunnerSleeper
 from .telegram_notifier import (
     TELEGRAM_NOTIFICATION_EVENT_TYPES_V1,
@@ -33,6 +38,7 @@ __all__ = [
     "StrategyLiveCandleStream",
     "StrategyClock",
     "StrategyEventRepository",
+    "StrategyExchangeBindingRepository",
     "StrategyRepository",
     "StrategyRunnerSleeper",
     "StrategyRunRepository",

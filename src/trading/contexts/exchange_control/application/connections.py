@@ -78,6 +78,8 @@ class ExchangeConnectionView:
     updated_at: datetime
     disabled_at: datetime | None = None
     archived_at: datetime | None = None
+    used_by_strategies_count: int = 0
+    active_strategy_bindings_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +174,20 @@ class ExchangeConnectionRepository(Protocol):
         result: ExchangeCredentialValidationResult,
         updated_at: datetime,
     ) -> ExchangeConnectionRecord | None: ...
+
+
+class ExchangeConnectionUsageGuard(Protocol):
+    def active_trading_bindings_count(
+        self, *, owner_user_id: UserId, connection_id: UUID
+    ) -> int: ...
+
+
+class AllowAllExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
+    def active_trading_bindings_count(
+        self, *, owner_user_id: UserId, connection_id: UUID
+    ) -> int:
+        _ = owner_user_id, connection_id
+        return 0
 
 
 class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
@@ -405,6 +421,7 @@ class ExchangeConnectionService:
         *,
         repository: ExchangeConnectionRepository,
         secret_cipher: ExchangeSecretCipher,
+        usage_guard: ExchangeConnectionUsageGuard | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExchangeConnectionService requires repository")
@@ -412,6 +429,7 @@ class ExchangeConnectionService:
             raise ValueError("ExchangeConnectionService requires secret_cipher")
         self._repository = repository
         self._secret_cipher = secret_cipher
+        self._usage_guard = usage_guard or AllowAllExchangeConnectionUsageGuard()
 
     def create_connection(
         self,
@@ -723,6 +741,11 @@ class ExchangeConnectionService:
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
+        self._assert_not_in_use(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+            action="disconnect",
+        )
         disabled = self._repository.disable(
             connection_id=connection_id,
             owner_user_id=owner_user_id,
@@ -779,6 +802,12 @@ class ExchangeConnectionService:
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
+        if connection.status != "archived":
+            self._assert_not_in_use(
+                owner_user_id=owner_user_id,
+                connection_id=connection_id,
+                action="archive",
+            )
         if connection.status == "active":
             raise ExchangeConnectionError(
                 code="exchange_connection_not_disabled",
@@ -886,6 +915,48 @@ class ExchangeConnectionService:
             )
         return connection
 
+    def _assert_not_in_use(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        action: str,
+    ) -> None:
+        active_bindings_count = self._active_strategy_bindings_count(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        if active_bindings_count <= 0:
+            return
+        raise ExchangeConnectionError(
+            code="exchange_connection_in_use",
+            message=(
+                f"Cannot {action}. This exchange account is used by "
+                f"{active_bindings_count} active strategies. Pause or reassign "
+                "strategies first."
+            ),
+            status_code=409,
+        )
+
+    def _active_strategy_bindings_count(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+    ) -> int:
+        try:
+            count = self._usage_guard.active_trading_bindings_count(
+                owner_user_id=owner_user_id,
+                connection_id=connection_id,
+            )
+        except Exception as exc:
+            raise ExchangeConnectionError(
+                code="exchange_connection_usage_guard_unavailable",
+                message="Exchange connection usage guard is unavailable.",
+                status_code=503,
+            ) from exc
+        return max(0, int(count))
+
     def _build_credential_version(
         self,
         *,
@@ -986,6 +1057,10 @@ class ExchangeConnectionService:
                 connection.status_reason == AUTO_VALIDATION_FAILED_STATUS_REASON
             ),
         )
+        active_bindings_count = self._active_strategy_bindings_count(
+            owner_user_id=connection.owner_user_id,
+            connection_id=connection.connection_id,
+        )
         return ExchangeConnectionView(
             connection_id=connection.connection_id,
             credential_version_id=connection.active_credential_version_id,
@@ -1034,6 +1109,8 @@ class ExchangeConnectionService:
             updated_at=connection.updated_at,
             disabled_at=connection.disabled_at,
             archived_at=connection.archived_at,
+            used_by_strategies_count=active_bindings_count,
+            active_strategy_bindings_count=active_bindings_count,
         )
 
 

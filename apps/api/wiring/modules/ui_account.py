@@ -17,8 +17,19 @@ from trading.contexts.identity.application import AccountSettingsRepository
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.strategy.adapters.outbound import (
+    InMemoryStrategyExchangeBindingRepository,
+    InMemoryStrategyRepository,
+    PostgresStrategyExchangeBindingRepository,
+    PostgresStrategyRepository,
+    PsycopgStrategyPostgresGateway,
+)
+from trading.contexts.strategy.application.use_cases import (
+    StrategyExchangeBindingService,
+)
 
 _IDENTITY_PG_DSN_KEY = "IDENTITY_PG_DSN"
+_STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 
 
 def build_ui_account_router(
@@ -34,6 +45,7 @@ def build_ui_account_router(
         current_user_dependency=current_user_dependency,
         clock=clock,
         exchange_control_client=build_exchange_control_client_from_environ(environ=environ),
+        strategy_binding_service=build_strategy_exchange_binding_service(environ=environ),
     )
 
 
@@ -56,3 +68,20 @@ def _build_account_settings_repository(
             gateway=PsycopgIdentityPostgresGateway(dsn=postgres_dsn)
         )
     return InMemoryAccountSettingsRepository()
+
+
+def build_strategy_exchange_binding_service(
+    *,
+    environ: Mapping[str, str],
+) -> StrategyExchangeBindingService:
+    postgres_dsn = environ.get(_STRATEGY_PG_DSN_KEY, "").strip()
+    if postgres_dsn:
+        gateway = PsycopgStrategyPostgresGateway(dsn=postgres_dsn)
+        return StrategyExchangeBindingService(
+            strategy_repository=PostgresStrategyRepository(gateway=gateway),
+            binding_repository=PostgresStrategyExchangeBindingRepository(gateway=gateway),
+        )
+    return StrategyExchangeBindingService(
+        strategy_repository=InMemoryStrategyRepository(),
+        binding_repository=InMemoryStrategyExchangeBindingRepository(),
+    )

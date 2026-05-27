@@ -34,6 +34,16 @@ from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryStrategyEventRepository,
+    InMemoryStrategyExchangeBindingRepository,
+    InMemoryStrategyRepository,
+)
+from trading.contexts.strategy.application import (
+    CreateStrategyUseCase,
+    CurrentUser,
+    StrategyExchangeBindingService,
+)
 from trading.shared_kernel.primitives import UserId
 
 _SESSION_COOKIE_NAME = "roehub_session_id"
@@ -124,6 +134,47 @@ class _ArchiveShouldNotRunClient:
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
         raise AssertionError("validate_connection must not run")
+
+
+class _InUseExchangeControlClient(InMemoryExchangeControlClient):
+    def __init__(self, *, connection_id: str) -> None:
+        super().__init__()
+        self.connection_id = connection_id
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]:
+        _ = owner_user_id, request_id
+        return (_exchange_result(connection_id=self.connection_id, active_bindings=1),)
+
+    def disable_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        status_reason: str | None = None,
+        reclassification_source: str | None = None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, connection_id, status_reason, reclassification_source, request_id
+        raise ExchangeControlClientError(
+            "exchange-control internal request failed with status 409 code "
+            "exchange_connection_in_use"
+        )
+
+    def archive_connection(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        cleanup_source: str | None = None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = owner_user_id, connection_id, cleanup_source, request_id
+        raise ExchangeControlClientError(
+            "exchange-control internal request failed with status 409 code "
+            "exchange_connection_in_use"
+        )
 
 
 def test_ui_account_routes_require_authenticated_user() -> None:
@@ -929,9 +980,104 @@ def test_exchange_control_fake_client_is_deterministic() -> None:
     assert first.service == "exchange-control"
 
 
+def test_strategy_exchange_binding_routes_create_list_and_disable_binding() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    service = StrategyExchangeBindingService(
+        strategy_repository=strategy_repository,
+        binding_repository=InMemoryStrategyExchangeBindingRepository(),
+    )
+    client, account_repository, session_ids = _build_test_client(
+        strategy_binding_service=service
+    )
+    owner = CurrentUser(user_id=session_ids["first_user_id"])
+    strategy = CreateStrategyUseCase(
+        repository=strategy_repository,
+        event_repository=InMemoryStrategyEventRepository(),
+        clock=_MutableClock(now_value=datetime(2026, 2, 15, 13, 1, tzinfo=timezone.utc)),
+    ).execute(spec_payload=_strategy_spec_payload(), current_user=owner)
+    created_connection = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "binding-ready",
+            "permissions": "trade",
+            "api_key": "BINDINGKEY1234",
+            "api_secret": "TRADE_SECRET",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert created_connection.status_code == 201
+    connection_id = created_connection.json()["connection_id"]
+
+    created_binding = client.post(
+        f"/ui/strategies/{strategy.strategy_id}/exchange-bindings",
+        json={"exchange_connection_id": connection_id, "usage_mode": "trading"},
+        headers={"origin": "http://testserver"},
+    )
+    assert created_binding.status_code == 201
+    binding_payload = created_binding.json()
+    assert binding_payload["exchange_connection_id"] == connection_id
+    assert binding_payload["binding_status"] == "active"
+    assert binding_payload["usage_mode"] == "trading"
+
+    listed = client.get(f"/ui/strategies/{strategy.strategy_id}/exchange-bindings")
+    assert listed.status_code == 200
+    assert [item["binding_id"] for item in listed.json()["items"]] == [
+        binding_payload["binding_id"]
+    ]
+
+    disabled = client.post(
+        f"/ui/strategies/{strategy.strategy_id}/exchange-bindings/"
+        f"{binding_payload['binding_id']}/disable",
+        headers={"origin": "http://testserver"},
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["binding_status"] == "disabled"
+    audit_types = [
+        event.event_type
+        for event in account_repository.list_audit_events(
+            owner_user_id=session_ids["first_user_id"],
+            cursor=None,
+            limit=20,
+        ).items
+    ]
+    assert "strategy_exchange_binding_created" in audit_types
+    assert "strategy_exchange_binding_disabled" in audit_types
+
+
+def test_exchange_connection_in_use_error_maps_to_409_and_audit() -> None:
+    connection_id = "00000000-0000-0000-0000-000000000321"
+    client, account_repository, session_ids = _build_test_client(
+        exchange_control_client=_InUseExchangeControlClient(connection_id=connection_id)
+    )
+
+    listed = client.get("/ui/account/exchange-connections")
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["active_strategy_bindings_count"] == 1
+    disabled = client.post(
+        f"/ui/account/exchange-connections/{connection_id}/disable",
+        headers={"origin": "http://testserver"},
+    )
+
+    assert disabled.status_code == 409
+    assert disabled.json()["error"]["code"] == "exchange_connection_in_use"
+    audit_types = [
+        event.event_type
+        for event in account_repository.list_audit_events(
+            owner_user_id=session_ids["first_user_id"],
+            cursor=None,
+            limit=20,
+        ).items
+    ]
+    assert "exchange_connection_disconnect_blocked" in audit_types
+
+
 def _build_test_client(
     *,
     exchange_control_client: ExchangeControlClient | None = None,
+    strategy_binding_service: StrategyExchangeBindingService | None = None,
 ) -> tuple[
     TestClient,
     InMemoryAccountSettingsRepository,
@@ -1029,6 +1175,7 @@ def _build_test_client(
             current_user_dependency=current_user_dependency,
             clock=clock,
             exchange_control_client=exchange_control_client or InMemoryExchangeControlClient(),
+            strategy_binding_service=strategy_binding_service,
         )
     )
     client = TestClient(app)
@@ -1036,4 +1183,65 @@ def _build_test_client(
     return client, account_repository, {
         "first_user_id": first_user.user_id,
         "second_user_id": second_user.user_id,
+    }
+
+
+def _exchange_result(
+    *,
+    connection_id: str,
+    active_bindings: int = 0,
+) -> ExchangeConnectionCommandResult:
+    now = datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc)
+    return ExchangeConnectionCommandResult(
+        connection_id=connection_id,
+        credential_version_id="00000000-0000-0000-0000-000000000654",
+        exchange_name="bybit",
+        market_type="spot",
+        environment="testnet",
+        label="used",
+        permissions="trade",
+        requested_permissions="trade",
+        exchange_permissions="trade",
+        effective_permissions="trade",
+        permission_warnings=(),
+        api_key="****1234",
+        status="active",
+        status_reason=None,
+        validation_status="valid_trade_enabled",
+        validation_reason="trade_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        last_validated_at=now,
+        created_at=now,
+        updated_at=now,
+        disabled_at=None,
+        archived_at=None,
+        requested_capability="trading",
+        effective_capability="trading",
+        connection_readiness="ready_for_trading",
+        connection_readiness_reason="trading_policy_ok",
+        permissions_deprecated=True,
+        used_by_strategies_count=active_bindings,
+        active_strategy_bindings_count=active_bindings,
+    )
+
+
+def _strategy_spec_payload() -> dict[str, object]:
+    return {
+        "instrument_id": {
+            "market_id": 1,
+            "symbol": "BTCUSDT",
+        },
+        "instrument_key": "binance:spot:BTCUSDT",
+        "market_type": "spot",
+        "timeframe": "1m",
+        "indicators": [
+            {
+                "name": "MA",
+                "params": {
+                    "fast": 20,
+                    "slow": 50,
+                },
+            }
+        ],
+        "signal_template": "MA(20,50)",
     }

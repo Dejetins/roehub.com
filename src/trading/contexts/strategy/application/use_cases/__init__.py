@@ -8,6 +8,7 @@ from .errors import (
     strategy_not_found,
     validation_error,
 )
+from .exchange_bindings import StrategyExchangeBindingService, StrategyExchangeBindingView
 from .get_my_strategy import GetMyStrategyUseCase
 from .list_my_strategies import ListMyStrategiesUseCase
 from .run_strategy import RunStrategyUseCase
@@ -21,6 +22,8 @@ __all__ = [
     "ListMyStrategiesUseCase",
     "RunStrategyUseCase",
     "StopStrategyUseCase",
+    "StrategyExchangeBindingService",
+    "StrategyExchangeBindingView",
     "map_strategy_exception",
     "strategy_conflict",
     "strategy_forbidden",

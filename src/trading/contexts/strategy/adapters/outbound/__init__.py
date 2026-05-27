@@ -31,9 +31,11 @@ from .messaging import (
 )
 from .persistence import (
     InMemoryStrategyEventRepository,
+    InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
     PostgresStrategyEventRepository,
+    PostgresStrategyExchangeBindingRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
     PsycopgStrategyPostgresGateway,
@@ -43,9 +45,11 @@ from .time import SystemRunnerSleeper, SystemStrategyClock
 
 __all__ = [
     "InMemoryStrategyEventRepository",
+    "InMemoryStrategyExchangeBindingRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
     "PostgresStrategyEventRepository",
+    "PostgresStrategyExchangeBindingRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PsycopgStrategyPostgresGateway",

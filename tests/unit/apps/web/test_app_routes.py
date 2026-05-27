@@ -391,6 +391,10 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "connection_readiness" in settings_js
     assert "settings.exchange.recheck" in settings_js
     assert "settings.exchange.disconnect" in settings_js
+    assert "settings.exchange.used_by_strategies" in settings_js
+    assert "settings.exchange.disconnect_blocked" in settings_js
+    assert "active_strategy_bindings_count" in settings_js
+    assert "Cannot disconnect" in (_WEB_ROOT / "locales" / "en.json").read_text()
     assert "DELETE" not in settings_js
     assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
         settings_js

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from uuid import UUID
 
 import pytest
 
@@ -9,6 +10,7 @@ from trading.contexts.exchange_control.application.connections import (
     RECLASSIFIED_NON_TRADING_STATUS_REASON,
     ExchangeConnectionError,
     ExchangeConnectionService,
+    ExchangeConnectionUsageGuard,
     InMemoryExchangeConnectionRepository,
 )
 from trading.contexts.exchange_control.application.secret_cipher import (
@@ -34,6 +36,17 @@ class _StaticValidator:
     ) -> ExchangeCredentialValidationResult:
         _ = request, now
         return self.result
+
+
+@dataclass(frozen=True)
+class _StaticUsageGuard(ExchangeConnectionUsageGuard):
+    active_count: int
+
+    def active_trading_bindings_count(
+        self, *, owner_user_id: UserId, connection_id: UUID
+    ) -> int:
+        _ = owner_user_id, connection_id
+        return self.active_count
 
 
 def test_connection_create_exposes_trading_capability_needing_validation() -> None:
@@ -515,10 +528,58 @@ def test_reclassification_refuses_active_trading_ready_connection() -> None:
     assert error.value.code == "exchange_connection_trading_ready"
 
 
-def _service() -> ExchangeConnectionService:
+def test_active_strategy_binding_blocks_disconnect_and_archive_but_not_rotate() -> None:
+    service = _service(usage_guard=_StaticUsageGuard(active_count=2))
+    created = service.create_connection(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        exchange_name="bybit",
+        market_type="spot",
+        environment="testnet",
+        label="used",
+        permissions="trade",
+        api_key="ACCOUNTKEY1234",
+        api_secret="TEST_SECRET",
+        passphrase=None,
+        now=datetime(2026, 5, 27, 10, 0, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(ExchangeConnectionError) as disable_error:
+        service.disable_connection(
+            owner_user_id=created.owner_user_id,
+            connection_id=created.connection_id,
+            now=datetime(2026, 5, 27, 10, 1, tzinfo=timezone.utc),
+        )
+    assert disable_error.value.code == "exchange_connection_in_use"
+    assert disable_error.value.status_code == 409
+
+    with pytest.raises(ExchangeConnectionError) as archive_error:
+        service.archive_connection(
+            owner_user_id=created.owner_user_id,
+            connection_id=created.connection_id,
+            now=datetime(2026, 5, 27, 10, 2, tzinfo=timezone.utc),
+        )
+    assert archive_error.value.code == "exchange_connection_in_use"
+
+    rotated = service.rotate_connection(
+        owner_user_id=created.owner_user_id,
+        connection_id=created.connection_id,
+        api_key="ACCOUNTKEY5678",
+        api_secret="TEST_SECRET_ROTATED",
+        passphrase=None,
+        now=datetime(2026, 5, 27, 10, 3, tzinfo=timezone.utc),
+    )
+    assert rotated.connection_id == created.connection_id
+    assert rotated.active_strategy_bindings_count == 2
+
+
+def _service(
+    *,
+    usage_guard: ExchangeConnectionUsageGuard | None = None,
+) -> ExchangeConnectionService:
     return ExchangeConnectionService(
         repository=InMemoryExchangeConnectionRepository(),
         secret_cipher=DeterministicInMemoryExchangeSecretCipher(),
+        usage_guard=usage_guard,
     )
 
 

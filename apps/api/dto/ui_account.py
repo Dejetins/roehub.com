@@ -111,6 +111,8 @@ class ExchangeConnectionResponse(BaseModel):
     updated_at: datetime
     disabled_at: datetime | None
     archived_at: datetime | None
+    used_by_strategies_count: int = 0
+    active_strategy_bindings_count: int = 0
 
 
 class ExchangeConnectionsResponse(BaseModel):
@@ -118,6 +120,33 @@ class ExchangeConnectionsResponse(BaseModel):
 
     items: list[ExchangeConnectionResponse]
     next_cursor: str | None = None
+
+
+class CreateStrategyExchangeBindingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exchange_connection_id: str
+    usage_mode: Literal["trading"] = "trading"
+
+
+class StrategyExchangeBindingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    binding_id: str
+    strategy_id: str
+    exchange_connection_id: str
+    usage_mode: Literal["trading"]
+    binding_status: Literal["active", "paused", "disabled", "archived"]
+    created_at: datetime
+    updated_at: datetime
+    disabled_at: datetime | None
+    archived_at: datetime | None
+
+
+class StrategyExchangeBindingsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[StrategyExchangeBindingResponse]
 
 
 class AccountIntegrationResponse(BaseModel):

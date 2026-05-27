@@ -20,12 +20,15 @@ from trading.contexts.exchange_control.adapters.outbound import (
     HttpExchangeCredentialValidator,
     OpenBaoTransitExchangeSecretCipher,
     PostgresExchangeConnectionRepository,
+    PostgresExchangeConnectionUsageGuard,
 )
 from trading.contexts.exchange_control.application.connections import (
     RECLASSIFIED_NON_TRADING_STATUS_REASON,
+    AllowAllExchangeConnectionUsageGuard,
     ExchangeConnectionError,
     ExchangeConnectionRepository,
     ExchangeConnectionService,
+    ExchangeConnectionUsageGuard,
     ExchangeConnectionView,
     InMemoryExchangeConnectionRepository,
 )
@@ -209,6 +212,11 @@ class ExchangeControlRuntimeConfig:
             return PostgresExchangeConnectionRepository(dsn=self.identity_postgres_dsn)
         return InMemoryExchangeConnectionRepository()
 
+    def build_usage_guard(self) -> ExchangeConnectionUsageGuard:
+        if self.identity_postgres_dsn:
+            return PostgresExchangeConnectionUsageGuard(dsn=self.identity_postgres_dsn)
+        return AllowAllExchangeConnectionUsageGuard()
+
     def build_credential_validator(self) -> ExchangeCredentialValidator:
         if self.exchange_validation_live_enabled:
             return HttpExchangeCredentialValidator()
@@ -271,6 +279,24 @@ class ExchangeControlMetrics:
             ("source", "result", "reason"),
             registry=self.registry,
         )
+        self.usage_guard_total = Counter(
+            "exchange_connection_usage_guard_total",
+            "Exchange connection usage guard decisions by action, result, and reason.",
+            ("action", "result", "reason"),
+            registry=self.registry,
+        )
+        self.active_strategy_bindings = Gauge(
+            "exchange_connection_active_strategy_bindings",
+            "Active strategy bindings by exchange connection exchange and status.",
+            ("exchange", "status"),
+            registry=self.registry,
+        )
+        self.strategy_binding_total = Counter(
+            "strategy_exchange_binding_total",
+            "Strategy exchange binding observations by action and result.",
+            ("action", "result"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -310,6 +336,13 @@ class ExchangeControlMetrics:
             result="disabled",
             reason="stage_10d_no_reclassification_attempt",
         ).inc(0)
+        self.usage_guard_total.labels(
+            action="none",
+            result="allowed",
+            reason="stage_11_no_guard_decision",
+        ).inc(0)
+        self.active_strategy_bindings.labels(exchange="none", status="active").set(0)
+        self.strategy_binding_total.labels(action="none", result="observed").inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
         self.connection_validation_total.labels(
@@ -385,6 +418,19 @@ class ExchangeControlMetrics:
             reason=reason,
         ).inc()
 
+    def record_usage_guard(self, *, action: str, result: str, reason: str) -> None:
+        self.usage_guard_total.labels(
+            action=action,
+            result=result,
+            reason=reason,
+        ).inc()
+
+    def set_active_strategy_bindings(
+        self, *, exchange: str, status: str, count: int
+    ) -> None:
+        self.active_strategy_bindings.labels(exchange=exchange, status=status).set(count)
+        self.strategy_binding_total.labels(action="list", result="observed").inc(0)
+
 
 class CreateExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -436,6 +482,7 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
     connection_service = ExchangeConnectionService(
         repository=config.build_connection_repository(),
         secret_cipher=secret_cipher,
+        usage_guard=config.build_usage_guard(),
     )
     credential_validator = config.build_credential_validator()
     readiness_probe = ExchangeControlReadinessProbe(
@@ -518,10 +565,17 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         owner = _parse_user_id(raw_value=owner_user_id)
+        views = connection_service.list_connections(owner_user_id=owner)
+        for view in views:
+            metrics.set_active_strategy_bindings(
+                exchange=view.exchange_name,
+                status=view.status,
+                count=view.active_strategy_bindings_count,
+            )
         return {
             "items": [
                 _exchange_connection_response(view=view)
-                for view in connection_service.list_connections(owner_user_id=owner)
+                for view in views
             ]
         }
 
@@ -659,7 +713,18 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                     result="rejected",
                     reason=error.code,
                 )
+            if error.code == "exchange_connection_in_use":
+                metrics.record_usage_guard(
+                    action="disconnect",
+                    result="blocked",
+                    reason=error.code,
+                )
             raise _exchange_connection_http_error(error=error) from error
+        metrics.record_usage_guard(
+            action="disconnect",
+            result="allowed",
+            reason="no_active_strategy_bindings",
+        )
         if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
             metrics.record_reclassification(
                 source=_cleanup_metric_source(
@@ -704,6 +769,12 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                 now=_utc_now(),
             )
         except ExchangeConnectionError as error:
+            if error.code == "exchange_connection_in_use":
+                metrics.record_usage_guard(
+                    action="archive",
+                    result="blocked",
+                    reason=error.code,
+                )
             metrics.record_archive(
                 exchange="unknown",
                 result="rejected",
@@ -715,6 +786,11 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                     result="rejected",
                 )
             raise _exchange_connection_http_error(error=error) from error
+        metrics.record_usage_guard(
+            action="archive",
+            result="allowed",
+            reason="no_active_strategy_bindings",
+        )
         metrics.record_archive(
             exchange=view.exchange_name,
             result=view.status,
@@ -912,6 +988,8 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
         "updated_at": view.updated_at.isoformat(),
         "disabled_at": view.disabled_at.isoformat() if view.disabled_at else None,
         "archived_at": view.archived_at.isoformat() if view.archived_at else None,
+        "used_by_strategies_count": view.used_by_strategies_count,
+        "active_strategy_bindings_count": view.active_strategy_bindings_count,
     }
 
 

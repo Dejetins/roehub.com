@@ -402,6 +402,16 @@ function renderExchangeKeys(payload) {
     });
     const action = row.insertCell();
     action.className = "settings-exchange-actions";
+    const activeStrategyBindings = Number(item.active_strategy_bindings_count || 0);
+    const usedByStrategies = Number(item.used_by_strategies_count || activeStrategyBindings);
+    if (usedByStrategies > 0) {
+      const usage = document.createElement("span");
+      usage.className = "settings-exchange-usage";
+      usage.textContent = t("settings.exchange.used_by_strategies", {
+        count: String(usedByStrategies),
+      });
+      action.append(usage);
+    }
     const actions =
       isTradingReady(item)
         ? [
@@ -420,6 +430,12 @@ function renderExchangeKeys(payload) {
         item.connection_id || item.key_id || "";
       button.setAttribute("aria-label", t(labelKey));
       button.textContent = t(shortLabelKey);
+      if (actionKey === "disable" && activeStrategyBindings > 0) {
+        button.disabled = true;
+        button.title = t("settings.exchange.disconnect_blocked", {
+          count: String(activeStrategyBindings),
+        });
+      }
       action.append(button);
     });
     if (!actions.length) {

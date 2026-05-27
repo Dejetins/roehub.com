@@ -20,9 +20,12 @@ from apps.api.dto.ui_account import (
     AccountSessionResponse,
     AccountSessionsResponse,
     CreateExchangeConnectionRequest,
+    CreateStrategyExchangeBindingRequest,
     ExchangeConnectionResponse,
     ExchangeConnectionsResponse,
     RotateExchangeConnectionRequest,
+    StrategyExchangeBindingResponse,
+    StrategyExchangeBindingsResponse,
     UpdateAccountIntegrationRequest,
     UpdateAccountNotificationRequest,
     UpdateAccountPreferencesRequest,
@@ -50,7 +53,12 @@ from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
     AccountSettingsValidationError,
 )
+from trading.contexts.strategy.application.use_cases.exchange_bindings import (
+    StrategyExchangeBindingService,
+    StrategyExchangeBindingView,
+)
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import UserId
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
@@ -63,6 +71,7 @@ def build_ui_account_router(
     current_user_dependency: CurrentUserDependency,
     clock: IdentityClock,
     exchange_control_client: ExchangeControlClient | None = None,
+    strategy_binding_service: StrategyExchangeBindingService | None = None,
 ) -> APIRouter:
     if account_settings is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires account_settings")
@@ -281,6 +290,13 @@ def build_ui_account_router(
                 request_id="apps-api-disable-exchange-connection",
             )
         except ExchangeControlClientError as error:
+            _record_exchange_connection_blocked_if_in_use(
+                account_settings=account_settings,
+                owner_user_id=principal.user_id,
+                connection_id=str(connection_id),
+                action="disconnect",
+                error=error,
+            )
             raise _exchange_control_unavailable(error=error) from error
         return _exchange_connection_response(row=row)
 
@@ -307,6 +323,13 @@ def build_ui_account_router(
                 request_id="apps-api-archive-exchange-connection",
             )
         except ExchangeControlClientError as error:
+            _record_exchange_connection_blocked_if_in_use(
+                account_settings=account_settings,
+                owner_user_id=principal.user_id,
+                connection_id=str(connection_id),
+                action="archive",
+                error=error,
+            )
             raise _exchange_control_unavailable(error=error) from error
         previous_row = next(
             (item for item in before_rows if item.connection_id == str(connection_id)),
@@ -350,6 +373,92 @@ def build_ui_account_router(
             validation_status=row.validation_status,
         )
         return _exchange_connection_response(row=row)
+
+    @router.get(
+        "/ui/strategies/{strategy_id}/exchange-bindings",
+        response_model=StrategyExchangeBindingsResponse,
+    )
+    def get_strategy_exchange_bindings(
+        strategy_id: UUID,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> StrategyExchangeBindingsResponse:
+        service = _require_strategy_binding_service(service=strategy_binding_service)
+        rows = service.list_bindings(
+            owner_user_id=principal.user_id,
+            strategy_id=strategy_id,
+        )
+        return StrategyExchangeBindingsResponse(
+            items=[_strategy_exchange_binding_response(row=row) for row in rows]
+        )
+
+    @router.post(
+        "/ui/strategies/{strategy_id}/exchange-bindings",
+        response_model=StrategyExchangeBindingResponse,
+        status_code=201,
+    )
+    def post_strategy_exchange_binding(
+        strategy_id: UUID,
+        request: Request,
+        payload: CreateStrategyExchangeBindingRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> StrategyExchangeBindingResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        service = _require_strategy_binding_service(service=strategy_binding_service)
+        client = _require_exchange_control_client(client=exchange_control_client)
+        connection_id = _parse_uuid(
+            value=payload.exchange_connection_id,
+            field="exchange_connection_id",
+        )
+        connection = _require_trading_ready_connection(
+            client=client,
+            owner_user_id=str(principal.user_id),
+            connection_id=str(connection_id),
+        )
+        binding = service.create_binding(
+            owner_user_id=principal.user_id,
+            strategy_id=strategy_id,
+            exchange_connection_id=connection_id,
+            usage_mode=payload.usage_mode,
+            now=clock.now(),
+        )
+        account_settings.record_strategy_exchange_binding_created(
+            owner_user_id=principal.user_id,
+            binding_id=str(binding.binding_id),
+            strategy_id=str(binding.strategy_id),
+            exchange_connection_id=str(binding.exchange_connection_id),
+            usage_mode=binding.usage_mode,
+            exchange_name=connection.exchange_name,
+        )
+        return _strategy_exchange_binding_response(row=binding)
+
+    @router.post(
+        "/ui/strategies/{strategy_id}/exchange-bindings/{binding_id}/disable",
+        response_model=StrategyExchangeBindingResponse,
+    )
+    def post_strategy_exchange_binding_disable(
+        strategy_id: UUID,
+        binding_id: UUID,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> StrategyExchangeBindingResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        service = _require_strategy_binding_service(service=strategy_binding_service)
+        binding = service.disable_binding(
+            owner_user_id=principal.user_id,
+            strategy_id=strategy_id,
+            binding_id=binding_id,
+            now=clock.now(),
+        )
+        account_settings.record_strategy_exchange_binding_disabled(
+            owner_user_id=principal.user_id,
+            binding_id=str(binding.binding_id),
+            strategy_id=str(binding.strategy_id),
+            exchange_connection_id=str(binding.exchange_connection_id),
+            usage_mode=binding.usage_mode,
+        )
+        return _strategy_exchange_binding_response(row=binding)
 
     @router.get("/ui/account/integrations", response_model=AccountIntegrationsResponse)
     def get_integrations(
@@ -506,6 +615,75 @@ def _require_exchange_control_client(
     return client
 
 
+def _require_strategy_binding_service(
+    *,
+    service: StrategyExchangeBindingService | None,
+) -> StrategyExchangeBindingService:
+    if service is None:
+        raise RoehubError(
+            code="strategy_exchange_bindings_unavailable",
+            message="Strategy exchange binding service is not configured",
+            details={},
+        )
+    return service
+
+
+def _require_trading_ready_connection(
+    *,
+    client: ExchangeControlClient,
+    owner_user_id: str,
+    connection_id: str,
+) -> ExchangeConnectionCommandResult:
+    try:
+        rows = client.list_connections(
+            owner_user_id=owner_user_id,
+            request_id="apps-api-create-strategy-binding-read-connection",
+        )
+    except ExchangeControlClientError as error:
+        raise _exchange_control_unavailable(error=error) from error
+    connection = next((row for row in rows if row.connection_id == connection_id), None)
+    if connection is None:
+        raise RoehubError(
+            code="exchange_connection_not_found",
+            message="Exchange connection was not found.",
+            details={},
+        )
+    if (
+        connection.status != "active"
+        or connection.effective_capability != "trading"
+        or connection.connection_readiness != "ready_for_trading"
+    ):
+        raise RoehubError(
+            code="exchange_connection_not_ready_for_trading",
+            message="Exchange connection is not ready for trading.",
+            details={
+                "connection_id": connection_id,
+                "connection_readiness": connection.connection_readiness,
+                "effective_capability": connection.effective_capability,
+            },
+        )
+    return connection
+
+
+def _parse_uuid(*, value: str, field: str) -> UUID:
+    try:
+        return UUID(value)
+    except ValueError as exc:
+        raise RoehubError(
+            code="validation_error",
+            message="Validation failed",
+            details={
+                "errors": [
+                    {
+                        "path": field,
+                        "code": "invalid_uuid",
+                        "message": "Value must be a valid UUID.",
+                    }
+                ]
+            },
+        ) from exc
+
+
 def _find_exchange_connection_before_mutation(
     *,
     client: ExchangeControlClient,
@@ -548,6 +726,21 @@ def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> Roehu
             code="exchange_connection_not_disabled",
             message="Exchange connection must be disabled before archive.",
             details={},
+        )
+    if "exchange_connection_in_use" in message:
+        return RoehubError(
+            code="exchange_connection_in_use",
+            message=(
+                "Cannot disconnect. This exchange account is used by active "
+                "strategies. Pause or reassign strategies first."
+            ),
+            details={"reason": "exchange_connection_in_use"},
+        )
+    if "exchange_connection_usage_guard_unavailable" in message:
+        return RoehubError(
+            code="exchange_connection_usage_guard_unavailable",
+            message="Exchange connection usage guard is unavailable.",
+            details={"reason": "usage_guard_unavailable"},
         )
     if "exchange_connection_invalid" in message:
         return RoehubError(
@@ -638,6 +831,43 @@ def _exchange_connection_response(
         updated_at=row.updated_at,
         disabled_at=row.disabled_at,
         archived_at=row.archived_at,
+        used_by_strategies_count=row.used_by_strategies_count,
+        active_strategy_bindings_count=row.active_strategy_bindings_count,
+    )
+
+
+def _strategy_exchange_binding_response(
+    *,
+    row: StrategyExchangeBindingView,
+) -> StrategyExchangeBindingResponse:
+    return StrategyExchangeBindingResponse(
+        binding_id=str(row.binding_id),
+        strategy_id=str(row.strategy_id),
+        exchange_connection_id=str(row.exchange_connection_id),
+        usage_mode=row.usage_mode,
+        binding_status=row.binding_status,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        disabled_at=row.disabled_at,
+        archived_at=row.archived_at,
+    )
+
+
+def _record_exchange_connection_blocked_if_in_use(
+    *,
+    account_settings: AccountSettingsUseCase,
+    owner_user_id: UserId,
+    connection_id: str,
+    action: str,
+    error: ExchangeControlClientError,
+) -> None:
+    if "exchange_connection_in_use" not in str(error):
+        return
+    account_settings.record_exchange_connection_disconnect_blocked(
+        owner_user_id=owner_user_id,
+        connection_id=connection_id,
+        action=action,
+        reason="exchange_connection_in_use",
     )
 
 

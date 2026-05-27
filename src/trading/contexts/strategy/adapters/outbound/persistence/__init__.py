@@ -1,10 +1,12 @@
 from .in_memory import (
     InMemoryStrategyEventRepository,
+    InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
 )
 from .postgres import (
     PostgresStrategyEventRepository,
+    PostgresStrategyExchangeBindingRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
     PsycopgStrategyPostgresGateway,
@@ -13,9 +15,11 @@ from .postgres import (
 
 __all__ = [
     "InMemoryStrategyEventRepository",
+    "InMemoryStrategyExchangeBindingRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
     "PostgresStrategyEventRepository",
+    "PostgresStrategyExchangeBindingRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PsycopgStrategyPostgresGateway",
