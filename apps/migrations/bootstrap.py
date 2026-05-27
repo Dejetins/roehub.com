@@ -25,6 +25,7 @@ _EXCHANGE_CONNECTIONS_V1_SQL_FILE = "0008_exchange_connections_v1.sql"
 _IDENTITY_EXCHANGE_RECLASSIFICATION_AUDIT_V1_SQL_FILE = (
     "0009_identity_exchange_reclassification_audit_v1.sql"
 )
+_STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE = "0010_strategy_exchange_bindings_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +288,10 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         migrations_dir=migrations_dir,
         filenames=(_IDENTITY_EXCHANGE_RECLASSIFICATION_AUDIT_V1_SQL_FILE,),
     )[0]
+    strategy_exchange_bindings_v1_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE,),
+    )[0]
 
     with psycopg.connect(
         normalized_identity_dsn,
@@ -335,6 +340,14 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         _execute_sql_script(
             connection=connection,
             sql_path=exchange_reclassification_audit_v1_path,
+        )
+        print(
+            "Applying identity baseline SQL: "
+            f"{strategy_exchange_bindings_v1_path.name}"
+        )
+        _execute_sql_script(
+            connection=connection,
+            sql_path=strategy_exchange_bindings_v1_path,
         )
 
 
