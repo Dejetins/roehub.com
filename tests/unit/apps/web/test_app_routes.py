@@ -348,6 +348,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-exchange-environment-advanced' in settings_response.text
     assert 'data-exchange-form-modal hidden aria-hidden="true"' in main_html
     assert 'role="dialog" aria-modal="true"' in main_html
+    assert "settings-exchange-field" in main_html
+    assert 'for="exchange-api-key"' in main_html
+    assert 'for="exchange-api-secret"' in main_html
     assert 'data-permissions-current' not in settings_response.text
     assert 'data-permissions-option' not in settings_response.text
     assert 'name="permissions"' not in settings_response.text

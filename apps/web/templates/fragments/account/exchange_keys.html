@@ -13,44 +13,62 @@
         <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-exchange-form-close aria-label="{{ t('settings.exchange.cancel') }}">×</button>
       </header>
       <div class="settings-form-grid settings-form-grid--modal">
-        <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-          <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-name-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-name-menu" data-rh-dropdown-trigger>
-            {{ t("settings.exchange.exchange") }} <span class="rh-dropdown__value" data-exchange-name-current>binance</span>
-          </button>
-          <div class="rh-popover" id="exchange-name-menu" role="listbox" hidden data-rh-dropdown-menu>
-            <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="binance" data-exchange-name-option="binance">Binance</button>
-            <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="bybit" data-exchange-name-option="bybit">Bybit</button>
-          </div>
-        </div>
-        <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-          <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-market-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-market-menu" data-rh-dropdown-trigger>
-            {{ t("settings.exchange.market") }} <span class="rh-dropdown__value" data-market-current>futures</span>
-          </button>
-          <div class="rh-popover" id="exchange-market-menu" role="listbox" hidden data-rh-dropdown-menu>
-            <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="spot" data-market-option="spot">Spot</button>
-            <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="futures" data-market-option="futures">Futures</button>
-          </div>
-        </div>
-        <details class="settings-exchange-advanced" data-exchange-environment-advanced>
-          <summary aria-label="{{ t('settings.exchange.testnet_advanced') }}">
-            {{ t("settings.exchange.mainnet_default") }} · {{ t("settings.exchange.testnet_advanced") }}
-            <span class="rh-dropdown__value" data-environment-current>mainnet</span>
-          </summary>
-          <div class="settings-exchange-advanced__body">
-            <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
-              <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-environment-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-environment-menu" data-rh-dropdown-trigger>
-                {{ t("settings.exchange.environment") }} <span class="rh-dropdown__value" data-environment-menu-current>mainnet</span>
-              </button>
-              <div class="rh-popover" id="exchange-environment-menu" role="listbox" hidden data-rh-dropdown-menu>
-                <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="mainnet" data-environment-option="mainnet">mainnet</button>
-                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="testnet" data-environment-option="testnet">testnet</button>
-              </div>
+        <div class="settings-exchange-field">
+          <span class="settings-exchange-field__label">{{ t("settings.exchange.exchange") }}</span>
+          <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+            <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-name-trigger" aria-label="{{ t('settings.exchange.exchange') }}" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-name-menu" data-rh-dropdown-trigger>
+              <span class="rh-dropdown__value" data-exchange-name-current>binance</span>
+            </button>
+            <div class="rh-popover" id="exchange-name-menu" role="listbox" hidden data-rh-dropdown-menu>
+              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="binance" data-exchange-name-option="binance">Binance</button>
+              <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="bybit" data-exchange-name-option="bybit">Bybit</button>
             </div>
           </div>
-        </details>
-        <input name="label" type="text" maxlength="80" placeholder="main_binance" aria-label="{{ t('settings.exchange.account') }}">
-        <input class="settings-secret-input" name="exchange_public_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API key" aria-label="API key" aria-autocomplete="none" data-secret-input data-exchange-api-key-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
-        <input class="settings-secret-input" name="exchange_private_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API secret" aria-label="API secret" aria-autocomplete="none" data-secret-input data-exchange-api-secret-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+        </div>
+        <div class="settings-exchange-field">
+          <span class="settings-exchange-field__label">{{ t("settings.exchange.market") }}</span>
+          <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+            <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-market-trigger" aria-label="{{ t('settings.exchange.market') }}" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-market-menu" data-rh-dropdown-trigger>
+              <span class="rh-dropdown__value" data-market-current>futures</span>
+            </button>
+            <div class="rh-popover" id="exchange-market-menu" role="listbox" hidden data-rh-dropdown-menu>
+              <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="spot" data-market-option="spot">Spot</button>
+              <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="futures" data-market-option="futures">Futures</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-exchange-field">
+          <span class="settings-exchange-field__label">{{ t("settings.exchange.environment") }}</span>
+          <details class="settings-exchange-advanced" data-exchange-environment-advanced>
+            <summary aria-label="{{ t('settings.exchange.testnet_advanced') }}">
+              {{ t("settings.exchange.mainnet_default") }} · {{ t("settings.exchange.testnet_advanced") }}
+              <span class="rh-dropdown__value" data-environment-current>mainnet</span>
+            </summary>
+            <div class="settings-exchange-advanced__body">
+              <div class="rh-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
+                <button class="rh-button rh-button--secondary rh-button--compact rh-dropdown__trigger" type="button" id="exchange-environment-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="exchange-environment-menu" data-rh-dropdown-trigger>
+                  <span class="rh-dropdown__value" data-environment-menu-current>mainnet</span>
+                </button>
+                <div class="rh-popover" id="exchange-environment-menu" role="listbox" hidden data-rh-dropdown-menu>
+                  <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="mainnet" data-environment-option="mainnet">mainnet</button>
+                  <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="testnet" data-environment-option="testnet">testnet</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="settings-exchange-field">
+          <label class="settings-exchange-field__label" for="exchange-key-label">{{ t("settings.exchange.account") }}</label>
+          <input id="exchange-key-label" name="label" type="text" maxlength="80" placeholder="main_binance" aria-label="{{ t('settings.exchange.account') }}">
+        </div>
+        <div class="settings-exchange-field">
+          <label class="settings-exchange-field__label" for="exchange-api-key">API key</label>
+          <input id="exchange-api-key" class="settings-secret-input" name="exchange_public_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API key" aria-label="API key" aria-autocomplete="none" data-secret-input data-exchange-api-key-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+        </div>
+        <div class="settings-exchange-field">
+          <label class="settings-exchange-field__label" for="exchange-api-secret">API secret</label>
+          <input id="exchange-api-secret" class="settings-secret-input" name="exchange_private_token" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" placeholder="API secret" aria-label="API secret" aria-autocomplete="none" data-secret-input data-exchange-api-secret-input data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+        </div>
       </div>
       <footer class="settings-exchange-modal__actions">
         <output class="settings-inline-status" data-exchange-form-status aria-live="polite"></output>

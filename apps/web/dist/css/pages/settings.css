@@ -557,18 +557,48 @@
 }
 
 .settings-form-grid--modal {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
 }
 
-.settings-form-grid--modal .settings-exchange-advanced,
-.settings-form-grid--modal input {
+.settings-exchange-field {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
   min-width: 0;
 }
 
-.settings-form-grid--modal input[name="label"],
-.settings-form-grid--modal [data-exchange-environment-advanced] {
-  grid-column: 1 / -1;
+.settings-exchange-field__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rh-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-exchange-field > .rh-dropdown,
+.settings-exchange-field > .settings-exchange-advanced,
+.settings-exchange-field > input {
+  min-width: 0;
+  width: 100%;
+}
+
+.settings-exchange-field .rh-dropdown__trigger,
+.settings-exchange-field .settings-exchange-advanced summary,
+.settings-exchange-field input {
+  width: 100%;
+}
+
+.settings-exchange-field .rh-dropdown__trigger,
+.settings-exchange-field .settings-exchange-advanced summary {
+  justify-content: space-between;
+}
+
+.settings-exchange-field .settings-exchange-advanced__body {
+  right: 0;
 }
 
 .settings-exchange-modal__actions {
@@ -803,6 +833,19 @@ body.settings-exchange-modal-lock {
   .settings-limit,
   .settings-limits {
     grid-template-columns: 1fr;
+  }
+
+  .settings-exchange-field {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .settings-exchange-field__label {
+    white-space: normal;
+  }
+
+  .settings-exchange-modal__actions {
+    flex-wrap: wrap;
   }
 
   .settings-avatar {
