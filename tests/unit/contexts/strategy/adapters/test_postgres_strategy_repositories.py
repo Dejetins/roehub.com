@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -193,6 +193,40 @@ def test_strategy_repository_list_for_user_uses_deterministic_ordering() -> None
 
     assert len(strategies) == 1
     assert "ORDER BY created_at ASC, strategy_id ASC" in gateway.fetch_all_queries[0]
+
+
+def test_strategy_repository_normalizes_postgres_session_timezone_to_utc() -> None:
+    """
+    Verify mapped `timestamptz` values remain valid domain UTC datetimes.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Production Postgres sessions may return `timestamptz` in the session timezone.
+    Raises:
+        AssertionError: If row mapping leaks non-UTC offsets into Strategy domain.
+    Side Effects:
+        None.
+    """
+    strategy_row = dict(_build_strategy_row())
+    strategy_row["created_at"] = datetime(
+        2026,
+        5,
+        27,
+        3,
+        21,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    gateway = _FakeGateway(fetch_all_results=[(strategy_row,)])
+    repository = PostgresStrategyRepository(gateway=gateway)
+
+    strategies = repository.list_for_user(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
+    )
+
+    assert strategies[0].created_at == datetime(2026, 5, 27, 0, 21, tzinfo=timezone.utc)
 
 
 def test_run_repository_find_active_includes_deterministic_order_clause() -> None:

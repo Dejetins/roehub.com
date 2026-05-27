@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any, Mapping, Sequence
 from uuid import UUID
 
@@ -356,7 +357,7 @@ def _map_strategy_row(*, row: Mapping[str, Any]) -> Strategy:
             user_id=UserId.from_string(str(row["user_id"])),
             name=str(row["name"]),
             spec=spec,
-            created_at=row["created_at"],
+            created_at=_coerce_utc_datetime(value=row["created_at"], field_name="created_at"),
             is_deleted=bool(row["is_deleted"]),
         )
     except StrategyStorageError:
@@ -442,6 +443,14 @@ def _coerce_json_value(*, value: Any, field_name: str) -> Any:
         except json.JSONDecodeError as error:
             raise StrategyStorageError(f"{field_name} is invalid JSON text") from error
     raise StrategyStorageError(f"{field_name} has unsupported JSON value type")
+
+
+def _coerce_utc_datetime(*, value: Any, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise StrategyStorageError(f"{field_name} must be datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise StrategyStorageError(f"{field_name} must be timezone-aware")
+    return value.astimezone(UTC)
 
 
 
