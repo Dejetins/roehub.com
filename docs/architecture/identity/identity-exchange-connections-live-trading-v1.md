@@ -2186,6 +2186,15 @@ curl -fsS http://127.0.0.1:9205/metrics \
 - stage report и iteration ledger обновлены;
 - после acceptance выполнен direct-main delivery.
 
+Stage 11 accepted evidence is recorded in
+`docs/architecture/identity/exchange-connections-stage-reports/11-strategy-binding-guard.md`.
+The accepted implementation used the primary HTTP binding API, not a direct DB
+insert: create/list binding, account usage counts, `409 exchange_connection_in_use`
+for Disconnect/Archive, rotate while used, binding release, disconnect/archive,
+DB/audit/metrics and authenticated `/settings` Playwright proof. Exchange
+execution, order placement, order simulation and physical deletes remain out of
+scope and blocked until a separate signal-to-execution architecture is accepted.
+
 ## Контрактное Влияние
 
 | Измерение | Классификация | Примечания |

@@ -331,6 +331,30 @@ API слой не должен знать доменные типы (тольк�
 * Доменные контексты не импортируют FastAPI/HTTP; они работают с доменными ошибками и/или `RoehubError`.
 * API слой не импортирует доменные типы ошибок напрямую — только `RoehubError`.
 
+## Exchange Connection Bindings
+
+Stage 11 of `identity-exchange-connections-live-trading-v1` adds strategy
+configuration bindings to exchange connections without changing strategy runner
+or execution semantics.
+
+Additive endpoints:
+
+* `GET /api/ui/strategies/{strategy_id}/exchange-bindings`
+* `POST /api/ui/strategies/{strategy_id}/exchange-bindings`
+* `POST /api/ui/strategies/{strategy_id}/exchange-bindings/{binding_id}/disable`
+
+Contract:
+
+* binding rows are owner-scoped and reference stable `strategy_id` and
+  `exchange_connection_id`;
+* v1 `usage_mode` is `trading`;
+* binding lifecycle is configuration-only and does not place, simulate, or
+  submit orders;
+* active trading bindings block exchange connection Disconnect/Archive with
+  deterministic `409 exchange_connection_in_use`;
+* credential rotation remains allowed because the binding uses stable
+  `connection_id`, not a credential version id.
+
 ## Связанные файлы
 
 * `src/trading/platform/errors/__init__.py` — стабильный экспорт ошибок
