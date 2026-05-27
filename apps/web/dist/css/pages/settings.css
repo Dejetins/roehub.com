@@ -498,6 +498,95 @@
   border-top: 1px solid var(--rh-divider);
 }
 
+.settings-exchange-modal[hidden] {
+  display: none !important;
+}
+
+.settings-exchange-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.settings-exchange-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--rh-background) 72%, transparent);
+  cursor: default;
+}
+
+.settings-exchange-modal .settings-exchange-form {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  width: min(680px, calc(100vw - 28px));
+  max-height: calc(100vh - 36px);
+  margin: 0;
+  border: 1px solid var(--rh-workstation-panel-border);
+  background: var(--rh-surface-2);
+  box-shadow: 0 18px 56px rgb(0 0 0 / 42%);
+  padding: 10px;
+  overflow: visible;
+}
+
+.settings-exchange-modal__heading,
+.settings-exchange-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-exchange-modal__heading {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rh-divider);
+  padding-bottom: 7px;
+}
+
+.settings-exchange-modal__heading h3 {
+  margin: 0;
+  color: var(--rh-accent-2);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settings-form-grid--modal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-form-grid--modal .settings-exchange-advanced,
+.settings-form-grid--modal input {
+  min-width: 0;
+}
+
+.settings-form-grid--modal input[name="label"],
+.settings-form-grid--modal [data-exchange-environment-advanced] {
+  grid-column: 1 / -1;
+}
+
+.settings-exchange-modal__actions {
+  justify-content: flex-end;
+  border-top: 1px solid var(--rh-divider);
+  padding-top: 7px;
+}
+
+.settings-exchange-modal__actions .settings-inline-status {
+  flex: 1 1 auto;
+  min-width: 120px;
+  margin: 0;
+}
+
+body.settings-exchange-modal-lock {
+  overflow: hidden;
+}
+
 .settings-rotate-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto minmax(90px, 0.5fr);

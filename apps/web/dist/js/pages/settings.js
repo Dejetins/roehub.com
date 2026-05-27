@@ -126,6 +126,37 @@ function clearSecretInputs(form) {
   });
 }
 
+function openExchangeFormModal() {
+  const modal = qs("[data-exchange-form-modal]");
+  if (!(modal instanceof HTMLElement)) return;
+  modal.hidden = false;
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("settings-exchange-modal-lock");
+  const status = qs("[data-exchange-form-status]", modal);
+  if (status) status.textContent = "";
+  const firstControl = qs("[data-rh-dropdown-trigger], input, button", modal);
+  if (firstControl instanceof HTMLElement) {
+    firstControl.focus();
+  }
+}
+
+function closeExchangeFormModal({ clearSecrets = true } = {}) {
+  const modal = qs("[data-exchange-form-modal]");
+  const form = qs("[data-exchange-form]");
+  if (form instanceof HTMLFormElement && clearSecrets) {
+    clearSecretInputs(form);
+  }
+  if (modal instanceof HTMLElement) {
+    modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+  }
+  document.body.classList.remove("settings-exchange-modal-lock");
+  const trigger = qs("[data-exchange-form-toggle]");
+  if (trigger instanceof HTMLElement) {
+    trigger.focus();
+  }
+}
+
 function secretInputValue(form, selector) {
   const input = qs(selector, form);
   return input instanceof HTMLInputElement ? input.value : "";
@@ -649,8 +680,17 @@ function initEvents(root) {
     }
   });
   on(root, "click", "[data-exchange-form-toggle]", () => {
-    const form = qs("[data-exchange-form]");
-    if (form) form.hidden = !form.hidden;
+    openExchangeFormModal();
+  });
+  on(root, "click", "[data-exchange-form-close]", () => {
+    closeExchangeFormModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    const modal = qs("[data-exchange-form-modal]");
+    if (event.key === "Escape" && modal instanceof HTMLElement && !modal.hidden) {
+      event.preventDefault();
+      closeExchangeFormModal();
+    }
   });
   on(root, "click", "[data-exchange-name-option]", (_event, item) => {
     state.exchangeName = item.dataset.exchangeNameOption || "binance";
@@ -713,6 +753,7 @@ function initForms(root) {
       const exchangeKeys = await loadJson(exchangeKeysPath(root, nextStatus), { items: [] });
       renderExchangeKeys(exchangeKeys);
       if (status) status.textContent = isTradingReady(saved) ? t("settings.exchange.saved") : readinessMessage(saved);
+      closeExchangeFormModal({ clearSecrets: false });
     } catch (error) {
       clearSecretInputs(form);
       if (status) status.textContent = errorMessage(error);

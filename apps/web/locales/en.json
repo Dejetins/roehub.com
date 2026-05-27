@@ -516,6 +516,8 @@
   "settings.exchange.account": "Account / name",
   "settings.exchange.actions": "Actions",
   "settings.exchange.add": "Connect and validate",
+  "settings.exchange.add_key": "ADD API KEY",
+  "settings.exchange.cancel": "Cancel",
   "settings.exchange.confirm_delete": "Disconnect this exchange key?",
   "settings.exchange.confirm_archive": "Type ARCHIVE to archive this disabled exchange connection.",
   "settings.exchange.confirm_disable": "Type DISCONNECT to disconnect this exchange connection.",

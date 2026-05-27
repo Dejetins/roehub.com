@@ -342,9 +342,12 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
     assert 'data-environment-current>mainnet</span>' in settings_response.text
+    assert "ADD API KEY" in settings_response.text
     assert "Connect and validate" in settings_response.text
     assert "Advanced testnet" in settings_response.text
     assert 'data-exchange-environment-advanced' in settings_response.text
+    assert 'data-exchange-form-modal hidden aria-hidden="true"' in main_html
+    assert 'role="dialog" aria-modal="true"' in main_html
     assert 'data-permissions-current' not in settings_response.text
     assert 'data-permissions-option' not in settings_response.text
     assert 'name="permissions"' not in settings_response.text
@@ -354,7 +357,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'name="api_key"' not in main_html
     assert 'name="api_secret"' not in main_html
     assert "data-secret-input" in main_html
-    assert 'data-exchange-form hidden autocomplete="off" data-lpignore="true"' in main_html
+    assert 'data-exchange-form autocomplete="off" data-lpignore="true"' in main_html
+    assert "settings-exchange-modal__actions" in main_html
     assert 'data-exchange-status-filter="active"' in main_html
     assert 'data-exchange-status-filter="history"' in main_html
     assert 'data-exchange-status-filter="disabled"' not in main_html

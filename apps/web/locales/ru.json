@@ -516,6 +516,8 @@
   "settings.exchange.account": "Аккаунт / имя",
   "settings.exchange.actions": "Действия",
   "settings.exchange.add": "Подключить и проверить",
+  "settings.exchange.add_key": "ADD API KEY",
+  "settings.exchange.cancel": "Отмена",
   "settings.exchange.confirm_delete": "Отключить этот биржевой ключ?",
   "settings.exchange.confirm_archive": "Введите ARCHIVE, чтобы архивировать это отключенное биржевое подключение.",
   "settings.exchange.confirm_disable": "Введите DISCONNECT, чтобы отключить это биржевое подключение.",
