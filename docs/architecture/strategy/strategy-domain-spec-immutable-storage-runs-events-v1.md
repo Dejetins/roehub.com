@@ -40,6 +40,8 @@
 - Runs:
   - максимум **1 активный run** на стратегию в состояниях `starting|warming_up|running|stopping`
   - хранение checkpoint для продолжения “с места остановки”
+  - restart как durable operation в `strategy_runs.metadata_json.restart`, не как
+    UI alias на stop+run
 - Events:
   - append-only история (truth) + база для realtime/UI
   - `run_id` допускается `NULL` (события уровня стратегии, не привязанные к конкретному запуску)
@@ -142,6 +144,19 @@ StrategySpec (spec_json) является source-of-truth и **не обновл
 - после рестарта worker может “догонять” с checkpoint.
 - события/метрики не дублируются.
 
+### 6A) metadata_json.restart: durable restart operation
+
+Restart фиксируется на текущем активном run как JSON object:
+
+- `operation_id` — stable UUID-like operation identity for audit and duplicate detection;
+- `state=pending_start` — API accepted restart and moved current run to `stopping`;
+- `state=drained` — live-runner finalized the old run as terminal `stopped`;
+- `state=successor_started` — successor run was created after drain;
+- `previous_run_id` — stored on successor metadata for traceability.
+
+Правило: browser/API не создаёт successor напрямую. Successor появляется только
+после того, как live-runner доказал drain старого run через terminal state.
+
 ### 7) Events append-only, run_id nullable
 
 Events — append-only (truth log).  
@@ -181,6 +196,7 @@ CI:
   - валидируется через `Timeframe` (`code` нормализуется и проверяется).
 - Runs:
   - максимум 1 активный run на strategy в состояниях `starting|warming_up|running|stopping`.
+  - restart operation durable in `metadata_json.restart`; duplicate pending restart is conflict.
 - Events:
   - append-only (никаких UPDATE/DELETE в пределах truth log).
   - `run_id` nullable (события уровня стратегии допускаются).

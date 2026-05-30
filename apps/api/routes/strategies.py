@@ -28,6 +28,7 @@ from trading.contexts.strategy.application.use_cases import (
     ListMyStrategiesUseCase,
     LiveStrategyProfileConfig,
     LiveStrategyProfileService,
+    RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
 )
@@ -247,6 +248,7 @@ def build_strategies_router(
     get_use_case: GetMyStrategyUseCase,
     run_use_case: RunStrategyUseCase,
     stop_use_case: StopStrategyUseCase,
+    restart_use_case: RestartStrategyUseCase,
     delete_use_case: DeleteStrategyUseCase,
     current_user_provider_dependency: CurrentUserProviderDependency,
     live_profile_service: LiveStrategyProfileService | None = None,
@@ -285,6 +287,8 @@ def build_strategies_router(
         raise ValueError("build_strategies_router requires run_use_case")
     if stop_use_case is None:  # type: ignore[truthy-bool]
         raise ValueError("build_strategies_router requires stop_use_case")
+    if restart_use_case is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_strategies_router requires restart_use_case")
     if delete_use_case is None:  # type: ignore[truthy-bool]
         raise ValueError("build_strategies_router requires delete_use_case")
 
@@ -545,6 +549,24 @@ def build_strategies_router(
         current_user = current_user_provider.require_current_user()
         stopped_run = stop_use_case.execute(strategy_id=strategy_id, current_user=current_user)
         return _to_strategy_run_response(run=stopped_run)
+
+    @router.post("/strategies/{strategy_id}/restart", response_model=StrategyRunResponse)
+    def post_strategy_restart(
+        strategy_id: UUID,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> StrategyRunResponse:
+        """
+        Queue durable restart for an active strategy run.
+
+        The API records restart intent and transitions the current run to `stopping`.
+        The live-runner drains it to `stopped` and creates the successor run.
+        """
+        current_user = current_user_provider.require_current_user()
+        restarting_run = restart_use_case.execute(
+            strategy_id=strategy_id,
+            current_user=current_user,
+        )
+        return _to_strategy_run_response(run=restarting_run)
 
     @router.delete("/strategies/{strategy_id}", status_code=204, response_model=None)
     def delete_strategy(

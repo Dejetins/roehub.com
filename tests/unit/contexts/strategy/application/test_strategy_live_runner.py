@@ -877,6 +877,74 @@ def test_live_runner_keeps_best_effort_when_telegram_notifier_raises() -> None:
     assert report.acked_messages == 1
 
 
+def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000919")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    strategy_repository.create(strategy=strategy)
+
+    running = _create_running_run(
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        checkpoint_ts_open=datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc),
+    )
+    stopping = running.transition_to(
+        next_state="stopping",
+        changed_at=datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc),
+        checkpoint_ts_open=running.checkpoint_ts_open,
+        last_error=None,
+    )
+    stopping = StrategyRun(
+        run_id=stopping.run_id,
+        user_id=stopping.user_id,
+        strategy_id=stopping.strategy_id,
+        state=stopping.state,
+        started_at=stopping.started_at,
+        stopped_at=stopping.stopped_at,
+        checkpoint_ts_open=stopping.checkpoint_ts_open,
+        last_error=stopping.last_error,
+        updated_at=stopping.updated_at,
+        metadata_json={
+            **dict(stopping.metadata_json),
+            "restart": {
+                "operation_id": "restart-op-1",
+                "state": "pending_start",
+                "requested_at": "2026-02-17T10:03:00Z",
+            },
+        },
+    )
+    run_repository.create(run=stopping)
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=_StreamStub(messages_by_instrument={strategy.spec.instrument_key: ()}),
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+    )
+
+    report = runner.run_once()
+    runs = run_repository.list_for_strategy(user_id=user_id, strategy_id=strategy.strategy_id)
+    stopped, successor = runs
+
+    assert report.polled_runs == 1
+    assert stopped.run_id == stopping.run_id
+    assert stopped.state == "stopped"
+    assert stopped.metadata_json["restart"]["state"] == "drained"
+    assert successor.run_id != stopped.run_id
+    assert successor.state == "starting"
+    assert successor.metadata_json["restart"] == {
+        "operation_id": "restart-op-1",
+        "previous_run_id": str(stopped.run_id),
+        "requested_at": "2026-02-17T10:03:00Z",
+        "state": "successor_started",
+    }
+    assert run_repository.find_active_for_strategy(
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+    ) == successor
+
+
 def _build_runner(
     *,
     strategy_repository: InMemoryStrategyRepository,

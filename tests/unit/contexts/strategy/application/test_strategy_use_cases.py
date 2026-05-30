@@ -19,6 +19,7 @@ from trading.contexts.strategy.application import (
     CreateStrategyUseCase,
     CurrentUser,
     GetMyStrategyUseCase,
+    RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
     estimate_strategy_warmup_bars,
@@ -403,6 +404,74 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
     )
     assert second_run.state == "starting"
     assert second_run.run_id != running.run_id
+
+
+def test_restart_use_case_records_durable_pending_operation() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    run_repository = InMemoryStrategyRunRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 5, 31, 8, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 8, 1, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 8, 2, tzinfo=timezone.utc),
+        )
+    )
+
+    create_use_case = CreateStrategyUseCase(
+        repository=strategy_repository,
+        event_repository=event_repository,
+        clock=clock,
+    )
+    run_use_case = RunStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
+        clock=clock,
+    )
+    restart_use_case = RestartStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
+        clock=clock,
+    )
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000405")
+    )
+    created_strategy = create_use_case.execute(
+        spec_payload=_build_spec_payload(),
+        current_user=current_user,
+    )
+    running = run_use_case.execute(
+        strategy_id=created_strategy.strategy_id,
+        current_user=current_user,
+    )
+
+    restarting = restart_use_case.execute(
+        strategy_id=created_strategy.strategy_id,
+        current_user=current_user,
+    )
+
+    assert restarting.run_id == running.run_id
+    assert restarting.state == "stopping"
+    restart = restarting.metadata_json["restart"]
+    assert restart["state"] == "pending_start"
+    assert restart["requested_at"] == "2026-05-31T08:02:00Z"
+    assert restart["operation_id"] != ""
+    events = event_repository.list_for_strategy(
+        user_id=current_user.user_id,
+        strategy_id=created_strategy.strategy_id,
+    )
+    assert events[-1].event_type == "run_restart_requested"
+    assert events[-1].payload_json["restart_operation_id"] == restart["operation_id"]
+
+    with pytest.raises(RoehubError) as error_info:
+        restart_use_case.execute(
+            strategy_id=created_strategy.strategy_id,
+            current_user=current_user,
+        )
+    assert error_info.value.code == "conflict"
+    assert error_info.value.message == "Strategy restart is already pending"
 
 
 

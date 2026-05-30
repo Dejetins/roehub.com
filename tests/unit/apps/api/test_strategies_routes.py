@@ -25,6 +25,7 @@ from trading.contexts.strategy.application import (
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
     LiveStrategyProfileService,
+    RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
 )
@@ -232,6 +233,12 @@ def _build_client() -> TestClient:
             event_repository=event_repository,
             clock=clock,
         ),
+        restart_use_case=RestartStrategyUseCase(
+            strategy_repository=strategy_repository,
+            run_repository=run_repository,
+            event_repository=event_repository,
+            clock=clock,
+        ),
         delete_use_case=DeleteStrategyUseCase(
             repository=strategy_repository,
             event_repository=event_repository,
@@ -290,6 +297,12 @@ def _build_live_profile_client(
                 clock=clock,
             ),
             stop_use_case=StopStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=InMemoryStrategyRunRepository(),
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            restart_use_case=RestartStrategyUseCase(
                 strategy_repository=strategy_repository,
                 run_repository=InMemoryStrategyRunRepository(),
                 event_repository=event_repository,
@@ -526,6 +539,38 @@ def test_strategy_run_stop_endpoints_expose_starting_and_stopping_states() -> No
     second_run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
     assert second_run.status_code == 409
     assert second_run.json()["error"]["code"] == "conflict"
+
+
+def test_strategy_restart_endpoint_persists_pending_restart_and_rejects_duplicate() -> None:
+    client = _build_client()
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000004445"}
+
+    create_response = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="ADAUSDT"),
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    strategy_id = create_response.json()["strategy_id"]
+
+    no_active_restart = client.post(f"/strategies/{strategy_id}/restart", headers=headers)
+    assert no_active_restart.status_code == 409
+    assert no_active_restart.json()["error"]["message"] == "Strategy has no active run to restart"
+
+    first_run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
+    assert first_run.status_code == 200
+    assert first_run.json()["state"] == "starting"
+
+    restart = client.post(f"/strategies/{strategy_id}/restart", headers=headers)
+    assert restart.status_code == 200
+    restart_payload = restart.json()
+    assert restart_payload["state"] == "stopping"
+    assert restart_payload["metadata"]["restart"]["state"] == "pending_start"
+    assert restart_payload["metadata"]["restart"]["operation_id"]
+
+    duplicate_restart = client.post(f"/strategies/{strategy_id}/restart", headers=headers)
+    assert duplicate_restart.status_code == 409
+    assert duplicate_restart.json()["error"]["message"] == "Strategy restart is already pending"
 
 
 

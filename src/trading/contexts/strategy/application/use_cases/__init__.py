@@ -16,6 +16,7 @@ from .exchange_bindings import StrategyExchangeBindingService, StrategyExchangeB
 from .get_my_strategy import GetMyStrategyUseCase
 from .list_my_strategies import ListMyStrategiesUseCase
 from .live_strategy_profiles import LiveStrategyProfileConfig, LiveStrategyProfileService
+from .restart_strategy import RestartStrategyUseCase
 from .run_strategy import RunStrategyUseCase
 from .stop_strategy import StopStrategyUseCase
 
@@ -33,6 +34,7 @@ __all__ = [
     "StrategyExchangeBindingView",
     "LiveStrategyProfileConfig",
     "LiveStrategyProfileService",
+    "RestartStrategyUseCase",
     "map_strategy_exception",
     "strategy_conflict",
     "strategy_forbidden",

@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Mapping
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
@@ -299,14 +299,27 @@ class StrategyLiveRunner:
 
             for context in contexts:
                 if context.run.state == "stopping":
+                    restart = _pending_restart_metadata(metadata_json=context.run.metadata_json)
+                    metadata_json = context.run.metadata_json
+                    if restart:
+                        metadata_json = _with_restart_state(
+                            metadata_json=metadata_json,
+                            state="drained",
+                        )
                     context.run = self._transition_state(
                         run=context.run,
                         spec=context.strategy.spec,
                         next_state="stopped",
                         checkpoint_ts_open=context.run.checkpoint_ts_open,
                         last_error=None,
-                        metadata_json=context.run.metadata_json,
+                        metadata_json=metadata_json,
                     )
+                    if restart:
+                        context.run = self._start_restart_successor(
+                            previous_run=context.run,
+                            strategy=context.strategy,
+                            restart=restart,
+                        )
 
         return StrategyLiveRunnerIterationReport(
             polled_runs=len(active_runs),
@@ -631,6 +644,51 @@ class StrategyLiveRunner:
             metadata_json=metadata_json,
         )
         return self._run_repository.update(run=snapshot)
+
+    def _start_restart_successor(
+        self,
+        *,
+        previous_run: StrategyRun,
+        strategy: Strategy,
+        restart: Mapping[str, Any],
+    ) -> StrategyRun:
+        """
+        Create the new active run for a drained restart operation.
+
+        Args:
+            previous_run: Terminal stopped run that carried restart metadata.
+            strategy: Strategy snapshot for realtime metric routing.
+            restart: Durable restart operation metadata from previous run.
+        Returns:
+            StrategyRun: Persisted successor run.
+        Assumptions:
+            Caller invokes this only after previous run is terminal, preserving one-active-run.
+        Raises:
+            Exception: Storage/domain errors from successor creation.
+        Side Effects:
+            Inserts one run row and publishes best-effort snapshot metrics.
+        """
+        started_at = _monotonic_changed_at(
+            now=self._clock.now(),
+            previous=previous_run.updated_at,
+        )
+        successor = StrategyRun.start(
+            run_id=uuid4(),
+            user_id=previous_run.user_id,
+            strategy_id=previous_run.strategy_id,
+            started_at=started_at,
+            metadata_json={
+                "restart": {
+                    "operation_id": str(restart.get("operation_id", "")),
+                    "state": "successor_started",
+                    "requested_at": str(restart.get("requested_at", "")),
+                    "previous_run_id": str(previous_run.run_id),
+                }
+            },
+        )
+        persisted = self._run_repository.create(run=successor)
+        self._publish_snapshot_metrics(run=persisted, spec=strategy.spec, ts=persisted.updated_at)
+        return persisted
 
     def _transition_state(
         self,
@@ -1360,6 +1418,54 @@ def _monotonic_changed_at(*, now: datetime, previous: datetime) -> datetime:
     if normalized_now < normalized_previous:
         return normalized_previous
     return normalized_now
+
+
+def _pending_restart_metadata(*, metadata_json: Mapping[str, Any]) -> Mapping[str, Any]:
+    """
+    Return pending restart metadata when a stopped successor should be created.
+
+    Args:
+        metadata_json: Current run metadata snapshot.
+    Returns:
+        Mapping[str, Any]: Restart metadata object or empty mapping.
+    Assumptions:
+        Restart operation identity is persisted under the fixed `restart` key.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    restart = metadata_json.get("restart")
+    if not isinstance(restart, Mapping):
+        return {}
+    if restart.get("state") != "pending_start":
+        return {}
+    return restart
+
+
+def _with_restart_state(*, metadata_json: Mapping[str, Any], state: str) -> dict[str, Any]:
+    """
+    Copy run metadata while updating restart operation state.
+
+    Args:
+        metadata_json: Existing run metadata snapshot.
+        state: New restart state literal.
+    Returns:
+        dict[str, Any]: Metadata copy with updated restart state.
+    Assumptions:
+        Callers pass a metadata object containing a mapping-valued `restart` key.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    metadata = dict(metadata_json)
+    restart = metadata.get("restart")
+    if isinstance(restart, Mapping):
+        updated_restart = dict(restart)
+        updated_restart["state"] = state
+        metadata["restart"] = updated_restart
+    return metadata
 
 
 def _parse_iso_utc(*, text: str) -> datetime:

@@ -47,6 +47,7 @@ from trading.contexts.strategy.application import (
     ListMyStrategiesUseCase,
     LiveStrategyProfileRepository,
     LiveStrategyProfileService,
+    RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
     StrategyEventRepository,
@@ -334,6 +335,12 @@ def build_strategy_router(
         clock=clock,
         event_repository=event_repository,
     )
+    restart_use_case = RestartStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        clock=clock,
+        event_repository=event_repository,
+    )
     delete_use_case = DeleteStrategyUseCase(
         repository=strategy_repository,
         clock=clock,
@@ -363,6 +370,7 @@ def build_strategy_router(
         get_use_case=get_use_case,
         run_use_case=run_use_case,
         stop_use_case=stop_use_case,
+        restart_use_case=restart_use_case,
         delete_use_case=delete_use_case,
         current_user_provider_dependency=current_user_provider_dependency,
         live_profile_service=live_profile_service,

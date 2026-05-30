@@ -400,6 +400,7 @@
   "strategies.actions.delete": "Удалить",
   "strategies.actions.execution": "Управление запуском",
   "strategies.actions.manage": "Управление",
+  "strategies.actions.restart": "Перезапустить",
   "strategies.actions.run": "Запустить",
   "strategies.actions.stop": "Остановить",
   "strategies.aria": "Рабочая поверхность аналитики выбранной стратегии",

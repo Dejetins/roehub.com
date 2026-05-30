@@ -14,6 +14,7 @@
     data-api-delete-path-template="/api/strategies/{strategy_id}"
     data-api-run-path-template="/api/strategies/{strategy_id}/run"
     data-api-stop-path-template="/api/strategies/{strategy_id}/stop"
+    data-api-restart-path-template="/api/strategies/{strategy_id}/restart"
     data-initial-mode="{{ strategy_initial_mode }}"
     data-initial-strategy-id="{{ strategy_initial_id }}"
     aria-label="{{ t('strategies.aria') }}"
@@ -126,6 +127,9 @@
               </button>
               <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop>
                 {{ t("strategies.actions.stop") }}
+              </button>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-restart>
+                {{ t("strategies.actions.restart") }}
               </button>
             </span>
             <span class="rh-dropdown strategies-dropdown strategies-action-menu" data-rh-dropdown data-rh-dropdown-kind="menu">

@@ -9,7 +9,7 @@
 - создать стратегию (immutable),
 - клонировать стратегию из шаблона/существующей,
 - просматривать только свои стратегии,
-- запускать/останавливать исполнение (runs) с корректной state machine,
+- запускать/останавливать/restart исполнение (runs) с корректной state machine,
 при этом правила были доменно-очевидными (в use-case), а identity использовалась через зависимость/порт (без копирования JWT-логики в strategy).
 
 ## Контекст
@@ -29,6 +29,8 @@
 - `GET /strategies/{id}` — get by id (owner)
 - `POST /strategies/{id}/run` — create run + transition по правилам
 - `POST /strategies/{id}/stop` — stop active run (stopping → stopped)
+- `POST /strategies/{id}/restart` — durable restart command: current active run
+  becomes `stopping`, live-runner drains it to `stopped` and creates successor run
 - `DELETE /strategies/{id}` — soft delete (deleted)
 
 2) Application/use-cases (явные правила)
@@ -133,14 +135,22 @@ Failure codes are stable for UI and later stages:
 - `strategy_variant_launch.idempotency_key_conflict`;
 - `strategy_variant_launch.unavailable`.
 
-### 6) Run state machine — доменная, детерминированная, поддерживает повторные запуски
+### 6) Run state machine — доменная, детерминированная, поддерживает повторные запуски и restart
 
 Состояния (минимально необходимые по договорённости):
-- `stopped` / `failed` → `run` → `running`
-- `running` → `stop` → `stopping` → `stopped`
+- `stopped` / `failed` → `run` → `starting` → `warming_up` → `running`
+- `starting|warming_up|running` → `stop` → `stopping` → `stopped`
+- `starting|warming_up|running` → `restart` → `stopping` with
+  `metadata_json.restart.state=pending_start` → live-runner drains to `stopped`
+  with `state=drained` → creates successor run with `state=successor_started`
 - “второй run” = следующий запуск после stop: **должен быть возможен**.
 
 Ключевое: `POST /strategies/{id}/run` создаёт новый run (run_id) и инициирует переходы согласно правилам, не “переиспользуя” старый run.
+
+`POST /strategies/{id}/restart` не является UI alias на stop+run. Это отдельная
+durable command: API пишет restart operation в `strategy_runs.metadata_json` и
+append-only event `run_restart_requested`; live-runner, а не browser/API, создаёт
+successor run только после drain старого run до terminal `stopped`.
 
 Последствия:
 - ✅ Повторные запуски после stop работают естественно.
@@ -155,6 +165,8 @@ Failure codes are stable for UI and later stages:
 - проверка текущего активного run,
 - если уже `running` → вернуть доменную ошибку “already running”,
 - если `stopping` → доменная ошибка “cannot start while stopping” (или политика “wait” — но в v1 проще fail-fast),
+- повторный `restart`, пока `metadata_json.restart.state=pending_start`, возвращает
+  conflict `Strategy restart is already pending`,
 - операции `run/stop` защищаются транзакцией/optimistic lock (версионность агрегата) либо уникальным индексом “active run”.
 
 Последствия:
@@ -197,6 +209,8 @@ Strategy/use-cases возвращают/бросают доменные ошиб
 - Soft delete: deleted стратегии не возвращаются в list/get по умолчанию.
 - Один активный run на стратегию в момент времени.
 - Повторный run после stop возможен всегда (если стратегия не deleted и нет активного run).
+- Restart является отдельной durable operation, а не client-side stop+run sequence.
+- Duplicate restart while pending is conflict; run while `stopping` remains conflict.
 - Warmup вычисляется runner’ом детерминированно из индикаторов.
 - Ошибки и 422 payload единообразны и детерминированы.
 
@@ -205,7 +219,7 @@ Strategy/use-cases возвращают/бросают доменные ошиб
 - `apps/api/routes/strategies.py` — HTTP endpoints Strategy (тонкие)
 - `apps/api/routes/backtests.py` — create-from-backtest-variant endpoint
 - `apps/api/wiring/strategy_container.py` — composition root для Strategy
-- `src/trading/contexts/strategy/application/use_cases/*.py` — use-cases (ownership, clone, run/stop)
+- `src/trading/contexts/strategy/application/use_cases/*.py` — use-cases (ownership, clone, run/stop/restart)
 - `src/trading/contexts/strategy/application/use_cases/create_strategy_from_backtest_variant.py` — owner-scoped variant promotion
 - `src/trading/contexts/strategy/application/ports/current_user.py` — порт `CurrentUser`/`CurrentUserProvider`
 - `src/trading/contexts/strategy/application/ports/backtest_variant_launch_reader.py` — owner-scoped backtest launch snapshot port

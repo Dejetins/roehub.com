@@ -182,6 +182,9 @@ function drawPlaceholderChart(svg, { negative = false } = {}) {
 }
 
 function renderSelected(root, selected) {
+  const actions = selected?.actions || {};
+  const runState = selected?.run_state || null;
+  const canRestart = ["starting", "warming_up", "running"].includes(runState);
   setText("[data-selected-name]", selected?.name || t("common.unavailable"), root);
   setText("[data-selected-version]", selected?.version || "--", root);
   setText("[data-selected-exchange]", selected?.exchange || t("common.unavailable"), root);
@@ -196,6 +199,16 @@ function renderSelected(root, selected) {
   setText("[data-selected-updated]", localTime(selected?.latest_update), root);
   setText("[data-selected-status]", selected?.status || t("strategies.status.unknown"), root);
   setText("[data-command-state]", selected?.state === "ready" ? t("strategies.status.ready") : t("strategies.status.degraded"), root);
+  setButtonDisabled(root, "[data-strategy-run]", actions.can_run !== true);
+  setButtonDisabled(root, "[data-strategy-stop]", actions.can_stop !== true);
+  setButtonDisabled(root, "[data-strategy-restart]", !canRestart);
+}
+
+function setButtonDisabled(root, selector, disabled) {
+  const button = qs(selector, root);
+  if (button instanceof HTMLButtonElement) {
+    button.disabled = disabled;
+  }
 }
 
 function renderLiveProfile(root, profile) {
@@ -812,6 +825,13 @@ function initStrategies(root) {
       return;
     }
     const path = root.dataset.apiStopPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
+    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
+  });
+  qs("[data-strategy-restart]", root)?.addEventListener("click", () => {
+    if (!state.selectedStrategyId) {
+      return;
+    }
+    const path = root.dataset.apiRestartPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
     apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
   });
   qs("[data-strategy-clone]", root)?.addEventListener("click", () => {

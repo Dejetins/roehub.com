@@ -400,6 +400,7 @@
   "strategies.actions.delete": "Delete",
   "strategies.actions.execution": "Execution controls",
   "strategies.actions.manage": "Manage",
+  "strategies.actions.restart": "Restart",
   "strategies.actions.run": "Run",
   "strategies.actions.stop": "Stop",
   "strategies.aria": "Selected strategy analytics workstation",

@@ -42,7 +42,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 - вычисление/фиксация warmup из `spec.indicators` (numeric_max_param_v1) в `run.metadata_json.warmup`;
 - rollup из 1m в TF стратегии (включая TF=`1m`);
 - strict монотонность checkpoint + repair(read) из ClickHouse canonical;
-- переходы run state: `starting → warming_up → running → stopped` (и обработка stop).
+- переходы run state: `starting → warming_up → running → stopped` (и обработка stop/restart drain).
 
 ## Non-goals
 
@@ -139,10 +139,15 @@ Live-runner выполняет:
 - после seed из canonical → перевод `starting → warming_up`;
 - после достижения warmup → перевод `warming_up → running`;
 - при остановке → доводит до `stopped` (или уважает stop, если stop инициирован use-case API).
+- при restart → видит `metadata_json.restart.state=pending_start` на `stopping`
+  run, переводит старый run в `stopped` с `restart.state=drained`, затем создаёт
+  новый run в `starting` с `restart.state=successor_started`.
 
 Последствия:
 - состояние run отражает реальную стадию готовности исполнения;
 - UI/оператору проще диагностировать “где мы”.
+- инвариант one-active-run сохраняется storage-side: successor создаётся только
+  после terminal state старого run.
 
 ### 9) Публикация Market Data в Redis best-effort и может опережать durable insert
 
@@ -170,6 +175,8 @@ Live-runner:
 - Gap: `ts_open > checkpoint+1m` → repair(read) из ClickHouse canonical; checkpoint не продвигается до восстановления непрерывности.
 - Rollup: derived bucket закрывается только когда есть все 1m внутри бакета.
 - Warmup: вычисляется runner’ом из `spec.indicators` (numeric_max_param_v1) и сохраняется в `run.metadata_json.warmup`.
+- Restart: pending operation хранится в `run.metadata_json.restart`; live-runner
+  materializes successor only after drain, never while old run is still active.
 - Market Data Redis publish best-effort и может опережать durable вставки; стратегия не должна полагаться на “Redis => canonical already”.
 
 ## Связанные файлы
@@ -205,4 +212,3 @@ pytest -q
 * Открытых вопросов по контракту v1: **нет** (все решения зафиксированы в секции “Ключевые решения”).
 
 ```
-
