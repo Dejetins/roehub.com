@@ -5,6 +5,9 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from trading.contexts.strategy.application.ports.clock import StrategyClock
+from trading.contexts.strategy.application.ports.compatibility_readiness import (
+    StrategyCompatibilityReadinessChecker,
+)
 from trading.contexts.strategy.application.ports.current_user import CurrentUser
 from trading.contexts.strategy.application.ports.exchange_connection_readiness import (
     ExchangeConnectionReadinessChecker,
@@ -48,6 +51,7 @@ class LiveStrategyProfileService:
         clock: StrategyClock,
         event_repository: StrategyEventRepository | None = None,
         exchange_connection_checker: ExchangeConnectionReadinessChecker | None = None,
+        compatibility_readiness_checker: StrategyCompatibilityReadinessChecker | None = None,
     ) -> None:
         if strategy_repository is None:  # type: ignore[truthy-bool]
             raise ValueError("LiveStrategyProfileService requires strategy_repository")
@@ -60,6 +64,7 @@ class LiveStrategyProfileService:
         self._clock = clock
         self._event_repository = event_repository
         self._exchange_connection_checker = exchange_connection_checker
+        self._compatibility_readiness_checker = compatibility_readiness_checker
 
     def get_or_create_default(
         self, *, strategy_id: UUID, current_user: CurrentUser
@@ -79,6 +84,11 @@ class LiveStrategyProfileService:
         profile = _default_profile(
             owner_user_id=current_user.user_id,
             strategy_id=strategy.strategy_id,
+            now=now,
+        )
+        profile = self._evaluate_readiness(
+            profile=profile,
+            recent_auth_confirmed=False,
             now=now,
         )
         created = self._profile_repository.create(profile=profile)
@@ -180,6 +190,17 @@ class LiveStrategyProfileService:
         recent_auth_confirmed: bool,
         now,
     ) -> LiveStrategyProfile:
+        if self._compatibility_readiness_checker is not None:
+            readiness = self._compatibility_readiness_checker.check_strategy(
+                strategy_id=profile.strategy_id,
+                current_user=CurrentUser(user_id=profile.owner_user_id),
+            )
+            if readiness.launch_blocked:
+                return profile.with_readiness(
+                    readiness_status="blocked",
+                    readiness_reason=readiness.launch_blocked_reason,
+                    updated_at=now,
+                )
         if profile.mode == "monitor_only":
             return profile.with_readiness(
                 readiness_status="ready",

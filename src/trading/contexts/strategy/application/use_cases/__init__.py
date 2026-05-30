@@ -1,8 +1,13 @@
 from .clone_strategy import CloneStrategyUseCase
+from .compatibility_readiness import (
+    StrategyCompatibilityReadinessReport,
+    StrategyCompatibilityReadinessService,
+)
 from .create_strategy import CreateStrategyUseCase
 from .create_strategy_from_backtest_variant import (
     CreateStrategyFromBacktestVariantResult,
     CreateStrategyFromBacktestVariantUseCase,
+    strategy_spec_from_backtest_variant_snapshot,
 )
 from .delete_strategy import DeleteStrategyUseCase
 from .errors import (
@@ -24,6 +29,9 @@ __all__ = [
     "CloneStrategyUseCase",
     "CreateStrategyFromBacktestVariantResult",
     "CreateStrategyFromBacktestVariantUseCase",
+    "StrategyCompatibilityReadinessReport",
+    "StrategyCompatibilityReadinessService",
+    "strategy_spec_from_backtest_variant_snapshot",
     "CreateStrategyUseCase",
     "DeleteStrategyUseCase",
     "GetMyStrategyUseCase",

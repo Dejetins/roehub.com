@@ -481,6 +481,9 @@ function variantEndpoint(root, kind, jobId, variantKey, params = {}) {
     trades:
       root.dataset.variantTradesEndpointTemplate ||
       "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page={page}&page_size={page_size}",
+    compatibility:
+      root.dataset.variantCompatibilityEndpointTemplate ||
+      "/api/backtests/jobs/{job_id}/variants/{variant_key}/compatibility-readiness",
     csv:
       root.dataset.variantTradesCsvEndpointTemplate ||
       "/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv",
@@ -1557,6 +1560,8 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
         ${renderResultMetric(t("backtests.results.sharpe"), numberOrDash(variant?.summary_metrics?.sharpe), financialClass(variant?.summary_metrics?.sharpe))}
         ${renderResultMetric(t("backtests.results.drawdown"), signedDrawdownPercent(variant?.summary_metrics?.max_drawdown_pct ?? variant?.summary_metrics?.avg_drawdown_pct), "rh-financial--negative")}
         ${renderResultMetric(t("backtests.results.trades"), integerOrDash(variant?.summary_metrics?.trade_count ?? variant?.summary_metrics?.trades_count), "")}
+        ${renderResultMetric(t("backtests.strategy_create.readiness"), compatibilityStatus(details?.compatibility), readinessClass(details?.compatibility))}
+        ${renderResultMetric(t("backtests.strategy_create.feed"), marketDataStatus(details?.compatibility), readinessClass(details?.compatibility))}
       </div>
       <div class="backtests-result-body">
         <div class="backtests-result-charts">
@@ -1579,6 +1584,25 @@ function renderResultMetric(label, value, className) {
       <strong class="${escapeHtml(className)}">${escapeHtml(value)}</strong>
     </div>
   `;
+}
+
+function compatibilityStatus(compatibility) {
+  const stateName = compatibility?.compatibility_state || "pending";
+  const reason = (compatibility?.compatibility_reason_codes || [compatibility?.launch_blocked_reason || "--"])[0];
+  return `${stateName}: ${reason}`;
+}
+
+function marketDataStatus(compatibility) {
+  const stateName = compatibility?.market_data_state || "pending";
+  const reason = (compatibility?.market_data_reason_codes || [compatibility?.launch_blocked_reason || "--"])[0];
+  return `${stateName}: ${reason}`;
+}
+
+function readinessClass(compatibility) {
+  if (!compatibility) {
+    return "rh-financial--neutral";
+  }
+  return compatibility.launch_blocked ? "rh-financial--negative" : "rh-financial--positive";
 }
 
 function resultDetailStatus(details) {
@@ -2107,6 +2131,9 @@ function variantDetailRequest(root, jobId, variantKey, page) {
       signal: controller.signal,
     }),
     monthly: apiFetch(variantEndpoint(root, "monthly", jobId, variantKey), {
+      signal: controller.signal,
+    }),
+    compatibility: apiFetch(variantEndpoint(root, "compatibility", jobId, variantKey), {
       signal: controller.signal,
     }),
     trades: apiFetch(tradesPath, {

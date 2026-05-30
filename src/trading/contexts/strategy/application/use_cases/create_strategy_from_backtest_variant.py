@@ -85,7 +85,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                 job_id=job_id,
                 variant_key=variant_key,
             )
-            spec = _strategy_spec_from_snapshot(snapshot=snapshot)
+            spec = strategy_spec_from_backtest_variant_snapshot(snapshot=snapshot)
             strategy_spec_hash = _sha256_json(spec.to_json())
             launch_request_hash = _sha256_json(
                 {
@@ -209,7 +209,9 @@ class CreateStrategyFromBacktestVariantUseCase:
         )
 
 
-def _strategy_spec_from_snapshot(*, snapshot: BacktestVariantLaunchSnapshot) -> StrategySpecV1:
+def strategy_spec_from_backtest_variant_snapshot(
+    *, snapshot: BacktestVariantLaunchSnapshot
+) -> StrategySpecV1:
     if snapshot.job_state != "succeeded":
         raise _variant_launch_error(
             code="strategy_variant_launch.not_launchable",

@@ -3,6 +3,9 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from trading.contexts.strategy.application.ports.clock import StrategyClock
+from trading.contexts.strategy.application.ports.compatibility_readiness import (
+    StrategyCompatibilityReadinessChecker,
+)
 from trading.contexts.strategy.application.ports.current_user import CurrentUser
 from trading.contexts.strategy.application.ports.repositories import (
     StrategyEventRepository,
@@ -42,6 +45,7 @@ class RunStrategyUseCase:
         run_repository: StrategyRunRepository,
         clock: StrategyClock,
         event_repository: StrategyEventRepository | None = None,
+        compatibility_readiness_checker: StrategyCompatibilityReadinessChecker | None = None,
     ) -> None:
         """
         Initialize strategy run-control use-case dependencies.
@@ -71,6 +75,7 @@ class RunStrategyUseCase:
         self._run_repository = run_repository
         self._clock = clock
         self._event_repository = event_repository
+        self._compatibility_readiness_checker = compatibility_readiness_checker
 
     def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
         """
@@ -96,6 +101,27 @@ class RunStrategyUseCase:
         run_started_at = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
 
         try:
+            if self._compatibility_readiness_checker is not None:
+                readiness = self._compatibility_readiness_checker.check_strategy(
+                    strategy_id=strategy.strategy_id,
+                    current_user=current_user,
+                )
+                if readiness.launch_blocked:
+                    raise RoehubError(
+                        code="strategy_run.readiness_blocked",
+                        message="Strategy run is blocked by compatibility or market-data readiness",
+                        details={
+                            "reason": readiness.launch_blocked_reason,
+                            "compatibility_state": readiness.compatibility_state,
+                            "compatibility_reason_codes": list(
+                                readiness.compatibility_reason_codes
+                            ),
+                            "market_data_state": readiness.market_data_state,
+                            "market_data_reason_codes": list(
+                                readiness.market_data_reason_codes
+                            ),
+                        },
+                    )
             active_run = self._run_repository.find_active_for_strategy(
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,

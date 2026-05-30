@@ -1,3 +1,4 @@
+from .compatibility_readiness_repository import StrategyCompatibilityReadinessRepository
 from .exchange_binding_repository import StrategyExchangeBindingRepository
 from .live_strategy_profile_repository import LiveStrategyProfileRepository
 from .strategy_backtest_variant_provenance_repository import (
@@ -10,6 +11,7 @@ from .strategy_signal_repository import StrategySignalRepository
 
 __all__ = [
     "StrategyBacktestVariantProvenanceRepository",
+    "StrategyCompatibilityReadinessRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
     "LiveStrategyProfileRepository",

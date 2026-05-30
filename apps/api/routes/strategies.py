@@ -17,7 +17,11 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.requests import Request
 
-from apps.api.monitoring import record_live_strategy_profile_readiness
+from apps.api.monitoring import (
+    record_live_strategy_profile_readiness,
+    record_market_data_readiness,
+    record_strategy_variant_compatibility,
+)
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
 from trading.contexts.strategy.application.use_cases import (
@@ -31,8 +35,10 @@ from trading.contexts.strategy.application.use_cases import (
     RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
+    StrategyCompatibilityReadinessService,
 )
 from trading.contexts.strategy.domain.entities import LiveStrategyProfile, Strategy, StrategyRun
+from trading.platform.errors import RoehubError
 
 CurrentUserProviderDependency = Callable[[Request], CurrentUserProvider]
 CurrentUserPrincipalDependency = Callable[[Request], CurrentUserPrincipal]
@@ -239,6 +245,30 @@ class LiveStrategyProfileResponse(BaseModel):
     updated_at: datetime
 
 
+class StrategyCompatibilityReadinessResponse(BaseModel):
+    compatibility_check_id: UUID
+    market_data_requirement_id: UUID
+    strategy_id: UUID | None
+    source_job_id: UUID | None
+    source_variant_key: str | None
+    strategy_spec_hash: str
+    instrument_key: str
+    market_type: str
+    timeframe: str
+    compatibility_state: Literal["launchable", "not_launchable", "degraded"]
+    compatibility_reason_codes: list[str]
+    market_data_state: Literal["ready", "missing", "stale", "pending"]
+    market_data_reason_codes: list[str]
+    market_data_stream_name: str
+    market_data_stream_length: int | None
+    market_data_last_message_id: str | None
+    market_data_last_observed_at: datetime | None
+    market_data_age_seconds: int | None
+    launch_blocked: bool
+    launch_blocked_reason: str
+    checked_at: datetime
+
+
 
 def build_strategies_router(
     *,
@@ -253,6 +283,7 @@ def build_strategies_router(
     current_user_provider_dependency: CurrentUserProviderDependency,
     live_profile_service: LiveStrategyProfileService | None = None,
     current_user_principal_dependency: CurrentUserPrincipalDependency | None = None,
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
 ) -> APIRouter:
     """
     Build Strategy API router with immutable CRUD, clone, and run-control endpoints.
@@ -502,6 +533,22 @@ def build_strategies_router(
         )
         return _to_live_strategy_profile_response(profile=profile)
 
+    @router.get(
+        "/strategies/{strategy_id}/compatibility-readiness",
+        response_model=StrategyCompatibilityReadinessResponse,
+    )
+    def get_strategy_compatibility_readiness(
+        strategy_id: UUID,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> StrategyCompatibilityReadinessResponse:
+        service = _require_compatibility_readiness_service(
+            service=compatibility_readiness_service,
+        )
+        current_user = current_user_provider.require_current_user()
+        report = service.check_strategy(strategy_id=strategy_id, current_user=current_user)
+        _record_compatibility_readiness(report=report)
+        return _to_compatibility_readiness_response(report=report)
+
     @router.post("/strategies/{strategy_id}/run", response_model=StrategyRunResponse)
     def post_strategy_run(
         strategy_id: UUID,
@@ -689,6 +736,18 @@ def _require_live_profile_service(
     return service
 
 
+def _require_compatibility_readiness_service(
+    *, service: StrategyCompatibilityReadinessService | None
+) -> StrategyCompatibilityReadinessService:
+    if service is None:
+        raise RoehubError(
+            code="strategy_compatibility.unavailable",
+            message="Strategy compatibility readiness service is not configured",
+            details={"reason": "strategy_compatibility_unavailable"},
+        )
+    return service
+
+
 def _recent_auth_confirmed(
     *,
     request: Request,
@@ -759,6 +818,45 @@ def _to_live_strategy_profile_response(
         readiness_reason=profile.readiness_reason,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
+    )
+
+
+def _to_compatibility_readiness_response(
+    *, report
+) -> StrategyCompatibilityReadinessResponse:
+    return StrategyCompatibilityReadinessResponse(
+        compatibility_check_id=report.compatibility_check_id,
+        market_data_requirement_id=report.market_data_requirement_id,
+        strategy_id=report.strategy_id,
+        source_job_id=report.source_job_id,
+        source_variant_key=report.source_variant_key,
+        strategy_spec_hash=report.strategy_spec_hash,
+        instrument_key=report.instrument_key,
+        market_type=report.market_type,
+        timeframe=report.timeframe,
+        compatibility_state=report.compatibility_state,
+        compatibility_reason_codes=list(report.compatibility_reason_codes),
+        market_data_state=report.market_data_state,
+        market_data_reason_codes=list(report.market_data_reason_codes),
+        market_data_stream_name=report.market_data_stream_name,
+        market_data_stream_length=report.market_data_stream_length,
+        market_data_last_message_id=report.market_data_last_message_id,
+        market_data_last_observed_at=report.market_data_last_observed_at,
+        market_data_age_seconds=report.market_data_age_seconds,
+        launch_blocked=report.launch_blocked,
+        launch_blocked_reason=report.launch_blocked_reason,
+        checked_at=report.checked_at,
+    )
+
+
+def _record_compatibility_readiness(*, report) -> None:
+    record_strategy_variant_compatibility(
+        state=report.compatibility_state,
+        reason=report.compatibility_reason_codes[0],
+    )
+    record_market_data_readiness(
+        state=report.market_data_state,
+        reason=report.market_data_reason_codes[0],
     )
 
 

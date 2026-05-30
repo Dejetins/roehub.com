@@ -1,3 +1,6 @@
+from .compatibility_readiness_repository import (
+    InMemoryStrategyCompatibilityReadinessRepository,
+)
 from .exchange_binding_repository import InMemoryStrategyExchangeBindingRepository
 from .live_strategy_profile_repository import InMemoryLiveStrategyProfileRepository
 from .strategy_backtest_variant_provenance_repository import (
@@ -13,6 +16,7 @@ __all__ = [
     "InMemoryStrategyEventRepository",
     "InMemoryStrategyExchangeBindingRepository",
     "InMemoryLiveStrategyProfileRepository",
+    "InMemoryStrategyCompatibilityReadinessRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
     "InMemoryStrategySignalRepository",

@@ -8,6 +8,7 @@ import pytest
 
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyBacktestVariantProvenanceRepository,
+    InMemoryStrategyCompatibilityReadinessRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
@@ -22,7 +23,11 @@ from trading.contexts.strategy.application import (
     RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
+    StrategyCompatibilityReadinessService,
     estimate_strategy_warmup_bars,
+)
+from trading.contexts.strategy.application.ports.market_data_readiness import (
+    MarketDataReadinessSnapshot,
 )
 from trading.contexts.strategy.domain.entities import StrategySpecV1
 from trading.platform.errors import RoehubError
@@ -406,6 +411,91 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
     assert second_run.run_id != running.run_id
 
 
+def test_run_strategy_blocks_when_market_data_readiness_is_missing() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    run_repository = InMemoryStrategyRunRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000406")
+    )
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 5, 31, 9, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 9, 1, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 9, 2, tzinfo=timezone.utc),
+        )
+    )
+    created_strategy = CreateStrategyUseCase(
+        repository=strategy_repository,
+        event_repository=event_repository,
+        clock=clock,
+    ).execute(spec_payload=_build_spec_payload(), current_user=current_user)
+    readiness_service = StrategyCompatibilityReadinessService(
+        strategy_repository=strategy_repository,
+        compatibility_repository=compatibility_repository,
+        market_data_reader=_StaticMarketDataReader(state="missing"),
+        event_repository=event_repository,
+        clock=clock,
+    )
+    run_use_case = RunStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
+        clock=clock,
+        compatibility_readiness_checker=readiness_service,
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        run_use_case.execute(strategy_id=created_strategy.strategy_id, current_user=current_user)
+
+    assert error_info.value.code == "strategy_run.readiness_blocked"
+    assert error_info.value.details is not None
+    assert error_info.value.details["market_data_state"] == "missing"
+    assert compatibility_repository.compatibility_reports[0].compatibility_state == "launchable"
+    assert compatibility_repository.compatibility_reports[0].market_data_state == "missing"
+
+
+def test_compatibility_readiness_reports_degraded_and_ready_feed_for_rollup() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000407")
+    )
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 5, 31, 9, 10, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 9, 11, tzinfo=timezone.utc),
+        )
+    )
+    strategy = CreateStrategyUseCase(
+        repository=strategy_repository,
+        event_repository=event_repository,
+        clock=clock,
+    ).execute(
+        spec_payload={**_build_spec_payload(), "timeframe": "15m"},
+        current_user=current_user,
+    )
+    readiness_service = StrategyCompatibilityReadinessService(
+        strategy_repository=strategy_repository,
+        compatibility_repository=compatibility_repository,
+        market_data_reader=_StaticMarketDataReader(state="ready"),
+        event_repository=event_repository,
+        clock=clock,
+    )
+
+    report = readiness_service.check_strategy(
+        strategy_id=strategy.strategy_id,
+        current_user=current_user,
+    )
+
+    assert report.compatibility_state == "degraded"
+    assert report.compatibility_reason_codes == ("timeframe_rollup_required",)
+    assert report.market_data_state == "ready"
+    assert report.launch_blocked is False
+
+
 def test_restart_use_case_records_durable_pending_operation() -> None:
     strategy_repository = InMemoryStrategyRepository()
     run_repository = InMemoryStrategyRunRepository()
@@ -515,6 +605,22 @@ class _StaticBacktestVariantReader:
     ) -> BacktestVariantLaunchSnapshot:
         _ = user_id, job_id, variant_key
         return self._snapshot
+
+
+class _StaticMarketDataReader:
+    def __init__(self, *, state: str) -> None:
+        self._state = state
+
+    def check(self, *, instrument_key: str, timeframe: str, observed_at: datetime):
+        return MarketDataReadinessSnapshot(
+            state=self._state,  # type: ignore[arg-type]
+            reason_code=f"market_data_stream_{self._state}",
+            stream_name=f"md.candles.1m.{instrument_key}",
+            stream_length=1 if self._state == "ready" else 0,
+            last_message_id="1790000000000-0" if self._state == "ready" else None,
+            last_observed_at=observed_at if self._state == "ready" else None,
+            age_seconds=0 if self._state == "ready" else None,
+        )
 
 
 def _launch_snapshot(

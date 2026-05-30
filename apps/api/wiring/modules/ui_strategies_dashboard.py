@@ -16,6 +16,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyBreakdownRowResponse,
     StrategyChartResponse,
     StrategyDashboardActionsResponse,
+    StrategyDashboardCompatibilityReadinessResponse,
     StrategyDashboardFooterStatusResponse,
     StrategyDashboardLiveProfileResponse,
     StrategyDashboardRefreshControlResponse,
@@ -40,6 +41,7 @@ from apps.api.routes.ui_strategies_dashboard import (
     build_ui_strategies_dashboard_router as build_ui_strategies_dashboard_api_router,
 )
 from apps.api.wiring.modules.strategy import (
+    _build_compatibility_readiness_service,
     _build_live_profile_repository,
     _build_repositories,
     _build_signal_repository,
@@ -48,6 +50,11 @@ from apps.api.wiring.modules.strategy import (
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
+from trading.contexts.strategy.application import (
+    CurrentUser,
+    StrategyCompatibilityReadinessService,
+)
 from trading.contexts.strategy.application.ports.repositories import (
     LiveStrategyProfileRepository,
     StrategyRepository,
@@ -75,6 +82,7 @@ _TRADES_SOURCE = "execution_fills"
 _EVENTS_SOURCE = "strategy_events"
 _RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 _LIVE_PROFILE_SOURCE = "strategy_live_profiles"
+_COMPATIBILITY_SOURCE = "strategy_compatibility_readiness"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
 _SIGNAL_JOURNAL_LIMIT = 20
 
@@ -134,12 +142,14 @@ class StrategyDashboardQueryService:
         run_repository: StrategyRunRepository | None,
         profile_repository: LiveStrategyProfileRepository | None = None,
         signal_repository: StrategySignalRepository | None = None,
+        compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
         self._profile_repository = profile_repository
         self._signal_repository = signal_repository
+        self._compatibility_readiness_service = compatibility_readiness_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -177,9 +187,15 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        compatibility_readiness, compatibility_source = self._load_compatibility_readiness(
+            principal=principal,
+            strategy=selected_strategy,
+            generated_at=generated_at,
+        )
         sources = [
             *dynamic_sources,
             live_profile_source,
+            compatibility_source,
             signal_journal_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
@@ -235,6 +251,7 @@ class StrategyDashboardQueryService:
                 requested_strategy_id=strategy_id,
             ),
             live_profile=_build_live_profile(profile=live_profile, strategy=selected_strategy),
+            compatibility_readiness=compatibility_readiness,
             strategy_selector=_build_strategy_selector(
                 strategies=strategies,
                 runs_by_strategy_id=runs_by_strategy_id,
@@ -270,6 +287,81 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_compatibility_readiness(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        generated_at: datetime,
+    ) -> tuple[
+        StrategyDashboardCompatibilityReadinessResponse,
+        StrategyDashboardSourceResponse,
+    ]:
+        if strategy is None:
+            return (
+                _build_empty_compatibility(reason="selected_strategy_not_found"),
+                _source(
+                    name=_COMPATIBILITY_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no selected strategy compatibility readiness is available",
+                ),
+            )
+        if self._compatibility_readiness_service is None:
+            return (
+                _build_empty_compatibility(reason="compatibility_readiness_not_configured"),
+                _source(
+                    name=_COMPATIBILITY_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="compatibility readiness service is not configured",
+                ),
+            )
+        try:
+            report = self._compatibility_readiness_service.check_strategy(
+                strategy_id=strategy.strategy_id,
+                current_user=CurrentUser(user_id=principal.user_id),
+            )
+        except Exception as error:  # noqa: BLE001
+            return (
+                _build_empty_compatibility(reason=str(error)),
+                _source(
+                    name=_COMPATIBILITY_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=str(error),
+                ),
+            )
+        state = "degraded" if report.launch_blocked else "ready"
+        return (
+            StrategyDashboardCompatibilityReadinessResponse(
+                source=_COMPATIBILITY_SOURCE,
+                state=state,
+                compatibility_state=report.compatibility_state,
+                compatibility_reason_codes=list(report.compatibility_reason_codes),
+                market_data_state=report.market_data_state,
+                market_data_reason_codes=list(report.market_data_reason_codes),
+                market_data_stream_name=report.market_data_stream_name,
+                market_data_age_seconds=report.market_data_age_seconds,
+                launch_blocked=report.launch_blocked,
+                launch_blocked_reason=report.launch_blocked_reason,
+                checked_at=report.checked_at,
+                degradation_reason=report.launch_blocked_reason if report.launch_blocked else None,
+            ),
+            _source(
+                name=_COMPATIBILITY_SOURCE,
+                status="degraded" if report.launch_blocked else "available",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(
+                    generated_at=generated_at,
+                    observed_at=report.checked_at,
+                ),
+                detail=(
+                    f"{report.compatibility_state}; market data {report.market_data_state}"
+                ),
             ),
         )
 
@@ -559,16 +651,25 @@ def build_strategy_dashboard_service(
             run_repository=None,
             profile_repository=None,
             signal_repository=None,
+            compatibility_readiness_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
     profile_repository = _build_live_profile_repository(settings=settings)
     signal_repository = _build_signal_repository(settings=settings)
+    compatibility_readiness_service = _build_compatibility_readiness_service(
+        environ=environ,
+        settings=settings,
+        strategy_repository=strategy_repository,
+        event_repository=None,
+        clock=SystemStrategyClock(),
+    )
     return StrategyDashboardQueryService(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
         profile_repository=profile_repository,
         signal_repository=signal_repository,
+        compatibility_readiness_service=compatibility_readiness_service,
     )
 
 
@@ -811,6 +912,25 @@ def _build_live_profile(
             if profile.readiness_status == "ready"
             else profile.readiness_reason
         ),
+    )
+
+
+def _build_empty_compatibility(
+    *, reason: str
+) -> StrategyDashboardCompatibilityReadinessResponse:
+    return StrategyDashboardCompatibilityReadinessResponse(
+        source=_COMPATIBILITY_SOURCE,
+        state="empty",
+        compatibility_state="not_launchable",
+        compatibility_reason_codes=[reason],
+        market_data_state="pending",
+        market_data_reason_codes=[reason],
+        market_data_stream_name=None,
+        market_data_age_seconds=None,
+        launch_blocked=True,
+        launch_blocked_reason=reason,
+        checked_at=None,
+        degradation_reason=reason,
     )
 
 

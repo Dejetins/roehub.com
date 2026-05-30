@@ -33,7 +33,11 @@ from apps.api.dto import (
     build_backtest_top_variant_response,
     build_backtest_top_variants_response,
 )
-from apps.api.monitoring import record_strategy_variant_launch
+from apps.api.monitoring import (
+    record_market_data_readiness,
+    record_strategy_variant_compatibility,
+    record_strategy_variant_launch,
+)
 from trading.contexts.backtest.application.dto import (
     BacktestLazyTradesMaterializationReadModel,
 )
@@ -49,9 +53,11 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application import (
+    BacktestVariantLaunchReader,
     CreateStrategyFromBacktestVariantResult,
     CreateStrategyFromBacktestVariantUseCase,
     CurrentUser,
+    StrategyCompatibilityReadinessService,
 )
 from trading.contexts.strategy.domain.entities import Strategy
 from trading.platform.errors import RoehubError
@@ -96,6 +102,30 @@ class BacktestVariantStrategyResponse(BaseModel):
     provenance: BacktestVariantStrategyProvenanceResponse
 
 
+class BacktestVariantCompatibilityReadinessResponse(BaseModel):
+    compatibility_check_id: UUID
+    market_data_requirement_id: UUID
+    strategy_id: UUID | None
+    source_job_id: UUID | None
+    source_variant_key: str | None
+    strategy_spec_hash: str
+    instrument_key: str
+    market_type: str
+    timeframe: str
+    compatibility_state: str
+    compatibility_reason_codes: list[str]
+    market_data_state: str
+    market_data_reason_codes: list[str]
+    market_data_stream_name: str
+    market_data_stream_length: int | None
+    market_data_last_message_id: str | None
+    market_data_last_observed_at: Any | None
+    market_data_age_seconds: int | None
+    launch_blocked: bool
+    launch_blocked_reason: str
+    checked_at: Any
+
+
 def build_backtests_router(
     *,
     runtime_defaults_service: BacktestRuntimeDefaultsService,
@@ -103,6 +133,8 @@ def build_backtests_router(
     current_user_dependency: CurrentUserDependency,
     jobs_use_case: BacktestJobsUseCase | None = None,
     create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+    backtest_variant_launch_reader: BacktestVariantLaunchReader | None = None,
 ) -> APIRouter:
     """
     Build Iteration 1 public backtests API shell.
@@ -145,6 +177,24 @@ def build_backtests_router(
                 details={"reason": "strategy_variant_launch_unavailable"},
             )
         return create_strategy_from_variant_use_case
+
+    def require_compatibility_readiness_service() -> StrategyCompatibilityReadinessService:
+        if compatibility_readiness_service is None:
+            raise RoehubError(
+                code="strategy_compatibility.unavailable",
+                message="Strategy compatibility readiness service is not configured",
+                details={"reason": "strategy_compatibility_unavailable"},
+            )
+        return compatibility_readiness_service
+
+    def require_backtest_variant_launch_reader() -> BacktestVariantLaunchReader:
+        if backtest_variant_launch_reader is None:
+            raise RoehubError(
+                code="strategy_compatibility.unavailable",
+                message="Backtest variant launch reader is not configured",
+                details={"reason": "backtest_variant_launch_reader_unavailable"},
+            )
+        return backtest_variant_launch_reader
 
     @router.get("/backtests/runtime-defaults", response_model=BacktestRuntimeDefaultsResponse)
     def get_backtest_runtime_defaults(
@@ -290,6 +340,38 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         return build_backtest_top_variant_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/compatibility-readiness",
+        response_model=BacktestVariantCompatibilityReadinessResponse,
+    )
+    def get_backtest_job_variant_compatibility_readiness(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        reader: BacktestVariantLaunchReader = Depends(require_backtest_variant_launch_reader),
+        service: StrategyCompatibilityReadinessService = Depends(
+            require_compatibility_readiness_service
+        ),
+    ) -> BacktestVariantCompatibilityReadinessResponse:
+        snapshot = reader.get(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        report = service.check_backtest_variant(
+            current_user=CurrentUser(user_id=principal.user_id),
+            snapshot=snapshot,
+        )
+        record_strategy_variant_compatibility(
+            state=report.compatibility_state,
+            reason=report.compatibility_reason_codes[0],
+        )
+        record_market_data_readiness(
+            state=report.market_data_state,
+            reason=report.market_data_reason_codes[0],
+        )
+        return _to_compatibility_readiness_response(report=report)
 
     @router.post(
         "/backtests/jobs/{job_id}/variants/{variant_key}/strategies",
@@ -551,6 +633,34 @@ def _to_variant_strategy_response(
             strategy_spec_hash=provenance.strategy_spec_hash,
             launch_request_hash=provenance.launch_request_hash,
         ),
+    )
+
+
+def _to_compatibility_readiness_response(
+    *, report
+) -> BacktestVariantCompatibilityReadinessResponse:
+    return BacktestVariantCompatibilityReadinessResponse(
+        compatibility_check_id=report.compatibility_check_id,
+        market_data_requirement_id=report.market_data_requirement_id,
+        strategy_id=report.strategy_id,
+        source_job_id=report.source_job_id,
+        source_variant_key=report.source_variant_key,
+        strategy_spec_hash=report.strategy_spec_hash,
+        instrument_key=report.instrument_key,
+        market_type=report.market_type,
+        timeframe=report.timeframe,
+        compatibility_state=report.compatibility_state,
+        compatibility_reason_codes=list(report.compatibility_reason_codes),
+        market_data_state=report.market_data_state,
+        market_data_reason_codes=list(report.market_data_reason_codes),
+        market_data_stream_name=report.market_data_stream_name,
+        market_data_stream_length=report.market_data_stream_length,
+        market_data_last_message_id=report.market_data_last_message_id,
+        market_data_last_observed_at=report.market_data_last_observed_at,
+        market_data_age_seconds=report.market_data_age_seconds,
+        launch_blocked=report.launch_blocked,
+        launch_blocked_reason=report.launch_blocked_reason,
+        checked_at=report.checked_at,
     )
 
 

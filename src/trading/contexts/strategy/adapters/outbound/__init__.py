@@ -20,6 +20,7 @@ from .config import (
 )
 from .messaging import (
     LogOnlyTelegramNotifier,
+    RedisMarketDataReadinessReader,
     RedisStrategyLiveCandleStream,
     RedisStrategyLiveCandleStreamConfig,
     RedisStrategyRealtimeOutputPublisher,
@@ -32,6 +33,7 @@ from .messaging import (
 from .persistence import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyBacktestVariantProvenanceRepository,
+    InMemoryStrategyCompatibilityReadinessRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
@@ -39,6 +41,7 @@ from .persistence import (
     InMemoryStrategySignalRepository,
     PostgresLiveStrategyProfileRepository,
     PostgresStrategyBacktestVariantProvenanceRepository,
+    PostgresStrategyCompatibilityReadinessRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyExchangeBindingRepository,
     PostgresStrategyRepository,
@@ -53,6 +56,7 @@ __all__ = [
     "InMemoryStrategyEventRepository",
     "InMemoryStrategyExchangeBindingRepository",
     "InMemoryLiveStrategyProfileRepository",
+    "InMemoryStrategyCompatibilityReadinessRepository",
     "InMemoryStrategyBacktestVariantProvenanceRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
@@ -60,6 +64,7 @@ __all__ = [
     "PostgresStrategyEventRepository",
     "PostgresStrategyExchangeBindingRepository",
     "PostgresLiveStrategyProfileRepository",
+    "PostgresStrategyCompatibilityReadinessRepository",
     "PostgresStrategyBacktestVariantProvenanceRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
@@ -84,6 +89,7 @@ __all__ = [
     "load_strategy_runtime_config",
     "resolve_strategy_config_path",
     "RedisStrategyLiveCandleStream",
+    "RedisMarketDataReadinessReader",
     "RedisStrategyLiveCandleStreamConfig",
     "RedisStrategyRealtimeOutputPublisher",
     "RedisStrategyRealtimeOutputPublisherConfig",

@@ -78,6 +78,23 @@ class StrategyDashboardLiveProfileResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyDashboardCompatibilityReadinessResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    compatibility_state: Literal["launchable", "not_launchable", "degraded"]
+    compatibility_reason_codes: list[str]
+    market_data_state: Literal["ready", "missing", "stale", "pending"]
+    market_data_reason_codes: list[str]
+    market_data_stream_name: str | None
+    market_data_age_seconds: int | None
+    launch_blocked: bool
+    launch_blocked_reason: str
+    checked_at: datetime | None
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardSelectorFiltersResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -342,6 +359,7 @@ class StrategyDashboardResponse(BaseModel):
     sources: list[StrategyDashboardSourceResponse]
     selected_strategy: StrategyDashboardSelectedStrategyResponse
     live_profile: StrategyDashboardLiveProfileResponse
+    compatibility_readiness: StrategyDashboardCompatibilityReadinessResponse
     strategy_selector: StrategyDashboardSelectorResponse
     chart: StrategyChartResponse
     metric_grid: StrategyMetricGridResponse

@@ -235,6 +235,15 @@ function renderLiveProfile(root, profile) {
   }
 }
 
+function renderCompatibilityReadiness(root, readiness) {
+  const compatibilityState = readiness?.compatibility_state || "not_launchable";
+  const compatibilityReason = (readiness?.compatibility_reason_codes || [readiness?.launch_blocked_reason || "--"])[0];
+  const marketDataState = readiness?.market_data_state || "pending";
+  const marketDataReason = (readiness?.market_data_reason_codes || [readiness?.launch_blocked_reason || "--"])[0];
+  setText("[data-profile-compatibility]", `${compatibilityState}: ${compatibilityReason}`, root);
+  setText("[data-profile-market-data]", `${marketDataState}: ${marketDataReason}`, root);
+}
+
 function renderMetrics(root, metricGrid) {
   const target = qs("[data-strategy-metrics]", root);
   if (!target) {
@@ -564,6 +573,7 @@ function renderFreshness(summary) {
 function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
   renderLiveProfile(root, summary.live_profile);
+  renderCompatibilityReadiness(root, summary.compatibility_readiness);
   renderSelector(root, summary.strategy_selector, state.savedQuery);
   renderChart(root, summary, state);
   syncStatWorkspace(root, state.statMode || "overall");

@@ -42,6 +42,16 @@ _LIVE_STRATEGY_PROFILE_READINESS_TOTAL = Counter(
     "Live strategy profile readiness evaluations by result.",
     ("status", "reason"),
 )
+_STRATEGY_VARIANT_COMPATIBILITY_TOTAL = Counter(
+    "strategy_variant_compatibility_total",
+    "Strategy variant compatibility checks by result.",
+    ("state", "reason"),
+)
+_MARKET_DATA_READINESS_TOTAL = Counter(
+    "market_data_readiness_total",
+    "Market-data readiness checks by result.",
+    ("state", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -159,6 +169,20 @@ def record_live_strategy_profile_readiness(*, status: str, reason: str) -> None:
     ).inc()
 
 
+def record_strategy_variant_compatibility(*, state: str, reason: str) -> None:
+    _STRATEGY_VARIANT_COMPATIBILITY_TOTAL.labels(
+        state=state,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def record_market_data_readiness(*, state: str, reason: str) -> None:
+    _MARKET_DATA_READINESS_TOTAL.labels(
+        state=state,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -190,5 +214,7 @@ __all__ = [
     "build_metrics_response",
     "install_metrics_middleware",
     "record_live_strategy_profile_readiness",
+    "record_market_data_readiness",
     "record_strategy_variant_launch",
+    "record_strategy_variant_compatibility",
 ]

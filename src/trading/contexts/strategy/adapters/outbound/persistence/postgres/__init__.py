@@ -1,3 +1,6 @@
+from .compatibility_readiness_repository import (
+    PostgresStrategyCompatibilityReadinessRepository,
+)
 from .exchange_binding_repository import PostgresStrategyExchangeBindingRepository
 from .gateway import PsycopgStrategyPostgresGateway, StrategyPostgresGateway
 from .live_strategy_profile_repository import PostgresLiveStrategyProfileRepository
@@ -14,6 +17,7 @@ __all__ = [
     "PostgresStrategyEventRepository",
     "PostgresStrategyExchangeBindingRepository",
     "PostgresLiveStrategyProfileRepository",
+    "PostgresStrategyCompatibilityReadinessRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PostgresStrategySignalRepository",

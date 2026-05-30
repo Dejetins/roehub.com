@@ -45,15 +45,21 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.strategy.adapters.outbound import (
     PostgresStrategyBacktestVariantProvenanceRepository,
+    PostgresStrategyCompatibilityReadinessRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
     PsycopgStrategyPostgresGateway,
+    RedisMarketDataReadinessReader,
+    RedisStrategyLiveCandleStreamConfig,
     SystemStrategyClock,
+    load_strategy_runtime_config,
+    resolve_strategy_config_path,
 )
 from trading.contexts.strategy.application import (
     BacktestVariantLaunchReader,
     BacktestVariantLaunchSnapshot,
     CreateStrategyFromBacktestVariantUseCase,
+    StrategyCompatibilityReadinessService,
 )
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
@@ -116,12 +122,22 @@ def build_backtests_router(
         environ=effective_environ,
         job_repository=job_repository,
     )
+    variant_launch_reader = (
+        _BacktestJobRepositoryVariantLaunchReader(repository=job_repository)
+        if job_repository is not None
+        else None
+    )
+    compatibility_readiness_service = _build_compatibility_readiness_service(
+        environ=effective_environ,
+    )
     return build_backtests_api_router(
         runtime_defaults_service=runtime_defaults_service,
         preflight_service=preflight_service,
         current_user_dependency=current_user_dependency,
         jobs_use_case=jobs_use_case,
         create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
+        compatibility_readiness_service=compatibility_readiness_service,
+        backtest_variant_launch_reader=variant_launch_reader,
     )
 
 
@@ -214,6 +230,49 @@ def _build_create_strategy_from_variant_use_case(
             gateway=strategy_gateway,
         ),
         event_repository=PostgresStrategyEventRepository(gateway=strategy_gateway),
+        clock=SystemStrategyClock(),
+    )
+
+
+def _build_compatibility_readiness_service(
+    *, environ: Mapping[str, str]
+) -> StrategyCompatibilityReadinessService | None:
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not postgres_dsn:
+        return None
+    strategy_gateway = PsycopgStrategyPostgresGateway(dsn=postgres_dsn)
+    redis_reader = None
+    try:
+        runtime_config = load_strategy_runtime_config(
+            resolve_strategy_config_path(environ=environ),
+            environ=environ,
+        )
+        redis_config = runtime_config.live_worker.redis_streams
+        if redis_config.enabled:
+            redis_reader = RedisMarketDataReadinessReader(
+                config=RedisStrategyLiveCandleStreamConfig(
+                    host=redis_config.host,
+                    port=redis_config.port,
+                    db=redis_config.db,
+                    password_env=redis_config.password_env,
+                    socket_timeout_s=redis_config.socket_timeout_s,
+                    connect_timeout_s=redis_config.connect_timeout_s,
+                    stream_prefix=redis_config.stream_prefix,
+                    consumer_group=redis_config.consumer_group,
+                    consumer_name="api-readiness",
+                    read_count=1,
+                    block_ms=0,
+                ),
+                environ=environ,
+            )
+    except Exception:
+        redis_reader = None
+    return StrategyCompatibilityReadinessService(
+        strategy_repository=PostgresStrategyRepository(gateway=strategy_gateway),
+        compatibility_repository=PostgresStrategyCompatibilityReadinessRepository(
+            gateway=strategy_gateway,
+        ),
+        market_data_reader=redis_reader,
         clock=SystemStrategyClock(),
     )
 

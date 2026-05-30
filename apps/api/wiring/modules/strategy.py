@@ -28,11 +28,14 @@ from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyRunRepository,
     InMemoryStrategySignalRepository,
     PostgresLiveStrategyProfileRepository,
+    PostgresStrategyCompatibilityReadinessRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
     PostgresStrategySignalRepository,
     PsycopgStrategyPostgresGateway,
+    RedisMarketDataReadinessReader,
+    RedisStrategyLiveCandleStreamConfig,
     SystemStrategyClock,
     load_strategy_runtime_config,
     resolve_strategy_config_path,
@@ -52,6 +55,7 @@ from trading.contexts.strategy.application import (
     RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
+    StrategyCompatibilityReadinessService,
     StrategyEventRepository,
     StrategyRepository,
     StrategyRunRepository,
@@ -313,6 +317,13 @@ def build_strategy_router(
     strategy_repository, run_repository, event_repository = _build_repositories(settings=settings)
     profile_repository = _build_live_profile_repository(settings=settings)
     clock = SystemStrategyClock()
+    compatibility_readiness_service = _build_compatibility_readiness_service(
+        environ=environ,
+        settings=settings,
+        strategy_repository=strategy_repository,
+        event_repository=event_repository,
+        clock=clock,
+    )
 
     create_use_case = CreateStrategyUseCase(
         repository=strategy_repository,
@@ -331,6 +342,7 @@ def build_strategy_router(
         run_repository=run_repository,
         clock=clock,
         event_repository=event_repository,
+        compatibility_readiness_checker=compatibility_readiness_service,
     )
     stop_use_case = StopStrategyUseCase(
         strategy_repository=strategy_repository,
@@ -360,6 +372,7 @@ def build_strategy_router(
             if exchange_client is not None
             else None
         ),
+        compatibility_readiness_checker=compatibility_readiness_service,
     )
 
     current_user_provider_dependency = StrategyCurrentUserProviderDependency(
@@ -378,6 +391,7 @@ def build_strategy_router(
         current_user_provider_dependency=current_user_provider_dependency,
         live_profile_service=live_profile_service,
         current_user_principal_dependency=current_user_dependency,
+        compatibility_readiness_service=compatibility_readiness_service,
     )
 
 
@@ -434,6 +448,54 @@ def _build_live_profile_repository(
             f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
         )
     return InMemoryLiveStrategyProfileRepository()
+
+
+def _build_compatibility_readiness_service(
+    *,
+    environ: Mapping[str, str],
+    settings: StrategyRuntimeSettings,
+    strategy_repository: StrategyRepository | None,
+    event_repository: StrategyEventRepository | None,
+    clock: SystemStrategyClock,
+) -> StrategyCompatibilityReadinessService:
+    repository = None
+    if settings.postgres_dsn:
+        repository = PostgresStrategyCompatibilityReadinessRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        )
+    redis_reader = None
+    try:
+        runtime_config = load_strategy_runtime_config(
+            resolve_strategy_config_path(environ=environ),
+            environ=environ,
+        )
+        redis_config = runtime_config.live_worker.redis_streams
+        if redis_config.enabled:
+            redis_reader = RedisMarketDataReadinessReader(
+                config=RedisStrategyLiveCandleStreamConfig(
+                    host=redis_config.host,
+                    port=redis_config.port,
+                    db=redis_config.db,
+                    password_env=redis_config.password_env,
+                    socket_timeout_s=redis_config.socket_timeout_s,
+                    connect_timeout_s=redis_config.connect_timeout_s,
+                    stream_prefix=redis_config.stream_prefix,
+                    consumer_group=redis_config.consumer_group,
+                    consumer_name="api-readiness",
+                    read_count=1,
+                    block_ms=0,
+                ),
+                environ=environ,
+            )
+    except Exception:
+        redis_reader = None
+    return StrategyCompatibilityReadinessService(
+        strategy_repository=strategy_repository,
+        compatibility_repository=repository,
+        market_data_reader=redis_reader,
+        event_repository=event_repository,
+        clock=clock,
+    )
 
 
 def _build_signal_repository(
