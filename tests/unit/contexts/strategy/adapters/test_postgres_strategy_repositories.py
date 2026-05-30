@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -11,8 +12,9 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres import (
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
+    PostgresStrategySignalRepository,
 )
-from trading.contexts.strategy.domain import StrategyRun, StrategySpecV1
+from trading.contexts.strategy.domain import StrategyRun, StrategySignal, StrategySpecV1
 from trading.contexts.strategy.domain.errors import StrategyActiveRunConflictError
 from trading.contexts.strategy.domain.services import generate_strategy_name
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe, UserId
@@ -256,6 +258,35 @@ def test_run_repository_find_active_includes_deterministic_order_clause() -> Non
     assert run is not None
     assert run.state == "running"
     assert "ORDER BY started_at DESC, run_id DESC" in gateway.fetch_one_queries[0]
+
+
+def test_signal_repository_records_stage05_signal_without_expected_order_payload() -> None:
+    signal = _build_signal()
+    gateway = _FakeGateway(fetch_one_results=[_build_signal_row()])
+    repository = PostgresStrategySignalRepository(gateway=gateway)
+
+    persisted = repository.record(signal=signal)
+
+    assert persisted.signal_id == signal.signal_id
+    assert persisted.outcome == "signal"
+    assert persisted.expected_order_json == {}
+    assert "ON CONFLICT (signal_id) DO NOTHING" in gateway.fetch_one_queries[0]
+    assert "expected_order_json" in gateway.fetch_one_queries[0]
+
+
+def test_signal_repository_latest_is_owner_scoped_and_bounded() -> None:
+    gateway = _FakeGateway(fetch_all_results=[(_build_signal_row(),)])
+    repository = PostgresStrategySignalRepository(gateway=gateway)
+
+    signals = repository.list_latest_for_strategy(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
+        strategy_id=UUID("00000000-0000-0000-0000-00000000A111"),
+        limit=500,
+    )
+
+    assert len(signals) == 1
+    assert gateway.fetch_all_queries[0].count("owner_user_id") >= 1
+    assert "ORDER BY created_at DESC, signal_id DESC" in gateway.fetch_all_queries[0]
 
 
 def test_run_repository_list_active_runs_uses_deterministic_ordering() -> None:
@@ -623,6 +654,59 @@ def _build_run_row(*, state: str) -> Mapping[str, Any]:
         "checkpoint_ts_open": datetime(2026, 2, 15, 13, 19, tzinfo=timezone.utc),
         "last_error": None,
         "updated_at": datetime(2026, 2, 15, 13, 20, tzinfo=timezone.utc),
+    }
+
+
+def _build_signal() -> StrategySignal:
+    return StrategySignal(
+        signal_id=UUID("00000000-0000-0000-0000-00000000F111"),
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
+        strategy_id=UUID("00000000-0000-0000-0000-00000000A111"),
+        strategy_run_id=UUID("00000000-0000-0000-0000-00000000B111"),
+        live_profile_id=None,
+        mode="monitor_only",
+        instrument_key="binance:spot:BTCUSDT",
+        market_type="spot",
+        timeframe="1m",
+        bar_ts_open=datetime(2026, 2, 15, 13, 21, tzinfo=timezone.utc),
+        bar_ts_close=datetime(2026, 2, 15, 13, 22, tzinfo=timezone.utc),
+        signal_action="open",
+        side="buy",
+        outcome="signal",
+        reason_code="ma_fast_crossed_above_slow_monitor_only_no_intent",
+        reference_price=Decimal("100.5"),
+        confidence=Decimal("1"),
+        expected_order_json={},
+        source_message_id="1771161660000-0",
+        evaluator_version="ma_cross_close_v1",
+        created_at=datetime(2026, 2, 15, 13, 22, tzinfo=timezone.utc),
+    )
+
+
+def _build_signal_row() -> Mapping[str, Any]:
+    signal = _build_signal()
+    return {
+        "signal_id": str(signal.signal_id),
+        "owner_user_id": str(signal.owner_user_id),
+        "strategy_id": str(signal.strategy_id),
+        "strategy_run_id": str(signal.strategy_run_id),
+        "live_profile_id": None,
+        "mode": signal.mode,
+        "instrument_key": signal.instrument_key,
+        "market_type": signal.market_type,
+        "timeframe": signal.timeframe,
+        "bar_ts_open": signal.bar_ts_open,
+        "bar_ts_close": signal.bar_ts_close,
+        "signal_action": signal.signal_action,
+        "side": signal.side,
+        "outcome": signal.outcome,
+        "reason_code": signal.reason_code,
+        "reference_price": signal.reference_price,
+        "confidence": signal.confidence,
+        "expected_order_json": {},
+        "source_message_id": signal.source_message_id,
+        "evaluator_version": signal.evaluator_version,
+        "created_at": signal.created_at,
     }
 
 

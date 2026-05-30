@@ -42,6 +42,10 @@
   - хранение checkpoint для продолжения “с места остановки”
   - restart как durable operation в `strategy_runs.metadata_json.restart`, не как
     UI alias на stop+run
+- Signals:
+  - `strategy_signals` — durable Stage 05 `StrategySignal`/no-signal journal;
+  - journal rows explain `warmup`, `no_signal`, `signal` and unsupported
+    evaluator `blocked` outcomes without order submission.
 - Events:
   - append-only история (truth) + база для realtime/UI
   - `run_id` допускается `NULL` (события уровня стратегии, не привязанные к конкретному запуску)
@@ -157,6 +161,29 @@ Restart фиксируется на текущем активном run как J
 Правило: browser/API не создаёт successor напрямую. Successor появляется только
 после того, как live-runner доказал drain старого run через terminal state.
 
+### 6B) strategy_signals: durable evaluator journal before execution
+
+Stage 05 adds `strategy_signals` as an additive Strategy-context table. It is
+not an execution ledger and does not imply order submission.
+
+Minimum invariant fields:
+
+- stable `signal_id`;
+- owner, strategy, run and optional `live_profile_id`;
+- `mode` in `monitor_only|paper|live`;
+- source candle window `bar_ts_open|bar_ts_close`;
+- `signal_action` in `none|open|close|reduce|reverse`;
+- optional `side` only for actionable rows;
+- `outcome` in `warmup|no_signal|signal|blocked`;
+- stable `reason_code`;
+- `reference_price`;
+- `source_message_id`;
+- `expected_order_json = {}` in Stage 05.
+
+Unsupported live evaluator specs write `outcome=blocked` and fail closed. Later
+execution stages must consume this journal through an explicit source-event
+boundary rather than treating it as an order request.
+
 ### 7) Events append-only, run_id nullable
 
 Events — append-only (truth log).  
@@ -197,6 +224,10 @@ CI:
 - Runs:
   - максимум 1 активный run на strategy в состояниях `starting|warming_up|running|stopping`.
   - restart operation durable in `metadata_json.restart`; duplicate pending restart is conflict.
+- Signals:
+  - `strategy_signals` is append-only by `signal_id` and owner-scoped for UI/API reads.
+  - Stage 05 signal rows never contain secrets, exchange payloads, signed payloads
+    or non-empty `expected_order_json`.
 - Events:
   - append-only (никаких UPDATE/DELETE в пределах truth log).
   - `run_id` nullable (события уровня стратегии допускаются).

@@ -79,6 +79,7 @@
   grid-template-rows:
     minmax(165px, 0.72fr)
     minmax(360px, 1.52fr)
+    minmax(140px, 0.58fr)
     minmax(150px, 0.62fr);
   gap: 6px;
   min-width: 0;
@@ -108,6 +109,11 @@
 }
 
 .strategies-trades {
+  grid-column: 1 / 17;
+  grid-row: 4;
+}
+
+.strategies-signals {
   grid-column: 1 / 17;
   grid-row: 3;
 }
@@ -372,6 +378,10 @@
   min-width: 1500px;
 }
 
+.strategies-table--signals {
+  min-width: 980px;
+}
+
 .strategies-table th,
 .strategies-table td {
   padding: 5px 7px;
@@ -387,6 +397,7 @@
 }
 
 .strategies-statistics,
+.strategies-signals,
 .strategies-trades {
   align-content: stretch;
   grid-template-rows: auto minmax(0, 1fr);
@@ -705,6 +716,10 @@
 
   .strategies-table--trades {
     min-width: 760px;
+  }
+
+  .strategies-table--signals {
+    min-width: 720px;
   }
 
   .strategies-empty-row,

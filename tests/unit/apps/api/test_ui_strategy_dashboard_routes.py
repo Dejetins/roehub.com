@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -14,7 +15,7 @@ from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_strategies_dashboard_router
 from apps.api.wiring.modules.ui_strategies_dashboard import StrategyDashboardQueryService
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
-from trading.contexts.strategy.domain.entities import Strategy, StrategyRun
+from trading.contexts.strategy.domain.entities import Strategy, StrategyRun, StrategySignal
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
@@ -69,6 +70,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     service = StrategyDashboardQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
+        signal_repository=_FakeSignalRepository(signals=(_signal(strategy=strategy, run=run),)),
     )
     client = _build_client(service=service)
 
@@ -105,6 +107,12 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         assert payload[panel]["state"] == "unavailable"
         assert payload[panel]["source"]
         assert payload[panel]["degradation_reason"]
+    assert payload["signal_journal"]["state"] == "ready"
+    assert payload["signal_journal"]["items"][0]["outcome"] == "signal"
+    assert payload["signal_journal"]["items"][0]["mode"] == "monitor_only"
+    assert payload["signal_journal"]["items"][0]["reason_code"].endswith(
+        "monitor_only_no_intent"
+    )
     assert "summary" not in payload["monthly_stats"]
     assert "symbol_results" not in payload
     assert payload["refresh_control"]["interval_seconds"] == 15
@@ -113,6 +121,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert source_statuses["strategy_strategies"] == "available"
     assert source_statuses["strategy_runs"] == "available"
     assert source_statuses["strategy_live_profiles"] == "unavailable"
+    assert source_statuses["strategy_signals"] == "available"
     assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"
@@ -269,6 +278,28 @@ class _FakeRunRepository:
         raise NotImplementedError
 
 
+class _FakeSignalRepository:
+    def __init__(self, *, signals: tuple[StrategySignal, ...]) -> None:
+        self._signals = signals
+
+    def record(self, *, signal: StrategySignal) -> StrategySignal:
+        raise NotImplementedError
+
+    def list_latest_for_strategy(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        limit: int,
+    ) -> tuple[StrategySignal, ...]:
+        _ = limit
+        return tuple(
+            signal
+            for signal in self._signals
+            if signal.owner_user_id == owner_user_id and signal.strategy_id == strategy_id
+        )
+
+
 def _build_client(*, service: StrategyDashboardQueryService) -> TestClient:
     app = FastAPI()
     register_api_error_handlers(app=app)
@@ -289,6 +320,32 @@ def _strategy(*, symbol: str) -> Strategy:
         spec=spec,
         created_at=datetime(2026, 5, 6, 8, 0, tzinfo=UTC),
         strategy_id=_STRATEGY_ID,
+    )
+
+
+def _signal(*, strategy: Strategy, run: StrategyRun) -> StrategySignal:
+    return StrategySignal(
+        signal_id=UUID("00000000-0000-0000-0000-000000006301"),
+        owner_user_id=strategy.user_id,
+        strategy_id=strategy.strategy_id,
+        strategy_run_id=run.run_id,
+        live_profile_id=None,
+        mode="monitor_only",
+        instrument_key=strategy.spec.instrument_key,
+        market_type=strategy.spec.market_type,
+        timeframe=strategy.spec.timeframe.code,
+        bar_ts_open=datetime(2026, 5, 6, 9, 1, tzinfo=UTC),
+        bar_ts_close=datetime(2026, 5, 6, 9, 2, tzinfo=UTC),
+        signal_action="open",
+        side="buy",
+        outcome="signal",
+        reason_code="ma_fast_crossed_above_slow_monitor_only_no_intent",
+        reference_price=Decimal("101.5"),
+        confidence=Decimal("1"),
+        expected_order_json={},
+        source_message_id="1746522060000-0",
+        evaluator_version="ma_cross_close_v1",
+        created_at=datetime(2026, 5, 6, 9, 2, tzinfo=UTC),
     )
 
 

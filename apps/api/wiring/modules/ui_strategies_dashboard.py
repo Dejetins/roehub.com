@@ -32,6 +32,8 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyMetricResponse,
     StrategyMonthlyStatsResponse,
     StrategySeriesPanelResponse,
+    StrategySignalJournalResponse,
+    StrategySignalJournalRowResponse,
     StrategyTradesResponse,
 )
 from apps.api.routes.ui_strategies_dashboard import (
@@ -40,6 +42,7 @@ from apps.api.routes.ui_strategies_dashboard import (
 from apps.api.wiring.modules.strategy import (
     _build_live_profile_repository,
     _build_repositories,
+    _build_signal_repository,
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
 )
@@ -49,8 +52,14 @@ from trading.contexts.strategy.application.ports.repositories import (
     LiveStrategyProfileRepository,
     StrategyRepository,
     StrategyRunRepository,
+    StrategySignalRepository,
 )
-from trading.contexts.strategy.domain.entities import LiveStrategyProfile, Strategy, StrategyRun
+from trading.contexts.strategy.domain.entities import (
+    LiveStrategyProfile,
+    Strategy,
+    StrategyRun,
+    StrategySignal,
+)
 from trading.shared_kernel.primitives import UserId
 
 _DEFAULT_REFRESH_INTERVAL_SECONDS = 15
@@ -66,6 +75,8 @@ _TRADES_SOURCE = "execution_fills"
 _EVENTS_SOURCE = "strategy_events"
 _RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 _LIVE_PROFILE_SOURCE = "strategy_live_profiles"
+_SIGNAL_JOURNAL_SOURCE = "strategy_signals"
+_SIGNAL_JOURNAL_LIMIT = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,11 +133,13 @@ class StrategyDashboardQueryService:
         strategy_repository: StrategyRepository | None,
         run_repository: StrategyRunRepository | None,
         profile_repository: LiveStrategyProfileRepository | None = None,
+        signal_repository: StrategySignalRepository | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
         self._profile_repository = profile_repository
+        self._signal_repository = signal_repository
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -159,9 +172,15 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        signal_journal, signal_journal_source = self._load_signal_journal(
+            principal=principal,
+            strategy=selected_strategy,
+            generated_at=generated_at,
+        )
         sources = [
             *dynamic_sources,
             live_profile_source,
+            signal_journal_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name=_CANDLE_SOURCE,
@@ -232,6 +251,7 @@ class StrategyDashboardQueryService:
             equity_curve=_build_unavailable_series(title="equity_curve"),
             hourly_results=_build_hourly_results(),
             trades=_build_trades(),
+            signal_journal=signal_journal,
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
                 data_status="degraded" if _has_degraded_sources(sources) else "actual",
@@ -250,6 +270,84 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_signal_journal(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        generated_at: datetime,
+    ) -> tuple[StrategySignalJournalResponse, StrategyDashboardSourceResponse]:
+        if strategy is None:
+            return (
+                _build_empty_signal_journal(reason="selected_strategy_not_found"),
+                _source(
+                    name=_SIGNAL_JOURNAL_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="no selected strategy signal journal is available",
+                ),
+            )
+        if self._signal_repository is None:
+            return (
+                _build_empty_signal_journal(reason="signal_repository_not_configured"),
+                _source(
+                    name=_SIGNAL_JOURNAL_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="strategy signal repository is not configured",
+                ),
+            )
+        try:
+            signals = self._signal_repository.list_latest_for_strategy(
+                owner_user_id=principal.user_id,
+                strategy_id=strategy.strategy_id,
+                limit=_SIGNAL_JOURNAL_LIMIT,
+            )
+        except Exception as error:  # noqa: BLE001
+            return (
+                _build_empty_signal_journal(reason=str(error)),
+                _source(
+                    name=_SIGNAL_JOURNAL_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail=str(error),
+                ),
+            )
+        if not signals:
+            return (
+                _build_empty_signal_journal(reason="signal_journal_empty"),
+                _source(
+                    name=_SIGNAL_JOURNAL_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="no StrategySignal journal rows exist for selected strategy",
+                ),
+            )
+        latest = max(
+            (signal.created_at or signal.bar_ts_close for signal in signals),
+            default=generated_at,
+        )
+        return (
+            StrategySignalJournalResponse(
+                source=_SIGNAL_JOURNAL_SOURCE,
+                state="ready",
+                limit=_SIGNAL_JOURNAL_LIMIT,
+                items=[_build_signal_journal_row(signal=signal) for signal in signals],
+                degradation_reason=None,
+            ),
+            _source(
+                name=_SIGNAL_JOURNAL_SOURCE,
+                status="available",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(generated_at=generated_at, observed_at=latest),
+                detail=f"{len(signals)} latest StrategySignal rows loaded",
             ),
         )
 
@@ -460,14 +558,17 @@ def build_strategy_dashboard_service(
             strategy_repository=None,
             run_repository=None,
             profile_repository=None,
+            signal_repository=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
     profile_repository = _build_live_profile_repository(settings=settings)
+    signal_repository = _build_signal_repository(settings=settings)
     return StrategyDashboardQueryService(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
         profile_repository=profile_repository,
+        signal_repository=signal_repository,
     )
 
 
@@ -1008,4 +1109,35 @@ def _build_trades() -> StrategyTradesResponse:
         items=[],
         next_cursor=None,
         degradation_reason="strategy_trades_projection_unavailable",
+    )
+
+
+def _build_empty_signal_journal(*, reason: str) -> StrategySignalJournalResponse:
+    return StrategySignalJournalResponse(
+        source=_SIGNAL_JOURNAL_SOURCE,
+        state="empty",
+        limit=_SIGNAL_JOURNAL_LIMIT,
+        items=[],
+        degradation_reason=reason,
+    )
+
+
+def _build_signal_journal_row(*, signal: StrategySignal) -> StrategySignalJournalRowResponse:
+    return StrategySignalJournalRowResponse(
+        signal_id=str(signal.signal_id),
+        strategy_run_id=str(signal.strategy_run_id),
+        live_profile_id=str(signal.live_profile_id) if signal.live_profile_id is not None else None,
+        mode=signal.mode,
+        outcome=signal.outcome,
+        signal_action=signal.signal_action,
+        side=signal.side,
+        reason_code=signal.reason_code,
+        reference_price=signal.reference_price,
+        instrument_key=signal.instrument_key,
+        market_type=signal.market_type,
+        timeframe=signal.timeframe,
+        bar_ts_open=signal.bar_ts_open,
+        bar_ts_close=signal.bar_ts_close,
+        source_message_id=signal.source_message_id,
+        created_at=signal.created_at,
     )

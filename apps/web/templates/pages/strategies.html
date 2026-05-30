@@ -282,6 +282,30 @@
         </div>
       </section>
 
+      <section class="terminal-panel strategies-signals" data-strategies-panel="signal_journal">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.signals.title") }}</h2>
+          <span class="strategies-pill" data-signal-journal-state>--</span>
+        </header>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--signals">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.signals.created") }}</th>
+                <th>{{ t("strategies.signals.mode") }}</th>
+                <th>{{ t("strategies.signals.outcome") }}</th>
+                <th>{{ t("strategies.signals.action") }}</th>
+                <th>{{ t("strategies.signals.price") }}</th>
+                <th>{{ t("strategies.signals.candle") }}</th>
+                <th>{{ t("strategies.signals.reason") }}</th>
+                <th>{{ t("strategies.signals.source") }}</th>
+              </tr>
+            </thead>
+            <tbody data-signal-journal-rows></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="terminal-panel strategies-trades" data-strategies-panel="trades">
         <header class="panel-heading panel-heading--with-tools">
           <h2>{{ t("strategies.trades.title") }}</h2>

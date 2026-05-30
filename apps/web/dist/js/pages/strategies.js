@@ -497,6 +497,37 @@ function renderTrades(root, trades) {
     .join("");
 }
 
+function renderSignalJournal(root, signalJournal) {
+  const target = qs("[data-signal-journal-rows]", root);
+  if (!target) {
+    return;
+  }
+  setText(
+    "[data-signal-journal-state]",
+    signalJournal?.state || t("strategies.panel.unavailable"),
+    root,
+  );
+  const items = signalJournal?.items || [];
+  if (!items.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="8">${escapeHtml(panelStatusText(signalJournal?.state, signalJournal?.degradation_reason, signalJournal?.source))}</td></tr>`;
+    return;
+  }
+  target.innerHTML = items
+    .map((item) => `
+      <tr data-signal-id="${escapeHtml(item.signal_id)}">
+        <td>${escapeHtml(localTime(item.created_at || item.bar_ts_close))}</td>
+        <td>${escapeHtml(item.mode)}</td>
+        <td>${escapeHtml(item.outcome)}</td>
+        <td>${escapeHtml(item.side ? `${item.signal_action}/${item.side}` : item.signal_action)}</td>
+        <td>${escapeHtml(valueOrUnavailable(item.reference_price))}</td>
+        <td>${escapeHtml(`${localTime(item.bar_ts_open)} -> ${localTime(item.bar_ts_close)}`)}</td>
+        <td>${escapeHtml(item.reason_code)}</td>
+        <td>${escapeHtml(item.source_message_id)}</td>
+      </tr>
+    `)
+    .join("");
+}
+
 function renderFooter(summary) {
   const footer = summary?.footer_status || {};
   setText("[data-footer-connection]", footer.connection_status || "--", document);
@@ -541,6 +572,7 @@ function renderDashboard(root, summary, state = {}) {
   renderLongShort(root, summary.long_short);
   renderRisk(root, summary.risk_execution);
   renderHours(root, summary.hourly_results);
+  renderSignalJournal(root, summary.signal_journal);
   renderTrades(root, summary.trades);
   renderFooter(summary);
   renderFreshness(summary);

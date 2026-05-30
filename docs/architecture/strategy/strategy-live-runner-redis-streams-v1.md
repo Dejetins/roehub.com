@@ -41,6 +41,8 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 - чтение live-потока: Redis Streams `md.candles.1m.<instrument_key>` (consumer group);
 - вычисление/фиксация warmup из `spec.indicators` (numeric_max_param_v1) в `run.metadata_json.warmup`;
 - rollup из 1m в TF стратегии (включая TF=`1m`);
+- Stage 05 live signal evaluation for supported `MA(fast,slow)` specs after bucket close;
+- durable `strategy_signals` journal rows for `warmup`, `no_signal`, `signal` and `blocked` outcomes;
 - strict монотонность checkpoint + repair(read) из ClickHouse canonical;
 - переходы run state: `starting → warming_up → running → stopped` (и обработка stop/restart drain).
 
@@ -149,6 +151,30 @@ Live-runner выполняет:
 - инвариант one-active-run сохраняется storage-side: successor создаётся только
   после terminal state старого run.
 
+### 8A) Stage 05: live signal evaluator writes `StrategySignal` journal, not orders
+
+После закрытия rollup bucket live-runner вызывает evaluator для поддержанного
+подмножества `StrategySpecV1`:
+
+- один `MA` indicator с `params.fast` и `params.slow`;
+- `signal_template` строго совпадает с `MA(fast,slow)`;
+- relation `fast_ma` vs `slow_ma` хранится в
+  `strategy_runs.metadata_json.signal_evaluator`.
+
+Результат каждого закрытого bucket записывается в Postgres `strategy_signals`:
+
+- `warmup` — evaluator еще набирает достаточно close values или run warmup не
+  удовлетворен;
+- `no_signal` — evaluator готов, но crossover не изменился;
+- `signal` — `open/buy` на cross above или `close/sell` на cross below;
+- `blocked` — spec/template не поддержан Stage 05 evaluator.
+
+Mode берется из `strategy_live_profiles`; если profile отсутствует, safe default
+`monitor_only`. В Stage 05 `expected_order_json` обязан оставаться `{}`:
+runner не создает `ExecutionIntent`, не пишет execution Redis streams и не
+делает exchange calls. Для `monitor_only|paper|live` signal rows являются только
+журналом решения; live/paper side effects добавляются в более поздних stages.
+
 ### 9) Публикация Market Data в Redis best-effort и может опережать durable insert
 
 В WS worker обработка закрытой свечи устроена так:
@@ -175,6 +201,10 @@ Live-runner:
 - Gap: `ts_open > checkpoint+1m` → repair(read) из ClickHouse canonical; checkpoint не продвигается до восстановления непрерывности.
 - Rollup: derived bucket закрывается только когда есть все 1m внутри бакета.
 - Warmup: вычисляется runner’ом из `spec.indicators` (numeric_max_param_v1) и сохраняется в `run.metadata_json.warmup`.
+- `StrategySignal`: закрытый evaluator bucket пишет durable row в
+  `strategy_signals`; `expected_order_json = {}` в Stage 05.
+- Unsupported evaluator spec writes `outcome=blocked` and fails closed before
+  any order/execution side effect.
 - Restart: pending operation хранится в `run.metadata_json.restart`; live-runner
   materializes successor only after drain, never while old run is still active.
 - Market Data Redis publish best-effort и может опережать durable вставки; стратегия не должна полагаться на “Redis => canonical already”.

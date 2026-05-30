@@ -276,6 +276,37 @@ class StrategyTradesResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategySignalJournalRowResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    signal_id: str
+    strategy_run_id: str
+    live_profile_id: str | None
+    mode: Literal["monitor_only", "paper", "live"]
+    outcome: Literal["warmup", "no_signal", "signal", "blocked"]
+    signal_action: Literal["none", "open", "close", "reduce", "reverse"]
+    side: Literal["buy", "sell"] | None
+    reason_code: str
+    reference_price: Decimal
+    instrument_key: str
+    market_type: str
+    timeframe: str
+    bar_ts_open: datetime
+    bar_ts_close: datetime
+    source_message_id: str
+    created_at: datetime | None
+
+
+class StrategySignalJournalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    limit: int
+    items: list[StrategySignalJournalRowResponse]
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -321,5 +352,6 @@ class StrategyDashboardResponse(BaseModel):
     equity_curve: StrategySeriesPanelResponse
     hourly_results: StrategyHourlyResultsResponse
     trades: StrategyTradesResponse
+    signal_journal: StrategySignalJournalResponse
     footer_status: StrategyDashboardFooterStatusResponse
     refresh_control: StrategyDashboardRefreshControlResponse

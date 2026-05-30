@@ -11,6 +11,7 @@ from trading.contexts.market_data.application.dto import (
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
+    InMemoryStrategySignalRepository,
 )
 from trading.contexts.strategy.application import (
     StrategyLiveCandleMessage,
@@ -945,6 +946,115 @@ def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
     ) == successor
 
 
+def test_live_runner_records_warmup_no_signal_and_signal_journal() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000925")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m", fast=2, slow=3)
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    signal_repository = InMemoryStrategySignalRepository()
+    strategy_repository.create(strategy=strategy)
+    run_repository.create(
+        run=StrategyRun.start(
+            run_id=UUID("00000000-0000-0000-0000-00000000E925"),
+            user_id=user_id,
+            strategy_id=strategy.strategy_id,
+            started_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
+            metadata_json={},
+        )
+    )
+    candles = (
+        _message("m-1", _candle_at(datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc), close=3)),
+        _message("m-2", _candle_at(datetime(2026, 2, 17, 19, 1, tzinfo=timezone.utc), close=2)),
+        _message("m-3", _candle_at(datetime(2026, 2, 17, 19, 2, tzinfo=timezone.utc), close=1)),
+        _message("m-4", _candle_at(datetime(2026, 2, 17, 19, 3, tzinfo=timezone.utc), close=4)),
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=_StreamStub(messages_by_instrument={strategy.spec.instrument_key: candles}),
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        signal_repository=signal_repository,
+        warmup_estimator=lambda **_kwargs: 1,
+    )
+
+    report = runner.run_once()
+    signals = signal_repository.list_latest_for_strategy(
+        owner_user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        limit=10,
+    )
+
+    assert report.acked_messages == 4
+    chronological = tuple(sorted(signals, key=lambda signal: signal.bar_ts_open))
+    assert [signal.outcome for signal in chronological] == [
+        "warmup",
+        "warmup",
+        "no_signal",
+        "signal",
+    ]
+    latest = chronological[-1]
+    assert latest.signal_action == "open"
+    assert latest.side == "buy"
+    assert latest.mode == "monitor_only"
+    assert latest.reason_code == "ma_fast_crossed_above_slow_monitor_only_no_intent"
+    assert latest.expected_order_json == {}
+
+
+def test_live_runner_blocks_unsupported_signal_template_without_order_dispatch() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000926")
+    strategy = _create_strategy(
+        user_id=user_id,
+        timeframe_code="1m",
+        indicator_name="RSI",
+        signal_template="RSI(14)",
+    )
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    signal_repository = InMemoryStrategySignalRepository()
+    strategy_repository.create(strategy=strategy)
+    started = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000E926"),
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 2, 17, 20, 0, tzinfo=timezone.utc),
+        metadata_json={},
+    )
+    run_repository.create(run=started)
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=_StreamStub(
+            messages_by_instrument={
+                strategy.spec.instrument_key: (
+                    _message(
+                        "m-unsupported",
+                        _candle_at(datetime(2026, 2, 17, 20, 0, tzinfo=timezone.utc)),
+                    ),
+                )
+            }
+        ),
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        signal_repository=signal_repository,
+        warmup_estimator=lambda **_kwargs: 1,
+    )
+
+    runner.run_once()
+    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started.run_id)
+    signals = signal_repository.list_latest_for_strategy(
+        owner_user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        limit=10,
+    )
+
+    assert persisted is not None
+    assert persisted.state == "failed"
+    assert len(signals) == 1
+    assert signals[0].outcome == "blocked"
+    assert signals[0].reason_code == "unsupported_live_evaluator"
+
+
 def _build_runner(
     *,
     strategy_repository: InMemoryStrategyRepository,
@@ -956,6 +1066,7 @@ def _build_runner(
     realtime_output_probe: _RealtimeOutputProbe | None = None,
     telegram_notifier_probe: _TelegramNotifierProbe | None = None,
     telegram_policy: TelegramNotificationPolicy | None = None,
+    signal_repository: InMemoryStrategySignalRepository | None = None,
     warmup_estimator: Callable[..., int] | None = None,
     rollup_policy: TimeframeRollupPolicy | None = None,
 ) -> StrategyLiveRunner:
@@ -988,6 +1099,7 @@ def _build_runner(
         run_repository=run_repository,
         live_candle_stream=stream,
         canonical_candle_reader=canonical_reader,
+        signal_repository=signal_repository or InMemoryStrategySignalRepository(),
         clock=_FixedClock(now_value=datetime(2026, 2, 17, 23, 0, tzinfo=timezone.utc)),
         sleeper=sleeper or _SleeperProbe(),
         repair_retry_attempts=retry_attempts,
@@ -1000,7 +1112,15 @@ def _build_runner(
     )
 
 
-def _create_strategy(*, user_id: UserId, timeframe_code: str) -> Strategy:
+def _create_strategy(
+    *,
+    user_id: UserId,
+    timeframe_code: str,
+    fast: int = 20,
+    slow: int = 50,
+    indicator_name: str = "MA",
+    signal_template: str | None = None,
+) -> Strategy:
     """
     Create deterministic immutable strategy fixture.
 
@@ -1023,14 +1143,14 @@ def _create_strategy(*, user_id: UserId, timeframe_code: str) -> Strategy:
         timeframe=Timeframe(timeframe_code),
         indicators=(
             {
-                "name": "MA",
+                "name": indicator_name,
                 "params": {
-                    "fast": 20,
-                    "slow": 50,
+                    "fast": fast,
+                    "slow": slow,
                 },
             },
         ),
-        signal_template="MA(20,50)",
+        signal_template=signal_template or f"MA({fast},{slow})",
     )
     return Strategy.create(
         user_id=user_id,
@@ -1119,7 +1239,7 @@ def _message(message_id: str, candle: CandleWithMeta) -> StrategyLiveCandleMessa
     return StrategyLiveCandleMessage(message_id=message_id, candle=candle)
 
 
-def _candle_at(ts_open: datetime) -> CandleWithMeta:
+def _candle_at(ts_open: datetime, *, close: float = 100.5) -> CandleWithMeta:
     """
     Build deterministic 1m candle fixture at requested open timestamp.
 
@@ -1139,10 +1259,10 @@ def _candle_at(ts_open: datetime) -> CandleWithMeta:
         instrument_id=instrument,
         ts_open=UtcTimestamp(ts_open),
         ts_close=UtcTimestamp(ts_open + timedelta(minutes=1)),
-        open=100.0,
-        high=101.0,
-        low=99.0,
-        close=100.5,
+        open=close,
+        high=close + 1.0,
+        low=close - 1.0,
+        close=close,
         volume_base=10.0,
         volume_quote=1005.0,
     )

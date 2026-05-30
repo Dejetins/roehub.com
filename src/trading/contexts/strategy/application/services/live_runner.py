@@ -3,13 +3,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any, Callable, Mapping
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.contexts.strategy.application.ports import (
     EventTypeV1,
+    LiveStrategyProfileRepository,
     MetricTypeV1,
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
@@ -21,18 +23,22 @@ from trading.contexts.strategy.application.ports import (
     StrategyRepository,
     StrategyRunnerSleeper,
     StrategyRunRepository,
+    StrategySignalRepository,
     StrategyTelegramNotificationEventV1,
     TelegramNotifier,
     serialize_realtime_event_payload_json,
 )
 from trading.contexts.strategy.domain.entities import (
+    LiveStrategyProfile,
     Strategy,
     StrategyRun,
     StrategyRunState,
+    StrategySignal,
     StrategySpecV1,
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
+from .signal_evaluator import SignalEvaluatorDecision, evaluate_strategy_signal
 from .telegram_notification_policy import TelegramNotificationPolicy
 from .timeframe_rollup import TimeframeRollupPolicy, TimeframeRollupProgress
 from .warmup_estimator import estimate_strategy_warmup_bars
@@ -125,11 +131,14 @@ class StrategyLiveRunner:
         run_repository: StrategyRunRepository,
         live_candle_stream: StrategyLiveCandleStream,
         canonical_candle_reader: CanonicalCandleReader,
+        signal_repository: StrategySignalRepository,
         clock: StrategyClock,
         sleeper: StrategyRunnerSleeper,
         repair_retry_attempts: int,
         repair_backoff_seconds: float,
         realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
+        live_profile_repository: LiveStrategyProfileRepository | None = None,
+        on_signal_recorded: Callable[[StrategySignal], None] | None = None,
         telegram_notifier: TelegramNotifier | None = None,
         telegram_notification_policy: TelegramNotificationPolicy | None = None,
         warmup_estimator: Callable[..., int] | None = None,
@@ -169,6 +178,8 @@ class StrategyLiveRunner:
             raise ValueError("StrategyLiveRunner requires live_candle_stream")
         if canonical_candle_reader is None:  # type: ignore[truthy-bool]
             raise ValueError("StrategyLiveRunner requires canonical_candle_reader")
+        if signal_repository is None:  # type: ignore[truthy-bool]
+            raise ValueError("StrategyLiveRunner requires signal_repository")
         if clock is None:  # type: ignore[truthy-bool]
             raise ValueError("StrategyLiveRunner requires clock")
         if sleeper is None:  # type: ignore[truthy-bool]
@@ -182,6 +193,9 @@ class StrategyLiveRunner:
         self._run_repository = run_repository
         self._live_candle_stream = live_candle_stream
         self._canonical_candle_reader = canonical_candle_reader
+        self._signal_repository = signal_repository
+        self._live_profile_repository = live_profile_repository
+        self._on_signal_recorded = on_signal_recorded
         self._clock = clock
         self._sleeper = sleeper
         self._repair_retry_attempts = repair_retry_attempts
@@ -282,6 +296,7 @@ class StrategyLiveRunner:
                             run=context.run,
                             spec=context.strategy.spec,
                             candle=message.candle,
+                            source_message_id=message.message_id,
                         )
                     except Exception as error:  # noqa: BLE001
                         context.run = self._mark_failed(
@@ -386,6 +401,7 @@ class StrategyLiveRunner:
         run: StrategyRun,
         spec: StrategySpecV1,
         candle: CandleWithMeta,
+        source_message_id: str,
     ) -> StrategyRun:
         """
         Process one stream candle against strict checkpoint rules and repair policy.
@@ -431,7 +447,12 @@ class StrategyLiveRunner:
             if not is_continuous:
                 return run
 
-        return self._accept_contiguous_candle(run=run, spec=spec, candle=candle)
+        return self._accept_contiguous_candle(
+            run=run,
+            spec=spec,
+            candle=candle,
+            source_message_id=source_message_id,
+        )
 
     def _accept_contiguous_candle(
         self,
@@ -439,6 +460,7 @@ class StrategyLiveRunner:
         run: StrategyRun,
         spec: StrategySpecV1,
         candle: CandleWithMeta,
+        source_message_id: str,
     ) -> StrategyRun:
         """
         Persist one contiguous candle and update warmup/rollup progress deterministically.
@@ -488,6 +510,15 @@ class StrategyLiveRunner:
             progress=rollup_step.progress,
             timeframe_code=spec.timeframe.code,
         )
+        signal_decision = None
+        if rollup_step.bucket_closed:
+            signal_decision = evaluate_strategy_signal(
+                spec=spec,
+                metadata_json=metadata_json,
+                candle=candle,
+                warmup_satisfied=normalized_warmup.satisfied,
+            )
+            metadata_json = signal_decision.metadata_json
 
         run = self._persist_same_state(
             run=run,
@@ -509,6 +540,20 @@ class StrategyLiveRunner:
                 ("repair_continuous", "1"),
             ),
         )
+        if signal_decision is not None:
+            signal = self._record_strategy_signal(
+                run=run,
+                spec=spec,
+                candle=candle,
+                source_message_id=source_message_id,
+                decision=signal_decision,
+            )
+            if signal.outcome == "blocked" and run.state in {"warming_up", "running"}:
+                run = self._mark_failed(
+                    run=run,
+                    error=RuntimeError(signal.reason_code),
+                    spec=spec,
+                )
         if run.state == "warming_up" and normalized_warmup.satisfied:
             run = self._transition_state(
                 run=run,
@@ -519,6 +564,53 @@ class StrategyLiveRunner:
                 metadata_json=run.metadata_json,
             )
         return run
+
+    def _record_strategy_signal(
+        self,
+        *,
+        run: StrategyRun,
+        spec: StrategySpecV1,
+        candle: CandleWithMeta,
+        source_message_id: str,
+        decision: SignalEvaluatorDecision,
+    ) -> StrategySignal:
+        profile = self._load_live_profile(run=run)
+        mode = profile.mode if profile is not None else "monitor_only"
+        signal = StrategySignal(
+            signal_id=_signal_id(run=run, candle=candle),
+            owner_user_id=run.user_id,
+            strategy_id=run.strategy_id,
+            strategy_run_id=run.run_id,
+            live_profile_id=profile.profile_id if profile is not None else None,
+            mode=mode,
+            instrument_key=spec.instrument_key,
+            market_type=spec.market_type,
+            timeframe=spec.timeframe.code,
+            bar_ts_open=candle.candle.ts_open.value,
+            bar_ts_close=candle.candle.ts_close.value,
+            signal_action=decision.action,
+            side=decision.side,
+            outcome=decision.outcome,
+            reason_code=_mode_reason_code(mode=mode, reason_code=decision.reason_code),
+            reference_price=Decimal(str(candle.candle.close)),
+            confidence=decision.confidence,
+            source_message_id=source_message_id,
+            evaluator_version=decision.evaluator_version,
+            expected_order_json={},
+            created_at=run.updated_at,
+        )
+        persisted = self._signal_repository.record(signal=signal)
+        if self._on_signal_recorded is not None:
+            self._on_signal_recorded(persisted)
+        return persisted
+
+    def _load_live_profile(self, *, run: StrategyRun) -> LiveStrategyProfile | None:
+        if self._live_profile_repository is None:
+            return None
+        return self._live_profile_repository.get_for_strategy(
+            owner_user_id=run.user_id,
+            strategy_id=run.strategy_id,
+        )
 
     def _repair_gap(
         self,
@@ -584,7 +676,12 @@ class StrategyLiveRunner:
 
             if expected_cursor >= target_ts_open:
                 for repaired in contiguous_rows:
-                    run = self._accept_contiguous_candle(run=run, spec=spec, candle=repaired)
+                    run = self._accept_contiguous_candle(
+                        run=run,
+                        spec=spec,
+                        candle=repaired,
+                        source_message_id=f"repair:{_isoformat_utc(repaired.candle.ts_open.value)}",
+                    )
                 self._publish_snapshot_metrics(
                     run=run,
                     spec=spec,
@@ -1485,6 +1582,29 @@ def _parse_iso_utc(*, text: str) -> datetime:
     """
     normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
     return UtcTimestamp(datetime.fromisoformat(normalized)).value
+
+
+def _signal_id(*, run: StrategyRun, candle: CandleWithMeta) -> UUID:
+    key = (
+        "roehub.strategy_signal.v1:"
+        f"{run.user_id}:"
+        f"{run.strategy_id}:"
+        f"{run.run_id}:"
+        f"{_isoformat_utc(candle.candle.ts_open.value)}"
+    )
+    return uuid5(NAMESPACE_URL, key)
+
+
+def _mode_reason_code(*, mode: str, reason_code: str) -> str:
+    if reason_code == "unsupported_live_evaluator":
+        return reason_code
+    if mode == "monitor_only" and reason_code.startswith("ma_fast_crossed_"):
+        return f"{reason_code}_monitor_only_no_intent"
+    if mode == "paper" and reason_code.startswith("ma_fast_crossed_"):
+        return f"{reason_code}_paper_no_order_stage05"
+    if mode == "live" and reason_code.startswith("ma_fast_crossed_"):
+        return f"{reason_code}_live_no_order_stage05"
+    return reason_code
 
 
 def _isoformat_utc(value: datetime) -> str:

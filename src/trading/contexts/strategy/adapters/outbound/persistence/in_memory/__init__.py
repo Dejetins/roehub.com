@@ -6,6 +6,7 @@ from .strategy_backtest_variant_provenance_repository import (
 from .strategy_event_repository import InMemoryStrategyEventRepository
 from .strategy_repository import InMemoryStrategyRepository
 from .strategy_run_repository import InMemoryStrategyRunRepository
+from .strategy_signal_repository import InMemoryStrategySignalRepository
 
 __all__ = [
     "InMemoryStrategyBacktestVariantProvenanceRepository",
@@ -14,4 +15,5 @@ __all__ = [
     "InMemoryLiveStrategyProfileRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
+    "InMemoryStrategySignalRepository",
 ]

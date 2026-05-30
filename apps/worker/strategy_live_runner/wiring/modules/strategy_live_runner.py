@@ -21,8 +21,10 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
 from trading.contexts.strategy.adapters.outbound import (
     LogOnlyTelegramNotifier,
     PostgresConfirmedTelegramChatBindingResolver,
+    PostgresLiveStrategyProfileRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
+    PostgresStrategySignalRepository,
     PsycopgStrategyPostgresGateway,
     RedisStrategyLiveCandleStream,
     RedisStrategyLiveCandleStreamConfig,
@@ -43,6 +45,7 @@ from trading.contexts.strategy.application import (
     StrategyLiveRunnerIterationReport,
     TelegramNotificationPolicy,
 )
+from trading.contexts.strategy.domain.entities import StrategySignal
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +128,11 @@ class StrategyLiveRunnerMetrics:
             "strategy_telegram_notify_skipped_total",
             "Strategy telegram notifications skipped due to missing confirmed chat binding",
         )
+        self.strategy_signal_total = Counter(
+            "strategy_signal_total",
+            "Strategy live evaluator journal outcomes",
+            ("mode", "action", "outcome"),
+        )
 
     def observe_iteration(
         self,
@@ -194,6 +202,13 @@ class StrategyLiveRunnerMetrics:
             on_notify_error=self.telegram_notify_errors_total.inc,
             on_notify_skipped=self.telegram_notify_skipped_total.inc,
         )
+
+    def observe_strategy_signal(self, signal: StrategySignal) -> None:
+        self.strategy_signal_total.labels(
+            mode=signal.mode,
+            action=signal.signal_action,
+            outcome=signal.outcome,
+        ).inc()
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,6 +326,8 @@ def build_strategy_live_runner_app(
     postgres_gateway = PsycopgStrategyPostgresGateway(dsn=strategy_pg_dsn)
     strategy_repository = PostgresStrategyRepository(gateway=postgres_gateway)
     run_repository = PostgresStrategyRunRepository(gateway=postgres_gateway)
+    signal_repository = PostgresStrategySignalRepository(gateway=postgres_gateway)
+    live_profile_repository = PostgresLiveStrategyProfileRepository(gateway=postgres_gateway)
 
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
@@ -393,11 +410,14 @@ def build_strategy_live_runner_app(
         run_repository=run_repository,
         live_candle_stream=live_candle_stream,
         canonical_candle_reader=canonical_reader,
+        signal_repository=signal_repository,
         clock=SystemStrategyClock(),
         sleeper=SystemRunnerSleeper(),
         repair_retry_attempts=runtime_config.repair.retry_attempts,
         repair_backoff_seconds=runtime_config.repair.retry_backoff_seconds,
         realtime_output_publisher=realtime_output_publisher,
+        live_profile_repository=live_profile_repository,
+        on_signal_recorded=metrics.observe_strategy_signal,
         telegram_notifier=telegram_notifier,
         telegram_notification_policy=telegram_notification_policy,
     )

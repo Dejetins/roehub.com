@@ -30,6 +30,7 @@ from .repositories import (
     StrategyExchangeBindingRepository,
     StrategyRepository,
     StrategyRunRepository,
+    StrategySignalRepository,
 )
 from .sleeper import StrategyRunnerSleeper
 from .telegram_notifier import (
@@ -58,6 +59,7 @@ __all__ = [
     "StrategyRepository",
     "StrategyRunnerSleeper",
     "StrategyRunRepository",
+    "StrategySignalRepository",
     "METRIC_TYPES_V1",
     "EVENT_TYPES_V1",
     "SCHEMA_VERSION_V1",

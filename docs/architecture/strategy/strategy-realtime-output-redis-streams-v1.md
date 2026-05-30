@@ -71,6 +71,17 @@
 
 > Non-goal: gap-repair и rollup события (шум для пользователя). Они остаются как метрики/внутренний дебаг при необходимости.
 
+### Stage 05 signal visibility
+
+`StrategySignal` decisions are durable Postgres journal rows in
+`strategy_signals`. The browser-visible latest signal panel reads the bounded
+API/dashboard projection, not the Redis realtime stream. Redis realtime output
+continues to carry run metrics/events only in v1.
+
+Stage 05 worker metrics add `strategy_signal_total{mode,action,outcome}` with
+bounded labels. Labels must never include user ids, strategy ids, signal ids,
+instrument keys, raw reason text, exchange payloads or credentials.
+
 ## Non-goals
 
 - WebSocket/SSE gateway для UI (только запись в Redis Streams).

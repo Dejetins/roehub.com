@@ -26,10 +26,12 @@ from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
+    InMemoryStrategySignalRepository,
     PostgresLiveStrategyProfileRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
+    PostgresStrategySignalRepository,
     PsycopgStrategyPostgresGateway,
     SystemStrategyClock,
     load_strategy_runtime_config,
@@ -53,6 +55,7 @@ from trading.contexts.strategy.application import (
     StrategyEventRepository,
     StrategyRepository,
     StrategyRunRepository,
+    StrategySignalRepository,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -431,6 +434,21 @@ def _build_live_profile_repository(
             f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
         )
     return InMemoryLiveStrategyProfileRepository()
+
+
+def _build_signal_repository(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> StrategySignalRepository:
+    if settings.postgres_dsn:
+        return PostgresStrategySignalRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        )
+    if settings.fail_fast:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
+        )
+    return InMemoryStrategySignalRepository()
 
 
 

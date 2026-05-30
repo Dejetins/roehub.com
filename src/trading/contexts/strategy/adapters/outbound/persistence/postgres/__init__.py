@@ -7,6 +7,7 @@ from .strategy_backtest_variant_provenance_repository import (
 from .strategy_event_repository import PostgresStrategyEventRepository
 from .strategy_repository import PostgresStrategyRepository
 from .strategy_run_repository import PostgresStrategyRunRepository
+from .strategy_signal_repository import PostgresStrategySignalRepository
 
 __all__ = [
     "PostgresStrategyBacktestVariantProvenanceRepository",
@@ -15,6 +16,7 @@ __all__ = [
     "PostgresLiveStrategyProfileRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
+    "PostgresStrategySignalRepository",
     "PsycopgStrategyPostgresGateway",
     "StrategyPostgresGateway",
 ]

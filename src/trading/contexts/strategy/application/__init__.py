@@ -29,12 +29,15 @@ from .ports import (
     StrategyRepository,
     StrategyRunnerSleeper,
     StrategyRunRepository,
+    StrategySignalRepository,
     StrategyTelegramNotificationEventV1,
     StrategyTelegramNotificationV1,
     TelegramNotifier,
     serialize_realtime_event_payload_json,
 )
 from .services import (
+    EVALUATOR_VERSION_V1,
+    SignalEvaluatorDecision,
     StrategyLiveRunner,
     StrategyLiveRunnerIterationReport,
     TelegramNotificationPolicy,
@@ -42,6 +45,7 @@ from .services import (
     TimeframeRollupProgress,
     TimeframeRollupStep,
     estimate_strategy_warmup_bars,
+    evaluate_strategy_signal,
 )
 from .use_cases import (
     CloneStrategyUseCase,
@@ -101,6 +105,9 @@ __all__ = [
     "RestartStrategyUseCase",
     "StrategyLiveRunner",
     "StrategyLiveRunnerIterationReport",
+    "EVALUATOR_VERSION_V1",
+    "SignalEvaluatorDecision",
+    "evaluate_strategy_signal",
     "StrategyLiveCandleMessage",
     "StrategyLiveCandleStream",
     "StrategyClock",
@@ -111,6 +118,7 @@ __all__ = [
     "StrategyRepository",
     "StrategyRunnerSleeper",
     "StrategyRunRepository",
+    "StrategySignalRepository",
     "TelegramNotificationPolicy",
     "TimeframeRollupPolicy",
     "TimeframeRollupProgress",
