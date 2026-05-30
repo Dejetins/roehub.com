@@ -6,8 +6,8 @@ submission.
 
 Date: 2026-05-31.
 
-Status: implementation complete locally; runtime acceptance and direct-main
-delivery pending.
+Status: accepted; direct-main delivered; CI/deploy and Mac Studio/public runtime
+evidence complete.
 
 ## Scope
 
@@ -38,7 +38,7 @@ Out of scope:
 |---|---|---|
 | Stage `04` accepted before Stage `05`. | Ledger status says Stage `04` accepted with direct-main delivery, CI/deploy and production runtime evidence complete. | Pass. |
 | Work on `main`, no stage branch or PR. | Local checkout is `main...origin/main`; worktree was clean before implementation. | Pass. |
-| Runtime acceptance is not tests-only. | Local gates passed; runtime boundary evidence still pending. | Pending. |
+| Runtime acceptance is not tests-only. | Mac Studio production runtime proof recorded controlled Redis candle input, `strategy_signals` rows, API/browser signal journal, worker metric labels, realtime output streams, and absence of execution streams/messages. | Pass. |
 
 ## Files Changed
 
@@ -127,19 +127,78 @@ order intent, paper order, execution stream or exchange call.
 | Focused runner/repository/API/migration tests | `uv run pytest -q tests/unit/contexts/strategy/application/test_strategy_live_runner.py tests/unit/contexts/strategy/adapters/test_postgres_strategy_repositories.py tests/unit/apps/api/test_ui_strategy_dashboard_routes.py tests/unit/apps/migrations/test_strategy_signals_sql.py` | `30 passed`. |
 | Focused lint | `uv run ruff check src/trading/contexts/strategy apps tests/unit/contexts/strategy tests/unit/apps` | Passed. |
 | Focused type checking | `uv run pyright src/trading/contexts/strategy apps tests/unit/contexts/strategy tests/unit/apps` | `0 errors, 0 warnings, 0 informations`. |
+| Full publish gates | `uv run ruff check . && uv run pyright && uv run pytest -q -ra && uv run python -m tools.docs.generate_docs_index --check && git diff --check` | Ruff passed; Pyright `0 errors`; pytest `1015 passed, 3 warnings` (existing httpx cookie deprecations); docs index check passed; diff check passed. |
 
 ## Runtime Evidence
 
-Pending. Required before acceptance:
+Commit and delivery:
 
-- inject or replay controlled closed candles through the live-runner runtime
-  boundary;
-- query `strategy_signals` rows for `warmup`, `no_signal`, `signal` and
-  `blocked`;
-- prove Market-data Redis stream input with `XINFO`/`XRANGE`;
-- prove no execution dispatch streams/messages were created;
-- prove `/strategies` latest journal in browser/API after refresh;
-- prove worker metrics include bounded `strategy_signal_total` labels.
+- implementation commit: `17c56b36 feat: add live strategy signal journal`;
+- GitHub CI `26696418272`: success;
+- Deploy Backend `26696449721`: success; migration/bootstrap ran and backend
+  smoke passed;
+- Publish App Image `26696449720`: success with a non-fatal Docker cache
+  reservation warning;
+- Deploy Web `26696468892`: success; public edge smoke passed;
+- Mac Studio `scripts/macos/smoke_prod.sh`: pass after deploy.
+
+Controlled Stage 05 production smoke:
+
+- smoke id: `stage05-8327e2ae4fc0`;
+- controlled Redis stream:
+  `md.candles.1m.codexstage0572d2ed:spot:BTCUSDT`;
+- runner report from the live-runner service path:
+  `polled_runs=3`, `active_instruments=1`, `read_messages=4`,
+  `acked_messages=4`, `failed_runs=1`;
+- Postgres `strategy_signals` rows for the smoke user: `9`;
+- monitor-only strategy outcomes:
+  `warmup`, `warmup`, `no_signal`, `signal`;
+- latest monitor-only signal:
+  `action=open`, `side=buy`,
+  `reason_code=ma_fast_crossed_above_slow_monitor_only_no_intent`;
+- paper profile signal:
+  `action=open`, `side=buy`,
+  `reason_code=ma_fast_crossed_above_slow_paper_no_order_stage05`;
+- unsupported variant:
+  `outcome=blocked`, `reason_code=unsupported_live_evaluator`, run state
+  `failed`, `last_error=unsupported_live_evaluator`;
+- `expected_order_json` proof: `0` rows for the smoke user had a non-empty
+  expected-order payload;
+- execution boundary proof:
+  `to_regclass('public.execution_intents') = NULL`, Redis scan for
+  `*execution*` returned `0` keys.
+
+Redis/runtime proof:
+
+- `XINFO STREAM` length for the controlled market-data stream: `4`;
+- `XRANGE` sample count: `4`;
+- consumer group pending count after ack: `0`;
+- realtime output streams were written:
+  metrics stream length `85`, events stream length `5`;
+- bounded worker metric labels were emitted in-process:
+  `strategy_signal_total{action="none",mode="monitor_only",outcome="warmup"} 2.0`,
+  `strategy_signal_total{action="open",mode="monitor_only",outcome="signal"} 1.0`,
+  `strategy_signal_total{action="none",mode="monitor_only",outcome="no_signal"} 1.0`.
+
+API/browser proof:
+
+- internal API
+  `/ui/strategies/dashboard?strategy_id=2362df73-913a-4a64-8173-805285ef0315&state=all&refresh=manual`
+  returned `signal_journal.source=strategy_signals`,
+  `signal_journal.state=ready`, `signal_journal.items=4`;
+- Playwright CLI against public `https://roehub.com/strategies` with the
+  temporary smoke session rendered `rows=4`, `state=ready`, and visible
+  `ma_fast_crossed_above_slow_monitor_only_no_intent`;
+- screenshot:
+  `output/playwright/stage05-strategies-signals.png`.
+
+Cleanup:
+
+- temporary smoke session was revoked;
+- two synthetic active smoke runs were moved to `stopped`;
+- post-cleanup active smoke runs: `0`;
+- durable smoke strategies/signals remain as inert audit evidence owned by the
+  temporary smoke user.
 
 ## Error Behavior
 
