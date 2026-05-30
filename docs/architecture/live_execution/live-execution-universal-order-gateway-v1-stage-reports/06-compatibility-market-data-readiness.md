@@ -151,7 +151,8 @@ Commit and delivery:
   smoke passed;
 - Publish App Image `26697309566`: success with a non-fatal Docker cache
   reservation warning;
-- Deploy Web `26697309568`: success;
+- Deploy Web `26697309568`: success; follow-up Deploy Web run `26697329959`
+  initially hit a transient public-edge smoke failure and passed after rerun;
 - Mac Studio `scripts/macos/smoke_prod.sh`: pass after deploy.
 
 Controlled Stage 06 production smoke:
