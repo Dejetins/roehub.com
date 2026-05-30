@@ -37,6 +37,11 @@ _STRATEGY_VARIANT_LAUNCH_TOTAL = Counter(
     "Strategy create-from-backtest-variant attempts by result.",
     ("result", "reason"),
 )
+_LIVE_STRATEGY_PROFILE_READINESS_TOTAL = Counter(
+    "live_strategy_profile_readiness_total",
+    "Live strategy profile readiness evaluations by result.",
+    ("status", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -143,6 +148,17 @@ def record_strategy_variant_launch(*, result: str, reason: str = "none") -> None
     _STRATEGY_VARIANT_LAUNCH_TOTAL.labels(result=result, reason=reason).inc()
 
 
+def record_live_strategy_profile_readiness(*, status: str, reason: str) -> None:
+    """
+    Record one profile readiness result without user, strategy, or connection labels.
+    """
+    bounded_reason = reason if reason else "unknown"
+    _LIVE_STRATEGY_PROFILE_READINESS_TOTAL.labels(
+        status=status,
+        reason=bounded_reason[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -173,5 +189,6 @@ def _resolve_path_label(*, request: Request) -> str:
 __all__ = [
     "build_metrics_response",
     "install_metrics_middleware",
+    "record_live_strategy_profile_readiness",
     "record_strategy_variant_launch",
 ]

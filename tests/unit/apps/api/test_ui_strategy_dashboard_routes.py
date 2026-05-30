@@ -86,6 +86,9 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["selected_strategy"]["status"] == "live"
     assert payload["selected_strategy"]["exchange"] == "binance"
     assert payload["selected_strategy"]["symbols"] == ["BTCUSDT"]
+    assert payload["live_profile"]["mode"] == "monitor_only"
+    assert payload["live_profile"]["readiness_status"] == "ready"
+    assert payload["live_profile"]["readiness_reason"] == "monitor_only_no_exchange_submit"
     assert payload["strategy_selector"]["filters"]["state"] == "active"
     assert payload["strategy_selector"]["totals"]["strategies"] == 1
     assert payload["strategy_selector"]["items"][0]["status"] == "live"
@@ -109,6 +112,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     source_statuses = {source["name"]: source["status"] for source in payload["sources"]}
     assert source_statuses["strategy_strategies"] == "available"
     assert source_statuses["strategy_runs"] == "available"
+    assert source_statuses["strategy_live_profiles"] == "unavailable"
     assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"

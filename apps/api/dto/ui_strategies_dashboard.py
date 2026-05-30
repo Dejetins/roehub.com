@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -56,6 +57,24 @@ class StrategyDashboardSelectedStrategyResponse(BaseModel):
     run_state: str | None
     latest_update: datetime | None
     actions: StrategyDashboardActionsResponse
+    degradation_reason: str | None = None
+
+
+class StrategyDashboardLiveProfileResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    mode: Literal["monitor_only", "paper", "live"]
+    exchange_connection_id: str | None
+    sizing_method: Literal["fixed_quote", "fixed_equity_pct"]
+    sizing_value: Decimal
+    max_position_notional: Decimal | None
+    max_orders_per_run: int
+    max_notional_per_run: Decimal
+    readiness_status: Literal["ready", "blocked"]
+    readiness_reason: str
+    updated_at: datetime | None
     degradation_reason: str | None = None
 
 
@@ -291,6 +310,7 @@ class StrategyDashboardResponse(BaseModel):
     retry_after_seconds: int | None
     sources: list[StrategyDashboardSourceResponse]
     selected_strategy: StrategyDashboardSelectedStrategyResponse
+    live_profile: StrategyDashboardLiveProfileResponse
     strategy_selector: StrategyDashboardSelectorResponse
     chart: StrategyChartResponse
     metric_grid: StrategyMetricGridResponse

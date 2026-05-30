@@ -4,6 +4,10 @@ from .backtest_variant_launch_reader import (
 )
 from .clock import StrategyClock
 from .current_user import CurrentUser, CurrentUserProvider
+from .exchange_connection_readiness import (
+    ExchangeConnectionReadiness,
+    ExchangeConnectionReadinessChecker,
+)
 from .live_candle_stream import StrategyLiveCandleMessage, StrategyLiveCandleStream
 from .realtime_output_publisher import (
     EVENT_TYPES_V1,
@@ -20,6 +24,7 @@ from .realtime_output_publisher import (
     serialize_realtime_event_payload_json,
 )
 from .repositories import (
+    LiveStrategyProfileRepository,
     StrategyBacktestVariantProvenanceRepository,
     StrategyEventRepository,
     StrategyExchangeBindingRepository,
@@ -47,6 +52,9 @@ __all__ = [
     "StrategyBacktestVariantProvenanceRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
+    "LiveStrategyProfileRepository",
+    "ExchangeConnectionReadiness",
+    "ExchangeConnectionReadinessChecker",
     "StrategyRepository",
     "StrategyRunnerSleeper",
     "StrategyRunRepository",

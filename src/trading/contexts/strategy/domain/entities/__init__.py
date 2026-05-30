@@ -1,4 +1,10 @@
 from .exchange_binding import StrategyExchangeBinding
+from .live_strategy_profile import (
+    LiveStrategyProfile,
+    LiveStrategyProfileMode,
+    LiveStrategyProfileReadinessStatus,
+    LiveStrategyProfileSizingMethod,
+)
 from .strategy import Strategy
 from .strategy_backtest_variant_provenance import StrategyBacktestVariantProvenance
 from .strategy_event import StrategyEvent
@@ -7,6 +13,10 @@ from .strategy_spec_v1 import STRATEGY_SPEC_KIND_V1, StrategySpecV1
 
 __all__ = [
     "STRATEGY_SPEC_KIND_V1",
+    "LiveStrategyProfile",
+    "LiveStrategyProfileMode",
+    "LiveStrategyProfileReadinessStatus",
+    "LiveStrategyProfileSizingMethod",
     "StrategyExchangeBinding",
     "Strategy",
     "StrategyBacktestVariantProvenance",

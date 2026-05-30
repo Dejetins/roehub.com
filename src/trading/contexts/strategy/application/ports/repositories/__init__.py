@@ -1,4 +1,5 @@
 from .exchange_binding_repository import StrategyExchangeBindingRepository
+from .live_strategy_profile_repository import LiveStrategyProfileRepository
 from .strategy_backtest_variant_provenance_repository import (
     StrategyBacktestVariantProvenanceRepository,
 )
@@ -10,6 +11,7 @@ __all__ = [
     "StrategyBacktestVariantProvenanceRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
+    "LiveStrategyProfileRepository",
     "StrategyRepository",
     "StrategyRunRepository",
 ]

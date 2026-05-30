@@ -388,6 +388,34 @@ Contract:
 * credential rotation remains allowed because the binding uses stable
   `connection_id`, not a credential version id.
 
+## Live Strategy Profile
+
+Stage `03` of `live-execution-universal-order-gateway-v1` adds
+`LiveStrategyProfile` as an additive Strategy API contract. `StrategySpecV1`
+continues to describe immutable strategy logic; the profile describes launch
+mode, optional exchange binding, sizing, limits and readiness.
+
+Additive endpoints:
+
+* `POST /api/strategies/{strategy_id}/live-profile`
+* `GET /api/strategies/{strategy_id}/live-profile`
+* `PUT /api/strategies/{strategy_id}/live-profile`
+* `GET /api/strategies/{strategy_id}/live-profile/readiness`
+
+Contract:
+
+* a newly created profile defaults to `monitor_only` with no exchange submit;
+* supported modes are `monitor_only`, `paper` and `live`;
+* supported sizing methods are `fixed_quote` and `fixed_equity_pct`;
+* `paper` remains non-money-moving in this stage;
+* `live` readiness fails closed unless the request has recent Keycloak
+  authentication and the configured `exchange_connection_id` is eligible for
+  trading through the non-secret exchange-control readiness projection;
+* Strategy API does not decrypt exchange credentials, call exchange SDKs or
+  submit orders;
+* readiness results are persisted and exposed on the `/strategies` dashboard
+  as a browser-visible profile panel.
+
 ## Связанные файлы
 
 * `src/trading/platform/errors/__init__.py` — стабильный экспорт ошибок

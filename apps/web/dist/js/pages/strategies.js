@@ -198,6 +198,30 @@ function renderSelected(root, selected) {
   setText("[data-command-state]", selected?.state === "ready" ? t("strategies.status.ready") : t("strategies.status.degraded"), root);
 }
 
+function renderLiveProfile(root, profile) {
+  const readiness = profile?.readiness_status || "blocked";
+  const reason = profile?.readiness_reason || "live_profile_unavailable";
+  setText("[data-profile-readiness]", `${readiness}: ${reason}`, root);
+  setText("[data-profile-mode]", profile?.mode || "monitor_only", root);
+  setText("[data-profile-exchange]", profile?.exchange_connection_id || "--", root);
+  setText(
+    "[data-profile-sizing]",
+    `${profile?.sizing_method || "fixed_quote"} / ${valueOrUnavailable(profile?.sizing_value)}`,
+    root,
+  );
+  setText(
+    "[data-profile-limits]",
+    `${t("strategies.profile.max_orders")}: ${valueOrUnavailable(profile?.max_orders_per_run)} / ${t("strategies.profile.max_notional")}: ${valueOrUnavailable(profile?.max_notional_per_run)}`,
+    root,
+  );
+  setText("[data-profile-reason]", reason, root);
+  setText("[data-profile-updated]", localTime(profile?.updated_at), root);
+  const panel = qs(".strategies-live-profile", root);
+  if (panel instanceof HTMLElement) {
+    panel.dataset.readiness = readiness;
+  }
+}
+
 function renderMetrics(root, metricGrid) {
   const target = qs("[data-strategy-metrics]", root);
   if (!target) {
@@ -495,6 +519,7 @@ function renderFreshness(summary) {
 
 function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
+  renderLiveProfile(root, summary.live_profile);
   renderSelector(root, summary.strategy_selector, state.savedQuery);
   renderChart(root, summary, state);
   syncStatWorkspace(root, state.statMode || "overall");

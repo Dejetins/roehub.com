@@ -8,14 +8,17 @@ Docs:
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Callable, Mapping
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Callable, Literal, Mapping
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.requests import Request
 
+from apps.api.monitoring import record_live_strategy_profile_readiness
+from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
 from trading.contexts.strategy.application.use_cases import (
     CloneStrategyUseCase,
@@ -23,12 +26,16 @@ from trading.contexts.strategy.application.use_cases import (
     DeleteStrategyUseCase,
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
+    LiveStrategyProfileConfig,
+    LiveStrategyProfileService,
     RunStrategyUseCase,
     StopStrategyUseCase,
 )
-from trading.contexts.strategy.domain.entities import Strategy, StrategyRun
+from trading.contexts.strategy.domain.entities import LiveStrategyProfile, Strategy, StrategyRun
 
 CurrentUserProviderDependency = Callable[[Request], CurrentUserProvider]
+CurrentUserPrincipalDependency = Callable[[Request], CurrentUserPrincipal]
+_RECENT_AUTH_WINDOW = timedelta(minutes=10)
 
 
 class StrategyInstrumentIdRequest(BaseModel):
@@ -202,6 +209,35 @@ class StrategyRunResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+class LiveStrategyProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["monitor_only", "paper", "live"] = "monitor_only"
+    exchange_connection_id: UUID | None = None
+    sizing_method: Literal["fixed_quote", "fixed_equity_pct"] = "fixed_quote"
+    sizing_value: Decimal = Field(default=Decimal("0"), ge=0)
+    max_position_notional: Decimal | None = Field(default=None, ge=0)
+    max_orders_per_run: int = Field(default=0, ge=0)
+    max_notional_per_run: Decimal = Field(default=Decimal("0"), ge=0)
+
+
+class LiveStrategyProfileResponse(BaseModel):
+    profile_id: UUID
+    owner_user_id: UUID
+    strategy_id: UUID
+    mode: Literal["monitor_only", "paper", "live"]
+    exchange_connection_id: UUID | None
+    sizing_method: Literal["fixed_quote", "fixed_equity_pct"]
+    sizing_value: Decimal
+    max_position_notional: Decimal | None
+    max_orders_per_run: int
+    max_notional_per_run: Decimal
+    readiness_status: Literal["ready", "blocked"]
+    readiness_reason: str
+    created_at: datetime
+    updated_at: datetime
+
+
 
 def build_strategies_router(
     *,
@@ -213,6 +249,8 @@ def build_strategies_router(
     stop_use_case: StopStrategyUseCase,
     delete_use_case: DeleteStrategyUseCase,
     current_user_provider_dependency: CurrentUserProviderDependency,
+    live_profile_service: LiveStrategyProfileService | None = None,
+    current_user_principal_dependency: CurrentUserPrincipalDependency | None = None,
 ) -> APIRouter:
     """
     Build Strategy API router with immutable CRUD, clone, and run-control endpoints.
@@ -358,6 +396,108 @@ def build_strategies_router(
         strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
         return _to_strategy_response(strategy=strategy)
 
+    @router.post(
+        "/strategies/{strategy_id}/live-profile",
+        response_model=LiveStrategyProfileResponse,
+        status_code=201,
+    )
+    def post_strategy_live_profile(
+        strategy_id: UUID,
+        request: Request,
+        payload: LiveStrategyProfileRequest | None = None,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> LiveStrategyProfileResponse:
+        service = _require_live_profile_service(service=live_profile_service)
+        current_user = current_user_provider.require_current_user()
+        if payload is None:
+            profile = service.get_or_create_default(
+                strategy_id=strategy_id,
+                current_user=current_user,
+            )
+        else:
+            profile = service.update_profile(
+                strategy_id=strategy_id,
+                current_user=current_user,
+                config=_profile_request_to_config(request=payload),
+                recent_auth_confirmed=_recent_auth_confirmed(
+                    request=request,
+                    principal_dependency=current_user_principal_dependency,
+                ),
+            )
+        record_live_strategy_profile_readiness(
+            status=profile.readiness_status,
+            reason=profile.readiness_reason,
+        )
+        return _to_live_strategy_profile_response(profile=profile)
+
+    @router.get(
+        "/strategies/{strategy_id}/live-profile",
+        response_model=LiveStrategyProfileResponse,
+    )
+    def get_strategy_live_profile(
+        strategy_id: UUID,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> LiveStrategyProfileResponse:
+        service = _require_live_profile_service(service=live_profile_service)
+        current_user = current_user_provider.require_current_user()
+        profile = service.get_or_create_default(
+            strategy_id=strategy_id,
+            current_user=current_user,
+        )
+        return _to_live_strategy_profile_response(profile=profile)
+
+    @router.put(
+        "/strategies/{strategy_id}/live-profile",
+        response_model=LiveStrategyProfileResponse,
+    )
+    def put_strategy_live_profile(
+        strategy_id: UUID,
+        request: Request,
+        payload: LiveStrategyProfileRequest,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> LiveStrategyProfileResponse:
+        service = _require_live_profile_service(service=live_profile_service)
+        current_user = current_user_provider.require_current_user()
+        profile = service.update_profile(
+            strategy_id=strategy_id,
+            current_user=current_user,
+            config=_profile_request_to_config(request=payload),
+            recent_auth_confirmed=_recent_auth_confirmed(
+                request=request,
+                principal_dependency=current_user_principal_dependency,
+            ),
+        )
+        record_live_strategy_profile_readiness(
+            status=profile.readiness_status,
+            reason=profile.readiness_reason,
+        )
+        return _to_live_strategy_profile_response(profile=profile)
+
+    @router.get(
+        "/strategies/{strategy_id}/live-profile/readiness",
+        response_model=LiveStrategyProfileResponse,
+    )
+    def get_strategy_live_profile_readiness(
+        strategy_id: UUID,
+        request: Request,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> LiveStrategyProfileResponse:
+        service = _require_live_profile_service(service=live_profile_service)
+        current_user = current_user_provider.require_current_user()
+        profile = service.refresh_readiness(
+            strategy_id=strategy_id,
+            current_user=current_user,
+            recent_auth_confirmed=_recent_auth_confirmed(
+                request=request,
+                principal_dependency=current_user_principal_dependency,
+            ),
+        )
+        record_live_strategy_profile_readiness(
+            status=profile.readiness_status,
+            reason=profile.readiness_reason,
+        )
+        return _to_live_strategy_profile_response(profile=profile)
+
     @router.post("/strategies/{strategy_id}/run", response_model=StrategyRunResponse)
     def post_strategy_run(
         strategy_id: UUID,
@@ -499,6 +639,48 @@ def _overrides_request_to_payload(
     return payload
 
 
+def _profile_request_to_config(
+    *, request: LiveStrategyProfileRequest
+) -> LiveStrategyProfileConfig:
+    return LiveStrategyProfileConfig(
+        mode=request.mode,
+        exchange_connection_id=request.exchange_connection_id,
+        sizing_method=request.sizing_method,
+        sizing_value=request.sizing_value,
+        max_position_notional=request.max_position_notional,
+        max_orders_per_run=request.max_orders_per_run,
+        max_notional_per_run=request.max_notional_per_run,
+    )
+
+
+def _require_live_profile_service(
+    *, service: LiveStrategyProfileService | None
+) -> LiveStrategyProfileService:
+    if service is None:
+        from trading.platform.errors import RoehubError
+
+        raise RoehubError(
+            code="live_strategy_profile_unavailable",
+            message="Live strategy profile service is not configured",
+            details={},
+        )
+    return service
+
+
+def _recent_auth_confirmed(
+    *,
+    request: Request,
+    principal_dependency: CurrentUserPrincipalDependency | None,
+) -> bool:
+    if principal_dependency is None:
+        return False
+    principal = principal_dependency(request)
+    if principal.session_created_at is None:
+        return False
+    now = datetime.now(tz=principal.session_created_at.tzinfo)
+    return principal.session_created_at + _RECENT_AUTH_WINDOW >= now
+
+
 
 def _to_strategy_response(*, strategy: Strategy) -> StrategyResponse:
     """
@@ -534,6 +716,27 @@ def _to_strategy_response(*, strategy: Strategy) -> StrategyResponse:
             schema_version=strategy.spec.schema_version,
             spec_kind=strategy.spec.spec_kind,
         ),
+    )
+
+
+def _to_live_strategy_profile_response(
+    *, profile: LiveStrategyProfile
+) -> LiveStrategyProfileResponse:
+    return LiveStrategyProfileResponse(
+        profile_id=profile.profile_id,
+        owner_user_id=profile.owner_user_id.value,
+        strategy_id=profile.strategy_id,
+        mode=profile.mode,
+        exchange_connection_id=profile.exchange_connection_id,
+        sizing_method=profile.sizing_method,
+        sizing_value=profile.sizing_value,
+        max_position_notional=profile.max_position_notional,
+        max_orders_per_run=profile.max_orders_per_run,
+        max_notional_per_run=profile.max_notional_per_run,
+        readiness_status=profile.readiness_status,
+        readiness_reason=profile.readiness_reason,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
     )
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from math import ceil
 from typing import Literal, Mapping
 from uuid import UUID
@@ -16,6 +17,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyChartResponse,
     StrategyDashboardActionsResponse,
     StrategyDashboardFooterStatusResponse,
+    StrategyDashboardLiveProfileResponse,
     StrategyDashboardRefreshControlResponse,
     StrategyDashboardResponse,
     StrategyDashboardSelectedStrategyResponse,
@@ -36,6 +38,7 @@ from apps.api.routes.ui_strategies_dashboard import (
     build_ui_strategies_dashboard_router as build_ui_strategies_dashboard_api_router,
 )
 from apps.api.wiring.modules.strategy import (
+    _build_live_profile_repository,
     _build_repositories,
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
@@ -43,10 +46,11 @@ from apps.api.wiring.modules.strategy import (
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.repositories import (
+    LiveStrategyProfileRepository,
     StrategyRepository,
     StrategyRunRepository,
 )
-from trading.contexts.strategy.domain.entities import Strategy, StrategyRun
+from trading.contexts.strategy.domain.entities import LiveStrategyProfile, Strategy, StrategyRun
 from trading.shared_kernel.primitives import UserId
 
 _DEFAULT_REFRESH_INTERVAL_SECONDS = 15
@@ -61,6 +65,7 @@ _CANDLE_SOURCE = "market_candles"
 _TRADES_SOURCE = "execution_fills"
 _EVENTS_SOURCE = "strategy_events"
 _RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
+_LIVE_PROFILE_SOURCE = "strategy_live_profiles"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,10 +121,12 @@ class StrategyDashboardQueryService:
         *,
         strategy_repository: StrategyRepository | None,
         run_repository: StrategyRunRepository | None,
+        profile_repository: LiveStrategyProfileRepository | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
+        self._profile_repository = profile_repository
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -147,8 +154,14 @@ class StrategyDashboardQueryService:
             if selected_strategy is not None
             else None
         )
+        live_profile, live_profile_source = self._load_live_profile(
+            principal=principal,
+            strategy=selected_strategy,
+            generated_at=generated_at,
+        )
         sources = [
             *dynamic_sources,
+            live_profile_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name=_CANDLE_SOURCE,
@@ -202,6 +215,7 @@ class StrategyDashboardQueryService:
                 generated_at=generated_at,
                 requested_strategy_id=strategy_id,
             ),
+            live_profile=_build_live_profile(profile=live_profile, strategy=selected_strategy),
             strategy_selector=_build_strategy_selector(
                 strategies=strategies,
                 runs_by_strategy_id=runs_by_strategy_id,
@@ -236,6 +250,75 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_live_profile(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        generated_at: datetime,
+    ) -> tuple[LiveStrategyProfile | None, StrategyDashboardSourceResponse]:
+        if strategy is None:
+            return (
+                None,
+                _source(
+                    name=_LIVE_PROFILE_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="no selected strategy profile is available",
+                ),
+            )
+        if self._profile_repository is None:
+            return (
+                None,
+                _source(
+                    name=_LIVE_PROFILE_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="live profile repository is not configured",
+                ),
+            )
+        try:
+            profile = self._profile_repository.get_for_strategy(
+                owner_user_id=principal.user_id,
+                strategy_id=strategy.strategy_id,
+            )
+        except Exception as error:  # noqa: BLE001
+            return (
+                None,
+                _source(
+                    name=_LIVE_PROFILE_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=str(error),
+                ),
+            )
+        if profile is None:
+            return (
+                None,
+                _source(
+                    name=_LIVE_PROFILE_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    age_seconds=None,
+                    detail="live profile has not been created yet; safe default is monitor_only",
+                ),
+            )
+        return (
+            profile,
+            _source(
+                name=_LIVE_PROFILE_SOURCE,
+                status="available",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(
+                    generated_at=generated_at,
+                    observed_at=profile.updated_at,
+                ),
+                detail=f"{profile.mode} profile readiness {profile.readiness_status}",
             ),
         )
 
@@ -376,12 +459,15 @@ def build_strategy_dashboard_service(
         return StrategyDashboardQueryService(
             strategy_repository=None,
             run_repository=None,
+            profile_repository=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
+    profile_repository = _build_live_profile_repository(settings=settings)
     return StrategyDashboardQueryService(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
+        profile_repository=profile_repository,
     )
 
 
@@ -562,6 +648,68 @@ def _build_selected_strategy(
             can_stop=is_live,
         ),
         degradation_reason="stat_projection_unavailable",
+    )
+
+
+def _build_live_profile(
+    *,
+    profile: LiveStrategyProfile | None,
+    strategy: Strategy | None,
+) -> StrategyDashboardLiveProfileResponse:
+    if strategy is None:
+        return StrategyDashboardLiveProfileResponse(
+            source=_LIVE_PROFILE_SOURCE,
+            state="empty",
+            mode="monitor_only",
+            exchange_connection_id=None,
+            sizing_method="fixed_quote",
+            sizing_value=Decimal("0"),
+            max_position_notional=None,
+            max_orders_per_run=0,
+            max_notional_per_run=Decimal("0"),
+            readiness_status="blocked",
+            readiness_reason="strategy_read_model_empty",
+            updated_at=None,
+            degradation_reason="strategy_read_model_empty",
+        )
+    if profile is None:
+        return StrategyDashboardLiveProfileResponse(
+            source=_LIVE_PROFILE_SOURCE,
+            state="degraded",
+            mode="monitor_only",
+            exchange_connection_id=None,
+            sizing_method="fixed_quote",
+            sizing_value=Decimal("0"),
+            max_position_notional=None,
+            max_orders_per_run=0,
+            max_notional_per_run=Decimal("0"),
+            readiness_status="ready",
+            readiness_reason="monitor_only_no_exchange_submit",
+            updated_at=None,
+            degradation_reason="live_profile_not_created_default_monitor_only",
+        )
+    return StrategyDashboardLiveProfileResponse(
+        source=_LIVE_PROFILE_SOURCE,
+        state="ready" if profile.readiness_status == "ready" else "degraded",
+        mode=profile.mode,
+        exchange_connection_id=(
+            str(profile.exchange_connection_id)
+            if profile.exchange_connection_id is not None
+            else None
+        ),
+        sizing_method=profile.sizing_method,
+        sizing_value=profile.sizing_value,
+        max_position_notional=profile.max_position_notional,
+        max_orders_per_run=profile.max_orders_per_run,
+        max_notional_per_run=profile.max_notional_per_run,
+        readiness_status=profile.readiness_status,
+        readiness_reason=profile.readiness_reason,
+        updated_at=profile.updated_at,
+        degradation_reason=(
+            None
+            if profile.readiness_status == "ready"
+            else profile.readiness_reason
+        ),
     )
 
 

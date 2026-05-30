@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -9,6 +10,7 @@ from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_strategies_router
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
@@ -19,8 +21,10 @@ from trading.contexts.strategy.application import (
     CurrentUser,
     CurrentUserProvider,
     DeleteStrategyUseCase,
+    ExchangeConnectionReadiness,
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
+    LiveStrategyProfileService,
     RunStrategyUseCase,
     StopStrategyUseCase,
 )
@@ -147,6 +151,37 @@ class _HeaderCurrentUserDependency:
         return _StaticCurrentUserProvider(user_id=principal.user_id)
 
 
+class _HeaderCurrentUserPrincipalDependency:
+    def __init__(self, *, session_created_at: datetime | None = None) -> None:
+        self._session_created_at = session_created_at
+
+    def __call__(self, request: Request) -> CurrentUserPrincipal:
+        raw_user_id = request.headers.get("x-user-id")
+        if raw_user_id is None:
+            raise ValueError("x-user-id header is required for strategy route tests")
+        return CurrentUserPrincipal(
+            user_id=UserId.from_string(raw_user_id),
+            paid_level=PaidLevel.free(),
+            session_created_at=self._session_created_at,
+        )
+
+
+class _StaticExchangeReadinessChecker:
+    def __init__(self, *, eligible: bool, reason: str = "ready_for_trading") -> None:
+        self._eligible = eligible
+        self._reason = reason
+
+    def check_trading_ready(
+        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+    ) -> ExchangeConnectionReadiness:
+        return ExchangeConnectionReadiness(
+            eligible=self._eligible,
+            reason=self._reason,
+            exchange_name="binance",
+            market_type="spot",
+        )
+
+
 
 def _build_client() -> TestClient:
     """
@@ -166,6 +201,7 @@ def _build_client() -> TestClient:
     strategy_repository = InMemoryStrategyRepository()
     run_repository = InMemoryStrategyRunRepository()
     event_repository = InMemoryStrategyEventRepository()
+    profile_repository = InMemoryLiveStrategyProfileRepository()
     clock = _SequenceClock(
         start=datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc),
         steps=60,
@@ -202,11 +238,88 @@ def _build_client() -> TestClient:
             clock=clock,
         ),
         current_user_provider_dependency=_HeaderCurrentUserDependency(),
+        live_profile_service=LiveStrategyProfileService(
+            strategy_repository=strategy_repository,
+            profile_repository=profile_repository,
+            event_repository=event_repository,
+            clock=clock,
+            exchange_connection_checker=_StaticExchangeReadinessChecker(eligible=True),
+        ),
+        current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
+            session_created_at=datetime.now(timezone.utc),
+        ),
     )
 
     app = FastAPI()
     register_api_error_handlers(app=app)
     app.include_router(router)
+    return TestClient(app)
+
+
+def _build_live_profile_client(
+    *,
+    session_created_at: datetime | None,
+    exchange_eligible: bool = True,
+) -> TestClient:
+    strategy_repository = InMemoryStrategyRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    clock = _SequenceClock(
+        start=datetime(2026, 5, 30, 12, 0, tzinfo=timezone.utc),
+        steps=60,
+    )
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+    app.include_router(
+        build_strategies_router(
+            create_use_case=CreateStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            clone_use_case=CloneStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            list_use_case=ListMyStrategiesUseCase(repository=strategy_repository),
+            get_use_case=GetMyStrategyUseCase(repository=strategy_repository),
+            run_use_case=RunStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=InMemoryStrategyRunRepository(),
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            stop_use_case=StopStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=InMemoryStrategyRunRepository(),
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            delete_use_case=DeleteStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            current_user_provider_dependency=_HeaderCurrentUserDependency(),
+            live_profile_service=LiveStrategyProfileService(
+                strategy_repository=strategy_repository,
+                profile_repository=InMemoryLiveStrategyProfileRepository(),
+                event_repository=event_repository,
+                clock=clock,
+                exchange_connection_checker=_StaticExchangeReadinessChecker(
+                    eligible=exchange_eligible,
+                    reason=(
+                        "ready_for_trading"
+                        if exchange_eligible
+                        else "exchange_connection_not_ready_for_trading"
+                    ),
+                ),
+            ),
+            current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
+                session_created_at=session_created_at,
+            ),
+        )
+    )
     return TestClient(app)
 
 
@@ -238,7 +351,6 @@ def test_strategies_list_endpoint_returns_deterministic_sort_order() -> None:
 
     list_response = client.get("/strategies", headers=headers)
     assert list_response.status_code == 200
-
     items = list_response.json()
     assert len(items) == 2
 
@@ -247,6 +359,88 @@ def test_strategies_list_endpoint_returns_deterministic_sort_order() -> None:
         key=lambda item: (item["created_at"], item["strategy_id"]),
     )
     assert items == sorted_items
+
+
+def test_live_profile_defaults_to_monitor_only_and_blocks_live_without_recent_auth() -> None:
+    client = _build_live_profile_client(session_created_at=None)
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000001333"}
+    created_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    assert created_strategy.status_code == 201
+    strategy_id = created_strategy.json()["strategy_id"]
+
+    created_profile = client.post(f"/strategies/{strategy_id}/live-profile", headers=headers)
+    assert created_profile.status_code == 201
+    default_payload = created_profile.json()
+    assert default_payload["mode"] == "monitor_only"
+    assert default_payload["exchange_connection_id"] is None
+    assert default_payload["readiness_status"] == "ready"
+    assert default_payload["readiness_reason"] == "monitor_only_no_exchange_submit"
+
+    blocked_live = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e001",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "25",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "25",
+        },
+        headers=headers,
+    )
+    assert blocked_live.status_code == 200
+    blocked_payload = blocked_live.json()
+    assert blocked_payload["mode"] == "live"
+    assert blocked_payload["readiness_status"] == "blocked"
+    assert blocked_payload["readiness_reason"] == "recent_auth_required"
+    assert "api_secret" not in blocked_live.text
+
+
+def test_live_strategy_profile_allows_paper_and_recent_auth_live_with_ready_connection() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000001334"}
+    created_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="ETHUSDT"),
+        headers=headers,
+    )
+    assert created_strategy.status_code == 201
+    strategy_id = created_strategy.json()["strategy_id"]
+
+    paper = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "paper",
+            "sizing_method": "fixed_equity_pct",
+            "sizing_value": "0.15",
+            "max_orders_per_run": 3,
+            "max_notional_per_run": "100",
+        },
+        headers=headers,
+    )
+    assert paper.status_code == 200
+    assert paper.json()["readiness_reason"] == "paper_no_exchange_submit"
+
+    live = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e002",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_position_notional": "100",
+            "max_orders_per_run": 2,
+            "max_notional_per_run": "50",
+        },
+        headers=headers,
+    )
+    assert live.status_code == 200
+    assert live.json()["readiness_status"] == "ready"
+    assert live.json()["readiness_reason"] == "live_ready_recent_auth_and_connection"
 
 
 

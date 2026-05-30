@@ -123,6 +123,10 @@
   gap: 2px 14px;
 }
 
+.strategies-kv--profile {
+  grid-template-columns: 1fr;
+}
+
 .strategies-kv div {
   display: grid;
   grid-template-columns: minmax(86px, 0.48fr) minmax(0, 1fr);
@@ -414,6 +418,37 @@
 .strategies-selected-details {
   overflow: auto;
   scrollbar-gutter: stable;
+}
+
+.strategies-live-profile {
+  display: grid;
+  gap: 5px;
+  margin-block-start: 8px;
+  padding-block-start: 7px;
+  border-top: 1px solid var(--rh-divider);
+}
+
+.strategies-live-profile header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.strategies-live-profile h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--rh-accent-2);
+  font-size: 11px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.strategies-live-profile[data-readiness="blocked"] .strategies-pill {
+  color: var(--rh-financial-negative);
 }
 
 .strategies-library {

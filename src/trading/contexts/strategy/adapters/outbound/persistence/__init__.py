@@ -1,4 +1,5 @@
 from .in_memory import (
+    InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyBacktestVariantProvenanceRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyExchangeBindingRepository,
@@ -6,6 +7,7 @@ from .in_memory import (
     InMemoryStrategyRunRepository,
 )
 from .postgres import (
+    PostgresLiveStrategyProfileRepository,
     PostgresStrategyBacktestVariantProvenanceRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyExchangeBindingRepository,
@@ -19,11 +21,13 @@ __all__ = [
     "InMemoryStrategyBacktestVariantProvenanceRepository",
     "InMemoryStrategyEventRepository",
     "InMemoryStrategyExchangeBindingRepository",
+    "InMemoryLiveStrategyProfileRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
     "PostgresStrategyBacktestVariantProvenanceRepository",
     "PostgresStrategyEventRepository",
     "PostgresStrategyExchangeBindingRepository",
+    "PostgresLiveStrategyProfileRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PsycopgStrategyPostgresGateway",

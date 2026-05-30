@@ -168,6 +168,20 @@
               <div><dt>{{ t("strategies.selected.runs") }}</dt><dd data-selected-run-state>--</dd></div>
               <div><dt>{{ t("strategies.selected.updated") }}</dt><dd data-selected-updated>--</dd></div>
             </dl>
+            <section class="strategies-live-profile" aria-label="{{ t('strategies.profile.title') }}">
+              <header>
+                <h3>{{ t("strategies.profile.title") }}</h3>
+                <span class="strategies-pill" data-profile-readiness>--</span>
+              </header>
+              <dl class="strategies-kv strategies-kv--profile">
+                <div><dt>{{ t("strategies.profile.mode") }}</dt><dd data-profile-mode>monitor_only</dd></div>
+                <div><dt>{{ t("strategies.profile.exchange") }}</dt><dd data-profile-exchange>--</dd></div>
+                <div><dt>{{ t("strategies.profile.sizing") }}</dt><dd data-profile-sizing>--</dd></div>
+                <div><dt>{{ t("strategies.profile.limits") }}</dt><dd data-profile-limits>--</dd></div>
+                <div><dt>{{ t("strategies.profile.reason") }}</dt><dd data-profile-reason>--</dd></div>
+                <div><dt>{{ t("strategies.profile.updated") }}</dt><dd data-profile-updated>--</dd></div>
+              </dl>
+            </section>
           </section>
         </div>
       </section>

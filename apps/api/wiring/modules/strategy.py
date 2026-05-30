@@ -8,17 +8,25 @@ Docs:
 
 from dataclasses import dataclass
 from typing import Mapping
+from uuid import UUID
 
 from fastapi import APIRouter
 from starlette.requests import Request
 
+from apps.api.exchange_control_client import (
+    ExchangeControlClient,
+    ExchangeControlClientError,
+    build_exchange_control_client_from_environ,
+)
 from apps.api.routes import build_strategies_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.adapters.outbound import (
+    InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
+    PostgresLiveStrategyProfileRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
@@ -33,14 +41,19 @@ from trading.contexts.strategy.application import (
     CurrentUser,
     CurrentUserProvider,
     DeleteStrategyUseCase,
+    ExchangeConnectionReadiness,
+    ExchangeConnectionReadinessChecker,
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
+    LiveStrategyProfileRepository,
+    LiveStrategyProfileService,
     RunStrategyUseCase,
     StopStrategyUseCase,
     StrategyEventRepository,
     StrategyRepository,
     StrategyRunRepository,
 )
+from trading.shared_kernel.primitives import UserId
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
@@ -189,6 +202,58 @@ class StrategyCurrentUserProviderDependency:
         return IdentityPrincipalCurrentUserProvider(principal=principal)
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
+    client: ExchangeControlClient
+
+    def check_trading_ready(
+        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+    ) -> ExchangeConnectionReadiness:
+        try:
+            rows = self.client.list_connections(
+                owner_user_id=str(owner_user_id),
+                request_id="apps-api-live-profile-read-connection",
+            )
+        except ExchangeControlClientError:
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason="exchange_control_unavailable",
+            )
+        connection = next(
+            (row for row in rows if row.connection_id == str(exchange_connection_id)),
+            None,
+        )
+        if connection is None:
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason="exchange_connection_not_found",
+            )
+        if connection.status != "active":
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason="exchange_connection_not_active",
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+            )
+        if (
+            connection.effective_capability != "trading"
+            or connection.connection_readiness != "ready_for_trading"
+        ):
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason=connection.connection_readiness_reason
+                or "exchange_connection_not_ready_for_trading",
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+            )
+        return ExchangeConnectionReadiness(
+            eligible=True,
+            reason="ready_for_trading",
+            exchange_name=connection.exchange_name,
+            market_type=connection.market_type,
+        )
+
+
 
 def is_strategy_api_enabled(*, environ: Mapping[str, str]) -> bool:
     """
@@ -242,6 +307,7 @@ def build_strategy_router(
     """
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, event_repository = _build_repositories(settings=settings)
+    profile_repository = _build_live_profile_repository(settings=settings)
     clock = SystemStrategyClock()
 
     create_use_case = CreateStrategyUseCase(
@@ -273,6 +339,18 @@ def build_strategy_router(
         clock=clock,
         event_repository=event_repository,
     )
+    exchange_client = build_exchange_control_client_from_environ(environ=environ)
+    live_profile_service = LiveStrategyProfileService(
+        strategy_repository=strategy_repository,
+        profile_repository=profile_repository,
+        clock=clock,
+        event_repository=event_repository,
+        exchange_connection_checker=(
+            ExchangeControlReadinessChecker(client=exchange_client)
+            if exchange_client is not None
+            else None
+        ),
+    )
 
     current_user_provider_dependency = StrategyCurrentUserProviderDependency(
         current_user_dependency=current_user_dependency,
@@ -287,6 +365,8 @@ def build_strategy_router(
         stop_use_case=stop_use_case,
         delete_use_case=delete_use_case,
         current_user_provider_dependency=current_user_provider_dependency,
+        live_profile_service=live_profile_service,
+        current_user_principal_dependency=current_user_dependency,
     )
 
 
@@ -328,6 +408,21 @@ def _build_repositories(
         InMemoryStrategyRunRepository(),
         InMemoryStrategyEventRepository(),
     )
+
+
+def _build_live_profile_repository(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> LiveStrategyProfileRepository:
+    if settings.postgres_dsn:
+        return PostgresLiveStrategyProfileRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        )
+    if settings.fail_fast:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
+        )
+    return InMemoryLiveStrategyProfileRepository()
 
 
 
