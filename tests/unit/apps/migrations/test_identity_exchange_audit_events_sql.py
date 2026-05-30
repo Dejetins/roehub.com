@@ -22,6 +22,10 @@ def test_identity_exchange_audit_events_migration_extends_check_constraint() -> 
         "exchange_connection_archived",
         "exchange_connection_deleted",
         "exchange_connection_reclassified",
+        "exchange_connection_disconnect_blocked",
+        "strategy_exchange_binding_created",
+        "strategy_exchange_binding_disabled",
+        "strategy_exchange_binding_archived",
     ):
         assert event_type in sql
 
@@ -37,4 +41,8 @@ def test_identity_exchange_reclassification_audit_migration_is_additive() -> Non
 
     assert "ADD COLUMN IF NOT EXISTS target_id TEXT" in sql
     assert "exchange_connection_reclassified" in sql
+    assert "exchange_connection_disconnect_blocked" in sql
+    assert "strategy_exchange_binding_created" in sql
+    assert "strategy_exchange_binding_disabled" in sql
+    assert "strategy_exchange_binding_archived" in sql
     assert "idx_identity_audit_events_target_created" in sql
