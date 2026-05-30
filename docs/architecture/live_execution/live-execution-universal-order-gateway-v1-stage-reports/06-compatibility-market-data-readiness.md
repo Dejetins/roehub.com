@@ -5,8 +5,8 @@ readiness evidence before a strategy can be presented or run as ready.
 
 Date: 2026-05-31.
 
-Status: implemented locally; direct-main delivery and production runtime
-evidence pending.
+Status: accepted; direct-main delivered; CI/deploy and Mac Studio/public runtime
+evidence complete.
 
 ## Scope
 
@@ -42,7 +42,7 @@ Out of scope:
 |---|---|---|
 | Stage `05` accepted before Stage `06`. | Ledger status says Stage `05` accepted with direct-main delivery, CI/deploy and production runtime evidence complete. | Pass. |
 | Work on `main`, no stage branch or PR. | Local checkout is on `main`; prompt requires direct-main delivery. | Pass. |
-| Runtime acceptance is not tests-only. | Production API/DB/Redis/browser proof is still pending for this initial local implementation report. | Pending. |
+| Runtime acceptance is not tests-only. | Mac Studio production proof recorded API states, SQL rows, Redis stream readiness, browser readiness display, metrics, no execution streams, and cleanup. | Pass. |
 
 ## Files Changed
 
@@ -128,26 +128,122 @@ strategy/feed evidence is unsafe.
 | Broad stage tests | `uv run pytest -q tests/unit/contexts/backtest tests/unit/contexts/strategy tests/unit/contexts/market_data tests/unit/apps` | `786 passed, 3 warnings` from existing httpx cookie deprecations. |
 | Broad lint | `uv run ruff check src/trading/contexts/backtest src/trading/contexts/strategy src/trading/contexts/market_data apps tests` | Passed. |
 | Broad type checking | `uv run pyright src/trading/contexts/backtest src/trading/contexts/strategy src/trading/contexts/market_data apps tests` | `0 errors, 0 warnings`. |
+| Full publish lint | `uv run ruff check .` | Passed. |
+| Full publish type checking | `uv run pyright` | `0 errors, 0 warnings, 0 informations`. |
+| Full publish tests | `uv run pytest -q -ra` | `1018 passed, 3 warnings` from existing httpx cookie deprecations. |
+| Docs index | `uv run python -m tools.docs.generate_docs_index --check` | Passed. |
+| Diff whitespace | `git diff --check` | Passed. |
 
 ## Runtime Evidence
 
 Local runtime probes before delivery:
 
-- `pg_isready`: unavailable on this host;
-- `redis-cli`: unavailable on this host;
-- `docker`: unavailable on this host;
-- relevant local DB/Redis env variables: not set in the current shell.
+- `pg_isready`: unavailable on the workstation;
+- `redis-cli`: unavailable on the workstation;
+- `docker`: unavailable on the workstation;
+- relevant local DB/Redis env variables: not set in the workstation shell.
 
-Production direct-main evidence is pending. Stage `06` is not accepted until the
-deployed revision proves:
+Commit and delivery:
 
-- API compatibility/readiness calls for `launchable`, `not_launchable`,
-  `degraded`, owner-forbidden, and replay/read repeat cases;
-- SQL rows in `strategy_variant_compatibility_checks` and
-  `market_data_subscription_requirements`;
-- Redis `XINFO`/`XRANGE` for ready/stale/missing market-data streams and absence
-  of execution streams;
-- `/backtests` and `/strategies` browser readiness display.
+- implementation commit: `2001e415 feat: add strategy compatibility readiness`;
+- GitHub CI `26697234121`: success;
+- Deploy Backend `26697309560`: success; DB bootstrap/migrations and backend
+  smoke passed;
+- Publish App Image `26697309566`: success with a non-fatal Docker cache
+  reservation warning;
+- Deploy Web `26697309568`: success;
+- Mac Studio `scripts/macos/smoke_prod.sh`: pass after deploy.
+
+Controlled Stage 06 production smoke:
+
+- smoke id: `stage06-ff9f51650345`;
+- API strategy readiness states:
+  - `launchable/ready`: `200`, reason `supported_live_evaluator` +
+    `market_data_stream_ready`, `launch_blocked=false`;
+  - `launchable/missing`: `200`, reason `market_data_stream_missing`,
+    `launch_blocked=true`;
+  - `launchable/stale`: `200`, age `600s`, reason
+    `market_data_stream_stale`, `launch_blocked=true`;
+  - `launchable/pending`: `200`, empty stream, reason
+    `market_data_stream_empty`, `launch_blocked=true`;
+  - `degraded/ready`: `200`, reason `timeframe_rollup_required` +
+    `market_data_stream_ready_for_rollup`, `launch_blocked=false`;
+  - `not_launchable/ready`: `200`, reason `unsupported_live_evaluator`,
+    `launch_blocked=true`;
+- run proof:
+  - ready strategy `POST /strategies/{strategy_id}/run` returned `200
+    starting`;
+  - missing-feed strategy run returned `strategy_run.readiness_blocked` with
+    reason `market_data_stream_missing`;
+  - synthetic ready run was stopped and then manually moved from `stopping` to
+    `stopped` as cleanup because the worker did not drain the synthetic stream
+    within the smoke wait window;
+- backtest variant proof:
+  - controlled job `4d2fde8d-a8d9-4d2a-b688-31997d8dcd29` succeeded with `5`
+    top variants;
+  - selected variant
+    `job_4d2fde8dcd29__dema_close_w10__risk_none__vh_cee9b06e`;
+  - `GET /backtests/jobs/{job_id}/variants/{variant_key}/compatibility-readiness`
+    returned `200`, `not_launchable`, `unsupported_live_evaluator`, and feed
+    `ready`;
+  - repeat read returned `200`;
+  - foreign owner read returned `403` with
+    `strategy_variant_launch.forbidden`.
+
+Redis/runtime proof:
+
+- ready stream `md.candles.1m.binance:spot:C06READY43E2E7`: `XINFO length=1`;
+- stale stream `md.candles.1m.binance:spot:C06STALE43E2E7`: `XINFO length=1`,
+  last id timestamp produced `age_seconds=600`;
+- pending stream `md.candles.1m.binance:spot:C06PEND43E2E7`: `XINFO length=0`
+  after controlled `XADD`/`XDEL`;
+- missing stream `md.candles.1m.binance:spot:C06MISS43E2E7`: key absent;
+- Redis scan for `*execution*` returned `0` keys.
+
+Postgres proof for the smoke user:
+
+- `strategy_variant_compatibility_checks`: `10` rows;
+- `market_data_subscription_requirements`: `10` rows;
+- recorded compatibility states include `launchable`, `not_launchable`, and
+  `degraded`;
+- recorded readiness states include `ready`, `missing`, `stale`, and `pending`;
+- `to_regclass('public.execution_intents') = NULL`.
+
+Metrics proof from `/metrics`:
+
+- `strategy_variant_compatibility_total{state="launchable",reason="supported_live_evaluator"} 4`;
+- `strategy_variant_compatibility_total{state="degraded",reason="timeframe_rollup_required"} 1`;
+- `strategy_variant_compatibility_total{state="not_launchable",reason="unsupported_live_evaluator"} 3`;
+- `market_data_readiness_total{state="ready",reason="market_data_stream_ready"} 2`;
+- `market_data_readiness_total{state="missing",reason="market_data_stream_missing"} 1`;
+- `market_data_readiness_total{state="stale",reason="market_data_stream_stale"} 1`;
+- `market_data_readiness_total{state="pending",reason="market_data_stream_empty"} 1`;
+- `market_data_readiness_total{state="ready",reason="market_data_stream_ready_for_rollup"} 3`.
+
+Browser proof:
+
+- Playwright against `https://roehub.com/strategies` with the temporary smoke
+  session rendered `Compatibility launchable: supported_live_evaluator` and
+  `Market data stale: market_data_stream_stale` after the controlled ready
+  stream aged past the freshness threshold; rerun had `0` server `5xx`
+  responses;
+- Playwright against `https://roehub.com/backtests/{job_id}` rendered the
+  selected variant detail with `READINESS not_launchable:
+  unsupported_live_evaluator` and `FEED ready:
+  market_data_stream_ready_for_rollup`; `0` failed requests and `0` console
+  errors on the selected-variant proof;
+- screenshots:
+  - `output/playwright/stage06-strategies-readiness-rerun.png`;
+  - `output/playwright/stage06-backtests-readiness-selected.png`.
+
+Cleanup:
+
+- temporary Stage 06 smoke sessions revoked: `2`;
+- active Stage 06 smoke sessions after cleanup: `0`;
+- active smoke runs after cleanup: `0`;
+- durable smoke strategies, compatibility checks, market-data requirements, and
+  the completed backtest job remain as inert audit evidence owned by the
+  temporary smoke user.
 
 ## Error Behavior
 
