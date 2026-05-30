@@ -1,0 +1,177 @@
+# Live Trading Universal Order Gateway v1 — журнал итераций
+
+Журнал фиксирует выполнение stages для документа `docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md`.
+
+Статус: staged rollout not started.
+
+## Правила Журнала
+
+| Правило | Требование |
+|---|---|
+| Обновление после каждого stage | Исполнитель обязан обновить этот журнал после валидации stage: статус, evidence, blockers, contract impact, rollback, handoff. |
+| Tests не являются acceptance | Unit/integration tests, ruff, pyright и docs check обязательны как quality gates, но stage считается accepted только после реальных вызовов к нужным runtime-boundaries. |
+| No secret leakage | Нельзя писать API keys, secrets, cookies, tokens, raw Authorization headers, raw exchange responses с чувствительными полями. |
+| Dependent stages blocked | Если stage зависит от недоказанного сервиса или контракта, следующий stage не может быть принят как production-ready. |
+| Direct-main delivery | После successful validation stage может быть доставлен direct-main только если здесь записаны evidence, rollback path и deploy/CI status. |
+
+## Обязательные Поля Stage Report
+
+| Поле | Что фиксировать |
+|---|---|
+| Files changed | Все созданные/измененные code/config/docs/infra/test файлы. |
+| Documentation sync | Какие связанные docs обновлены, какие оставлены без изменения и почему. |
+| Service calls | Какие реальные API/internal/DB/Redis/exchange вызовы выполнены. |
+| Error behavior | Какие failure cases проверены фактическими вызовами, не только tests. |
+| Runtime config | Какие env/YAML/feature flags/kill switches добавлены или изменены, и какой fail-closed default доказан. |
+| Latency/slippage | Какие hot-path latency/slippage metrics собраны или почему stage еще не касается hot path. |
+| Logging/redaction | Доказательство, что logs/reports/artifacts не содержат secrets и signed payloads. |
+| Monitoring | Prometheus/Monit/health evidence, alert/runbook impact. |
+| Contract impact | Public/API, persistence, Redis, config, runtime, UI/browser. |
+| Rollback | Как безопасно отключить stage без потери ledger/audit данных. |
+
+## Stage Status
+
+| Stage | Назначение | Статус | Блокеры | Следующий handoff |
+|---|---|---|---|---|
+| `01` | Current-state baseline: Backtest results, Strategy CRUD/run/stop, Live Runner, Redis streams, exchange connections, bindings, runtime ops. | planned | none | Зафиксировать, какие endpoints/tables/streams/processes уже существуют и где отсутствуют launch/restart/signal/execution компоненты. |
+| `02` | Backtest variant -> immutable strategy creation. | planned | `01` accepted | Передать owner-scoped launchable variant contract, provenance, idempotency и rejected cases. |
+| `03` | `LiveStrategyProfile`: mode, exchange binding, sizing, limits, readiness. | planned | `02` accepted | Передать profile schema/API, safe defaults, readiness reasons и no-live-without-recent-auth evidence. |
+| `04` | Strategy run/stop/restart lifecycle hardening. | planned | `03` accepted | Передать run/restart command semantics, UI controls, one-active-run proof, worker pickup/drain evidence. |
+| `05` | Live signal evaluator and `StrategySignal` journal. | planned | `04` accepted | Передать evaluator contract, `/strategies` signal journal, mode behavior, signal/no-signal DB evidence, unsupported variant blocking. |
+| `06` | Strategy compatibility checker + market-data readiness/provisioning для backtest variants. | planned | `05` accepted | Передать launchable/not_launchable/degraded reason codes, market-data ready/missing/stale/pending evidence и UI readiness semantics. |
+| `07` | Exchange account state projection + exchange configuration guard. | planned | `06` accepted and exchange connection read-only credentials available | Передать account/balance/position/open-order/filter projection schema, exchange config verify-only policy, freshness policy, stale/config-mismatch fail-closed evidence. |
+| `08` | Strategy position ownership lock. | planned | `07` accepted | Передать ownership schema, unique active invariant, conflict/release/repair behavior. |
+| `09` | Capital reservation + paper execution + strategy-local accounting. | planned | `08` accepted | Передать capital reservation + paper orders/fills/accounting schema, fee/funding model, idempotency, UI reserved budget/PnL/position/completeness evidence, no real submit proof. |
+| `10` | Universal `ExecutionSourceEvent` + `ExecutionRequest` contract, explicit v1 order model, source registry, `ExecutionIntent` persistence. | planned | `09` accepted | Передать schema/API/idempotency contract for source events + intents, `market/limit` allowlist и advanced-order rejection без Redis/order submit. |
+| `11` | Source-aware authorization и risk gate v1. | planned | `10` accepted | Передать accepted/rejected reason codes, audit events, metrics и compatibility/market-data/account-config/account-state/capital-reservation/order-model/ownership/accounting/source/profile/run policy. |
+| `12` | Redis dispatch transport after accepted durable intent. | planned | `11` accepted | Передать stream names, consumer group, retry/backpressure/outage behavior, retry budget, DLQ/quarantine и ack-after-durable rule. |
+| `13` | `exchange-execution` supervised process skeleton. | planned | `12` accepted | Передать launchd/Monit/Prometheus health, ready/degraded semantics, process config, rate-limit/backpressure/DLQ и clock drift guards. |
+| `14` | Native Binance/Bybit testnet order adapters + private stream lifecycle skeleton. | planned | `13` accepted and testnet credentials available | Передать native adapter evidence with limiter/config/time/order-model guards, mainnet hard-block, private stream session/keepalive evidence, secret-clean report. |
+| `15` | Order/fill/funding ledger, private status updates, reconciliation, retention/partitioning, backup/PITR proof. | planned | `14` accepted | Передать lifecycle evidence, private stream reconnect/backfill, fee/funding reconciliation, terminal states, partition/retention/PITR dry-run. |
+| `16` | Producer integrations: Strategy from backtest-created profile, Manual, ML agent contract, notification outbox. | planned | `15` accepted | Передать доказательство, что все producers пишут source events и используют один ingress/risk/ledger path, плюс UI-visible link `strategy signal -> execution outcome` и redacted notification events. |
+| `17` | Production readiness: latency/slippage, canary protocol, deploy/ops proof. | planned | `16` accepted | Передать final Playwright + runtime safe E2E evidence, rollback, kill-switch, DLQ, clock, private-stream, PITR, alert owner/severity/escalation, retention, notifications, deploy/CI status. |
+
+## Обязательные Доказательства По Stage
+
+| Stage | API/runtime | DB | Redis | Ops/metrics | Browser/exchange |
+|---|---|---|---|---|---|
+| `01` | `curl` текущих backtest/strategy/exchange API показывает наличие run/stop и отсутствие launch/restart/execution submit path. | SQL inventory показывает существующие backtest/strategy/exchange/binding tables и отсутствие profile/execution tables. | `XINFO` текущих market/strategy streams и отсутствие execution streams. | `monit summary`, inventory текущих `/metrics`. | Browser inventory для backtests/strategies/settings, если runtime доступен. |
+| `02` | Реальные `GET variant` и `POST create strategy from variant`, duplicate idempotency, forbidden/not-launchable cases. | Strategy/provenance rows доказывают source job/variant/hash и отсутствие duplicate strategy при replay. | Не требуется. | `strategy_variant_launch_total`, audit rows. | Playwright proof: `/backtests` visible variant -> create live strategy; rejected variant shows safe reason. |
+| `03` | Реальные profile create/update/readiness calls, включая live-mode recent-auth failure/success. | Profile rows доказывают mode/status/readiness/reason и отсутствие secrets. | Не требуется. | Profile readiness/audit metrics. | Playwright proof: `/strategies` live profile panel, safe default, blocked reason. |
+| `04` | Реальные `run`, `stop`, `restart`, duplicate restart, active/stopping conflict. | `strategy_runs` и operation/event rows доказывают one active run max и restart sequence. | Evidence, что strategy worker подхватил run; execution stream отсутствует. | Run command/restart metrics. | Playwright user flow, нет duplicate active run после refresh. |
+| `05` | Controlled closed candles создают warmup -> signal/no-signal через live runner. | `strategy_signals`/events доказывают mode behavior и блокировку unsupported variants. | Market-data stream input и strategy realtime output evidence. | Signal/evaluator metrics. | Playwright/API latest signal/journal; exchange calls отсутствуют. |
+| `06` | Compatibility + market-data readiness calls доказывают launchable/not_launchable/degraded/forbidden/replay and ready/missing/stale/pending feed. | Compatibility rows and market-data requirement rows доказывают variant/profile hash, feed status, result, stable reason codes. | `XINFO` ready/stale/missing `md.candles...`; execution stream отсутствует. | Compatibility + market-data readiness counters and audit rows. | Playwright proof: `/backtests` and `/strategies` show safe launchability/feed reasons. |
+| `07` | Read-only account sync/config guard call/worker доказывает fresh/stale/degraded/config-mismatch projection. | Account/balance/position/open-order/filter snapshots без secrets, с age/source hash/config requirement. | Optional stream reconnect evidence if used. | Account sync/config guard counters, staleness gauge, Monit/health if separate process. | UI/API readiness shows stale/fresh/config mismatch reason; no exchange submit/auto-config. |
+| `08` | Two strategy/profile run attempts на один connection+instrument доказывают first owner and second conflict; release after stop. | `strategy_position_ownership` rows prove reserved/active/releasing/released/stale states and unique active invariant. | Не требуется. | Ownership counters and stuck alert query. | Playwright conflict reason, no unsafe override. |
+| `09` | Reservation create/release and controlled signal in paper mode creates paper order/fill/accounting; replay idempotent; fee/funding status explicit. | Capital reservation + paper orders/fills/accounting snapshots prove reserved budget/position/equity/PnL and fee/funding assumptions. | Existing market/strategy streams only; execution dispatch empty unless shadowed. | Capital reservation + paper/accounting/fee-funding metrics. | Playwright reserved budget + paper position/PnL completeness, real exchange calls отсутствуют. |
+| `10` | Реальные `POST` calls создают valid/invalid/duplicate source events и intents для всех source types; unsupported order model rejected. | `execution_source_events` и `execution_intents` rows доказывают status, source refs, source-event links, `strategy_signal_id`, order model fields, idempotency. | Dispatch stream отсутствует или пустой по контракту stage. | Source-event + intent + order-model-rejected counters and audit rows. | Не требуется. |
+| `11` | Реальные accepted/rejected calls для incompatible variant, missing/stale feed, config mismatch, stale account projection, insufficient capital, unsupported order model, ownership conflict, inactive connection, profile blocked, run inactive, missing binding, no recent-auth, ML without policy, kill switch. | Durable risk status/reason and audit rows. | Rejected intents never dispatched. | Risk latency and result counters. | Не требуется. |
+| `12` | Accepted intent возвращает dispatch state; retry budget и poison-message cases проверены фактическими сообщениями. | Status transitions `accepted/dispatching/dispatched/retry/quarantined` persisted. | `XINFO`, `XREADGROUP`, `XPENDING`, retry stream, DLQ stream, duplicate replay, outage recovery. | Dispatch, retry, DLQ и Redis error counters. | Не требуется. |
+| `13` | Local `GET /health/ready` доказывает dependency, limiter/backpressure и clock drift states. | Process heartbeat/lock rows, если реализованы. | Consumer group и DLQ visible; submit calls отсутствуют. | launchd/Monit/Prometheus/rate/clock/DLQ evidence. | Не требуется. |
+| `14` | Safe internal submit/cancel/status command через `exchange-execution` with limiter/config/time/order-model guards and private stream session/keepalive evidence. | `execution_orders` persisted with exchange order id/status and guard decisions. | Request acked только после DB update; retry/DLQ evidence for adapter errors. | Submit latency/counters, rate-limit wait, clock drift, private-stream metrics, secret grep clean. | Binance/Bybit testnet ack/cancel/status/private-stream session; mainnet blocked. |
+| `15` | Restart/gap scenario запускает reconciliation, private stream reconnect/backfill, fee/funding reconciliation and retention/partition/PITR dry-run. | `execution_order_events`, `execution_fills`, `execution_funding_events`, `execution_reconciliation_runs` converge; partitions/indexes/retention/PITR metadata verified. | Pending messages reconcile with ledger. | Reconciliation, private-stream, partition/index-bloat, backup/PITR and alert evidence. | Testnet exchange state/fill/funding facts match local ledger. |
+| `16` | Backtest-created Strategy/manual/ML producer calls создают source events и eligible intents через один ingress; notification outbox writes terminal/rejected/unknown events. | Source refs, `source_event_id`, intent links, outbox rows и no-intent outcomes доказывают producer-specific paths. | Accepted safe intents dispatch через тот же stream. | Per-source signal-to-intent/fill gap and notification metrics with bounded labels. | Playwright signal -> source event -> execution outcome + notification link; ML shadow/testnet proof. |
+| `17` | Full E2E smoke plus rollback/kill-switch commands. | Terminal lifecycle rows match expected results от variant до fill/funding/reconciliation/notification; partition/retention/PITR proof recorded. | No stuck pending/DLQ messages. | Prometheus scrape, Monit restart/health, alert rules with severity/owner/escalation, clock, private-stream, rate limiter, retention/PITR proof. | Full Playwright journey + API proof + exchange testnet proof + latency/slippage/notification report. |
+
+## Handoff Facts
+
+| Факт | Значение |
+|---|---|
+| Backtest launch policy | Live strategy может создаваться только из owner-scoped launchable backtest variant; provenance обязателен. |
+| Strategy/profile split | `StrategySpecV1` описывает логику, `LiveStrategyProfile` описывает mode/binding/sizing/limits/readiness. |
+| Safe launch default | Backtest-created strategy не стартует live/mainnet неявно; default mode `monitor_only` или `paper`. |
+| Restart policy | Restart является durable command, а не UI alias на stop+run; one-active-run invariant обязателен. |
+| Signal evaluator policy | Live runner должен доказать `StrategySignal`/no-signal output на controlled candles до integration with execution. |
+| Compatibility policy | Stage `06` обязан доказать `launchable`, `not_launchable`, `degraded` и owner-forbidden cases до дальнейших live/paper stages. |
+| Market-data readiness policy | Stage `06` обязан доказать ready/missing/stale/pending feed и блокировать run до active/fresh runtime stream. |
+| Account projection policy | Stage `07` создает локальную fresh/stale projection для readiness/risk/sizing; hot path не делает exchange read. |
+| Exchange config guard policy | Stage `07`/`14` только проверяют leverage/margin/position mode/filters; auto-config запрещен до отдельного stage. |
+| Position ownership policy | Stage `08` запрещает двум active strategies владеть одним `exchange_connection_id + market_type + instrument_key`. |
+| Capital reservation policy | Stage `09` обязан доказать durable reservation/release и insufficient/stale capital блокировку до paper/live. |
+| Paper accounting policy | Stage `09` должен писать durable paper orders/fills/accounting; paper success без accounting и explicit fee/funding status запрещен. |
+| Order model policy | Stage `10` фиксирует v1 allowlist `market|limit`; Stage `11`/`14` rejects OCO/TP/SL/trailing/amend/multi-leg до Redis/submit. |
+| UI current-state policy | `/backtests` уже имеет results/variant detail surface, `/strategies` уже имеет selected strategy + run/stop; create-from-variant, live profile, restart, signal journal, compatibility/market-data/account state/ownership/capital/paper accounting и execution links должны добавляться в stages `02-09` и `16-17`. |
+| Execution layer ownership | `exchange-execution` является producer-neutral money boundary, а не частью Strategy. |
+| Источники v1 | `strategy_signal`, `manual_request`, `ml_agent_decision`, `ops_test`. |
+| Redis роль | Fast transport only; source of truth для денег остается Postgres ledger plus exchange reconciliation. |
+| Redis DLQ policy | Poison messages never submit orders; Stage `12`/`13` must prove quarantine and ledger-backed repair path. |
+| Signal journal policy | `execution_source_events` records every factual strategy/manual/ML/ops signal or decision, including no-intent and rejected paths. |
+| Mainnet policy | Mainnet order submit запрещен до отдельного canary approval после `17`. |
+| ML policy | ML agent не получает прямой доступ к exchange SDK/API/secrets; он записывает `ExecutionSourceEvent`, а eligible decision создает `ExecutionRequest` и проходит risk gate. |
+| Secrets policy | Producers и `apps/api` не decrypt credentials; secret-bearing operations scoped to approved exchange-control/exchange-execution path. |
+| Runtime config policy | Все execution flags default-deny; producer flags и mainnet flag должны быть включены явно. |
+| Latency policy | Hot path не делает внешнюю validation; latency/slippage принимаются только по runtime metrics, не по предположениям. |
+| Clock policy | Stage `13`/`17` must prove clock drift below configured threshold before exchange submit readiness. |
+| Private stream policy | Stage `14`/`15` must prove Binance/Bybit private stream session, keepalive, reconnect, backfill and dedupe behavior. |
+| Retention policy | Stage `10`/`15`/`17` must prove partition/retention/archive design before production readiness. |
+| Backup/PITR policy | Stage `15`/`17` must prove backup/PITR restore for money ledger before production readiness/canary. |
+| Notification policy | Stage `16`/`17` must prove redacted notification outbox for rejected/fill/unknown/kill-switch states. |
+| Alert ownership policy | Stage `17` alert rules/runbooks must include severity, owner and escalation path. |
+| Documentation policy | Каждый stage обязан обновлять затронутые architecture/runbook/ops docs из основного плана или явно писать, почему doc не менялся. |
+| File-map policy | Если исполнитель отклоняется от planned file map, причина и новый путь фиксируются в stage report и этом ledger. |
+
+## Documentation And File Coverage
+
+| Stage | Must consider docs | Must consider file areas |
+|---|---|---|
+| `01` | Main plan, этот ledger, related strategy/backtest/identity docs, `docs/architecture/README.md`. | No code changes; inventory only. |
+| `02` | Backtest result docs, strategy API/domain docs, main plan, ledger. | Backtest variant lookup/DTO, create-from-variant use case, API route/DTO, backtests UI CTA/modal, locales, provenance events, optional migration. |
+| `03` | Strategy API/domain docs, identity exchange connection doc, main plan. | `strategy_live_profiles` domain/repo/migration/API, profile validation/readiness, strategy/profile UI surface, metrics/audit. |
+| `04` | Strategy API/run-control docs, live runner docs, strategy realtime docs. | Restart use case/API, optional run operation storage, worker stop/drain behavior, strategy UI action/state, run metrics/audit. |
+| `05` | Strategy live runner docs, strategy realtime docs, main plan signal sections. | Signal evaluator, `StrategySignal` journal/events, live runner integration, market-data controlled input evidence. |
+| `06` | Backtest result docs, strategy API/domain docs, market-data live-feed doc, main plan. | Compatibility checker service/use case/API DTO, reason codes, persisted checks, market-data readiness/provisioning port, `market_data_subscription_requirements`, `/backtests` and `/strategies` UI readiness. |
+| `07` | Identity exchange connection doc, exchange secret runbook, operations doc if worker created, main plan. | Account projection domain/read models/migrations, native read-only adapters, exchange config guard, config requirement/readiness codes, sync worker/health, metrics/audit, stale/config-mismatch policy. |
+| `08` | Strategy API/domain docs, strategy live worker runbook, main plan. | Position ownership domain/use cases/repo/migration, profile/run readiness checks, release/repair behavior, UI conflict reason. |
+| `09` | Strategy live runner docs, strategy realtime docs, identity exchange doc, main plan capital/paper/fee-funding sections. | Capital reservation domain/use cases/repo/migration, paper execution/accounting domain/use cases/repo/migrations, fee/funding config/read model, live runner integration, UI reserved capital/paper position/PnL/completeness, metrics/audit. |
+| `10` | Main plan, ledger, retention/partition note if separate. | `src/trading/contexts/live_execution/`, explicit `ExecutionRequest` order model DTO/value objects, migrations with `execution_source_events` + `execution_intents`, partition/retention scaffolding, APIs/wiring. |
+| `11` | Main plan risk/error sections, identity exchange connection doc if usage guard changes. | Risk gate checks for compatibility/market-data/account-config/account-state/capital-reservation/order-model/ownership/accounting/profile/run/source policy, audit/metrics wiring. |
+| `12` | Redis transport section, new or existing Redis runbook section. | Redis adapter/config, retry stream, DLQ/quarantine, retry budget metadata, `configs/{dev,test,prod}/`. |
+| `13` | Operations architecture doc, new `docs/runbooks/exchange-execution.md`. | `apps/exchange_execution/`, rate limiter/backpressure/DLQ/clock drift guards, launchd, Monit, Prometheus scrape config. |
+| `14` | Exchange secret runbook, identity exchange connection doc, exchange-execution runbook. | Native exchange adapters, limiter/config/time/order-model guard integration, private stream lifecycle skeleton, testnet config/env docs. |
+| `15` | Main plan reconciliation/retention/backup section, exchange-execution runbook. | Postgres repos/migrations, reconciliation worker/use cases, exchange status/private stream adapters, fee/funding reconciliation, partition/retention/archive proof, backup/PITR restore proof. |
+| `16` | Strategy live runner docs, strategy realtime docs, ML producer contract note, notification/outbox docs if separate. | Strategy producer port/adapter, manual UI/API if enabled, ML contract/stub, notification outbox rows/read model. |
+| `17` | Operations doc, strategy/exchange runbooks, docs index. | Prometheus rules with severity/owner/escalation, Grafana dashboards, Monit, launchd, DLQ/clock/private-stream/PITR/retention/notification deploy verification artifacts. |
+
+## Contract Impact Ledger
+
+| Stage | Public/API | Persistence | Redis | Runtime/Ops | Rollback |
+|---|---|---|---|---|---|
+| `01` | none | none | none | none | docs-only inventory. |
+| `02` | compatible-change: new create-from-backtest-variant API/DTO | additive provenance/event/profile seed if needed | none | metrics/audit additive | disable launch flag, keep created strategies as immutable audit records. |
+| `03` | compatible-change: profile API/DTO | additive `strategy_live_profiles` or equivalent | none | metrics/audit additive | disable profile flag; profiles remain inert. |
+| `04` | compatible-change: restart API/DTO; run/stop must remain compatible | optional run operation table/events | no execution streams | worker/run metrics additive | disable restart flag; existing run/stop continue. |
+| `05` | compatible-change: signal read/event surfaces if exposed | additive signal/event journal | existing market/strategy streams only | evaluator metrics additive | disable evaluator flag; runner returns to warmup/metrics-only behavior. |
+| `06` | compatible-change: compatibility/readiness/feed API/DTO/reason codes | additive compatibility checks table or profile fields plus `market_data_subscription_requirements` if needed | existing market streams only; no execution streams | compatibility/feed metrics and audit additive | disable checker/readiness flags; profiles blocked rather than unsafe-ready. |
+| `07` | compatible-change: readiness/risk can expose stale account/config mismatch reasons | additive account/balance/position/open-order/filter snapshots plus config requirement/result rows if needed | optional private stream reconnect only | account sync/config guard worker/metrics/alerts additive | disable sync/config guard flags; live/paper readiness blocks until projection/config evidence available. |
+| `08` | compatible-change: run/profile may return ownership conflict | additive `strategy_position_ownership` | none | metrics/audit additive | disable ownership flag only before live; otherwise release/repair then disable. |
+| `09` | compatible-change: capital reservation and paper accounting read surfaces with fee/funding completeness | additive `strategy_capital_reservations` plus paper orders/fills/accounting tables and fee/funding metadata | existing market/strategy streams only | capital reservation + paper/accounting/fee-funding metrics additive | disable capital/paper flags only after release/stop path is verified; data remains audit. |
+| `10` | compatible-change: new execution source-event/intent API/DTO with explicit v1 order model | additive `execution_source_events` + `execution_intents` with order model fields and partition/retention scaffolding | none | source/intent/order-model rejection metrics and audit additive | disable routes/config, keep tables inert. |
+| `11` | compatible-change: risk outcomes/reasons include compatibility/feed/config/capital/order-model/ownership/source | additive risk fields/audit | none or accepted-only publish hook | risk metrics additive | feature-flag risk gate to reject all non-test intents. |
+| `12` | compatible-change: dispatch state is observable | status/retry/quarantine fields used | new execution, retry and DLQ streams/groups | Redis dependency for dispatch plus retry/DLQ metrics | disable dispatch worker, leave intents accepted/not submitted; DLQ is repair-only. |
+| `13` | none/public; internal health only | optional heartbeat/locks | consumer group and DLQ group | new supervised process with limiter/backpressure/clock guards | stop process and disable launchd/Monit entry; pending intents remain durable. |
+| `14` | internal adapter contract | orders table used with guard decisions | request consumption plus retry/DLQ on adapter errors | exchange testnet dependency, rate/config/time/order-model/private-stream guards | disable adapters/private streams; keep intents/orders for audit. |
+| `15` | event/status query compatibility may be additive | fills/funding/events/reconciliation tables plus partitions/retention/PITR metadata used | event/pending streams reconcile with ledger | reconciliation, retention and backup/PITR proof jobs/processes | pause reconciliation/retention jobs; ledger remains durable and restore evidence blocks readiness if missing. |
+| `16` | producer integration endpoints/ports and notification read surfaces additive | source refs, source-event links and notification outbox rows used | same dispatch stream for accepted safe intents | producer signal-gap and notification metrics additive | disable producer and notification feature flags independently. |
+| `17` | no new contract unless canary approved | no destructive migration; partition/retention/PITR verified before activation | no destructive change; DLQ must be empty or explained | deploy/monitoring config active with severity/owner/escalation alerts for clock/rate/DLQ/private-stream/PITR/retention/notifications | kill switch, stop process, revert config/commit if needed. |
+
+## Stage Evidence Log
+
+| Stage | Status | Evidence summary | Commands / evidence refs | Commit / deploy | Notes |
+|---|---|---|---|---|---|
+| `01` | planned | - | - | - | - |
+| `02` | planned | - | - | - | - |
+| `03` | planned | - | - | - | - |
+| `04` | planned | - | - | - | - |
+| `05` | planned | - | - | - | - |
+| `06` | planned | - | - | - | - |
+| `07` | planned | - | - | - | - |
+| `08` | planned | - | - | - | - |
+| `09` | planned | - | - | - | - |
+| `10` | planned | - | - | - | - |
+| `11` | planned | - | - | - | - |
+| `12` | planned | - | - | - | - |
+| `13` | planned | - | - | - | - |
+| `14` | planned | - | - | - | - |
+| `15` | planned | - | - | - | - |
+| `16` | planned | - | - | - | - |
+| `17` | planned | - | - | - | - |
