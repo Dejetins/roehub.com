@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
+import apps.api.routes.backtests as backtests_routes
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_backtests_router
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
@@ -52,6 +53,7 @@ from trading.contexts.strategy.domain.entities import (
     StrategyBacktestVariantProvenance,
     StrategySpecV1,
 )
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 
@@ -243,6 +245,41 @@ def test_post_backtest_variant_strategy_requires_idempotency_and_returns_provena
     assert payload["provenance"]["source_job_id"] == "00000000-0000-0000-0000-00000000b001"
     assert payload["provenance"]["source_variant_key"] == "job_demo"
     assert use_case.calls == (("job_demo", "launch-1"),)
+
+
+def test_post_backtest_variant_strategy_sanitizes_unexpected_metric_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[tuple[str, str]] = []
+
+    def record_strategy_variant_launch(*, result: str, reason: str = "none") -> None:
+        captured.append((result, reason))
+
+    monkeypatch.setattr(
+        backtests_routes,
+        "record_strategy_variant_launch",
+        record_strategy_variant_launch,
+    )
+    use_case = _RaisingCreateStrategyFromVariantUseCase(
+        RoehubError(
+            code="unexpected_error",
+            message="Unexpected error",
+            details={"reason": "PostgresBacktestJobRepository cannot map top-variant row"},
+        )
+    )
+    client = _build_client(create_strategy_from_variant_use_case=use_case)
+
+    response = client.post(
+        "/backtests/jobs/00000000-0000-0000-0000-00000000b001/variants/job_demo/strategies",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-1",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "unexpected_error"
+    assert captured == [("rejected", "unexpected_error")]
 
 
 def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
@@ -1359,6 +1396,21 @@ class _FakeCreateStrategyFromVariantUseCase:
             provenance=provenance,
             duplicate=False,
         )
+
+
+class _RaisingCreateStrategyFromVariantUseCase:
+    def __init__(self, error: RoehubError) -> None:
+        self._error = error
+
+    def execute(
+        self,
+        *,
+        current_user: CurrentUser,
+        job_id: UUID,
+        variant_key: str,
+        idempotency_key: str | None,
+    ) -> CreateStrategyFromBacktestVariantResult:
+        raise self._error
 
 
 def _strategy_spec_payload() -> dict[str, Any]:

@@ -58,6 +58,26 @@ from trading.platform.errors import RoehubError
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
 
+_STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS = frozenset(
+    {
+        "forbidden",
+        "idempotency_key_conflict",
+        "idempotency_key_required",
+        "not_found",
+        "not_launchable",
+        "strategy_variant_launch_unavailable",
+        "unavailable",
+        "unexpected_error",
+    }
+)
+_STRATEGY_VARIANT_LAUNCH_DUPLICATE_REASONS = frozenset(
+    {
+        "duplicate",
+        "idempotent_replay",
+        "source_variant_exists",
+    }
+)
+
 
 class BacktestVariantStrategyProvenanceResponse(BaseModel):
     source_job_id: UUID
@@ -294,15 +314,18 @@ def build_backtests_router(
                 idempotency_key=idempotency_key,
             )
         except RoehubError as error:
-            error_details = error.details or {}
-            reason = str(error_details.get("reason", error.code))
-            record_strategy_variant_launch(result="rejected", reason=reason)
+            record_strategy_variant_launch(
+                result="rejected",
+                reason=_strategy_variant_launch_rejected_metric_reason(error=error),
+            )
             raise
         if result.duplicate:
             response.status_code = 200
             record_strategy_variant_launch(
                 result="duplicate",
-                reason=result.duplicate_reason or "duplicate",
+                reason=_strategy_variant_launch_duplicate_metric_reason(
+                    reason=result.duplicate_reason
+                ),
             )
         else:
             record_strategy_variant_launch(result="created")
@@ -550,6 +573,26 @@ def _resolve_result_points(*, points: int | None, max_points: int | None) -> int
             details={"points": points, "max_points": max_points},
         )
     return max_points if max_points is not None else points or DEFAULT_BACKTEST_RESULT_POINTS
+
+
+def _strategy_variant_launch_rejected_metric_reason(*, error: RoehubError) -> str:
+    details = error.details or {}
+    candidate = str(details.get("reason", ""))
+    if candidate in _STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS:
+        return candidate
+    if error.code.startswith("strategy_variant_launch."):
+        suffix = error.code.rsplit(".", 1)[-1]
+        if suffix in _STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS:
+            return suffix
+    if error.code == "unexpected_error":
+        return "unexpected_error"
+    return "unexpected_error"
+
+
+def _strategy_variant_launch_duplicate_metric_reason(*, reason: str | None) -> str:
+    if reason in _STRATEGY_VARIANT_LAUNCH_DUPLICATE_REASONS:
+        return reason
+    return "duplicate"
 
 
 __all__ = ["build_backtests_router"]
