@@ -3405,8 +3405,8 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
         timeframe="15m",
         indicator_id="ma.ema",
     )
-    initial_mapping_lengths = {
-        timeframe: _load_mapping_arrays_v2(fixture=fixture, timeframe=timeframe)[0].shape[0]
+    initial_price_open_by_timeframe = {
+        timeframe: _load_price_arrays_v2(fixture=fixture, timeframe=timeframe)[0]
         for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
     }
     initial_one_hour_mapping_open, initial_one_hour_mapping_close = _load_mapping_arrays_v2(
@@ -3466,9 +3466,31 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
         expected_asof_date="2026-03-29",
         expected_slot_generation=5,
     )
-    expected_mapping_reused_prefix_bars = sum(initial_mapping_lengths.values())
+    price_tail_start_ms = int(
+        initial_open_time[initial_end_minute - fixture.runtime_settings.price_tail_bars_1m]
+    )
+    expected_mapping_reused_prefix_bars_by_timeframe = {
+        timeframe: int(
+            np.searchsorted(
+                initial_price_open_by_timeframe[timeframe],
+                np.int64(
+                    price_tail_start_ms
+                    - (
+                        price_tail_start_ms
+                        % int(Timeframe(timeframe).duration().total_seconds() * 1000)
+                    )
+                ),
+                side="left",
+            )
+        )
+        for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
+    }
+    expected_mapping_reused_prefix_bars = sum(
+        expected_mapping_reused_prefix_bars_by_timeframe.values()
+    )
     expected_mapping_rewritten_bars = sum(
-        updated_mapping_lengths[timeframe] - initial_mapping_lengths[timeframe]
+        updated_mapping_lengths[timeframe]
+        - expected_mapping_reused_prefix_bars_by_timeframe[timeframe]
         for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
     )
 
@@ -3519,17 +3541,17 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
     )
     assert _time_axis_prefix_sha256_v2(
         array=updated_one_hour_mapping_open,
-        prefix_bars=initial_one_hour_mapping_open.shape[0],
+        prefix_bars=expected_mapping_reused_prefix_bars_by_timeframe["1h"],
     ) == _time_axis_prefix_sha256_v2(
         array=initial_one_hour_mapping_open,
-        prefix_bars=initial_one_hour_mapping_open.shape[0],
+        prefix_bars=expected_mapping_reused_prefix_bars_by_timeframe["1h"],
     )
     assert _time_axis_prefix_sha256_v2(
         array=updated_one_hour_mapping_close,
-        prefix_bars=initial_one_hour_mapping_close.shape[0],
+        prefix_bars=expected_mapping_reused_prefix_bars_by_timeframe["1h"],
     ) == _time_axis_prefix_sha256_v2(
         array=initial_one_hour_mapping_close,
-        prefix_bars=initial_one_hour_mapping_close.shape[0],
+        prefix_bars=expected_mapping_reused_prefix_bars_by_timeframe["1h"],
     )
     assert _time_axis_prefix_sha256_v2(
         array=updated_signal_matrix,

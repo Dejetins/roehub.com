@@ -853,17 +853,25 @@ class BacktestArtifactPrecomputeRunnerV2:
         slot_root = manifest_path.parent
         existing_manifest = None
         existing_arrays = None
+        reuse_source_slot = (
+            inactive_slot
+            if request.reuse_source_slot is None
+            else request.reuse_source_slot
+        )
         if not request.force_full_rebuild:
             existing_manifest = _load_existing_inactive_manifest_v2(
                 artifact_loader=self.artifact_loader,
                 coordinates=request.coordinates,
-                slot=inactive_slot,
-                manifest_path=manifest_path,
+                slot=reuse_source_slot,
+                manifest_path=self.artifact_loader.resolve_slot_manifest_path(
+                    request.coordinates,
+                    reuse_source_slot,
+                ),
             )
             existing_arrays = _load_existing_canonical_price_arrays_v2(
                 artifact_loader=self.artifact_loader,
                 coordinates=request.coordinates,
-                slot=inactive_slot,
+                slot=reuse_source_slot,
                 existing_manifest=existing_manifest,
             )
         export_started_at = time.perf_counter()
@@ -948,6 +956,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                     coordinates=request.coordinates,
                     slot=inactive_slot,
                     slot_root=slot_root,
+                    existing_slot=reuse_source_slot,
                     existing_manifest=existing_manifest,
                     request=request,
                     slot_generation=target_slot_generation,
@@ -1044,6 +1053,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                             coordinates=request.coordinates,
                             slot=inactive_slot,
                             slot_root=slot_root,
+                            existing_slot=reuse_source_slot,
                             existing_manifest=existing_manifest,
                             request=request,
                             slot_generation=target_slot_generation,
@@ -1143,7 +1153,11 @@ class BacktestArtifactPrecomputeRunnerV2:
                 signal_reused_prefix_bars += timeframe_stage_result.reused_signal_prefix_bars
                 signal_rewritten_tail_bars += timeframe_stage_result.rewritten_signal_tail_bars
 
-            scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
+            scaffold = _build_root_manifest_scaffold_v2(
+                existing_manifest=(
+                    existing_manifest if reuse_source_slot == inactive_slot else None
+                )
+            )
             root_signals = (
                 scaffold.signals
                 if len(signal_manifests) == 0
@@ -1386,6 +1400,7 @@ def _materialize_timeframe_session_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: ArtifactSlotLiteralV2,
     slot_root: Path,
+    existing_slot: ArtifactSlotLiteralV2,
     existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
@@ -1443,6 +1458,7 @@ def _materialize_timeframe_session_v2(
         coordinates=coordinates,
         slot=slot,
         slot_root=slot_root,
+        existing_slot=existing_slot,
         existing_manifest=existing_manifest,
         source_arrays=one_minute_arrays,
         source_tail_time_range=source_tail_time_range,
@@ -1453,9 +1469,11 @@ def _materialize_timeframe_session_v2(
         coordinates=coordinates,
         slot=slot,
         slot_root=slot_root,
+        existing_slot=existing_slot,
         existing_manifest=existing_manifest,
         one_minute_arrays=one_minute_arrays,
         price_by_timeframe={timeframe: price_manifest},
+        price_tail_source_time_range=source_tail_time_range,
         mapping_tail_bars_1m=runtime_settings.mapping_tail_bars_1m,
     )
     session_price_arrays: _CanonicalPriceArraysV2 | None = None
@@ -1489,6 +1507,7 @@ def _materialize_timeframe_session_v2(
             coordinates=coordinates,
             slot=slot,
             slot_root=slot_root,
+            existing_slot=existing_slot,
             existing_manifest=existing_manifest,
             request=request,
             slot_generation=slot_generation,
@@ -1689,6 +1708,7 @@ def _materialize_signal_artifact_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_slot: str,
     existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
@@ -1774,7 +1794,7 @@ def _materialize_signal_artifact_v2(
     existing_signal_artifact = _load_existing_signal_artifact_v2(
         artifact_loader=artifact_loader,
         coordinates=coordinates,
-        slot=slot,
+        slot=existing_slot,
         existing_manifest=existing_manifest,
         signal_target=signal_target,
         expected_variant_keys_sha256=signal_variant_keys_sha256,
@@ -5002,6 +5022,7 @@ def _materialize_rolled_price_timeframe_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_slot: str,
     existing_manifest: ArtifactManifestDocumentV2 | None,
     source_arrays: _CanonicalPriceArraysV2,
     source_tail_time_range: TimeRange,
@@ -5033,7 +5054,7 @@ def _materialize_rolled_price_timeframe_v2(
     existing_arrays = _load_existing_price_timeframe_arrays_v2(
         artifact_loader=artifact_loader,
         coordinates=coordinates,
-        slot=slot,
+        slot=existing_slot,
         existing_manifest=existing_manifest,
         timeframe=timeframe,
     )
@@ -5166,9 +5187,11 @@ def _materialize_mapping_timeframe_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_slot: str,
     existing_manifest: ArtifactManifestDocumentV2 | None,
     one_minute_arrays: _CanonicalPriceArraysV2,
     price_by_timeframe: Mapping[str, ArtifactPriceTimeframeManifestV2],
+    price_tail_source_time_range: TimeRange,
     mapping_tail_bars_1m: int,
 ) -> _MappingArtifactMaterializationResultV2:
     """
@@ -5183,6 +5206,7 @@ def _materialize_mapping_timeframe_v2(
         existing_manifest: Existing inactive-slot root manifest when present.
         one_minute_arrays: Materialized artifact-backed `prices/1m` arrays.
         price_by_timeframe: Fresh strict `prices/<tf>` sections keyed by timeframe.
+        price_tail_source_time_range: Canonical source reread window used by the price stage.
         mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
     Returns:
         _MappingArtifactMaterializationResultV2: Strict manifest plus per-timeframe rebuild stats.
@@ -5209,7 +5233,7 @@ def _materialize_mapping_timeframe_v2(
     existing_arrays = _load_existing_mapping_arrays_v2(
         artifact_loader=artifact_loader,
         coordinates=coordinates,
-        slot=slot,
+        slot=existing_slot,
         existing_manifest=existing_manifest,
         timeframe=timeframe,
     )
@@ -5218,6 +5242,7 @@ def _materialize_mapping_timeframe_v2(
         timeframe_arrays=timeframe_arrays,
         existing_arrays=existing_arrays,
         timeframe=timeframe,
+        price_tail_source_time_range=price_tail_source_time_range,
         mapping_tail_bars_1m=mapping_tail_bars_1m,
     )
     mapping_paths = artifact_loader.resolve_mapping_paths(coordinates, slot, timeframe)
@@ -5243,6 +5268,7 @@ def _build_mapping_arrays_with_tail_update_v2(
     timeframe_arrays: _CanonicalPriceArraysV2,
     existing_arrays: _TimeframeMappingArraysV2 | None,
     timeframe: str,
+    price_tail_source_time_range: TimeRange,
     mapping_tail_bars_1m: int,
 ) -> _TimeframeMappingBuildResultV2:
     """
@@ -5253,6 +5279,7 @@ def _build_mapping_arrays_with_tail_update_v2(
         timeframe_arrays: Materialized artifact-backed `prices/<tf>` arrays.
         existing_arrays: Existing inactive-slot mapping arrays for the timeframe, when present.
         timeframe: Target request timeframe literal.
+        price_tail_source_time_range: Canonical source reread window used by the price stage.
         mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
     Returns:
         _TimeframeMappingBuildResultV2: Final strict mapping arrays plus the number of rebuilt
@@ -5306,7 +5333,22 @@ def _build_mapping_arrays_with_tail_update_v2(
             side="right",
         )
     )
-    prefix_bar_count = min(prefix_end_idx, int(existing_arrays.bar_open_1m_idx.shape[0]))
+    price_tail_bucket_open_ms = _bucket_open_epoch_millis_v2(
+        timeframe=Timeframe(timeframe),
+        value=_utc_timestamp_to_epoch_millis_v2(price_tail_source_time_range.start),
+    )
+    price_prefix_end_idx = int(
+        np.searchsorted(
+            timeframe_arrays.open_time,
+            np.int64(price_tail_bucket_open_ms),
+            side="left",
+        )
+    )
+    prefix_bar_count = min(
+        prefix_end_idx,
+        price_prefix_end_idx,
+        int(existing_arrays.bar_open_1m_idx.shape[0]),
+    )
     prefix = (
         None
         if prefix_bar_count <= 0
@@ -5969,6 +6011,7 @@ def _materialize_hit_times_artifacts_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_slot: str,
     existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
@@ -5985,6 +6028,7 @@ def _materialize_hit_times_artifacts_v2(
         coordinates: Artifact coordinates selecting one symbol root.
         slot: Inactive slot literal receiving the hit-times files.
         slot_root: Absolute inactive-slot root directory.
+        existing_slot: Slot literal used as the read-only prefix-reuse source.
         existing_manifest: Previously materialized inactive-slot root manifest, when present.
         request: Explicit export request carrying slot identity and timestamps.
         slot_generation: Target inactive-slot generation assigned to the build.
@@ -6013,7 +6057,7 @@ def _materialize_hit_times_artifacts_v2(
     existing_hit_times_artifact = _load_existing_hit_times_artifact_v2(
         artifact_loader=artifact_loader,
         coordinates=coordinates,
-        slot=slot,
+        slot=existing_slot,
         existing_manifest=existing_manifest,
         one_minute_manifest=one_minute_manifest,
         runtime_settings=runtime_settings,

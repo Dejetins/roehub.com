@@ -2644,6 +2644,7 @@ class ArtifactCanonicalPriceExportRequestV2:
     generated_at_utc: str
     target_slot: ArtifactSlotLiteralV2 | None = None
     target_slot_generation: int | None = None
+    reuse_source_slot: ArtifactSlotLiteralV2 | None = None
     force_full_rebuild: bool = False
 
     def __post_init__(self) -> None:
@@ -2681,6 +2682,12 @@ class ArtifactCanonicalPriceExportRequestV2:
             "generated_at_utc",
             validate_current_pointer_published_at_utc_v2(self.generated_at_utc),
         )
+        if self.reuse_source_slot is not None:
+            object.__setattr__(
+                self,
+                "reuse_source_slot",
+                validate_artifact_slot_v2(self.reuse_source_slot),
+            )
         if self.target_slot is None and self.target_slot_generation is not None:
             raise ValueError(
                 "ArtifactCanonicalPriceExportRequestV2.target_slot_generation requires target_slot"
