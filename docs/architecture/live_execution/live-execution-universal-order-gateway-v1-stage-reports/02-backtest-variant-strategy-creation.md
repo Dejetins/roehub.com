@@ -4,7 +4,7 @@ Stage 02 adds the canonical path from a launchable persisted backtest variant to
 
 Date: 2026-05-30.
 
-Status: implementation locally validated; runtime acceptance pending post-deploy boundary evidence.
+Status: accepted.
 
 ## Scope
 
@@ -33,7 +33,7 @@ Out of scope:
 |---|---|---|
 | Stage `01` accepted before Stage `02`. | Ledger row for `01` is `accepted`; `main` and `origin/main` were at `1c4a9e8e docs: accept live execution stage 01 baseline`; GitHub workflows for that commit were green and `scripts/macos/smoke_prod.sh` passed on `macstudio`. | Pass. |
 | Work on `main`, no stage branch or PR. | `git branch --show-current` returned `main`. | Pass. |
-| Runtime acceptance is not tests-only. | This report is not accepted until post-deploy API/SQL/browser proof is appended. | Pending. |
+| Runtime acceptance is not tests-only. | Post-deploy Mac Studio API, SQL, metrics, smoke, and browser proof are recorded below. | Pass. |
 
 ## Files Changed
 
@@ -67,6 +67,7 @@ Tests:
 
 - `tests/unit/contexts/strategy/application/test_strategy_use_cases.py`
 - `tests/unit/apps/api/test_backtests_routes.py`
+- `tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py`
 
 Docs:
 
@@ -74,6 +75,12 @@ Docs:
 - `docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md`
 - `docs/architecture/live_execution/live-execution-universal-order-gateway-v1-stage-reports/02-backtest-variant-strategy-creation.md`
 - `docs/architecture/live_execution/live-execution-universal-order-gateway-v1-stage-reports/live-execution-universal-order-gateway-v1-iteration-ledger.md`
+
+Deploy repair:
+
+- `migrations/postgres/0007_identity_exchange_audit_events_v1.sql`
+- `migrations/postgres/0009_identity_exchange_reclassification_audit_v1.sql`
+- `tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py`
 
 ## Implementation
 
@@ -119,23 +126,82 @@ POST /api/backtests/jobs/{job_id}/variants/{variant_key}/strategies
 | Broad unit slice | `uv run pytest -q tests/unit/contexts/backtest tests/unit/contexts/strategy tests/unit/apps` | `659 passed, 3 warnings`. |
 | Type checking | `uv run pyright src/trading/contexts/backtest src/trading/contexts/strategy apps/api tests` | `0 errors, 0 warnings, 0 informations`. |
 | Lint | `uv run ruff check src/trading/contexts/backtest src/trading/contexts/strategy apps/api tests` | Passed. |
+| Metric-label regression | `uv run pytest -q tests/unit/apps/api/test_backtests_routes.py`; `uv run ruff check apps/api/routes/backtests.py tests/unit/apps/api/test_backtests_routes.py`; `uv run pyright apps/api/routes/backtests.py tests/unit/apps/api/test_backtests_routes.py` | `73 passed`; ruff passed; pyright `0 errors`. |
+| Deploy repair gate | `uv run pytest -q tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py tests/unit/apps/migrations/test_strategy_exchange_bindings_sql.py`; `uv run ruff check tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py`; `uv run pyright tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py` | `3 passed`; ruff passed; pyright `0 errors`. |
+| Docs index | `python -m tools.docs.generate_docs_index --check` | Passed. |
+| Whitespace | `git diff --check` | Passed. |
 
 The three warnings are existing `httpx` per-request cookie deprecation warnings in web route tests.
 
 ## Runtime Evidence
 
-Pending after publish/deploy:
+Post-deploy Mac Studio smoke passed after `0e3a9b07`:
 
-- real HTTP `GET /backtests/jobs/{job_id}/variants/{variant_key}`;
-- real HTTP `POST /backtests/jobs/{job_id}/variants/{variant_key}/strategies`;
-- idempotent replay with same key;
-- forbidden owner proof;
-- not-launchable proof;
-- SQL proof for strategy/provenance rows and no duplicate strategy on replay;
-- metrics proof for `strategy_variant_launch_total`;
-- browser proof for `/backtests` variant detail to create-strategy modal/action.
+- `ssh macstudio 'cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh'`
+- launchd listed `com.roehub.api`, `com.roehub.backtest-job-runner`, exporters, Redis, Postgres, ClickHouse, Keycloak, exchange-control, and related Roehub services;
+- HTTP probes returned expected `302`, `200`, `405`, and authenticated `401` surfaces;
+- Redis returned `PONG`;
+- Tailscale backend state was `Running`.
 
-Until those are recorded, Stage `02` remains pending runtime acceptance.
+Deployed code proof on `/opt/roehub/app`:
+
+- `apps/api/monitoring.py` contains `strategy_variant_launch_total`;
+- `apps/api/routes/backtests.py` contains `_strategy_variant_launch_rejected_metric_reason`;
+- Postgres provenance adapter and Alembic revision `20260530_0016` are present.
+
+Production API/SQL probe used fixed synthetic Stage 02 owner/job/session rows and did not print cookies,
+raw idempotency keys, Authorization headers, secrets, credential material, or raw exchange payloads.
+
+| Runtime boundary | Evidence | Result |
+|---|---|---|
+| Variant read | `GET /backtests/jobs/{job_id}/variants/stage02_launchable` | `200`; returned public variant key `stage02_launchable`. |
+| Create strategy | `POST /backtests/jobs/{job_id}/variants/stage02_launchable/strategies` with `Idempotency-Key` | `201`; response included strategy and provenance hashes. |
+| Idempotent replay | Same `POST` and same key | `200`; `duplicate=true`; same strategy as create. |
+| Owner scope | Other synthetic owner posted to the source owner job | `403 strategy_variant_launch.forbidden`; no second strategy. |
+| Missing idempotency | Same owner without `Idempotency-Key` | `422 strategy_variant_launch.idempotency_key_required`. |
+| Missing public variant | Same owner with missing public variant key | `404 strategy_variant_launch.not_found`. |
+| Not launchable | Same owner against a succeeded synthetic job with no launchable market id | `409 strategy_variant_launch.not_launchable`. |
+| SQL provenance | Postgres query over `strategy_strategies`, `strategy_backtest_variant_provenance`, `strategy_events`, and `strategy_runs` | `provenance_rows=1`, `distinct_strategy_rows=1`, `event_rows=1`, `run_rows=0`, idempotency hash shape is SHA-256, strategy spec hash present. |
+| Metrics | `GET /metrics` on the API process | `strategy_variant_launch_total` emitted bounded labels for `created`, `duplicate/idempotent_replay`, `forbidden`, `idempotency_key_required`, `not_found`, and `not_launchable`. |
+
+Browser proof used a real headed Playwright session at `https://roehub.com/backtests` with the synthetic
+session cookie:
+
+- `/backtests` loaded as `Ultra`, not guest/login;
+- Results tab loaded two synthetic jobs from `GET /api/ui/backtests/workstation`;
+- expanding the not-launchable job loaded variant detail from
+  `GET /api/backtests/jobs/{job_id}/variants/stage02_not_launchable`;
+- the modal text said: `No live or mainnet run is started.`;
+- submitting the not-launchable variant produced visible status
+  `HTTP 409: Backtest job has no launchable market id; not_launchable`;
+- expanding the launchable job loaded variant detail from
+  `GET /api/backtests/jobs/{job_id}/variants/stage02_launchable`;
+- submitting the launchable variant hit
+  `POST /api/backtests/jobs/{job_id}/variants/stage02_launchable/strategies => 200`
+  because API runtime had already created the synthetic strategy and the UI path replayed as a duplicate.
+
+The browser console recorded expected `422` detail-data fetch failures for the synthetic rows because they
+intentionally did not include materialized result series/trades. Those are outside Stage `02`; the
+create-strategy endpoint behavior was verified independently by API status and visible modal state.
+
+## Publish And Deploy
+
+Direct-main commits:
+
+- `ca69d631` — Stage `02` code/UI/schema/docs implementation;
+- `8ba38ae8` — deploy-unblocking identity audit bootstrap replay repair;
+- `0e3a9b07` — bounded strategy launch metric reason sanitization.
+
+GitHub Actions:
+
+- CI `26693054391` for `ca69d631`: success;
+- initial backend deploy for `ca69d631` failed because legacy identity audit bootstrap SQL recreated
+  a narrower accepted-event check than production already needed;
+- CI `26693175577` for `8ba38ae8`: success;
+- Deploy Backend `26693216924`, Publish App Image `26693216925`, Deploy Web `26693216919` and
+  `26693220054`: success;
+- CI `26693431678` for `0e3a9b07`: success;
+- Deploy Backend `26693505333`, Publish App Image `26693505329`, Deploy Web `26693505336`: success.
 
 ## Error Behavior
 
@@ -196,7 +262,7 @@ No exchange state, Redis execution stream, order ledger, paper order or live ord
 
 ## Next-Stage Handoff
 
-Stage `03` can rely on these facts only after runtime acceptance is appended:
+Stage `03` can rely on these accepted facts:
 
 - a strategy created from a backtest variant is immutable and inert;
 - provenance links owner, source job, public variant key/hash, strategy id, strategy spec hash and idempotency hash;
