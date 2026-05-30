@@ -55,6 +55,7 @@ class _FakeGateway:
         self._fetch_one_results = list(fetch_one_results or [])
         self._fetch_all_results = list(fetch_all_results or [])
         self.fetch_one_queries: list[str] = []
+        self.fetch_one_parameters: list[Mapping[str, Any]] = []
         self.fetch_all_queries: list[str] = []
         self.execute_queries: list[str] = []
 
@@ -75,7 +76,7 @@ class _FakeGateway:
             Appends query text to call log.
         """
         self.fetch_one_queries.append(query)
-        _ = parameters
+        self.fetch_one_parameters.append(dict(parameters))
         if not self._fetch_one_results:
             return None
         result = self._fetch_one_results.pop(0)
@@ -397,6 +398,42 @@ def test_run_repository_update_persists_metadata_json_field() -> None:
     repository.update(run=running)
 
     assert "metadata_json = %(metadata_json)s::jsonb" in gateway.fetch_one_queries[0]
+    metadata_json = gateway.fetch_one_parameters[0]["metadata_json"]
+    assert isinstance(metadata_json, str)
+    assert json.loads(metadata_json)["warmup"]["processed_bars"] == 10
+
+
+def test_run_repository_create_serializes_metadata_json_for_jsonb_parameter() -> None:
+    """
+    Verify run creation serializes metadata_json before passing it to psycopg JSONB SQL.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        psycopg production gateway expects JSON text for `%(metadata_json)s::jsonb`.
+    Raises:
+        AssertionError: If raw Python dict metadata is passed to the gateway.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(fetch_one_results=[None, _build_run_row(state="starting")])
+    repository = PostgresStrategyRunRepository(gateway=gateway)
+
+    run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000B889"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000001012"),
+        strategy_id=UUID("00000000-0000-0000-0000-00000000A112"),
+        started_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
+        metadata_json={"restart": {"state": "successor_started"}},
+    )
+
+    repository.create(run=run)
+
+    metadata_json = gateway.fetch_one_parameters[1]["metadata_json"]
+    assert isinstance(metadata_json, str)
+    assert json.loads(metadata_json) == {"restart": {"state": "successor_started"}}
 
 
 def test_run_repository_create_translates_unique_violation_to_domain_conflict() -> None:

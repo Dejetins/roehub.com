@@ -138,7 +138,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                     "checkpoint_ts_open": run.checkpoint_ts_open,
                     "last_error": run.last_error,
                     "updated_at": run.updated_at,
-                    "metadata_json": run.metadata_json,
+                    "metadata_json": _json_dumps(payload=run.metadata_json),
                 },
             )
         except Exception as error:  # noqa: BLE001
@@ -200,7 +200,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                 "checkpoint_ts_open": run.checkpoint_ts_open,
                 "last_error": run.last_error,
                 "updated_at": run.updated_at,
-                "metadata_json": run.metadata_json,
+                "metadata_json": _json_dumps(payload=run.metadata_json),
             },
         )
         if row is None:
@@ -512,3 +512,12 @@ def _coerce_utc_datetime(*, value: Any, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise StrategyStorageError(f"{field_name} must be timezone-aware")
     return value.astimezone(UTC)
+
+
+def _json_dumps(*, payload: Mapping[str, Any]) -> str:
+    try:
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    except (TypeError, ValueError) as error:
+        raise StrategyStorageError(
+            "strategy_runs.metadata_json is not JSON serializable"
+        ) from error
