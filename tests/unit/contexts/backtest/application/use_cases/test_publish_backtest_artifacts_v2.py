@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Sequence, cast
 
@@ -383,6 +383,15 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_and_rec
     assert second_result.previous_manifest_sha256 == first_result.published_manifest_sha256
     assert second_result.published_active_slot == "slot_b"
     assert second_result.published_slot_generation == 2
+    assert second_result.reused_prefix_bars == (
+        precompute_runner_testkit_v2._FULL_BUILD_MINUTES_V2
+        - publish_fixture.fixture.runtime_settings.price_tail_bars_1m
+    )
+    assert (
+        second_result.rewritten_tail_bars
+        == publish_fixture.fixture.runtime_settings.price_tail_bars_1m
+    )
+    assert second_result.stage_rebuild_stats.signals.reused_prefix_bars > 0
     assert second_result.validation.manifest_sha256 == second_result.published_manifest_sha256
     assert current_pointer.active_slot == "slot_b"
     assert current_pointer.slot_generation == 2
@@ -400,6 +409,8 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_and_rec
     assert third_result.previous_slot_generation == 2
     assert third_result.published_active_slot == "slot_a"
     assert third_result.published_slot_generation == 3
+    assert third_result.reused_prefix_bars == second_result.reused_prefix_bars
+    assert third_result.rewritten_tail_bars == second_result.rewritten_tail_bars
     assert slot_a_manifest_path.is_file()
     assert len(publish_fixture.index_reader.bounds_calls) == 3
 
@@ -483,7 +494,7 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
         bar_indexes=tuple(range(precompute_runner_testkit_v2._FULL_BUILD_MINUTES_V2))
     )
     index_reader = _FixedCanonicalCandleIndexReader(
-        first_ts_open=rows[0].candle.ts_open,
+        first_ts_open=UtcTimestamp(rows[0].candle.ts_open.value - timedelta(hours=3)),
         last_ts_open=rows[-1].candle.ts_open,
     )
     grid_builder = precompute_runner_testkit_v2._signal_grid_builder_v2()

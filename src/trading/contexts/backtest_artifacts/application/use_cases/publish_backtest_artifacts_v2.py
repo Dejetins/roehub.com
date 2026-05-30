@@ -382,15 +382,26 @@ class PublishBacktestArtifactsV2UseCase:
             request=request,
             bootstrap=precheck.bootstrap,
         )
+        build_time_range = _resolve_build_time_range_v2(
+            requested_time_range=requested_time_range,
+            publish_mode=publish_mode,
+            precheck=precheck,
+            slot_publisher=self.slot_publisher,
+        )
         build_request = ArtifactCanonicalPriceExportRequestV2(
             coordinates=request.coordinates,
-            time_range=requested_time_range,
+            time_range=build_time_range,
             asof_date=(
                 requested_time_range.end.value.astimezone(timezone.utc) - timedelta(minutes=1)
             ).date().isoformat(),
             generated_at_utc=_utc_timestamp_literal_v2(started_at_utc),
             target_slot=precheck.inactive_slot,
             target_slot_generation=precheck.target_slot_generation,
+            reuse_source_slot=(
+                None
+                if precheck.current_pointer is None or publish_mode != "incremental"
+                else precheck.current_pointer.active_slot
+            ),
             force_full_rebuild=publish_mode != "incremental",
         )
         build_result = self.precompute_runner.export_canonical_price_1m(build_request)
@@ -422,8 +433,8 @@ class PublishBacktestArtifactsV2UseCase:
             published_manifest_sha256=publish_result.published_pointer.manifest_sha256,
             asof_date=publish_result.published_pointer.asof_date,
             published_at_utc=publish_result.published_pointer.published_at_utc,
-            requested_start_utc=_utc_timestamp_literal_v2(requested_time_range.start.value),
-            requested_end_utc=_utc_timestamp_literal_v2(requested_time_range.end.value),
+            requested_start_utc=_utc_timestamp_literal_v2(build_time_range.start.value),
+            requested_end_utc=_utc_timestamp_literal_v2(build_time_range.end.value),
             source_start_utc=_utc_timestamp_literal_v2(build_result.source_time_range.start.value),
             source_end_utc=_utc_timestamp_literal_v2(build_result.source_time_range.end.value),
             source_candle_count=build_result.source_candle_count,
@@ -479,6 +490,93 @@ def _resolve_requested_time_range_v2(
         start=first_ts_open,
         end=UtcTimestamp(last_ts_open.value + timedelta(minutes=1)),
     )
+
+
+def _resolve_build_time_range_v2(
+    *,
+    requested_time_range: TimeRange,
+    publish_mode: PublishBacktestArtifactsModeV2,
+    precheck: ArtifactPublishPrecheckV2,
+    slot_publisher: BacktestArtifactSlotPublisherV2,
+) -> TimeRange:
+    """
+    Resolve the source envelope used for the actual inactive-slot build.
+
+    Args:
+        requested_time_range: Full canonical ClickHouse bounds for the target symbol.
+        publish_mode: Resolved bootstrap/incremental/full-rebuild mode.
+        precheck: Publish precheck carrying the active pointer, when present.
+        slot_publisher: Publisher dependency exposing the artifact loader.
+    Returns:
+        TimeRange: Build range that preserves tail semantics for incremental publishes.
+    Assumptions:
+        Incremental publish is a tail refresh. If ClickHouse later exposes older canonical rows
+        than the already-published artifact start, that is a separate head backfill/full-rebuild
+        operation and must not silently disable prefix reuse.
+    Raises:
+        ValueError: If the active manifest lacks a strict `prices/1m` coverage section.
+    Side Effects:
+        Reads the active slot manifest for incremental publish only.
+    Docs:
+      - docs/runbooks/backtest-artifacts-rebuild.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest_artifacts/application/services/v2/
+        artifact_precompute_runner.py
+    """
+    if publish_mode != "incremental" or precheck.current_pointer is None:
+        return requested_time_range
+    active_start = _active_one_minute_start_v2(
+        precheck=precheck,
+        slot_publisher=slot_publisher,
+    )
+    if active_start.value <= requested_time_range.start.value:
+        return requested_time_range
+    if active_start.value >= requested_time_range.end.value:
+        raise ValueError(
+            "incremental artifact publish active prices/1m start must be before requested end; "
+            f"got active_start={active_start.value.isoformat()} and "
+            f"requested_end={requested_time_range.end.value.isoformat()}"
+        )
+    return TimeRange(start=active_start, end=requested_time_range.end)
+
+
+def _active_one_minute_start_v2(
+    *,
+    precheck: ArtifactPublishPrecheckV2,
+    slot_publisher: BacktestArtifactSlotPublisherV2,
+) -> UtcTimestamp:
+    """
+    Return the active slot `prices/1m` start timestamp for incremental tail refreshes.
+
+    Args:
+        precheck: Publish precheck carrying the current active pointer.
+        slot_publisher: Publisher dependency exposing the artifact loader.
+    Returns:
+        UtcTimestamp: Active artifact `prices/1m.coverage.open_time_start`.
+    Assumptions:
+        A valid current pointer always references a strict active slot manifest.
+    Raises:
+        ValueError: If the current pointer or `prices/1m` section is absent.
+    Side Effects:
+        Reads one active slot manifest.
+    """
+    current_pointer = precheck.current_pointer
+    if current_pointer is None:
+        raise ValueError("incremental artifact publish requires current pointer")
+    active_manifest = slot_publisher.artifact_loader.load_slot_manifest(
+        precheck.coordinates,
+        current_pointer.active_slot,
+    )
+    for price_section in active_manifest.prices:
+        if price_section.timeframe == "1m":
+            return UtcTimestamp(
+                datetime.fromtimestamp(
+                    price_section.coverage.open_time_start / 1000,
+                    tz=timezone.utc,
+                )
+            )
+    raise ValueError("incremental artifact publish active manifest missing prices/1m section")
 
 
 def _ensure_precheck_ready_v2(*, precheck: ArtifactPublishPrecheckV2) -> None:

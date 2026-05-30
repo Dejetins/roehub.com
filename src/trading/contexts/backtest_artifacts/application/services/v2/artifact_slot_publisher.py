@@ -284,6 +284,11 @@ class BacktestArtifactSlotPublisherV2:
                 generated_at_utc=request.generated_at_utc,
                 target_slot=precheck.inactive_slot,
                 target_slot_generation=precheck.target_slot_generation,
+                reuse_source_slot=(
+                    None
+                    if precheck.current_pointer is None or request.force_full_rebuild
+                    else precheck.current_pointer.active_slot
+                ),
                 force_full_rebuild=request.force_full_rebuild,
             )
         )
