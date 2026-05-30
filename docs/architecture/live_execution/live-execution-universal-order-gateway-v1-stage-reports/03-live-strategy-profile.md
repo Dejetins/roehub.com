@@ -4,7 +4,7 @@ Stage 03 adds `LiveStrategyProfile` for strategy launch mode, exchange binding, 
 
 Date: 2026-05-30.
 
-Status: local validation passed; direct-main publish/deploy pending.
+Status: accepted; direct-main delivered; CI/deploy and Mac Studio/public runtime evidence complete.
 
 ## Scope
 
@@ -35,7 +35,7 @@ Out of scope:
 |---|---|---|
 | Stage `02` accepted before Stage `03`. | Ledger row for `02` is `accepted`; evidence log records post-deploy API/SQL/browser proof. | Pass. |
 | Work on `main`, no stage branch or PR. | `git status --short --branch` returned `## main...origin/main` before implementation. | Pass. |
-| Runtime acceptance is not tests-only. | Local HTTP and browser boundary proof is recorded below. Production SQL/deploy evidence is pending direct-main delivery. | Pending. |
+| Runtime acceptance is not tests-only. | Local HTTP/browser proof and post-deploy Mac Studio API/SQL/metrics plus public browser proof are recorded below. | Pass. |
 
 ## Files Changed
 
@@ -145,7 +145,48 @@ Browser proof used Playwright CLI against a local web/API Uvicorn pair with one 
   - `output/playwright/stage03-strategies-live-profile-desktop.png`
   - `output/playwright/stage03-strategies-live-profile-mobile.png`
 
-Production SQL/API/browser proof is pending direct-main publish/deploy.
+Post-deploy Mac Studio smoke passed after direct-main deploy:
+
+- `ssh macstudio 'cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh'`;
+- launchd listed `com.roehub.api`, `com.roehub.exchange-control`, `com.roehub.backtest-job-runner`, market-data workers, exporters, Redis, Postgres, ClickHouse, Keycloak, OpenBao and Tailscale services;
+- HTTP probes returned expected root redirect/API unauthenticated `401`/metrics surfaces;
+- Redis returned `PONG`;
+- Tailscale backend state was `Running`.
+
+Deployed bundle and schema proof:
+
+- `/opt/roehub/app` contains `alembic/versions/20260530_0017_strategy_live_profiles_v1.py`;
+- deployed API bundle contains `live_strategy_profile_readiness_total` and `strategy_live_profiles` references;
+- `alembic_version` is `20260530_0017`;
+- `strategy_live_profiles` exists with non-secret profile columns and no `secret` column names.
+
+Production API/SQL probe used synthetic Stage `03` owner/session/strategy rows plus a synthetic
+exchange-control readiness projection. The projection used placeholder ciphertext only and did not
+decrypt credentials or call exchange submit.
+
+| Runtime boundary | Evidence | Result |
+|---|---|---|
+| Strategy create | `POST /strategies` with synthetic owner session | `201`. |
+| Default profile | `POST /strategies/{strategy_id}/live-profile` | `201`; `mode=monitor_only`, `ready/monitor_only_no_exchange_submit`, no exchange connection. |
+| Paper profile | `PUT /strategies/{strategy_id}/live-profile` with `mode=paper` | `200`; `ready/paper_no_exchange_submit`, no exchange submit. |
+| Live without recent auth | Same profile with old synthetic session and eligible connection id | `200`; fail-closed `blocked/recent_auth_required`. |
+| Live with recent auth | Same profile with fresh synthetic session and eligible connection id | `200`; `ready/live_ready_recent_auth_and_connection`. |
+| Readiness refresh | `GET /strategies/{strategy_id}/live-profile/readiness` with fresh session | `200`; persisted live ready state returned. |
+| Dashboard read model | `GET /ui/strategies/dashboard?strategy_id=<synthetic_strategy_id>` | `200`; top-level `live_profile` had `mode=live`, `readiness_status=ready`, `readiness_reason=live_ready_recent_auth_and_connection`. |
+| SQL profile row | Query over `strategy_live_profiles` and `strategy_events` | one live ready profile row, exchange connection id present, `profile_events=4`, `secret_columns=0`. |
+| Metrics | `GET /metrics` on Mac Studio API | bounded `live_strategy_profile_readiness_total` labels for `monitor_only_no_exchange_submit`, `paper_no_exchange_submit`, `recent_auth_required`, and `live_ready_recent_auth_and_connection`. |
+
+Public browser proof used Playwright against `https://roehub.com/strategies?strategy_id=<synthetic_strategy_id>`
+with a synthetic session cookie that was not printed or recorded:
+
+- desktop viewport showed profile panel title `Live profile`, `mode=live`, readiness
+  `ready: live_ready_recent_auth_and_connection`, reason `live_ready_recent_auth_and_connection`;
+- mobile viewport showed the same profile state and no horizontal document overflow;
+- `GET https://roehub.com/api/ui/strategies/dashboard?...` returned `200`;
+- console errors: none;
+- screenshots:
+  - `output/playwright/stage03-prod-strategies-live-profile-desktop.png`
+  - `output/playwright/stage03-prod-strategies-live-profile-mobile.png`
 
 ## Error Behavior
 
@@ -206,7 +247,17 @@ Safe rollback path before later execution stages depend on this table:
 
 ## Publish And Deploy
 
-Pending direct-main commit, push, CI, Mac Studio deploy and production post-deploy smoke.
+Direct-main commit:
+
+- `6a3ea338` — Stage `03` code/UI/schema/docs implementation.
+
+GitHub Actions:
+
+- CI `26694694133`: success;
+- Deploy Backend `26694731561`: success; backend deploy applied DB bootstrap/migrations, reloaded production launchd surface and passed backend smoke;
+- Publish App Image `26694731562`: success, with a non-blocking Docker cache reservation warning;
+- Deploy Web `26694731541`: success;
+- Deploy Web `26694755752`: first attempt failed public-edge smoke with transient `/api/auth/current-user=502`; rerun attempt `2` passed, including public edge smoke.
 
 ## Next-Stage Handoff
 
