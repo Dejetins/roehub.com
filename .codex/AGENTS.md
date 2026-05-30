@@ -138,6 +138,8 @@ Current intended routing:
 
 Architecture documents created or materially rewritten by `architecture-design` MUST default to Russian narrative, clear explanations, and a business-readable layer in addition to engineering detail. Prompt artifacts produced by `prompt-manager` MUST keep their own language contract and remain English unless a higher-priority user instruction explicitly says otherwise.
 
+Non-trivial architecture plans MUST conditionally cover the risk surfaces they introduce. When a plan touches service or context calls, external providers, exchange execution, secrets, runtime operations, alerts, runbooks, staged delivery, or side-effecting retry paths, it MUST name the applicable service-call contracts, auth model, timeout/retry/error behavior, planned code/config/infra/docs artifacts by stage, affected documentation, idempotency and unknown-state rules, redaction boundaries, and operational alerts/runbook actions. These sections SHOULD be omitted or marked `N/A` for small internal plans where the surface is genuinely unaffected.
+
 When the user asks to apply, publish, ship, or carry repository changes through Git, GitHub, CI, deploy, and verification, the agent SHOULD prefer `publish-ci-deploy` as the single orchestration skill.
 
 `publish-ci-deploy` owns the end-to-end Git/GitHub delivery lifecycle and MAY internally use narrower verification helpers such as `backend-quality-gates` or `browser-qa-evidence` without asking the user to choose among them.
