@@ -33,7 +33,7 @@
 
 | Stage | Назначение | Статус | Блокеры | Следующий handoff |
 |---|---|---|---|---|
-| `01` | Current-state baseline: Backtest results, Strategy CRUD/run/stop, Live Runner, Redis streams, exchange connections, bindings, runtime ops. | planned | none | Зафиксировать, какие endpoints/tables/streams/processes уже существуют и где отсутствуют launch/restart/signal/execution компоненты. |
+| `01` | Current-state baseline: Backtest results, Strategy CRUD/run/stop, Live Runner, Redis streams, exchange connections, bindings, runtime ops. | accepted | Initial local probe was not the target runtime. Follow-up SSH evidence on `macstudio` confirmed API, Postgres, Redis, exchange-control, Monit and most Prometheus targets are available. Authenticated browser inventory for `/backtests`, `/strategies`, and `/settings` completed. `backtest-artifact-publisher` remains `up=0` / port `9203` closed, but the Mac Studio runbook excludes it from automatic startup, so it is current ops state rather than a Stage 01 blocker. | Direct-main publish/deploy handoff remains required before Stage 02 implementation starts. |
 | `02` | Backtest variant -> immutable strategy creation. | planned | `01` accepted | Передать owner-scoped launchable variant contract, provenance, idempotency и rejected cases. |
 | `03` | `LiveStrategyProfile`: mode, exchange binding, sizing, limits, readiness. | planned | `02` accepted | Передать profile schema/API, safe defaults, readiness reasons и no-live-without-recent-auth evidence. |
 | `04` | Strategy run/stop/restart lifecycle hardening. | planned | `03` accepted | Передать run/restart command semantics, UI controls, one-active-run proof, worker pickup/drain evidence. |
@@ -158,7 +158,7 @@
 
 | Stage | Status | Evidence summary | Commands / evidence refs | Commit / deploy | Notes |
 |---|---|---|---|---|---|
-| `01` | planned | - | - | - | - |
+| `01` | accepted | Static inventory found current backtest result/variant routes, strategy CRUD/clone/run/stop, strategy live-runner, exchange connections, strategy exchange bindings, and ops config. Mac Studio runtime evidence confirmed API health/openapi, current authenticated routes returning `401`, missing restart/execution routes returning `404`, SQL table presence/absence, Redis market-data streams with no execution streams, exchange-control ready/metrics, launchd services, Monit OK, and Prometheus `up=1` for core targets. Authenticated browser inventory confirmed `/backtests`, `/strategies`, and `/settings` current UI surfaces and absence of create-from-variant, restart, live profile, signal journal, execution console, and order-submit controls. `backtest-artifact-publisher` remains excluded from automatic startup per Mac Studio runbook; no service start was performed. | `docs/architecture/live_execution/live-execution-universal-order-gateway-v1-stage-reports/01-current-state-baseline.md`; SSH `macstudio` API/openapi/route probes; SQL metadata query; Redis scan/XINFO; exchange-control `/health/ready` and `/metrics`; launchd/Monit/Prometheus inventory; authenticated Playwright browser inventory. | Direct-main delivery pending. | Docs-only change; no product code/schema/config/runtime changes; Stage 02 may start only after direct-main publish/deploy handoff completes. |
 | `02` | planned | - | - | - | - |
 | `03` | planned | - | - | - | - |
 | `04` | planned | - | - | - | - |
