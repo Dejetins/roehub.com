@@ -43,6 +43,15 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.strategy.application import (
+    CreateStrategyFromBacktestVariantResult,
+    CurrentUser,
+)
+from trading.contexts.strategy.domain.entities import (
+    Strategy,
+    StrategyBacktestVariantProvenance,
+    StrategySpecV1,
+)
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 
@@ -206,6 +215,34 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     )
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
+
+
+def test_post_backtest_variant_strategy_requires_idempotency_and_returns_provenance() -> None:
+    use_case = _FakeCreateStrategyFromVariantUseCase()
+    client = _build_client(create_strategy_from_variant_use_case=use_case)
+
+    missing = client.post(
+        "/backtests/jobs/00000000-0000-0000-0000-00000000b001/variants/job_demo/strategies",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+    )
+    created = client.post(
+        "/backtests/jobs/00000000-0000-0000-0000-00000000b001/variants/job_demo/strategies",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-1",
+        },
+    )
+
+    assert missing.status_code == 422
+    assert missing.json()["error"]["code"] == "strategy_variant_launch.idempotency_key_required"
+    assert created.status_code == 201
+    payload = created.json()
+    assert payload["status"] == "created"
+    assert payload["duplicate"] is False
+    assert payload["strategy"]["spec"]["instrument_key"] == "binance:spot:BTCUSDT"
+    assert payload["provenance"]["source_job_id"] == "00000000-0000-0000-0000-00000000b001"
+    assert payload["provenance"]["source_variant_key"] == "job_demo"
+    assert use_case.calls == (("job_demo", "launch-1"),)
 
 
 def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
@@ -1245,6 +1282,7 @@ def _build_client(
     *,
     resolver: _FakeArtifactResolver | _UnavailableArtifactResolver | None = None,
     jobs_use_case: BacktestJobsUseCase | None = None,
+    create_strategy_from_variant_use_case: Any | None = None,
 ) -> TestClient:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -1269,9 +1307,68 @@ def _build_client(
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
             jobs_use_case=jobs_use_case,
+            create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
         )
     )
     return TestClient(app)
+
+
+class _FakeCreateStrategyFromVariantUseCase:
+    def __init__(self) -> None:
+        self.calls: tuple[tuple[str, str | None], ...] = ()
+
+    def execute(
+        self,
+        *,
+        current_user: CurrentUser,
+        job_id: UUID,
+        variant_key: str,
+        idempotency_key: str | None,
+    ) -> CreateStrategyFromBacktestVariantResult:
+        if not idempotency_key:
+            from trading.platform.errors import RoehubError
+
+            raise RoehubError(
+                code="strategy_variant_launch.idempotency_key_required",
+                message="Idempotency-Key header is required",
+                details={"reason": "idempotency_key_required"},
+            )
+        self.calls = (*self.calls, (variant_key, idempotency_key))
+        strategy = Strategy.create(
+            user_id=current_user.user_id,
+            spec=StrategySpecV1.from_json(payload=_strategy_spec_payload()),
+            created_at=datetime(2026, 5, 30, 10, 0, tzinfo=UTC),
+            strategy_id=UUID("00000000-0000-0000-0000-00000000c001"),
+        )
+        provenance = StrategyBacktestVariantProvenance(
+            strategy_id=strategy.strategy_id,
+            user_id=current_user.user_id,
+            source_job_id=job_id,
+            source_variant_key=variant_key,
+            source_variant_hash="a" * 64,
+            source_indicator_variant_hash="b" * 64,
+            backtest_request_hash="d" * 64,
+            backtest_result_config_hash="e" * 64,
+            strategy_spec_hash="f" * 64,
+            launch_request_hash="1" * 64,
+            idempotency_key_hash="2" * 64,
+            created_at=datetime(2026, 5, 30, 10, 0, tzinfo=UTC),
+        )
+        return CreateStrategyFromBacktestVariantResult(
+            strategy=strategy,
+            provenance=provenance,
+            duplicate=False,
+        )
+
+
+def _strategy_spec_payload() -> dict[str, Any]:
+    return {
+        "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+        "instrument_key": "binance:spot:BTCUSDT",
+        "market_type": "spot",
+        "timeframe": "15m",
+        "indicators": [{"id": "ma.dema", "params": {"source": "close", "window": 5}}],
+    }
 
 
 def _build_jobs_use_case(

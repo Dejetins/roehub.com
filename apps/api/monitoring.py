@@ -32,6 +32,11 @@ _REQUESTS_IN_PROGRESS = Gauge(
     "http_requests_in_progress",
     "Number of in-flight Roehub API HTTP requests.",
 )
+_STRATEGY_VARIANT_LAUNCH_TOTAL = Counter(
+    "strategy_variant_launch_total",
+    "Strategy create-from-backtest-variant attempts by result.",
+    ("result", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -131,6 +136,13 @@ def build_metrics_response() -> Response:
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+def record_strategy_variant_launch(*, result: str, reason: str = "none") -> None:
+    """
+    Record one create-from-backtest-variant attempt without user or strategy labels.
+    """
+    _STRATEGY_VARIANT_LAUNCH_TOTAL.labels(result=result, reason=reason).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -158,4 +170,8 @@ def _resolve_path_label(*, request: Request) -> str:
     return request.url.path
 
 
-__all__ = ["build_metrics_response", "install_metrics_middleware"]
+__all__ = [
+    "build_metrics_response",
+    "install_metrics_middleware",
+    "record_strategy_variant_launch",
+]

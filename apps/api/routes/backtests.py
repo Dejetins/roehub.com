@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from apps.api.dto import (
     BacktestJobResponse,
@@ -32,6 +33,7 @@ from apps.api.dto import (
     build_backtest_top_variant_response,
     build_backtest_top_variants_response,
 )
+from apps.api.monitoring import record_strategy_variant_launch
 from trading.contexts.backtest.application.dto import (
     BacktestLazyTradesMaterializationReadModel,
 )
@@ -46,9 +48,32 @@ from trading.contexts.backtest.application.services.v2 import (
 )
 from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.strategy.application import (
+    CreateStrategyFromBacktestVariantResult,
+    CreateStrategyFromBacktestVariantUseCase,
+    CurrentUser,
+)
+from trading.contexts.strategy.domain.entities import Strategy
 from trading.platform.errors import RoehubError
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
+
+
+class BacktestVariantStrategyProvenanceResponse(BaseModel):
+    source_job_id: UUID
+    source_variant_key: str
+    source_variant_hash: str
+    source_indicator_variant_hash: str | None
+    strategy_spec_hash: str
+    launch_request_hash: str
+
+
+class BacktestVariantStrategyResponse(BaseModel):
+    status: str
+    duplicate: bool
+    duplicate_reason: str | None
+    strategy: dict[str, Any]
+    provenance: BacktestVariantStrategyProvenanceResponse
 
 
 def build_backtests_router(
@@ -57,6 +82,7 @@ def build_backtests_router(
     preflight_service: BacktestPreflightService,
     current_user_dependency: CurrentUserDependency,
     jobs_use_case: BacktestJobsUseCase | None = None,
+    create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
 ) -> APIRouter:
     """
     Build Iteration 1 public backtests API shell.
@@ -90,6 +116,15 @@ def build_backtests_router(
                 details={"reason": "job_repository_unavailable"},
             )
         return jobs_use_case
+
+    def require_create_strategy_from_variant_use_case() -> CreateStrategyFromBacktestVariantUseCase:
+        if create_strategy_from_variant_use_case is None:
+            raise RoehubError(
+                code="strategy_variant_launch.unavailable",
+                message="Create strategy from variant service is not configured",
+                details={"reason": "strategy_variant_launch_unavailable"},
+            )
+        return create_strategy_from_variant_use_case
 
     @router.get("/backtests/runtime-defaults", response_model=BacktestRuntimeDefaultsResponse)
     def get_backtest_runtime_defaults(
@@ -235,6 +270,43 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         return build_backtest_top_variant_response(result=result)
+
+    @router.post(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/strategies",
+        response_model=BacktestVariantStrategyResponse,
+        status_code=201,
+    )
+    def post_backtest_job_variant_strategy(
+        response: Response,
+        job_id: UUID,
+        variant_key: str,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: CreateStrategyFromBacktestVariantUseCase = Depends(
+            require_create_strategy_from_variant_use_case
+        ),
+    ) -> BacktestVariantStrategyResponse:
+        try:
+            result = use_case.execute(
+                current_user=CurrentUser(user_id=principal.user_id),
+                job_id=job_id,
+                variant_key=variant_key,
+                idempotency_key=idempotency_key,
+            )
+        except RoehubError as error:
+            error_details = error.details or {}
+            reason = str(error_details.get("reason", error.code))
+            record_strategy_variant_launch(result="rejected", reason=reason)
+            raise
+        if result.duplicate:
+            response.status_code = 200
+            record_strategy_variant_launch(
+                result="duplicate",
+                reason=result.duplicate_reason or "duplicate",
+            )
+        else:
+            record_strategy_variant_launch(result="created")
+        return _to_variant_strategy_response(result=result)
 
     @router.post(
         "/backtests/jobs/{job_id}/variants/{variant_key}/trades",
@@ -436,6 +508,38 @@ def build_backtests_router(
 def _apply_materialization_status_code(*, response: Response, result: Any) -> None:
     if isinstance(result, BacktestLazyTradesMaterializationReadModel):
         response.status_code = 202
+
+
+def _to_variant_strategy_response(
+    *,
+    result: CreateStrategyFromBacktestVariantResult,
+) -> BacktestVariantStrategyResponse:
+    provenance = result.provenance
+    return BacktestVariantStrategyResponse(
+        status="duplicate" if result.duplicate else "created",
+        duplicate=result.duplicate,
+        duplicate_reason=result.duplicate_reason,
+        strategy=_strategy_response_mapping(strategy=result.strategy),
+        provenance=BacktestVariantStrategyProvenanceResponse(
+            source_job_id=provenance.source_job_id,
+            source_variant_key=provenance.source_variant_key,
+            source_variant_hash=provenance.source_variant_hash,
+            source_indicator_variant_hash=provenance.source_indicator_variant_hash,
+            strategy_spec_hash=provenance.strategy_spec_hash,
+            launch_request_hash=provenance.launch_request_hash,
+        ),
+    )
+
+
+def _strategy_response_mapping(*, strategy: Strategy) -> dict[str, Any]:
+    return {
+        "strategy_id": str(strategy.strategy_id),
+        "user_id": str(strategy.user_id),
+        "name": strategy.name,
+        "created_at": strategy.created_at.isoformat(),
+        "is_deleted": strategy.is_deleted,
+        "spec": strategy.spec.to_json(),
+    }
 
 
 def _resolve_result_points(*, points: int | None, max_points: int | None) -> int:

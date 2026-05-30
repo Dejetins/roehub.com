@@ -254,6 +254,7 @@ Lazy trades endpoint:
 
 ```http
 POST /backtests/jobs/{job_id}/variants/{variant_key}/trades
+POST /backtests/jobs/{job_id}/variants/{variant_key}/strategies
 ```
 
 Поведение:
@@ -393,6 +394,25 @@ Each row includes:
 
 Returns one persisted variant summary and full parameter decomposition.
 
+### `POST /backtests/jobs/{job_id}/variants/{variant_key}/strategies`
+
+Creates an immutable strategy from one owner-scoped launchable persisted top variant.
+
+Headers:
+
+- required `Idempotency-Key`;
+- replaying the same launch request with the same key returns the existing strategy/provenance;
+- reusing the same key for a different launch request returns deterministic `409`.
+
+Behavior:
+
+- resolves the job and public `variant_key` inside the current user's scope;
+- requires the job to be `succeeded` and to contain persisted launch metadata;
+- builds `StrategySpecV1` from the canonical variant indicators and job coordinates;
+- persists strategy plus `strategy_backtest_variant_provenance` atomically;
+- records a `strategy_created_from_backtest_variant` strategy event for new creations;
+- does not create a run, profile, Redis dispatch, paper order or exchange order.
+
 ### `POST /backtests/jobs/{job_id}/variants/{variant_key}/trades`
 
 Returns cached lazy trades views for one variant or creates/replays a lazy
@@ -447,6 +467,12 @@ validation and remains the authoritative create path.
 | 404 | `backtest.not_found` | no | Job or variant is not visible to the user. |
 | 409 | `backtest.idempotency_key_conflict` | no | Same `Idempotency-Key` was reused with different canonical request. |
 | 409 | `backtest.job_not_cancellable` | no | Cancellation is not valid for the current state. |
+| 403 | `strategy_variant_launch.forbidden` | no | Current user does not own the source job. |
+| 404 | `strategy_variant_launch.not_found` | no | Source job or public variant key is not visible. |
+| 409 | `strategy_variant_launch.idempotency_key_conflict` | no | Same `Idempotency-Key` was reused for a different variant launch request. |
+| 409 | `strategy_variant_launch.not_launchable` | no | Source job or variant is not launchable as an immutable strategy. |
+| 422 | `strategy_variant_launch.idempotency_key_required` | no | Mutating create-from-variant request has no valid `Idempotency-Key`. |
+| 503 | `strategy_variant_launch.unavailable` | yes | Create-from-variant service is not configured in the runtime. |
 | 422 | `backtest.invalid_request` | no | Coordinates, timeframe, range, indicator grid or execution settings are invalid. |
 | 422 | `backtest.tp_sl_grid_not_covered` | no | Requested TP/SL grid is not covered by published `hit_times/15m`. |
 | 422 | `backtest.request_too_expensive` | no | Request exceeds configured cost/combination limits. |

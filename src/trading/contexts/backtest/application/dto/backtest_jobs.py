@@ -308,6 +308,17 @@ def build_top_variant_read_model(
     )
     variant_hash = str(payload.get("variant_hash") or row.variant_key)
     indicator_variant_hash = payload.get("indicator_variant_hash") or row.indicator_variant_key
+    actions = _mapping_payload(payload.get("actions"))
+    create_strategy_available = bool(
+        _mapping_payload(payload.get("canonical_variant_params")).get("indicators")
+    )
+    actions.setdefault(
+        "create_strategy_from_variant",
+        {
+            "available": create_strategy_available,
+            "status": "launchable" if create_strategy_available else "not_launchable",
+        },
+    )
     return BacktestJobTopVariantReadModel(
         rank=row.rank,
         variant_key=public_variant_key,
@@ -319,7 +330,7 @@ def build_top_variant_read_model(
         canonical_variant_params=_mapping_payload(payload.get("canonical_variant_params")),
         readable_params=_mapping_payload(payload.get("readable_params")),
         links=_mapping_payload(payload.get("links")),
-        actions=_mapping_payload(payload.get("actions")),
+        actions=actions,
     )
 
 

@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Mapping
+from uuid import UUID
 
 import pytest
 
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryStrategyBacktestVariantProvenanceRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
 )
 from trading.contexts.strategy.application import (
+    BacktestVariantLaunchSnapshot,
     CloneStrategyUseCase,
+    CreateStrategyFromBacktestVariantUseCase,
     CreateStrategyUseCase,
     CurrentUser,
     GetMyStrategyUseCase,
@@ -109,6 +113,128 @@ def test_get_my_strategy_use_case_rejects_non_owner_access() -> None:
 
     assert error_info.value.code == "forbidden"
     assert error_info.value.details == {"strategy_id": str(created_strategy.strategy_id)}
+
+
+def test_create_strategy_from_backtest_variant_persists_provenance_and_replays() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    provenance_repository = InMemoryStrategyBacktestVariantProvenanceRepository(
+        strategy_repository=strategy_repository,
+    )
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000123")
+    )
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
+        strategy_repository=strategy_repository,
+        provenance_repository=provenance_repository,
+        event_repository=event_repository,
+        clock=_SequenceClock(
+            values=(
+                datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
+            )
+        ),
+    )
+
+    created = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-1",
+    )
+    replay = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-1",
+    )
+
+    assert created.duplicate is False
+    assert replay.duplicate is True
+    assert replay.duplicate_reason == "idempotent_replay"
+    assert replay.strategy.strategy_id == created.strategy.strategy_id
+    assert created.provenance.source_job_id == UUID("00000000-0000-0000-0000-00000000b001")
+    assert created.provenance.source_variant_key == "job_demo__dema_close_w5__vh_aaaaaaaa"
+    assert created.provenance.source_variant_hash == "a" * 64
+    assert created.provenance.idempotency_key_hash != "launch-1"
+    assert created.strategy.spec.instrument_key == "binance:spot:BTCUSDT"
+    assert created.strategy.spec.indicators[0] == {
+        "id": "ma.dema",
+        "params": {"row_id": 7, "source": "close", "window": 5},
+    }
+    events = event_repository.list_for_strategy(
+        user_id=current_user.user_id,
+        strategy_id=created.strategy.strategy_id,
+    )
+    assert events[0].event_type == "strategy_created_from_backtest_variant"
+
+
+def test_create_strategy_from_backtest_variant_returns_duplicate_for_same_source_variant() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    provenance_repository = InMemoryStrategyBacktestVariantProvenanceRepository(
+        strategy_repository=strategy_repository,
+    )
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000124")
+    )
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
+        strategy_repository=strategy_repository,
+        provenance_repository=provenance_repository,
+        clock=_SequenceClock(
+            values=(
+                datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
+            )
+        ),
+    )
+
+    created = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-1",
+    )
+    duplicate = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-2",
+    )
+
+    assert duplicate.duplicate is True
+    assert duplicate.duplicate_reason == "source_variant_exists"
+    assert duplicate.strategy.strategy_id == created.strategy.strategy_id
+
+
+def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_job() -> None:
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000125")
+    )
+    strategy_repository = InMemoryStrategyRepository()
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(
+            snapshot=_launch_snapshot(current_user, job_state="running")
+        ),
+        strategy_repository=strategy_repository,
+        provenance_repository=InMemoryStrategyBacktestVariantProvenanceRepository(
+            strategy_repository=strategy_repository,
+        ),
+        clock=_SequenceClock(
+            values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)
+        ),
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        use_case.execute(
+            current_user=current_user,
+            job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+            variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+            idempotency_key="launch-1",
+        )
+
+    assert error_info.value.code == "strategy_variant_launch.not_launchable"
+    assert error_info.value.details is not None
+    assert error_info.value.details["reason"] == "not_launchable"
 
 
 
@@ -305,6 +431,60 @@ def test_warmup_estimator_is_deterministic_for_equal_strategy_specs() -> None:
     assert warmup_b == 50
     assert warmup_a == warmup_b
 
+
+
+class _StaticBacktestVariantReader:
+    def __init__(self, *, snapshot: BacktestVariantLaunchSnapshot) -> None:
+        self._snapshot = snapshot
+
+    def get(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestVariantLaunchSnapshot:
+        _ = user_id, job_id, variant_key
+        return self._snapshot
+
+
+def _launch_snapshot(
+    current_user: CurrentUser,
+    *,
+    job_state: str = "succeeded",
+) -> BacktestVariantLaunchSnapshot:
+    return BacktestVariantLaunchSnapshot(
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        owner_user_id=current_user.user_id,
+        job_state=job_state,
+        request_hash="d" * 64,
+        result_config_hash="e" * 64,
+        market_id=1,
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+        timeframe="15m",
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        variant_hash="a" * 64,
+        indicator_variant_hash="b" * 64,
+        rank=1,
+        summary_metrics={"total_return_pct": 12.5, "trade_count": 2},
+        canonical_variant_params={
+            "schema_version": 1,
+            "indicators": [
+                {
+                    "indicator_id": "ma.dema",
+                    "row_id": 7,
+                    "source": "close",
+                    "window": 5,
+                }
+            ],
+            "risk": {"mode": "none"},
+            "execution": {"direction_mode": "long_short_reversal"},
+            "ranking": {"primary_metric": "total_return_pct"},
+        },
+        readable_params={"slug": "dema_close_w5"},
+    )
 
 
 def _build_spec_payload() -> Mapping[str, Any]:

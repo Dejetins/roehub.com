@@ -3,6 +3,8 @@ from .ports import (
     METRIC_TYPES_V1,
     SCHEMA_VERSION_V1,
     TELEGRAM_NOTIFICATION_EVENT_TYPES_V1,
+    BacktestVariantLaunchReader,
+    BacktestVariantLaunchSnapshot,
     ConfirmedTelegramChatBindingResolver,
     CurrentUser,
     CurrentUserProvider,
@@ -11,6 +13,7 @@ from .ports import (
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
     RealtimeOutputKindV1,
+    StrategyBacktestVariantProvenanceRepository,
     StrategyClock,
     StrategyEventRepository,
     StrategyExchangeBindingRepository,
@@ -39,6 +42,8 @@ from .services import (
 )
 from .use_cases import (
     CloneStrategyUseCase,
+    CreateStrategyFromBacktestVariantResult,
+    CreateStrategyFromBacktestVariantUseCase,
     CreateStrategyUseCase,
     DeleteStrategyUseCase,
     GetMyStrategyUseCase,
@@ -51,7 +56,11 @@ from .use_cases import (
 
 __all__ = [
     "CloneStrategyUseCase",
+    "CreateStrategyFromBacktestVariantResult",
+    "CreateStrategyFromBacktestVariantUseCase",
     "CreateStrategyUseCase",
+    "BacktestVariantLaunchReader",
+    "BacktestVariantLaunchSnapshot",
     "CurrentUser",
     "CurrentUserProvider",
     "METRIC_TYPES_V1",
@@ -84,6 +93,7 @@ __all__ = [
     "StrategyLiveCandleMessage",
     "StrategyLiveCandleStream",
     "StrategyClock",
+    "StrategyBacktestVariantProvenanceRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
     "StrategyRepository",

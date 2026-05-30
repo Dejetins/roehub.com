@@ -24,6 +24,7 @@
 1) Endpoints (API v1)
 - `POST /strategies` — create (immutable)
 - `POST /strategies/clone` — clone from template/existing → new strategy
+- `POST /backtests/jobs/{job_id}/variants/{variant_key}/strategies` — create immutable strategy from an owner-scoped backtest variant
 - `GET /strategies` — list by current user (owner)
 - `GET /strategies/{id}` — get by id (owner)
 - `POST /strategies/{id}/run` — create run + transition по правилам
@@ -43,6 +44,12 @@
 
 5) Ошибки и 422 payload
 - Используется общий механизм ошибок (см. отдельный документ `api-errors-and-422-payload-v1.md`).
+
+6) Backtest variant promotion
+- Strategy can be created from a persisted launchable backtest top variant through the Backtest API surface.
+- The use-case resolves the job and variant by current owner before building `StrategySpecV1`.
+- The create request requires `Idempotency-Key`; replay returns the existing strategy/provenance instead of creating a second immutable strategy.
+- The created strategy is inert: no run, live profile, source event, Redis dispatch, paper order or exchange order is created by this endpoint.
 
 ## Non-goals
 
@@ -102,6 +109,29 @@ Strategy контекст не знает про JWT/HTTP. API слой пред
 Последствия:
 - ✅ Единая модель изменений.
 - ⚠️ Нужно явно описать список разрешённых overrides и их валидацию.
+
+### 5A) Create-from-backtest-variant — canonical promotion path
+
+`POST /backtests/jobs/{job_id}/variants/{variant_key}/strategies` creates a new immutable strategy from a persisted top-variant row.
+
+Contract:
+
+- the job must belong to the current user;
+- the job must be in `succeeded` state and carry launchable persisted metadata;
+- the variant is addressed by public `variant_key`, not by raw storage hash;
+- `StrategySpecV1` is derived from canonical variant indicator parameters plus persisted job coordinates;
+- provenance is persisted in `strategy_backtest_variant_provenance`;
+- duplicate replay by `Idempotency-Key` or by same owner/job/variant/spec returns the existing strategy result;
+- the endpoint never starts a run or creates live/paper execution state.
+
+Failure codes are stable for UI and later stages:
+
+- `strategy_variant_launch.forbidden`;
+- `strategy_variant_launch.not_found`;
+- `strategy_variant_launch.not_launchable`;
+- `strategy_variant_launch.idempotency_key_required`;
+- `strategy_variant_launch.idempotency_key_conflict`;
+- `strategy_variant_launch.unavailable`.
 
 ### 6) Run state machine — доменная, детерминированная, поддерживает повторные запуски
 
@@ -173,9 +203,12 @@ Strategy/use-cases возвращают/бросают доменные ошиб
 ## Связанные файлы
 
 - `apps/api/routes/strategies.py` — HTTP endpoints Strategy (тонкие)
+- `apps/api/routes/backtests.py` — create-from-backtest-variant endpoint
 - `apps/api/wiring/strategy_container.py` — composition root для Strategy
 - `src/trading/contexts/strategy/application/use_cases/*.py` — use-cases (ownership, clone, run/stop)
+- `src/trading/contexts/strategy/application/use_cases/create_strategy_from_backtest_variant.py` — owner-scoped variant promotion
 - `src/trading/contexts/strategy/application/ports/current_user.py` — порт `CurrentUser`/`CurrentUserProvider`
+- `src/trading/contexts/strategy/application/ports/backtest_variant_launch_reader.py` — owner-scoped backtest launch snapshot port
 - `src/trading/contexts/strategy/domain/*.py` — агрегаты Strategy/Run + доменные ошибки
 - `src/trading/contexts/strategy/adapters/outbound/*` — репозитории/хранилища
 - `docs/architecture/api/api-errors-and-422-payload-v1.md` — общий контракт ошибок/422 (см. отдельный документ)

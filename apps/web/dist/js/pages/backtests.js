@@ -58,6 +58,7 @@ const state = {
   loadedAllJobs: false,
   selectedJobId: null,
   selectedVariantKey: null,
+  pendingStrategyCreate: null,
   pendingCancelJobId: null,
   pendingCancelTrigger: null,
   resultSummary: null,
@@ -1546,6 +1547,7 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
           <span>${escapeHtml(resultDetailStatus(details))}</span>
         </div>
         <div class="backtests-result-actions">
+          <button class="rh-button rh-button--primary rh-button--compact" type="button" data-create-strategy-from-variant data-job-id="${escapeHtml(jobId)}" data-variant-key="${escapeHtml(variantKey)}">${escapeHtml(t("backtests.strategy_create.action"))}</button>
           <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-result-refresh>${escapeHtml(t("refresh.manual"))}</button>
           <a class="rh-button rh-button--secondary rh-button--compact backtests-download-button" href="${escapeHtml(csvHref)}" data-result-csv>${escapeHtml(t("backtests.variants.csv"))}</a>
         </div>
@@ -2647,6 +2649,98 @@ async function confirmCancelDialog(root) {
   closeCancelDialog(root, { restoreFocus: false });
 }
 
+function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
+  if (!jobId || !variantKey) {
+    return;
+  }
+  const idempotencyKey = window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `strategy-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  state.pendingStrategyCreate = {
+    jobId,
+    variantKey,
+    idempotencyKey,
+    trigger: trigger instanceof HTMLElement ? trigger : null,
+  };
+  const dialog = qs("[data-strategy-create-dialog]", root);
+  if (!dialog) {
+    createStrategyFromVariant(root).catch(() => {});
+    return;
+  }
+  setText("[data-strategy-create-title]", t("backtests.strategy_create.title"), dialog);
+  setText(
+    "[data-strategy-create-body]",
+    t("backtests.strategy_create.body", { variant: compactId(variantKey) }),
+    dialog
+  );
+  setText("[data-strategy-create-status]", "", dialog);
+  const confirm = qs("[data-strategy-create-confirm]", dialog);
+  if (confirm instanceof HTMLButtonElement) {
+    confirm.disabled = false;
+    confirm.textContent = t("backtests.strategy_create.confirm");
+  }
+  dialog.hidden = false;
+  dialog.setAttribute("aria-hidden", "false");
+  confirm?.focus();
+}
+
+function closeCreateStrategyDialog(root, { restoreFocus = true } = {}) {
+  const dialog = qs("[data-strategy-create-dialog]", root);
+  if (dialog) {
+    dialog.hidden = true;
+    dialog.setAttribute("aria-hidden", "true");
+  }
+  const trigger = state.pendingStrategyCreate?.trigger;
+  state.pendingStrategyCreate = null;
+  if (restoreFocus && trigger?.isConnected) {
+    trigger.focus();
+  }
+}
+
+async function confirmCreateStrategyDialog(root) {
+  const dialog = qs("[data-strategy-create-dialog]", root);
+  const pending = state.pendingStrategyCreate;
+  if (!dialog || !pending) {
+    return;
+  }
+  const confirm = qs("[data-strategy-create-confirm]", dialog);
+  if (confirm instanceof HTMLButtonElement) {
+    confirm.disabled = true;
+    confirm.textContent = t("backtests.strategy_create.creating");
+  }
+  setText("[data-strategy-create-status]", t("backtests.strategy_create.creating"), dialog);
+  const result = await createStrategyFromVariant(root);
+  setText(
+    "[data-create-status]",
+    t(
+      result.duplicate
+        ? "backtests.strategy_create.duplicate_status"
+        : "backtests.strategy_create.created_status",
+      { strategy: compactId(result.strategy?.strategy_id || "") }
+    ),
+    root
+  );
+  closeCreateStrategyDialog(root, { restoreFocus: false });
+}
+
+async function createStrategyFromVariant(root) {
+  const pending = state.pendingStrategyCreate;
+  if (!pending) {
+    throw new Error("No pending strategy creation");
+  }
+  const endpoint = endpointFromTemplate(
+    root.dataset.createStrategyEndpointTemplate
+      || "/api/backtests/jobs/{job_id}/variants/{variant_key}/strategies",
+    { job_id: pending.jobId, variant_key: pending.variantKey }
+  );
+  return apiFetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": pending.idempotencyKey,
+    },
+  });
+}
+
 async function deleteJob(root, jobId) {
   if (!jobId) {
     return;
@@ -2840,6 +2934,38 @@ function bind(root) {
       });
       return;
     }
+    const strategyCreateButton = event.target.closest("[data-create-strategy-from-variant]");
+    if (strategyCreateButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      openCreateStrategyDialog(
+        root,
+        strategyCreateButton.dataset.jobId || "",
+        strategyCreateButton.dataset.variantKey || "",
+        strategyCreateButton
+      );
+      return;
+    }
+    const strategyCreateConfirm = event.target.closest("[data-strategy-create-confirm]");
+    if (strategyCreateConfirm instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      confirmCreateStrategyDialog(root).catch((error) => {
+        const dialog = qs("[data-strategy-create-dialog]", root);
+        if (dialog) {
+          setText("[data-strategy-create-status]", describeApiError(error), dialog);
+        }
+        setText("[data-create-status]", describeApiError(error), root);
+      });
+      return;
+    }
+    const strategyCreateDismiss = event.target.closest("[data-strategy-create-dismiss]");
+    if (strategyCreateDismiss instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCreateStrategyDialog(root);
+      return;
+    }
     const cancelDismiss = event.target.closest("[data-job-cancel-dismiss]");
     if (cancelDismiss instanceof HTMLElement) {
       event.preventDefault();
@@ -3030,6 +3156,11 @@ function bind(root) {
     }
   });
   root.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.pendingStrategyCreate) {
+      event.preventDefault();
+      closeCreateStrategyDialog(root);
+      return;
+    }
     if (event.key === "Escape" && state.pendingCancelJobId) {
       event.preventDefault();
       closeCancelDialog(root);

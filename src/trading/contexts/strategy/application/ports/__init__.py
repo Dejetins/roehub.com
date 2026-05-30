@@ -1,3 +1,7 @@
+from .backtest_variant_launch_reader import (
+    BacktestVariantLaunchReader,
+    BacktestVariantLaunchSnapshot,
+)
 from .clock import StrategyClock
 from .current_user import CurrentUser, CurrentUserProvider
 from .live_candle_stream import StrategyLiveCandleMessage, StrategyLiveCandleStream
@@ -16,6 +20,7 @@ from .realtime_output_publisher import (
     serialize_realtime_event_payload_json,
 )
 from .repositories import (
+    StrategyBacktestVariantProvenanceRepository,
     StrategyEventRepository,
     StrategyExchangeBindingRepository,
     StrategyRepository,
@@ -34,9 +39,12 @@ from .telegram_notifier import (
 __all__ = [
     "CurrentUser",
     "CurrentUserProvider",
+    "BacktestVariantLaunchReader",
+    "BacktestVariantLaunchSnapshot",
     "StrategyLiveCandleMessage",
     "StrategyLiveCandleStream",
     "StrategyClock",
+    "StrategyBacktestVariantProvenanceRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
     "StrategyRepository",

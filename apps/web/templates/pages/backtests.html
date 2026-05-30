@@ -23,6 +23,7 @@
     data-variant-symbol-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats"
     data-variant-trades-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page={page}&page_size={page_size}"
     data-variant-trades-csv-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv"
+    data-create-strategy-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/strategies"
     data-variant-open-delay-ms="180"
     data-variant-open-duration-ms="650"
     data-variant-preview-limit="10"
@@ -426,6 +427,37 @@
           {{ t("backtests.config_summary.edit") }}
         </button>
       </aside>
+    </div>
+    <div
+      class="backtests-cancel-dialog"
+      data-strategy-create-dialog
+      hidden
+      aria-hidden="true"
+    >
+      <button
+        class="backtests-cancel-dialog__backdrop"
+        type="button"
+        data-strategy-create-dismiss
+        aria-label="{{ t('backtests.strategy_create.dismiss') }}"
+      ></button>
+      <section
+        class="backtests-cancel-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="backtests-strategy-create-title"
+        aria-describedby="backtests-strategy-create-body"
+      >
+        <header class="backtests-cancel-dialog__heading">
+          <h2 id="backtests-strategy-create-title" data-strategy-create-title>{{ t("backtests.strategy_create.title") }}</h2>
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-create-dismiss>{{ t("backtests.strategy_create.dismiss") }}</button>
+        </header>
+        <p id="backtests-strategy-create-body" data-strategy-create-body>{{ t("backtests.strategy_create.body_static") }}</p>
+        <div class="backtests-cancel-dialog__actions">
+          <output data-strategy-create-status aria-live="polite"></output>
+          <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-create-dismiss>{{ t("backtests.strategy_create.keep") }}</button>
+          <button class="rh-button rh-button--primary rh-button--compact" type="button" data-strategy-create-confirm>{{ t("backtests.strategy_create.confirm") }}</button>
+        </div>
+      </section>
     </div>
     <div
       class="backtests-cancel-dialog"

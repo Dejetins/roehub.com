@@ -1,5 +1,9 @@
 from .clone_strategy import CloneStrategyUseCase
 from .create_strategy import CreateStrategyUseCase
+from .create_strategy_from_backtest_variant import (
+    CreateStrategyFromBacktestVariantResult,
+    CreateStrategyFromBacktestVariantUseCase,
+)
 from .delete_strategy import DeleteStrategyUseCase
 from .errors import (
     map_strategy_exception,
@@ -16,6 +20,8 @@ from .stop_strategy import StopStrategyUseCase
 
 __all__ = [
     "CloneStrategyUseCase",
+    "CreateStrategyFromBacktestVariantResult",
+    "CreateStrategyFromBacktestVariantUseCase",
     "CreateStrategyUseCase",
     "DeleteStrategyUseCase",
     "GetMyStrategyUseCase",

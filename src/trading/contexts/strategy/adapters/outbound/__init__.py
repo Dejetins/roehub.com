@@ -30,10 +30,12 @@ from .messaging import (
     TelegramNotifierHooks,
 )
 from .persistence import (
+    InMemoryStrategyBacktestVariantProvenanceRepository,
     InMemoryStrategyEventRepository,
     InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
+    PostgresStrategyBacktestVariantProvenanceRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyExchangeBindingRepository,
     PostgresStrategyRepository,
@@ -46,10 +48,12 @@ from .time import SystemRunnerSleeper, SystemStrategyClock
 __all__ = [
     "InMemoryStrategyEventRepository",
     "InMemoryStrategyExchangeBindingRepository",
+    "InMemoryStrategyBacktestVariantProvenanceRepository",
     "InMemoryStrategyRepository",
     "InMemoryStrategyRunRepository",
     "PostgresStrategyEventRepository",
     "PostgresStrategyExchangeBindingRepository",
+    "PostgresStrategyBacktestVariantProvenanceRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PsycopgStrategyPostgresGateway",

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
+from uuid import UUID
 
 from fastapi import APIRouter
 
@@ -25,6 +26,7 @@ from trading.contexts.backtest.adapters.outbound import (
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
+from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services.v2 import (
     DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
     BacktestAdmissionService,
@@ -41,6 +43,20 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+from trading.contexts.strategy.adapters.outbound import (
+    PostgresStrategyBacktestVariantProvenanceRepository,
+    PostgresStrategyEventRepository,
+    PostgresStrategyRepository,
+    PsycopgStrategyPostgresGateway,
+    SystemStrategyClock,
+)
+from trading.contexts.strategy.application import (
+    BacktestVariantLaunchReader,
+    BacktestVariantLaunchSnapshot,
+    CreateStrategyFromBacktestVariantUseCase,
+)
+from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import UserId
 
 
 def build_backtests_router(
@@ -87,18 +103,25 @@ def build_backtests_router(
         artifact_context_resolver=artifact_context_resolver,
         runtime_config=runtime_config,
     )
+    job_repository = _build_job_repository(environ=effective_environ)
     jobs_use_case = _build_jobs_use_case(
         environ=effective_environ,
+        job_repository=job_repository,
         defaults_provider=defaults_provider,
         artifact_array_loader=artifact_array_loader,
         preflight_service=preflight_service,
         runtime_config=runtime_config,
+    )
+    create_strategy_from_variant_use_case = _build_create_strategy_from_variant_use_case(
+        environ=effective_environ,
+        job_repository=job_repository,
     )
     return build_backtests_api_router(
         runtime_defaults_service=runtime_defaults_service,
         preflight_service=preflight_service,
         current_user_dependency=current_user_dependency,
         jobs_use_case=jobs_use_case,
+        create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
     )
 
 
@@ -110,6 +133,15 @@ def _with_local_dev_default(*, environ: Mapping[str, str]) -> Mapping[str, str]:
     return {**environ, "ROEHUB_ENV": "dev"}
 
 
+def _build_job_repository(*, environ: Mapping[str, str]) -> BacktestJobRepository | None:
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not postgres_dsn:
+        return None
+    return PostgresBacktestJobRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
+    )
+
+
 def _build_jobs_use_case(
     *,
     environ: Mapping[str, str],
@@ -117,12 +149,14 @@ def _build_jobs_use_case(
     artifact_array_loader: FilesystemBacktestArtifactArrayLoader,
     preflight_service: BacktestPreflightService,
     runtime_config: BacktestRuntimeConfig,
+    job_repository: BacktestJobRepository | None = None,
 ) -> BacktestJobsUseCase | None:
-    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
-    if not postgres_dsn:
+    if job_repository is None:
+        job_repository = _build_job_repository(environ=environ)
+    if job_repository is None:
         return None
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
-    job_repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
     prepare_pools = BacktestPreparePoolsService(
         artifact_array_loader=artifact_array_loader,
         defaults_provider=defaults_provider,
@@ -161,6 +195,100 @@ def _build_jobs_use_case(
             ),
         ),
     )
+
+
+def _build_create_strategy_from_variant_use_case(
+    *,
+    environ: Mapping[str, str],
+    job_repository: BacktestJobRepository | None,
+) -> CreateStrategyFromBacktestVariantUseCase | None:
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not postgres_dsn or job_repository is None:
+        return None
+    strategy_gateway = PsycopgStrategyPostgresGateway(dsn=postgres_dsn)
+    strategy_repository = PostgresStrategyRepository(gateway=strategy_gateway)
+    return CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_BacktestJobRepositoryVariantLaunchReader(repository=job_repository),
+        strategy_repository=strategy_repository,
+        provenance_repository=PostgresStrategyBacktestVariantProvenanceRepository(
+            gateway=strategy_gateway,
+        ),
+        event_repository=PostgresStrategyEventRepository(gateway=strategy_gateway),
+        clock=SystemStrategyClock(),
+    )
+
+
+class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
+    def __init__(self, *, repository: BacktestJobRepository) -> None:
+        self._repository = repository
+
+    def get(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestVariantLaunchSnapshot:
+        job = self._repository.get(job_id=job_id)
+        if job is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest job was not found",
+                details={"reason": "not_found", "job_id": str(job_id)},
+            )
+        if job.user_id != user_id:
+            raise RoehubError(
+                code="strategy_variant_launch.forbidden",
+                message="Backtest job does not belong to current user",
+                details={"reason": "forbidden", "job_id": str(job_id)},
+            )
+        row = self._repository.get_top_variant_by_public_key(
+            job_id=job_id,
+            public_variant_key=variant_key,
+        )
+        if row is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest variant was not found",
+                details={"reason": "not_found", "job_id": str(job_id), "variant_key": variant_key},
+            )
+        request = dict(job.request_json)
+        coordinates = _mapping(request.get("coordinates"))
+        payload = dict(row.payload_json)
+        market_id = job.market_id
+        if market_id is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_launchable",
+                message="Backtest job has no launchable market id",
+                details={"reason": "not_launchable", "job_id": str(job_id)},
+            )
+        return BacktestVariantLaunchSnapshot(
+            job_id=job.job_id,
+            owner_user_id=job.user_id,
+            job_state=job.state,
+            request_hash=job.request_hash,
+            result_config_hash=job.engine_params_hash,
+            market_id=int(market_id),
+            exchange=str(coordinates.get("exchange", "binance")),
+            market_type=str(coordinates.get("market_type", "spot")),
+            symbol=str(coordinates.get("symbol", job.symbol)),
+            timeframe=str(job.timeframe),
+            variant_key=str(payload.get("public_variant_key") or variant_key),
+            variant_hash=str(payload.get("variant_hash") or row.variant_key),
+            indicator_variant_hash=(
+                str(payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                if (payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                else None
+            ),
+            rank=row.rank,
+            summary_metrics=dict(row.summary_metrics_json),
+            canonical_variant_params=_mapping(payload.get("canonical_variant_params")),
+            readable_params=_mapping(payload.get("readable_params")),
+        )
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 def _lazy_trades_cache_ttl_seconds(*, environ: Mapping[str, str]) -> int:
