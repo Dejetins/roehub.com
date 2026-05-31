@@ -432,7 +432,8 @@
 }
 
 .strategies-live-profile,
-.strategies-account-readiness {
+.strategies-account-readiness,
+.strategies-paper-accounting {
   display: grid;
   gap: 5px;
   margin-block-start: 8px;
@@ -441,7 +442,8 @@
 }
 
 .strategies-live-profile header,
-.strategies-account-readiness header {
+.strategies-account-readiness header,
+.strategies-paper-accounting header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -450,7 +452,8 @@
 }
 
 .strategies-live-profile h3,
-.strategies-account-readiness h3 {
+.strategies-account-readiness h3,
+.strategies-paper-accounting h3 {
   overflow: hidden;
   margin: 0;
   color: var(--rh-accent-2);
@@ -467,7 +470,8 @@
 
 .strategies-account-readiness[data-readiness="stale"] .strategies-pill,
 .strategies-account-readiness[data-readiness="degraded"] .strategies-pill,
-.strategies-account-readiness[data-readiness="config_mismatch"] .strategies-pill {
+.strategies-account-readiness[data-readiness="config_mismatch"] .strategies-pill,
+.strategies-paper-accounting[data-readiness="degraded"] .strategies-pill {
   color: var(--rh-financial-negative);
 }
 

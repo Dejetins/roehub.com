@@ -20,6 +20,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyDashboardExchangeAccountReadinessResponse,
     StrategyDashboardFooterStatusResponse,
     StrategyDashboardLiveProfileResponse,
+    StrategyDashboardPaperAccountingResponse,
     StrategyDashboardRefreshControlResponse,
     StrategyDashboardResponse,
     StrategyDashboardSelectedStrategyResponse,
@@ -57,13 +58,16 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExchangeAccountProjectionRepository,
+    InMemoryPaperAccountingRepository,
     PostgresExchangeAccountProjectionRepository,
+    PostgresPaperAccountingRepository,
     SystemLiveExecutionClock,
 )
 from trading.contexts.live_execution.application import ExchangeAccountProjectionService
 from trading.contexts.live_execution.domain import (
     AccountProjectionReadiness,
     ExpectedInstrumentConfig,
+    StrategyPaperAccountingSnapshot,
 )
 from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
 from trading.contexts.strategy.application import (
@@ -100,6 +104,7 @@ _LIVE_PROFILE_SOURCE = "strategy_live_profiles"
 _COMPATIBILITY_SOURCE = "strategy_compatibility_readiness"
 _EXCHANGE_ACCOUNT_SOURCE = "exchange_account_projection"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
+_PAPER_ACCOUNTING_SOURCE = "strategy_paper_accounting"
 _SIGNAL_JOURNAL_LIMIT = 20
 
 
@@ -118,6 +123,12 @@ class AccountProjectionReadinessService(Protocol):
         exchange_connection_id: UUID | None,
         requirement: ExpectedInstrumentConfig | None,
     ) -> AccountProjectionReadiness: ...
+
+
+class PaperAccountingReadService(Protocol):
+    def get_latest_accounting_for_strategy(
+        self, *, owner_user_id: UserId, strategy_id: UUID
+    ) -> StrategyPaperAccountingSnapshot | None: ...
 
 
 class StrategyDashboardManualRefreshLimiter:
@@ -170,6 +181,7 @@ class StrategyDashboardQueryService:
         signal_repository: StrategySignalRepository | None = None,
         compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
         account_projection_service: AccountProjectionReadinessService | None = None,
+        paper_accounting_service: PaperAccountingReadService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -178,6 +190,7 @@ class StrategyDashboardQueryService:
         self._signal_repository = signal_repository
         self._compatibility_readiness_service = compatibility_readiness_service
         self._account_projection_service = account_projection_service
+        self._paper_accounting_service = paper_accounting_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -215,6 +228,11 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        paper_accounting, paper_accounting_source = self._load_paper_accounting(
+            principal=principal,
+            strategy=selected_strategy,
+            generated_at=generated_at,
+        )
         compatibility_readiness, compatibility_source = self._load_compatibility_readiness(
             principal=principal,
             strategy=selected_strategy,
@@ -232,6 +250,7 @@ class StrategyDashboardQueryService:
             compatibility_source,
             account_source,
             signal_journal_source,
+            paper_accounting_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name=_CANDLE_SOURCE,
@@ -299,6 +318,7 @@ class StrategyDashboardQueryService:
             hourly_results=_build_hourly_results(),
             trades=_build_trades(),
             signal_journal=signal_journal,
+            paper_accounting=paper_accounting,
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
                 data_status="degraded" if _has_degraded_sources(sources) else "actual",
@@ -317,6 +337,91 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_paper_accounting(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        generated_at: datetime,
+    ) -> tuple[StrategyDashboardPaperAccountingResponse, StrategyDashboardSourceResponse]:
+        if strategy is None:
+            return (
+                _build_empty_paper_accounting(reason="selected_strategy_not_found"),
+                _source(
+                    name=_PAPER_ACCOUNTING_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no selected strategy paper accounting is available",
+                ),
+            )
+        if self._paper_accounting_service is None:
+            return (
+                _build_empty_paper_accounting(reason="paper_accounting_not_configured"),
+                _source(
+                    name=_PAPER_ACCOUNTING_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="paper accounting repository is not configured",
+                ),
+            )
+        try:
+            accounting = self._paper_accounting_service.get_latest_accounting_for_strategy(
+                owner_user_id=principal.user_id,
+                strategy_id=strategy.strategy_id,
+            )
+        except Exception as error:  # noqa: BLE001
+            return (
+                _build_empty_paper_accounting(reason=str(error)),
+                _source(
+                    name=_PAPER_ACCOUNTING_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=str(error),
+                ),
+            )
+        if accounting is None:
+            return (
+                _build_empty_paper_accounting(reason="paper_accounting_empty"),
+                _source(
+                    name=_PAPER_ACCOUNTING_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no paper accounting rows exist for selected strategy",
+                ),
+            )
+        return (
+            StrategyDashboardPaperAccountingResponse(
+                source=_PAPER_ACCOUNTING_SOURCE,
+                state="ready",
+                reserved_budget=accounting.reserved_budget,
+                position_quantity=accounting.position_quantity,
+                average_entry_price=accounting.average_entry_price,
+                equity=accounting.equity,
+                realized_pnl=accounting.realized_pnl,
+                unrealized_pnl=accounting.unrealized_pnl,
+                fee_total=accounting.fee_total,
+                funding_total=accounting.funding_total,
+                fee_model=accounting.fee_model,
+                funding_model=accounting.funding_model,
+                pnl_complete=accounting.pnl_complete,
+                completeness_reason=accounting.completeness_reason,
+                updated_at=accounting.created_at,
+                degradation_reason=(
+                    None if accounting.pnl_complete else accounting.completeness_reason
+                ),
+            ),
+            _source(
+                name=_PAPER_ACCOUNTING_SOURCE,
+                status="available" if accounting.pnl_complete else "degraded",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(
+                    generated_at=generated_at,
+                    observed_at=accounting.created_at,
+                ),
+                detail=f"paper accounting {accounting.completeness_reason}",
             ),
         )
 
@@ -790,9 +895,10 @@ def build_strategy_dashboard_service(
             strategy_repository=None,
             run_repository=None,
             profile_repository=None,
-            signal_repository=None,
-            compatibility_readiness_service=None,
-            account_projection_service=None,
+        signal_repository=None,
+        compatibility_readiness_service=None,
+        account_projection_service=None,
+        paper_accounting_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -812,6 +918,7 @@ def build_strategy_dashboard_service(
         signal_repository=signal_repository,
         compatibility_readiness_service=compatibility_readiness_service,
         account_projection_service=_build_account_projection_service(settings=settings),
+        paper_accounting_service=_build_paper_accounting_service(settings=settings),
     )
 
 
@@ -830,6 +937,14 @@ def _build_account_projection_service(
         repository=repository,
         clock=SystemLiveExecutionClock(),
     )
+
+
+def _build_paper_accounting_service(*, settings):
+    if settings.postgres_dsn:
+        return PostgresPaperAccountingRepository(
+            gateway=_build_live_execution_gateway(settings=settings)
+        )
+    return InMemoryPaperAccountingRepository()
 
 
 def _build_live_execution_gateway(*, settings):
@@ -1433,6 +1548,27 @@ def _build_empty_signal_journal(*, reason: str) -> StrategySignalJournalResponse
         state="empty",
         limit=_SIGNAL_JOURNAL_LIMIT,
         items=[],
+        degradation_reason=reason,
+    )
+
+
+def _build_empty_paper_accounting(*, reason: str) -> StrategyDashboardPaperAccountingResponse:
+    return StrategyDashboardPaperAccountingResponse(
+        source=_PAPER_ACCOUNTING_SOURCE,
+        state="empty",
+        reserved_budget=None,
+        position_quantity=None,
+        average_entry_price=None,
+        equity=None,
+        realized_pnl=None,
+        unrealized_pnl=None,
+        fee_total=None,
+        funding_total=None,
+        fee_model=None,
+        funding_model=None,
+        pnl_complete=False,
+        completeness_reason=reason,
+        updated_at=None,
         degradation_reason=reason,
     )
 

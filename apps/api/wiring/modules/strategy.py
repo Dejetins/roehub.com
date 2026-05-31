@@ -18,15 +18,26 @@ from apps.api.exchange_control_client import (
     ExchangeControlClientError,
     build_exchange_control_client_from_environ,
 )
-from apps.api.monitoring import record_strategy_position_ownership
+from apps.api.monitoring import (
+    record_strategy_capital_reservation,
+    record_strategy_paper_accounting,
+    record_strategy_position_ownership,
+)
 from apps.api.routes import build_strategies_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
+    InMemoryPaperAccountingRepository,
     InMemoryStrategyPositionOwnershipRepository,
+    PostgresExchangeAccountProjectionRepository,
+    PostgresPaperAccountingRepository,
     PostgresStrategyPositionOwnershipRepository,
+    SystemLiveExecutionClock,
 )
-from trading.contexts.live_execution.application import StrategyPositionOwnershipService
+from trading.contexts.live_execution.application import (
+    CapitalReservationPaperAccountingService,
+    StrategyPositionOwnershipService,
+)
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -326,6 +337,7 @@ def build_strategy_router(
     position_ownership_coordinator = _build_position_ownership_coordinator(
         settings=settings,
     )
+    paper_accounting_service = _build_paper_accounting_service(settings=settings)
     clock = SystemStrategyClock()
     compatibility_readiness_service = _build_compatibility_readiness_service(
         environ=environ,
@@ -355,6 +367,7 @@ def build_strategy_router(
         compatibility_readiness_checker=compatibility_readiness_service,
         live_profile_repository=profile_repository,
         position_ownership_coordinator=position_ownership_coordinator,
+        capital_reservation_coordinator=paper_accounting_service,
     )
     stop_use_case = StopStrategyUseCase(
         strategy_repository=strategy_repository,
@@ -481,6 +494,42 @@ def _build_position_ownership_coordinator(
     return StrategyPositionOwnershipService(
         repository=InMemoryStrategyPositionOwnershipRepository(),
         on_transition=lambda result, reason: record_strategy_position_ownership(
+            result=result,
+            reason=reason,
+        ),
+    )
+
+
+def _build_paper_accounting_service(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> CapitalReservationPaperAccountingService:
+    if settings.postgres_dsn:
+        gateway = PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        return CapitalReservationPaperAccountingService(
+            repository=PostgresPaperAccountingRepository(gateway=gateway),
+            account_projection_repository=PostgresExchangeAccountProjectionRepository(
+                gateway=gateway
+            ),
+            clock=SystemLiveExecutionClock(),
+            on_capital_reservation=lambda result, reason: record_strategy_capital_reservation(
+                result=result,
+                reason=reason,
+            ),
+            on_paper_accounting=lambda result, reason: record_strategy_paper_accounting(
+                result=result,
+                reason=reason,
+            ),
+        )
+    return CapitalReservationPaperAccountingService(
+        repository=InMemoryPaperAccountingRepository(),
+        account_projection_repository=None,
+        clock=SystemLiveExecutionClock(),
+        on_capital_reservation=lambda result, reason: record_strategy_capital_reservation(
+            result=result,
+            reason=reason,
+        ),
+        on_paper_accounting=lambda result, reason: record_strategy_paper_accounting(
             result=result,
             reason=reason,
         ),

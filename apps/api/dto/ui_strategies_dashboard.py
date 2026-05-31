@@ -342,6 +342,27 @@ class StrategySignalJournalResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyDashboardPaperAccountingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    reserved_budget: Decimal | None
+    position_quantity: Decimal | None
+    average_entry_price: Decimal | None
+    equity: Decimal | None
+    realized_pnl: Decimal | None
+    unrealized_pnl: Decimal | None
+    fee_total: Decimal | None
+    funding_total: Decimal | None
+    fee_model: str | None
+    funding_model: str | None
+    pnl_complete: bool
+    completeness_reason: str
+    updated_at: datetime | None
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -390,5 +411,6 @@ class StrategyDashboardResponse(BaseModel):
     hourly_results: StrategyHourlyResultsResponse
     trades: StrategyTradesResponse
     signal_journal: StrategySignalJournalResponse
+    paper_accounting: StrategyDashboardPaperAccountingResponse
     footer_status: StrategyDashboardFooterStatusResponse
     refresh_control: StrategyDashboardRefreshControlResponse

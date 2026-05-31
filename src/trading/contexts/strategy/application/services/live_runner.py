@@ -15,8 +15,10 @@ from trading.contexts.strategy.application.ports import (
     MetricTypeV1,
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
+    StrategyCapitalReservationCoordinator,
     StrategyClock,
     StrategyLiveCandleStream,
+    StrategyPaperAccountingRecorder,
     StrategyPositionOwnershipCoordinator,
     StrategyRealtimeEventV1,
     StrategyRealtimeMetricV1,
@@ -140,6 +142,8 @@ class StrategyLiveRunner:
         realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
         live_profile_repository: LiveStrategyProfileRepository | None = None,
         position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
+        capital_reservation_coordinator: StrategyCapitalReservationCoordinator | None = None,
+        paper_accounting_recorder: StrategyPaperAccountingRecorder | None = None,
         on_signal_recorded: Callable[[StrategySignal], None] | None = None,
         telegram_notifier: TelegramNotifier | None = None,
         telegram_notification_policy: TelegramNotificationPolicy | None = None,
@@ -198,6 +202,8 @@ class StrategyLiveRunner:
         self._signal_repository = signal_repository
         self._live_profile_repository = live_profile_repository
         self._position_ownership_coordinator = position_ownership_coordinator
+        self._capital_reservation_coordinator = capital_reservation_coordinator
+        self._paper_accounting_recorder = paper_accounting_recorder
         self._on_signal_recorded = on_signal_recorded
         self._clock = clock
         self._sleeper = sleeper
@@ -605,6 +611,8 @@ class StrategyLiveRunner:
         persisted = self._signal_repository.record(signal=signal)
         if self._on_signal_recorded is not None:
             self._on_signal_recorded(persisted)
+        if self._paper_accounting_recorder is not None:
+            self._paper_accounting_recorder.record_paper_signal(signal=persisted)
         return persisted
 
     def _load_live_profile(self, *, run: StrategyRun) -> LiveStrategyProfile | None:
@@ -786,8 +794,16 @@ class StrategyLiveRunner:
                 }
             },
         )
-        self._reserve_ownership_for_run(run=successor, strategy=strategy, now=started_at)
-        persisted = self._run_repository.create(run=successor)
+        capital_reserved = False
+        try:
+            self._reserve_capital_for_run(run=successor, now=started_at)
+            capital_reserved = True
+            self._reserve_ownership_for_run(run=successor, strategy=strategy, now=started_at)
+            persisted = self._run_repository.create(run=successor)
+        except Exception:
+            if capital_reserved:
+                self._release_capital_for_terminal_run(run=successor)
+            raise
         self._activate_ownership_for_run(run=persisted, now=started_at)
         self._publish_snapshot_metrics(run=persisted, spec=strategy.spec, ts=persisted.updated_at)
         return persisted
@@ -846,6 +862,7 @@ class StrategyLiveRunner:
             self._publish_transition_events(previous=run, current=persisted, spec=spec)
         if persisted.state in {"stopped", "failed"}:
             self._release_ownership_for_terminal_run(run=persisted)
+            self._release_capital_for_terminal_run(run=persisted)
         return persisted
 
     def _reserve_ownership_for_run(
@@ -873,6 +890,26 @@ class StrategyLiveRunner:
             reason="restart_successor_started",
         )
 
+    def _reserve_capital_for_run(self, *, run: StrategyRun, now: datetime) -> None:
+        if self._capital_reservation_coordinator is None:
+            return
+        profile = self._load_live_profile(run=run)
+        if (
+            profile is None
+            or profile.exchange_connection_id is None
+            or profile.mode not in {"paper", "live"}
+        ):
+            return
+        self._capital_reservation_coordinator.reserve_for_strategy_run(
+            owner_user_id=run.user_id,
+            exchange_connection_id=profile.exchange_connection_id,
+            strategy_id=run.strategy_id,
+            live_profile_id=profile.profile_id,
+            strategy_run_id=run.run_id,
+            requested_amount=profile.sizing_value,
+            now=now,
+        )
+
     def _activate_ownership_for_run(self, *, run: StrategyRun, now: datetime) -> None:
         if self._position_ownership_coordinator is None:
             return
@@ -886,6 +923,16 @@ class StrategyLiveRunner:
         if self._position_ownership_coordinator is None:
             return
         self._position_ownership_coordinator.release_for_strategy_run(
+            owner_user_id=run.user_id,
+            strategy_run_id=run.run_id,
+            now=run.updated_at,
+            reason="run_failed" if run.state == "failed" else "run_stopped",
+        )
+
+    def _release_capital_for_terminal_run(self, *, run: StrategyRun) -> None:
+        if self._capital_reservation_coordinator is None:
+            return
+        self._capital_reservation_coordinator.release_for_strategy_run(
             owner_user_id=run.user_id,
             strategy_run_id=run.run_id,
             now=run.updated_at,

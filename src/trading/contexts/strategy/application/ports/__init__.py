@@ -2,6 +2,10 @@ from .backtest_variant_launch_reader import (
     BacktestVariantLaunchReader,
     BacktestVariantLaunchSnapshot,
 )
+from .capital_reservation import (
+    StrategyCapitalReservationCoordinator,
+    StrategyPaperAccountingRecorder,
+)
 from .clock import StrategyClock
 from .compatibility_readiness import StrategyCompatibilityReadinessChecker
 from .current_user import CurrentUser, CurrentUserProvider
@@ -54,6 +58,8 @@ __all__ = [
     "CurrentUser",
     "CurrentUserProvider",
     "StrategyCompatibilityReadinessChecker",
+    "StrategyCapitalReservationCoordinator",
+    "StrategyPaperAccountingRecorder",
     "BacktestVariantLaunchReader",
     "BacktestVariantLaunchSnapshot",
     "StrategyLiveCandleMessage",

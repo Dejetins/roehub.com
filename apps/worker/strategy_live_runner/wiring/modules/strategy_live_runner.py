@@ -15,9 +15,14 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     _clickhouse_client,
 )
 from trading.contexts.live_execution.adapters.outbound import (
+    PostgresExchangeAccountProjectionRepository,
+    PostgresPaperAccountingRepository,
     PostgresStrategyPositionOwnershipRepository,
 )
-from trading.contexts.live_execution.application import StrategyPositionOwnershipService
+from trading.contexts.live_execution.application import (
+    CapitalReservationPaperAccountingService,
+    StrategyPositionOwnershipService,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
@@ -142,6 +147,16 @@ class StrategyLiveRunnerMetrics:
             "Strategy position ownership reserve/release/conflict outcomes.",
             ("result", "reason"),
         )
+        self.strategy_capital_reservation_total = Counter(
+            "strategy_capital_reservation_total",
+            "Strategy capital reservation outcomes.",
+            ("result", "reason"),
+        )
+        self.strategy_paper_accounting_total = Counter(
+            "strategy_paper_accounting_total",
+            "Strategy paper order/fill/accounting outcomes.",
+            ("result", "reason"),
+        )
 
     def observe_iteration(
         self,
@@ -221,6 +236,18 @@ class StrategyLiveRunnerMetrics:
 
     def observe_strategy_position_ownership(self, result: str, reason: str) -> None:
         self.strategy_position_ownership_total.labels(
+            result=result,
+            reason=(reason or "unknown")[:80],
+        ).inc()
+
+    def observe_strategy_capital_reservation(self, result: str, reason: str) -> None:
+        self.strategy_capital_reservation_total.labels(
+            result=result,
+            reason=(reason or "unknown")[:80],
+        ).inc()
+
+    def observe_strategy_paper_accounting(self, result: str, reason: str) -> None:
+        self.strategy_paper_accounting_total.labels(
             result=result,
             reason=(reason or "unknown")[:80],
         ).inc()
@@ -348,6 +375,15 @@ def build_strategy_live_runner_app(
         repository=PostgresStrategyPositionOwnershipRepository(gateway=postgres_gateway),
         on_transition=metrics.observe_strategy_position_ownership,
     )
+    paper_accounting_service = CapitalReservationPaperAccountingService(
+        repository=PostgresPaperAccountingRepository(gateway=postgres_gateway),
+        account_projection_repository=PostgresExchangeAccountProjectionRepository(
+            gateway=postgres_gateway
+        ),
+        clock=SystemStrategyClock(),
+        on_capital_reservation=metrics.observe_strategy_capital_reservation,
+        on_paper_accounting=metrics.observe_strategy_paper_accounting,
+    )
 
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
@@ -436,6 +472,8 @@ def build_strategy_live_runner_app(
         realtime_output_publisher=realtime_output_publisher,
         live_profile_repository=live_profile_repository,
         position_ownership_coordinator=position_ownership_coordinator,
+        capital_reservation_coordinator=paper_accounting_service,
+        paper_accounting_recorder=paper_accounting_service,
         on_signal_recorded=metrics.observe_strategy_signal,
         telegram_notifier=telegram_notifier,
         telegram_notification_policy=telegram_notification_policy,

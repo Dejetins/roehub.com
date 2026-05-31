@@ -1,0 +1,197 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from uuid import UUID, uuid4
+
+import pytest
+
+from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryExchangeAccountProjectionRepository,
+    InMemoryPaperAccountingRepository,
+)
+from trading.contexts.live_execution.application import CapitalReservationPaperAccountingService
+from trading.contexts.live_execution.domain import (
+    CapitalReservationBlockedError,
+    ExchangeAccountProjection,
+    ExchangeBalanceSnapshot,
+    ExchangeInstrumentFilterSnapshot,
+)
+from trading.contexts.strategy.domain.entities import StrategySignal
+from trading.shared_kernel.primitives import UserId
+
+_USER_ID = UserId.from_string("00000000-0000-0000-0000-000000009001")
+_CONNECTION_ID = UUID("00000000-0000-0000-0000-000000009101")
+_STRATEGY_ID = UUID("00000000-0000-0000-0000-000000009201")
+_RUN_ID = UUID("00000000-0000-0000-0000-000000009301")
+_PROFILE_ID = UUID("00000000-0000-0000-0000-000000009401")
+_NOW = datetime(2026, 5, 31, 12, 0, tzinfo=UTC)
+
+
+class _Clock:
+    def now(self) -> datetime:
+        return _NOW
+
+
+def test_capital_reservation_uses_fresh_projection_and_releases() -> None:
+    projection_repository = InMemoryExchangeAccountProjectionRepository()
+    projection_repository.record_projection(
+        projection=_projection(free=Decimal("100"), observed_at=_NOW - timedelta(seconds=30))
+    )
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=projection_repository,
+        clock=_Clock(),
+    )
+
+    reservation = service.reserve_for_strategy_run(
+        owner_user_id=_USER_ID,
+        exchange_connection_id=_CONNECTION_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        requested_amount=Decimal("25"),
+        now=_NOW,
+    )
+    released = service.release_for_strategy_run(
+        owner_user_id=_USER_ID,
+        strategy_run_id=_RUN_ID,
+        now=_NOW + timedelta(minutes=1),
+        reason="run_stopped",
+    )
+
+    assert reservation.state == "reserved"
+    assert reservation.reserved_amount == Decimal("25")
+    assert released is not None
+    assert released.state == "released"
+    assert accounting_repository.sum_active_reserved(
+        owner_user_id=_USER_ID,
+        exchange_connection_id=_CONNECTION_ID,
+        asset="USDT",
+    ) == Decimal("0")
+
+
+@pytest.mark.parametrize(
+    ("free", "observed_at", "reason"),
+    (
+        (Decimal("10"), _NOW - timedelta(seconds=30), "capital_insufficient_available_balance"),
+        (Decimal("100"), _NOW - timedelta(minutes=5), "capital_projection_stale"),
+    ),
+)
+def test_capital_reservation_rejects_insufficient_or_stale_projection(
+    free: Decimal, observed_at: datetime, reason: str
+) -> None:
+    projection_repository = InMemoryExchangeAccountProjectionRepository()
+    projection_repository.record_projection(
+        projection=_projection(free=free, observed_at=observed_at)
+    )
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=projection_repository,
+        clock=_Clock(),
+    )
+
+    with pytest.raises(CapitalReservationBlockedError) as error_info:
+        service.reserve_for_strategy_run(
+            owner_user_id=_USER_ID,
+            exchange_connection_id=_CONNECTION_ID,
+            strategy_id=_STRATEGY_ID,
+            live_profile_id=_PROFILE_ID,
+            strategy_run_id=_RUN_ID,
+            requested_amount=Decimal("25"),
+            now=_NOW,
+        )
+
+    assert error_info.value.reason == reason
+    assert accounting_repository.reservations[-1].state == "rejected"
+    assert accounting_repository.reservations[-1].reason == reason
+
+
+def test_paper_signal_records_order_fill_accounting_idempotently() -> None:
+    projection_repository = InMemoryExchangeAccountProjectionRepository()
+    projection_repository.record_projection(
+        projection=_projection(free=Decimal("100"), observed_at=_NOW - timedelta(seconds=30))
+    )
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=projection_repository,
+        clock=_Clock(),
+    )
+    service.reserve_for_strategy_run(
+        owner_user_id=_USER_ID,
+        exchange_connection_id=_CONNECTION_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        requested_amount=Decimal("50"),
+        now=_NOW,
+    )
+    signal = _signal(signal_id=UUID("00000000-0000-0000-0000-000000009501"))
+
+    first = service.record_paper_signal(signal=signal)
+    replay = service.record_paper_signal(signal=signal)
+
+    assert first is not None
+    assert replay is not None
+    assert replay.accounting_id == first.accounting_id
+    assert len(accounting_repository.orders) == 1
+    assert len(accounting_repository.fills) == 1
+    assert len(accounting_repository.accounting) == 1
+    assert first.reserved_budget == Decimal("50")
+    assert first.position_quantity == Decimal("0.00500000")
+    assert first.fee_model == "paper_fixed_bps_10"
+    assert first.funding_model == "spot_not_applicable"
+    assert first.pnl_complete is True
+
+
+def _projection(*, free: Decimal, observed_at: datetime) -> ExchangeAccountProjection:
+    return ExchangeAccountProjection(
+        account_snapshot_id=uuid4(),
+        owner_user_id=_USER_ID,
+        exchange_connection_id=_CONNECTION_ID,
+        exchange_name="binance",
+        market_type="spot",
+        environment="testnet",
+        account_mode="spot",
+        balances=(ExchangeBalanceSnapshot(asset="USDT", free=free, total=free),),
+        positions=(),
+        open_orders=(),
+        instrument_filters=(
+            ExchangeInstrumentFilterSnapshot(
+                instrument_key="binance:spot:BTCUSDT",
+                min_notional=Decimal("10"),
+            ),
+        ),
+        source_hash="b" * 64,
+        observed_at=observed_at,
+        synced_at=observed_at,
+    )
+
+
+def _signal(*, signal_id: UUID) -> StrategySignal:
+    return StrategySignal(
+        signal_id=signal_id,
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        strategy_run_id=_RUN_ID,
+        live_profile_id=_PROFILE_ID,
+        mode="paper",
+        instrument_key="binance:spot:BTCUSDT",
+        market_type="spot",
+        timeframe="1m",
+        bar_ts_open=_NOW,
+        bar_ts_close=_NOW + timedelta(minutes=1),
+        signal_action="open",
+        side="buy",
+        outcome="signal",
+        reason_code="ma_fast_crossed_above_slow_paper_no_order_stage05",
+        reference_price=Decimal("10000"),
+        confidence=Decimal("1"),
+        source_message_id="1-0",
+        evaluator_version="ma_cross_close_v1",
+        expected_order_json={},
+        created_at=_NOW + timedelta(minutes=1),
+    )

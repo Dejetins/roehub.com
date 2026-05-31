@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+from trading.contexts.strategy.application.ports.capital_reservation import (
+    StrategyCapitalReservationCoordinator,
+)
 from trading.contexts.strategy.application.ports.clock import StrategyClock
 from trading.contexts.strategy.application.ports.compatibility_readiness import (
     StrategyCompatibilityReadinessChecker,
@@ -53,6 +56,7 @@ class RunStrategyUseCase:
         compatibility_readiness_checker: StrategyCompatibilityReadinessChecker | None = None,
         live_profile_repository: LiveStrategyProfileRepository | None = None,
         position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
+        capital_reservation_coordinator: StrategyCapitalReservationCoordinator | None = None,
     ) -> None:
         """
         Initialize strategy run-control use-case dependencies.
@@ -85,6 +89,7 @@ class RunStrategyUseCase:
         self._compatibility_readiness_checker = compatibility_readiness_checker
         self._live_profile_repository = live_profile_repository
         self._position_ownership_coordinator = position_ownership_coordinator
+        self._capital_reservation_coordinator = capital_reservation_coordinator
 
     def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
         """
@@ -147,6 +152,7 @@ class RunStrategyUseCase:
 
             run_id = uuid4()
             reserved_ownership = False
+            reserved_capital = False
             profile = (
                 self._live_profile_repository.get_for_strategy(
                     owner_user_id=current_user.user_id,
@@ -155,6 +161,33 @@ class RunStrategyUseCase:
                 if self._live_profile_repository is not None
                 else None
             )
+            if (
+                self._capital_reservation_coordinator is not None
+                and profile is not None
+                and profile.exchange_connection_id is not None
+                and profile.mode in {"paper", "live"}
+            ):
+                try:
+                    self._capital_reservation_coordinator.reserve_for_strategy_run(
+                        owner_user_id=current_user.user_id,
+                        exchange_connection_id=profile.exchange_connection_id,
+                        strategy_id=strategy.strategy_id,
+                        live_profile_id=profile.profile_id,
+                        strategy_run_id=run_id,
+                        requested_amount=profile.sizing_value,
+                        now=run_started_at,
+                    )
+                except Exception as error:  # noqa: BLE001
+                    reason = getattr(error, "reason", None) or "capital_reservation_blocked"
+                    raise RoehubError(
+                        code="strategy_run.capital_reservation_blocked",
+                        message="Strategy run is blocked by capital reservation",
+                        details={
+                            "reason": str(reason),
+                            "strategy_id": str(strategy.strategy_id),
+                        },
+                    ) from error
+                reserved_capital = True
             if (
                 self._position_ownership_coordinator is not None
                 and profile is not None
@@ -173,6 +206,13 @@ class RunStrategyUseCase:
                         now=run_started_at,
                     )
                 except Exception as error:  # noqa: BLE001
+                    if reserved_capital and self._capital_reservation_coordinator is not None:
+                        self._capital_reservation_coordinator.release_for_strategy_run(
+                            owner_user_id=current_user.user_id,
+                            strategy_run_id=run_id,
+                            now=run_started_at,
+                            reason="position_ownership_failed",
+                        )
                     if error.__class__.__name__ == "StrategyPositionOwnershipConflictError":
                         raise position_ownership_conflict_error(
                             existing=getattr(error, "existing", None)
@@ -190,6 +230,13 @@ class RunStrategyUseCase:
             try:
                 persisted_started = self._run_repository.create(run=started)
             except Exception:
+                if reserved_capital and self._capital_reservation_coordinator is not None:
+                    self._capital_reservation_coordinator.release_for_strategy_run(
+                        owner_user_id=current_user.user_id,
+                        strategy_run_id=run_id,
+                        now=run_started_at,
+                        reason="run_start_failed",
+                    )
                 if reserved_ownership and self._position_ownership_coordinator is not None:
                     self._position_ownership_coordinator.release_for_strategy_run(
                         owner_user_id=current_user.user_id,

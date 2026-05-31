@@ -71,6 +71,16 @@ _STRATEGY_POSITION_OWNERSHIP_TOTAL = Counter(
     "Strategy position ownership reserve/release/conflict outcomes.",
     ("result", "reason"),
 )
+_STRATEGY_CAPITAL_RESERVATION_TOTAL = Counter(
+    "strategy_capital_reservation_total",
+    "Strategy capital reservation outcomes.",
+    ("result", "reason"),
+)
+_STRATEGY_PAPER_ACCOUNTING_TOTAL = Counter(
+    "strategy_paper_accounting_total",
+    "Strategy paper order/fill/accounting outcomes.",
+    ("result", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -227,6 +237,20 @@ def record_strategy_position_ownership(*, result: str, reason: str) -> None:
     ).inc()
 
 
+def record_strategy_capital_reservation(*, result: str, reason: str) -> None:
+    _STRATEGY_CAPITAL_RESERVATION_TOTAL.labels(
+        result=result,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def record_strategy_paper_accounting(*, result: str, reason: str) -> None:
+    _STRATEGY_PAPER_ACCOUNTING_TOTAL.labels(
+        result=result,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -262,6 +286,8 @@ __all__ = [
     "record_live_strategy_profile_readiness",
     "record_market_data_readiness",
     "record_strategy_position_ownership",
+    "record_strategy_capital_reservation",
+    "record_strategy_paper_accounting",
     "record_strategy_variant_launch",
     "record_strategy_variant_compatibility",
 ]

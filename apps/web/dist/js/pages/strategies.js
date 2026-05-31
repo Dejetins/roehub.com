@@ -283,6 +283,36 @@ function renderExchangeAccountReadiness(root, readiness) {
   }
 }
 
+function renderPaperAccounting(root, accounting) {
+  const completeness = accounting?.pnl_complete ? "complete" : "incomplete";
+  const reason = accounting?.completeness_reason || "paper_accounting_unavailable";
+  setText("[data-paper-completeness]", `${completeness}: ${reason}`, root);
+  setText("[data-paper-reserved]", valueOrUnavailable(accounting?.reserved_budget), root);
+  setText("[data-paper-position]", valueOrUnavailable(accounting?.position_quantity), root);
+  setText("[data-paper-entry]", valueOrUnavailable(accounting?.average_entry_price), root);
+  setText("[data-paper-equity]", valueOrUnavailable(accounting?.equity), root);
+  setText(
+    "[data-paper-pnl]",
+    `${valueOrUnavailable(accounting?.realized_pnl)} / ${valueOrUnavailable(accounting?.unrealized_pnl)}`,
+    root,
+  );
+  setText(
+    "[data-paper-fees]",
+    `${valueOrUnavailable(accounting?.fee_total)} / ${valueOrUnavailable(accounting?.funding_total)}`,
+    root,
+  );
+  setText(
+    "[data-paper-models]",
+    `${valueOrUnavailable(accounting?.fee_model)} / ${valueOrUnavailable(accounting?.funding_model)}`,
+    root,
+  );
+  setText("[data-paper-updated]", localTime(accounting?.updated_at), root);
+  const panel = qs(".strategies-paper-accounting", root);
+  if (panel instanceof HTMLElement) {
+    panel.dataset.readiness = accounting?.pnl_complete ? "ready" : "degraded";
+  }
+}
+
 function renderMetrics(root, metricGrid) {
   const target = qs("[data-strategy-metrics]", root);
   if (!target) {
@@ -614,6 +644,7 @@ function renderDashboard(root, summary, state = {}) {
   renderLiveProfile(root, summary.live_profile);
   renderCompatibilityReadiness(root, summary.compatibility_readiness);
   renderExchangeAccountReadiness(root, summary.exchange_account_readiness);
+  renderPaperAccounting(root, summary.paper_accounting);
   renderSelector(root, summary.strategy_selector, state.savedQuery);
   renderChart(root, summary, state);
   syncStatWorkspace(root, state.statMode || "overall");
