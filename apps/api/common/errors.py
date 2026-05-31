@@ -35,6 +35,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "not_found": 404,
     "forbidden": 403,
     "conflict": 409,
+    "position_ownership_conflict": 409,
     "exchange_connection_not_found": 404,
     "exchange_connection_not_owned": 404,
     "exchange_connection_already_exists": 409,

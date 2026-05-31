@@ -12,6 +12,7 @@ from .create_strategy_from_backtest_variant import (
 from .delete_strategy import DeleteStrategyUseCase
 from .errors import (
     map_strategy_exception,
+    position_ownership_conflict_error,
     strategy_conflict,
     strategy_forbidden,
     strategy_not_found,
@@ -44,6 +45,7 @@ __all__ = [
     "LiveStrategyProfileService",
     "RestartStrategyUseCase",
     "map_strategy_exception",
+    "position_ownership_conflict_error",
     "strategy_conflict",
     "strategy_forbidden",
     "strategy_not_found",

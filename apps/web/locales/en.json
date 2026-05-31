@@ -403,6 +403,7 @@
   "strategies.actions.close": "Close",
   "strategies.actions.delete": "Delete",
   "strategies.actions.execution": "Execution controls",
+  "strategies.actions.failed": "Action failed",
   "strategies.actions.manage": "Manage",
   "strategies.actions.restart": "Restart",
   "strategies.actions.run": "Run",

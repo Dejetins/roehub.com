@@ -204,6 +204,17 @@ function renderSelected(root, selected) {
   setButtonDisabled(root, "[data-strategy-restart]", !canRestart);
 }
 
+function setActionStatus(root, value) {
+  setText("[data-strategy-action-status]", value || "--", root);
+}
+
+function actionErrorText(error) {
+  const payload = error?.payload?.error || {};
+  const details = payload.details || {};
+  const reason = details.reason || payload.code || error?.code || "request_failed";
+  return `${payload.message || error?.message || t("strategies.actions.failed")}: ${reason}`;
+}
+
 function setButtonDisabled(root, selector, disabled) {
   const button = qs(selector, root);
   if (button instanceof HTMLButtonElement) {
@@ -889,21 +900,39 @@ function initStrategies(root) {
       return;
     }
     const path = root.dataset.apiRunPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
-    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
+    setActionStatus(root, t("strategies.actions.run"));
+    apiFetch(path, { method: "POST" })
+      .then(() => {
+        setActionStatus(root, t("strategies.status.ready"));
+        return loadDashboard("initial");
+      })
+      .catch((error) => setActionStatus(root, actionErrorText(error)));
   });
   qs("[data-strategy-stop]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
       return;
     }
     const path = root.dataset.apiStopPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
-    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
+    setActionStatus(root, t("strategies.actions.stop"));
+    apiFetch(path, { method: "POST" })
+      .then(() => {
+        setActionStatus(root, t("strategies.status.ready"));
+        return loadDashboard("initial");
+      })
+      .catch((error) => setActionStatus(root, actionErrorText(error)));
   });
   qs("[data-strategy-restart]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
       return;
     }
     const path = root.dataset.apiRestartPathTemplate.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
-    apiFetch(path, { method: "POST" }).then(() => loadDashboard("initial")).catch(() => null);
+    setActionStatus(root, t("strategies.actions.restart"));
+    apiFetch(path, { method: "POST" })
+      .then(() => {
+        setActionStatus(root, t("strategies.status.ready"));
+        return loadDashboard("initial");
+      })
+      .catch((error) => setActionStatus(root, actionErrorText(error)));
   });
   qs("[data-strategy-clone]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {

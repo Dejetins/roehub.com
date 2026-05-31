@@ -66,6 +66,11 @@ _EXCHANGE_ACCOUNT_PROJECTION_STALENESS_SECONDS = Gauge(
     "exchange_account_projection_staleness_seconds",
     "Latest observed exchange account projection age in seconds.",
 )
+_STRATEGY_POSITION_OWNERSHIP_TOTAL = Counter(
+    "strategy_position_ownership_total",
+    "Strategy position ownership reserve/release/conflict outcomes.",
+    ("result", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -215,6 +220,13 @@ def record_exchange_config_guard(*, status: str, reason: str) -> None:
     ).inc()
 
 
+def record_strategy_position_ownership(*, result: str, reason: str) -> None:
+    _STRATEGY_POSITION_OWNERSHIP_TOTAL.labels(
+        result=result,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -249,6 +261,7 @@ __all__ = [
     "record_exchange_config_guard",
     "record_live_strategy_profile_readiness",
     "record_market_data_readiness",
+    "record_strategy_position_ownership",
     "record_strategy_variant_launch",
     "record_strategy_variant_compatibility",
 ]

@@ -113,6 +113,24 @@ def strategy_conflict(*, message: str, details: Mapping[str, Any]) -> RoehubErro
     return RoehubError(code="conflict", message=message, details=dict(details))
 
 
+def position_ownership_conflict_error(*, existing: Any) -> RoehubError:
+    return RoehubError(
+        code="position_ownership_conflict",
+        message="Position ownership is already held by another active strategy run",
+        details={
+            "owner_user_id": str(getattr(existing, "owner_user_id", "")),
+            "exchange_connection_id": str(getattr(existing, "exchange_connection_id", "")),
+            "market_type": str(getattr(existing, "market_type", "")),
+            "instrument_key": str(getattr(existing, "instrument_key", "")),
+            "existing_strategy_id": str(getattr(existing, "strategy_id", "")),
+            "existing_live_profile_id": str(getattr(existing, "live_profile_id", "")),
+            "existing_strategy_run_id": str(getattr(existing, "strategy_run_id", "")),
+            "existing_state": str(getattr(existing, "state", "")),
+            "reason": "position_ownership_conflict",
+        },
+    )
+
+
 
 def map_strategy_exception(*, error: Exception) -> RoehubError:
     """
@@ -147,6 +165,8 @@ def map_strategy_exception(*, error: Exception) -> RoehubError:
             message="Strategy storage operation failed",
             details={"reason": str(error)},
         )
+    if error.__class__.__name__ == "StrategyPositionOwnershipConflictError":
+        return position_ownership_conflict_error(existing=getattr(error, "existing", None))
 
     return RoehubError(
         code="unexpected_error",

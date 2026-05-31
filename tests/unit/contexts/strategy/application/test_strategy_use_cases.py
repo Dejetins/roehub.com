@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Mapping
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
+from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryStrategyPositionOwnershipRepository,
+)
+from trading.contexts.live_execution.application import StrategyPositionOwnershipService
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyBacktestVariantProvenanceRepository,
     InMemoryStrategyCompatibilityReadinessRepository,
     InMemoryStrategyEventRepository,
@@ -30,6 +36,7 @@ from trading.contexts.strategy.application.ports.market_data_readiness import (
     MarketDataReadinessSnapshot,
 )
 from trading.contexts.strategy.domain.entities import StrategySpecV1
+from trading.contexts.strategy.domain.entities.live_strategy_profile import LiveStrategyProfile
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
 
@@ -411,6 +418,104 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
     assert second_run.run_id != running.run_id
 
 
+def test_position_ownership_blocks_second_strategy_on_same_connection_instrument() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    run_repository = InMemoryStrategyRunRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    profile_repository = InMemoryLiveStrategyProfileRepository()
+    ownership_repository = InMemoryStrategyPositionOwnershipRepository()
+    ownership_service = StrategyPositionOwnershipService(repository=ownership_repository)
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408")
+    )
+    connection_id = UUID("00000000-0000-0000-0000-00000000c408")
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 5, 31, 10, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 10, 1, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 10, 2, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 10, 3, tzinfo=timezone.utc),
+            datetime(2026, 5, 31, 10, 4, tzinfo=timezone.utc),
+        )
+    )
+    create_use_case = CreateStrategyUseCase(
+        repository=strategy_repository,
+        event_repository=event_repository,
+        clock=clock,
+    )
+    first_strategy = create_use_case.execute(
+        spec_payload=_build_spec_payload(),
+        current_user=current_user,
+    )
+    second_strategy = create_use_case.execute(
+        spec_payload=_build_spec_payload(),
+        current_user=current_user,
+    )
+    profile_repository.create(
+        profile=_profile(
+            current_user=current_user,
+            strategy_id=first_strategy.strategy_id,
+            exchange_connection_id=connection_id,
+            now=datetime(2026, 5, 31, 10, 2, tzinfo=timezone.utc),
+        )
+    )
+    profile_repository.create(
+        profile=_profile(
+            current_user=current_user,
+            strategy_id=second_strategy.strategy_id,
+            exchange_connection_id=connection_id,
+            now=datetime(2026, 5, 31, 10, 2, tzinfo=timezone.utc),
+        )
+    )
+    run_use_case = RunStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
+        clock=clock,
+        live_profile_repository=profile_repository,
+        position_ownership_coordinator=ownership_service,
+    )
+    stop_use_case = StopStrategyUseCase(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        event_repository=event_repository,
+        clock=clock,
+        position_ownership_coordinator=ownership_service,
+    )
+
+    first_run = run_use_case.execute(
+        strategy_id=first_strategy.strategy_id,
+        current_user=current_user,
+    )
+    first_ownership = ownership_repository.get_for_run(
+        owner_user_id=current_user.user_id,
+        strategy_run_id=first_run.run_id,
+    )
+    assert first_ownership is not None
+    assert first_ownership.state == "active"
+
+    with pytest.raises(RoehubError) as conflict_error:
+        run_use_case.execute(
+            strategy_id=second_strategy.strategy_id,
+            current_user=current_user,
+        )
+    assert conflict_error.value.code == "position_ownership_conflict"
+    assert conflict_error.value.details is not None
+    assert conflict_error.value.details["existing_strategy_run_id"] == str(first_run.run_id)
+    assert conflict_error.value.details["reason"] == "position_ownership_conflict"
+
+    stopping = stop_use_case.execute(
+        strategy_id=first_strategy.strategy_id,
+        current_user=current_user,
+    )
+    releasing = ownership_repository.get_for_run(
+        owner_user_id=current_user.user_id,
+        strategy_run_id=stopping.run_id,
+    )
+    assert releasing is not None
+    assert releasing.state == "releasing"
+
+
 def test_run_strategy_blocks_when_market_data_readiness_is_missing() -> None:
     strategy_repository = InMemoryStrategyRepository()
     run_repository = InMemoryStrategyRunRepository()
@@ -696,3 +801,28 @@ def _build_spec_payload() -> Mapping[str, Any]:
         ],
         "signal_template": "MA(20,50)",
     }
+
+
+def _profile(
+    *,
+    current_user: CurrentUser,
+    strategy_id: UUID,
+    exchange_connection_id: UUID,
+    now: datetime,
+) -> LiveStrategyProfile:
+    return LiveStrategyProfile(
+        profile_id=uuid4(),
+        owner_user_id=current_user.user_id,
+        strategy_id=strategy_id,
+        mode="paper",
+        exchange_connection_id=exchange_connection_id,
+        sizing_method="fixed_quote",
+        sizing_value=Decimal("100"),
+        max_position_notional=None,
+        max_orders_per_run=1,
+        max_notional_per_run=Decimal("100"),
+        readiness_status="ready",
+        readiness_reason="paper_no_exchange_submit",
+        created_at=now,
+        updated_at=now,
+    )

@@ -15,6 +15,7 @@ from .market_data_readiness import (
     MarketDataReadinessSnapshot,
     MarketDataReadinessState,
 )
+from .position_ownership import StrategyPositionOwnershipCoordinator
 from .realtime_output_publisher import (
     EVENT_TYPES_V1,
     METRIC_TYPES_V1,
@@ -60,6 +61,7 @@ __all__ = [
     "MarketDataReadinessReader",
     "MarketDataReadinessSnapshot",
     "MarketDataReadinessState",
+    "StrategyPositionOwnershipCoordinator",
     "StrategyClock",
     "StrategyBacktestVariantProvenanceRepository",
     "StrategyCompatibilityReadinessRepository",

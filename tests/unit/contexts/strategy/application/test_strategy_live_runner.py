@@ -4,6 +4,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Mapping, Sequence
 from uuid import UUID
 
+from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryStrategyPositionOwnershipRepository,
+)
+from trading.contexts.live_execution.application import StrategyPositionOwnershipService
 from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
     CanonicalCandleBatch1m,
@@ -16,6 +20,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
 from trading.contexts.strategy.application import (
     StrategyLiveCandleMessage,
     StrategyLiveRunner,
+    StrategyPositionOwnershipCoordinator,
     StrategyRealtimeEventV1,
     StrategyRealtimeMetricV1,
     StrategyRealtimeOutputRecordV1,
@@ -946,6 +951,62 @@ def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
     ) == successor
 
 
+def test_live_runner_releases_position_ownership_after_terminal_stop() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000920")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    ownership_repository = InMemoryStrategyPositionOwnershipRepository()
+    ownership_service = StrategyPositionOwnershipService(repository=ownership_repository)
+    strategy_repository.create(strategy=strategy)
+    running = _create_running_run(
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        checkpoint_ts_open=datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc),
+    )
+    stopping = running.transition_to(
+        next_state="stopping",
+        changed_at=datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc),
+        checkpoint_ts_open=running.checkpoint_ts_open,
+        last_error=None,
+    )
+    run_repository.create(run=stopping)
+    ownership_service.reserve_for_strategy_run(
+        owner_user_id=user_id,
+        exchange_connection_id=UUID("00000000-0000-0000-0000-00000000c920"),
+        strategy_id=strategy.strategy_id,
+        live_profile_id=None,
+        strategy_run_id=stopping.run_id,
+        market_type=strategy.spec.market_type,
+        instrument_key=strategy.spec.instrument_key,
+        position_mode="net",
+        now=datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc),
+    )
+    ownership_service.activate_for_strategy_run(
+        owner_user_id=user_id,
+        strategy_run_id=stopping.run_id,
+        now=datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc),
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=_StreamStub(messages_by_instrument={strategy.spec.instrument_key: ()}),
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        position_ownership_coordinator=ownership_service,
+    )
+
+    runner.run_once()
+    ownership = ownership_repository.get_for_run(
+        owner_user_id=user_id,
+        strategy_run_id=stopping.run_id,
+    )
+
+    assert ownership is not None
+    assert ownership.state == "released"
+    assert ownership.reason == "run_stopped"
+
+
 def test_live_runner_records_warmup_no_signal_and_signal_journal() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000000925")
     strategy = _create_strategy(user_id=user_id, timeframe_code="1m", fast=2, slow=3)
@@ -1067,6 +1128,7 @@ def _build_runner(
     telegram_notifier_probe: _TelegramNotifierProbe | None = None,
     telegram_policy: TelegramNotificationPolicy | None = None,
     signal_repository: InMemoryStrategySignalRepository | None = None,
+    position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
     warmup_estimator: Callable[..., int] | None = None,
     rollup_policy: TimeframeRollupPolicy | None = None,
 ) -> StrategyLiveRunner:
@@ -1105,6 +1167,7 @@ def _build_runner(
         repair_retry_attempts=retry_attempts,
         repair_backoff_seconds=1.0,
         realtime_output_publisher=realtime_output_probe,
+        position_ownership_coordinator=position_ownership_coordinator,
         telegram_notifier=telegram_notifier_probe,
         telegram_notification_policy=telegram_policy,
         warmup_estimator=warmup_estimator,

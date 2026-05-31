@@ -7,7 +7,11 @@ from trading.contexts.strategy.application.ports.compatibility_readiness import 
     StrategyCompatibilityReadinessChecker,
 )
 from trading.contexts.strategy.application.ports.current_user import CurrentUser
+from trading.contexts.strategy.application.ports.position_ownership import (
+    StrategyPositionOwnershipCoordinator,
+)
 from trading.contexts.strategy.application.ports.repositories import (
+    LiveStrategyProfileRepository,
     StrategyEventRepository,
     StrategyRepository,
     StrategyRunRepository,
@@ -19,6 +23,7 @@ from trading.contexts.strategy.application.use_cases._shared import (
 )
 from trading.contexts.strategy.application.use_cases.errors import (
     map_strategy_exception,
+    position_ownership_conflict_error,
     strategy_conflict,
 )
 from trading.contexts.strategy.domain.entities import StrategyRun
@@ -46,6 +51,8 @@ class RunStrategyUseCase:
         clock: StrategyClock,
         event_repository: StrategyEventRepository | None = None,
         compatibility_readiness_checker: StrategyCompatibilityReadinessChecker | None = None,
+        live_profile_repository: LiveStrategyProfileRepository | None = None,
+        position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
     ) -> None:
         """
         Initialize strategy run-control use-case dependencies.
@@ -76,6 +83,8 @@ class RunStrategyUseCase:
         self._clock = clock
         self._event_repository = event_repository
         self._compatibility_readiness_checker = compatibility_readiness_checker
+        self._live_profile_repository = live_profile_repository
+        self._position_ownership_coordinator = position_ownership_coordinator
 
     def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
         """
@@ -136,14 +145,65 @@ class RunStrategyUseCase:
                     },
                 )
 
+            run_id = uuid4()
+            reserved_ownership = False
+            profile = (
+                self._live_profile_repository.get_for_strategy(
+                    owner_user_id=current_user.user_id,
+                    strategy_id=strategy.strategy_id,
+                )
+                if self._live_profile_repository is not None
+                else None
+            )
+            if (
+                self._position_ownership_coordinator is not None
+                and profile is not None
+                and profile.exchange_connection_id is not None
+            ):
+                try:
+                    self._position_ownership_coordinator.reserve_for_strategy_run(
+                        owner_user_id=current_user.user_id,
+                        exchange_connection_id=profile.exchange_connection_id,
+                        strategy_id=strategy.strategy_id,
+                        live_profile_id=profile.profile_id,
+                        strategy_run_id=run_id,
+                        market_type=strategy.spec.market_type,
+                        instrument_key=strategy.spec.instrument_key,
+                        position_mode="net",
+                        now=run_started_at,
+                    )
+                except Exception as error:  # noqa: BLE001
+                    if error.__class__.__name__ == "StrategyPositionOwnershipConflictError":
+                        raise position_ownership_conflict_error(
+                            existing=getattr(error, "existing", None)
+                        ) from error
+                    raise
+                reserved_ownership = True
+
             started = StrategyRun.start(
-                run_id=uuid4(),
+                run_id=run_id,
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
                 started_at=run_started_at,
                 metadata_json={},
             )
-            persisted_started = self._run_repository.create(run=started)
+            try:
+                persisted_started = self._run_repository.create(run=started)
+            except Exception:
+                if reserved_ownership and self._position_ownership_coordinator is not None:
+                    self._position_ownership_coordinator.release_for_strategy_run(
+                        owner_user_id=current_user.user_id,
+                        strategy_run_id=run_id,
+                        now=run_started_at,
+                        reason="run_start_failed",
+                    )
+                raise
+            if reserved_ownership and self._position_ownership_coordinator is not None:
+                self._position_ownership_coordinator.activate_for_strategy_run(
+                    owner_user_id=current_user.user_id,
+                    strategy_run_id=persisted_started.run_id,
+                    now=run_started_at,
+                )
 
             append_strategy_event(
                 repository=self._event_repository,

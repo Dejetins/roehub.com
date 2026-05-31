@@ -14,6 +14,10 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
     _clickhouse_client,
 )
+from trading.contexts.live_execution.adapters.outbound import (
+    PostgresStrategyPositionOwnershipRepository,
+)
+from trading.contexts.live_execution.application import StrategyPositionOwnershipService
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
@@ -133,6 +137,11 @@ class StrategyLiveRunnerMetrics:
             "Strategy live evaluator journal outcomes",
             ("mode", "action", "outcome"),
         )
+        self.strategy_position_ownership_total = Counter(
+            "strategy_position_ownership_total",
+            "Strategy position ownership reserve/release/conflict outcomes.",
+            ("result", "reason"),
+        )
 
     def observe_iteration(
         self,
@@ -208,6 +217,12 @@ class StrategyLiveRunnerMetrics:
             mode=signal.mode,
             action=signal.signal_action,
             outcome=signal.outcome,
+        ).inc()
+
+    def observe_strategy_position_ownership(self, result: str, reason: str) -> None:
+        self.strategy_position_ownership_total.labels(
+            result=result,
+            reason=(reason or "unknown")[:80],
         ).inc()
 
 
@@ -328,6 +343,11 @@ def build_strategy_live_runner_app(
     run_repository = PostgresStrategyRunRepository(gateway=postgres_gateway)
     signal_repository = PostgresStrategySignalRepository(gateway=postgres_gateway)
     live_profile_repository = PostgresLiveStrategyProfileRepository(gateway=postgres_gateway)
+    metrics = StrategyLiveRunnerMetrics()
+    position_ownership_coordinator = StrategyPositionOwnershipService(
+        repository=PostgresStrategyPositionOwnershipRepository(gateway=postgres_gateway),
+        on_transition=metrics.observe_strategy_position_ownership,
+    )
 
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
@@ -355,8 +375,6 @@ def build_strategy_live_runner_app(
         ),
         environ=environ,
     )
-    metrics = StrategyLiveRunnerMetrics()
-
     realtime_output_config = runtime_config.realtime_output
     realtime_output_publisher = NoOpStrategyRealtimeOutputPublisher()
     if realtime_output_config.enabled:
@@ -417,6 +435,7 @@ def build_strategy_live_runner_app(
         repair_backoff_seconds=runtime_config.repair.retry_backoff_seconds,
         realtime_output_publisher=realtime_output_publisher,
         live_profile_repository=live_profile_repository,
+        position_ownership_coordinator=position_ownership_coordinator,
         on_signal_recorded=metrics.observe_strategy_signal,
         telegram_notifier=telegram_notifier,
         telegram_notification_policy=telegram_notification_policy,

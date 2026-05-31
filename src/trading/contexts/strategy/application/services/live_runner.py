@@ -17,6 +17,7 @@ from trading.contexts.strategy.application.ports import (
     NoOpTelegramNotifier,
     StrategyClock,
     StrategyLiveCandleStream,
+    StrategyPositionOwnershipCoordinator,
     StrategyRealtimeEventV1,
     StrategyRealtimeMetricV1,
     StrategyRealtimeOutputPublisher,
@@ -138,6 +139,7 @@ class StrategyLiveRunner:
         repair_backoff_seconds: float,
         realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
         live_profile_repository: LiveStrategyProfileRepository | None = None,
+        position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
         on_signal_recorded: Callable[[StrategySignal], None] | None = None,
         telegram_notifier: TelegramNotifier | None = None,
         telegram_notification_policy: TelegramNotificationPolicy | None = None,
@@ -195,6 +197,7 @@ class StrategyLiveRunner:
         self._canonical_candle_reader = canonical_candle_reader
         self._signal_repository = signal_repository
         self._live_profile_repository = live_profile_repository
+        self._position_ownership_coordinator = position_ownership_coordinator
         self._on_signal_recorded = on_signal_recorded
         self._clock = clock
         self._sleeper = sleeper
@@ -783,7 +786,9 @@ class StrategyLiveRunner:
                 }
             },
         )
+        self._reserve_ownership_for_run(run=successor, strategy=strategy, now=started_at)
         persisted = self._run_repository.create(run=successor)
+        self._activate_ownership_for_run(run=persisted, now=started_at)
         self._publish_snapshot_metrics(run=persisted, spec=strategy.spec, ts=persisted.updated_at)
         return persisted
 
@@ -839,7 +844,53 @@ class StrategyLiveRunner:
         if spec is not None:
             self._publish_snapshot_metrics(run=persisted, spec=spec, ts=persisted.updated_at)
             self._publish_transition_events(previous=run, current=persisted, spec=spec)
+        if persisted.state in {"stopped", "failed"}:
+            self._release_ownership_for_terminal_run(run=persisted)
         return persisted
+
+    def _reserve_ownership_for_run(
+        self,
+        *,
+        run: StrategyRun,
+        strategy: Strategy,
+        now: datetime,
+    ) -> None:
+        if self._position_ownership_coordinator is None:
+            return
+        profile = self._load_live_profile(run=run)
+        if profile is None or profile.exchange_connection_id is None:
+            return
+        self._position_ownership_coordinator.reserve_for_strategy_run(
+            owner_user_id=run.user_id,
+            exchange_connection_id=profile.exchange_connection_id,
+            strategy_id=run.strategy_id,
+            live_profile_id=profile.profile_id,
+            strategy_run_id=run.run_id,
+            market_type=strategy.spec.market_type,
+            instrument_key=strategy.spec.instrument_key,
+            position_mode="net",
+            now=now,
+            reason="restart_successor_started",
+        )
+
+    def _activate_ownership_for_run(self, *, run: StrategyRun, now: datetime) -> None:
+        if self._position_ownership_coordinator is None:
+            return
+        self._position_ownership_coordinator.activate_for_strategy_run(
+            owner_user_id=run.user_id,
+            strategy_run_id=run.run_id,
+            now=now,
+        )
+
+    def _release_ownership_for_terminal_run(self, *, run: StrategyRun) -> None:
+        if self._position_ownership_coordinator is None:
+            return
+        self._position_ownership_coordinator.release_for_strategy_run(
+            owner_user_id=run.user_id,
+            strategy_run_id=run.run_id,
+            now=run.updated_at,
+            reason="run_failed" if run.state == "failed" else "run_stopped",
+        )
 
     def _mark_failed(
         self,

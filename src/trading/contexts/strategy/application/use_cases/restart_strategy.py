@@ -6,6 +6,9 @@ from uuid import UUID, uuid4
 
 from trading.contexts.strategy.application.ports.clock import StrategyClock
 from trading.contexts.strategy.application.ports.current_user import CurrentUser
+from trading.contexts.strategy.application.ports.position_ownership import (
+    StrategyPositionOwnershipCoordinator,
+)
 from trading.contexts.strategy.application.ports.repositories import (
     StrategyEventRepository,
     StrategyRepository,
@@ -48,6 +51,7 @@ class RestartStrategyUseCase:
         run_repository: StrategyRunRepository,
         clock: StrategyClock,
         event_repository: StrategyEventRepository | None = None,
+        position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
     ) -> None:
         if strategy_repository is None:  # type: ignore[truthy-bool]
             raise ValueError("RestartStrategyUseCase requires strategy_repository")
@@ -60,6 +64,7 @@ class RestartStrategyUseCase:
         self._run_repository = run_repository
         self._clock = clock
         self._event_repository = event_repository
+        self._position_ownership_coordinator = position_ownership_coordinator
 
     def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
         """
@@ -132,6 +137,13 @@ class RestartStrategyUseCase:
                 metadata_json=metadata_json,
             )
             persisted_stopping = self._run_repository.update(run=stopping)
+            if self._position_ownership_coordinator is not None:
+                self._position_ownership_coordinator.mark_releasing_for_strategy_run(
+                    owner_user_id=current_user.user_id,
+                    strategy_run_id=persisted_stopping.run_id,
+                    now=requested_at,
+                    reason="run_restart_requested",
+                )
 
             append_strategy_event(
                 repository=self._event_repository,

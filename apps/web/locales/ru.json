@@ -403,6 +403,7 @@
   "strategies.actions.close": "Закрыть",
   "strategies.actions.delete": "Удалить",
   "strategies.actions.execution": "Управление запуском",
+  "strategies.actions.failed": "Действие не выполнено",
   "strategies.actions.manage": "Управление",
   "strategies.actions.restart": "Перезапустить",
   "strategies.actions.run": "Запустить",
