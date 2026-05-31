@@ -161,16 +161,15 @@ Accepted runtime proof:
 | Read-only key rejection | The smoke read-only Bybit key remains `valid_readonly`, `connection_readiness=rejected`, `connection_readiness_reason=read_only_not_supported`, `effective_capability=none`. Account-state sync against that connection exited `1` with exchange-control `422 read_only_not_supported`. | Pass. |
 | Dashboard API readiness | Authenticated production `GET /ui/strategies/dashboard` for the smoke strategy returned `fresh/account_projection_fresh`, `config_mismatch/min_notional_below_requirement`, `degraded/account_projection_missing`, and after the freshness window `stale/account_projection_stale`. | Pass. |
 | DB snapshot redaction | Latest projection row recorded `bybit|spot|mainnet|unified|fresh|account_state_read_ok|source_hash length 64|balances 9|positions 0|orders 0|filters 1|metadata source present`; child rows showed `balances=9`, `positions=0`, `orders=0`, `filters=1`, `instrument=bybit:spot:BTCUSDT`, `tick=0.1`, `step=0.000001`, `min_notional=5`. No API key, secret, authorization, signature, passphrase, signed payload or ciphertext columns are introduced. | Pass. |
-| Metrics | exchange-control `/metrics` emitted `exchange_account_state_read_total{exchange="bybit",reason="account_state_read_ok",result="fresh"}` and `exchange_account_state_read_total{reason="read_only_not_supported",result="rejected"}`. API `/metrics` emitted account readiness counters for `fresh`, `config_mismatch`, `degraded`, `stale`, config guard counters for `verified`, `mismatch`, `degraded`, and staleness gauge `130`. | Pass. |
+| Metrics | exchange-control `/metrics` emitted `exchange_account_state_read_total{exchange="bybit",reason="account_state_read_ok",result="fresh"} 2` and `exchange_account_state_read_total{reason="read_only_not_supported",result="rejected"} 1`. API `/metrics` emitted account readiness counters for `fresh`, `config_mismatch`, `degraded`, `stale`, config guard counters for `verified`, `mismatch`, `degraded`, and staleness gauge updates. | Pass. |
 | Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed after reload; core services were running and API health returned `{"status":"ok"}`. | Pass. |
+| Public web proof | Manual `Publish App Image` workflow `26715014736` built image tag `cfc45915d4235ee69410c40f16035a3fb16a0b64`; manual `Deploy Web` workflow `26715048528` deployed it successfully. Authenticated public `https://roehub.com/strategies` HTML contained `strategies-account-readiness` and no secret terms; Playwright screenshot `output/playwright/stage07-prod-strategies-account.png` showed `Account readiness` with `stale: account_projection_stale`, and DOM scan returned `hasPanel=true`, `hasStale=true`, `secretLeak=false`. | Pass. |
 
 Public web image note: the first implementation commit contained the `/strategies`
 panel but its CI failed on a test import-order issue. The later fix commit passed
 CI but did not touch `apps/web`, so the normal image route did not rebuild the
-public web container with the Stage `07` template. The acceptance path therefore
-requires a manual `Publish App Image` workflow dispatch from the accepted `main`
-commit and the subsequent `Deploy Web` run before public `/strategies` browser
-proof is considered final.
+public web container with the Stage `07` template. This was corrected by manual
+`Publish App Image` and `Deploy Web` workflow dispatches from accepted `main`.
 
 ## Contract Impact
 
