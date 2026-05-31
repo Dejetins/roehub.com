@@ -21,3 +21,10 @@ def test_exchange_execution_native_service_assets_are_installed_and_reloaded() -
     assert "com.roehub.exchange-execution.plist" in reload_services
     assert "com.roehub.test.exchange-execution.plist" in test_bootstrap
     assert "com.roehub.test.exchange-execution.plist" in reload_services
+
+
+def test_backend_deploy_reloads_monit_for_monit_asset_changes() -> None:
+    workflow = _read(".github/workflows/deploy-backend.yml")
+
+    assert "infra/scripts/monit/" in workflow
+    assert "brew services restart monit" in workflow

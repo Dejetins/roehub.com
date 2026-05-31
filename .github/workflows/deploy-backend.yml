@@ -178,7 +178,8 @@ jobs:
             changed_files="$(git diff --name-only HEAD~1 HEAD || true)"
           fi
           monitoring_changed=0
-          if printf '%s\n' "$changed_files" | grep -Eq '^(infra/macos/prometheus/|infra/macos/blackbox/|infra/macos/launchd/com\.roehub\.blackbox-exporter\.plist)'; then
+          monitoring_pattern='^(infra/macos/prometheus/|infra/macos/blackbox/|infra/macos/launchd/com\.roehub\.blackbox-exporter\.plist|infra/scripts/monit/)'
+          if printf '%s\n' "$changed_files" | grep -Eq "$monitoring_pattern"; then
             monitoring_changed=1
           fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -198,6 +199,7 @@ jobs:
         run: |
           set -euxo pipefail
           export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+          brew services restart monit
           brew services restart prometheus
           brew services restart grafana
           sleep 5
