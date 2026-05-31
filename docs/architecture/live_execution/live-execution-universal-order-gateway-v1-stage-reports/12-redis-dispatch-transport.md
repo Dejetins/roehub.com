@@ -6,9 +6,8 @@ rejected and legacy `recorded/not_evaluated` rows are never published.
 
 Date: 2026-05-31.
 
-Status: pending delivery. Local code gates are complete; direct-main delivery,
-CI/deploy and Mac Studio post-deploy runtime evidence must be added before the
-stage is accepted.
+Status: accepted. Direct-main delivery, CI/deploy and Mac Studio post-deploy
+runtime evidence are complete.
 
 ## Scope
 
@@ -57,18 +56,60 @@ Out of scope:
 | Required pyright | `uv run pyright src/trading/contexts/live_execution apps tests` | `0 errors`. |
 | Required unit/apps scope | `uv run pytest -q tests/unit/contexts/live_execution tests/unit/apps` | `323 passed, 3 warnings`. |
 | Required integration path | `uv run pytest -q tests/unit/contexts/live_execution tests/unit/apps tests/integration` | Blocked locally because `tests/integration` does not exist in this checkout; no tests ran for that path. |
+| Full local suite | `uv run pytest -q -ra` | `1074 passed, 3 warnings`. |
+| Docs index | `uv run python -m tools.docs.generate_docs_index --check` | Passed. |
+| Whitespace | `git diff --check` | Passed. |
+
+## Delivery Evidence
+
+Direct-main delivery:
+
+- implementation commit: `565f0ace Add execution Redis dispatch transport`;
+- pushed to `origin/main`;
+- CI `26720381203`: success;
+- Publish App Image `26720422220`: success;
+- Deploy Backend `26720422250`: success;
+- Deploy Web `26720422190` and follow-up `26720426619`: success.
 
 ## Runtime Evidence
 
-Pending post-deploy Mac Studio evidence:
+Production proof used a disposable authenticated smoke session against the
+deployed Mac Studio API at `http://127.0.0.1:8000`, direct Postgres reads,
+Redis Streams calls through redis-py, and API `/metrics`. The temporary smoke
+session was revoked after the probe.
 
-- accepted intent creates `dispatched` DB state and one Redis message;
-- rejected and missing-risk intents remain non-dispatchable;
-- `XINFO`, `XREADGROUP`, `XPENDING`, retry stream and DLQ stream evidence;
-- duplicate replay proves no second primary dispatch after `dispatched`;
-- Redis outage/recovery proves `retry` then successful dispatch;
-- metrics expose dispatch, retry, DLQ, backpressure and Redis error counters;
-- no exchange submit, credential decrypt or signed exchange payload exists.
+Run id: `stage12-d18b0618`.
+
+| Surface | Evidence | Result |
+|---|---|---|
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` succeeded after deploy: launchd services, API unauthorized boundary, Redis `PONG`, Postgres service and Tailscale state were healthy. | Pass. |
+| API accepted path | Real authenticated `POST /ui/execution/source-events` returned HTTP `201`; `POST /ui/execution/intents` with all risk checks true returned HTTP `201`, `status=dispatched`, `status_reason=redis_xadd_ok`. | Pass. |
+| DB accepted dispatch | Postgres row for the accepted intent had `status=dispatched`, `risk_status=accepted`, `risk_reason=risk_gate_accepted`, `dispatch_attempt_count=1`, `dispatch_stream_name=execution.requests.v1`, and a Redis message id. | Pass. |
+| Duplicate replay | Exact duplicate intent replay returned HTTP `200`, `duplicate=true`, same `intent_id`; Redis primary stream contained exactly `1` message for that intent. | Pass. |
+| Rejected no-dispatch | Missing-risk intent returned HTTP `201`, `status=rejected`, `risk_reason=risk_state_unavailable`; Postgres dispatch fields stayed empty and Redis primary stream contained `0` messages for that rejected intent. | Pass. |
+| Redis primary stream | `XINFO STREAM execution.requests.v1` reported length `1`; `XINFO GROUPS` reported one group; `XREADGROUP GROUP exchange-execution.v1 <probe-consumer>` read one message; `XPENDING` was `1`, then `XACK` after durable DB state returned `1`, and `XPENDING` returned `0`. | Pass. |
+| Backpressure retry | A direct application-service probe with real Postgres/Redis and `backpressure_max_stream_length=1` returned `retry/dispatch_backpressure`, DB status `retry`, and one marker in `execution.requests.retry.v1`. | Pass. |
+| Redis outage/recovery | A direct dispatch probe pointed at unavailable Redis port `6390` returned `retry/ConnectionError`; replay with real Redis returned `dispatched/redis_xadd_ok`, DB status `dispatched`, and one primary stream message. | Pass. |
+| Poison/DLQ | A direct dispatch probe with a poison transport over real Redis returned `dlq/stage12_poison_probe`, DB status `quarantined`, and one marker in `execution.requests.dlq.v1`. | Pass. |
+| Retry/DLQ stream info | `XINFO STREAM execution.requests.retry.v1` length `1`; `XINFO STREAM execution.requests.dlq.v1` length `1`. | Pass. |
+| Metrics | API `/metrics` exposed `execution_dispatch_total`, `execution_dispatch_retry_total`, `execution_dispatch_dlq_total`, `execution_dispatch_backpressure_total`, and `execution_dispatch_redis_errors_total`; `execution_dispatch_total{result="dispatched",reason="redis_xadd_ok"} 1.0` was present from the API accepted path. | Pass. |
+| Redaction | Latest 10 entries checked in request, retry and DLQ streams had no `authorization`, `api_key`, `apikey`, `secret`, `token`, `cookie`, `passphrase`, `signature` or `ciphertext` terms. | Pass. |
+| Cleanup | Temporary smoke session revoke updated `1` session. Durable smoke ledger rows and Redis messages were retained as audit evidence. | Pass. |
+
+Boundary command summary:
+
+```text
+accepted_api 201 201 dispatched redis_xadd_ok
+accepted_db dispatched accepted risk_gate_accepted dispatch_attempt_count=1 stream=execution.requests.v1
+duplicate 200 true same_intent true primary_messages_for_intent 1
+rejected_api 201 201 rejected risk_state_unavailable rejected_stream_count 0
+redis_primary length=1 groups=1 xreadgroup=true pending_before=1 acked=1 pending_after=0
+backpressure retry dispatch_backpressure db_status=retry retry_stream_messages=1
+outage_recovery retry ConnectionError dispatched redis_xadd_ok db_status=dispatched primary_messages=1
+poison_dlq dlq stage12_poison_probe db_status=quarantined dlq_messages=1
+retry_stream_length 1 dlq_stream_length 1 metrics_present true
+stream_secret_scan request=0 retry=0 dlq=0
+```
 
 Local workstation runtime limitation:
 
