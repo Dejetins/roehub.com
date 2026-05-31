@@ -173,10 +173,10 @@ function isTradingReady(item) {
 function exchangeItems(payload, status = state.exchangeStatusFilter) {
   const items = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
   if (status === "active") {
-    return items.filter(isTradingReady);
+    return items.filter((item) => item?.status === "active");
   }
   if (status === "history") {
-    return items.filter((item) => !isTradingReady(item));
+    return items.filter((item) => item?.status !== "active");
   }
   return items;
 }
@@ -444,7 +444,7 @@ function renderExchangeKeys(payload) {
       action.append(usage);
     }
     const actions =
-      isTradingReady(item)
+      item.status === "active"
         ? [
             ["validate", "settings.exchange.recheck", "settings.exchange.recheck_short"],
             ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],

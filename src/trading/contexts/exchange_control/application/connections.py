@@ -888,7 +888,18 @@ class ExchangeConnectionService:
         )
         if updated is None:
             raise _not_found()
-        return self._to_view(connection=updated)
+        view = self._to_view(connection=updated)
+        if (
+            view.effective_capability != "trading"
+            or view.connection_readiness != "ready_for_trading"
+        ):
+            return self.disable_connection(
+                owner_user_id=owner_user_id,
+                connection_id=connection_id,
+                now=now,
+                status_reason=RECLASSIFIED_NON_TRADING_STATUS_REASON,
+            )
+        return view
 
     def _require_active_owned_connection(
         self, *, owner_user_id: UserId, connection_id: UUID

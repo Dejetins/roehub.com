@@ -107,6 +107,21 @@ def _trade_ready_result() -> ExchangeCredentialValidationResult:
     )
 
 
+def _readonly_result() -> ExchangeCredentialValidationResult:
+    return ExchangeCredentialValidationResult(
+        status="valid_readonly",
+        reason="readonly_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        permission_summary={
+            "requested_permissions": "trade",
+            "permissions": "trade",
+            "exchange_permissions": "read",
+            "effective_permissions": "read",
+            "permission_warnings": [],
+        },
+    )
+
+
 def test_service_identity_is_mandatory_exchange_control() -> None:
     identity = ExchangeControlServiceIdentity(name=EXCHANGE_CONTROL_SERVICE_IDENTITY)
 
@@ -501,6 +516,68 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert "exchange_connection_cleanup_total" in metrics.text
     assert 'result="archived",source="stage09d"' in metrics.text
     assert "connection_id" not in metrics.text
+
+
+def test_internal_validate_reclassifies_readonly_connection_and_allows_recreate() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_SequenceValidator(
+            results=(
+                _trade_ready_result(),
+                _readonly_result(),
+                _trade_ready_result(),
+            )
+        )
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": "readonly-recheck-regression",
+    }
+    owner_user_id = "00000000-0000-0000-0000-000000000402"
+    create_payload = {
+        "owner_user_id": owner_user_id,
+        "exchange_name": "bybit",
+        "market_type": "spot",
+        "environment": "mainnet",
+        "label": "bybit-recheck",
+        "permissions": "trade",
+        "api_key": "BYBITRECHECK1234",
+        "api_secret": "TEST_SECRET_BYBIT_RECHECK",
+    }
+
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json=create_payload,
+    )
+    assert created.status_code == 200
+    connection_id = created.json()["connection_id"]
+
+    rechecked = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/validate",
+        headers=headers,
+        json={"owner_user_id": owner_user_id},
+    )
+
+    assert rechecked.status_code == 200
+    rechecked_payload = rechecked.json()
+    assert rechecked_payload["connection_id"] == connection_id
+    assert rechecked_payload["status"] == "disabled"
+    assert rechecked_payload["status_reason"] == "reclassified_non_trading_ready"
+    assert rechecked_payload["connection_readiness"] == "rejected"
+    assert rechecked_payload["connection_readiness_reason"] == "read_only_not_supported"
+
+    recreated = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={**create_payload, "label": "bybit-recreated"},
+    )
+    assert recreated.status_code == 200
+    recreated_payload = recreated.json()
+    assert recreated_payload["connection_id"] != connection_id
+    assert recreated_payload["status"] == "active"
+    assert recreated_payload["connection_readiness"] == "ready_for_trading"
 
 
 def test_internal_exchange_connection_auto_validation_unavailable_is_not_active() -> None:

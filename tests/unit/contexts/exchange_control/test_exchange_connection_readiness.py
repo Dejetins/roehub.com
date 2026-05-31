@@ -489,6 +489,55 @@ def test_reclassification_moves_active_readonly_to_history_without_losing_reason
     assert repeated.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON
 
 
+def test_validate_reclassifies_readonly_active_connection_and_frees_duplicate_key() -> None:
+    service = _service()
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000123")
+    created = service.create_connection_with_validation(
+        owner_user_id=owner_user_id,
+        exchange_name="bybit",
+        market_type="spot",
+        environment="mainnet",
+        label="bybit-recheck",
+        permissions="trade",
+        api_key="ACCOUNTKEY1234",
+        api_secret="TEST_SECRET",
+        passphrase=None,
+        validator=_StaticValidator(result=_trade_ready_validation_result()),
+        now=datetime(2026, 5, 26, 15, 0, tzinfo=timezone.utc),
+    )
+
+    rechecked = service.validate_connection(
+        owner_user_id=owner_user_id,
+        connection_id=created.connection_id,
+        validator=_StaticValidator(result=_readonly_validation_result()),
+        now=datetime(2026, 5, 26, 15, 1, tzinfo=timezone.utc),
+    )
+
+    assert rechecked.connection_id == created.connection_id
+    assert rechecked.status == "disabled"
+    assert rechecked.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON
+    assert rechecked.connection_readiness == "rejected"
+    assert rechecked.connection_readiness_reason == "read_only_not_supported"
+
+    recreated = service.create_connection_with_validation(
+        owner_user_id=owner_user_id,
+        exchange_name="bybit",
+        market_type="spot",
+        environment="mainnet",
+        label="bybit-recreated",
+        permissions="trade",
+        api_key="ACCOUNTKEY1234",
+        api_secret="TEST_SECRET_ROTATED",
+        passphrase=None,
+        validator=_StaticValidator(result=_trade_ready_validation_result()),
+        now=datetime(2026, 5, 26, 15, 2, tzinfo=timezone.utc),
+    )
+
+    assert recreated.connection_id != created.connection_id
+    assert recreated.status == "active"
+    assert recreated.connection_readiness == "ready_for_trading"
+
+
 def test_reclassification_refuses_active_trading_ready_connection() -> None:
     service = _service()
     created = service.create_connection_with_validation(
@@ -599,4 +648,34 @@ def _create_connection(
         api_secret="TEST_SECRET",
         passphrase=None,
         now=datetime(2026, 5, 26, 12, 0, tzinfo=timezone.utc),
+    )
+
+
+def _trade_ready_validation_result() -> ExchangeCredentialValidationResult:
+    return ExchangeCredentialValidationResult(
+        status="valid_trade_enabled",
+        reason="trade_permission_detected",
+        ip_restriction_status="restricted",
+        permission_summary={
+            "requested_permissions": "trade",
+            "permissions": "trade",
+            "exchange_permissions": "trade",
+            "effective_permissions": "trade",
+            "permission_warnings": [],
+        },
+    )
+
+
+def _readonly_validation_result() -> ExchangeCredentialValidationResult:
+    return ExchangeCredentialValidationResult(
+        status="valid_readonly",
+        reason="readonly_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        permission_summary={
+            "requested_permissions": "trade",
+            "permissions": "trade",
+            "exchange_permissions": "read",
+            "effective_permissions": "read",
+            "permission_warnings": [],
+        },
     )
