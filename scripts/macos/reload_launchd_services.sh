@@ -17,6 +17,7 @@ prod_services=(
   com.roehub.openbao.plist
   com.roehub.openbao-recover.plist
   com.roehub.exchange-control.plist
+  com.roehub.exchange-execution.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist
@@ -35,6 +36,7 @@ prod_pre_openbao_services=(
 prod_post_openbao_services=(
   com.roehub.openbao-recover.plist
   com.roehub.exchange-control.plist
+  com.roehub.exchange-execution.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist
@@ -49,6 +51,7 @@ test_services=(
   com.roehub.test.prometheus.plist
   com.roehub.test.blackbox-exporter.plist
   com.roehub.test.api.plist
+  com.roehub.test.exchange-execution.plist
   com.roehub.test.backtest-job-runner.plist
   com.roehub.test.market-data-ws-worker.plist
   com.roehub.test.market-data-scheduler.plist
