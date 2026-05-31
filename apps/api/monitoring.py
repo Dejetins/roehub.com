@@ -96,6 +96,17 @@ _EXECUTION_ORDER_MODEL_REJECTED_TOTAL = Counter(
     "Unsupported execution order model rejections.",
     ("source_type", "reason"),
 )
+_EXECUTION_RISK_GATE_TOTAL = Counter(
+    "execution_risk_gate_total",
+    "Execution risk gate decisions by source type and bounded reason.",
+    ("source_type", "result", "reason"),
+)
+_EXECUTION_RISK_GATE_LATENCY_SECONDS = Histogram(
+    "execution_risk_gate_latency_seconds",
+    "Execution risk gate evaluation duration in seconds.",
+    ("source_type", "result"),
+    buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -288,6 +299,22 @@ def record_execution_order_model_rejected(*, source_type: str, reason: str) -> N
     ).inc()
 
 
+def record_execution_risk_gate(
+    *, source_type: str, result: str, reason: str, latency_seconds: float
+) -> None:
+    bounded_source = (source_type or "unknown")[:80]
+    bounded_result = (result or "unknown")[:80]
+    _EXECUTION_RISK_GATE_TOTAL.labels(
+        source_type=bounded_source,
+        result=bounded_result,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+    _EXECUTION_RISK_GATE_LATENCY_SECONDS.labels(
+        source_type=bounded_source,
+        result=bounded_result,
+    ).observe(max(0.0, latency_seconds))
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -327,4 +354,8 @@ __all__ = [
     "record_strategy_paper_accounting",
     "record_strategy_variant_launch",
     "record_strategy_variant_compatibility",
+    "record_execution_intent",
+    "record_execution_order_model_rejected",
+    "record_execution_risk_gate",
+    "record_execution_source_event",
 ]

@@ -13,8 +13,11 @@ from trading.contexts.live_execution.domain import (
     ExecutionIntent,
     ExecutionOrderModelRejectedError,
     ExecutionRequest,
+    ExecutionRiskAuditEvent,
+    ExecutionRiskContext,
     ExecutionSourceEvent,
     ExecutionSourceValidationError,
+    evaluate_execution_risk,
     hash_idempotency_key,
     validate_order_model,
     validate_source_event_fields,
@@ -46,6 +49,7 @@ class CreateExecutionIntentCommand:
     quote_notional: Decimal | None
     limit_price: Decimal | None
     advanced_order_flags: Mapping[str, object]
+    risk_context: ExecutionRiskContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +74,7 @@ class ExecutionIngressService:
         on_source_event: Callable[[str, str], None] | None = None,
         on_intent: Callable[[str, str, str], None] | None = None,
         on_order_model_rejected: Callable[[str, str], None] | None = None,
+        on_risk_decision: Callable[[str, str, str, float], None] | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionIngressService requires repository")
@@ -80,6 +85,7 @@ class ExecutionIngressService:
         self._on_source_event = on_source_event
         self._on_intent = on_intent
         self._on_order_model_rejected = on_order_model_rejected
+        self._on_risk_decision = on_risk_decision
 
     def record_source_event(
         self, *, command: RecordExecutionSourceEventCommand
@@ -148,7 +154,8 @@ class ExecutionIngressService:
             )
             self._record_order_model_rejected(source_type=event.source_type, reason=error.reason)
             raise
-        intent = ExecutionIntent(
+        now = self._clock.now()
+        draft_intent = ExecutionIntent(
             intent_id=uuid4(),
             source_event_id=request.source_event_id,
             owner_user_id=command.owner_user_id,
@@ -163,24 +170,69 @@ class ExecutionIngressService:
             quote_notional=request.order.quote_notional,
             limit_price=request.order.limit_price,
             status="recorded",
-            status_reason="stage10_recorded_no_dispatch",
+            status_reason="risk_gate_pending",
             risk_status="not_evaluated",
-            risk_reason="stage11_not_implemented",
+            risk_reason="risk_gate_pending",
             idempotency_key_hash=idempotency_key_hash,
-            created_at=self._clock.now(),
+            created_at=now,
+        )
+        risk_started_at = self._clock.now()
+        decision = evaluate_execution_risk(intent=draft_intent, context=command.risk_context)
+        risk_finished_at = self._clock.now()
+        intent = ExecutionIntent(
+            intent_id=draft_intent.intent_id,
+            source_event_id=draft_intent.source_event_id,
+            owner_user_id=draft_intent.owner_user_id,
+            source_type=draft_intent.source_type,
+            strategy_signal_id=draft_intent.strategy_signal_id,
+            exchange_connection_id=draft_intent.exchange_connection_id,
+            market_type=draft_intent.market_type,
+            instrument_key=draft_intent.instrument_key,
+            side=draft_intent.side,
+            order_type=draft_intent.order_type,
+            quantity=draft_intent.quantity,
+            quote_notional=draft_intent.quote_notional,
+            limit_price=draft_intent.limit_price,
+            status=decision.status,
+            status_reason=decision.reason,
+            risk_status=decision.status,
+            risk_reason=decision.reason,
+            idempotency_key_hash=draft_intent.idempotency_key_hash,
+            created_at=draft_intent.created_at,
         )
         recorded = self._repository.record_intent(intent=intent)
+        self._repository.record_risk_audit_event(
+            event=ExecutionRiskAuditEvent(
+                event_id=uuid4(),
+                intent_id=recorded.intent_id,
+                source_event_id=recorded.source_event_id,
+                owner_user_id=recorded.owner_user_id,
+                source_type=recorded.source_type,
+                event_type=f"risk_gate_{recorded.risk_status}",
+                risk_status=recorded.risk_status,  # type: ignore[arg-type]
+                risk_reason=recorded.risk_reason,
+                check_name=decision.check_name,
+                metadata_json={"dispatch": "no-dispatch"},
+                created_at=self._clock.now(),
+            )
+        )
         linked = self._repository.update_source_event_outcome(
             owner_user_id=command.owner_user_id,
             source_event_id=event.source_event_id,
             outcome="intent_created",
-            outcome_reason="stage10_recorded_no_dispatch",
+            outcome_reason=recorded.risk_reason,
             intent_id=recorded.intent_id,
         )
         self._record_intent(
             source_type=recorded.source_type,
-            result="recorded",
+            result=recorded.status,
             reason=recorded.status_reason,
+        )
+        self._record_risk_decision(
+            source_type=recorded.source_type,
+            result=recorded.risk_status,
+            reason=recorded.risk_reason,
+            latency_seconds=max(0.0, (risk_finished_at - risk_started_at).total_seconds()),
         )
         return ExecutionIntentResult(event=linked or event, intent=recorded, duplicate=False)
 
@@ -220,3 +272,9 @@ class ExecutionIngressService:
     def _record_order_model_rejected(self, *, source_type: str, reason: str) -> None:
         if self._on_order_model_rejected is not None:
             self._on_order_model_rejected(source_type, reason)
+
+    def _record_risk_decision(
+        self, *, source_type: str, result: str, reason: str, latency_seconds: float
+    ) -> None:
+        if self._on_risk_decision is not None:
+            self._on_risk_decision(source_type, result, reason, latency_seconds)

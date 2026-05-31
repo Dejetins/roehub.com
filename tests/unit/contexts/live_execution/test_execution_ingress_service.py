@@ -16,6 +16,7 @@ from trading.contexts.live_execution.application import (
 )
 from trading.contexts.live_execution.domain import (
     ExecutionOrderModelRejectedError,
+    ExecutionRiskContext,
     ExecutionSourceValidationError,
 )
 from trading.shared_kernel.primitives import UserId
@@ -72,9 +73,10 @@ def test_records_source_event_and_intent_for_strategy_signal_idempotently() -> N
     assert len(repository.intents) == 1
     assert repository.source_events[0].outcome == "intent_created"
     assert repository.source_events[0].intent_id == intent.intent.intent_id
-    assert intent.intent.status == "recorded"
-    assert intent.intent.status_reason == "stage10_recorded_no_dispatch"
-    assert intent.intent.risk_status == "not_evaluated"
+    assert intent.intent.status == "accepted"
+    assert intent.intent.status_reason == "risk_gate_accepted"
+    assert intent.intent.risk_status == "accepted"
+    assert repository.risk_audit_events[0].event_type == "risk_gate_accepted"
 
 
 @pytest.mark.parametrize(
@@ -108,6 +110,113 @@ def test_supported_source_types_share_the_same_ingress(source_type: str) -> None
     assert source.event.source_type == source_type
     assert intent.intent.source_type == source_type
     assert intent.event.outcome == "intent_created"
+
+
+def test_risk_gate_rejects_missing_context_and_records_audit() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="ops_test",
+            source_event_ref="ops-missing-risk",
+            source_ref_json={"ops_test_id": "missing-risk"},
+            strategy_signal_id=None,
+            idempotency_key="missing-risk-source-key",
+        )
+    )
+
+    intent = service.create_intent(
+        command=CreateExecutionIntentCommand(
+            owner_user_id=_USER_ID,
+            source_event_id=source.event.source_event_id,
+            idempotency_key="missing-risk-intent-key",
+            exchange_connection_id=UUID("00000000-0000-0000-0000-000000010201"),
+            market_type="spot",
+            instrument_key="binance:spot:BTCUSDT",
+            order_type="market",
+            side="buy",
+            quantity=Decimal("0.01"),
+            quote_notional=None,
+            limit_price=None,
+            advanced_order_flags={},
+            risk_context=None,
+        )
+    )
+
+    assert intent.intent.status == "rejected"
+    assert intent.intent.risk_status == "rejected"
+    assert intent.intent.risk_reason == "risk_state_unavailable"
+    assert repository.risk_audit_events[0].event_type == "risk_gate_rejected"
+    assert repository.risk_audit_events[0].metadata_json == {"dispatch": "no-dispatch"}
+
+
+@pytest.mark.parametrize(
+    ("source_type", "context_overrides", "reason"),
+    (
+        ("ops_test", {"exchange_connection_active": False}, "exchange_connection_inactive"),
+        ("ops_test", {"exchange_config_verified": False}, "exchange_config_mismatch"),
+        ("ops_test", {"account_state_fresh": False}, "account_projection_stale"),
+        (
+            "strategy_signal",
+            {"strategy_variant_compatible": False},
+            "strategy_variant_incompatible",
+        ),
+        ("strategy_signal", {"market_data_state": "missing"}, "market_data_missing"),
+        ("strategy_signal", {"market_data_state": "stale"}, "market_data_stale"),
+        ("strategy_signal", {"strategy_binding_active": False}, "strategy_binding_missing"),
+        (
+            "strategy_signal",
+            {"strategy_live_profile_ready": False},
+            "strategy_live_profile_blocked",
+        ),
+        ("strategy_signal", {"strategy_run_active": False}, "strategy_run_inactive"),
+        (
+            "strategy_signal",
+            {"position_ownership_active": False},
+            "position_ownership_conflict",
+        ),
+        (
+            "strategy_signal",
+            {"capital_reservation_sufficient": False},
+            "capital_reservation_insufficient",
+        ),
+        ("manual_request", {"manual_recent_auth": False}, "manual_recent_auth_required"),
+        ("ml_agent_decision", {"ml_agent_policy_active": False}, "ml_agent_policy_missing"),
+        ("ops_test", {"kill_switch_open": False}, "kill_switch_closed"),
+        ("ops_test", {"environment_policy_allows": False}, "mainnet_canary_not_approved"),
+    ),
+)
+def test_risk_gate_rejects_source_aware_safety_cases(
+    source_type: str,
+    context_overrides: dict[str, object],
+    reason: str,
+) -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    signal_id = uuid4() if source_type == "strategy_signal" else None
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type=source_type,
+            source_event_ref=f"{source_type}-{reason}",
+            source_ref_json={f"{source_type}_id": reason},
+            strategy_signal_id=signal_id,
+            idempotency_key=f"{source_type}-{reason}-source-key",
+        )
+    )
+
+    intent = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key=f"{source_type}-{reason}-intent-key",
+            risk_context=_accepted_context(**context_overrides),
+        )
+    )
+
+    assert intent.intent.status == "rejected"
+    assert intent.intent.risk_reason == reason
+    assert repository.source_events[0].outcome_reason == reason
 
 
 def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> None:
@@ -166,6 +275,7 @@ def _intent_command(
     idempotency_key: str = "intent-key",
     order_type: str = "market",
     advanced_order_flags: dict[str, object] | None = None,
+    risk_context: ExecutionRiskContext | None = None,
 ) -> CreateExecutionIntentCommand:
     return CreateExecutionIntentCommand(
         owner_user_id=_USER_ID,
@@ -180,4 +290,32 @@ def _intent_command(
         quote_notional=None,
         limit_price=None,
         advanced_order_flags=advanced_order_flags or {},
+        risk_context=_accepted_context() if risk_context is None else risk_context,
     )
+
+
+def _accepted_context(**overrides: object) -> ExecutionRiskContext:
+    values = {
+        "exchange_connection_active": True,
+        "secret_custody_ready": True,
+        "source_authorized": True,
+        "strategy_variant_compatible": True,
+        "market_data_state": "ready",
+        "strategy_binding_active": True,
+        "strategy_live_profile_ready": True,
+        "strategy_run_active": True,
+        "exchange_config_verified": True,
+        "account_state_fresh": True,
+        "position_ownership_active": True,
+        "capital_reservation_active": True,
+        "capital_reservation_sufficient": True,
+        "paper_accounting_ready": True,
+        "manual_recent_auth": True,
+        "ml_agent_policy_active": True,
+        "kill_switch_open": True,
+        "environment_policy_allows": True,
+        "max_order_size_ok": True,
+        "daily_limit_ok": True,
+    }
+    values.update(overrides)
+    return ExecutionRiskContext(**values)

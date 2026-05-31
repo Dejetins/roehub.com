@@ -4,7 +4,11 @@ from dataclasses import replace
 from uuid import UUID
 
 from trading.contexts.live_execution.application.ports import ExecutionIntentRepository
-from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionSourceEvent
+from trading.contexts.live_execution.domain import (
+    ExecutionIntent,
+    ExecutionRiskAuditEvent,
+    ExecutionSourceEvent,
+)
 from trading.shared_kernel.primitives import UserId
 
 
@@ -12,6 +16,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
     def __init__(self) -> None:
         self.source_events: list[ExecutionSourceEvent] = []
         self.intents: list[ExecutionIntent] = []
+        self.risk_audit_events: list[ExecutionRiskAuditEvent] = []
 
     def record_source_event(self, *, event: ExecutionSourceEvent) -> ExecutionSourceEvent:
         existing = self.get_source_event_by_idempotency(
@@ -97,3 +102,9 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             ),
             None,
         )
+
+    def record_risk_audit_event(
+        self, *, event: ExecutionRiskAuditEvent
+    ) -> ExecutionRiskAuditEvent:
+        self.risk_audit_events.append(event)
+        return event

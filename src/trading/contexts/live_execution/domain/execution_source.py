@@ -21,7 +21,7 @@ ExecutionSourceOutcome = Literal[
     "order_model_rejected",
     "no_intent",
 ]
-ExecutionIntentStatus = Literal["recorded"]
+ExecutionIntentStatus = Literal["recorded", "accepted", "rejected"]
 ExecutionSide = Literal["buy", "sell"]
 ExecutionOrderType = Literal["market", "limit"]
 

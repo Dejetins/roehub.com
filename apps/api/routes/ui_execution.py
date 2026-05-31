@@ -19,6 +19,7 @@ from trading.contexts.live_execution.application import (
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
     ExecutionOrderModelRejectedError,
+    ExecutionRiskContext,
     ExecutionSourceEvent,
     ExecutionSourceValidationError,
 )
@@ -98,6 +99,7 @@ def build_ui_execution_router(
                         "amend_replace": payload.order.amend_replace,
                         "legs": payload.order.legs,
                     },
+                    risk_context=_risk_context_from_payload(payload=payload),
                 )
             )
         except ExecutionOrderModelRejectedError as error:
@@ -159,6 +161,14 @@ def _to_intent_response(
         duplicate=duplicate,
         source_event=_to_source_event_response(event=source_event, duplicate=False),
     )
+
+
+def _risk_context_from_payload(
+    *, payload: ExecutionIntentRequest
+) -> ExecutionRiskContext | None:
+    if payload.risk_context is None:
+        return None
+    return ExecutionRiskContext(**payload.risk_context.model_dump())
 
 
 def _source_event_error(*, reason: str) -> RoehubError:

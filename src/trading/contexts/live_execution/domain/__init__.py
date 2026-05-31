@@ -43,6 +43,13 @@ from .position_ownership import (
     StrategyPositionOwnershipState,
     StrategyPositionOwnershipStorageError,
 )
+from .risk_gate import (
+    ExecutionRiskAuditEvent,
+    ExecutionRiskContext,
+    ExecutionRiskDecision,
+    RiskStatus,
+    evaluate_execution_risk,
+)
 
 __all__ = [
     "AccountConfigGuardResult",
@@ -57,6 +64,9 @@ __all__ = [
     "ExecutionOrderModelV1",
     "ExecutionOrderType",
     "ExecutionRequest",
+    "ExecutionRiskAuditEvent",
+    "ExecutionRiskContext",
+    "ExecutionRiskDecision",
     "ExecutionSide",
     "ExecutionSourceEvent",
     "ExecutionSourceOutcome",
@@ -72,6 +82,7 @@ __all__ = [
     "PaperOrder",
     "PaperOrderStatus",
     "PaperSide",
+    "RiskStatus",
     "StrategyPaperAccountingSnapshot",
     "StrategyPositionOwnership",
     "StrategyPositionOwnershipConflictError",
@@ -80,6 +91,7 @@ __all__ = [
     "SUPPORTED_ORDER_TYPES",
     "SUPPORTED_SOURCE_TYPES",
     "hash_idempotency_key",
+    "evaluate_execution_risk",
     "validate_order_model",
     "validate_source_event_fields",
 ]

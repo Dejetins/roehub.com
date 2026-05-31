@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
-from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionSourceEvent
+from trading.contexts.live_execution.domain import (
+    ExecutionIntent,
+    ExecutionRiskAuditEvent,
+    ExecutionSourceEvent,
+)
 from trading.shared_kernel.primitives import UserId
 
 
@@ -37,3 +41,7 @@ class ExecutionIntentRepository(Protocol):
     def get_intent_by_idempotency(
         self, *, owner_user_id: UserId, idempotency_key_hash: str
     ) -> ExecutionIntent | None: ...
+
+    def record_risk_audit_event(
+        self, *, event: ExecutionRiskAuditEvent
+    ) -> ExecutionRiskAuditEvent: ...

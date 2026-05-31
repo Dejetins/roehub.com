@@ -70,6 +70,7 @@ def test_ui_execution_routes_create_and_dedupe_intent() -> None:
             "quantity": "0.01",
             "limit_price": "10000",
         },
+        "risk_context": _accepted_risk_context(),
     }
     intent_response = client.post(
         "/ui/execution/intents",
@@ -90,7 +91,44 @@ def test_ui_execution_routes_create_and_dedupe_intent() -> None:
     assert intent_replay.json()["duplicate"] is True
     assert intent_replay.json()["intent_id"] == intent_response.json()["intent_id"]
     assert intent_response.json()["order_type"] == "limit"
-    assert intent_response.json()["status_reason"] == "stage10_recorded_no_dispatch"
+    assert intent_response.json()["status"] == "accepted"
+    assert intent_response.json()["status_reason"] == "risk_gate_accepted"
+
+
+def test_ui_execution_route_rejects_intent_when_risk_context_is_missing() -> None:
+    client = _build_client()
+
+    source_id = client.post(
+        "/ui/execution/source-events",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_type": "ops_test",
+            "source_event_ref": "ops-stage11-missing-risk",
+            "source_ref": {"ops_test_id": "stage11"},
+            "idempotency_key": "stage11-source-key",
+        },
+    ).json()["source_event_id"]
+
+    response = client.post(
+        "/ui/execution/intents",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_event_id": source_id,
+            "idempotency_key": "stage11-intent-key",
+            "exchange_connection_id": "00000000-0000-0000-0000-000000010601",
+            "market_type": "spot",
+            "instrument_key": "binance:spot:BTCUSDT",
+            "order": {
+                "order_type": "market",
+                "side": "buy",
+                "quote_notional": "25",
+            },
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "rejected"
+    assert response.json()["risk_reason"] == "risk_state_unavailable"
 
 
 def test_ui_execution_route_rejects_unsupported_order_model() -> None:
@@ -161,3 +199,28 @@ def _build_client() -> TestClient:
         )
     )
     return TestClient(app)
+
+
+def _accepted_risk_context() -> dict[str, object]:
+    return {
+        "exchange_connection_active": True,
+        "secret_custody_ready": True,
+        "source_authorized": True,
+        "strategy_variant_compatible": True,
+        "market_data_state": "ready",
+        "strategy_binding_active": True,
+        "strategy_live_profile_ready": True,
+        "strategy_run_active": True,
+        "exchange_config_verified": True,
+        "account_state_fresh": True,
+        "position_ownership_active": True,
+        "capital_reservation_active": True,
+        "capital_reservation_sufficient": True,
+        "paper_accounting_ready": True,
+        "manual_recent_auth": True,
+        "ml_agent_policy_active": True,
+        "kill_switch_open": True,
+        "environment_policy_allows": True,
+        "max_order_size_ok": True,
+        "daily_limit_ok": True,
+    }

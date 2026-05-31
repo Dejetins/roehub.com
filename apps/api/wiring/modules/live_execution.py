@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from apps.api.monitoring import (
     record_execution_intent,
     record_execution_order_model_rejected,
+    record_execution_risk_gate,
     record_execution_source_event,
 )
 from apps.api.routes import build_ui_execution_router
@@ -64,6 +65,14 @@ def build_ui_execution_router_module(
         on_order_model_rejected=lambda source_type, reason: record_execution_order_model_rejected(
             source_type=source_type,
             reason=reason,
+        ),
+        on_risk_decision=lambda source_type, result, reason, latency_seconds: (
+            record_execution_risk_gate(
+                source_type=source_type,
+                result=result,
+                reason=reason,
+                latency_seconds=latency_seconds,
+            )
         ),
     )
     return build_ui_execution_router(

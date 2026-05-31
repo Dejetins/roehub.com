@@ -7,7 +7,11 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from trading.contexts.live_execution.application.ports import ExecutionIntentRepository
-from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionSourceEvent
+from trading.contexts.live_execution.domain import (
+    ExecutionIntent,
+    ExecutionRiskAuditEvent,
+    ExecutionSourceEvent,
+)
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
@@ -167,6 +171,29 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
         )
         return _map_intent(row) if row is not None else None
 
+    def record_risk_audit_event(
+        self, *, event: ExecutionRiskAuditEvent
+    ) -> ExecutionRiskAuditEvent:
+        row = self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_risk_audit_events
+            (
+                event_id, intent_id, source_event_id, owner_user_id, source_type,
+                event_type, risk_status, risk_reason, check_name, metadata_json, created_at
+            )
+            VALUES
+            (
+                %(event_id)s, %(intent_id)s, %(source_event_id)s, %(owner_user_id)s,
+                %(source_type)s, %(event_type)s, %(risk_status)s, %(risk_reason)s,
+                %(check_name)s, %(metadata_json)s::jsonb, %(created_at)s
+            )
+            ON CONFLICT (event_id) DO NOTHING
+            RETURNING *
+            """,
+            parameters=_risk_audit_params(event),
+        )
+        return _map_risk_audit_event(row) if row is not None else event
+
 
 def _source_event_params(event: ExecutionSourceEvent) -> dict[str, object]:
     return {
@@ -212,6 +239,22 @@ def _intent_params(intent: ExecutionIntent) -> dict[str, object]:
     }
 
 
+def _risk_audit_params(event: ExecutionRiskAuditEvent) -> dict[str, object]:
+    return {
+        "event_id": str(event.event_id),
+        "intent_id": str(event.intent_id),
+        "source_event_id": str(event.source_event_id),
+        "owner_user_id": str(event.owner_user_id),
+        "source_type": event.source_type,
+        "event_type": event.event_type,
+        "risk_status": event.risk_status,
+        "risk_reason": event.risk_reason,
+        "check_name": event.check_name,
+        "metadata_json": json.dumps(dict(event.metadata_json), sort_keys=True),
+        "created_at": event.created_at,
+    }
+
+
 def _map_source_event(row: Mapping[str, Any]) -> ExecutionSourceEvent:
     return ExecutionSourceEvent(
         source_event_id=UUID(str(row["source_event_id"])),
@@ -248,6 +291,22 @@ def _map_intent(row: Mapping[str, Any]) -> ExecutionIntent:
         risk_status=str(row["risk_status"]),
         risk_reason=str(row["risk_reason"]),
         idempotency_key_hash=str(row["idempotency_key_hash"]),
+        created_at=_datetime(row["created_at"]),
+    )
+
+
+def _map_risk_audit_event(row: Mapping[str, Any]) -> ExecutionRiskAuditEvent:
+    return ExecutionRiskAuditEvent(
+        event_id=UUID(str(row["event_id"])),
+        intent_id=UUID(str(row["intent_id"])),
+        source_event_id=UUID(str(row["source_event_id"])),
+        owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+        source_type=str(row["source_type"]),  # type: ignore[arg-type]
+        event_type=str(row["event_type"]),
+        risk_status=str(row["risk_status"]),  # type: ignore[arg-type]
+        risk_reason=str(row["risk_reason"]),
+        check_name=str(row["check_name"]),
+        metadata_json=_json_mapping(row.get("metadata_json")),
         created_at=_datetime(row["created_at"]),
     )
 
