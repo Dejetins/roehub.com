@@ -11,7 +11,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE execution_intents DROP CONSTRAINT IF EXISTS execution_intents_status_chk")
+    op.execute(
+        "ALTER TABLE execution_intents DROP CONSTRAINT IF EXISTS execution_intents_status_chk"
+    )
     op.execute(
         """
         ALTER TABLE execution_intents
@@ -90,7 +92,9 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_execution_risk_audit_events_owner_created")
     op.execute("DROP INDEX IF EXISTS idx_execution_risk_audit_events_intent")
     op.execute("DROP TABLE IF EXISTS execution_risk_audit_events")
-    op.execute("ALTER TABLE execution_intents DROP CONSTRAINT IF EXISTS execution_intents_status_chk")
+    op.execute(
+        "ALTER TABLE execution_intents DROP CONSTRAINT IF EXISTS execution_intents_status_chk"
+    )
     op.execute(
         """
         ALTER TABLE execution_intents
