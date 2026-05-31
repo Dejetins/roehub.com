@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
@@ -65,6 +66,62 @@ class ExchangeConnectionCommandResult:
     active_strategy_bindings_count: int = 0
 
 
+@dataclass(frozen=True)
+class ExchangeControlBalanceSnapshot:
+    asset: str
+    free: Decimal
+    locked: Decimal
+    total: Decimal | None
+
+
+@dataclass(frozen=True)
+class ExchangeControlPositionSnapshot:
+    instrument_key: str
+    side: str
+    quantity: Decimal
+    entry_price: Decimal | None
+    leverage: Decimal | None
+    margin_mode: str | None
+    position_mode: str | None
+
+
+@dataclass(frozen=True)
+class ExchangeControlOpenOrderSnapshot:
+    instrument_key: str
+    exchange_order_ref: str
+    side: str
+    order_type: str
+    quantity: Decimal
+    price: Decimal | None
+    status: str
+
+
+@dataclass(frozen=True)
+class ExchangeControlInstrumentFilterSnapshot:
+    instrument_key: str
+    tick_size: Decimal | None
+    step_size: Decimal | None
+    min_qty: Decimal | None
+    min_notional: Decimal | None
+    max_leverage: Decimal | None
+
+
+@dataclass(frozen=True)
+class ExchangeControlAccountStateSnapshot:
+    exchange_name: str
+    market_type: str
+    environment: str
+    account_mode: str
+    sync_status: str
+    sync_reason: str
+    source_hash: str
+    observed_at: datetime
+    balances: tuple[ExchangeControlBalanceSnapshot, ...]
+    positions: tuple[ExchangeControlPositionSnapshot, ...]
+    open_orders: tuple[ExchangeControlOpenOrderSnapshot, ...]
+    instrument_filters: tuple[ExchangeControlInstrumentFilterSnapshot, ...]
+
+
 class ExchangeControlClient(Protocol):
     def get_capabilities(
         self, *, request_id: str | None = None
@@ -124,6 +181,15 @@ class ExchangeControlClient(Protocol):
         connection_id: str,
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
+
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_keys: tuple[str, ...] = (),
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountStateSnapshot: ...
 
 
 @dataclass(frozen=True)
@@ -311,6 +377,25 @@ class HttpExchangeControlClient:
             json={"owner_user_id": owner_user_id},
         )
         return _connection_from_payload(response.json())
+
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_keys: tuple[str, ...] = (),
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountStateSnapshot:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/account-state",
+            request_id=request_id,
+            json={
+                "owner_user_id": owner_user_id,
+                "instrument_keys": list(instrument_keys),
+            },
+        )
+        return _account_state_from_payload(response.json())
 
     def _request(
         self,
@@ -653,6 +738,54 @@ class InMemoryExchangeControlClient:
         self._connections_dict()[connection_id] = validated
         return validated
 
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_keys: tuple[str, ...] = (),
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountStateSnapshot:
+        _ = request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.connection_readiness != "ready_for_trading":
+            raise ExchangeControlClientError("exchange_connection_not_ready")
+        observed_at = datetime.fromisoformat("2026-05-24T12:04:00+00:00")
+        filters = tuple(
+            ExchangeControlInstrumentFilterSnapshot(
+                instrument_key=instrument_key,
+                tick_size=Decimal("0.01"),
+                step_size=Decimal("0.00001"),
+                min_qty=Decimal("0.00001"),
+                min_notional=Decimal("5"),
+                max_leverage=None,
+            )
+            for instrument_key in instrument_keys
+        )
+        return ExchangeControlAccountStateSnapshot(
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            account_mode="unified",
+            sync_status="fresh",
+            sync_reason="account_state_read_ok",
+            source_hash="b" * 64,
+            observed_at=observed_at,
+            balances=(
+                ExchangeControlBalanceSnapshot(
+                    asset="USDT",
+                    free=Decimal("100"),
+                    locked=Decimal("0"),
+                    total=Decimal("100"),
+                ),
+            ),
+            positions=(),
+            open_orders=(),
+            instrument_filters=filters,
+        )
+
     def _connections_dict(self) -> dict[str, ExchangeConnectionCommandResult]:
         if self._connections is None:
             raise ExchangeControlClientError("exchange-control fake client is uninitialized")
@@ -767,6 +900,105 @@ def _connection_from_payload(payload: object) -> ExchangeConnectionCommandResult
         ) from exc
 
 
+def _account_state_from_payload(payload: object) -> ExchangeControlAccountStateSnapshot:
+    if not isinstance(payload, dict):
+        raise ExchangeControlClientError("exchange-control account-state response is invalid")
+    try:
+        return ExchangeControlAccountStateSnapshot(
+            exchange_name=str(payload["exchange_name"]),
+            market_type=str(payload["market_type"]),
+            environment=str(payload["environment"]),
+            account_mode=str(payload["account_mode"]),
+            sync_status=str(payload["sync_status"]),
+            sync_reason=str(payload["sync_reason"]),
+            source_hash=str(payload["source_hash"]),
+            observed_at=datetime.fromisoformat(str(payload["observed_at"])),
+            balances=tuple(
+                _balance_from_payload(item) for item in _list_payload(payload, "balances")
+            ),
+            positions=tuple(
+                _position_from_payload(item) for item in _list_payload(payload, "positions")
+            ),
+            open_orders=tuple(
+                _order_from_payload(item) for item in _list_payload(payload, "open_orders")
+            ),
+            instrument_filters=tuple(
+                _filter_from_payload(item)
+                for item in _list_payload(payload, "instrument_filters")
+            ),
+        )
+    except (KeyError, ValueError, TypeError) as exc:
+        raise ExchangeControlClientError(
+            "exchange-control account-state response is invalid"
+        ) from exc
+
+
+def _list_payload(payload: dict[str, object], key: str) -> list[object]:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"{key} must be a list")
+    return value
+
+
+def _balance_from_payload(payload: object) -> ExchangeControlBalanceSnapshot:
+    if not isinstance(payload, dict):
+        raise ValueError("balance payload is invalid")
+    return ExchangeControlBalanceSnapshot(
+        asset=str(payload["asset"]),
+        free=Decimal(str(payload["free"])),
+        locked=Decimal(str(payload["locked"])),
+        total=_decimal_or_none(payload.get("total")),
+    )
+
+
+def _position_from_payload(payload: object) -> ExchangeControlPositionSnapshot:
+    if not isinstance(payload, dict):
+        raise ValueError("position payload is invalid")
+    return ExchangeControlPositionSnapshot(
+        instrument_key=str(payload["instrument_key"]),
+        side=str(payload["side"]),
+        quantity=Decimal(str(payload["quantity"])),
+        entry_price=_decimal_or_none(payload.get("entry_price")),
+        leverage=_decimal_or_none(payload.get("leverage")),
+        margin_mode=str(payload["margin_mode"]) if payload.get("margin_mode") else None,
+        position_mode=str(payload["position_mode"]) if payload.get("position_mode") else None,
+    )
+
+
+def _order_from_payload(payload: object) -> ExchangeControlOpenOrderSnapshot:
+    if not isinstance(payload, dict):
+        raise ValueError("open order payload is invalid")
+    return ExchangeControlOpenOrderSnapshot(
+        instrument_key=str(payload["instrument_key"]),
+        exchange_order_ref=str(payload["exchange_order_ref"]),
+        side=str(payload["side"]),
+        order_type=str(payload["order_type"]),
+        quantity=Decimal(str(payload["quantity"])),
+        price=_decimal_or_none(payload.get("price")),
+        status=str(payload["status"]),
+    )
+
+
+def _filter_from_payload(payload: object) -> ExchangeControlInstrumentFilterSnapshot:
+    if not isinstance(payload, dict):
+        raise ValueError("instrument filter payload is invalid")
+    return ExchangeControlInstrumentFilterSnapshot(
+        instrument_key=str(payload["instrument_key"]),
+        tick_size=_decimal_or_none(payload.get("tick_size")),
+        step_size=_decimal_or_none(payload.get("step_size")),
+        min_qty=_decimal_or_none(payload.get("min_qty")),
+        min_notional=_decimal_or_none(payload.get("min_notional")),
+        max_leverage=_decimal_or_none(payload.get("max_leverage")),
+    )
+
+
+def _decimal_or_none(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    raw = str(value).strip()
+    return Decimal(raw) if raw else None
+
+
 def _safe_error_code(*, response: httpx.Response) -> str | None:
     try:
         payload = response.json()
@@ -877,10 +1109,15 @@ __all__ = [
     "INTERNAL_SERVICE_NAME",
     "REQUEST_ID_HEADER",
     "ExchangeControlCapabilities",
+    "ExchangeControlAccountStateSnapshot",
+    "ExchangeControlBalanceSnapshot",
     "ExchangeControlClient",
     "ExchangeControlClientConfig",
     "ExchangeControlClientError",
+    "ExchangeControlInstrumentFilterSnapshot",
     "ExchangeConnectionCommandResult",
+    "ExchangeControlOpenOrderSnapshot",
+    "ExchangeControlPositionSnapshot",
     "HttpExchangeControlClient",
     "InMemoryExchangeControlClient",
     "build_exchange_control_client_from_environ",

@@ -95,6 +95,24 @@ class StrategyDashboardCompatibilityReadinessResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyDashboardExchangeAccountReadinessResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    status: Literal["fresh", "stale", "degraded", "config_mismatch"]
+    reason_codes: list[str]
+    exchange_connection_id: str | None
+    instrument_key: str | None
+    market_type: str | None
+    account_snapshot_id: str | None
+    config_guard_result_id: str | None
+    age_seconds: int | None
+    checked_at: datetime | None
+    ready_for_risk: bool
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardSelectorFiltersResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -360,6 +378,7 @@ class StrategyDashboardResponse(BaseModel):
     selected_strategy: StrategyDashboardSelectedStrategyResponse
     live_profile: StrategyDashboardLiveProfileResponse
     compatibility_readiness: StrategyDashboardCompatibilityReadinessResponse
+    exchange_account_readiness: StrategyDashboardExchangeAccountReadinessResponse
     strategy_selector: StrategyDashboardSelectorResponse
     chart: StrategyChartResponse
     metric_grid: StrategyMetricGridResponse

@@ -92,6 +92,14 @@ class _SequenceValidator:
         return self._results.pop(0)
 
 
+def _internal_headers(request_id: str) -> dict[str, str]:
+    return {
+        "Authorization": "Bearer internal-token",
+        "X-Roehub-Internal-Service": "apps/api",
+        "X-Request-Id": request_id,
+    }
+
+
 def _trade_ready_result() -> ExchangeCredentialValidationResult:
     return ExchangeCredentialValidationResult(
         status="valid_trade_enabled",
@@ -578,6 +586,83 @@ def test_internal_validate_reclassifies_readonly_connection_and_allows_recreate(
     assert recreated_payload["connection_id"] != connection_id
     assert recreated_payload["status"] == "active"
     assert recreated_payload["connection_readiness"] == "ready_for_trading"
+
+
+def test_internal_account_state_read_requires_trading_ready_connection() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(_readonly_result())
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=_internal_headers("account-state-readonly"),
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000123",
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "readonly",
+            "permissions": "trade",
+            "api_key": "readonly-key",
+            "api_secret": "readonly-secret",
+        },
+    )
+    assert created.status_code == 200
+    connection_id = created.json()["connection_id"]
+
+    response = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/account-state",
+        headers=_internal_headers("account-state-readonly-sync"),
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000123",
+            "instrument_keys": ["bybit:spot:BTCUSDT"],
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"]["code"] == "exchange_connection_not_found"
+
+
+def test_internal_account_state_read_returns_secret_safe_sanitized_projection() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(_trade_ready_result())
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=_internal_headers("account-state-create"),
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000124",
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "trade-ready",
+            "permissions": "trade",
+            "api_key": "trade-key",
+            "api_secret": "trade-secret",
+        },
+    )
+    assert created.status_code == 200
+    connection_id = created.json()["connection_id"]
+
+    response = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/account-state",
+        headers=_internal_headers("account-state-sync"),
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000124",
+            "instrument_keys": ["bybit:spot:BTCUSDT"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sync_status"] == "degraded"
+    assert payload["sync_reason"] == "account_state_sync_disabled"
+    assert len(payload["source_hash"]) == 64
+    dumped = str(payload).lower()
+    assert "trade-key" not in dumped
+    assert "trade-secret" not in dumped
+    assert "authorization" not in dumped
 
 
 def test_internal_exchange_connection_auto_validation_unavailable_is_not_active() -> None:

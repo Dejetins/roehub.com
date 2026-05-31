@@ -244,6 +244,34 @@ function renderCompatibilityReadiness(root, readiness) {
   setText("[data-profile-market-data]", `${marketDataState}: ${marketDataReason}`, root);
 }
 
+function renderExchangeAccountReadiness(root, readiness) {
+  const status = readiness?.status || "degraded";
+  const reason = (readiness?.reason_codes || [readiness?.degradation_reason || "--"])[0];
+  setText("[data-account-readiness]", `${status}: ${reason}`, root);
+  setText("[data-account-connection]", readiness?.exchange_connection_id || "--", root);
+  setText("[data-account-instrument]", readiness?.instrument_key || "--", root);
+  setText(
+    "[data-account-age]",
+    readiness?.age_seconds === null || readiness?.age_seconds === undefined
+      ? "--"
+      : `${readiness.age_seconds}s`,
+    root,
+  );
+  setText(
+    "[data-account-config]",
+    readiness?.config_guard_result_id
+      ? `${readiness.ready_for_risk ? "verified" : status}`
+      : "verify-only pending",
+    root,
+  );
+  setText("[data-account-reason]", reason, root);
+  setText("[data-account-checked]", localTime(readiness?.checked_at), root);
+  const panel = qs(".strategies-account-readiness", root);
+  if (panel instanceof HTMLElement) {
+    panel.dataset.readiness = status;
+  }
+}
+
 function renderMetrics(root, metricGrid) {
   const target = qs("[data-strategy-metrics]", root);
   if (!target) {
@@ -574,6 +602,7 @@ function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
   renderLiveProfile(root, summary.live_profile);
   renderCompatibilityReadiness(root, summary.compatibility_readiness);
+  renderExchangeAccountReadiness(root, summary.exchange_account_readiness);
   renderSelector(root, summary.strategy_selector, state.savedQuery);
   renderChart(root, summary, state);
   syncStatWorkspace(root, state.statMode || "overall");

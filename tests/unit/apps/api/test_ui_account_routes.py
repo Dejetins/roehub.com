@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
 from apps.api.exchange_control_client import (
+    ExchangeControlAccountStateSnapshot,
     ExchangeConnectionCommandResult,
     ExchangeControlCapabilities,
     ExchangeControlClient,
@@ -134,6 +135,16 @@ class _ArchiveShouldNotRunClient:
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult:
         raise AssertionError("validate_connection must not run")
+
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_keys: tuple[str, ...] = (),
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountStateSnapshot:
+        raise AssertionError("read_account_state must not run")
 
 
 class _InUseExchangeControlClient(InMemoryExchangeControlClient):

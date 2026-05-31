@@ -113,6 +113,11 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["signal_journal"]["items"][0]["reason_code"].endswith(
         "monitor_only_no_intent"
     )
+    assert payload["exchange_account_readiness"]["status"] == "degraded"
+    assert payload["exchange_account_readiness"]["reason_codes"] == [
+        "account_projection_not_configured"
+    ]
+    assert payload["exchange_account_readiness"]["ready_for_risk"] is False
     assert "summary" not in payload["monthly_stats"]
     assert "symbol_results" not in payload
     assert payload["refresh_control"]["interval_seconds"] == 15
@@ -122,6 +127,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert source_statuses["strategy_runs"] == "available"
     assert source_statuses["strategy_live_profiles"] == "unavailable"
     assert source_statuses["strategy_signals"] == "available"
+    assert source_statuses["exchange_account_projection"] == "unavailable"
     assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"

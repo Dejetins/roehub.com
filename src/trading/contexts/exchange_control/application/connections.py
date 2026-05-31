@@ -6,6 +6,11 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountStateReader,
+    ExchangeAccountStateReadRequest,
+    ExchangeAccountStateReadResult,
+)
 from trading.contexts.exchange_control.application.secret_cipher import (
     ExchangeCredentialCiphertext,
     ExchangeCredentialSecret,
@@ -901,6 +906,47 @@ class ExchangeConnectionService:
             )
         return view
 
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        reader: ExchangeAccountStateReader,
+        instrument_keys: tuple[str, ...],
+        now: datetime,
+    ) -> ExchangeAccountStateReadResult:
+        connection = self._require_active_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        view = self._to_view(connection=connection)
+        if (
+            view.effective_capability != "trading"
+            or view.connection_readiness != "ready_for_trading"
+        ):
+            raise ExchangeConnectionError(
+                code=view.connection_readiness_reason or "exchange_connection_not_ready",
+                message="Exchange connection is not ready for account-state reads.",
+                status_code=422,
+            )
+        if bool(getattr(reader, "requires_plaintext", True)):
+            plaintext = self._decrypt_active_credential(connection_id=connection_id)
+        else:
+            plaintext = ExchangeCredentialPlaintext(
+                api_key="account_state_sync_disabled",
+                api_secret="account_state_sync_disabled",
+            )
+        return reader.read_account_state(
+            request=ExchangeAccountStateReadRequest(
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                environment=connection.environment,
+                credential=plaintext,
+                instrument_keys=instrument_keys,
+            ),
+            now=now,
+        )
+
     def _require_active_owned_connection(
         self, *, owner_user_id: UserId, connection_id: UUID
     ) -> ExchangeConnectionRecord:
@@ -967,6 +1013,37 @@ class ExchangeConnectionService:
                 status_code=503,
             ) from exc
         return max(0, int(count))
+
+    def _decrypt_active_credential(
+        self, *, connection_id: UUID
+    ) -> ExchangeCredentialPlaintext:
+        credential = self._repository.get_active_credential(connection_id=connection_id)
+        if credential is None:
+            raise _not_found()
+        try:
+            return ExchangeCredentialPlaintext(
+                api_key=self._secret_cipher.decrypt(
+                    ExchangeCredentialCiphertext(value=credential.api_key_ciphertext)
+                ).value,
+                api_secret=self._secret_cipher.decrypt(
+                    ExchangeCredentialCiphertext(value=credential.api_secret_ciphertext)
+                ).value,
+                passphrase=(
+                    self._secret_cipher.decrypt(
+                        ExchangeCredentialCiphertext(
+                            value=credential.passphrase_ciphertext
+                        )
+                    ).value
+                    if credential.passphrase_ciphertext is not None
+                    else None
+                ),
+            )
+        except ExchangeSecretCipherError as exc:
+            raise ExchangeConnectionError(
+                code="exchange_connection_account_state_unavailable",
+                message="Exchange account-state read is unavailable.",
+                status_code=503,
+            ) from exc
 
     def _build_credential_version(
         self,

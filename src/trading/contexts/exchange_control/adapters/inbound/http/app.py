@@ -17,10 +17,16 @@ from prometheus_client import (
 from pydantic import BaseModel, ConfigDict, Field
 
 from trading.contexts.exchange_control.adapters.outbound import (
+    HttpExchangeAccountStateReader,
     HttpExchangeCredentialValidator,
     OpenBaoTransitExchangeSecretCipher,
     PostgresExchangeConnectionRepository,
     PostgresExchangeConnectionUsageGuard,
+    SkippedExchangeAccountStateReader,
+)
+from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountStateReader,
+    ExchangeAccountStateReadResult,
 )
 from trading.contexts.exchange_control.application.connections import (
     RECLASSIFIED_NON_TRADING_STATUS_REASON,
@@ -66,6 +72,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_connections.disable",
     "exchange_connections.archive",
     "exchange_connections.validate",
+    "exchange_account_state.read",
 )
 SECRET_CIPHER_IN_MEMORY_DEV = "in_memory_dev"
 SECRET_CIPHER_OPENBAO_TRANSIT_V1 = "openbao_transit_v1"
@@ -83,6 +90,7 @@ class ExchangeControlRuntimeConfig:
     metrics_port: int
     real_exchange_validation_enabled: bool = False
     exchange_validation_live_enabled: bool = False
+    account_state_sync_enabled: bool = False
     secret_cipher_backend: str = SECRET_CIPHER_IN_MEMORY_DEV
     openbao_addr: str | None = None
     exchange_control_transit_token: str | None = None
@@ -121,6 +129,10 @@ class ExchangeControlRuntimeConfig:
             value=environ.get("ROEHUB_EXCHANGE_VALIDATION_LIVE"),
             default=False,
         )
+        account_state_sync_enabled = _read_bool(
+            value=environ.get("ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED"),
+            default=False,
+        )
         secret_cipher_backend = environ.get(
             "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER",
             SECRET_CIPHER_IN_MEMORY_DEV,
@@ -144,6 +156,7 @@ class ExchangeControlRuntimeConfig:
             metrics_port=resolved_port,
             real_exchange_validation_enabled=validation_enabled,
             exchange_validation_live_enabled=exchange_validation_live_enabled,
+            account_state_sync_enabled=account_state_sync_enabled,
             secret_cipher_backend=secret_cipher_backend,
             openbao_addr=openbao_addr,
             exchange_control_transit_token=exchange_control_transit_token,
@@ -222,6 +235,11 @@ class ExchangeControlRuntimeConfig:
             return HttpExchangeCredentialValidator()
         return SkippedExchangeCredentialValidator()
 
+    def build_account_state_reader(self) -> ExchangeAccountStateReader:
+        if self.account_state_sync_enabled:
+            return HttpExchangeAccountStateReader()
+        return SkippedExchangeAccountStateReader()
+
 
 class ExchangeControlMetrics:
     def __init__(self) -> None:
@@ -297,6 +315,12 @@ class ExchangeControlMetrics:
             ("action", "result"),
             registry=self.registry,
         )
+        self.account_state_read_total = Counter(
+            "exchange_account_state_read_total",
+            "Exchange account-state read attempts by exchange, result, and reason.",
+            ("exchange", "result", "reason"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -343,6 +367,11 @@ class ExchangeControlMetrics:
         ).inc(0)
         self.active_strategy_bindings.labels(exchange="none", status="active").set(0)
         self.strategy_binding_total.labels(action="none", result="observed").inc(0)
+        self.account_state_read_total.labels(
+            exchange="none",
+            result="degraded",
+            reason="stage_07_no_account_state_read",
+        ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
         self.connection_validation_total.labels(
@@ -431,6 +460,15 @@ class ExchangeControlMetrics:
         self.active_strategy_bindings.labels(exchange=exchange, status=status).set(count)
         self.strategy_binding_total.labels(action="list", result="observed").inc(0)
 
+    def record_account_state_read(
+        self, *, exchange: str, result: str, reason: str
+    ) -> None:
+        self.account_state_read_total.labels(
+            exchange=exchange,
+            result=result,
+            reason=reason,
+        ).inc()
+
 
 class CreateExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -476,6 +514,13 @@ class ValidateExchangeConnectionInternalRequest(BaseModel):
     owner_user_id: str
 
 
+class ReadExchangeAccountStateInternalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_user_id: str
+    instrument_keys: list[str] = Field(default_factory=list, max_length=20)
+
+
 def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> FastAPI:
     service_identity = build_exchange_control_service_identity(name=config.service_identity_name)
     secret_cipher = config.build_secret_cipher()
@@ -497,6 +542,8 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
     app.state.secret_cipher = secret_cipher
     app.state.exchange_connection_service = connection_service
     app.state.exchange_credential_validator = credential_validator
+    account_state_reader = config.build_account_state_reader()
+    app.state.exchange_account_state_reader = account_state_reader
 
     @app.get("/health/ready")
     def get_readiness(response: Response) -> dict[str, object]:
@@ -837,6 +884,60 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         _record_validation_observation(metrics=metrics, view=view)
         return _exchange_connection_response(view=view)
 
+    @app.post(
+        "/internal/v1/exchange-connections/{connection_id}/account-state",
+        include_in_schema=False,
+    )
+    def read_internal_exchange_account_state(
+        connection_id: UUID,
+        payload: ReadExchangeAccountStateInternalRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_roehub_internal_service: str | None = Header(
+            default=None,
+            alias="X-Roehub-Internal-Service",
+        ),
+        x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    ) -> dict[str, object]:
+        _require_internal_request(
+            request=request,
+            authorization=authorization,
+            expected_token=config.internal_api_token,
+            internal_service=x_roehub_internal_service,
+            request_id=x_request_id,
+        )
+        try:
+            result = connection_service.read_account_state(
+                owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                connection_id=connection_id,
+                reader=account_state_reader,
+                instrument_keys=tuple(_normalize_instrument_keys(payload.instrument_keys)),
+                now=_utc_now(),
+            )
+        except ExchangeConnectionError as error:
+            metrics.record_account_state_read(
+                exchange="unknown",
+                result="rejected",
+                reason=error.code,
+            )
+            raise _exchange_connection_http_error(error=error) from error
+        except Exception as error:
+            metrics.record_account_state_read(
+                exchange="unknown",
+                result="degraded",
+                reason="account_state_read_failed",
+            )
+            raise _internal_error(
+                status_code=503,
+                code="account_state_read_failed",
+            ) from error
+        metrics.record_account_state_read(
+            exchange=result.exchange_name,
+            result=result.sync_status,
+            reason=result.sync_reason,
+        )
+        return _exchange_account_state_response(result=result)
+
     return app
 
 
@@ -957,6 +1058,18 @@ def _cleanup_metric_source(*, value: str) -> str:
     return normalized[:40] or "unknown"
 
 
+def _normalize_instrument_keys(values: list[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for value in values:
+        item = value.strip()
+        if not item:
+            continue
+        if len(item) > 80:
+            raise _internal_error(status_code=400, code="instrument_key_invalid")
+        normalized.append(item)
+    return tuple(dict.fromkeys(normalized))
+
+
 def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, object]:
     return {
         "connection_id": str(view.connection_id),
@@ -990,6 +1103,71 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
         "archived_at": view.archived_at.isoformat() if view.archived_at else None,
         "used_by_strategies_count": view.used_by_strategies_count,
         "active_strategy_bindings_count": view.active_strategy_bindings_count,
+    }
+
+
+def _exchange_account_state_response(
+    *, result: ExchangeAccountStateReadResult
+) -> dict[str, object]:
+    return {
+        "exchange_name": result.exchange_name,
+        "market_type": result.market_type,
+        "environment": result.environment,
+        "account_mode": result.account_mode,
+        "sync_status": result.sync_status,
+        "sync_reason": result.sync_reason,
+        "source_hash": result.source_hash,
+        "observed_at": result.observed_at.isoformat(),
+        "balances": [
+            {
+                "asset": item.asset,
+                "free": str(item.free),
+                "locked": str(item.locked),
+                "total": str(item.total) if item.total is not None else None,
+            }
+            for item in result.balances
+        ],
+        "positions": [
+            {
+                "instrument_key": item.instrument_key,
+                "side": item.side,
+                "quantity": str(item.quantity),
+                "entry_price": (
+                    str(item.entry_price) if item.entry_price is not None else None
+                ),
+                "leverage": str(item.leverage) if item.leverage is not None else None,
+                "margin_mode": item.margin_mode,
+                "position_mode": item.position_mode,
+            }
+            for item in result.positions
+        ],
+        "open_orders": [
+            {
+                "instrument_key": item.instrument_key,
+                "exchange_order_ref": item.exchange_order_ref,
+                "side": item.side,
+                "order_type": item.order_type,
+                "quantity": str(item.quantity),
+                "price": str(item.price) if item.price is not None else None,
+                "status": item.status,
+            }
+            for item in result.open_orders
+        ],
+        "instrument_filters": [
+            {
+                "instrument_key": item.instrument_key,
+                "tick_size": str(item.tick_size) if item.tick_size is not None else None,
+                "step_size": str(item.step_size) if item.step_size is not None else None,
+                "min_qty": str(item.min_qty) if item.min_qty is not None else None,
+                "min_notional": (
+                    str(item.min_notional) if item.min_notional is not None else None
+                ),
+                "max_leverage": (
+                    str(item.max_leverage) if item.max_leverage is not None else None
+                ),
+            }
+            for item in result.instrument_filters
+        ],
     }
 
 

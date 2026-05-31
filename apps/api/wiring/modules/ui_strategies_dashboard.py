@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from math import ceil
-from typing import Literal, Mapping
+from typing import Literal, Mapping, Protocol
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -17,6 +17,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyChartResponse,
     StrategyDashboardActionsResponse,
     StrategyDashboardCompatibilityReadinessResponse,
+    StrategyDashboardExchangeAccountReadinessResponse,
     StrategyDashboardFooterStatusResponse,
     StrategyDashboardLiveProfileResponse,
     StrategyDashboardRefreshControlResponse,
@@ -37,6 +38,10 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategySignalJournalRowResponse,
     StrategyTradesResponse,
 )
+from apps.api.monitoring import (
+    record_exchange_account_state_sync,
+    record_exchange_config_guard,
+)
 from apps.api.routes.ui_strategies_dashboard import (
     build_ui_strategies_dashboard_router as build_ui_strategies_dashboard_api_router,
 )
@@ -50,6 +55,16 @@ from apps.api.wiring.modules.strategy import (
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.live_execution.adapters.outbound import (
+    InMemoryExchangeAccountProjectionRepository,
+    PostgresExchangeAccountProjectionRepository,
+    SystemLiveExecutionClock,
+)
+from trading.contexts.live_execution.application import ExchangeAccountProjectionService
+from trading.contexts.live_execution.domain import (
+    AccountProjectionReadiness,
+    ExpectedInstrumentConfig,
+)
 from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
 from trading.contexts.strategy.application import (
     CurrentUser,
@@ -83,6 +98,7 @@ _EVENTS_SOURCE = "strategy_events"
 _RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 _LIVE_PROFILE_SOURCE = "strategy_live_profiles"
 _COMPATIBILITY_SOURCE = "strategy_compatibility_readiness"
+_EXCHANGE_ACCOUNT_SOURCE = "exchange_account_projection"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
 _SIGNAL_JOURNAL_LIMIT = 20
 
@@ -92,6 +108,16 @@ class _RefreshDecision:
     status: RefreshStatus
     next_allowed_refresh_at: datetime | None
     retry_after_seconds: int | None
+
+
+class AccountProjectionReadinessService(Protocol):
+    def get_readiness(
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID | None,
+        requirement: ExpectedInstrumentConfig | None,
+    ) -> AccountProjectionReadiness: ...
 
 
 class StrategyDashboardManualRefreshLimiter:
@@ -143,6 +169,7 @@ class StrategyDashboardQueryService:
         profile_repository: LiveStrategyProfileRepository | None = None,
         signal_repository: StrategySignalRepository | None = None,
         compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+        account_projection_service: AccountProjectionReadinessService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -150,6 +177,7 @@ class StrategyDashboardQueryService:
         self._profile_repository = profile_repository
         self._signal_repository = signal_repository
         self._compatibility_readiness_service = compatibility_readiness_service
+        self._account_projection_service = account_projection_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -192,10 +220,17 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        account_readiness, account_source = self._load_exchange_account_readiness(
+            principal=principal,
+            strategy=selected_strategy,
+            profile=live_profile,
+            generated_at=generated_at,
+        )
         sources = [
             *dynamic_sources,
             live_profile_source,
             compatibility_source,
+            account_source,
             signal_journal_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
@@ -225,12 +260,6 @@ class StrategyDashboardQueryService:
                 generated_at=generated_at,
                 detail="strategy events are not exposed as a dashboard panel read-model yet",
             ),
-            _source(
-                name="exchange_account",
-                status="unavailable",
-                generated_at=generated_at,
-                detail="exchange account snapshots are not called from the browser",
-            ),
         ]
         effective_refresh_status = _resolve_refresh_status(
             refresh_decision=refresh_decision,
@@ -252,6 +281,7 @@ class StrategyDashboardQueryService:
             ),
             live_profile=_build_live_profile(profile=live_profile, strategy=selected_strategy),
             compatibility_readiness=compatibility_readiness,
+            exchange_account_readiness=account_readiness,
             strategy_selector=_build_strategy_selector(
                 strategies=strategies,
                 runs_by_strategy_id=runs_by_strategy_id,
@@ -287,6 +317,116 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_exchange_account_readiness(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        profile: LiveStrategyProfile | None,
+        generated_at: datetime,
+    ) -> tuple[
+        StrategyDashboardExchangeAccountReadinessResponse,
+        StrategyDashboardSourceResponse,
+    ]:
+        if strategy is None:
+            return (
+                _build_empty_exchange_account_readiness(reason="selected_strategy_not_found"),
+                _source(
+                    name=_EXCHANGE_ACCOUNT_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no selected strategy account projection is available",
+                ),
+            )
+        if self._account_projection_service is None:
+            return (
+                _build_empty_exchange_account_readiness(
+                    reason="account_projection_not_configured"
+                ),
+                _source(
+                    name=_EXCHANGE_ACCOUNT_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="account projection repository is not configured",
+                ),
+            )
+        requirement = _account_requirement_for_strategy(strategy=strategy)
+        exchange_connection_id = (
+            profile.exchange_connection_id
+            if profile is not None and profile.exchange_connection_id is not None
+            else None
+        )
+        try:
+            readiness = self._account_projection_service.get_readiness(
+                owner_user_id=principal.user_id,
+                exchange_connection_id=exchange_connection_id,
+                requirement=requirement,
+            )
+        except Exception as error:  # noqa: BLE001
+            reason = str(error)
+            return (
+                _build_empty_exchange_account_readiness(reason=reason),
+                _source(
+                    name=_EXCHANGE_ACCOUNT_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=reason,
+                ),
+            )
+        primary_reason = readiness.reason_codes[0] if readiness.reason_codes else "unknown"
+        record_exchange_account_state_sync(
+            status=readiness.status,
+            reason=primary_reason,
+            age_seconds=readiness.age_seconds,
+        )
+        record_exchange_config_guard(
+            status=(
+                "mismatch"
+                if readiness.status == "config_mismatch"
+                else "verified"
+                if readiness.status == "fresh"
+                else "degraded"
+            ),
+            reason=primary_reason,
+        )
+        panel_state = "ready" if readiness.status == "fresh" else "degraded"
+        return (
+            StrategyDashboardExchangeAccountReadinessResponse(
+                source=_EXCHANGE_ACCOUNT_SOURCE,
+                state=panel_state,
+                status=readiness.status,
+                reason_codes=list(readiness.reason_codes),
+                exchange_connection_id=(
+                    str(readiness.exchange_connection_id)
+                    if readiness.exchange_connection_id is not None
+                    else None
+                ),
+                instrument_key=readiness.instrument_key,
+                market_type=readiness.market_type,
+                account_snapshot_id=(
+                    str(readiness.account_snapshot_id)
+                    if readiness.account_snapshot_id is not None
+                    else None
+                ),
+                config_guard_result_id=(
+                    str(readiness.config_guard_result_id)
+                    if readiness.config_guard_result_id is not None
+                    else None
+                ),
+                age_seconds=readiness.age_seconds,
+                checked_at=readiness.checked_at,
+                ready_for_risk=readiness.ready_for_risk,
+                degradation_reason=None if readiness.ready_for_risk else primary_reason,
+            ),
+            _source(
+                name=_EXCHANGE_ACCOUNT_SOURCE,
+                status="available" if readiness.status == "fresh" else "degraded",
+                generated_at=generated_at,
+                age_seconds=readiness.age_seconds,
+                detail=f"{readiness.status}: {primary_reason}",
             ),
         )
 
@@ -652,6 +792,7 @@ def build_strategy_dashboard_service(
             profile_repository=None,
             signal_repository=None,
             compatibility_readiness_service=None,
+            account_projection_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -670,7 +811,31 @@ def build_strategy_dashboard_service(
         profile_repository=profile_repository,
         signal_repository=signal_repository,
         compatibility_readiness_service=compatibility_readiness_service,
+        account_projection_service=_build_account_projection_service(settings=settings),
     )
+
+
+def _build_account_projection_service(
+    *,
+    settings,
+) -> ExchangeAccountProjectionService:
+    repository = (
+        PostgresExchangeAccountProjectionRepository(
+            gateway=_build_live_execution_gateway(settings=settings)
+        )
+        if settings.postgres_dsn
+        else InMemoryExchangeAccountProjectionRepository()
+    )
+    return ExchangeAccountProjectionService(
+        repository=repository,
+        clock=SystemLiveExecutionClock(),
+    )
+
+
+def _build_live_execution_gateway(*, settings):
+    from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
+
+    return PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
 
 
 def _source(
@@ -931,6 +1096,36 @@ def _build_empty_compatibility(
         launch_blocked_reason=reason,
         checked_at=None,
         degradation_reason=reason,
+    )
+
+
+def _build_empty_exchange_account_readiness(
+    *, reason: str
+) -> StrategyDashboardExchangeAccountReadinessResponse:
+    return StrategyDashboardExchangeAccountReadinessResponse(
+        source=_EXCHANGE_ACCOUNT_SOURCE,
+        state="empty",
+        status="degraded",
+        reason_codes=[reason],
+        exchange_connection_id=None,
+        instrument_key=None,
+        market_type=None,
+        account_snapshot_id=None,
+        config_guard_result_id=None,
+        age_seconds=None,
+        checked_at=None,
+        ready_for_risk=False,
+        degradation_reason=reason,
+    )
+
+
+def _account_requirement_for_strategy(*, strategy: Strategy) -> ExpectedInstrumentConfig:
+    return ExpectedInstrumentConfig(
+        instrument_key=strategy.spec.instrument_key,
+        market_type=strategy.spec.market_type,
+        expected_margin_mode=None if strategy.spec.market_type == "spot" else "isolated",
+        expected_position_mode="net" if strategy.spec.market_type == "spot" else "one_way",
+        min_notional=Decimal("0"),
     )
 
 

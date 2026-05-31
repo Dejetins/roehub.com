@@ -431,7 +431,8 @@
   scrollbar-gutter: stable;
 }
 
-.strategies-live-profile {
+.strategies-live-profile,
+.strategies-account-readiness {
   display: grid;
   gap: 5px;
   margin-block-start: 8px;
@@ -439,7 +440,8 @@
   border-top: 1px solid var(--rh-divider);
 }
 
-.strategies-live-profile header {
+.strategies-live-profile header,
+.strategies-account-readiness header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -447,7 +449,8 @@
   min-width: 0;
 }
 
-.strategies-live-profile h3 {
+.strategies-live-profile h3,
+.strategies-account-readiness h3 {
   overflow: hidden;
   margin: 0;
   color: var(--rh-accent-2);
@@ -459,6 +462,12 @@
 }
 
 .strategies-live-profile[data-readiness="blocked"] .strategies-pill {
+  color: var(--rh-financial-negative);
+}
+
+.strategies-account-readiness[data-readiness="stale"] .strategies-pill,
+.strategies-account-readiness[data-readiness="degraded"] .strategies-pill,
+.strategies-account-readiness[data-readiness="config_mismatch"] .strategies-pill {
   color: var(--rh-financial-negative);
 }
 

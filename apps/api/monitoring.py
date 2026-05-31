@@ -52,6 +52,20 @@ _MARKET_DATA_READINESS_TOTAL = Counter(
     "Market-data readiness checks by result.",
     ("state", "reason"),
 )
+_EXCHANGE_ACCOUNT_STATE_SYNC_TOTAL = Counter(
+    "exchange_account_state_sync_total",
+    "Exchange account projection sync/readiness checks by result.",
+    ("status", "reason"),
+)
+_EXCHANGE_CONFIG_GUARD_TOTAL = Counter(
+    "exchange_config_guard_total",
+    "Verify-only exchange config guard checks by result.",
+    ("status", "reason"),
+)
+_EXCHANGE_ACCOUNT_PROJECTION_STALENESS_SECONDS = Gauge(
+    "exchange_account_projection_staleness_seconds",
+    "Latest observed exchange account projection age in seconds.",
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -183,6 +197,24 @@ def record_market_data_readiness(*, state: str, reason: str) -> None:
     ).inc()
 
 
+def record_exchange_account_state_sync(
+    *, status: str, reason: str, age_seconds: int | None = None
+) -> None:
+    _EXCHANGE_ACCOUNT_STATE_SYNC_TOTAL.labels(
+        status=status,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+    if age_seconds is not None:
+        _EXCHANGE_ACCOUNT_PROJECTION_STALENESS_SECONDS.set(max(0, age_seconds))
+
+
+def record_exchange_config_guard(*, status: str, reason: str) -> None:
+    _EXCHANGE_CONFIG_GUARD_TOTAL.labels(
+        status=status,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -213,6 +245,8 @@ def _resolve_path_label(*, request: Request) -> str:
 __all__ = [
     "build_metrics_response",
     "install_metrics_middleware",
+    "record_exchange_account_state_sync",
+    "record_exchange_config_guard",
     "record_live_strategy_profile_readiness",
     "record_market_data_readiness",
     "record_strategy_variant_launch",
