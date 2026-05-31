@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import yaml
 from fastapi import FastAPI, Response
@@ -15,12 +15,21 @@ from prometheus_client import (
     CollectorRegistry,
     Counter,
     Gauge,
+    Histogram,
     generate_latest,
 )
 
+from apps.exchange_execution.adapters import BinanceTestnetOrderAdapter, BybitTestnetOrderAdapter
+from trading.contexts.exchange_control.adapters.outbound import (
+    OpenBaoTransitExchangeSecretCipher,
+    PostgresExchangeConnectionRepository,
+)
 from trading.contexts.live_execution.adapters.outbound import (
+    ExchangeControlCredentialResolver,
+    InMemoryExchangeExecutionOrderRepository,
     InMemoryExchangeExecutionProcessRepository,
     InMemoryExecutionIntentRepository,
+    PostgresExchangeExecutionOrderRepository,
     PostgresExchangeExecutionProcessRepository,
     PostgresExecutionIntentRepository,
     RedisExchangeExecutionConsumer,
@@ -34,6 +43,8 @@ from trading.contexts.live_execution.application import (
 from trading.contexts.live_execution.application.ports import (
     ExchangeExecutionConsumer,
     ExchangeExecutionProcessRepository,
+    ExchangeOrderAdapter,
+    ExecutionDispatchUnavailableError,
     ExecutionIntentRepository,
 )
 from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
@@ -61,6 +72,9 @@ class ExchangeExecutionRuntimeSettings:
     redis_connect_timeout_s: float
     process_config: ExchangeExecutionProcessConfig
     poll_interval_seconds: float
+    adapter_timeout_seconds: float
+    transit_address: str
+    transit_token: str
 
 
 class ExchangeExecutionMetrics:
@@ -117,7 +131,24 @@ class ExchangeExecutionMetrics:
             "1 when order adapters are disabled.",
             registry=self.registry,
         )
-        self.adapter_disabled.set(1)
+        self.testnet_order_total = Counter(
+            "exchange_execution_testnet_order_total",
+            "Testnet order adapter outcomes by exchange and reason.",
+            ("exchange", "reason"),
+            registry=self.registry,
+        )
+        self.private_stream_total = Counter(
+            "exchange_execution_private_stream_total",
+            "Private stream lifecycle outcomes by exchange and reason.",
+            ("exchange", "reason"),
+            registry=self.registry,
+        )
+        self.submit_latency_ms = Histogram(
+            "exchange_execution_submit_latency_ms",
+            "Native exchange adapter order/cancel/status latency in milliseconds.",
+            ("exchange",),
+            registry=self.registry,
+        )
 
     def update_readiness(self, snapshot: Any) -> None:
         self.ready.labels(status=snapshot.status, reason=snapshot.status_reason).set(1)
@@ -147,6 +178,10 @@ class ExchangeExecutionMetrics:
                 drift = dependency.metadata.get("clock_drift_ms")
                 if drift is not None:
                     self.clock_drift_ms.set(float(drift))
+            if dependency.name == "adapter":
+                submit_enabled = dependency.metadata.get("submit_enabled")
+                if submit_enabled is not None:
+                    self.adapter_disabled.set(0 if int(submit_enabled) == 1 else 1)
 
     def record_observation(self, status: str, reason: str) -> None:
         self.observations_total.labels(status=status, reason=reason).inc()
@@ -156,6 +191,15 @@ class ExchangeExecutionMetrics:
 
     def record_ack(self, reason: str) -> None:
         self.ack_total.labels(reason=reason).inc()
+
+    def record_order_submit(self, exchange: str, reason: str) -> None:
+        self.testnet_order_total.labels(exchange=exchange, reason=reason).inc()
+
+    def record_private_stream(self, exchange: str, reason: str) -> None:
+        self.private_stream_total.labels(exchange=exchange, reason=reason).inc()
+
+    def record_order_latency(self, exchange: str, latency_ms: float) -> None:
+        self.submit_latency_ms.labels(exchange=exchange).observe(latency_ms)
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -219,12 +263,28 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
 
     @app.post("/internal/v1/run-once", include_in_schema=False)
     def post_run_once(response: Response) -> dict[str, object]:
-        result = service.run_once()
+        try:
+            result = service.run_once()
+        except ExecutionDispatchUnavailableError as error:
+            response.status_code = 503
+            return {
+                "read_count": 0,
+                "observed_count": 0,
+                "submitted_count": 0,
+                "guard_rejected_count": 0,
+                "adapter_error_count": 0,
+                "quarantined_count": 0,
+                "acked_count": 0,
+                "reason": error.reason,
+            }
         if result.reason == "consumer_disabled":
             response.status_code = 409
         return {
             "read_count": result.read_count,
             "observed_count": result.observed_count,
+            "submitted_count": result.submitted_count,
+            "guard_rejected_count": result.guard_rejected_count,
+            "adapter_error_count": result.adapter_error_count,
             "quarantined_count": result.quarantined_count,
             "acked_count": result.acked_count,
             "reason": result.reason,
@@ -254,9 +314,11 @@ def build_runtime(
         intent_repository: ExecutionIntentRepository = PostgresExecutionIntentRepository(
             gateway=gateway
         )
+        order_repository = PostgresExchangeExecutionOrderRepository(gateway=gateway)
     else:
         process_repository = InMemoryExchangeExecutionProcessRepository()
         intent_repository = InMemoryExecutionIntentRepository()
+        order_repository = InMemoryExchangeExecutionOrderRepository()
     consumer: ExchangeExecutionConsumer | None = None
     if settings.redis_enabled:
         consumer = RedisExchangeExecutionConsumer(
@@ -276,15 +338,42 @@ def build_runtime(
             environ=environ,
         )
     metrics = ExchangeExecutionMetrics()
+    credential_resolver = None
+    order_adapters: tuple[ExchangeOrderAdapter, ...] = ()
+    if settings.process_config.adapter_mode == "testnet":
+        if settings.postgres_dsn and settings.transit_address and settings.transit_token:
+            credential_resolver = ExchangeControlCredentialResolver(
+                connection_repository=PostgresExchangeConnectionRepository(
+                    dsn=settings.postgres_dsn
+                ),
+                secret_cipher=OpenBaoTransitExchangeSecretCipher(
+                    address=settings.transit_address,
+                    token=settings.transit_token,
+                    timeout_seconds=settings.adapter_timeout_seconds,
+                ),
+            )
+        order_adapters = cast(
+            tuple[ExchangeOrderAdapter, ...],
+            (
+                BinanceTestnetOrderAdapter(timeout_seconds=settings.adapter_timeout_seconds),
+                BybitTestnetOrderAdapter(timeout_seconds=settings.adapter_timeout_seconds),
+            ),
+        )
     service = ExchangeExecutionProcessService(
         config=settings.process_config,
         repository=process_repository,
         intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=credential_resolver,
+        order_adapters=order_adapters,
         consumer=consumer,
         clock=clock,
         on_observation=metrics.record_observation,
         on_dlq=metrics.record_dlq,
         on_ack=metrics.record_ack,
+        on_order_submit=metrics.record_order_submit,
+        on_private_stream=metrics.record_private_stream,
+        on_order_latency=metrics.record_order_latency,
     )
     return service, metrics
 
@@ -306,6 +395,7 @@ def resolve_runtime_settings(
     process = _mapping(exchange_execution.get("process", {}), "exchange_execution.process")
     limiter = _mapping(exchange_execution.get("rate_limit", {}), "exchange_execution.rate_limit")
     clock = _mapping(exchange_execution.get("clock", {}), "exchange_execution.clock")
+    adapter = _mapping(exchange_execution.get("adapter", {}), "exchange_execution.adapter")
 
     raw_fail_fast = environ.get(_STRATEGY_FAIL_FAST_KEY)
     fail_fast = env_name == "prod" if raw_fail_fast is None else _parse_bool(raw_fail_fast)
@@ -342,6 +432,8 @@ def resolve_runtime_settings(
             "rate_limit.per_second",
         ),
         rate_limit_burst=_positive_int(str(limiter.get("burst", "10")), "rate_limit.burst"),
+        enabled_exchanges=_string_tuple(adapter.get("enabled_exchanges", ("binance", "bybit"))),
+        cancel_after_submit=_parse_bool(str(adapter.get("cancel_after_submit", "true"))),
         fail_fast=fail_fast,
     )
     if env_name == "prod":
@@ -372,6 +464,12 @@ def resolve_runtime_settings(
             str(process.get("poll_interval_seconds", "1.0")),
             "poll_interval_seconds",
         ),
+        adapter_timeout_seconds=_positive_float(
+            str(adapter.get("timeout_seconds", "5.0")),
+            "adapter.timeout_seconds",
+        ),
+        transit_address=environ.get("OPENBAO_ADDR", "").strip(),
+        transit_token=environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "").strip(),
     )
 
 
@@ -382,7 +480,10 @@ async def _consumer_loop(
     poll_interval_seconds: float,
 ) -> None:
     while not stop_event.is_set():
-        service.run_once()
+        try:
+            service.run_once()
+        except ExecutionDispatchUnavailableError:
+            pass
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=poll_interval_seconds)
         except TimeoutError:
@@ -407,6 +508,19 @@ def _optional_str(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        items = value.split(",")
+    elif isinstance(value, list | tuple):
+        items = [str(item) for item in value]
+    else:
+        raise ValueError("string list required")
+    normalized = tuple(item.strip().lower() for item in items if item.strip())
+    if not normalized:
+        raise ValueError("at least one exchange must be enabled")
+    return normalized
 
 
 def _parse_bool(raw_value: str) -> bool:

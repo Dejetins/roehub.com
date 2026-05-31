@@ -28,6 +28,13 @@ exchange_execution:
     block_ms: 100
     backpressure_max_stream_length: 10000
 
+  adapter:
+    enabled_exchanges:
+      - "binance"
+      - "bybit"
+    cancel_after_submit: true
+    timeout_seconds: 5.0
+
   rate_limit:
     per_second: 5.0
     burst: 10

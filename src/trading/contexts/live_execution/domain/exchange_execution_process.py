@@ -7,11 +7,14 @@ from uuid import UUID
 
 ExchangeExecutionDependencyStatus = Literal["ready", "degraded", "not_ready"]
 ExchangeExecutionProcessStatus = Literal["ready", "degraded", "not_ready"]
-ExchangeExecutionAdapterMode = Literal["disabled"]
+ExchangeExecutionAdapterMode = Literal["disabled", "testnet"]
 ExchangeExecutionObservationStatus = Literal[
     "adapter_disabled",
+    "adapter_error",
+    "guard_rejected",
     "quarantined",
     "skipped",
+    "testnet_submitted",
 ]
 
 

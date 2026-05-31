@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryExchangeExecutionOrderRepository,
     InMemoryExchangeExecutionProcessRepository,
     InMemoryExecutionIntentRepository,
 )
@@ -17,7 +18,16 @@ from trading.contexts.live_execution.application.ports import (
     ExchangeExecutionRedisMessage,
     ExecutionDispatchPublishResult,
 )
-from trading.contexts.live_execution.domain import ExecutionIntent
+from trading.contexts.live_execution.domain import (
+    ExchangeExecutionConnection,
+    ExchangeExecutionCredential,
+    ExchangeOrderCancelResult,
+    ExchangeOrderCommand,
+    ExchangeOrderStatusResult,
+    ExchangeOrderSubmitResult,
+    ExchangePrivateStreamSession,
+    ExecutionIntent,
+)
 from trading.shared_kernel.primitives import UserId
 
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000013001")
@@ -165,6 +175,90 @@ def test_invalid_or_non_dispatchable_message_is_quarantined_to_dlq_and_acked() -
     assert dlq_reasons == ["intent_not_found"]
 
 
+def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    adapter = _Adapter(exchange_name="bybit")
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(adapter,),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.submitted_count == 1
+    assert result.acked_count == 1
+    assert consumer.acked == [("execution.requests.v1", "1-0")]
+    assert order_repository.orders[intent.intent_id].status == "cancelled"
+    assert order_repository.orders[intent.intent_id].exchange_order_id == "order-1"
+    assert process_repository.observations[0].status == "testnet_submitted"
+    assert order_repository.private_stream_sessions[intent.exchange_connection_id].status == "ready"
+    assert adapter.submitted == 1
+
+
+def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="mainnet"),
+        order_adapters=(_Adapter(exchange_name="bybit"),),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.guard_rejected_count == 1
+    assert result.acked_count == 1
+    assert order_repository.orders[intent.intent_id].status == "guard_rejected"
+    assert order_repository.orders[intent.intent_id].status_reason == "mainnet_hard_block"
+    assert process_repository.observations[0].status == "guard_rejected"
+
+
 def _message(*, payload: dict[str, str]) -> ExchangeExecutionRedisMessage:
     return ExchangeExecutionRedisMessage(
         stream_name="execution.requests.v1",
@@ -199,3 +293,97 @@ def _intent(*, status: str, risk_status: str) -> ExecutionIntent:
         dispatch_redis_message_id="1-0",
         dispatch_updated_at=_NOW,
     )
+
+
+class _Resolver:
+    def __init__(self, *, environment: str) -> None:
+        self._environment = environment
+
+    def resolve(
+        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+    ) -> ExchangeExecutionConnection:
+        return ExchangeExecutionConnection(
+            connection_id=exchange_connection_id,
+            owner_user_id=owner_user_id,
+            exchange_name="bybit",
+            market_type="spot",
+            environment=self._environment,
+            connection_readiness="ready_for_trading",
+            effective_capability="trading",
+            credential=ExchangeExecutionCredential(
+                api_key="test-key",
+                api_secret="test-secret",
+            ),
+        )
+
+
+class _Adapter:
+    def __init__(self, *, exchange_name: str) -> None:
+        self.exchange_name = exchange_name
+        self.submitted = 0
+
+    def server_time_ms(self) -> int:
+        return int(_NOW.timestamp() * 1000)
+
+    def ensure_private_stream_session(
+        self,
+        *,
+        connection: ExchangeExecutionConnection,
+    ) -> ExchangePrivateStreamSession:
+        return ExchangePrivateStreamSession(
+            session_id=UUID("00000000-0000-0000-0000-000000013901"),
+            exchange_name=connection.exchange_name,
+            environment=connection.environment,
+            market_type=connection.market_type,
+            status="ready",
+            status_reason="listen_key_keepalive_ok",
+            opened_at=_NOW,
+            keepalive_at=_NOW,
+            expires_at=None,
+            metadata={"provider": connection.exchange_name},
+        )
+
+    def submit_order(
+        self, *, command: ExchangeOrderCommand, credential: object
+    ) -> ExchangeOrderSubmitResult:
+        _ = command, credential
+        self.submitted += 1
+        return ExchangeOrderSubmitResult(
+            exchange_order_id="order-1",
+            exchange_status="new",
+            submitted_at=_NOW,
+            latency_ms=1.5,
+            metadata={"provider": self.exchange_name},
+        )
+
+    def get_order_status(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        exchange_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderStatusResult:
+        _ = command, credential
+        return ExchangeOrderStatusResult(
+            exchange_order_id=exchange_order_id,
+            exchange_status="new",
+            checked_at=_NOW,
+            latency_ms=1.0,
+            metadata={"provider": self.exchange_name},
+        )
+
+    def cancel_order(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        exchange_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderCancelResult:
+        _ = command, credential
+        return ExchangeOrderCancelResult(
+            exchange_order_id=exchange_order_id,
+            exchange_status="cancelled",
+            cancelled_at=_NOW,
+            latency_ms=1.0,
+            metadata={"provider": self.exchange_name},
+        )

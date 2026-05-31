@@ -14,6 +14,13 @@ from .execution_dispatch_transport import (
     ExecutionDispatchUnavailableError,
 )
 from .execution_intent_repository import ExecutionIntentRepository
+from .order_execution import (
+    ExchangeExecutionCredentialResolver,
+    ExchangeExecutionCredentialUnavailable,
+    ExchangeExecutionOrderRepository,
+    ExchangeOrderAdapter,
+    ExchangeOrderAdapterError,
+)
 from .paper_accounting_repository import PaperAccountingRepository
 from .position_ownership_repository import StrategyPositionOwnershipRepository
 
@@ -24,6 +31,11 @@ __all__ = [
     "ExchangeExecutionProcessRepository",
     "ExchangeExecutionRedisHealth",
     "ExchangeExecutionRedisMessage",
+    "ExchangeExecutionCredentialResolver",
+    "ExchangeExecutionCredentialUnavailable",
+    "ExchangeExecutionOrderRepository",
+    "ExchangeOrderAdapter",
+    "ExchangeOrderAdapterError",
     "ExecutionIntentRepository",
     "ExecutionDispatchPoisonMessageError",
     "ExecutionDispatchPublishResult",

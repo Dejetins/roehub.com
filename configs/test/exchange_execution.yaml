@@ -22,11 +22,18 @@ exchange_execution:
     service_id: "exchange-execution-test"
     consumer_name: "exchange-execution-test"
     consumer_enabled: true
-    adapter_mode: "disabled"
+    adapter_mode: "testnet"
     poll_interval_seconds: 1.0
     read_count: 10
     block_ms: 100
     backpressure_max_stream_length: 10000
+
+  adapter:
+    enabled_exchanges:
+      - "binance"
+      - "bybit"
+    cancel_after_submit: true
+    timeout_seconds: 5.0
 
   rate_limit:
     per_second: 5.0
