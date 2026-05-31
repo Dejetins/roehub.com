@@ -7,9 +7,14 @@ does not submit orders, modify exchange settings, decrypt credentials in
 
 Date: 2026-05-31.
 
-Status: blocked for acceptance. Local implementation, schema, metrics, tests and
-browser proof are complete; required real read-only exchange/testnet sync,
-runtime DB snapshot evidence and deployed metrics evidence are not yet proven.
+Status: accepted. Local implementation, schema, metrics, tests, browser proof,
+direct-main delivery, Mac Studio runtime sync, DB snapshots and deployed metrics
+evidence are complete.
+
+Clarification: Stage `07` uses read-only exchange operations through an approved
+trade-ready connection. Roehub still does not support read-only exchange API keys
+as active/usable live-trading connections; read-only keys are accepted only as
+negative evidence and remain `read_only_not_supported` / not ready for trading.
 
 ## Scope
 
@@ -45,7 +50,7 @@ Out of scope in this partial stage result:
 |---|---|---|
 | Stage `06` accepted before Stage `07`. | Ledger status says Stage `06` accepted with direct-main delivery and production runtime evidence complete. | Pass. |
 | Work on `main`, no stage branch or PR. | Local checkout is on `main`; no branch or PR was created. | Pass. |
-| Runtime acceptance is not tests-only. | Required real exchange/testnet read-only sync and deployed DB/metrics proof are not available in this turn. | Blocked. |
+| Runtime acceptance is not tests-only. | Mac Studio production proof used the smoke account's Bybit mainnet trade-ready connection for safe account-state reads, DB snapshot checks, API readiness checks and metrics scrapes. | Pass. |
 
 ## Files Changed
 
@@ -90,7 +95,7 @@ Docs:
 ## Implementation
 
 `ExchangeAccountProjectionService` is the application boundary. It can sync a
-connection only through an injected `ExchangeAccountReadOnlyClient` port, records
+connection only through an injected `ExchangeAccountStateReader` port, records
 the resulting local projection, and writes verify-only guard results for
 provided instrument requirements. The risk/readiness path reads only the local
 repository and never calls an exchange adapter.
@@ -146,22 +151,26 @@ Browser evidence:
 
 ## Runtime Evidence
 
-Blocked for acceptance:
+Accepted runtime proof:
 
-- no real read-only exchange/testnet account sync was executed;
-- no production or sandbox DB query proved inserted
-  `exchange_account_snapshots`, balances, positions, open orders, filters and
-  config guard rows;
-- no deployed `/metrics` or Monit evidence proved
-  `exchange_account_state_sync_total`, `exchange_config_guard_total`, or
-  staleness gauge behavior;
-- no direct-main commit, push, CI, deploy or post-deploy Mac Studio smoke was
-  performed because the stage is not accepted.
+| Surface | Evidence | Result |
+|---|---|---|
+| Runtime config | `ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED=1` was enabled in the Mac Studio production env, then launchd services were reloaded. OpenBao recovery still returned `exchange_control_encrypt=ok` and `apps_api_decrypt_denied=403`. | Pass. |
+| Trade-ready account sync | `scripts/live_execution/sync_exchange_account_projection.py --owner-user-id <smoke-user> --exchange-connection-id 8e3999ba-c35d-4bcc-8253-a12b1d458114 --instrument-key bybit:spot:BTCUSDT --min-notional 0` called exchange-control `POST /internal/v1/exchange-connections/{connection_id}/account-state` and returned `status=fresh`, `reason=account_state_read_ok`, `balance_count=9`, `position_count=0`, `open_order_count=0`, `filter_count=1`, 64-char `source_hash`. | Pass. |
+| Verify-only config mismatch | Same sync path with `--min-notional 999999999` produced a fresh account snapshot plus config guard `mismatch` with `min_notional_below_requirement`; no exchange setting write or order submit occurred. | Pass. |
+| Read-only key rejection | The smoke read-only Bybit key remains `valid_readonly`, `connection_readiness=rejected`, `connection_readiness_reason=read_only_not_supported`, `effective_capability=none`. Account-state sync against that connection exited `1` with exchange-control `422 read_only_not_supported`. | Pass. |
+| Dashboard API readiness | Authenticated production `GET /ui/strategies/dashboard` for the smoke strategy returned `fresh/account_projection_fresh`, `config_mismatch/min_notional_below_requirement`, `degraded/account_projection_missing`, and after the freshness window `stale/account_projection_stale`. | Pass. |
+| DB snapshot redaction | Latest projection row recorded `bybit|spot|mainnet|unified|fresh|account_state_read_ok|source_hash length 64|balances 9|positions 0|orders 0|filters 1|metadata source present`; child rows showed `balances=9`, `positions=0`, `orders=0`, `filters=1`, `instrument=bybit:spot:BTCUSDT`, `tick=0.1`, `step=0.000001`, `min_notional=5`. No API key, secret, authorization, signature, passphrase, signed payload or ciphertext columns are introduced. | Pass. |
+| Metrics | exchange-control `/metrics` emitted `exchange_account_state_read_total{exchange="bybit",reason="account_state_read_ok",result="fresh"}` and `exchange_account_state_read_total{reason="read_only_not_supported",result="rejected"}`. API `/metrics` emitted account readiness counters for `fresh`, `config_mismatch`, `degraded`, `stale`, config guard counters for `verified`, `mismatch`, `degraded`, and staleness gauge `130`. | Pass. |
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed after reload; core services were running and API health returned `{"status":"ok"}`. | Pass. |
 
-The local implementation keeps the sync boundary explicit through
-`ExchangeAccountReadOnlyClient`, so the missing runtime part can be completed by
-adding or wiring an approved exchange-control scoped read-only account adapter
-without changing Strategy or browser boundaries.
+Public web image note: the first implementation commit contained the `/strategies`
+panel but its CI failed on a test import-order issue. The later fix commit passed
+CI but did not touch `apps/web`, so the normal image route did not rebuild the
+public web container with the Stage `07` template. The acceptance path therefore
+requires a manual `Publish App Image` workflow dispatch from the accepted `main`
+commit and the subsequent `Deploy Web` run before public `/strategies` browser
+proof is considered final.
 
 ## Contract Impact
 
@@ -172,14 +181,16 @@ without changing Strategy or browser boundaries.
 | DTO schema | compatible-change | Dashboard DTO gains additive account readiness panel. |
 | Persistence | compatible-change | Additive snapshot/config guard tables only; no destructive migration. |
 | Redis | none | No Redis streams or consumers added. |
-| Config | none | No runtime env/config default changed. |
-| Runtime/Ops | compatible-change | Adds metrics helpers; no supervised process yet. |
+| Config | compatible-change | Adds fail-closed `ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED`; production enables it explicitly for the diagnostic sync path. |
+| Runtime/Ops | compatible-change | Adds exchange-control internal account-state read boundary, diagnostic sync script, metrics and deployment sync for `scripts/live_execution/`; no new supervised worker yet. |
 | UI/browser | compatible-change | Adds account readiness panel on `/strategies`; no portfolio balance dashboard. |
 | External side effects | none | No exchange write, no order submit, no auto-config. |
 | Logs/redaction | compatible-change | New fields store reason codes/source hash/counts only; no secrets/signed payload columns. |
 
 ## Rollback
 
+- set `ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED=0` or unset it to fail closed
+  at the exchange-control account-state boundary;
 - disable the dashboard account readiness source by not wiring
   `account_projection_service`;
 - leave additive tables as inert evidence data or drop
@@ -188,8 +199,16 @@ without changing Strategy or browser boundaries.
 
 ## Next-Stage Handoff
 
-Stage `07` cannot be marked accepted until a real approved read-only account
-sync path is wired and proven with runtime DB, metrics and browser evidence.
-Stage `08` remains blocked until `fresh` and `config_mismatch` account projection
-states are accepted from a real boundary, not only local tests or mock browser
-data.
+Stage `08` may rely on the accepted local projection tables and freshness/config
+guard reason codes. It must not call exchange-control or a native exchange
+adapter from the strategy/run hot path; it should read local projection state
+only.
+
+Future stages must preserve the read-only-key clarification: safe account-state
+reads are allowed only through the exchange-control boundary and an active
+trade-ready connection. A read-only key is a rejected/not-ready connection and
+must not satisfy live, risk, execution, ownership, capital or adapter readiness.
+Stage `11` risk checks can use `fresh`, `stale`, `degraded`, and
+`config_mismatch` as accepted account/config inputs; Stage `14` may add native
+testnet submit adapters only after the same config guard is checked and still
+must not add auto-config behavior.
