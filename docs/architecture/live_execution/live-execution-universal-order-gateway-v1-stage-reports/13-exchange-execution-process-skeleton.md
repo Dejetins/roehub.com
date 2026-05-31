@@ -7,8 +7,8 @@ assets, and the operator runbook.
 
 Date: 2026-05-31.
 
-Status: local implementation complete; target-runtime Mac Studio
-launchd/Monit/Prometheus/Redis evidence is pending direct-main deploy.
+Status: accepted after direct-main deploy, follow-up native-service install
+repair, Monit reload repair, CI/deploy success, and Mac Studio runtime proof.
 
 ## Scope
 
@@ -55,23 +55,61 @@ Out of scope:
 | Docs index | `uv run python -m tools.docs.generate_docs_index --check` | Passed. |
 | Local process smoke | `ROEHUB_ENV=dev STRATEGY_FAIL_FAST=false ROEHUB_EXCHANGE_EXECUTION_CONFIG=configs/dev/exchange_execution.yaml uv run python -m apps.exchange_execution.main.main --host 127.0.0.1 --port 19206` plus `curl /health/ready`, `curl /metrics`, `POST /internal/v1/run-once` | Process started, `/health/ready` returned HTTP `200` with `status=degraded`, `adapter_disabled_stage13`, `postgres=ready`, `redis_consumer_disabled`, backpressure/DLQ/clock drift unavailable because dev consumer disabled; `/metrics` exposed `exchange_execution_ready`, dependency gauges and `exchange_execution_adapter_disabled 1.0`; `run-once` returned HTTP `409 consumer_disabled`. |
 | Local Redis CLI | `redis-cli -h 127.0.0.1 -p 6379 PING` | Blocked on workstation: `redis-cli` is not installed. Target runtime proof must use Mac Studio. |
+| Native service scripts | `bash -n scripts/macos/bootstrap_native_prod.sh scripts/macos/bootstrap_native_test.sh scripts/macos/reload_launchd_services.sh` | Passed. |
+| Native service regression | `uv run pytest -q tests/unit/infra/test_native_service_assets.py tests/unit/tools/test_ci_route_changes.py` | `7 passed`. |
+| Native service ruff | `uv run ruff check tests/unit/infra/test_native_service_assets.py tests/unit/tools/test_ci_route_changes.py` | Passed. |
+| Native service pyright | `uv run pyright tests/unit/infra/test_native_service_assets.py tests/unit/tools/test_ci_route_changes.py` | `0 errors`. |
 | Secret grep | `rg -n "(api_key|apikey|secret|token|cookie|authorization|passphrase|signature|ciphertext)" apps/exchange_execution src/trading/contexts/live_execution/adapters/outbound/redis/exchange_execution_consumer.py src/trading/contexts/live_execution/application/use_cases/exchange_execution_process.py docs/architecture/live_execution/live-execution-universal-order-gateway-v1-stage-reports/13-exchange-execution-process-skeleton.md docs/runbooks/exchange-execution.md infra/macos/launchd/com.roehub.exchange-execution.plist infra/scripts/monit/roehub-exchange-execution.monitrc configs/prod/exchange_execution.yaml` | Only policy/report wording matched; no secret values, cookies, raw authorization headers, signed payloads or ciphertexts were present. |
 | Whitespace | `git diff --check` | Passed. |
 
 ## Runtime Evidence
 
-Pending direct-main deploy to Mac Studio.
+Direct-main delivery:
 
-Required target-runtime checks before acceptance:
+- implementation commit `35255ae5`;
+- native service install follow-up `b12651f6`;
+- Monit reload workflow follow-up `488db042`;
+- CI `26722743278`, `26722919238`, and full matrix CI `26723039066`
+  succeeded;
+- Publish App Image `26722819985`, `26722959212`, and `26723120694`
+  succeeded;
+- Deploy Backend `26722819989`, `26722959240`, `26723120686`, and
+  workflow-dispatch `26723143386` succeeded;
+- Deploy Web `26722819995`, `26722824151`, `26722959214`,
+  `26722963442`, and `26723120684` succeeded.
 
-- `curl -fsS http://127.0.0.1:9206/health/ready`;
-- `curl -fsS http://127.0.0.1:9206/metrics`;
-- Redis `XINFO STREAM`, `XINFO GROUPS`, `XPENDING` and DLQ stream proof;
-- Postgres heartbeat/observation row proof;
-- `launchctl` proof for `com.roehub.exchange-execution`;
-- Monit summary proof for `roehub_exchange_execution`;
-- Prometheus query proof for `up{job="exchange-execution"}`;
-- secret/log grep proof.
+Mac Studio runtime proof:
+
+- native assets installed:
+  `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist`
+  and `/opt/homebrew/etc/monit.d/roehub-exchange-execution.monitrc`;
+- `launchctl list` showed `com.roehub.exchange-execution` loaded with pid
+  `78878`;
+- `/opt/homebrew/bin/monit -c /opt/homebrew/etc/monitrc summary` showed
+  `roehub_exchange_execution OK`;
+- `GET http://127.0.0.1:9206/health` returned
+  `{"status":"ok","service":"exchange-execution"}`;
+- `GET http://127.0.0.1:9206/health/ready` returned HTTP `200` with
+  `status=degraded`, `status_reason=adapter_disabled_stage13`,
+  `adapter_mode=disabled`, `consumer_enabled=1`, `fail_fast=1`,
+  Redis ready, DLQ ready, backpressure ready, clock drift ready and Postgres
+  heartbeat recorded;
+- `POST http://127.0.0.1:9206/internal/v1/run-once` returned HTTP `200`
+  with `read_count=0`, `observed_count=0`, `acked_count=0`,
+  `reason=adapter_disabled_no_submit`;
+- `/metrics` exposed `exchange_execution_ready`,
+  `exchange_execution_dependency_ready`, `exchange_execution_redis_stream_length`,
+  `exchange_execution_redis_pending`, `exchange_execution_clock_drift_ms`, and
+  `exchange_execution_adapter_disabled 1.0`;
+- Prometheus active target for `job="exchange-execution"` was `health=up`,
+  scrape URL `http://127.0.0.1:9206/metrics`, and
+  `up{job="exchange-execution"} == 1`;
+- Postgres showed one heartbeat row and one observation row; latest heartbeat
+  was `exchange-execution|degraded|adapter_disabled_stage13`;
+- `scripts/macos/smoke_prod.sh` completed successfully after the final backend
+  deploy;
+- no exchange adapter, credential decrypt, signed payload, submit, cancel,
+  amend or order status call was introduced or invoked.
 
 ## Contract Impact
 
