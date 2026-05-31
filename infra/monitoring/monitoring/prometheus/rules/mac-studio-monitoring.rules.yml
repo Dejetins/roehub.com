@@ -64,6 +64,33 @@ groups:
           summary: API /health probe is failing
           description: Blackbox probe to http://api:8000/health has failed for 2 minutes.
 
+      - alert: ExchangeExecutionDown
+        expr: max(up{job="exchange-execution"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: exchange-execution metrics endpoint is down
+          description: Prometheus cannot scrape exchange-execution:9206 for 2 minutes.
+
+      - alert: ExchangeExecutionNotReady
+        expr: max(exchange_execution_ready{job="exchange-execution",status="not_ready"}) == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: exchange-execution readiness is not_ready
+          description: exchange-execution reports a fail-closed dependency state.
+
+      - alert: ExchangeExecutionClockDrift
+        expr: abs(max(exchange_execution_clock_drift_ms{job="exchange-execution"})) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: exchange-execution clock drift exceeds Stage 13 guard
+          description: Redis server time and local process time differ by more than 1000 ms.
+
       - alert: PostgresTcpDown
         expr: max(probe_success{job="blackbox_tcp",service="postgres_tcp"}) == 0
         for: 2m

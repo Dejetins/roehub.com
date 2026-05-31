@@ -76,6 +76,10 @@ scrape_configs:
     static_configs:
       - targets: ["127.0.0.1:9205"]
 
+  - job_name: exchange-execution
+    static_configs:
+      - targets: ["127.0.0.1:9206"]
+
   - job_name: openbao
     metrics_path: /v1/sys/metrics
     params:

@@ -32,6 +32,7 @@
 | `com.roehub.market-data-scheduler` | `launchd` + `Monit` | `:9202` (`scheduler_job_runs_total`, `scheduler_job_errors_total`) | trigger/reschedule job actions |
 | `com.roehub.backtest-artifact-publisher` | `launchd` + `Monit` (обязательно) | Prometheus-compatible publish/freshness/failure metrics (`/metrics` или exporter bridge для batch-режима), freshness/lag alerts | run-now/rebuild/switch-slot действия |
 | `strategy-live-runner` (target) | `launchd` + `Monit` + control-plane lease model | `:9203`, heartbeat/command lag/failure metrics | start/stop/pause/resume, kill-switch, incident actions |
+| `exchange-execution` (Stage 13 skeleton) | `launchd` + `Monit` | `:9206`, `/health/ready`, Redis stream/DLQ/backpressure/clock metrics | disabled-adapter observation, DLQ quarantine diagnostics, future kill-switch |
 | PostgreSQL | `brew services`/`launchd` + `Monit` | `postgres-exporter` + TCP probe | `pgAdmin 4` (role/db/session ops) |
 | Redis | `brew services`/`launchd` + `Monit` | `redis-exporter` + memory/latency alerts | `redis-commander` (streams/keys ops) |
 | ClickHouse | `launchd` + `Monit` | `clickhouse-exporter`, HTTP `/ping`, native TCP probe | `CH-UI`/DBeaver CE + runbook operations |
@@ -169,6 +170,29 @@
   - stop user runs,
   - replay/recovery,
   - incident mode.
+
+### 6A) Exchange execution (Stage 13 skeleton)
+
+- Запуск: `launchd` label `com.roehub.exchange-execution`.
+- Контроль: `Monit` process check plus HTTP checks for `/health/ready` and
+  `/metrics` on `127.0.0.1:9206`.
+- Мониторинг:
+  - `exchange_execution_ready`,
+  - `exchange_execution_dependency_ready`,
+  - `exchange_execution_redis_stream_length`,
+  - `exchange_execution_redis_pending`,
+  - `exchange_execution_clock_drift_ms`,
+  - `exchange_execution_observations_total`,
+  - `exchange_execution_dlq_total`,
+  - `exchange_execution_ack_total`.
+- Stage 13 adapters are disabled. Valid dispatched intents are observed but not
+  acked; poison/non-dispatchable messages are persisted to the observation table,
+  published to DLQ, and acked only after the durable observation succeeds.
+- Админ-операции:
+  - inspect Redis group/pending/DLQ,
+  - inspect heartbeat and observation rows,
+  - restart through Monit/launchd,
+  - keep order submit disabled until Stage 14 testnet-only adapters are accepted.
 
 ### 7) PostgreSQL
 

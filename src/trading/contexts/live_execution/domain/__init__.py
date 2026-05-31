@@ -8,6 +8,16 @@ from .account_state import (
     ExchangePositionSnapshot,
     ExpectedInstrumentConfig,
 )
+from .exchange_execution_process import (
+    ExchangeExecutionAdapterMode,
+    ExchangeExecutionDependencyHealth,
+    ExchangeExecutionDependencyStatus,
+    ExchangeExecutionHealthSnapshot,
+    ExchangeExecutionObservationStatus,
+    ExchangeExecutionProcessHeartbeat,
+    ExchangeExecutionProcessStatus,
+    ExchangeExecutionRequestObservation,
+)
 from .execution_source import (
     SUPPORTED_ORDER_TYPES,
     SUPPORTED_SOURCE_TYPES,
@@ -72,6 +82,14 @@ __all__ = [
     "ExecutionSourceOutcome",
     "ExecutionSourceType",
     "ExecutionSourceValidationError",
+    "ExchangeExecutionAdapterMode",
+    "ExchangeExecutionDependencyHealth",
+    "ExchangeExecutionDependencyStatus",
+    "ExchangeExecutionHealthSnapshot",
+    "ExchangeExecutionObservationStatus",
+    "ExchangeExecutionProcessHeartbeat",
+    "ExchangeExecutionProcessStatus",
+    "ExchangeExecutionRequestObservation",
     "ExchangeAccountProjection",
     "ExchangeBalanceSnapshot",
     "ExchangeInstrumentFilterSnapshot",

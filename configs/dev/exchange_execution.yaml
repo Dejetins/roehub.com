@@ -1,0 +1,36 @@
+version: 1
+
+exchange_execution:
+  http:
+    host: "127.0.0.1"
+    port: 9206
+
+  redis_streams:
+    enabled: false
+    host: "redis"
+    port: 6379
+    db: 0
+    password_env: "ROEHUB_REDIS_PASSWORD"
+    socket_timeout_s: 2.0
+    connect_timeout_s: 2.0
+    request_stream: "execution.requests.v1"
+    retry_stream: "execution.requests.retry.v1"
+    dlq_stream: "execution.requests.dlq.v1"
+    consumer_group: "exchange-execution.v1"
+
+  process:
+    service_id: "exchange-execution"
+    consumer_name: "exchange-execution-dev"
+    consumer_enabled: false
+    adapter_mode: "disabled"
+    poll_interval_seconds: 1.0
+    read_count: 10
+    block_ms: 100
+    backpressure_max_stream_length: 10000
+
+  rate_limit:
+    per_second: 5.0
+    burst: 10
+
+  clock:
+    max_drift_ms: 1000

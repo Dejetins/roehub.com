@@ -1,0 +1,6 @@
+check process roehub_exchange_execution matching "apps.exchange_execution.main.main"
+  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.exchange-execution /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist"
+  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.exchange-execution /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist"
+  if failed host 127.0.0.1 port 9206 protocol http request "/health/ready" for 2 cycles then alert
+  if failed host 127.0.0.1 port 9206 protocol http request "/metrics" for 2 cycles then alert
+  if 5 restarts within 10 cycles then unmonitor
