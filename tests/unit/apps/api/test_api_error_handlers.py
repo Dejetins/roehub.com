@@ -69,6 +69,25 @@ def test_roehub_error_handler_maps_error_to_http_status_and_payload() -> None:
     }
 
 
+def test_roehub_error_handler_maps_capital_reservation_block_to_conflict() -> None:
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+
+    @app.get("/capital-blocked")
+    def capital_blocked() -> None:
+        raise RoehubError(
+            code="strategy_run.capital_reservation_blocked",
+            message="Strategy run is blocked by capital reservation",
+            details={"reason": "capital_projection_stale"},
+        )
+
+    client = TestClient(app)
+    response = client.get("/capital-blocked")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["details"]["reason"] == "capital_projection_stale"
+
+
 
 def test_request_validation_error_handler_returns_sorted_validation_errors() -> None:
     """

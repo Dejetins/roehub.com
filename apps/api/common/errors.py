@@ -52,6 +52,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "strategy_exchange_binding_already_active": 409,
     "strategy_exchange_binding_not_found": 404,
     "strategy_exchange_bindings_unavailable": 503,
+    "strategy_run.capital_reservation_blocked": 409,
     "strategy_variant_launch.forbidden": 403,
     "strategy_variant_launch.idempotency_key_conflict": 409,
     "strategy_variant_launch.idempotency_key_required": 422,
