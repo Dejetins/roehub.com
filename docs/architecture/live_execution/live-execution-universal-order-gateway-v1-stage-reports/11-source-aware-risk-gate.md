@@ -7,8 +7,8 @@ state fails closed as `risk_state_unavailable`.
 
 Date: 2026-05-31.
 
-Status: accepted locally. Direct-main delivery, CI/deploy and Mac Studio
-post-deploy runtime evidence are pending.
+Status: accepted. Direct-main delivery, CI/deploy and Mac Studio
+post-deploy runtime evidence are complete.
 
 ## Scope
 
@@ -84,9 +84,39 @@ sample_reasons risk_gate_accepted,strategy_variant_incompatible,market_data_miss
 metrics_present True True
 ```
 
+Mac Studio production proof used the deployed API, persisted Roehub session
+auth, Postgres, Redis and the live `/metrics` endpoint on `127.0.0.1:8000`.
+The temporary smoke session was revoked after the probe.
+
+| Surface | Evidence | Result |
+|---|---|---|
+| API accepted path | Real authenticated `POST /ui/execution/source-events` + `POST /ui/execution/intents` for `strategy_signal` with all risk checks true returned HTTP `201`, `risk_status=accepted`, `risk_reason=risk_gate_accepted`. | Pass. |
+| API rejected paths | Real authenticated calls returned durable rejected intents for incompatible variant, missing feed, stale feed, config mismatch, stale account projection, insufficient capital, ownership conflict, inactive connection, blocked profile, inactive run, missing binding, missing manual recent-auth, ML policy missing and kill switch closed. | Pass. |
+| Unsupported order model | Real authenticated `POST /ui/execution/intents` with `take_profit` returned HTTP `422`, reason `tp_sl_not_supported`; no intent row was created for that unsupported order. | Pass. |
+| Durable state | Postgres contained `15` Stage 11 smoke intents grouped as `1` accepted and `14` rejected, with the expected stable risk reasons. | Pass. |
+| Audit/no-dispatch | Postgres contained `15` `execution_risk_audit_events` rows and `BOOL_AND(metadata_json->>'dispatch' = 'no-dispatch') = true`. | Pass. |
+| Redis | Redis `SCAN "*execution*"` returned `0` keys and `XINFO STREAM execution.requests.v1` returned `ResponseError`, proving the dispatch stream is absent. | Pass. |
+| Metrics | `/metrics` exposed `execution_risk_gate_total` and `execution_risk_gate_latency_seconds`. | Pass. |
+
+Production boundary command summary:
+
+```text
+api_cases 15 accepted 1 rejected 14
+audit {'audit_count': 15, 'no_dispatch': True}
+redis_execution_key_count 0 dispatch_stream ResponseError
+metrics_present True
+unsupported_order_model 422 tp_sl_not_supported
+```
+
 ## Delivery Evidence
 
-Pending direct-main commit, push, CI/deploy and post-deploy Mac Studio smoke.
+| Evidence | Result |
+|---|---|
+| Commits | `edc8e955` implementation; `089c895c` Alembic lint repair. |
+| Initial CI | Run `26719536539` failed static lint on two Alembic `E501` lines; migrations and tests had passed. |
+| Final CI | Run `26719584962` passed static lint/type/docs, migrations and all test shards. |
+| Deploy | Publish App Image `26719665047`, Deploy Backend `26719665048` and Deploy Web `26719665044` completed successfully for `089c895c`. |
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` succeeded on `/opt/roehub/app`: API health, Redis `PONG`, Postgres service, launchd services, Monit services and Tailscale backend state were healthy. |
 
 ## Contract Impact
 
