@@ -8,6 +8,7 @@ from .persistence import (
     PostgresPaperAccountingRepository,
     PostgresStrategyPositionOwnershipRepository,
 )
+from .redis import RedisExecutionDispatchTransport, RedisExecutionDispatchTransportConfig
 from .time import SystemLiveExecutionClock
 
 __all__ = [
@@ -19,5 +20,7 @@ __all__ = [
     "PostgresExecutionIntentRepository",
     "PostgresPaperAccountingRepository",
     "PostgresStrategyPositionOwnershipRepository",
+    "RedisExecutionDispatchTransport",
+    "RedisExecutionDispatchTransportConfig",
     "SystemLiveExecutionClock",
 ]

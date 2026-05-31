@@ -1,4 +1,9 @@
 from .account_projection import ExchangeAccountProjectionService
+from .execution_dispatch import (
+    ExecutionDispatchConfig,
+    ExecutionDispatchResult,
+    ExecutionDispatchService,
+)
 from .execution_ingress import (
     CreateExecutionIntentCommand,
     ExecutionIngressService,
@@ -13,6 +18,9 @@ __all__ = [
     "CapitalReservationPaperAccountingService",
     "CreateExecutionIntentCommand",
     "ExecutionIngressService",
+    "ExecutionDispatchConfig",
+    "ExecutionDispatchResult",
+    "ExecutionDispatchService",
     "ExecutionIntentResult",
     "ExecutionSourceEventResult",
     "ExchangeAccountProjectionService",

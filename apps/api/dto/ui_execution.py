@@ -101,6 +101,11 @@ class ExecutionIntentResponse(BaseModel):
     status_reason: str
     risk_status: str
     risk_reason: str
+    dispatch_attempt_count: int = 0
+    dispatch_stream_name: str | None = None
+    dispatch_redis_message_id: str | None = None
+    dispatch_last_error: str | None = None
+    dispatch_updated_at: datetime | None = None
     created_at: datetime
     duplicate: bool = False
     source_event: ExecutionSourceEventResponse

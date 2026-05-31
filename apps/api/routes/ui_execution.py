@@ -13,6 +13,7 @@ from apps.api.dto.ui_execution import (
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.application import (
     CreateExecutionIntentCommand,
+    ExecutionDispatchService,
     ExecutionIngressService,
     RecordExecutionSourceEventCommand,
 )
@@ -31,6 +32,7 @@ CurrentUserPrincipalDependency = Callable[..., CurrentUserPrincipal]
 def build_ui_execution_router(
     *,
     ingress_service: ExecutionIngressService,
+    dispatch_service: ExecutionDispatchService | None = None,
     current_user_dependency: CurrentUserPrincipalDependency,
 ) -> APIRouter:
     if ingress_service is None:  # type: ignore[truthy-bool]
@@ -108,8 +110,11 @@ def build_ui_execution_router(
             raise _execution_request_error(reason=error.reason) from error
         if result.duplicate:
             response.status_code = 200
+        response_intent = result.intent
+        if dispatch_service is not None:
+            response_intent = dispatch_service.dispatch_intent(intent=result.intent).intent
         return _to_intent_response(
-            intent=result.intent,
+            intent=response_intent,
             source_event=result.event,
             duplicate=result.duplicate,
         )
@@ -157,6 +162,11 @@ def _to_intent_response(
         status_reason=intent.status_reason,
         risk_status=intent.risk_status,
         risk_reason=intent.risk_reason,
+        dispatch_attempt_count=intent.dispatch_attempt_count,
+        dispatch_stream_name=intent.dispatch_stream_name,
+        dispatch_redis_message_id=intent.dispatch_redis_message_id,
+        dispatch_last_error=intent.dispatch_last_error,
+        dispatch_updated_at=intent.dispatch_updated_at,
         created_at=intent.created_at,
         duplicate=duplicate,
         source_event=_to_source_event_response(event=source_event, duplicate=False),

@@ -131,7 +131,9 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
                 strategy_signal_id, exchange_connection_id, market_type,
                 instrument_key, side, order_type, quantity, quote_notional,
                 limit_price, status, status_reason, risk_status, risk_reason,
-                idempotency_key_hash, created_at
+                idempotency_key_hash, created_at, dispatch_attempt_count,
+                dispatch_stream_name, dispatch_redis_message_id, dispatch_last_error,
+                dispatch_updated_at
             )
             VALUES
             (
@@ -140,7 +142,9 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
                 %(market_type)s, %(instrument_key)s, %(side)s, %(order_type)s,
                 %(quantity)s, %(quote_notional)s, %(limit_price)s, %(status)s,
                 %(status_reason)s, %(risk_status)s, %(risk_reason)s,
-                %(idempotency_key_hash)s, %(created_at)s
+                %(idempotency_key_hash)s, %(created_at)s, %(dispatch_attempt_count)s,
+                %(dispatch_stream_name)s, %(dispatch_redis_message_id)s,
+                %(dispatch_last_error)s, %(dispatch_updated_at)s
             )
             ON CONFLICT (owner_user_id, idempotency_key_hash) DO NOTHING
             RETURNING *
@@ -167,6 +171,125 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
             parameters={
                 "owner_user_id": str(owner_user_id),
                 "idempotency_key_hash": idempotency_key_hash,
+            },
+        )
+        return _map_intent(row) if row is not None else None
+
+    def get_intent_by_id(
+        self, *, owner_user_id: UserId, intent_id: UUID
+    ) -> ExecutionIntent | None:
+        row = self._gateway.fetch_one(
+            query="""
+            SELECT *
+            FROM execution_intents
+            WHERE owner_user_id = %(owner_user_id)s
+              AND intent_id = %(intent_id)s
+            """,
+            parameters={
+                "owner_user_id": str(owner_user_id),
+                "intent_id": str(intent_id),
+            },
+        )
+        return _map_intent(row) if row is not None else None
+
+    def claim_intent_for_dispatch(
+        self, *, intent_id: UUID, now: datetime, retry_budget: int
+    ) -> ExecutionIntent | None:
+        row = self._gateway.fetch_one(
+            query="""
+            UPDATE execution_intents
+            SET status = 'dispatching',
+                status_reason = 'dispatch_publish_pending',
+                dispatch_attempt_count = dispatch_attempt_count + 1,
+                dispatch_last_error = NULL,
+                dispatch_updated_at = %(now)s
+            WHERE intent_id = %(intent_id)s
+              AND status IN ('accepted', 'retry')
+              AND risk_status = 'accepted'
+              AND dispatch_attempt_count < %(retry_budget)s
+            RETURNING *
+            """,
+            parameters={
+                "intent_id": str(intent_id),
+                "now": now,
+                "retry_budget": retry_budget,
+            },
+        )
+        return _map_intent(row) if row is not None else None
+
+    def mark_intent_dispatched(
+        self,
+        *,
+        intent_id: UUID,
+        stream_name: str,
+        redis_message_id: str,
+        now: datetime,
+    ) -> ExecutionIntent | None:
+        row = self._gateway.fetch_one(
+            query="""
+            UPDATE execution_intents
+            SET status = 'dispatched',
+                status_reason = 'redis_xadd_ok',
+                dispatch_stream_name = %(stream_name)s,
+                dispatch_redis_message_id = %(redis_message_id)s,
+                dispatch_last_error = NULL,
+                dispatch_updated_at = %(now)s
+            WHERE intent_id = %(intent_id)s
+            RETURNING *
+            """,
+            parameters={
+                "intent_id": str(intent_id),
+                "stream_name": stream_name,
+                "redis_message_id": redis_message_id,
+                "now": now,
+            },
+        )
+        return _map_intent(row) if row is not None else None
+
+    def mark_intent_dispatch_retry(
+        self, *, intent_id: UUID, reason: str, now: datetime
+    ) -> ExecutionIntent | None:
+        row = self._gateway.fetch_one(
+            query="""
+            UPDATE execution_intents
+            SET status = 'retry',
+                status_reason = %(reason)s,
+                dispatch_last_error = %(reason)s,
+                dispatch_updated_at = %(now)s
+            WHERE intent_id = %(intent_id)s
+              AND status <> 'dispatched'
+              AND risk_status = 'accepted'
+            RETURNING *
+            """,
+            parameters={
+                "intent_id": str(intent_id),
+                "reason": reason,
+                "now": now,
+            },
+        )
+        return _map_intent(row) if row is not None else None
+
+    def mark_intent_quarantined(
+        self, *, intent_id: UUID, reason: str, stream_name: str | None, now: datetime
+    ) -> ExecutionIntent | None:
+        row = self._gateway.fetch_one(
+            query="""
+            UPDATE execution_intents
+            SET status = 'quarantined',
+                status_reason = %(reason)s,
+                dispatch_stream_name = COALESCE(%(stream_name)s, dispatch_stream_name),
+                dispatch_last_error = %(reason)s,
+                dispatch_updated_at = %(now)s
+            WHERE intent_id = %(intent_id)s
+              AND status <> 'dispatched'
+              AND risk_status = 'accepted'
+            RETURNING *
+            """,
+            parameters={
+                "intent_id": str(intent_id),
+                "reason": reason,
+                "stream_name": stream_name,
+                "now": now,
             },
         )
         return _map_intent(row) if row is not None else None
@@ -236,6 +359,11 @@ def _intent_params(intent: ExecutionIntent) -> dict[str, object]:
         "risk_reason": intent.risk_reason,
         "idempotency_key_hash": intent.idempotency_key_hash,
         "created_at": intent.created_at,
+        "dispatch_attempt_count": intent.dispatch_attempt_count,
+        "dispatch_stream_name": intent.dispatch_stream_name,
+        "dispatch_redis_message_id": intent.dispatch_redis_message_id,
+        "dispatch_last_error": intent.dispatch_last_error,
+        "dispatch_updated_at": intent.dispatch_updated_at,
     }
 
 
@@ -292,6 +420,15 @@ def _map_intent(row: Mapping[str, Any]) -> ExecutionIntent:
         risk_reason=str(row["risk_reason"]),
         idempotency_key_hash=str(row["idempotency_key_hash"]),
         created_at=_datetime(row["created_at"]),
+        dispatch_attempt_count=int(row.get("dispatch_attempt_count") or 0),
+        dispatch_stream_name=_str_or_none(row.get("dispatch_stream_name")),
+        dispatch_redis_message_id=_str_or_none(row.get("dispatch_redis_message_id")),
+        dispatch_last_error=_str_or_none(row.get("dispatch_last_error")),
+        dispatch_updated_at=(
+            _datetime(row["dispatch_updated_at"])
+            if row.get("dispatch_updated_at") is not None
+            else None
+        ),
     )
 
 
@@ -333,3 +470,10 @@ def _datetime(value: object) -> datetime:
     if isinstance(value, datetime):
         return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     return datetime.fromisoformat(str(value))
+
+
+def _str_or_none(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 from uuid import UUID
 
 from trading.contexts.live_execution.application.ports import ExecutionIntentRepository
@@ -103,8 +104,91 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             None,
         )
 
+    def get_intent_by_id(
+        self, *, owner_user_id: UserId, intent_id: UUID
+    ) -> ExecutionIntent | None:
+        return next(
+            (
+                item
+                for item in self.intents
+                if item.owner_user_id == owner_user_id and item.intent_id == intent_id
+            ),
+            None,
+        )
+
+    def claim_intent_for_dispatch(
+        self, *, intent_id: UUID, now: datetime, retry_budget: int
+    ) -> ExecutionIntent | None:
+        for index, item in enumerate(self.intents):
+            if (
+                item.intent_id == intent_id
+                and item.status in {"accepted", "retry"}
+                and item.risk_status == "accepted"
+                and item.dispatch_attempt_count < retry_budget
+            ):
+                updated = replace(
+                    item,
+                    status="dispatching",
+                    status_reason="dispatch_publish_pending",
+                    dispatch_attempt_count=item.dispatch_attempt_count + 1,
+                    dispatch_last_error=None,
+                    dispatch_updated_at=now,
+                )
+                self.intents[index] = updated
+                return updated
+        return None
+
+    def mark_intent_dispatched(
+        self,
+        *,
+        intent_id: UUID,
+        stream_name: str,
+        redis_message_id: str,
+        now: datetime,
+    ) -> ExecutionIntent | None:
+        return self._replace_intent(
+            intent_id=intent_id,
+            status="dispatched",
+            status_reason="redis_xadd_ok",
+            dispatch_stream_name=stream_name,
+            dispatch_redis_message_id=redis_message_id,
+            dispatch_last_error=None,
+            dispatch_updated_at=now,
+        )
+
+    def mark_intent_dispatch_retry(
+        self, *, intent_id: UUID, reason: str, now: datetime
+    ) -> ExecutionIntent | None:
+        return self._replace_intent(
+            intent_id=intent_id,
+            status="retry",
+            status_reason=reason,
+            dispatch_last_error=reason,
+            dispatch_updated_at=now,
+        )
+
+    def mark_intent_quarantined(
+        self, *, intent_id: UUID, reason: str, stream_name: str | None, now: datetime
+    ) -> ExecutionIntent | None:
+        return self._replace_intent(
+            intent_id=intent_id,
+            status="quarantined",
+            status_reason=reason,
+            dispatch_stream_name=stream_name,
+            dispatch_last_error=reason,
+            dispatch_updated_at=now,
+        )
+
     def record_risk_audit_event(
         self, *, event: ExecutionRiskAuditEvent
     ) -> ExecutionRiskAuditEvent:
         self.risk_audit_events.append(event)
         return event
+
+    def _replace_intent(self, *, intent_id: UUID, **updates: object) -> ExecutionIntent | None:
+        for index, item in enumerate(self.intents):
+            if item.intent_id == intent_id:
+                updated = replace(item, **updates)
+                self.intents[index] = updated
+                return updated
+        return None

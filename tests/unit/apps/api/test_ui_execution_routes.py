@@ -12,6 +12,10 @@ from trading.contexts.live_execution.adapters.outbound.persistence.in_memory imp
     InMemoryExecutionIntentRepository,
 )
 from trading.contexts.live_execution.application import ExecutionIngressService
+from trading.contexts.live_execution.application.ports import ExecutionDispatchPublishResult
+from trading.contexts.live_execution.application.use_cases.execution_dispatch import (
+    ExecutionDispatchService,
+)
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 _USER_ID = "00000000-0000-0000-0000-000000010501"
@@ -93,6 +97,46 @@ def test_ui_execution_routes_create_and_dedupe_intent() -> None:
     assert intent_response.json()["order_type"] == "limit"
     assert intent_response.json()["status"] == "accepted"
     assert intent_response.json()["status_reason"] == "risk_gate_accepted"
+
+
+def test_ui_execution_route_dispatches_accepted_intent_when_dispatch_service_is_wired() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    client = _build_client(repository=repository, dispatch_transport=_DispatchTransport())
+
+    source_response = client.post(
+        "/ui/execution/source-events",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_type": "ops_test",
+            "source_event_ref": "ops-stage12-ref",
+            "source_ref": {"ops_test_id": "stage12"},
+            "idempotency_key": "stage12-source-key",
+        },
+    )
+    intent_response = client.post(
+        "/ui/execution/intents",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_event_id": source_response.json()["source_event_id"],
+            "idempotency_key": "stage12-intent-key",
+            "exchange_connection_id": "00000000-0000-0000-0000-000000010601",
+            "market_type": "spot",
+            "instrument_key": "binance:spot:BTCUSDT",
+            "order": {
+                "order_type": "market",
+                "side": "buy",
+                "quote_notional": "25",
+            },
+            "risk_context": _accepted_risk_context(),
+        },
+    )
+
+    assert intent_response.status_code == 201
+    assert intent_response.json()["status"] == "dispatched"
+    assert intent_response.json()["status_reason"] == "redis_xadd_ok"
+    assert intent_response.json()["dispatch_stream_name"] == "execution.requests.v1"
+    assert intent_response.json()["dispatch_redis_message_id"] == "1-0"
+    assert repository.intents[0].status == "dispatched"
 
 
 def test_ui_execution_route_rejects_intent_when_risk_context_is_missing() -> None:
@@ -186,19 +230,69 @@ def test_ui_execution_route_requires_strategy_signal_id_for_strategy_sources() -
     assert response.json()["error"]["details"]["reason"] == "strategy_signal_id_required"
 
 
-def _build_client() -> TestClient:
+def _build_client(
+    *,
+    repository: InMemoryExecutionIntentRepository | None = None,
+    dispatch_transport: object | None = None,
+) -> TestClient:
+    intent_repository = repository or InMemoryExecutionIntentRepository()
+    clock = _Clock()
+    dispatch_service = None
+    if dispatch_transport is not None:
+        dispatch_service = ExecutionDispatchService(
+            repository=intent_repository,
+            transport=dispatch_transport,  # type: ignore[arg-type]
+            clock=clock,
+        )
     app = FastAPI()
     register_api_error_handlers(app=app)
     app.include_router(
         build_ui_execution_router(
             ingress_service=ExecutionIngressService(
-                repository=InMemoryExecutionIntentRepository(),
-                clock=_Clock(),
+                repository=intent_repository,
+                clock=clock,
             ),
+            dispatch_service=dispatch_service,
             current_user_dependency=_CurrentUserDependency(),
         )
     )
     return TestClient(app)
+
+
+class _DispatchTransport:
+    def ensure_request_group(self) -> None:
+        return None
+
+    def request_stream_length(self) -> int:
+        return 0
+
+    def publish_request(self, *, intent, attempt_count: int) -> ExecutionDispatchPublishResult:
+        _ = intent, attempt_count
+        return ExecutionDispatchPublishResult(
+            stream_name="execution.requests.v1",
+            message_id="1-0",
+        )
+
+    def publish_retry(
+        self, *, intent, reason: str, attempt_count: int
+    ) -> ExecutionDispatchPublishResult:
+        _ = intent, reason, attempt_count
+        return ExecutionDispatchPublishResult(
+            stream_name="execution.requests.retry.v1",
+            message_id="2-0",
+        )
+
+    def publish_dlq(
+        self, *, intent, reason: str, attempt_count: int
+    ) -> ExecutionDispatchPublishResult:
+        _ = intent, reason, attempt_count
+        return ExecutionDispatchPublishResult(
+            stream_name="execution.requests.dlq.v1",
+            message_id="3-0",
+        )
+
+    def ack_after_durable_state_change(self, *, stream_name: str, message_id: str) -> None:
+        _ = stream_name, message_id
 
 
 def _accepted_risk_context() -> dict[str, object]:

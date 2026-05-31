@@ -107,6 +107,31 @@ _EXECUTION_RISK_GATE_LATENCY_SECONDS = Histogram(
     ("source_type", "result"),
     buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 )
+_EXECUTION_DISPATCH_TOTAL = Counter(
+    "execution_dispatch_total",
+    "Execution intent Redis dispatch outcomes.",
+    ("result", "reason"),
+)
+_EXECUTION_DISPATCH_RETRY_TOTAL = Counter(
+    "execution_dispatch_retry_total",
+    "Execution intent Redis dispatch retry outcomes.",
+    ("reason",),
+)
+_EXECUTION_DISPATCH_DLQ_TOTAL = Counter(
+    "execution_dispatch_dlq_total",
+    "Execution intent Redis dispatch quarantine/DLQ outcomes.",
+    ("reason",),
+)
+_EXECUTION_DISPATCH_BACKPRESSURE_TOTAL = Counter(
+    "execution_dispatch_backpressure_total",
+    "Execution intent Redis dispatch backpressure outcomes.",
+    ("reason",),
+)
+_EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL = Counter(
+    "execution_dispatch_redis_errors_total",
+    "Execution intent Redis dispatch transport errors.",
+    ("reason",),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -315,6 +340,29 @@ def record_execution_risk_gate(
     ).observe(max(0.0, latency_seconds))
 
 
+def record_execution_dispatch(*, result: str, reason: str) -> None:
+    _EXECUTION_DISPATCH_TOTAL.labels(
+        result=(result or "unknown")[:80],
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def record_execution_dispatch_retry(*, reason: str) -> None:
+    _EXECUTION_DISPATCH_RETRY_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+
+
+def record_execution_dispatch_dlq(*, reason: str) -> None:
+    _EXECUTION_DISPATCH_DLQ_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+
+
+def record_execution_dispatch_backpressure(*, reason: str) -> None:
+    _EXECUTION_DISPATCH_BACKPRESSURE_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+
+
+def record_execution_dispatch_redis_error(*, reason: str) -> None:
+    _EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -355,6 +403,11 @@ __all__ = [
     "record_strategy_variant_launch",
     "record_strategy_variant_compatibility",
     "record_execution_intent",
+    "record_execution_dispatch",
+    "record_execution_dispatch_backpressure",
+    "record_execution_dispatch_dlq",
+    "record_execution_dispatch_redis_error",
+    "record_execution_dispatch_retry",
     "record_execution_order_model_rejected",
     "record_execution_risk_gate",
     "record_execution_source_event",

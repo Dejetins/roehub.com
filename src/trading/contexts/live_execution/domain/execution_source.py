@@ -21,7 +21,15 @@ ExecutionSourceOutcome = Literal[
     "order_model_rejected",
     "no_intent",
 ]
-ExecutionIntentStatus = Literal["recorded", "accepted", "rejected"]
+ExecutionIntentStatus = Literal[
+    "recorded",
+    "accepted",
+    "rejected",
+    "dispatching",
+    "dispatched",
+    "retry",
+    "quarantined",
+]
 ExecutionSide = Literal["buy", "sell"]
 ExecutionOrderType = Literal["market", "limit"]
 
@@ -102,6 +110,11 @@ class ExecutionIntent:
     risk_reason: str
     idempotency_key_hash: str
     created_at: datetime
+    dispatch_attempt_count: int = 0
+    dispatch_stream_name: str | None = None
+    dispatch_redis_message_id: str | None = None
+    dispatch_last_error: str | None = None
+    dispatch_updated_at: datetime | None = None
 
 
 def hash_idempotency_key(raw_value: str) -> str:
