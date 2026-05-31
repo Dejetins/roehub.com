@@ -6,6 +6,7 @@ from .indicators import (
     build_indicators_compute,
     build_indicators_registry,
 )
+from .live_execution import build_ui_execution_router_module
 from .market_data_reference import build_market_data_reference_router
 from .strategy import build_strategy_router, is_strategy_api_enabled
 from .ui_account import build_account_settings_use_case, build_ui_account_router
@@ -28,6 +29,7 @@ __all__ = [
     "build_indicators_compute",
     "build_indicators_registry",
     "build_market_data_reference_router",
+    "build_ui_execution_router_module",
     "build_strategy_router",
     "build_ui_account_router",
     "build_ui_backtests_router",

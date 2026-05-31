@@ -81,6 +81,21 @@ _STRATEGY_PAPER_ACCOUNTING_TOTAL = Counter(
     "Strategy paper order/fill/accounting outcomes.",
     ("result", "reason"),
 )
+_EXECUTION_SOURCE_EVENT_TOTAL = Counter(
+    "execution_source_event_total",
+    "Execution source events recorded by producer type.",
+    ("source_type", "result"),
+)
+_EXECUTION_INTENT_TOTAL = Counter(
+    "execution_intent_total",
+    "Execution intent ingress outcomes.",
+    ("source_type", "result", "reason"),
+)
+_EXECUTION_ORDER_MODEL_REJECTED_TOTAL = Counter(
+    "execution_order_model_rejected_total",
+    "Unsupported execution order model rejections.",
+    ("source_type", "reason"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -247,6 +262,28 @@ def record_strategy_capital_reservation(*, result: str, reason: str) -> None:
 def record_strategy_paper_accounting(*, result: str, reason: str) -> None:
     _STRATEGY_PAPER_ACCOUNTING_TOTAL.labels(
         result=result,
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def record_execution_source_event(*, source_type: str, result: str) -> None:
+    _EXECUTION_SOURCE_EVENT_TOTAL.labels(
+        source_type=(source_type or "unknown")[:80],
+        result=(result or "unknown")[:80],
+    ).inc()
+
+
+def record_execution_intent(*, source_type: str, result: str, reason: str) -> None:
+    _EXECUTION_INTENT_TOTAL.labels(
+        source_type=(source_type or "unknown")[:80],
+        result=(result or "unknown")[:80],
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def record_execution_order_model_rejected(*, source_type: str, reason: str) -> None:
+    _EXECUTION_ORDER_MODEL_REJECTED_TOTAL.labels(
+        source_type=(source_type or "unknown")[:80],
         reason=(reason or "unknown")[:80],
     ).inc()
 

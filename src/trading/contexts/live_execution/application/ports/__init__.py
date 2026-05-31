@@ -1,12 +1,14 @@
 from .account_projection_repository import ExchangeAccountProjectionRepository
 from .clock import LiveExecutionClock
 from .exchange_account_state_reader import ExchangeAccountStateReader
+from .execution_intent_repository import ExecutionIntentRepository
 from .paper_accounting_repository import PaperAccountingRepository
 from .position_ownership_repository import StrategyPositionOwnershipRepository
 
 __all__ = [
     "ExchangeAccountProjectionRepository",
     "ExchangeAccountStateReader",
+    "ExecutionIntentRepository",
     "LiveExecutionClock",
     "PaperAccountingRepository",
     "StrategyPositionOwnershipRepository",

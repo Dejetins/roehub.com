@@ -7,6 +7,7 @@ from .strategies import build_strategies_router
 from .ui_account import build_ui_account_router
 from .ui_backtests import build_ui_backtests_router
 from .ui_dashboard import build_ui_dashboard_router
+from .ui_execution import build_ui_execution_router
 from .ui_strategies_dashboard import build_ui_strategies_dashboard_router
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "build_ui_account_router",
     "build_ui_backtests_router",
     "build_ui_dashboard_router",
+    "build_ui_execution_router",
     "build_ui_strategies_dashboard_router",
 ]
