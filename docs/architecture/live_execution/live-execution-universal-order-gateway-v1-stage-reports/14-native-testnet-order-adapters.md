@@ -7,11 +7,14 @@ credential resolution and bounded metrics.
 
 Date: 2026-05-31.
 
-Status: blocked for acceptance. Implementation, CI and deploy are complete, but
-the available Binance testnet trade-ready connections use placeholder
-credentials that cannot be decrypted by the exchange-control Transit boundary.
-Per the Stage 14 prompt, missing testnet credentials block live submit/status/
-cancel acceptance rather than being downgraded to tests-only evidence.
+Status: blocked for acceptance. Implementation, CI and deploy are complete.
+The original Binance blocker remains because its testnet trade-ready
+connections use placeholder credentials that cannot be decrypted by the
+exchange-control Transit boundary. A new Bybit testnet key now decrypts through
+`exchange_control_transit_v1`, but Bybit rejected both spot and linear testnet
+submit attempts for insufficient available balance. Per the Stage 14 prompt,
+missing usable testnet funds block live submit/status/cancel acceptance rather
+than being downgraded to tests-only evidence.
 
 ## Scope
 
@@ -64,7 +67,7 @@ Out of scope:
 | Mainnet guard migration pyright | `uv run pyright tests/unit/apps/migrations/test_testnet_order_adapters_sql.py` | `0 errors`. |
 | Mainnet guard migration whitespace | `git diff --check` | Passed. |
 | Credential availability probe | Local environment boolean-only check | Workstation has no `STRATEGY_PG_DSN`, `OPENBAO_ADDR`, `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN` or Redis secret env. |
-| Mac Studio credential prerequisites | SSH boolean-only env check and sanitized SQL grouping | Mac Studio has `STRATEGY_PG_DSN`, `OPENBAO_ADDR`, `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN`; current DB has active Binance futures testnet trading connections. No Bybit testnet trading connection is currently present. |
+| Mac Studio credential prerequisites | SSH boolean-only env check and sanitized SQL grouping | Mac Studio has `STRATEGY_PG_DSN`, `OPENBAO_ADDR`, `ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN`; current DB has active Binance futures testnet trading connections with placeholder credentials and one active Bybit spot testnet trading connection using `exchange_control_transit_v1`. |
 
 ## Runtime Evidence
 
@@ -119,14 +122,43 @@ Mac Studio runtime evidence:
   `exchange_execution_private_stream_total` and
   `exchange_execution_submit_latency_ms` are registered but have no samples
   because credential decrypt failed before private stream or order submit.
+- after a Bybit spot testnet key was added, credential decrypt passed inside
+  exchange-control/exchange-execution (`exchange_control_transit_v1` with
+  boolean-only decrypt proof);
+- exchange-control account-state sync for the Bybit spot testnet connection
+  returned `status=fresh`, `reason=account_state_read_ok`, `filter_count=1` for
+  `bybit:spot:BTCUSDT`, `min_notional=5`, but `balance_count=0`;
+- controlled Bybit spot testnet dispatch through `execution.requests.v1`
+  returned `run-once` HTTP `200` with `adapter_error_count=1`,
+  `acked_count=1`; Postgres recorded `adapter_error`,
+  `status_reason=exchange_ret_code_170131`, no provider order id and no
+  submit/status/cancel timestamps;
+- a temporary ops-test Bybit futures testnet connection was created from the
+  same Transit-managed credential to check whether the test funds were in the
+  linear/contract wallet; controlled `bybit:futures:BTCUSDT` dispatch returned
+  `run-once` HTTP `200` with `adapter_error_count=1`, `acked_count=1`;
+  Postgres recorded `adapter_error`, `status_reason=exchange_ret_code_110007`,
+  no provider order id and no submit/status/cancel timestamps;
+- the temporary futures connection and copied credential version were archived
+  after the probe, leaving the user-created Bybit spot testnet connection
+  unchanged;
+- final `/health/ready` still returned `status=ready`,
+  `status_reason=all_dependencies_ready`, `adapter_mode=testnet`, with Redis
+  `pending_count=1` from pre-existing state and no pending increase from the
+  Bybit probes;
+- final `/metrics` includes `exchange_execution_private_stream_total` for
+  `bybit/private_ws_auth_probe_ready`, `exchange_execution_observations_total`
+  for `exchange_ret_code_170131` and `exchange_ret_code_110007`, and matching
+  `exchange_execution_ack_total` counters.
 
 Acceptance blocker:
 
-- Safe submit/status/cancel was not executed against Binance or Bybit testnet.
-  The Stage 14 validation strategy explicitly says missing testnet credentials
-  block acceptance for that adapter. This stage remains blocked until at least
-  one active exchange-testnet connection has decryptable Transit-managed
-  credentials.
+- Safe submit/status/cancel was not completed against Binance or Bybit testnet.
+  Binance remains blocked by undecryptable placeholder credentials. Bybit now
+  has a decryptable testnet key, but the account has no available balance for
+  the probed spot or linear order paths. This stage remains blocked until at
+  least one active exchange-testnet connection has decryptable
+  Transit-managed credentials and usable testnet funds.
 
 ## Contract Impact
 
@@ -162,10 +194,10 @@ exchange boundary.
 
 ## Handoff To Stage 15
 
-Stage `15` remains blocked until Stage `14` is unblocked with decryptable
-exchange-testnet credentials and records real submit/status/cancel plus private
-stream evidence. The next operator should provision or rotate a Binance and/or
-Bybit testnet connection through exchange-control so the credential row uses
-`exchange_control_transit_v1`, then rerun the same `exchange-execution`
+Stage `15` remains blocked until Stage `14` is unblocked with a decryptable
+exchange-testnet credential that also has usable testnet funds and records real
+submit/status/cancel plus private-stream evidence. For the current Bybit key,
+fund the API account's spot/unified or linear/contract testnet wallet with
+usable BTCUSDT margin/quote balance, then rerun the same `exchange-execution`
 dispatch probe. After that, Stage `15` can treat `execution_orders` as the
 first exchange-facing order ledger, but not as full reconciliation.
