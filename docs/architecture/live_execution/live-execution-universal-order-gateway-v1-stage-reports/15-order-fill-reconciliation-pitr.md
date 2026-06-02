@@ -6,9 +6,9 @@ the existing `exchange-execution` testnet order path.
 
 Date: 2026-06-03.
 
-Status: local implementation and quality gates complete; runtime boundary
-proof, direct-main delivery, CI, deploy and post-deploy proof are pending in
-this working copy.
+Status: accepted. Implementation, direct-main CI/deploy, Mac Studio runtime
+proof, real Bybit spot testnet fill/status/cancel reconciliation, retention
+metadata and PITR restore-drill evidence are complete.
 
 ## Scope
 
@@ -61,15 +61,97 @@ Out of scope:
 
 ## Runtime Evidence
 
-Pending. Stage acceptance still requires real boundary proof:
+Direct-main delivery:
 
-- safe testnet lifecycle or adapter simulator plus exchange state lookup for
-  gap recovery;
-- DB rows for order events, fills, funding events, reconciliation runs,
-  retention policy and PITR drill metadata;
-- private stream restart/backfill/dedupe proof;
-- backup/PITR dry-run or target-host equivalent;
-- direct-main CI/deploy and post-deploy smoke.
+- implementation commit `4c2fa626` pushed to `main`;
+- CI run `26848950859` passed;
+- Publish App Image `26849114751`, Deploy Backend `26849114746`, Deploy Web
+  `26849114759` and follow-up Deploy Web `26849126853` passed;
+- `scripts/macos/smoke_prod.sh` passed after deploy and confirmed launchd,
+  Redis, Postgres service state, Tailscale and API unauthenticated boundary.
+
+Mac Studio readiness and schema:
+
+- `GET http://127.0.0.1:9206/health/ready` returned
+  `status=ready`, `status_reason=all_dependencies_ready`,
+  `adapter_mode=testnet`;
+- dependencies included `adapter=testnet_adapters_ready`,
+  `ledger_pitr=pitr_restore_verified`, Redis stream length `12`,
+  pre-existing pending count `1`, DLQ length `1`, clock drift `0.057 ms` and
+  Postgres heartbeat `ready`;
+- Alembic head was `20260602_0029`;
+- `to_regclass` found `execution_order_events`, `execution_fills`,
+  `execution_funding_events`, `execution_reconciliation_runs`,
+  `execution_ledger_retention_policies` and
+  `execution_ledger_pitr_drills`;
+- ledger counts after the probes were `execution_orders=9`,
+  `execution_order_events=10`, `execution_fills=1`,
+  `execution_funding_events=0`, `execution_reconciliation_runs=3`,
+  `execution_ledger_retention_policies=5` and
+  `execution_ledger_pitr_drills=1`.
+
+Controlled Bybit spot testnet probes:
+
+| Probe | Boundary | Result |
+|---|---|---|
+| `stage15-market-fill-probe-20260603-03` | Created an `ops_test` source event and accepted market buy intent through the same Postgres repository and Redis dispatch transport as the API path, then executed `POST /internal/v1/run-once`. | Intent persisted as `dispatched/redis_xadd_ok`; provider order id was present; status lookup returned `filled`; one normalized fill was recorded with provider trade id present, price `64625.200000000000`, quantity `0.000092000000`, fee `0.000000165600 BTC`; reconciliation recorded `matched/spot_order_status_and_fills_matched` with `fill_count=1`. The later cancel attempt returned adapter reason `exchange_ret_code_170213` because the market order was already filled, and a second reconciliation row recorded `pending/adapter_error_reconciliation_pending`. |
+| `stage15-limit-cancel-probe-20260603-01` | Created an `ops_test` source event and accepted low limit buy intent through Redis dispatch, then executed `POST /internal/v1/run-once`. | `run-once` returned HTTP `200` with `read_count=1`, `observed_count=1`, `submitted_count=1`, `adapter_error_count=0`, `acked_count=1`; `execution_orders` recorded `cancelled/cancel_requested` with provider order id, submit, status and cancel timestamps present; reconciliation recorded `matched/spot_order_status_matched` with `fill_count=0`. |
+
+Order event and observation evidence:
+
+- market fill probe wrote append-only order events
+  `submit_pending`, `private_stream_backfill`, `submitted`, `status_checked`
+  and `adapter_error`;
+- limit cancel probe wrote append-only order events `submit_pending`,
+  `private_stream_backfill`, `submitted`, `status_checked` and `cancelled`;
+- `exchange_execution_request_observations` recorded
+  `adapter_error/exchange_ret_code_170213` for Redis message
+  `1780436341228-0` and
+  `testnet_submitted/testnet_submit_status_cancel_recorded` for Redis message
+  `1780436388341-0`;
+- Redis scan over the latest 15 request, retry and DLQ stream entries reported
+  `0` hits for secret-like terms.
+
+Retention and PITR proof:
+
+- retention policies were seeded for `execution_orders`,
+  `execution_order_events`, `execution_fills`, `execution_funding_events` and
+  `execution_reconciliation_runs`, all with `retention_days=2555`,
+  `archive_before_purge=true`, `pitr_required=true`, `status=configured`;
+- production database role cannot create databases, so the restore drill used
+  a real `pg_dump` / `pg_restore` into an isolated temporary local Postgres
+  cluster on Mac Studio;
+- `execution_ledger_pitr_drills` recorded
+  `verified/stage15_temp_cluster_restore_verified`, method
+  `pg_dump_pg_restore`, restore target `temporary_local_cluster`, restored row
+  counts `execution_orders=7`, `execution_order_events=0`,
+  `execution_fills=0`, `execution_funding_events=0`,
+  `execution_reconciliation_runs=0`,
+  `execution_ledger_retention_policies=5`;
+- `ROEHUB_EXECUTION_PITR_VERIFIED=true` was set in the Mac Studio runtime env
+  after the restore proof and `com.roehub.exchange-execution` was restarted;
+  readiness then reported `ledger_pitr=pitr_restore_verified`.
+
+Metrics:
+
+- `/metrics` exposed
+  `exchange_execution_ready{status="ready",reason="all_dependencies_ready"} 1`;
+- dependency gauges included
+  `exchange_execution_dependency_ready{dependency="ledger_pitr",status="ready",reason="pitr_restore_verified"} 1`;
+- order/reconciliation metrics included
+  `exchange_execution_testnet_order_total{exchange="bybit",reason="submitted"} 2`,
+  `exchange_execution_private_stream_total{exchange="bybit",reason="private_ws_auth_probe_ready"} 2`,
+  `execution_reconciliation_total{status="matched",reason="spot_order_status_and_fills_matched"} 1`,
+  `execution_reconciliation_total{status="matched",reason="spot_order_status_matched"} 1`
+  and
+  `execution_reconciliation_total{status="pending",reason="adapter_error_reconciliation_pending"} 1`.
+
+Residual risk:
+
+- futures funding facts remain unproven with real provider data in Stage 15;
+  the code records `funding_reconciliation_pending` for non-spot orders without
+  funding facts and Stage 16/17 must not treat futures funding/PnL as complete
+  until a futures funding boundary is exercised.
 
 ## Contract Impact
 
@@ -104,8 +186,9 @@ bounded to status/reason/exchange.
 
 ## Handoff To Stage 16
 
-Stage 16 must not treat Stage 15 as accepted until runtime proof, PITR proof,
-direct-main delivery and deploy evidence are appended here and in the
-iteration ledger. Once accepted, producers can rely on a single dispatch path
-that records order events, fills and reconciliation state before operator/user
-notification work.
+Stage 16 can start. Producers must continue to use the single execution
+ingress, risk and Redis dispatch path so `exchange-execution` records order
+events, fills and reconciliation state before operator/user notification work.
+Stage 16 must preserve the Stage 15 limitation that real futures funding
+boundary proof is still pending and should not emit complete futures
+funding/PnL notifications without that evidence.
