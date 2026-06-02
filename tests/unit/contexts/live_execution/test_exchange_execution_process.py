@@ -26,6 +26,7 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionFillFact,
     ExecutionIntent,
 )
 from trading.shared_kernel.primitives import UserId
@@ -216,6 +217,11 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
     assert order_repository.orders[intent.intent_id].exchange_order_id == "order-1"
     assert process_repository.observations[0].status == "testnet_submitted"
     assert order_repository.private_stream_sessions[intent.exchange_connection_id].status == "ready"
+    assert len(order_repository.order_events) == 5
+    assert len(order_repository.fills) == 1
+    assert len(order_repository.reconciliation_runs) == 1
+    assert order_repository.reconciliation_runs[0].status == "matched"
+    assert order_repository.reconciliation_runs[0].reason == "spot_order_status_and_fills_matched"
     assert adapter.submitted == 1
 
 
@@ -256,6 +262,7 @@ def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
     assert result.acked_count == 1
     assert order_repository.orders[intent.intent_id].status == "guard_rejected"
     assert order_repository.orders[intent.intent_id].status_reason == "mainnet_hard_block"
+    assert order_repository.order_events[0].event_type == "guard_rejected"
     assert process_repository.observations[0].status == "guard_rejected"
 
 
@@ -370,6 +377,18 @@ class _Adapter:
             checked_at=_NOW,
             latency_ms=1.0,
             metadata={"provider": self.exchange_name},
+            fills=(
+                ExecutionFillFact(
+                    provider_trade_id="trade-1",
+                    price=Decimal("20"),
+                    quantity=Decimal("0.01"),
+                    fee_amount=Decimal("0.001"),
+                    fee_asset="USDT",
+                    filled_at=_NOW,
+                    liquidity="taker",
+                    metadata={"provider": self.exchange_name},
+                ),
+            ),
         )
 
     def cancel_order(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Mapping
@@ -17,8 +17,21 @@ ExchangeExecutionOrderStatus = Literal[
     "cancelled",
     "adapter_error",
     "unknown",
+    "reconciled",
 ]
 ExchangePrivateStreamStatus = Literal["ready", "degraded", "not_ready"]
+ExecutionOrderEventType = Literal[
+    "guard_rejected",
+    "submit_pending",
+    "submitted",
+    "status_checked",
+    "cancelled",
+    "adapter_error",
+    "private_stream_backfill",
+    "reconciled",
+]
+ExecutionReconciliationStatus = Literal["matched", "mismatch", "pending", "failed"]
+ExecutionPitrDrillStatus = Literal["verified", "blocked", "failed"]
 
 
 @dataclass(frozen=True, repr=False, slots=True)
@@ -101,6 +114,8 @@ class ExchangeOrderStatusResult:
     checked_at: datetime
     latency_ms: float
     metadata: Mapping[str, int | float | str]
+    fills: tuple["ExecutionFillFact", ...] = ()
+    funding_events: tuple["ExecutionFundingFact", ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +138,136 @@ class ExchangePrivateStreamSession:
     opened_at: datetime
     keepalive_at: datetime | None
     expires_at: datetime | None
+    metadata: Mapping[str, int | float | str]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionFillFact:
+    provider_trade_id: str
+    price: Decimal
+    quantity: Decimal
+    fee_amount: Decimal
+    fee_asset: str
+    filled_at: datetime
+    liquidity: str | None = None
+    metadata: Mapping[str, int | float | str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.provider_trade_id.strip():
+            raise ValueError("ExecutionFillFact.provider_trade_id must be non-empty")
+        if self.quantity <= 0:
+            raise ValueError("ExecutionFillFact.quantity must be > 0")
+        if self.price <= 0:
+            raise ValueError("ExecutionFillFact.price must be > 0")
+        if self.fee_amount < 0:
+            raise ValueError("ExecutionFillFact.fee_amount must be >= 0")
+        if not self.fee_asset.strip():
+            raise ValueError("ExecutionFillFact.fee_asset must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionFundingFact:
+    provider_event_id: str
+    amount: Decimal
+    asset: str
+    funding_at: datetime
+    reason: str
+    metadata: Mapping[str, int | float | str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.provider_event_id.strip():
+            raise ValueError("ExecutionFundingFact.provider_event_id must be non-empty")
+        if not self.asset.strip():
+            raise ValueError("ExecutionFundingFact.asset must be non-empty")
+        if not self.reason.strip():
+            raise ValueError("ExecutionFundingFact.reason must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionOrderEvent:
+    event_id: UUID
+    order_id: UUID
+    intent_id: UUID
+    owner_user_id: UserId
+    event_type: ExecutionOrderEventType
+    status: str
+    reason: str
+    provider_order_id: str | None
+    provider_event_id: str | None
+    observed_at: datetime
+    metadata: Mapping[str, int | float | str]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionFill:
+    fill_id: UUID
+    order_id: UUID
+    intent_id: UUID
+    owner_user_id: UserId
+    provider_trade_id: str
+    price: Decimal
+    quantity: Decimal
+    fee_amount: Decimal
+    fee_asset: str
+    filled_at: datetime
+    liquidity: str | None
+    metadata: Mapping[str, int | float | str]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionFundingEvent:
+    funding_event_id: UUID
+    order_id: UUID
+    intent_id: UUID
+    owner_user_id: UserId
+    provider_event_id: str
+    amount: Decimal
+    asset: str
+    funding_at: datetime
+    reason: str
+    metadata: Mapping[str, int | float | str]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionReconciliationRun:
+    reconciliation_run_id: UUID
+    order_id: UUID
+    intent_id: UUID
+    owner_user_id: UserId
+    exchange_name: str
+    environment: str
+    status: ExecutionReconciliationStatus
+    reason: str
+    local_status: str
+    provider_status: str | None
+    fill_count: int
+    funding_event_count: int
+    started_at: datetime
+    completed_at: datetime
+    metadata: Mapping[str, int | float | str]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionLedgerRetentionPolicy:
+    policy_name: str
+    table_name: str
+    partition_key: str
+    retention_days: int
+    archive_before_purge: bool
+    pitr_required: bool
+    checked_at: datetime
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionLedgerPitrDrill:
+    drill_id: UUID
+    target_time: datetime
+    status: ExecutionPitrDrillStatus
+    reason: str
+    verified_at: datetime
+    row_counts: Mapping[str, int]
     metadata: Mapping[str, int | float | str]
 
 

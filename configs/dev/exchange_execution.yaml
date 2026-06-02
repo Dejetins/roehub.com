@@ -41,3 +41,7 @@ exchange_execution:
 
   clock:
     max_drift_ms: 1000
+
+  ledger:
+    pitr_required: false
+    pitr_verified_env: "ROEHUB_EXECUTION_PITR_VERIFIED"

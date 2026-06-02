@@ -55,6 +55,7 @@ _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_EXCHANGE_EXECUTION_CONFIG"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
+_PITR_VERIFIED_KEY = "ROEHUB_EXECUTION_PITR_VERIFIED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,7 @@ class ExchangeExecutionRuntimeSettings:
     adapter_timeout_seconds: float
     transit_address: str
     transit_token: str
+    pitr_verified_env: str
 
 
 class ExchangeExecutionMetrics:
@@ -149,6 +151,18 @@ class ExchangeExecutionMetrics:
             ("exchange",),
             registry=self.registry,
         )
+        self.reconciliation_total = Counter(
+            "execution_reconciliation_total",
+            "Execution order reconciliation outcomes by status and reason.",
+            ("status", "reason"),
+            registry=self.registry,
+        )
+        self.ledger_backup_restore_total = Counter(
+            "execution_ledger_backup_restore_total",
+            "Money-ledger backup/PITR restore drill outcomes.",
+            ("result", "reason"),
+            registry=self.registry,
+        )
 
     def update_readiness(self, snapshot: Any) -> None:
         self.ready.labels(status=snapshot.status, reason=snapshot.status_reason).set(1)
@@ -200,6 +214,12 @@ class ExchangeExecutionMetrics:
 
     def record_order_latency(self, exchange: str, latency_ms: float) -> None:
         self.submit_latency_ms.labels(exchange=exchange).observe(latency_ms)
+
+    def record_reconciliation(self, status: str, reason: str) -> None:
+        self.reconciliation_total.labels(status=status, reason=reason).inc()
+
+    def record_pitr_drill(self, result: str, reason: str) -> None:
+        self.ledger_backup_restore_total.labels(result=result, reason=reason).inc()
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -374,6 +394,7 @@ def build_runtime(
         on_order_submit=metrics.record_order_submit,
         on_private_stream=metrics.record_private_stream,
         on_order_latency=metrics.record_order_latency,
+        on_reconciliation=metrics.record_reconciliation,
     )
     return service, metrics
 
@@ -396,6 +417,7 @@ def resolve_runtime_settings(
     limiter = _mapping(exchange_execution.get("rate_limit", {}), "exchange_execution.rate_limit")
     clock = _mapping(exchange_execution.get("clock", {}), "exchange_execution.clock")
     adapter = _mapping(exchange_execution.get("adapter", {}), "exchange_execution.adapter")
+    ledger = _mapping(exchange_execution.get("ledger", {}), "exchange_execution.ledger")
 
     raw_fail_fast = environ.get(_STRATEGY_FAIL_FAST_KEY)
     fail_fast = env_name == "prod" if raw_fail_fast is None else _parse_bool(raw_fail_fast)
@@ -434,6 +456,12 @@ def resolve_runtime_settings(
         rate_limit_burst=_positive_int(str(limiter.get("burst", "10")), "rate_limit.burst"),
         enabled_exchanges=_string_tuple(adapter.get("enabled_exchanges", ("binance", "bybit"))),
         cancel_after_submit=_parse_bool(str(adapter.get("cancel_after_submit", "true"))),
+        ledger_pitr_required=_parse_bool(
+            str(ledger.get("pitr_required", "true" if env_name == "prod" else "false"))
+        ),
+        ledger_pitr_verified=_parse_bool(
+            environ.get(str(ledger.get("pitr_verified_env", _PITR_VERIFIED_KEY)), "false")
+        ),
         fail_fast=fail_fast,
     )
     if env_name == "prod":
@@ -470,6 +498,7 @@ def resolve_runtime_settings(
         ),
         transit_address=environ.get("OPENBAO_ADDR", "").strip(),
         transit_token=environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "").strip(),
+        pitr_verified_env=str(ledger.get("pitr_verified_env", _PITR_VERIFIED_KEY)),
     )
 
 

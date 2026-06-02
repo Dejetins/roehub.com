@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from time import perf_counter
 from typing import Any, Mapping
 from uuid import UUID
@@ -22,6 +23,7 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionFillFact,
 )
 
 _RECV_WINDOW = "5000"
@@ -93,6 +95,12 @@ class BinanceTestnetOrderAdapter:
             checked_at=observed_at,
             latency_ms=_elapsed_ms(started),
             metadata={"provider": "binance", "http_method": "GET"},
+            fills=_binance_order_fills(
+                command=command,
+                exchange_order_id=exchange_order_id,
+                credential=secret,
+                timeout_seconds=self.timeout_seconds,
+            ),
         )
 
     def cancel_order(
@@ -234,6 +242,12 @@ class BybitTestnetOrderAdapter:
             checked_at=observed_at,
             latency_ms=_elapsed_ms(started),
             metadata={"provider": "bybit", "http_method": "GET"},
+            fills=_bybit_order_fills(
+                command=command,
+                exchange_order_id=exchange_order_id,
+                credential=secret,
+                timeout_seconds=self.timeout_seconds,
+            ),
         )
 
     def cancel_order(
@@ -351,6 +365,31 @@ def _bybit_signed_json(
     )
 
 
+def _binance_signed_payload(
+    *,
+    method: str,
+    base_url: str,
+    path: str,
+    params: Mapping[str, object],
+    credential: ExchangeExecutionCredential,
+    timeout_seconds: float,
+) -> Any:
+    signed = {**params, "recvWindow": _RECV_WINDOW, "timestamp": str(int(time.time() * 1000))}
+    query = urllib.parse.urlencode(signed)
+    signature = hmac.new(
+        credential.api_secret.encode("utf-8"),
+        query.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    url = f"{base_url}{path}?{query}&signature={signature}"
+    return _request_json_payload(
+        method=method,
+        url=url,
+        headers={"X-MBX-APIKEY": credential.api_key},
+        timeout_seconds=timeout_seconds,
+    )
+
+
 def _request_json(
     *,
     method: str,
@@ -384,6 +423,32 @@ def _request_json(
     if "retCode" in payload and int(payload.get("retCode", 0)) != 0:
         raise ExchangeOrderAdapterError(reason=f"exchange_ret_code_{payload.get('retCode')}")
     return payload
+
+
+def _request_json_payload(
+    *,
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    timeout_seconds: float,
+) -> Any:
+    request = urllib.request.Request(url=url, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raise ExchangeOrderAdapterError(reason=f"exchange_http_{exc.code}") from exc
+    except TimeoutError as exc:
+        raise ExchangeOrderAdapterError(
+            reason="exchange_request_timeout",
+            unknown_state=True,
+        ) from exc
+    except OSError as exc:
+        raise ExchangeOrderAdapterError(reason="exchange_request_failed") from exc
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ExchangeOrderAdapterError(reason="exchange_response_invalid") from exc
 
 
 def _get_json(*, url: str, headers: dict[str, str], timeout_seconds: float) -> dict[str, Any]:
@@ -483,6 +548,134 @@ def _bybit_result(payload: Mapping[str, Any]) -> Mapping[str, Any]:
     if not isinstance(result, Mapping):
         raise ExchangeOrderAdapterError(reason="exchange_response_invalid")
     return result
+
+
+def _binance_order_fills(
+    *,
+    command: ExchangeOrderCommand,
+    exchange_order_id: str,
+    credential: ExchangeExecutionCredential,
+    timeout_seconds: float,
+) -> tuple[ExecutionFillFact, ...]:
+    base_url, _path = _binance_base_and_order_path(command)
+    trades_path = "/api/v3/myTrades" if command.market_type == "spot" else "/fapi/v1/userTrades"
+    try:
+        payload = _binance_signed_payload(
+            method="GET",
+            base_url=base_url,
+            path=trades_path,
+            params={"symbol": _symbol(command), "orderId": exchange_order_id},
+            credential=credential,
+            timeout_seconds=timeout_seconds,
+        )
+    except ExchangeOrderAdapterError:
+        return ()
+    if not isinstance(payload, list):
+        return ()
+    fills: list[ExecutionFillFact] = []
+    for row in payload:
+        if not isinstance(row, Mapping):
+            continue
+        trade_id = str(row.get("id") or row.get("tradeId") or "")
+        price = _decimal_from(row.get("price"))
+        quantity = _decimal_from(row.get("qty"))
+        fee = _decimal_from(row.get("commission"), default="0")
+        fee_asset = str(row.get("commissionAsset") or row.get("commissionAsset".lower()) or "")
+        timestamp = _datetime_from_millis(row.get("time"))
+        if not trade_id or price is None or quantity is None or not fee_asset or timestamp is None:
+            continue
+        fills.append(
+            ExecutionFillFact(
+                provider_trade_id=trade_id,
+                price=price,
+                quantity=quantity,
+                fee_amount=fee or Decimal("0"),
+                fee_asset=fee_asset,
+                filled_at=timestamp,
+                liquidity=_maker_taker(row.get("isMaker")),
+                metadata={"provider": "binance"},
+            )
+        )
+    return tuple(fills)
+
+
+def _bybit_order_fills(
+    *,
+    command: ExchangeOrderCommand,
+    exchange_order_id: str,
+    credential: ExchangeExecutionCredential,
+    timeout_seconds: float,
+) -> tuple[ExecutionFillFact, ...]:
+    try:
+        payload = _bybit_signed_json(
+            method="GET",
+            path="/v5/execution/list",
+            params={
+                "category": _bybit_category(command),
+                "symbol": _symbol(command),
+                "orderId": exchange_order_id,
+            },
+            credential=credential,
+            timeout_seconds=timeout_seconds,
+        )
+    except ExchangeOrderAdapterError:
+        return ()
+    result = _bybit_result(payload)
+    rows = result.get("list")
+    if not isinstance(rows, list):
+        return ()
+    fills: list[ExecutionFillFact] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        trade_id = str(row.get("execId") or "")
+        price = _decimal_from(row.get("execPrice"))
+        quantity = _decimal_from(row.get("execQty"))
+        fee = _decimal_from(row.get("execFee"), default="0")
+        fee_asset = str(row.get("feeCurrency") or row.get("feeRate") or "UNKNOWN")
+        timestamp = _datetime_from_millis(row.get("execTime"))
+        if not trade_id or price is None or quantity is None or timestamp is None:
+            continue
+        fills.append(
+            ExecutionFillFact(
+                provider_trade_id=trade_id,
+                price=price,
+                quantity=quantity,
+                fee_amount=fee or Decimal("0"),
+                fee_asset=fee_asset,
+                filled_at=timestamp,
+                liquidity=str(row.get("execType") or "") or None,
+                metadata={"provider": "bybit"},
+            )
+        )
+    return tuple(fills)
+
+
+def _decimal_from(value: object, *, default: str | None = None) -> Decimal | None:
+    if value is None:
+        return Decimal(default) if default is not None else None
+    text = str(value).strip()
+    if not text:
+        return Decimal(default) if default is not None else None
+    return Decimal(text)
+
+
+def _datetime_from_millis(value: object) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        millis = int(str(value))
+    except ValueError:
+        return None
+    return datetime.fromtimestamp(millis / 1000, tz=UTC)
+
+
+def _maker_taker(value: object) -> str | None:
+    if value is True:
+        return "maker"
+    if value is False:
+        return "taker"
+    return None
 
 
 def _elapsed_ms(started: float) -> float:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Mapping
 from uuid import UUID, uuid4
 
 from trading.contexts.live_execution.application.ports import (
@@ -21,11 +21,15 @@ from trading.contexts.live_execution.domain import (
     ExchangeExecutionDependencyHealth,
     ExchangeExecutionHealthSnapshot,
     ExchangeExecutionObservationStatus,
+    ExchangeExecutionOrderRecord,
     ExchangeExecutionProcessHeartbeat,
     ExchangeExecutionProcessStatus,
     ExchangeExecutionRequestObservation,
     ExchangeOrderCommand,
+    ExchangeOrderStatusResult,
     ExecutionIntent,
+    ExecutionOrderEvent,
+    ExecutionReconciliationRun,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -48,6 +52,8 @@ class ExchangeExecutionProcessConfig:
     rate_limit_burst: int = 10
     enabled_exchanges: tuple[str, ...] = ("binance", "bybit")
     cancel_after_submit: bool = True
+    ledger_pitr_required: bool = False
+    ledger_pitr_verified: bool = False
     fail_fast: bool = False
 
     def __post_init__(self) -> None:
@@ -104,6 +110,7 @@ class ExchangeExecutionProcessService:
         on_order_submit: Callable[[str, str], None] | None = None,
         on_private_stream: Callable[[str, str], None] | None = None,
         on_order_latency: Callable[[str, float], None] | None = None,
+        on_reconciliation: Callable[[str, str], None] | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExchangeExecutionProcessService requires repository")
@@ -126,6 +133,7 @@ class ExchangeExecutionProcessService:
         self._on_order_submit = on_order_submit
         self._on_private_stream = on_private_stream
         self._on_order_latency = on_order_latency
+        self._on_reconciliation = on_reconciliation
 
     def readiness(self) -> ExchangeExecutionHealthSnapshot:
         now = self._clock.now()
@@ -149,6 +157,7 @@ class ExchangeExecutionProcessService:
                     "burst": self._config.rate_limit_burst,
                 },
             ),
+            self._ledger_pitr_dependency(),
         ]
         dependencies.extend(self._redis_dependencies())
         status, reason = _rollup_status(dependencies=dependencies)
@@ -311,6 +320,28 @@ class ExchangeExecutionProcessService:
             },
         )
 
+    def _ledger_pitr_dependency(self) -> ExchangeExecutionDependencyHealth:
+        if not self._config.ledger_pitr_required:
+            return ExchangeExecutionDependencyHealth(
+                name="ledger_pitr",
+                status="ready",
+                reason="pitr_not_required_for_env",
+                metadata={"required": 0},
+            )
+        if self._config.ledger_pitr_verified:
+            return ExchangeExecutionDependencyHealth(
+                name="ledger_pitr",
+                status="ready",
+                reason="pitr_restore_verified",
+                metadata={"required": 1},
+            )
+        return ExchangeExecutionDependencyHealth(
+            name="ledger_pitr",
+            status="not_ready" if self._config.fail_fast else "degraded",
+            reason="pitr_restore_not_verified",
+            metadata={"required": 1},
+        )
+
     def _redis_dependencies(self) -> tuple[ExchangeExecutionDependencyHealth, ...]:
         if self._consumer is None:
             return (
@@ -454,9 +485,16 @@ class ExchangeExecutionProcessService:
         adapter = self._order_adapters.get(exchange_name)
         if exchange_name not in self._config.enabled_exchanges or adapter is None:
             command = _command_from_intent(intent=intent, exchange_name=exchange_name)
-            self._order_repository.record_guard_rejection(
+            order = self._order_repository.record_guard_rejection(
                 command=command,
                 reason="exchange_adapter_not_enabled",
+            )
+            self._record_order_event(
+                order=order,
+                event_type="guard_rejected",
+                status="guard_rejected",
+                reason="exchange_adapter_not_enabled",
+                metadata={"exchange": exchange_name},
             )
             return "guard_rejected", "exchange_adapter_not_enabled"
         command = _command_from_intent(intent=intent, exchange_name=exchange_name)
@@ -469,7 +507,17 @@ class ExchangeExecutionProcessService:
                 exchange_connection_id=intent.exchange_connection_id,
             )
         except ExchangeExecutionCredentialUnavailable as error:
-            self._order_repository.record_guard_rejection(command=command, reason=error.reason)
+            order = self._order_repository.record_guard_rejection(
+                command=command,
+                reason=error.reason,
+            )
+            self._record_order_event(
+                order=order,
+                event_type="guard_rejected",
+                status="guard_rejected",
+                reason=error.reason,
+                metadata={"guard": "credential"},
+            )
             return "guard_rejected", error.reason
         guard_reason = _connection_guard_reason(intent=intent, connection=connection)
         if guard_reason is not None:
@@ -478,9 +526,16 @@ class ExchangeExecutionProcessService:
                 exchange_name=connection.exchange_name,
                 environment=connection.environment,
             )
-            self._order_repository.record_guard_rejection(
+            order = self._order_repository.record_guard_rejection(
                 command=guarded_command,
                 reason=guard_reason,
+            )
+            self._record_order_event(
+                order=order,
+                event_type="guard_rejected",
+                status="guard_rejected",
+                reason=guard_reason,
+                metadata={"guard": "connection"},
             )
             return "guard_rejected", guard_reason
         command = _command_from_intent(
@@ -490,14 +545,39 @@ class ExchangeExecutionProcessService:
         )
         clock_reason = self._exchange_clock_guard_reason(adapter=adapter)
         if clock_reason is not None:
-            self._order_repository.record_guard_rejection(command=command, reason=clock_reason)
+            order = self._order_repository.record_guard_rejection(
+                command=command,
+                reason=clock_reason,
+            )
+            self._record_order_event(
+                order=order,
+                event_type="guard_rejected",
+                status="guard_rejected",
+                reason=clock_reason,
+                metadata={"guard": "clock"},
+            )
             return "guard_rejected", clock_reason
-        self._order_repository.record_submit_pending(command=command)
+        pending_order = self._order_repository.record_submit_pending(command=command)
+        self._record_order_event(
+            order=pending_order,
+            event_type="submit_pending",
+            status="submit_pending",
+            reason="submit_pending",
+            metadata={"source": "redis_dispatch"},
+        )
         try:
             session = adapter.ensure_private_stream_session(connection=connection)
             self._order_repository.record_private_stream_session(
                 connection_id=connection.connection_id,
                 session=session,
+            )
+            self._record_order_event(
+                order=pending_order,
+                event_type="private_stream_backfill",
+                status=session.status,
+                reason=session.status_reason,
+                provider_event_id=str(session.session_id),
+                metadata=session.metadata,
             )
             self._record_private_stream(
                 exchange=connection.exchange_name,
@@ -507,10 +587,19 @@ class ExchangeExecutionProcessService:
                 command=command,
                 credential=connection.credential,
             )
-            self._order_repository.record_submit_result(
+            submitted_order = self._order_repository.record_submit_result(
                 intent_id=intent.intent_id,
                 result=submitted,
             )
+            if submitted_order is not None:
+                self._record_order_event(
+                    order=submitted_order,
+                    event_type="submitted",
+                    status="submitted",
+                    reason=submitted.exchange_status,
+                    provider_event_id=submitted.exchange_order_id,
+                    metadata=submitted.metadata,
+                )
             self._record_order_submit(
                 exchange=connection.exchange_name,
                 reason=submitted.exchange_status,
@@ -524,17 +613,43 @@ class ExchangeExecutionProcessService:
                 exchange_order_id=submitted.exchange_order_id,
                 credential=connection.credential,
             )
-            self._order_repository.record_status_result(intent_id=intent.intent_id, result=status)
+            status_order = self._order_repository.record_status_result(
+                intent_id=intent.intent_id,
+                result=status,
+            )
+            if status_order is not None:
+                self._record_order_event(
+                    order=status_order,
+                    event_type="status_checked",
+                    status="status_checked",
+                    reason=status.exchange_status,
+                    provider_event_id=status.exchange_order_id,
+                    metadata=status.metadata,
+                )
+                self._record_reconciliation(
+                    order=status_order,
+                    status_result=status,
+                    reason=_reconciliation_reason(order=status_order, status_result=status),
+                )
             if self._config.cancel_after_submit:
                 cancelled = adapter.cancel_order(
                     command=command,
                     exchange_order_id=submitted.exchange_order_id,
                     credential=connection.credential,
                 )
-                self._order_repository.record_cancel_result(
+                cancelled_order = self._order_repository.record_cancel_result(
                     intent_id=intent.intent_id,
                     result=cancelled,
                 )
+                if cancelled_order is not None:
+                    self._record_order_event(
+                        order=cancelled_order,
+                        event_type="cancelled",
+                        status="cancelled",
+                        reason=cancelled.exchange_status,
+                        provider_event_id=cancelled.exchange_order_id,
+                        metadata=cancelled.metadata,
+                    )
                 self._record_order_latency(
                     exchange=connection.exchange_name,
                     latency_ms=cancelled.latency_ms,
@@ -545,9 +660,112 @@ class ExchangeExecutionProcessService:
                 if error.unknown_state
                 else error.reason
             )
-            self._order_repository.record_adapter_error(intent_id=intent.intent_id, reason=reason)
+            order = self._order_repository.record_adapter_error(
+                intent_id=intent.intent_id,
+                reason=reason,
+            )
+            if order is not None:
+                self._record_order_event(
+                    order=order,
+                    event_type="adapter_error",
+                    status="adapter_error",
+                    reason=reason,
+                    metadata={"unknown_state": int(error.unknown_state)},
+                )
+                self._record_reconciliation(
+                    order=order,
+                    status_result=None,
+                    reason=(
+                        "unknown_needs_reconciliation"
+                        if error.unknown_state
+                        else "adapter_error_reconciliation_pending"
+                    ),
+                )
             return "adapter_error", reason
         return "testnet_submitted", "testnet_submit_status_cancel_recorded"
+
+    def _record_order_event(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        event_type: str,
+        status: str,
+        reason: str,
+        provider_event_id: str | None = None,
+        metadata: object | None = None,
+    ) -> None:
+        if self._order_repository is None:
+            return
+        self._order_repository.record_order_event(
+            event=ExecutionOrderEvent(
+                event_id=uuid4(),
+                order_id=order.order_id,
+                intent_id=order.intent_id,
+                owner_user_id=order.owner_user_id,
+                event_type=event_type,  # type: ignore[arg-type]
+                status=status,
+                reason=reason,
+                provider_order_id=order.exchange_order_id,
+                provider_event_id=provider_event_id,
+                observed_at=self._clock.now(),
+                metadata=_bounded_metadata(metadata),
+            )
+        )
+
+    def _record_reconciliation(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        status_result: ExchangeOrderStatusResult | None,
+        reason: str,
+    ) -> None:
+        if self._order_repository is None:
+            return
+        fill_count = 0
+        funding_event_count = 0
+        provider_status = None
+        if status_result is not None:
+            provider_status = status_result.exchange_status
+            for fill in status_result.fills:
+                self._order_repository.record_fill(order=order, fill=fill)
+                fill_count += 1
+            for funding_event in status_result.funding_events:
+                self._order_repository.record_funding_event(
+                    order=order,
+                    funding_event=funding_event,
+                )
+                funding_event_count += 1
+        status = (
+            "matched"
+            if status_result is not None and reason.endswith("_matched")
+            else "pending"
+        )
+        completed_at = self._clock.now()
+        self._order_repository.record_reconciliation_run(
+            run=ExecutionReconciliationRun(
+                reconciliation_run_id=uuid4(),
+                order_id=order.order_id,
+                intent_id=order.intent_id,
+                owner_user_id=order.owner_user_id,
+                exchange_name=order.exchange_name,
+                environment=order.environment,
+                status=status,  # type: ignore[arg-type]
+                reason=reason,
+                local_status=order.status,
+                provider_status=provider_status,
+                fill_count=fill_count,
+                funding_event_count=funding_event_count,
+                started_at=completed_at,
+                completed_at=completed_at,
+                metadata={
+                    "spot_funding_not_applicable": int(order.market_type == "spot"),
+                    "funding_pending": int(
+                        order.market_type != "spot" and funding_event_count == 0
+                    ),
+                },
+            )
+        )
+        self._record_reconciliation_metric(status=status, reason=reason)
 
     def _exchange_clock_guard_reason(self, *, adapter: ExchangeOrderAdapter) -> str | None:
         try:
@@ -583,6 +801,10 @@ class ExchangeExecutionProcessService:
     def _record_order_latency(self, *, exchange: str, latency_ms: float) -> None:
         if self._on_order_latency is not None:
             self._on_order_latency(exchange, latency_ms)
+
+    def _record_reconciliation_metric(self, *, status: str, reason: str) -> None:
+        if self._on_reconciliation is not None:
+            self._on_reconciliation(status, reason)
 
 
 def _rollup_status(
@@ -643,3 +865,27 @@ def _connection_guard_reason(
     if market_type != intent.market_type:
         return "exchange_config_mismatch"
     return None
+
+
+def _reconciliation_reason(
+    *,
+    order: ExchangeExecutionOrderRecord,
+    status_result: ExchangeOrderStatusResult,
+) -> str:
+    if order.market_type == "spot":
+        if status_result.fills:
+            return "spot_order_status_and_fills_matched"
+        return "spot_order_status_matched"
+    if status_result.funding_events:
+        return "futures_order_status_fills_funding_matched"
+    return "funding_reconciliation_pending"
+
+
+def _bounded_metadata(value: object | None) -> Mapping[str, int | float | str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): item
+        for key, item in value.items()
+        if isinstance(item, (int, float, str))
+    }

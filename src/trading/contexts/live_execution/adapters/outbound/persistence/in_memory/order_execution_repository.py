@@ -11,6 +11,14 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionFill,
+    ExecutionFillFact,
+    ExecutionFundingEvent,
+    ExecutionFundingFact,
+    ExecutionLedgerPitrDrill,
+    ExecutionLedgerRetentionPolicy,
+    ExecutionOrderEvent,
+    ExecutionReconciliationRun,
 )
 
 
@@ -18,6 +26,12 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
     def __init__(self) -> None:
         self.orders: dict[UUID, ExchangeExecutionOrderRecord] = {}
         self.private_stream_sessions: dict[UUID, ExchangePrivateStreamSession] = {}
+        self.order_events: list[ExecutionOrderEvent] = []
+        self.fills: dict[tuple[UUID, str], ExecutionFill] = {}
+        self.funding_events: dict[tuple[UUID, str], ExecutionFundingEvent] = {}
+        self.reconciliation_runs: list[ExecutionReconciliationRun] = []
+        self.retention_policies: dict[str, ExecutionLedgerRetentionPolicy] = {}
+        self.pitr_drills: list[ExecutionLedgerPitrDrill] = []
 
     def get_by_intent(self, *, intent_id: UUID) -> ExchangeExecutionOrderRecord | None:
         return self.orders.get(intent_id)
@@ -132,6 +146,90 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
     ) -> ExchangePrivateStreamSession:
         self.private_stream_sessions[connection_id] = session
         return session
+
+    def record_order_event(self, *, event: ExecutionOrderEvent) -> ExecutionOrderEvent:
+        existing = next(
+            (
+                item
+                for item in self.order_events
+                if item.order_id == event.order_id
+                and item.event_type == event.event_type
+                and item.provider_event_id == event.provider_event_id
+            ),
+            None,
+        )
+        if existing is not None:
+            return existing
+        self.order_events.append(event)
+        return event
+
+    def record_fill(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        fill: ExecutionFillFact,
+    ) -> ExecutionFill:
+        key = (order.order_id, fill.provider_trade_id)
+        existing = self.fills.get(key)
+        if existing is not None:
+            return existing
+        record = ExecutionFill(
+            fill_id=uuid4(),
+            order_id=order.order_id,
+            intent_id=order.intent_id,
+            owner_user_id=order.owner_user_id,
+            provider_trade_id=fill.provider_trade_id,
+            price=fill.price,
+            quantity=fill.quantity,
+            fee_amount=fill.fee_amount,
+            fee_asset=fill.fee_asset,
+            filled_at=fill.filled_at,
+            liquidity=fill.liquidity,
+            metadata=dict(fill.metadata),
+        )
+        self.fills[key] = record
+        return record
+
+    def record_funding_event(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        funding_event: ExecutionFundingFact,
+    ) -> ExecutionFundingEvent:
+        key = (order.order_id, funding_event.provider_event_id)
+        existing = self.funding_events.get(key)
+        if existing is not None:
+            return existing
+        record = ExecutionFundingEvent(
+            funding_event_id=uuid4(),
+            order_id=order.order_id,
+            intent_id=order.intent_id,
+            owner_user_id=order.owner_user_id,
+            provider_event_id=funding_event.provider_event_id,
+            amount=funding_event.amount,
+            asset=funding_event.asset,
+            funding_at=funding_event.funding_at,
+            reason=funding_event.reason,
+            metadata=dict(funding_event.metadata),
+        )
+        self.funding_events[key] = record
+        return record
+
+    def record_reconciliation_run(
+        self, *, run: ExecutionReconciliationRun
+    ) -> ExecutionReconciliationRun:
+        self.reconciliation_runs.append(run)
+        return run
+
+    def record_retention_policy(
+        self, *, policy: ExecutionLedgerRetentionPolicy
+    ) -> ExecutionLedgerRetentionPolicy:
+        self.retention_policies[policy.policy_name] = policy
+        return policy
+
+    def record_pitr_drill(self, *, drill: ExecutionLedgerPitrDrill) -> ExecutionLedgerPitrDrill:
+        self.pitr_drills.append(drill)
+        return drill
 
 
 def _base_record(

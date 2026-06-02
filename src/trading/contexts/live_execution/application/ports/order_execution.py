@@ -11,6 +11,14 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionFill,
+    ExecutionFillFact,
+    ExecutionFundingEvent,
+    ExecutionFundingFact,
+    ExecutionLedgerPitrDrill,
+    ExecutionLedgerRetentionPolicy,
+    ExecutionOrderEvent,
+    ExecutionReconciliationRun,
 )
 from trading.shared_kernel.primitives import UserId
 
@@ -108,3 +116,29 @@ class ExchangeExecutionOrderRepository(Protocol):
         connection_id: UUID,
         session: ExchangePrivateStreamSession,
     ) -> ExchangePrivateStreamSession: ...
+
+    def record_order_event(self, *, event: ExecutionOrderEvent) -> ExecutionOrderEvent: ...
+
+    def record_fill(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        fill: ExecutionFillFact,
+    ) -> ExecutionFill: ...
+
+    def record_funding_event(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        funding_event: ExecutionFundingFact,
+    ) -> ExecutionFundingEvent: ...
+
+    def record_reconciliation_run(
+        self, *, run: ExecutionReconciliationRun
+    ) -> ExecutionReconciliationRun: ...
+
+    def record_retention_policy(
+        self, *, policy: ExecutionLedgerRetentionPolicy
+    ) -> ExecutionLedgerRetentionPolicy: ...
+
+    def record_pitr_drill(self, *, drill: ExecutionLedgerPitrDrill) -> ExecutionLedgerPitrDrill: ...

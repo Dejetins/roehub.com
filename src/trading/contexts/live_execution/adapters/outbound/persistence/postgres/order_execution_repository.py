@@ -14,6 +14,14 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionFill,
+    ExecutionFillFact,
+    ExecutionFundingEvent,
+    ExecutionFundingFact,
+    ExecutionLedgerPitrDrill,
+    ExecutionLedgerRetentionPolicy,
+    ExecutionOrderEvent,
+    ExecutionReconciliationRun,
 )
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
@@ -220,6 +228,243 @@ class PostgresExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
         )
         return session
 
+    def record_order_event(self, *, event: ExecutionOrderEvent) -> ExecutionOrderEvent:
+        self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_order_events
+            (
+                event_id, order_id, intent_id, owner_user_id, event_type, status,
+                reason, provider_order_id, provider_event_id, observed_at, metadata_json
+            )
+            VALUES
+            (
+                %(event_id)s, %(order_id)s, %(intent_id)s, %(owner_user_id)s,
+                %(event_type)s, %(status)s, %(reason)s, %(provider_order_id)s,
+                %(provider_event_id)s, %(observed_at)s, %(metadata_json)s::jsonb
+            )
+            ON CONFLICT (order_id, event_type, provider_event_id_key) DO NOTHING
+            RETURNING event_id
+            """,
+            parameters={
+                "event_id": str(event.event_id),
+                "order_id": str(event.order_id),
+                "intent_id": str(event.intent_id),
+                "owner_user_id": str(event.owner_user_id),
+                "event_type": event.event_type,
+                "status": event.status,
+                "reason": event.reason,
+                "provider_order_id": event.provider_order_id,
+                "provider_event_id": event.provider_event_id,
+                "observed_at": event.observed_at,
+                "metadata_json": _metadata_json(event.metadata),
+            },
+        )
+        return event
+
+    def record_fill(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        fill: ExecutionFillFact,
+    ) -> ExecutionFill:
+        row = self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_fills
+            (
+                fill_id, order_id, intent_id, owner_user_id, provider_trade_id,
+                price, quantity, fee_amount, fee_asset, filled_at, liquidity,
+                metadata_json
+            )
+            VALUES
+            (
+                %(fill_id)s, %(order_id)s, %(intent_id)s, %(owner_user_id)s,
+                %(provider_trade_id)s, %(price)s, %(quantity)s, %(fee_amount)s,
+                %(fee_asset)s, %(filled_at)s, %(liquidity)s, %(metadata_json)s::jsonb
+            )
+            ON CONFLICT (order_id, provider_trade_id) DO UPDATE
+            SET price = EXCLUDED.price,
+                quantity = EXCLUDED.quantity,
+                fee_amount = EXCLUDED.fee_amount,
+                fee_asset = EXCLUDED.fee_asset,
+                filled_at = EXCLUDED.filled_at,
+                liquidity = EXCLUDED.liquidity,
+                metadata_json = EXCLUDED.metadata_json
+            RETURNING *
+            """,
+            parameters={
+                "fill_id": str(uuid4()),
+                "order_id": str(order.order_id),
+                "intent_id": str(order.intent_id),
+                "owner_user_id": str(order.owner_user_id),
+                "provider_trade_id": fill.provider_trade_id,
+                "price": fill.price,
+                "quantity": fill.quantity,
+                "fee_amount": fill.fee_amount,
+                "fee_asset": fill.fee_asset,
+                "filled_at": fill.filled_at,
+                "liquidity": fill.liquidity,
+                "metadata_json": _metadata_json(fill.metadata),
+            },
+        )
+        if row is None:
+            raise RuntimeError("execution fill write returned no row")
+        return _map_fill(row)
+
+    def record_funding_event(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        funding_event: ExecutionFundingFact,
+    ) -> ExecutionFundingEvent:
+        row = self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_funding_events
+            (
+                funding_event_id, order_id, intent_id, owner_user_id,
+                provider_event_id, amount, asset, funding_at, reason, metadata_json
+            )
+            VALUES
+            (
+                %(funding_event_id)s, %(order_id)s, %(intent_id)s,
+                %(owner_user_id)s, %(provider_event_id)s, %(amount)s, %(asset)s,
+                %(funding_at)s, %(reason)s, %(metadata_json)s::jsonb
+            )
+            ON CONFLICT (order_id, provider_event_id) DO UPDATE
+            SET amount = EXCLUDED.amount,
+                asset = EXCLUDED.asset,
+                funding_at = EXCLUDED.funding_at,
+                reason = EXCLUDED.reason,
+                metadata_json = EXCLUDED.metadata_json
+            RETURNING *
+            """,
+            parameters={
+                "funding_event_id": str(uuid4()),
+                "order_id": str(order.order_id),
+                "intent_id": str(order.intent_id),
+                "owner_user_id": str(order.owner_user_id),
+                "provider_event_id": funding_event.provider_event_id,
+                "amount": funding_event.amount,
+                "asset": funding_event.asset,
+                "funding_at": funding_event.funding_at,
+                "reason": funding_event.reason,
+                "metadata_json": _metadata_json(funding_event.metadata),
+            },
+        )
+        if row is None:
+            raise RuntimeError("execution funding event write returned no row")
+        return _map_funding_event(row)
+
+    def record_reconciliation_run(
+        self, *, run: ExecutionReconciliationRun
+    ) -> ExecutionReconciliationRun:
+        self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_reconciliation_runs
+            (
+                reconciliation_run_id, order_id, intent_id, owner_user_id,
+                exchange_name, environment, status, reason, local_status,
+                provider_status, fill_count, funding_event_count, started_at,
+                completed_at, metadata_json
+            )
+            VALUES
+            (
+                %(reconciliation_run_id)s, %(order_id)s, %(intent_id)s,
+                %(owner_user_id)s, %(exchange_name)s, %(environment)s, %(status)s,
+                %(reason)s, %(local_status)s, %(provider_status)s, %(fill_count)s,
+                %(funding_event_count)s, %(started_at)s, %(completed_at)s,
+                %(metadata_json)s::jsonb
+            )
+            RETURNING reconciliation_run_id
+            """,
+            parameters={
+                "reconciliation_run_id": str(run.reconciliation_run_id),
+                "order_id": str(run.order_id),
+                "intent_id": str(run.intent_id),
+                "owner_user_id": str(run.owner_user_id),
+                "exchange_name": run.exchange_name,
+                "environment": run.environment,
+                "status": run.status,
+                "reason": run.reason,
+                "local_status": run.local_status,
+                "provider_status": run.provider_status,
+                "fill_count": run.fill_count,
+                "funding_event_count": run.funding_event_count,
+                "started_at": run.started_at,
+                "completed_at": run.completed_at,
+                "metadata_json": _metadata_json(run.metadata),
+            },
+        )
+        return run
+
+    def record_retention_policy(
+        self, *, policy: ExecutionLedgerRetentionPolicy
+    ) -> ExecutionLedgerRetentionPolicy:
+        self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_ledger_retention_policies
+            (
+                policy_name, table_name, partition_key, retention_days,
+                archive_before_purge, pitr_required, checked_at, status, reason
+            )
+            VALUES
+            (
+                %(policy_name)s, %(table_name)s, %(partition_key)s,
+                %(retention_days)s, %(archive_before_purge)s, %(pitr_required)s,
+                %(checked_at)s, %(status)s, %(reason)s
+            )
+            ON CONFLICT (policy_name) DO UPDATE
+            SET table_name = EXCLUDED.table_name,
+                partition_key = EXCLUDED.partition_key,
+                retention_days = EXCLUDED.retention_days,
+                archive_before_purge = EXCLUDED.archive_before_purge,
+                pitr_required = EXCLUDED.pitr_required,
+                checked_at = EXCLUDED.checked_at,
+                status = EXCLUDED.status,
+                reason = EXCLUDED.reason
+            RETURNING policy_name
+            """,
+            parameters={
+                "policy_name": policy.policy_name,
+                "table_name": policy.table_name,
+                "partition_key": policy.partition_key,
+                "retention_days": policy.retention_days,
+                "archive_before_purge": policy.archive_before_purge,
+                "pitr_required": policy.pitr_required,
+                "checked_at": policy.checked_at,
+                "status": policy.status,
+                "reason": policy.reason,
+            },
+        )
+        return policy
+
+    def record_pitr_drill(self, *, drill: ExecutionLedgerPitrDrill) -> ExecutionLedgerPitrDrill:
+        self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_ledger_pitr_drills
+            (
+                drill_id, target_time, status, reason, verified_at,
+                row_counts_json, metadata_json
+            )
+            VALUES
+            (
+                %(drill_id)s, %(target_time)s, %(status)s, %(reason)s,
+                %(verified_at)s, %(row_counts_json)s::jsonb, %(metadata_json)s::jsonb
+            )
+            ON CONFLICT (drill_id) DO NOTHING
+            RETURNING drill_id
+            """,
+            parameters={
+                "drill_id": str(drill.drill_id),
+                "target_time": drill.target_time,
+                "status": drill.status,
+                "reason": drill.reason,
+                "verified_at": drill.verified_at,
+                "row_counts_json": json.dumps(dict(drill.row_counts), sort_keys=True),
+                "metadata_json": _metadata_json(drill.metadata),
+            },
+        )
+        return drill
+
     def _insert_or_update_base(
         self,
         *,
@@ -313,6 +558,38 @@ def _map_order(row: Mapping[str, Any]) -> ExchangeExecutionOrderRecord:
         metadata=_metadata_mapping(row.get("metadata_json")),
         created_at=_datetime(row["created_at"]),
         updated_at=_datetime(row["updated_at"]),
+    )
+
+
+def _map_fill(row: Mapping[str, Any]) -> ExecutionFill:
+    return ExecutionFill(
+        fill_id=UUID(str(row["fill_id"])),
+        order_id=UUID(str(row["order_id"])),
+        intent_id=UUID(str(row["intent_id"])),
+        owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+        provider_trade_id=str(row["provider_trade_id"]),
+        price=Decimal(str(row["price"])),
+        quantity=Decimal(str(row["quantity"])),
+        fee_amount=Decimal(str(row["fee_amount"])),
+        fee_asset=str(row["fee_asset"]),
+        filled_at=_datetime(row["filled_at"]),
+        liquidity=_str_or_none(row.get("liquidity")),
+        metadata=_metadata_mapping(row.get("metadata_json")),
+    )
+
+
+def _map_funding_event(row: Mapping[str, Any]) -> ExecutionFundingEvent:
+    return ExecutionFundingEvent(
+        funding_event_id=UUID(str(row["funding_event_id"])),
+        order_id=UUID(str(row["order_id"])),
+        intent_id=UUID(str(row["intent_id"])),
+        owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+        provider_event_id=str(row["provider_event_id"]),
+        amount=Decimal(str(row["amount"])),
+        asset=str(row["asset"]),
+        funding_at=_datetime(row["funding_at"]),
+        reason=str(row["reason"]),
+        metadata=_metadata_mapping(row.get("metadata_json")),
     )
 
 

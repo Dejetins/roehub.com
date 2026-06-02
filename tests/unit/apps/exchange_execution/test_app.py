@@ -50,3 +50,43 @@ def test_exchange_execution_run_once_reports_redis_unavailable() -> None:
 
     assert response.status_code == 503
     assert response.json()["reason"] == "ConnectionError"
+
+
+def test_exchange_execution_prod_readiness_requires_pitr_verification() -> None:
+    app = create_app(
+        environ={
+            "ROEHUB_ENV": "prod",
+            "ROEHUB_EXCHANGE_EXECUTION_CONFIG": "configs/prod/exchange_execution.yaml",
+            "STRATEGY_FAIL_FAST": "false",
+        }
+    )
+
+    with TestClient(app) as client:
+        ready = client.get("/health/ready")
+
+    assert ready.status_code == 200
+    dependency = next(
+        item for item in ready.json()["dependencies"] if item["name"] == "ledger_pitr"
+    )
+    assert dependency["status"] == "degraded"
+    assert dependency["reason"] == "pitr_restore_not_verified"
+
+
+def test_exchange_execution_prod_readiness_accepts_pitr_verification_marker() -> None:
+    app = create_app(
+        environ={
+            "ROEHUB_ENV": "prod",
+            "ROEHUB_EXCHANGE_EXECUTION_CONFIG": "configs/prod/exchange_execution.yaml",
+            "STRATEGY_FAIL_FAST": "false",
+            "ROEHUB_EXECUTION_PITR_VERIFIED": "true",
+        }
+    )
+
+    with TestClient(app) as client:
+        ready = client.get("/health/ready")
+
+    dependency = next(
+        item for item in ready.json()["dependencies"] if item["name"] == "ledger_pitr"
+    )
+    assert dependency["status"] == "ready"
+    assert dependency["reason"] == "pitr_restore_verified"
