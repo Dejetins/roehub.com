@@ -1,7 +1,7 @@
 ---
 doc: live-execution-stage-16-producer-integrations-notifications
 stage: "16"
-status: in_progress
+status: accepted
 canonical_plan: docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md
 ledger: docs/architecture/live_execution/live-execution-universal-order-gateway-v1-stage-reports/live-execution-universal-order-gateway-v1-iteration-ledger.md
 ---
@@ -12,7 +12,7 @@ Stage 16 adds producer outcome linking and a redacted execution notification
 outbox on top of the Stage 10-15 source-event, risk, Redis dispatch,
 exchange-execution, order, fill, and reconciliation ledgers.
 
-Status: `in_progress`.
+Status: `accepted`.
 
 Previous stage: Stage `15` is accepted in the iteration ledger.
 
@@ -107,25 +107,110 @@ Passed after documentation update:
 - `uv run ruff check src/trading/contexts/strategy src/trading/contexts/live_execution apps tests`
 - `uv run pyright src/trading/contexts/strategy src/trading/contexts/live_execution apps tests`
 - `uv run pytest -q tests/unit/contexts/strategy tests/unit/contexts/live_execution tests/unit/apps`
+  (`421 passed, 3 warnings`)
 - `uv run python -m tools.docs.generate_docs_index --check`
 - `git diff --check`
 
-Pending:
+CI/deploy:
 
-- Runtime API/DB/Redis/browser/Mac Studio acceptance evidence.
+- Commit `89e40026` pushed to `main`.
+- CI `26850850053`: successful.
+- Publish App Image `26850942477`: successful; Docker cache reservation
+  annotation was non-fatal.
+- Deploy Backend `26850942515`: successful.
+- Deploy Web `26850942466` and follow-up `26850986731`: successful.
 
 ## Runtime Evidence
 
-Pending. The stage is not accepted until real boundary calls prove:
+Accepted on Mac Studio after the `main` deployment.
 
-- Strategy, manual, ML, and ops producers create source events through one
-  ingress.
-- Eligible accepted intents dispatch through `execution.requests.v1`.
-- Rejected/no-intent paths do not dispatch.
-- Postgres rows link `source_event_id`, intents, orders/fills/reconciliation,
-  and `execution_notification_outbox`.
-- `/strategies` browser UI renders the signal/source/intent/outcome/notification
-  link.
+Mac Studio deployment and health:
+
+- `/opt/roehub/app` is the launchd runtime copy and contains the Stage 16
+  migration, notification domain module, and `/strategies` UI hooks.
+- `bash scripts/macos/smoke_prod.sh` passed: launchd services were loaded,
+  API unauthorized boundary returned `401`, Postgres returned `1`, Redis
+  returned `PONG`, and Tailscale backend state was `Running`.
+- Production database Alembic version was `20260603_0030`; SQL confirmed
+  `execution_notification_outbox`, `execution_source_events`, and
+  `execution_intents` tables exist.
+
+Runtime producer/API probe:
+
+- Run marker: `stage16-20260602T222018-d29a99c2`.
+- Synthetic strategy:
+  `d6a4633a-1c14-4cc9-8a53-4c8b1693485d`.
+- API/runtime producer calls covered all four source types:
+  `strategy_signal`, `manual_request`, `ml_agent_decision`, and `ops_test`.
+- Strategy ACL adapter call recorded a monitor-only `StrategySignal` as
+  `strategy_signal/no_intent` with reason
+  `stage16_monitor_only_no_intent`.
+- Strategy kill-switch intent was rejected with
+  `risk_reason=kill_switch_closed` and created a
+  `producer_kill_switch` notification.
+- Manual intent was rejected with
+  `risk_reason=manual_recent_auth_required` and created a
+  `producer_rejected` notification.
+- ML intent was rejected with `risk_reason=ml_agent_policy_missing`; this
+  proves ML source decisions do not bypass the risk gate. The same source link
+  also carried a redacted `producer_unknown` notification.
+- Ops accepted intent returned `status=dispatched`,
+  `dispatch_stream_name=execution.requests.v1`, and a Redis message id;
+  Redis stream length moved from `12` to `13`.
+- Additional ops source-event notification proved terminal visibility with
+  `producer_terminal/stage16_cancelled_terminal`.
+
+SQL evidence by strategy id:
+
+| Source type | Outcome | Reason | Count |
+|---|---|---|---:|
+| `strategy_signal` | `no_intent` | `stage16_monitor_only_no_intent` | 1 |
+| `strategy_signal` | `risk_rejected` | `kill_switch_closed` | 1 |
+| `manual_request` | `risk_rejected` | `manual_recent_auth_required` | 1 |
+| `ml_agent_decision` | `risk_rejected` | `ml_agent_policy_missing` | 1 |
+| `ops_test` | `intent_created` | `risk_gate_accepted` | 1 |
+| `ops_test` | `recorded` | `source_event_recorded` | 1 |
+
+Notification outbox evidence by strategy id:
+
+| Event type | Severity | Reason | Linked source outcome |
+|---|---|---|---|
+| `producer_fill` | `info` | `stage16_fill_observed` | `intent_created` |
+| `producer_kill_switch` | `critical` | `kill_switch_closed` | `risk_rejected` |
+| `producer_rejected` | `warning` | `manual_recent_auth_required` | `risk_rejected` |
+| `producer_rejected` | `warning` | `ml_agent_policy_missing` | `risk_rejected` |
+| `producer_terminal` | `info` | `stage16_cancelled_terminal` | `recorded` |
+| `producer_unknown` | `critical` | `stage16_unknown_state` | `risk_rejected` |
+
+Metrics evidence:
+
+- API metrics exposed bounded counters for:
+  `execution_source_event_total`,
+  `execution_intent_total`,
+  `execution_dispatch_total{result="dispatched",reason="redis_xadd_ok"}`,
+  and `execution_notification_outbox_total` with bounded `event_type`,
+  `source_type`, and `severity` labels.
+
+Browser evidence:
+
+- Playwright against
+  `https://roehub.com/strategies?strategy_id=d6a4633a-1c14-4cc9-8a53-4c8b1693485d`
+  used the temporary smoke session.
+- Dashboard requests returned `200`.
+- Accessibility snapshot and DOM artifact showed the `Execution outcomes`
+  panel in `ready` state with `6` rows and coverage for
+  `producer_fill`, `producer_unknown`, `producer_kill_switch`,
+  `producer_terminal`, `producer_rejected`, and `no_intent`.
+- DOM secret scan returned `false`.
+- Artifacts:
+  - `output/playwright/stage16-producer-notifications-dom-stage16-20260602T222018-d29a99c2.json`
+  - `output/playwright/stage16-execution-outcomes-panel-ultrawide-stage16-20260602T222018-d29a99c2.png`
+
+Cleanup:
+
+- Temporary smoke session was revoked; SQL cleanup proof returned
+  `stage16_smoke_session_active_after_cleanup=0`.
+- Temporary auth state files and remote probe scripts were deleted.
 
 ## Rollback
 
@@ -139,7 +224,9 @@ Pending. The stage is not accepted until real boundary calls prove:
 
 ## Next Handoff
 
-Before accepting Stage 16, run the required full local gates, apply the
-migration in the target runtime, perform real API/SQL/Redis/browser probes, and
-then update this report plus the ledger from `in_progress` to `accepted` or
-`blocked`.
+Stage `17` can start. It must use the accepted producer-neutral ingress,
+notification outbox, and `/strategies` outcome link as the producer handoff
+surface. Keep `ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED=0` unless a later
+stage explicitly enables live Strategy producer writes in production. Redis
+remains transport only; durable Postgres source/intent/order/fill/reconciliation
+rows remain source of truth.
