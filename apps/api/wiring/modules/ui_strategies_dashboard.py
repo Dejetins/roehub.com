@@ -29,6 +29,8 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyDashboardSelectorRowResponse,
     StrategyDashboardSelectorTotalsResponse,
     StrategyDashboardSourceResponse,
+    StrategyExecutionOutcomeLinkResponse,
+    StrategyExecutionOutcomeLinksResponse,
     StrategyHourlyResultResponse,
     StrategyHourlyResultsResponse,
     StrategyMetricGridResponse,
@@ -58,14 +60,17 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExchangeAccountProjectionRepository,
+    InMemoryExecutionIntentRepository,
     InMemoryPaperAccountingRepository,
     PostgresExchangeAccountProjectionRepository,
+    PostgresExecutionIntentRepository,
     PostgresPaperAccountingRepository,
     SystemLiveExecutionClock,
 )
 from trading.contexts.live_execution.application import ExchangeAccountProjectionService
 from trading.contexts.live_execution.domain import (
     AccountProjectionReadiness,
+    ExecutionProducerOutcomeLink,
     ExpectedInstrumentConfig,
     StrategyPaperAccountingSnapshot,
 )
@@ -105,7 +110,9 @@ _COMPATIBILITY_SOURCE = "strategy_compatibility_readiness"
 _EXCHANGE_ACCOUNT_SOURCE = "exchange_account_projection"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
 _PAPER_ACCOUNTING_SOURCE = "strategy_paper_accounting"
+_EXECUTION_OUTCOMES_SOURCE = "execution_producer_outcomes"
 _SIGNAL_JOURNAL_LIMIT = 20
+_EXECUTION_OUTCOME_LIMIT = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +136,12 @@ class PaperAccountingReadService(Protocol):
     def get_latest_accounting_for_strategy(
         self, *, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None: ...
+
+
+class ExecutionOutcomeReadService(Protocol):
+    def list_producer_outcome_links_for_strategy(
+        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+    ) -> tuple[ExecutionProducerOutcomeLink, ...]: ...
 
 
 class StrategyDashboardManualRefreshLimiter:
@@ -182,6 +195,7 @@ class StrategyDashboardQueryService:
         compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
         account_projection_service: AccountProjectionReadinessService | None = None,
         paper_accounting_service: PaperAccountingReadService | None = None,
+        execution_outcome_service: ExecutionOutcomeReadService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -191,6 +205,7 @@ class StrategyDashboardQueryService:
         self._compatibility_readiness_service = compatibility_readiness_service
         self._account_projection_service = account_projection_service
         self._paper_accounting_service = paper_accounting_service
+        self._execution_outcome_service = execution_outcome_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -233,6 +248,11 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        execution_outcomes, execution_outcomes_source = self._load_execution_outcomes(
+            principal=principal,
+            strategy=selected_strategy,
+            generated_at=generated_at,
+        )
         compatibility_readiness, compatibility_source = self._load_compatibility_readiness(
             principal=principal,
             strategy=selected_strategy,
@@ -251,6 +271,7 @@ class StrategyDashboardQueryService:
             account_source,
             signal_journal_source,
             paper_accounting_source,
+            execution_outcomes_source,
             _runtime_metadata_source(run=selected_run, generated_at=generated_at),
             _source(
                 name=_CANDLE_SOURCE,
@@ -319,6 +340,7 @@ class StrategyDashboardQueryService:
             trades=_build_trades(),
             signal_journal=signal_journal,
             paper_accounting=paper_accounting,
+            execution_outcomes=execution_outcomes,
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
                 data_status="degraded" if _has_degraded_sources(sources) else "actual",
@@ -337,6 +359,79 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_execution_outcomes(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        strategy: Strategy | None,
+        generated_at: datetime,
+    ) -> tuple[StrategyExecutionOutcomeLinksResponse, StrategyDashboardSourceResponse]:
+        if strategy is None:
+            return (
+                _build_empty_execution_outcomes(reason="selected_strategy_not_found"),
+                _source(
+                    name=_EXECUTION_OUTCOMES_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no selected strategy execution outcome links are available",
+                ),
+            )
+        if self._execution_outcome_service is None:
+            return (
+                _build_empty_execution_outcomes(reason="execution_outcomes_not_configured"),
+                _source(
+                    name=_EXECUTION_OUTCOMES_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="execution outcome repository is not configured",
+                ),
+            )
+        try:
+            links = self._execution_outcome_service.list_producer_outcome_links_for_strategy(
+                owner_user_id=principal.user_id,
+                strategy_id=strategy.strategy_id,
+                limit=_EXECUTION_OUTCOME_LIMIT,
+            )
+        except Exception as error:  # noqa: BLE001
+            return (
+                _build_empty_execution_outcomes(reason=str(error)),
+                _source(
+                    name=_EXECUTION_OUTCOMES_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=str(error),
+                ),
+            )
+        if not links:
+            return (
+                _build_empty_execution_outcomes(reason="execution_outcomes_empty"),
+                _source(
+                    name=_EXECUTION_OUTCOMES_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="no source-event to execution outcome links exist yet",
+                ),
+            )
+        return (
+            StrategyExecutionOutcomeLinksResponse(
+                source=_EXECUTION_OUTCOMES_SOURCE,
+                state="ready",
+                limit=_EXECUTION_OUTCOME_LIMIT,
+                items=[_build_execution_outcome_link(link=link) for link in links],
+                degradation_reason=None,
+            ),
+            _source(
+                name=_EXECUTION_OUTCOMES_SOURCE,
+                status="available",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(
+                    generated_at=generated_at,
+                    observed_at=max(link.updated_at for link in links),
+                ),
+                detail=f"{len(links)} execution outcome links loaded",
             ),
         )
 
@@ -895,10 +990,11 @@ def build_strategy_dashboard_service(
             strategy_repository=None,
             run_repository=None,
             profile_repository=None,
-        signal_repository=None,
-        compatibility_readiness_service=None,
-        account_projection_service=None,
-        paper_accounting_service=None,
+            signal_repository=None,
+            compatibility_readiness_service=None,
+            account_projection_service=None,
+            paper_accounting_service=None,
+            execution_outcome_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -919,6 +1015,7 @@ def build_strategy_dashboard_service(
         compatibility_readiness_service=compatibility_readiness_service,
         account_projection_service=_build_account_projection_service(settings=settings),
         paper_accounting_service=_build_paper_accounting_service(settings=settings),
+        execution_outcome_service=_build_execution_outcome_service(settings=settings),
     )
 
 
@@ -945,6 +1042,14 @@ def _build_paper_accounting_service(*, settings):
             gateway=_build_live_execution_gateway(settings=settings)
         )
     return InMemoryPaperAccountingRepository()
+
+
+def _build_execution_outcome_service(*, settings):
+    if settings.postgres_dsn:
+        return PostgresExecutionIntentRepository(
+            gateway=_build_live_execution_gateway(settings=settings)
+        )
+    return InMemoryExecutionIntentRepository()
 
 
 def _build_live_execution_gateway(*, settings):
@@ -1570,6 +1675,41 @@ def _build_empty_paper_accounting(*, reason: str) -> StrategyDashboardPaperAccou
         completeness_reason=reason,
         updated_at=None,
         degradation_reason=reason,
+    )
+
+
+def _build_empty_execution_outcomes(*, reason: str) -> StrategyExecutionOutcomeLinksResponse:
+    return StrategyExecutionOutcomeLinksResponse(
+        source=_EXECUTION_OUTCOMES_SOURCE,
+        state="empty",
+        limit=_EXECUTION_OUTCOME_LIMIT,
+        items=[],
+        degradation_reason=reason,
+    )
+
+
+def _build_execution_outcome_link(
+    *, link: ExecutionProducerOutcomeLink
+) -> StrategyExecutionOutcomeLinkResponse:
+    return StrategyExecutionOutcomeLinkResponse(
+        source_event_id=str(link.source_event_id),
+        source_type=link.source_type,
+        source_event_ref=link.source_event_ref,
+        strategy_signal_id=(
+            str(link.strategy_signal_id) if link.strategy_signal_id is not None else None
+        ),
+        outcome=link.outcome,
+        outcome_reason=link.outcome_reason,
+        intent_id=str(link.intent_id) if link.intent_id is not None else None,
+        intent_status=link.intent_status,
+        intent_status_reason=link.intent_status_reason,
+        risk_status=link.risk_status,
+        risk_reason=link.risk_reason,
+        order_status=link.order_status,
+        order_status_reason=link.order_status_reason,
+        notification_event_type=link.notification_event_type,
+        notification_reason=link.notification_reason,
+        updated_at=link.updated_at,
     )
 
 

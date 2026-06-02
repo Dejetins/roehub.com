@@ -219,6 +219,26 @@
                 <div><dt>{{ t("strategies.paper.updated") }}</dt><dd data-paper-updated>--</dd></div>
               </dl>
             </section>
+            <section class="strategies-execution-outcomes" aria-label="{{ t('strategies.execution_outcomes.title') }}">
+              <header>
+                <h3>{{ t("strategies.execution_outcomes.title") }}</h3>
+                <span class="strategies-pill" data-execution-outcomes-state>--</span>
+              </header>
+              <div class="strategies-table-wrap strategies-table-wrap--compact">
+                <table class="strategies-table strategies-table--stats">
+                  <thead>
+                    <tr>
+                      <th>{{ t("strategies.execution_outcomes.signal") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.source") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.intent") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.execution") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.notification") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody data-execution-outcome-rows></tbody>
+                </table>
+              </div>
+            </section>
           </section>
         </div>
       </section>

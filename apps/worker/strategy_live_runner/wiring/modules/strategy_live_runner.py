@@ -16,11 +16,14 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
 )
 from trading.contexts.live_execution.adapters.outbound import (
     PostgresExchangeAccountProjectionRepository,
+    PostgresExecutionIntentRepository,
     PostgresPaperAccountingRepository,
     PostgresStrategyPositionOwnershipRepository,
+    SystemLiveExecutionClock,
 )
 from trading.contexts.live_execution.application import (
     CapitalReservationPaperAccountingService,
+    ExecutionIngressService,
     StrategyPositionOwnershipService,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
@@ -47,6 +50,9 @@ from trading.contexts.strategy.adapters.outbound import (
     TelegramNotifierHooks,
     load_strategy_live_runner_runtime_config,
 )
+from trading.contexts.strategy.adapters.outbound.acl.live_execution_producer import (
+    LiveExecutionStrategySignalProducer,
+)
 from trading.contexts.strategy.application import (
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
@@ -59,6 +65,7 @@ from trading.contexts.strategy.domain.entities import StrategySignal
 log = logging.getLogger(__name__)
 
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
+_STRATEGY_PRODUCER_ENABLED_KEY = "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED"
 
 
 class StrategyLiveRunnerMetrics:
@@ -459,6 +466,17 @@ def build_strategy_live_runner_app(
                 hooks=metrics.telegram_notifier_hooks(),
             )
 
+    execution_producer = None
+    if _parse_bool(environ.get(_STRATEGY_PRODUCER_ENABLED_KEY, "0")):
+        execution_repository = PostgresExecutionIntentRepository(gateway=postgres_gateway)
+        execution_producer = LiveExecutionStrategySignalProducer(
+            ingress_service=ExecutionIngressService(
+                repository=execution_repository,
+                clock=SystemLiveExecutionClock(),
+            ),
+            repository=execution_repository,
+        )
+
     runner = StrategyLiveRunner(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
@@ -474,6 +492,7 @@ def build_strategy_live_runner_app(
         position_ownership_coordinator=position_ownership_coordinator,
         capital_reservation_coordinator=paper_accounting_service,
         paper_accounting_recorder=paper_accounting_service,
+        execution_producer=execution_producer,
         on_signal_recorded=metrics.observe_strategy_signal,
         telegram_notifier=telegram_notifier,
         telegram_notification_policy=telegram_notification_policy,
@@ -539,3 +558,8 @@ def _require_non_empty_env_value(
             )
         )
     return value
+
+
+def _parse_bool(raw_value: str) -> bool:
+    normalized = raw_value.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}

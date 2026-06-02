@@ -7,18 +7,24 @@ from fastapi import APIRouter, Depends, Response
 from apps.api.dto.ui_execution import (
     ExecutionIntentRequest,
     ExecutionIntentResponse,
+    ExecutionNotificationRequest,
+    ExecutionNotificationResponse,
+    ExecutionNotificationsResponse,
     ExecutionSourceEventRequest,
     ExecutionSourceEventResponse,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.application import (
     CreateExecutionIntentCommand,
+    EmitExecutionNotificationCommand,
     ExecutionDispatchService,
     ExecutionIngressService,
     RecordExecutionSourceEventCommand,
 )
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
+    ExecutionNotificationOutboxEvent,
+    ExecutionNotificationValidationError,
     ExecutionOrderModelRejectedError,
     ExecutionRiskContext,
     ExecutionSourceEvent,
@@ -119,6 +125,58 @@ def build_ui_execution_router(
             duplicate=result.duplicate,
         )
 
+    @router.post(
+        "/ui/execution/notifications",
+        response_model=ExecutionNotificationResponse,
+        status_code=201,
+    )
+    def post_notification(
+        payload: ExecutionNotificationRequest,
+        response: Response,
+        current_user: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> ExecutionNotificationResponse:
+        try:
+            result = ingress_service.emit_notification(
+                command=EmitExecutionNotificationCommand(
+                    owner_user_id=current_user.user_id,
+                    source_type=payload.source_type,
+                    event_type=payload.event_type,
+                    severity=payload.severity,
+                    reason=payload.reason,
+                    source_event_id=payload.source_event_id,
+                    intent_id=payload.intent_id,
+                    order_id=payload.order_id,
+                    strategy_signal_id=payload.strategy_signal_id,
+                    labels=payload.labels,
+                )
+            )
+        except (ExecutionSourceValidationError, ExecutionNotificationValidationError) as error:
+            reason = getattr(error, "reason", "invalid_notification")
+            raise _notification_error(reason=reason) from error
+        if result.duplicate:
+            response.status_code = 200
+        return _to_notification_response(
+            notification=result.notification,
+            duplicate=result.duplicate,
+        )
+
+    @router.get(
+        "/ui/execution/notifications",
+        response_model=ExecutionNotificationsResponse,
+    )
+    def get_notifications(
+        current_user: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> ExecutionNotificationsResponse:
+        return ExecutionNotificationsResponse(
+            items=[
+                _to_notification_response(notification=notification, duplicate=False)
+                for notification in ingress_service.list_recent_notifications(
+                    owner_user_id=current_user.user_id,
+                    limit=50,
+                )
+            ]
+        )
+
     return router
 
 
@@ -173,6 +231,29 @@ def _to_intent_response(
     )
 
 
+def _to_notification_response(
+    *,
+    notification: ExecutionNotificationOutboxEvent,
+    duplicate: bool,
+) -> ExecutionNotificationResponse:
+    return ExecutionNotificationResponse(
+        notification_id=notification.notification_id,
+        source_type=notification.source_type,
+        event_type=notification.event_type,
+        severity=notification.severity,
+        reason=notification.reason,
+        source_event_id=notification.source_event_id,
+        intent_id=notification.intent_id,
+        order_id=notification.order_id,
+        strategy_signal_id=notification.strategy_signal_id,
+        labels=dict(notification.labels_json),
+        status=notification.status,
+        created_at=notification.created_at,
+        sent_at=notification.sent_at,
+        duplicate=duplicate,
+    )
+
+
 def _risk_context_from_payload(
     *, payload: ExecutionIntentRequest
 ) -> ExecutionRiskContext | None:
@@ -206,6 +287,14 @@ def _unsupported_order_model_error(*, reason: str) -> RoehubError:
     return RoehubError(
         code="execution.unsupported_order_model",
         message="Execution order model is not supported in v1",
+        details={"reason": reason},
+    )
+
+
+def _notification_error(*, reason: str) -> RoehubError:
+    return RoehubError(
+        code="execution.invalid_notification",
+        message="Execution notification is invalid",
         details={"reason": reason},
     )
 

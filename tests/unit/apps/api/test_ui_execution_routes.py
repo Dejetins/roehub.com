@@ -211,6 +211,67 @@ def test_ui_execution_route_rejects_unsupported_order_model() -> None:
     assert response.json()["error"]["details"]["reason"] == "tp_sl_not_supported"
 
 
+def test_ui_execution_notifications_create_dedupe_and_list() -> None:
+    client = _build_client()
+    source_id = client.post(
+        "/ui/execution/source-events",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_type": "ops_test",
+            "source_event_ref": "ops-terminal-ref",
+            "source_ref": {"ops_test_id": "stage16"},
+            "idempotency_key": "stage16-notification-source-key",
+        },
+    ).json()["source_event_id"]
+    payload = {
+        "source_type": "ops_test",
+        "event_type": "producer_terminal",
+        "severity": "info",
+        "reason": "cancelled",
+        "source_event_id": source_id,
+        "labels": {"exchange": "bybit", "status": "cancelled"},
+    }
+
+    created = client.post(
+        "/ui/execution/notifications",
+        headers={"x-user-id": _USER_ID},
+        json=payload,
+    )
+    replay = client.post(
+        "/ui/execution/notifications",
+        headers={"x-user-id": _USER_ID},
+        json=payload,
+    )
+    listed = client.get("/ui/execution/notifications", headers={"x-user-id": _USER_ID})
+
+    assert created.status_code == 201
+    assert replay.status_code == 200
+    assert replay.json()["duplicate"] is True
+    assert replay.json()["notification_id"] == created.json()["notification_id"]
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["event_type"] == "producer_terminal"
+
+
+def test_ui_execution_notifications_reject_sensitive_labels() -> None:
+    client = _build_client()
+
+    response = client.post(
+        "/ui/execution/notifications",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_type": "ops_test",
+            "event_type": "producer_unknown",
+            "severity": "critical",
+            "reason": "adapter_unknown_state_reconciliation_required",
+            "labels": {"authorization": "secret"},
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "execution.invalid_notification"
+    assert response.json()["error"]["details"]["reason"] == "sensitive_notification_label_rejected"
+
+
 def test_ui_execution_route_requires_strategy_signal_id_for_strategy_sources() -> None:
     client = _build_client()
 

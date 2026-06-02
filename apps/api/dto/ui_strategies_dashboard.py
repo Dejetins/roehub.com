@@ -363,6 +363,37 @@ class StrategyDashboardPaperAccountingResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyExecutionOutcomeLinkResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_event_id: str
+    source_type: str
+    source_event_ref: str
+    strategy_signal_id: str | None
+    outcome: str
+    outcome_reason: str
+    intent_id: str | None
+    intent_status: str | None
+    intent_status_reason: str | None
+    risk_status: str | None
+    risk_reason: str | None
+    order_status: str | None
+    order_status_reason: str | None
+    notification_event_type: str | None
+    notification_reason: str | None
+    updated_at: datetime
+
+
+class StrategyExecutionOutcomeLinksResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    limit: int
+    items: list[StrategyExecutionOutcomeLinkResponse]
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -412,5 +443,6 @@ class StrategyDashboardResponse(BaseModel):
     trades: StrategyTradesResponse
     signal_journal: StrategySignalJournalResponse
     paper_accounting: StrategyDashboardPaperAccountingResponse
+    execution_outcomes: StrategyExecutionOutcomeLinksResponse
     footer_status: StrategyDashboardFooterStatusResponse
     refresh_control: StrategyDashboardRefreshControlResponse

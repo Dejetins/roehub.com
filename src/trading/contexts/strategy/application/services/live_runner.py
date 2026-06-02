@@ -13,10 +13,12 @@ from trading.contexts.strategy.application.ports import (
     EventTypeV1,
     LiveStrategyProfileRepository,
     MetricTypeV1,
+    NoOpStrategyExecutionProducer,
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
     StrategyCapitalReservationCoordinator,
     StrategyClock,
+    StrategyExecutionProducer,
     StrategyLiveCandleStream,
     StrategyPaperAccountingRecorder,
     StrategyPositionOwnershipCoordinator,
@@ -144,6 +146,7 @@ class StrategyLiveRunner:
         position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
         capital_reservation_coordinator: StrategyCapitalReservationCoordinator | None = None,
         paper_accounting_recorder: StrategyPaperAccountingRecorder | None = None,
+        execution_producer: StrategyExecutionProducer | None = None,
         on_signal_recorded: Callable[[StrategySignal], None] | None = None,
         telegram_notifier: TelegramNotifier | None = None,
         telegram_notification_policy: TelegramNotificationPolicy | None = None,
@@ -204,6 +207,11 @@ class StrategyLiveRunner:
         self._position_ownership_coordinator = position_ownership_coordinator
         self._capital_reservation_coordinator = capital_reservation_coordinator
         self._paper_accounting_recorder = paper_accounting_recorder
+        self._execution_producer = (
+            execution_producer
+            if execution_producer is not None
+            else NoOpStrategyExecutionProducer()
+        )
         self._on_signal_recorded = on_signal_recorded
         self._clock = clock
         self._sleeper = sleeper
@@ -611,6 +619,7 @@ class StrategyLiveRunner:
         persisted = self._signal_repository.record(signal=signal)
         if self._on_signal_recorded is not None:
             self._on_signal_recorded(persisted)
+        self._execution_producer.record_signal(signal=persisted)
         if self._paper_accounting_recorder is not None:
             self._paper_accounting_recorder.record_paper_signal(signal=persisted)
         return persisted

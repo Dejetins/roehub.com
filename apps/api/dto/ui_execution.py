@@ -109,3 +109,44 @@ class ExecutionIntentResponse(BaseModel):
     created_at: datetime
     duplicate: bool = False
     source_event: ExecutionSourceEventResponse
+
+
+class ExecutionNotificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_type: Literal["strategy_signal", "manual_request", "ml_agent_decision", "ops_test"]
+    event_type: Literal[
+        "producer_rejected",
+        "producer_fill",
+        "producer_unknown",
+        "producer_kill_switch",
+        "producer_terminal",
+    ]
+    severity: Literal["info", "warning", "critical"]
+    reason: str = Field(min_length=1, max_length=160)
+    source_event_id: UUID | None = None
+    intent_id: UUID | None = None
+    order_id: UUID | None = None
+    strategy_signal_id: UUID | None = None
+    labels: dict[str, object] = Field(default_factory=dict)
+
+
+class ExecutionNotificationResponse(BaseModel):
+    notification_id: UUID
+    source_type: str
+    event_type: str
+    severity: str
+    reason: str
+    source_event_id: UUID | None
+    intent_id: UUID | None
+    order_id: UUID | None
+    strategy_signal_id: UUID | None
+    labels: dict[str, str]
+    status: str
+    created_at: datetime
+    sent_at: datetime | None
+    duplicate: bool = False
+
+
+class ExecutionNotificationsResponse(BaseModel):
+    items: list[ExecutionNotificationResponse]

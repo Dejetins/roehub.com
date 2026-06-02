@@ -132,6 +132,11 @@ _EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL = Counter(
     "Execution intent Redis dispatch transport errors.",
     ("reason",),
 )
+_EXECUTION_NOTIFICATION_OUTBOX_TOTAL = Counter(
+    "execution_notification_outbox_total",
+    "Execution notification outbox events by type and producer source.",
+    ("event_type", "source_type", "severity"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -363,6 +368,16 @@ def record_execution_dispatch_redis_error(*, reason: str) -> None:
     _EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
 
 
+def record_execution_notification_outbox(
+    *, event_type: str, source_type: str, severity: str
+) -> None:
+    _EXECUTION_NOTIFICATION_OUTBOX_TOTAL.labels(
+        event_type=(event_type or "unknown")[:80],
+        source_type=(source_type or "unknown")[:80],
+        severity=(severity or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -409,6 +424,7 @@ __all__ = [
     "record_execution_dispatch_redis_error",
     "record_execution_dispatch_retry",
     "record_execution_order_model_rejected",
+    "record_execution_notification_outbox",
     "record_execution_risk_gate",
     "record_execution_source_event",
 ]

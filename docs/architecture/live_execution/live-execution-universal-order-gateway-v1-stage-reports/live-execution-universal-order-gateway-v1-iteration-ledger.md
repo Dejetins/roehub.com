@@ -2,9 +2,10 @@
 
 Журнал фиксирует выполнение stages для документа `docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md`.
 
-Статус: Stage `15` accepted; order/fill/reconciliation ledger, retention
-metadata, PITR restore-drill proof, CI/deploy and Mac Studio runtime evidence
-are complete.
+Статус: Stage `16` in progress; local producer integration and notification
+outbox implementation is under validation. Stage `15` remains the latest
+accepted stage until API/DB/Redis/browser/Mac Studio Stage `16` evidence is
+complete.
 
 ## Правила Журнала
 
@@ -50,7 +51,7 @@ are complete.
 | `13` | `exchange-execution` supervised process skeleton. | accepted | None. Runtime launchd/Monit/Prometheus/API/DB/Redis evidence recorded after direct-main deploy and native-service installer/reload follow-ups. | Передать accepted supervised process boundary, local-only health/metrics/run-once API, disabled-adapter degraded readiness, heartbeat/observation persistence, Redis group/DLQ visibility, and no-submit/no-decrypt proof. |
 | `14` | Native Binance/Bybit testnet order adapters + private stream lifecycle skeleton. | accepted | None. Implementation, CI and deploy are complete. Funded Bybit spot testnet proof recorded real `exchange-execution` submit/status/cancel/private-stream evidence with durable `execution_orders`, private stream readiness, Redis ack-after-durable state and bounded metrics. Binance futures testnet still needs credential rotation away from `stage03_no_decrypt_placeholder` for Binance-specific proof, but this is not a Stage 14 blocker because Bybit satisfied the native testnet adapter criterion. | Передать accepted Bybit spot testnet submit/status/cancel/private-stream path, mainnet hard-block proof, Redis ack-after-durable order decision, bounded metrics, and the limitation that Stage `15` still must implement fills/funding/reconciliation/PITR rather than treating submit/cancel as full ledger convergence. |
 | `15` | Order/fill/funding ledger, private status updates, reconciliation, retention/partitioning, backup/PITR proof. | accepted | None. Direct-main implementation, CI/deploy, Mac Studio readiness, real Bybit spot testnet fill/status/cancel reconciliation, append-only order-event/fill/reconciliation rows, retention metadata, PITR restore drill and secret-clean Redis stream scan are complete. Literal `tests/integration` path is absent in this checkout, matching prior stage limitation. Futures funding facts remain a documented next-stage/runtime limitation, not a Stage 15 blocker for spot reconciliation. | Передать accepted order-event/fill/reconciliation ledger, `ledger_pitr=pitr_restore_verified` readiness, retention/PITR proof, Redis ack-after-durable reconciliation and the limitation that futures funding/PnL notifications must stay incomplete until real futures funding boundary proof exists. |
-| `16` | Producer integrations: Strategy from backtest-created profile, Manual, ML agent contract, notification outbox. | planned | `15` accepted | Передать доказательство, что все producers пишут source events и используют один ingress/risk/ledger path, плюс UI-visible link `strategy signal -> execution outcome` и redacted notification events. |
+| `16` | Producer integrations: Strategy from backtest-created profile, Manual, ML agent contract, notification outbox. | in_progress | Runtime acceptance evidence pending. Local implementation adds redacted `execution_notification_outbox`, Strategy producer source-event port, rejected/kill-switch/fill/unknown/terminal notification writes, and `/strategies` source-event -> intent -> outcome -> notification UI links. | Complete full local gates, Mac Studio migration/deploy, API/DB/Redis/browser probes, then record accepted or blocked evidence. |
 | `17` | Production readiness: latency/slippage, canary protocol, deploy/ops proof. | planned | `16` accepted | Передать final Playwright + runtime safe E2E evidence, rollback, kill-switch, DLQ, clock, private-stream, PITR, alert owner/severity/escalation, retention, notifications, deploy/CI status. |
 
 ## Обязательные Доказательства По Stage

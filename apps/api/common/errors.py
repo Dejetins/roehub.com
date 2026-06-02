@@ -45,6 +45,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "exchange_connection_usage_guard_unavailable": 503,
     "exchange_control_unavailable": 503,
     "execution.invalid_execution_request": 400,
+    "execution.invalid_notification": 400,
     "execution.invalid_source_event": 400,
     "execution.source_event_not_found": 404,
     "execution.unsupported_order_model": 422,

@@ -11,10 +11,12 @@ from trading.contexts.live_execution.adapters.outbound.persistence.in_memory imp
 )
 from trading.contexts.live_execution.application import (
     CreateExecutionIntentCommand,
+    EmitExecutionNotificationCommand,
     ExecutionIngressService,
     RecordExecutionSourceEventCommand,
 )
 from trading.contexts.live_execution.domain import (
+    ExecutionNotificationValidationError,
     ExecutionOrderModelRejectedError,
     ExecutionRiskContext,
     ExecutionSourceValidationError,
@@ -149,6 +151,9 @@ def test_risk_gate_rejects_missing_context_and_records_audit() -> None:
     assert intent.intent.risk_reason == "risk_state_unavailable"
     assert repository.risk_audit_events[0].event_type == "risk_gate_rejected"
     assert repository.risk_audit_events[0].metadata_json == {"dispatch": "no-dispatch"}
+    assert repository.source_events[0].outcome == "risk_rejected"
+    assert repository.notifications[0].event_type == "producer_rejected"
+    assert repository.notifications[0].reason == "risk_state_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -217,6 +222,8 @@ def test_risk_gate_rejects_source_aware_safety_cases(
     assert intent.intent.status == "rejected"
     assert intent.intent.risk_reason == reason
     assert repository.source_events[0].outcome_reason == reason
+    if reason == "kill_switch_closed":
+        assert repository.notifications[0].event_type == "producer_kill_switch"
 
 
 def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> None:
@@ -267,6 +274,73 @@ def test_rejects_invalid_source_policy() -> None:
         )
 
     assert error_info.value.reason == "strategy_signal_id_required"
+
+
+def test_emits_redacted_notification_outbox_event_idempotently() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="ops_test",
+            source_event_ref="ops-terminal",
+            source_ref_json={"ops_test_id": "terminal"},
+            strategy_signal_id=None,
+            idempotency_key="terminal-source-key",
+        )
+    )
+
+    first = service.emit_notification(
+        command=EmitExecutionNotificationCommand(
+            owner_user_id=_USER_ID,
+            source_type="ops_test",
+            event_type="producer_terminal",
+            severity="info",
+            reason="cancelled",
+            source_event_id=source.event.source_event_id,
+            labels={"exchange": "bybit", "status": "cancelled"},
+        )
+    )
+    replay = service.emit_notification(
+        command=EmitExecutionNotificationCommand(
+            owner_user_id=_USER_ID,
+            source_type="ops_test",
+            event_type="producer_terminal",
+            severity="info",
+            reason="cancelled",
+            source_event_id=source.event.source_event_id,
+            labels={"exchange": "bybit", "status": "cancelled"},
+        )
+    )
+
+    assert first.duplicate is False
+    assert replay.duplicate is True
+    assert replay.notification.notification_id == first.notification.notification_id
+    assert repository.notifications[0].labels_json == {
+        "exchange": "bybit",
+        "status": "cancelled",
+    }
+
+
+def test_rejects_sensitive_notification_labels() -> None:
+    service = ExecutionIngressService(
+        repository=InMemoryExecutionIntentRepository(),
+        clock=_Clock(),
+    )
+
+    with pytest.raises(ExecutionNotificationValidationError) as error_info:
+        service.emit_notification(
+            command=EmitExecutionNotificationCommand(
+                owner_user_id=_USER_ID,
+                source_type="ops_test",
+                event_type="producer_unknown",
+                severity="critical",
+                reason="adapter_unknown_state_reconciliation_required",
+                labels={"api_key": "secret"},
+            )
+        )
+
+    assert error_info.value.reason == "sensitive_notification_label_rejected"
 
 
 def _intent_command(

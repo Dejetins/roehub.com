@@ -157,6 +157,12 @@ class ExchangeExecutionMetrics:
             ("status", "reason"),
             registry=self.registry,
         )
+        self.notification_outbox_total = Counter(
+            "execution_notification_outbox_total",
+            "Execution notification outbox events by type and producer source.",
+            ("event_type", "source_type", "severity"),
+            registry=self.registry,
+        )
         self.ledger_backup_restore_total = Counter(
             "execution_ledger_backup_restore_total",
             "Money-ledger backup/PITR restore drill outcomes.",
@@ -217,6 +223,13 @@ class ExchangeExecutionMetrics:
 
     def record_reconciliation(self, status: str, reason: str) -> None:
         self.reconciliation_total.labels(status=status, reason=reason).inc()
+
+    def record_notification(self, event_type: str, source_type: str, severity: str) -> None:
+        self.notification_outbox_total.labels(
+            event_type=event_type,
+            source_type=source_type,
+            severity=severity,
+        ).inc()
 
     def record_pitr_drill(self, result: str, reason: str) -> None:
         self.ledger_backup_restore_total.labels(result=result, reason=reason).inc()
@@ -395,6 +408,7 @@ def build_runtime(
         on_private_stream=metrics.record_private_stream,
         on_order_latency=metrics.record_order_latency,
         on_reconciliation=metrics.record_reconciliation,
+        on_notification=metrics.record_notification,
     )
     return service, metrics
 

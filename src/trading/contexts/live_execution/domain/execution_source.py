@@ -20,6 +20,13 @@ ExecutionSourceOutcome = Literal[
     "intent_created",
     "order_model_rejected",
     "no_intent",
+    "risk_rejected",
+    "submitted",
+    "filled",
+    "cancelled",
+    "failed",
+    "reconciliation_required",
+    "handoff_failed",
 ]
 ExecutionIntentStatus = Literal[
     "recorded",
@@ -115,6 +122,27 @@ class ExecutionIntent:
     dispatch_redis_message_id: str | None = None
     dispatch_last_error: str | None = None
     dispatch_updated_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionProducerOutcomeLink:
+    source_event_id: UUID
+    owner_user_id: UserId
+    source_type: ExecutionSourceType
+    source_event_ref: str
+    strategy_signal_id: UUID | None
+    outcome: str
+    outcome_reason: str
+    intent_id: UUID | None
+    intent_status: str | None
+    intent_status_reason: str | None
+    risk_status: str | None
+    risk_reason: str | None
+    order_status: str | None
+    order_status_reason: str | None
+    notification_event_type: str | None
+    notification_reason: str | None
+    updated_at: datetime
 
 
 def hash_idempotency_key(raw_value: str) -> str:

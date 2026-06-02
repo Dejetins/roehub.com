@@ -9,6 +9,8 @@ from uuid import UUID
 from trading.contexts.live_execution.application.ports import ExecutionIntentRepository
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
+    ExecutionNotificationOutboxEvent,
+    ExecutionProducerOutcomeLink,
     ExecutionRiskAuditEvent,
     ExecutionSourceEvent,
 )
@@ -317,6 +319,151 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
         )
         return _map_risk_audit_event(row) if row is not None else event
 
+    def record_notification_outbox(
+        self, *, event: ExecutionNotificationOutboxEvent
+    ) -> ExecutionNotificationOutboxEvent:
+        row = self._gateway.fetch_one(
+            query="""
+            INSERT INTO execution_notification_outbox
+            (
+                notification_id, owner_user_id, source_type, event_type, severity,
+                reason, source_event_id, intent_id, order_id, strategy_signal_id,
+                labels_json, status, created_at, sent_at
+            )
+            VALUES
+            (
+                %(notification_id)s, %(owner_user_id)s, %(source_type)s,
+                %(event_type)s, %(severity)s, %(reason)s, %(source_event_id)s,
+                %(intent_id)s, %(order_id)s, %(strategy_signal_id)s,
+                %(labels_json)s::jsonb, %(status)s, %(created_at)s, %(sent_at)s
+            )
+            ON CONFLICT (
+                owner_user_id, event_type, source_event_key, intent_key, order_key, reason
+            ) DO NOTHING
+            RETURNING *
+            """,
+            parameters=_notification_params(event),
+        )
+        if row is None:
+            existing = self._gateway.fetch_one(
+                query="""
+                SELECT *
+                FROM execution_notification_outbox
+                WHERE owner_user_id = %(owner_user_id)s
+                  AND event_type = %(event_type)s
+                  AND source_event_key = COALESCE(
+                    %(source_event_id)s,
+                    '00000000-0000-0000-0000-000000000000'::uuid
+                  )
+                  AND intent_key = COALESCE(
+                    %(intent_id)s,
+                    '00000000-0000-0000-0000-000000000000'::uuid
+                  )
+                  AND order_key = COALESCE(
+                    %(order_id)s,
+                    '00000000-0000-0000-0000-000000000000'::uuid
+                  )
+                  AND reason = %(reason)s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                parameters=_notification_params(event),
+            )
+            return _map_notification(existing) if existing is not None else event
+        return _map_notification(row)
+
+    def list_recent_notifications(
+        self,
+        *,
+        owner_user_id: UserId,
+        limit: int,
+        strategy_id: UUID | None = None,
+    ) -> tuple[ExecutionNotificationOutboxEvent, ...]:
+        if strategy_id is None:
+            rows = self._gateway.fetch_all(
+                query="""
+                SELECT *
+                FROM execution_notification_outbox
+                WHERE owner_user_id = %(owner_user_id)s
+                ORDER BY created_at DESC
+                LIMIT %(limit)s
+                """,
+                parameters={"owner_user_id": str(owner_user_id), "limit": max(1, limit)},
+            )
+        else:
+            rows = self._gateway.fetch_all(
+                query="""
+                SELECT n.*
+                FROM execution_notification_outbox n
+                LEFT JOIN execution_source_events e
+                  ON e.source_event_id = n.source_event_id
+                WHERE n.owner_user_id = %(owner_user_id)s
+                  AND (
+                    n.strategy_signal_id IS NOT NULL
+                    OR e.source_ref_json ->> 'strategy_id' = %(strategy_id)s
+                  )
+                ORDER BY n.created_at DESC
+                LIMIT %(limit)s
+                """,
+                parameters={
+                    "owner_user_id": str(owner_user_id),
+                    "strategy_id": str(strategy_id),
+                    "limit": max(1, limit),
+                },
+            )
+        return tuple(_map_notification(row) for row in rows)
+
+    def list_producer_outcome_links_for_strategy(
+        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+    ) -> tuple[ExecutionProducerOutcomeLink, ...]:
+        rows = self._gateway.fetch_all(
+            query="""
+            SELECT
+                e.source_event_id,
+                e.owner_user_id,
+                e.source_type,
+                e.source_event_ref,
+                e.strategy_signal_id,
+                e.outcome,
+                e.outcome_reason,
+                e.intent_id,
+                i.status AS intent_status,
+                i.status_reason AS intent_status_reason,
+                i.risk_status,
+                i.risk_reason,
+                o.status AS order_status,
+                o.status_reason AS order_status_reason,
+                n.event_type AS notification_event_type,
+                n.reason AS notification_reason,
+                COALESCE(o.updated_at, i.dispatch_updated_at, i.created_at, e.received_at)
+                    AS updated_at
+            FROM execution_source_events e
+            LEFT JOIN execution_intents i
+              ON i.intent_id = e.intent_id
+            LEFT JOIN execution_orders o
+              ON o.intent_id = i.intent_id
+            LEFT JOIN LATERAL (
+                SELECT event_type, reason
+                FROM execution_notification_outbox n
+                WHERE n.source_event_id = e.source_event_id
+                   OR n.intent_id = i.intent_id
+                   OR n.order_id = o.order_id
+                ORDER BY n.created_at DESC
+                LIMIT 1
+            ) n ON TRUE
+            WHERE e.owner_user_id = %(owner_user_id)s
+              AND e.source_ref_json ->> 'strategy_id' = %(strategy_id)s
+            ORDER BY updated_at DESC
+            LIMIT %(limit)s
+            """,
+            parameters={
+                "owner_user_id": str(owner_user_id),
+                "strategy_id": str(strategy_id),
+                "limit": max(1, limit),
+            },
+        )
+        return tuple(_map_producer_link(row) for row in rows)
+
 
 def _source_event_params(event: ExecutionSourceEvent) -> dict[str, object]:
     return {
@@ -383,6 +530,29 @@ def _risk_audit_params(event: ExecutionRiskAuditEvent) -> dict[str, object]:
     }
 
 
+def _notification_params(event: ExecutionNotificationOutboxEvent) -> dict[str, object]:
+    return {
+        "notification_id": str(event.notification_id),
+        "owner_user_id": str(event.owner_user_id),
+        "source_type": event.source_type,
+        "event_type": event.event_type,
+        "severity": event.severity,
+        "reason": event.reason,
+        "source_event_id": (
+            str(event.source_event_id) if event.source_event_id is not None else None
+        ),
+        "intent_id": str(event.intent_id) if event.intent_id is not None else None,
+        "order_id": str(event.order_id) if event.order_id is not None else None,
+        "strategy_signal_id": (
+            str(event.strategy_signal_id) if event.strategy_signal_id is not None else None
+        ),
+        "labels_json": json.dumps(dict(event.labels_json), sort_keys=True),
+        "status": event.status,
+        "created_at": event.created_at,
+        "sent_at": event.sent_at,
+    }
+
+
 def _map_source_event(row: Mapping[str, Any]) -> ExecutionSourceEvent:
     return ExecutionSourceEvent(
         source_event_id=UUID(str(row["source_event_id"])),
@@ -445,6 +615,47 @@ def _map_risk_audit_event(row: Mapping[str, Any]) -> ExecutionRiskAuditEvent:
         check_name=str(row["check_name"]),
         metadata_json=_json_mapping(row.get("metadata_json")),
         created_at=_datetime(row["created_at"]),
+    )
+
+
+def _map_notification(row: Mapping[str, Any]) -> ExecutionNotificationOutboxEvent:
+    return ExecutionNotificationOutboxEvent(
+        notification_id=UUID(str(row["notification_id"])),
+        owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+        source_type=str(row["source_type"]),  # type: ignore[arg-type]
+        event_type=str(row["event_type"]),  # type: ignore[arg-type]
+        severity=str(row["severity"]),  # type: ignore[arg-type]
+        reason=str(row["reason"]),
+        source_event_id=_uuid_or_none(row.get("source_event_id")),
+        intent_id=_uuid_or_none(row.get("intent_id")),
+        order_id=_uuid_or_none(row.get("order_id")),
+        strategy_signal_id=_uuid_or_none(row.get("strategy_signal_id")),
+        labels_json=_json_mapping(row.get("labels_json")),
+        status=str(row["status"]),  # type: ignore[arg-type]
+        created_at=_datetime(row["created_at"]),
+        sent_at=_datetime(row["sent_at"]) if row.get("sent_at") is not None else None,
+    )
+
+
+def _map_producer_link(row: Mapping[str, Any]) -> ExecutionProducerOutcomeLink:
+    return ExecutionProducerOutcomeLink(
+        source_event_id=UUID(str(row["source_event_id"])),
+        owner_user_id=UserId.from_string(str(row["owner_user_id"])),
+        source_type=str(row["source_type"]),  # type: ignore[arg-type]
+        source_event_ref=str(row["source_event_ref"]),
+        strategy_signal_id=_uuid_or_none(row.get("strategy_signal_id")),
+        outcome=str(row["outcome"]),
+        outcome_reason=str(row["outcome_reason"]),
+        intent_id=_uuid_or_none(row.get("intent_id")),
+        intent_status=_str_or_none(row.get("intent_status")),
+        intent_status_reason=_str_or_none(row.get("intent_status_reason")),
+        risk_status=_str_or_none(row.get("risk_status")),
+        risk_reason=_str_or_none(row.get("risk_reason")),
+        order_status=_str_or_none(row.get("order_status")),
+        order_status_reason=_str_or_none(row.get("order_status_reason")),
+        notification_event_type=_str_or_none(row.get("notification_event_type")),
+        notification_reason=_str_or_none(row.get("notification_reason")),
+        updated_at=_datetime(row["updated_at"]),
     )
 
 

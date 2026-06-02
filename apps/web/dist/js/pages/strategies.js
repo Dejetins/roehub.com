@@ -606,6 +606,34 @@ function renderSignalJournal(root, signalJournal) {
     .join("");
 }
 
+function renderExecutionOutcomes(root, executionOutcomes) {
+  const target = qs("[data-execution-outcome-rows]", root);
+  if (!target) {
+    return;
+  }
+  setText(
+    "[data-execution-outcomes-state]",
+    executionOutcomes?.state || t("strategies.panel.unavailable"),
+    root,
+  );
+  const items = executionOutcomes?.items || [];
+  if (!items.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="5">${escapeHtml(panelStatusText(executionOutcomes?.state, executionOutcomes?.degradation_reason, executionOutcomes?.source))}</td></tr>`;
+    return;
+  }
+  target.innerHTML = items
+    .map((item) => `
+      <tr data-source-event-id="${escapeHtml(item.source_event_id)}">
+        <td>${escapeHtml(item.strategy_signal_id || item.source_event_ref)}</td>
+        <td>${escapeHtml(`${item.source_type}: ${item.outcome} / ${item.outcome_reason}`)}</td>
+        <td>${escapeHtml(item.intent_id ? `${item.intent_status || "--"} / ${item.risk_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.order_status ? `${item.order_status} / ${item.order_status_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.notification_event_type ? `${item.notification_event_type} / ${item.notification_reason || "--"}` : "--")}</td>
+      </tr>
+    `)
+    .join("");
+}
+
 function renderFooter(summary) {
   const footer = summary?.footer_status || {};
   setText("[data-footer-connection]", footer.connection_status || "--", document);
@@ -654,6 +682,7 @@ function renderDashboard(root, summary, state = {}) {
   renderRisk(root, summary.risk_execution);
   renderHours(root, summary.hourly_results);
   renderSignalJournal(root, summary.signal_journal);
+  renderExecutionOutcomes(root, summary.execution_outcomes);
   renderTrades(root, summary.trades);
   renderFooter(summary);
   renderFreshness(summary);

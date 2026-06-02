@@ -11,7 +11,9 @@ from trading.contexts.live_execution.application.ports import (
 )
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
+    ExecutionNotificationOutboxEvent,
     ExecutionOrderModelRejectedError,
+    ExecutionProducerOutcomeLink,
     ExecutionRequest,
     ExecutionRiskAuditEvent,
     ExecutionRiskContext,
@@ -19,6 +21,7 @@ from trading.contexts.live_execution.domain import (
     ExecutionSourceValidationError,
     evaluate_execution_risk,
     hash_idempotency_key,
+    sanitize_notification_labels,
     validate_order_model,
     validate_source_event_fields,
 )
@@ -53,6 +56,20 @@ class CreateExecutionIntentCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class EmitExecutionNotificationCommand:
+    owner_user_id: UserId
+    source_type: str
+    event_type: str
+    severity: str
+    reason: str
+    source_event_id: UUID | None = None
+    intent_id: UUID | None = None
+    order_id: UUID | None = None
+    strategy_signal_id: UUID | None = None
+    labels: Mapping[str, object] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionSourceEventResult:
     event: ExecutionSourceEvent
     duplicate: bool
@@ -62,6 +79,12 @@ class ExecutionSourceEventResult:
 class ExecutionIntentResult:
     event: ExecutionSourceEvent
     intent: ExecutionIntent
+    duplicate: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionNotificationResult:
+    notification: ExecutionNotificationOutboxEvent
     duplicate: bool
 
 
@@ -75,6 +98,7 @@ class ExecutionIngressService:
         on_intent: Callable[[str, str, str], None] | None = None,
         on_order_model_rejected: Callable[[str, str], None] | None = None,
         on_risk_decision: Callable[[str, str, str, float], None] | None = None,
+        on_notification: Callable[[str, str, str], None] | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionIngressService requires repository")
@@ -86,6 +110,7 @@ class ExecutionIngressService:
         self._on_intent = on_intent
         self._on_order_model_rejected = on_order_model_rejected
         self._on_risk_decision = on_risk_decision
+        self._on_notification = on_notification
 
     def record_source_event(
         self, *, command: RecordExecutionSourceEventCommand
@@ -216,13 +241,37 @@ class ExecutionIngressService:
                 created_at=self._clock.now(),
             )
         )
+        source_outcome = "risk_rejected" if recorded.risk_status == "rejected" else "intent_created"
         linked = self._repository.update_source_event_outcome(
             owner_user_id=command.owner_user_id,
             source_event_id=event.source_event_id,
-            outcome="intent_created",
+            outcome=source_outcome,
             outcome_reason=recorded.risk_reason,
             intent_id=recorded.intent_id,
         )
+        if recorded.risk_status == "rejected":
+            event_type = (
+                "producer_kill_switch"
+                if recorded.risk_reason == "kill_switch_closed"
+                else "producer_rejected"
+            )
+            self.emit_notification(
+                command=EmitExecutionNotificationCommand(
+                    owner_user_id=recorded.owner_user_id,
+                    source_type=recorded.source_type,
+                    event_type=event_type,
+                    severity="critical" if event_type == "producer_kill_switch" else "warning",
+                    reason=recorded.risk_reason,
+                    source_event_id=recorded.source_event_id,
+                    intent_id=recorded.intent_id,
+                    strategy_signal_id=recorded.strategy_signal_id,
+                    labels={
+                        "risk_status": recorded.risk_status,
+                        "intent_status": recorded.status,
+                        "instrument_key": recorded.instrument_key,
+                    },
+                )
+            )
         self._record_intent(
             source_type=recorded.source_type,
             result=recorded.status,
@@ -235,6 +284,66 @@ class ExecutionIngressService:
             latency_seconds=max(0.0, (risk_finished_at - risk_started_at).total_seconds()),
         )
         return ExecutionIntentResult(event=linked or event, intent=recorded, duplicate=False)
+
+    def emit_notification(
+        self, *, command: EmitExecutionNotificationCommand
+    ) -> ExecutionNotificationResult:
+        source_type = validate_source_event_fields(
+            source_type=command.source_type,
+            source_event_ref=str(command.source_event_id or command.intent_id or command.order_id),
+            source_ref_json={"notification": command.event_type},
+            strategy_signal_id=(
+                command.strategy_signal_id if command.source_type == "strategy_signal" else None
+            ),
+        )
+        labels = sanitize_notification_labels(command.labels or {})
+        notification = ExecutionNotificationOutboxEvent(
+            notification_id=uuid4(),
+            owner_user_id=command.owner_user_id,
+            source_type=source_type,
+            event_type=command.event_type,  # type: ignore[arg-type]
+            severity=command.severity,  # type: ignore[arg-type]
+            reason=command.reason.strip(),
+            source_event_id=command.source_event_id,
+            intent_id=command.intent_id,
+            order_id=command.order_id,
+            strategy_signal_id=command.strategy_signal_id,
+            labels_json=labels,
+            status="pending",
+            created_at=self._clock.now(),
+        )
+        recorded = self._repository.record_notification_outbox(event=notification)
+        self._record_notification(
+            event_type=recorded.event_type,
+            source_type=recorded.source_type,
+            severity=recorded.severity,
+        )
+        return ExecutionNotificationResult(
+            notification=recorded,
+            duplicate=recorded.notification_id != notification.notification_id,
+        )
+
+    def list_recent_notifications(
+        self,
+        *,
+        owner_user_id: UserId,
+        limit: int,
+        strategy_id: UUID | None = None,
+    ) -> tuple[ExecutionNotificationOutboxEvent, ...]:
+        return self._repository.list_recent_notifications(
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+            limit=limit,
+        )
+
+    def list_producer_outcome_links_for_strategy(
+        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+    ) -> tuple[ExecutionProducerOutcomeLink, ...]:
+        return self._repository.list_producer_outcome_links_for_strategy(
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+            limit=limit,
+        )
 
     def _build_request(
         self, *, command: CreateExecutionIntentCommand, event: ExecutionSourceEvent
@@ -278,3 +387,7 @@ class ExecutionIngressService:
     ) -> None:
         if self._on_risk_decision is not None:
             self._on_risk_decision(source_type, result, reason, latency_seconds)
+
+    def _record_notification(self, *, event_type: str, source_type: str, severity: str) -> None:
+        if self._on_notification is not None:
+            self._on_notification(event_type, source_type, severity)

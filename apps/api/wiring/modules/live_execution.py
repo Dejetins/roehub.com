@@ -12,6 +12,7 @@ from apps.api.monitoring import (
     record_execution_dispatch_redis_error,
     record_execution_dispatch_retry,
     record_execution_intent,
+    record_execution_notification_outbox,
     record_execution_order_model_rejected,
     record_execution_risk_gate,
     record_execution_source_event,
@@ -110,6 +111,13 @@ def build_ui_execution_router_module(
                 result=result,
                 reason=reason,
                 latency_seconds=latency_seconds,
+            )
+        ),
+        on_notification=lambda event_type, source_type, severity: (
+            record_execution_notification_outbox(
+                event_type=event_type,
+                source_type=source_type,
+                severity=severity,
             )
         ),
     )

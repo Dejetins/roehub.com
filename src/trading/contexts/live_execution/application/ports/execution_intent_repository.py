@@ -6,6 +6,8 @@ from uuid import UUID
 
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
+    ExecutionNotificationOutboxEvent,
+    ExecutionProducerOutcomeLink,
     ExecutionRiskAuditEvent,
     ExecutionSourceEvent,
 )
@@ -71,3 +73,19 @@ class ExecutionIntentRepository(Protocol):
     def record_risk_audit_event(
         self, *, event: ExecutionRiskAuditEvent
     ) -> ExecutionRiskAuditEvent: ...
+
+    def record_notification_outbox(
+        self, *, event: ExecutionNotificationOutboxEvent
+    ) -> ExecutionNotificationOutboxEvent: ...
+
+    def list_recent_notifications(
+        self,
+        *,
+        owner_user_id: UserId,
+        limit: int,
+        strategy_id: UUID | None = None,
+    ) -> tuple[ExecutionNotificationOutboxEvent, ...]: ...
+
+    def list_producer_outcome_links_for_strategy(
+        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+    ) -> tuple[ExecutionProducerOutcomeLink, ...]: ...

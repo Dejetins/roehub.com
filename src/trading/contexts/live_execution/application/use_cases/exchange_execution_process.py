@@ -28,6 +28,7 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderCommand,
     ExchangeOrderStatusResult,
     ExecutionIntent,
+    ExecutionNotificationOutboxEvent,
     ExecutionOrderEvent,
     ExecutionReconciliationRun,
 )
@@ -111,6 +112,7 @@ class ExchangeExecutionProcessService:
         on_private_stream: Callable[[str, str], None] | None = None,
         on_order_latency: Callable[[str, float], None] | None = None,
         on_reconciliation: Callable[[str, str], None] | None = None,
+        on_notification: Callable[[str, str, str], None] | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExchangeExecutionProcessService requires repository")
@@ -134,6 +136,7 @@ class ExchangeExecutionProcessService:
         self._on_private_stream = on_private_stream
         self._on_order_latency = on_order_latency
         self._on_reconciliation = on_reconciliation
+        self._on_notification = on_notification
 
     def readiness(self) -> ExchangeExecutionHealthSnapshot:
         now = self._clock.now()
@@ -496,6 +499,12 @@ class ExchangeExecutionProcessService:
                 reason="exchange_adapter_not_enabled",
                 metadata={"exchange": exchange_name},
             )
+            self._record_order_notification(
+                order=order,
+                event_type="producer_rejected",
+                severity="warning",
+                reason="exchange_adapter_not_enabled",
+            )
             return "guard_rejected", "exchange_adapter_not_enabled"
         command = _command_from_intent(intent=intent, exchange_name=exchange_name)
         existing = self._order_repository.get_by_intent(intent_id=intent.intent_id)
@@ -518,6 +527,12 @@ class ExchangeExecutionProcessService:
                 reason=error.reason,
                 metadata={"guard": "credential"},
             )
+            self._record_order_notification(
+                order=order,
+                event_type="producer_rejected",
+                severity="warning",
+                reason=error.reason,
+            )
             return "guard_rejected", error.reason
         guard_reason = _connection_guard_reason(intent=intent, connection=connection)
         if guard_reason is not None:
@@ -537,6 +552,12 @@ class ExchangeExecutionProcessService:
                 reason=guard_reason,
                 metadata={"guard": "connection"},
             )
+            self._record_order_notification(
+                order=order,
+                event_type="producer_rejected",
+                severity="warning",
+                reason=guard_reason,
+            )
             return "guard_rejected", guard_reason
         command = _command_from_intent(
             intent=intent,
@@ -555,6 +576,12 @@ class ExchangeExecutionProcessService:
                 status="guard_rejected",
                 reason=clock_reason,
                 metadata={"guard": "clock"},
+            )
+            self._record_order_notification(
+                order=order,
+                event_type="producer_rejected",
+                severity="warning",
+                reason=clock_reason,
             )
             return "guard_rejected", clock_reason
         pending_order = self._order_repository.record_submit_pending(command=command)
@@ -599,6 +626,11 @@ class ExchangeExecutionProcessService:
                     reason=submitted.exchange_status,
                     provider_event_id=submitted.exchange_order_id,
                     metadata=submitted.metadata,
+                )
+                self._update_source_event_from_order(
+                    order=submitted_order,
+                    outcome="submitted",
+                    reason=submitted.exchange_status,
                 )
             self._record_order_submit(
                 exchange=connection.exchange_name,
@@ -650,6 +682,17 @@ class ExchangeExecutionProcessService:
                         provider_event_id=cancelled.exchange_order_id,
                         metadata=cancelled.metadata,
                     )
+                    self._update_source_event_from_order(
+                        order=cancelled_order,
+                        outcome="cancelled",
+                        reason=cancelled.exchange_status,
+                    )
+                    self._record_order_notification(
+                        order=cancelled_order,
+                        event_type="producer_terminal",
+                        severity="info",
+                        reason=cancelled.exchange_status,
+                    )
                 self._record_order_latency(
                     exchange=connection.exchange_name,
                     latency_ms=cancelled.latency_ms,
@@ -671,6 +714,17 @@ class ExchangeExecutionProcessService:
                     status="adapter_error",
                     reason=reason,
                     metadata={"unknown_state": int(error.unknown_state)},
+                )
+                self._update_source_event_from_order(
+                    order=order,
+                    outcome="reconciliation_required" if error.unknown_state else "failed",
+                    reason=reason,
+                )
+                self._record_order_notification(
+                    order=order,
+                    event_type="producer_unknown" if error.unknown_state else "producer_terminal",
+                    severity="critical" if error.unknown_state else "warning",
+                    reason=reason,
                 )
                 self._record_reconciliation(
                     order=order,
@@ -766,6 +820,84 @@ class ExchangeExecutionProcessService:
             )
         )
         self._record_reconciliation_metric(status=status, reason=reason)
+        if fill_count > 0:
+            self._update_source_event_from_order(
+                order=order,
+                outcome="filled",
+                reason=reason,
+            )
+            self._record_order_notification(
+                order=order,
+                event_type="producer_fill",
+                severity="info",
+                reason=reason,
+            )
+        if status == "matched":
+            self._record_order_notification(
+                order=order,
+                event_type="producer_terminal",
+                severity="info",
+                reason=reason,
+            )
+
+    def _update_source_event_from_order(
+        self, *, order: ExchangeExecutionOrderRecord, outcome: str, reason: str
+    ) -> None:
+        intent = self._intent_repository.get_intent_by_id(
+            owner_user_id=order.owner_user_id,
+            intent_id=order.intent_id,
+        )
+        if intent is None:
+            return
+        self._intent_repository.update_source_event_outcome(
+            owner_user_id=order.owner_user_id,
+            source_event_id=intent.source_event_id,
+            outcome=outcome,
+            outcome_reason=reason,
+            intent_id=intent.intent_id,
+        )
+
+    def _record_order_notification(
+        self,
+        *,
+        order: ExchangeExecutionOrderRecord,
+        event_type: str,
+        severity: str,
+        reason: str,
+    ) -> None:
+        intent = self._intent_repository.get_intent_by_id(
+            owner_user_id=order.owner_user_id,
+            intent_id=order.intent_id,
+        )
+        if intent is None:
+            return
+        recorded = self._intent_repository.record_notification_outbox(
+            event=ExecutionNotificationOutboxEvent(
+                notification_id=uuid4(),
+                owner_user_id=order.owner_user_id,
+                source_type=intent.source_type,
+                event_type=event_type,  # type: ignore[arg-type]
+                severity=severity,  # type: ignore[arg-type]
+                reason=reason,
+                source_event_id=intent.source_event_id,
+                intent_id=intent.intent_id,
+                order_id=order.order_id,
+                strategy_signal_id=intent.strategy_signal_id,
+                labels_json={
+                    "order_status": order.status,
+                    "market_type": order.market_type,
+                    "exchange": order.exchange_name,
+                },
+                status="pending",
+                created_at=self._clock.now(),
+            )
+        )
+        if self._on_notification is not None:
+            self._on_notification(
+                recorded.event_type,
+                recorded.source_type,
+                recorded.severity,
+            )
 
     def _exchange_clock_guard_reason(self, *, adapter: ExchangeOrderAdapter) -> str | None:
         try:
