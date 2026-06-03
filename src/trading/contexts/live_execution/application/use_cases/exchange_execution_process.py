@@ -218,10 +218,15 @@ class ExchangeExecutionProcessService:
                 reason="consumer_disabled",
             )
         self._consumer.ensure_request_group()
-        messages = self._consumer.read_new_requests(
-            count=self._config.read_count,
-            block_ms=self._config.block_ms,
-        )
+        pending_messages = self._consumer.read_pending_requests(count=self._config.read_count)
+        if len(pending_messages) >= self._config.read_count:
+            messages = pending_messages
+        else:
+            new_messages = self._consumer.read_new_requests(
+                count=self._config.read_count - len(pending_messages),
+                block_ms=self._config.block_ms,
+            )
+            messages = (*pending_messages, *new_messages)
         observed_count = 0
         submitted_count = 0
         guard_rejected_count = 0

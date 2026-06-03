@@ -13,6 +13,7 @@ from trading.contexts.live_execution.adapters.outbound.redis import (
 class _FakeRedis:
     def __init__(self) -> None:
         self.groups: list[tuple[str, str]] = []
+        self.reads: list[Mapping[str, str]] = []
         self.messages: dict[str, list[tuple[str, dict[str, str]]]] = {
             "execution.requests.v1": [
                 ("1-0", {"intent_id": "00000000-0000-0000-0000-000000000001"})
@@ -48,6 +49,7 @@ class _FakeRedis:
         block: int,
     ) -> list[tuple[str, list[tuple[str, dict[str, str]]]]]:
         _ = groupname, consumername, block
+        self.reads.append(streams)
         stream_name = next(iter(streams))
         return [(stream_name, self.messages.get(stream_name, [])[:count])]
 
@@ -74,6 +76,7 @@ def test_redis_exchange_execution_consumer_reads_dlqs_and_acks() -> None:
 
     consumer.ensure_request_group()
     messages = consumer.read_new_requests(count=10, block_ms=0)
+    pending_messages = consumer.read_pending_requests(count=10)
     dlq = consumer.publish_dlq(message=messages[0], reason="intent_not_found")
     consumer.ack_after_durable_state_change(
         stream_name=messages[0].stream_name,
@@ -81,7 +84,14 @@ def test_redis_exchange_execution_consumer_reads_dlqs_and_acks() -> None:
     )
 
     assert redis.groups == [("execution.requests.v1", "exchange-execution.v1")]
+    assert redis.reads == [
+        {"execution.requests.v1": ">"},
+        {"execution.requests.v1": "0"},
+    ]
     assert messages[0].payload["intent_id"] == "00000000-0000-0000-0000-000000000001"
+    assert pending_messages[0].payload["intent_id"] == (
+        "00000000-0000-0000-0000-000000000001"
+    )
     assert dlq.stream_name == "execution.requests.dlq.v1"
     assert redis.messages["execution.requests.dlq.v1"][0][1]["quarantine_reason"] == (
         "intent_not_found"

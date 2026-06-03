@@ -1,3 +1,8 @@
+# Stage 17 alert contract:
+# severity: critical for /health/ready and /metrics failures.
+# owner: live-execution.
+# escalation: stop canary/mainnet enablement and inspect durable Postgres/Redis state.
+# runbook/action: docs/runbooks/exchange-execution.md#stage-17-alert-actions.
 check process roehub_exchange_execution matching "apps.exchange_execution.main.main"
   start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.exchange-execution /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist"
   stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.exchange-execution /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist"

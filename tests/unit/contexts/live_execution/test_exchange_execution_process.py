@@ -46,8 +46,13 @@ class _Clock:
 
 
 class _Consumer:
-    def __init__(self, messages: tuple[ExchangeExecutionRedisMessage, ...]) -> None:
+    def __init__(
+        self,
+        messages: tuple[ExchangeExecutionRedisMessage, ...],
+        pending_messages: tuple[ExchangeExecutionRedisMessage, ...] = (),
+    ) -> None:
         self.messages = messages
+        self.pending_messages = pending_messages
         self.groups_ensured = 0
         self.dlq: list[tuple[str, str]] = []
         self.acked: list[tuple[str, str]] = []
@@ -69,6 +74,9 @@ class _Consumer:
     ) -> tuple[ExchangeExecutionRedisMessage, ...]:
         _ = block_ms
         return self.messages[:count]
+
+    def read_pending_requests(self, *, count: int) -> tuple[ExchangeExecutionRedisMessage, ...]:
+        return self.pending_messages[:count]
 
     def publish_dlq(
         self, *, message: ExchangeExecutionRedisMessage, reason: str
@@ -174,6 +182,46 @@ def test_invalid_or_non_dispatchable_message_is_quarantined_to_dlq_and_acked() -
     assert consumer.dlq == [("1-0", "intent_not_found")]
     assert consumer.acked == [("execution.requests.v1", "1-0")]
     assert dlq_reasons == ["intent_not_found"]
+
+
+def test_run_once_recovers_pending_messages_before_reading_new_requests() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    first_intent = _intent(status="dispatched", risk_status="accepted")
+    second_intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=first_intent)
+    intent_repository.record_intent(intent=second_intent)
+    pending_message = _message(
+        payload={
+            "intent_id": str(first_intent.intent_id),
+            "owner_user_id": str(first_intent.owner_user_id),
+        }
+    )
+    new_message = ExchangeExecutionRedisMessage(
+        stream_name="execution.requests.v1",
+        message_id="2-0",
+        payload={
+            "intent_id": str(second_intent.intent_id),
+            "owner_user_id": str(second_intent.owner_user_id),
+        },
+    )
+    consumer = _Consumer(messages=(new_message,), pending_messages=(pending_message,))
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(consumer_enabled=True),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.read_count == 2
+    assert result.observed_count == 2
+    assert [item.redis_message_id for item in process_repository.observations] == [
+        "1-0",
+        "2-0",
+    ]
 
 
 def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:

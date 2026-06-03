@@ -180,3 +180,71 @@ Do not enable mainnet order adapters from this runbook. Testnet evidence must
 record only redacted provider identifiers and must never include API keys,
 secrets, passphrases, signatures, cookies, Authorization headers or raw signed
 payloads.
+
+## Stage 17 Production Readiness
+
+Stage 17 keeps production in `adapter_mode=testnet`. Mainnet submit remains
+blocked until a separate explicit canary approval changes the policy outside
+this runbook.
+
+Safe canary protocol:
+
+1. Confirm Stage 16 and Stage 17 ledger entries are accepted and deployed.
+2. Confirm `ROEHUB_EXECUTION_PITR_VERIFIED=true`, `/health/ready` is `ready`,
+   Monit shows `roehub_exchange_execution OK`, and Prometheus target
+   `up{job="exchange-execution"}` is `1`.
+3. Run only a funded testnet connection with a tiny bounded notional and
+   `cancel_after_submit=true` unless the explicit canary approval says
+   otherwise.
+4. Record source-event, intent, risk, Redis dispatch, order, fill/funding,
+   reconciliation and notification rows before declaring the run complete.
+5. Compute latency from durable timestamps only: source received, intent
+   created, risk decision, Redis dispatch, submit, ack/status, fill,
+   reconciliation and notification.
+6. Compute slippage only when a bounded expected price is available in the
+   source reference or limit price. Otherwise report slippage as unavailable,
+   not zero.
+7. Verify Redis has no unexplained `XPENDING` or DLQ growth after the canary.
+8. Keep all reports secret-safe: no cookies, tokens, ciphertext, raw signed
+   payloads, passphrases or provider responses with sensitive fields.
+
+Rollback and kill switch:
+
+```bash
+# Producer-side kill switch proof: accepted context must set kill_switch_open=false
+# and return risk_reason=kill_switch_closed before Redis dispatch.
+
+# Runtime stop:
+launchctl bootout gui/$(id -u) /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist
+
+# Runtime restore:
+launchctl bootstrap gui/$(id -u) /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.exchange-execution.plist
+curl -fsS http://127.0.0.1:9206/health/ready
+```
+
+Do not delete ledger rows during rollback. Postgres remains the source of truth
+for source events, intents, orders, fills, reconciliation and notification
+outbox rows. Redis messages may be acknowledged only after the durable state
+change they represent has been written.
+
+## Stage 17 Alert Actions
+
+The repo-managed production rules live in
+`infra/macos/prometheus/rules/live-execution-stage17.rules.yml` and are
+installed by `scripts/macos/bootstrap_native_prod.sh` into
+`/opt/roehub/config/prometheus.rules/`.
+
+| Alert | Severity | Owner | Escalation | Runbook action |
+|---|---|---|---|---|
+| `LiveExecutionDlqGrowing` | critical | live-execution | Stop canary; keep mainnet disabled. | Inspect `execution.requests.v1`, `execution.requests.dlq.v1`, `exchange_execution_request_observations`, `execution_intents`, then reconcile before replay. |
+| `LiveExecutionClockDriftUnsafe` | critical | live-execution | Stop canary and block submit. | Fix host time/NTP, reload `exchange-execution`, rerun `/health/ready` and drift metric checks. |
+| `LiveExecutionPrivateStreamMissingForSubmit` | critical | live-execution | Stop canary; reconcile provider state. | Check `exchange_private_stream_sessions`, `execution_order_events` and `execution_reconciliation_runs` for stream/session proof. |
+| `LiveExecutionDispatchBackpressure` | warning | live-execution | Pause new dispatch until drained. | Compare `XINFO STREAM`, `XPENDING`, API dispatch retry counters and observations before resuming. |
+| `LiveExecutionReconciliationPending` | critical | live-execution | Stop canary and reconcile provider facts. | Query orders, order events, fills and reconciliation rows; do not retry blindly. |
+| `LiveExecutionPitrNotVerified` | critical | live-execution | Keep mainnet disabled; block canary approval. | Run PITR restore drill, insert redacted `execution_ledger_pitr_drills`, set `ROEHUB_EXECUTION_PITR_VERIFIED=true`, reload. |
+| `LiveExecutionUnknownState` | critical | live-execution | Stop canary; preserve evidence. | Use notification outbox, order events, reconciliation rows and provider status as source of truth before retry. |
+
+Monit is the process-level guard for `roehub_exchange_execution`. Its
+Stage 17 contract is critical severity, owner `live-execution`, and the same
+escalation: stop canary/mainnet enablement, inspect durable Postgres/Redis
+state, then recover through this runbook.

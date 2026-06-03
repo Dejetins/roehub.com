@@ -69,6 +69,50 @@ def test_prometheus_monitoring_contract_includes_required_jobs_and_targets() -> 
     ]
 
 
+def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
+    payload = _load_yaml(relative_path="infra/macos/prometheus/prometheus.prod.yml")
+    assert payload["rule_files"] == [
+        "/opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml"
+    ]
+    jobs_by_name = {job["job_name"]: job for job in payload["scrape_configs"]}
+    assert jobs_by_name["exchange-execution"]["static_configs"] == [
+        {"targets": ["127.0.0.1:9206"]}
+    ]
+
+    rules_payload = _load_yaml(
+        relative_path="infra/macos/prometheus/rules/live-execution-stage17.rules.yml"
+    )
+    groups = rules_payload["groups"]
+    assert [group["name"] for group in groups] == ["live-execution-production-readiness"]
+    rules = groups[0]["rules"]
+    alerts = {rule["alert"]: rule for rule in rules}
+    assert set(alerts) == {
+        "LiveExecutionDlqGrowing",
+        "LiveExecutionClockDriftUnsafe",
+        "LiveExecutionPrivateStreamMissingForSubmit",
+        "LiveExecutionDispatchBackpressure",
+        "LiveExecutionReconciliationPending",
+        "LiveExecutionPitrNotVerified",
+        "LiveExecutionUnknownState",
+    }
+    for rule in alerts.values():
+        assert rule["labels"]["severity"] in {"warning", "critical"}
+        assert rule["labels"]["owner"] == "live-execution"
+        assert rule["annotations"]["runbook"] == (
+            "docs/runbooks/exchange-execution.md#stage-17-alert-actions"
+        )
+        assert rule["annotations"]["escalation"]
+        assert rule["annotations"]["action"]
+
+
+def test_macos_bootstrap_installs_stage17_prometheus_rules() -> None:
+    script = (_repo_root() / "scripts/macos/bootstrap_native_prod.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "/opt/roehub/config/prometheus.rules" in script
+    assert "live-execution-stage17.rules.yml" in script
+
+
 def test_blackbox_and_grafana_provisioning_assets_are_repo_managed() -> None:
     blackbox_payload = _load_yaml(relative_path="infra/monitoring/monitoring/blackbox/blackbox.yml")
     datasource_payload = _load_yaml(

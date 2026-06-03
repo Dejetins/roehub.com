@@ -84,17 +84,20 @@ class RedisExchangeExecutionConsumer(ExchangeExecutionConsumer):
             )
         except RedisError as error:
             raise _unavailable(error) from error
-        messages: list[ExchangeExecutionRedisMessage] = []
-        for stream_name, stream_messages in cast(Any, raw_response):
-            for message_id, payload in stream_messages:
-                messages.append(
-                    ExchangeExecutionRedisMessage(
-                        stream_name=str(stream_name),
-                        message_id=str(message_id),
-                        payload={str(key): str(value) for key, value in dict(payload).items()},
-                    )
-                )
-        return tuple(messages)
+        return _messages_from_raw_response(raw_response=raw_response)
+
+    def read_pending_requests(self, *, count: int) -> tuple[ExchangeExecutionRedisMessage, ...]:
+        try:
+            raw_response = self._redis.xreadgroup(
+                groupname=self._config.consumer_group,
+                consumername=self._consumer_name,
+                streams={self._config.request_stream: "0"},
+                count=count,
+                block=0,
+            )
+        except RedisError as error:
+            raise _unavailable(error) from error
+        return _messages_from_raw_response(raw_response=raw_response)
 
     def publish_dlq(
         self, *, message: ExchangeExecutionRedisMessage, reason: str
@@ -166,6 +169,20 @@ class RedisExchangeExecutionConsumer(ExchangeExecutionConsumer):
 def _bounded(reason: str) -> str:
     text = reason.strip() or "unknown"
     return text[:80]
+
+
+def _messages_from_raw_response(raw_response: object) -> tuple[ExchangeExecutionRedisMessage, ...]:
+    messages: list[ExchangeExecutionRedisMessage] = []
+    for stream_name, stream_messages in cast(Any, raw_response):
+        for message_id, payload in stream_messages:
+            messages.append(
+                ExchangeExecutionRedisMessage(
+                    stream_name=str(stream_name),
+                    message_id=str(message_id),
+                    payload={str(key): str(value) for key, value in dict(payload).items()},
+                )
+            )
+    return tuple(messages)
 
 
 def _unavailable(error: BaseException) -> ExecutionDispatchUnavailableError:

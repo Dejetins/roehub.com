@@ -1,0 +1,93 @@
+groups:
+  - name: live-execution-production-readiness
+    rules:
+      - alert: LiveExecutionDlqGrowing
+        expr: increase(exchange_execution_dlq_total{job="exchange-execution"}[15m]) > 0 or increase(execution_dispatch_dlq_total{job="api"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: Live execution DLQ received messages
+          description: A request was quarantined or moved to a live-execution DLQ in the last 15 minutes.
+          escalation: Stop canary, keep mainnet disabled, inspect Postgres intent/order rows before any replay.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Check XPENDING and XREVRANGE for execution.requests.v1 and execution.requests.dlq.v1, then reconcile from Postgres before retry.
+
+      - alert: LiveExecutionClockDriftUnsafe
+        expr: abs(max(exchange_execution_clock_drift_ms{job="exchange-execution"})) > 1000
+        for: 2m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: exchange-execution clock drift exceeds signing guard
+          description: Local process time and Redis server time differ by more than 1000 ms.
+          escalation: Stop canary and block submit until host time is corrected and readiness returns ready.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Verify host time/NTP, reload exchange-execution, rerun /health/ready and metrics drift checks.
+
+      - alert: LiveExecutionPrivateStreamMissingForSubmit
+        expr: increase(exchange_execution_testnet_order_total{job="exchange-execution"}[30m]) > 0 unless increase(exchange_execution_private_stream_total{job="exchange-execution"}[30m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: Testnet submit happened without private stream readiness evidence
+          description: Order adapter activity increased without matching private stream lifecycle evidence.
+          escalation: Stop canary, verify provider private stream session and run reconciliation before any retry.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Check exchange_private_stream_sessions, execution_order_events, and execution_reconciliation_runs for the affected connection.
+
+      - alert: LiveExecutionDispatchBackpressure
+        expr: max(exchange_execution_dependency_ready{job="exchange-execution",dependency="backpressure",status="degraded",reason="dispatch_backpressure"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+          owner: live-execution
+        annotations:
+          summary: Live execution dispatch stream is at backpressure threshold
+          description: exchange-execution readiness observed request-stream backpressure.
+          escalation: Pause new canary dispatch and drain or reconcile existing requests before resuming.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Compare XINFO STREAM length, XPENDING, API dispatch retry counters, and exchange-execution observations.
+
+      - alert: LiveExecutionReconciliationPending
+        expr: increase(execution_reconciliation_total{job="exchange-execution",status="pending"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: Live execution reconciliation is pending
+          description: At least one order requires reconciliation and is not matched to provider facts.
+          escalation: Stop canary and reconcile from provider status/fills before retry or cleanup.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Query execution_orders, execution_order_events, execution_fills, and execution_reconciliation_runs for the pending row.
+
+      - alert: LiveExecutionPitrNotVerified
+        expr: max(exchange_execution_dependency_ready{job="exchange-execution",dependency="ledger_pitr",status!="ready",reason="pitr_restore_not_verified"}) == 0
+        for: 5m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: Money-ledger PITR restore proof is missing
+          description: exchange-execution reports PITR readiness as not verified for production money ledgers.
+          escalation: Keep mainnet disabled and do not approve canary until restore proof is recorded.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Run target-host PITR restore drill, insert redacted execution_ledger_pitr_drills evidence, set ROEHUB_EXECUTION_PITR_VERIFIED=true, and reload.
+
+      - alert: LiveExecutionUnknownState
+        expr: increase(execution_notification_outbox_total{job="exchange-execution",event_type="producer_unknown"}[15m]) > 0 or increase(execution_reconciliation_total{job="exchange-execution",reason="unknown_needs_reconciliation"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: live-execution
+        annotations:
+          summary: Live execution entered an unknown provider state
+          description: A producer_unknown notification or unknown-state reconciliation marker was emitted.
+          escalation: Stop canary, preserve Redis/Postgres/provider evidence, and reconcile from durable/provider source of truth before retry.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Query notification outbox, order events, reconciliation rows, and provider status for the affected order.

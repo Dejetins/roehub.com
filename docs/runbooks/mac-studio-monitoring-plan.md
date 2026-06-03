@@ -8,6 +8,8 @@
 - `VPS` остается публичным edge;
 - monitoring собирается локально с `127.0.0.1` целей;
 - source of truth для scrape-конфигурации: `infra/macos/prometheus/prometheus.prod.yml`.
+- live-execution production-readiness rules live in
+  `infra/macos/prometheus/rules/live-execution-stage17.rules.yml`.
 
 ## Что реально мониторится сейчас
 
@@ -117,6 +119,13 @@ bash scripts/macos/reload_launchd_services.sh prod
 - market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
 - backtest runner metrics (`backtest_runner_*`, `backtest_lazy_trades_cache_total`, `backtest_quota_rejections_total`)
 - exchange-control runtime metrics (`exchange_control_active`, `exchange_connection_validation_total`, `exchange_connection_status`)
+- exchange-execution runtime metrics (`exchange_execution_ready`,
+  `exchange_execution_dependency_ready`, `exchange_execution_dlq_total`,
+  `exchange_execution_clock_drift_ms`, `exchange_execution_private_stream_total`,
+  `exchange_execution_testnet_order_total`,
+  `execution_reconciliation_total`,
+  `execution_notification_outbox_total`,
+  `execution_ledger_backup_restore_total`)
 - API auth path health (`http_requests_total`, `http_request_duration_seconds`)
 - Prometheus self metrics
 
@@ -131,6 +140,11 @@ bash scripts/macos/reload_launchd_services.sh prod
 - market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
 - backtest job runner: `backtest_runner_tasks_claimed_total`, `backtest_runner_tasks_finished_total`, `backtest_runner_task_duration_seconds`, `backtest_runner_queue_wait_seconds`, `backtest_runner_active`, `backtest_runner_lease_lost_total`, `backtest_lazy_trades_cache_total`, `backtest_runner_last_success_unixtime`
 - exchange-control: `exchange_control_active`, `exchange_connection_validation_total{exchange,result,reason}`, `exchange_connection_status{exchange,status}`
+- live execution: `exchange_execution_ready`,
+  `exchange_execution_dependency_ready`, `exchange_execution_dlq_total`,
+  `exchange_execution_clock_drift_ms`, `exchange_execution_submit_latency_ms`,
+  `execution_reconciliation_total`,
+  `execution_notification_outbox_total`
 - auth API (через `http://127.0.0.1:8000/metrics`): `http_requests_total{path=~"/auth/(login|callback|logout|current-user)",status_code=~"5.."}`, `http_request_duration_seconds_count{path=~"/auth/(login|callback|logout|current-user)"}`.
 
 ## Вне scope

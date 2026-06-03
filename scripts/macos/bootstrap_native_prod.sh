@@ -5,7 +5,7 @@ PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
 
-mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/config/openbao /opt/roehub/config/openbao/policies /opt/roehub/state/backups /opt/roehub/state/openbao/data /opt/roehub/clickhouse
+mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/config/prometheus.rules /opt/roehub/config/openbao /opt/roehub/config/openbao/policies /opt/roehub/state/backups /opt/roehub/state/openbao/data /opt/roehub/clickhouse
 mkdir -p /opt/roehub/state/backtest_artifacts/v2
 mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clickhouse/logs /opt/roehub/clickhouse/backups /opt/roehub/clickhouse/access
 mkdir -p /Users/daniildegtyarev/.config/roehub /Users/daniildegtyarev/.local/bin /Users/daniildegtyarev/Library/Logs/roehub "$LAUNCH_AGENTS_DIR"
@@ -19,6 +19,7 @@ rm -f \
   /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
+install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/live-execution-stage17.rules.yml" /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl" /opt/roehub/config/openbao/policies/roehub-api-transit-deny-decrypt.hcl
