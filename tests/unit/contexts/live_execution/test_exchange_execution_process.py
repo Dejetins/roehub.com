@@ -314,6 +314,53 @@ def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
     assert process_repository.observations[0].status == "guard_rejected"
 
 
+def test_testnet_adapter_rejects_unsupported_exchange_without_order_row() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(
+        status="dispatched",
+        risk_status="accepted",
+        instrument_key="codexstage16:spot:BTCUSDT",
+    )
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        pending_messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        ),
+        messages=(),
+    )
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(_Adapter(exchange_name="bybit"),),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.guard_rejected_count == 1
+    assert result.acked_count == 1
+    assert consumer.acked == [("execution.requests.v1", "1-0")]
+    assert process_repository.observations[0].status == "guard_rejected"
+    assert process_repository.observations[0].status_reason == "exchange_adapter_not_enabled"
+    assert order_repository.orders == {}
+    assert order_repository.order_events == []
+
+
 def _message(*, payload: dict[str, str]) -> ExchangeExecutionRedisMessage:
     return ExchangeExecutionRedisMessage(
         stream_name="execution.requests.v1",
@@ -322,7 +369,12 @@ def _message(*, payload: dict[str, str]) -> ExchangeExecutionRedisMessage:
     )
 
 
-def _intent(*, status: str, risk_status: str) -> ExecutionIntent:
+def _intent(
+    *,
+    status: str,
+    risk_status: str,
+    instrument_key: str = "bybit:spot:BTCUSDT",
+) -> ExecutionIntent:
     return ExecutionIntent(
         intent_id=uuid4(),
         source_event_id=uuid4(),
@@ -331,7 +383,7 @@ def _intent(*, status: str, risk_status: str) -> ExecutionIntent:
         strategy_signal_id=None,
         exchange_connection_id=UUID("00000000-0000-0000-0000-000000013101"),
         market_type="spot",
-        instrument_key="bybit:spot:BTCUSDT",
+        instrument_key=instrument_key,
         side="buy",
         order_type="market",
         quantity=Decimal("0.01"),

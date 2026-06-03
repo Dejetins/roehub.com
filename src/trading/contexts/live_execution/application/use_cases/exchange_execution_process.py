@@ -34,6 +34,8 @@ from trading.contexts.live_execution.domain import (
 )
 from trading.shared_kernel.primitives import UserId
 
+_ORDER_LEDGER_EXCHANGES = frozenset({"binance", "bybit"})
+
 
 @dataclass(frozen=True, slots=True)
 class ExchangeExecutionProcessConfig:
@@ -490,6 +492,8 @@ class ExchangeExecutionProcessService:
         if self._order_repository is None or self._credential_resolver is None:
             return "guard_rejected", "testnet_adapter_dependency_missing"
         exchange_name = _exchange_from_instrument_key(intent.instrument_key)
+        if exchange_name not in _ORDER_LEDGER_EXCHANGES:
+            return "guard_rejected", "exchange_adapter_not_enabled"
         adapter = self._order_adapters.get(exchange_name)
         if exchange_name not in self._config.enabled_exchanges or adapter is None:
             command = _command_from_intent(intent=intent, exchange_name=exchange_name)
