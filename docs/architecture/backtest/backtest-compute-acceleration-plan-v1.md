@@ -308,6 +308,32 @@ but accepted speedup must not get a benchmark advantage over the current service
 If any fairness rule is not met, the result can be recorded as directional
 evidence only and cannot set `next_iteration_allowed: true` for a production path.
 
+### Git / Main Branch Delivery
+
+Все stage prompts выполняются из checkout ветки `main`. Если активная ветка не
+`main`, executor должен остановиться и явно сообщить blocker, если пользователь
+заранее не разрешил другой branch для конкретного stage.
+
+После успешного `accepted` stage executor должен:
+
+- обновить stage ledger, evidence и связанные docs до финального состояния;
+- выполнить required quality gates и benchmark/evidence gates;
+- добавить в Git только scoped stage files, без unrelated worktree changes;
+- создать commit на ветке `main` с stage-specific message;
+- записать commit SHA, scoped paths и `push/deploy: not performed` в финальный
+  отчет и stage ledger.
+
+`accepted_for_learning` shadow/telemetry stages тоже должны быть сохранены в
+`main`, если их код, docs или evidence являются durable handoff для следующих
+stages. При этом ledger обязан сохранить статус `accepted_for_learning` и явно
+указать, что production `on` mode не разблокирован.
+
+`blocked` и `rejected` stages не должны коммитить production runtime changes.
+Допускается сохранить в `main` только ledger/evidence/docs, фиксирующие blocker
+или rejection, если это нужно для durable history. Push/deploy не является частью
+этих stage prompts и выполняется только по отдельному user request или delivery
+prompt.
+
 ### Correctness Acceptance Matrix
 
 Every stage that changes scoring, candidate pruning, sidecar loading or top-N
@@ -407,6 +433,9 @@ Each row must record:
 - correctness result;
 - memory result;
 - contract impact;
+- Git branch, scoped staged/committed paths and commit SHA when the stage is
+  `accepted` or `accepted_for_learning`;
+- push/deploy handoff status, normally `not performed` for this plan;
 - `next_iteration_allowed`.
 
 ## Открытые Риски

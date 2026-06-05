@@ -13,6 +13,25 @@ production-affecting backend stage может двигаться дальше т
 - `accepted`: stage прошел correctness, speed, memory и contract gates.
 - `rejected`: stage не принят; изменения не должны оставаться в production runtime.
 
+## Git / Main Delivery Rule
+
+Все implementation stages выполняются на ветке `main`. Если checkout не на
+`main`, executor должен остановиться и записать blocker, если пользователь
+явно не разрешил другой branch.
+
+После `accepted` stage executor должен обновить ledger/evidence/docs, выполнить
+required gates, добавить в Git только scoped stage files и создать commit на
+ветке `main`. Запись stage должна включать branch, scoped paths, commit SHA и
+`push/deploy` статус. По умолчанию для этого плана `push/deploy: not performed`.
+
+`accepted_for_learning` stages коммитятся в `main`, только если shadow/telemetry
+code, docs или evidence являются durable handoff для следующих stages. Такой
+commit не разблокирует production `on` mode без отдельного `accepted` speed gate.
+
+Для `blocked` или `rejected` stages production runtime changes не коммитятся.
+Допускается коммитить только ledger/evidence/docs, фиксирующие blocker или
+rejection, если это нужно для durable history.
+
 ## Historical Reference Evidence
 
 Это не новая baseline-запись, а последний сохраненный ориентир до Stage 00.
@@ -60,11 +79,44 @@ Current heavy timings:
 | `tp_sl_grid/arity_6/long_only` | 17.206 | 17.446 | 1.014 | 38.605 | pass |
 | `tp_sl_grid/arity_6/long_short_reversal` | 15.367 | 16.204 | 1.054 | 15.733 | pass |
 
+### Stage 00 Verification - 2026-06-06
+
+Stage 00 remains accepted on current checkout
+`6dcb62dc918a98564abec9554ae575187b32fa39`.
+
+The Mac Studio benchmark evidence was not refreshed because the scoped backtest
+runtime and benchmark harness diff from evidence commit
+`d9bfa5811e3f5bccab9fb2635166f97e43f100bb` to current `HEAD` is empty for:
+
+```bash
+git diff --name-only d9bfa5811e3f5bccab9fb2635166f97e43f100bb..HEAD -- \
+  scripts/backtest \
+  apps/api/dto/backtests.py \
+  apps/api/dto/ui_backtests.py \
+  apps/api/routes/backtests.py \
+  apps/api/routes/ui_backtests.py \
+  apps/api/wiring/modules/backtest.py \
+  apps/api/wiring/modules/ui_backtests.py \
+  apps/worker/backtest_job_runner \
+  src/trading/contexts/backtest
+```
+
+Benchmark accounting was re-validated locally:
+
+```bash
+uv run python scripts/backtest/validate_benchmark_accounting.py \
+  --out docs/architecture/backtest/benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/local_accounting_validation.json
+```
+
+Result: accounting validation passed; Stage 00 evidence remains comparable for
+the backtest compute acceleration baseline. Contract impact: `none`.
+`next_iteration_allowed` remains `true` for Stage 01 only.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
 |---:|---|---|---|---|---|
-| 00 | accepted | Refresh current heavy baseline on Mac Studio before code changes | `benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/` | Baseline accepted; performance, parity, memory, lazy cache, legacy path and docs drift gates passed | true |
+| 00 | accepted | Refresh current heavy baseline on Mac Studio before code changes | `benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/` | Baseline accepted; re-verified on checkout `6dcb62dc918a98564abec9554ae575187b32fa39`; scoped backtest runtime/harness diff from evidence commit is empty; performance, parity, memory, lazy cache, legacy path, accounting and docs drift gates passed | true |
 | 01 | planned | Add instrumentation counters without behavior changes | planned | Allowed by Stage 00; not started | false |
 | 02 | planned | Row/signature telemetry shadow | planned | Pending Stage 01 | false |
 | 03 | planned | Runtime bitset pack shadow | planned | Pending Stage 02 | false |
@@ -116,6 +168,9 @@ contract impact и финальное решение. Если хотя бы о�
 - Any change to public API, DB schema, canonical artifact manifests, request hash,
   `variant_hash`, TP/SL tie-breaking, fees/slippage or sizing semantics requires
   an explicit plan update before implementation continues.
+- Accepted or accepted-for-learning stages must leave a scoped commit on `main`
+  after evidence and ledger updates. The ledger must record commit SHA, branch,
+  scoped paths and whether push/deploy was performed.
 - Approximate beam search, GPU-first rewrite, publisher-level bitset artifacts and
   mark-to-market drawdown acceleration are outside this ledger unless a separate
   approved plan adds them.

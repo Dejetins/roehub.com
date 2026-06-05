@@ -160,6 +160,10 @@ Additional context:
 ## Requirements (Must)
 
 - Read context using the protocol below and stop early once sufficient.
+- Work from branch `main`; stop and report a blocker if the checkout is not on `main` unless the user explicitly approves another branch for this stage.
+- After an `accepted` stage, update ledger/evidence/docs, run required gates, stage only scoped files, commit them to `main`, and report commit SHA and scoped paths. Do not push unless explicitly requested.
+- For `accepted_for_learning`, commit scoped shadow/telemetry/docs/evidence only when that record is the durable handoff; keep the production-off limitation explicit.
+- For `blocked` or `rejected`, do not commit production runtime changes; commit only ledger/evidence/docs documenting the blocker or rejection when needed, and report residual uncommitted changes.
 - Implement only the scoped change described in this prompt.
 - Preserve all explicitly protected contracts and invariants.
 - Update the stage execution ledger after validation and before the final report.
