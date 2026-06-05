@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -185,7 +185,7 @@ def _register_routes(
 
     @app.get("/favicon.ico", include_in_schema=False)
     def get_favicon() -> Response:
-        return Response(status_code=204)
+        return FileResponse(_DIST_PATH / "favicon.svg", media_type="image/svg+xml")
 
     @app.get("/locale", include_in_schema=False)
     def set_locale(

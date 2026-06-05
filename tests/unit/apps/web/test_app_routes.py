@@ -101,6 +101,7 @@ def test_public_landing_renders_terminal_shell_and_local_assets() -> None:
     assert "/assets/css/components.css" in response.text
     assert "/assets/css/motion-config.css" in response.text
     assert "/assets/css/pages/landing.css" in response.text
+    assert "/assets/favicon.svg?v=" in response.text
     assert "/assets/js/core/theme.js" in response.text
     assert "/assets/js/core/locale.js" in response.text
     assert "/assets/js/components/dropdown.js" in response.text
@@ -240,12 +241,14 @@ def test_register_route_is_separate_keycloak_backed_entrypoint() -> None:
     assert "<form" not in response.text
 
 
-def test_favicon_route_avoids_browser_404_noise() -> None:
+def test_favicon_route_serves_tab_icon_asset() -> None:
     client = _build_test_client()
 
     response = client.get("/favicon.ico")
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
+    assert b"<svg" in response.content
 
 
 @pytest.mark.parametrize(
