@@ -478,7 +478,7 @@ class ExchangeExecutionProcessService:
         )
         if intent is None:
             return "quarantined", "intent_not_found", None
-        if intent.status != "dispatched" or intent.risk_status != "accepted":
+        if intent.status not in {"dispatching", "dispatched"} or intent.risk_status != "accepted":
             return "quarantined", "intent_not_dispatchable", intent
         if self._config.adapter_mode == "disabled":
             return "adapter_disabled", "adapter_disabled_stage13", intent
