@@ -112,13 +112,91 @@ Result: accounting validation passed; Stage 00 evidence remains comparable for
 the backtest compute acceleration baseline. Contract impact: `none`.
 `next_iteration_allowed` remains `true` for Stage 01 only.
 
+## Stage 01 Instrumentation Counters
+
+Evidence:
+
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/`
+
+Mac Studio run from checkout `d9bfa5811e3f5bccab9fb2635166f97e43f100bb`
+with a scoped dirty worktree containing only Stage 01 runtime/reporting files:
+
+- `apps/worker/backtest_job_runner/wiring/modules/child_ipc.py`
+- `apps/worker/backtest_job_runner/wiring/modules/child_process.py`
+- `scripts/backtest/run_api_runner_benchmark_parity.py`
+- `src/trading/contexts/backtest/application/services/v2/job_orchestration.py`
+
+The remote checkout was intentionally not fast-forwarded before the benchmark
+because its tracked backtest runtime and benchmark harness diff from Stage 00
+evidence commit to local `HEAD` was empty before Stage 01 changes. This keeps the
+Stage 00/Stage 01 comparison scoped to instrumentation counters.
+
+Commands:
+
+```bash
+uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+  --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation
+
+uv run python scripts/backtest/validate_benchmark_accounting.py \
+  --out docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/local_accounting_validation.json
+```
+
+Overall gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `instrumentation.pass` | true |
+| `performance.pass` | true |
+| `parity.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Stage 01 timing comparison against Stage 00:
+
+| Job | Stage 00 service wall s | Stage 01 service wall s | Wall delta % | Stage 00 service total s | Stage 01 service total s | Total delta % | Stage 00 exact s | Stage 01 exact s | Exact delta % |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | 22.032 | 16.169 | -26.612 | 18.337 | 16.690 | -8.981 | 15.704 | 15.484 | -1.400 |
+| `none/arity_6/long_short_reversal` | 15.358 | 15.313 | -0.290 | 15.658 | 15.589 | -0.439 | 15.111 | 15.078 | -0.216 |
+| `tp_sl_grid/arity_6/long_only` | 38.605 | 17.940 | -53.530 | 36.398 | 34.284 | -5.807 | 17.206 | 16.175 | -5.994 |
+| `tp_sl_grid/arity_6/long_short_reversal` | 15.733 | 15.613 | -0.765 | 31.319 | 31.066 | -0.809 | 15.367 | 15.254 | -0.739 |
+
+Instrumentation counters are emitted per benchmark job. Required fields are
+present; counters that are not available in the current runtime are explicitly
+`null`, including `signals_pack_ms`, `rows_before_prefilter`,
+`avg_segments_per_candidate` and `avg_trades_per_candidate`.
+
+Representative counters:
+
+| Job | artifact load ms | combos | proxy candidates | exact candidates/s | trade-cell evals/s | rows after prefilter | tp/sl cells |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | 86.278 | 46656 | 46656 | 3013.182 | n/a | 36 | 0 |
+| `none/arity_6/long_short_reversal` | 80.319 | 46656 | 46656 | 3094.228 | n/a | 36 | 0 |
+| `tp_sl_grid/arity_6/long_only` | 79.925 | 46656 | 46656 | 2884.457 | 6371765.328 | 36 | 2209 |
+| `tp_sl_grid/arity_6/long_short_reversal` | 79.095 | 46656 | 46656 | 3058.664 | 6756589.105 | 36 | 2209 |
+
+Decision: Stage 01 is `accepted_for_learning`. It is a telemetry/reporting
+handoff only: no matrix backend, production `on` mode, scoring semantics,
+ranking, top-N shape, request hash, cache identity or persistence semantics are
+changed. Contract impact: public API `none`; DTO schema `none`; persisted schema
+`none`; config schema `none`; request hash/cache identity `none`; benchmark and
+report semantics `compatible-change`.
+
+`next_iteration_allowed` is `true` for Stage 02 telemetry only. It does not
+unlock any production-affecting backend `on` mode.
+
+Git branch: `main`. Scoped commit SHA is recorded in the executor final report
+after the commit is created. Push/deploy: not performed.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
 |---:|---|---|---|---|---|
 | 00 | accepted | Refresh current heavy baseline on Mac Studio before code changes | `benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/` | Baseline accepted; re-verified on checkout `6dcb62dc918a98564abec9554ae575187b32fa39`; scoped backtest runtime/harness diff from evidence commit is empty; performance, parity, memory, lazy cache, legacy path, accounting and docs drift gates passed | true |
-| 01 | planned | Add instrumentation counters without behavior changes | planned | Allowed by Stage 00; not started | false |
-| 02 | planned | Row/signature telemetry shadow | planned | Pending Stage 01 | false |
+| 01 | accepted_for_learning | Add instrumentation counters without behavior changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/` | Counters present; explicit `null` for unavailable current-runtime counters; parity, performance, memory, lazy cache, legacy path and accounting gates passed; overhead stayed within <= 1% limit with no Stage 00 service/exact regression; production `on` mode remains locked | true |
+| 02 | planned | Row/signature telemetry shadow | planned | Pending Stage 01 commit handoff; allowed for telemetry-only work after Stage 01 commit | false |
 | 03 | planned | Runtime bitset pack shadow | planned | Pending Stage 02 | false |
 | 04 | planned | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | planned | Pending Stage 03 | false |
 | 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 | false |

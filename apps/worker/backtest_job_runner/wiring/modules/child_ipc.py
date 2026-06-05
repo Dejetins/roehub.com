@@ -24,6 +24,7 @@ class BacktestChildSuccessResult:
     summary_hash: str
     cleanup_evidence: Mapping[str, Any]
     exact_diagnostics: Mapping[str, Any] = field(default_factory=dict)
+    instrumentation_counters: Mapping[str, Any] = field(default_factory=dict)
 
 
 def preflight_to_mapping(*, preflight: BacktestPreflightResult) -> dict[str, Any]:
@@ -80,6 +81,7 @@ def child_success_to_mapping(*, result: Any) -> dict[str, Any]:
         "summary_hash": str(result.summary_hash),
         "cleanup_evidence": dict(result.cleanup_evidence),
         "exact_diagnostics": dict(result.exact_diagnostics),
+        "instrumentation_counters": dict(result.instrumentation_counters),
     }
 
 
@@ -121,6 +123,9 @@ def child_result_from_mapping(
         summary_hash=str(payload["summary_hash"]),
         cleanup_evidence=dict(_mapping(payload.get("cleanup_evidence"))),
         exact_diagnostics=dict(_mapping(payload.get("exact_diagnostics", {}))),
+        instrumentation_counters=dict(
+            _mapping(payload.get("instrumentation_counters", {}))
+        ),
     )
 
 

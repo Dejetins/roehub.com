@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 import math
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, Mapping
@@ -42,6 +43,7 @@ class BacktestJobExecutionResult:
     summary_hash: str
     cleanup_evidence: Mapping[str, Any]
     exact_diagnostics: Mapping[str, Any] = field(default_factory=dict)
+    instrumentation_counters: Mapping[str, Any] = field(default_factory=dict)
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -50,6 +52,7 @@ class BacktestJobExecutionResult:
             "summary_hash": self.summary_hash,
             "cleanup_evidence": dict(self.cleanup_evidence),
             "exact_diagnostics": dict(self.exact_diagnostics),
+            "instrumentation_counters": dict(self.instrumentation_counters),
         }
 
 
@@ -160,17 +163,27 @@ class BacktestRuntimeJobOrchestrationService:
             }
             exact_diagnostics = {
                 "telemetry": exact_result.telemetry.as_mapping(),
+                "combo_planning": combo_result.telemetry.as_mapping(),
                 "self_check": exact_result.self_check.as_mapping(),
                 "top_results_sample": [
                     item.as_mapping() for item in exact_result.top_results[:5]
                 ],
             }
+            instrumentation_counters = _instrumentation_counters(
+                preflight=preflight,
+                prepared_result=prepared_result,
+                combo_result=combo_result,
+                hit_times_result=hit_times_result,
+                exact_result=exact_result,
+                stage_timings=stage_timings,
+            )
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,
                 stage_timings=stage_timings,
                 summary_hash=assembly.summary_hash,
                 cleanup_evidence=cleanup_evidence,
                 exact_diagnostics=exact_diagnostics,
+                instrumentation_counters=instrumentation_counters,
             )
         finally:
             del warmup_result
@@ -260,6 +273,99 @@ def _stage_timings(
     timers.setdefault(PERSIST_TOP_N_IO_STAGE_NAME, 0.0)
     timers["service_wall_clock_s"] = elapsed
     return timers
+
+
+def _instrumentation_counters(
+    *,
+    preflight: BacktestPreflightResult,
+    prepared_result: BacktestPreparePoolsResult,
+    combo_result: Any,
+    hit_times_result: Any,
+    exact_result: Any,
+    stage_timings: Mapping[str, float],
+) -> dict[str, Any]:
+    combo_telemetry = combo_result.telemetry
+    exact_telemetry = exact_result.telemetry
+    artifact_load_s = _sum_optional_seconds(
+        stage_timings,
+        ("artifact_context_resolve", "artifact_array_open"),
+    )
+    exact_candidates = int(exact_telemetry.exact_candidates_evaluated)
+    exact_scoring_s = _optional_seconds(stage_timings, "exact_scoring")
+    tp_sl_exact_scoring_s = _optional_seconds(stage_timings, "tp_sl_exact_scoring")
+    tp_count, sl_count = _tp_sl_grid_counts(hit_times_result=hit_times_result)
+    tp_sl_cells = int(preflight.cost_estimate.tp_sl_cells)
+
+    return {
+        "artifact_load_ms": _seconds_to_ms(artifact_load_s),
+        "signals_pack_ms": None,
+        "combo_iteration_ms": _stage_ms(stage_timings, "combo_iteration"),
+        "proxy_filter_ms": _stage_ms(stage_timings, "proxy_filter"),
+        "exact_scoring_ms": _stage_ms(stage_timings, "exact_scoring"),
+        "tp_sl_exact_scoring_ms": _stage_ms(stage_timings, "tp_sl_exact_scoring"),
+        "top_result_assembly_ms": _stage_ms(stage_timings, "top_result_assembly"),
+        "rows_before_prefilter": None,
+        "rows_after_prefilter": _rows_after_prefilter(prepared_result),
+        "combo_count_planned": int(combo_telemetry.cartesian_combinations),
+        "candidates_after_proxy": int(combo_telemetry.proxy_candidates_selected),
+        "exact_candidates": exact_candidates,
+        "avg_segments_per_candidate": None,
+        "avg_trades_per_candidate": None,
+        "tp_count": tp_count,
+        "sl_count": sl_count,
+        "tp_sl_cells": tp_sl_cells,
+        "exact_candidates_per_sec": _rate(
+            numerator=exact_candidates,
+            denominator_s=exact_scoring_s,
+        ),
+        "trade_cell_evals_per_sec": _rate(
+            numerator=exact_candidates * tp_sl_cells,
+            denominator_s=tp_sl_exact_scoring_s,
+        ),
+    }
+
+
+def _optional_seconds(timers: Mapping[str, float], key: str) -> float | None:
+    value = timers.get(key)
+    if value is None:
+        return None
+    return float(value)
+
+
+def _sum_optional_seconds(
+    timers: Mapping[str, float],
+    keys: Sequence[str],
+) -> float | None:
+    values = [_optional_seconds(timers, key) for key in keys]
+    present = [value for value in values if value is not None]
+    if not present:
+        return None
+    return math.fsum(present)
+
+
+def _seconds_to_ms(value: float | None) -> float | None:
+    return None if value is None else value * 1000.0
+
+
+def _stage_ms(timers: Mapping[str, float], key: str) -> float | None:
+    return _seconds_to_ms(_optional_seconds(timers, key))
+
+
+def _rate(*, numerator: int, denominator_s: float | None) -> float | None:
+    if denominator_s is None or denominator_s <= 0.0:
+        return None
+    return float(numerator) / denominator_s
+
+
+def _rows_after_prefilter(prepared_result: BacktestPreparePoolsResult) -> int:
+    return sum(int(pool.row_ids.shape[0]) for pool in prepared_result.indicator_pools)
+
+
+def _tp_sl_grid_counts(*, hit_times_result: Any) -> tuple[int | None, int | None]:
+    if hit_times_result is None:
+        return None, None
+    hit_times = hit_times_result.hit_times
+    return int(hit_times.tp_values.shape[0]), int(hit_times.sl_values.shape[0])
 
 
 def _limit_prepared_rows_for_warmup(

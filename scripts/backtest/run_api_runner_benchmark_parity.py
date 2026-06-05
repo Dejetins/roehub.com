@@ -171,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         }
         payload["parity"] = _parity_summary(benchmark_jobs)
         payload["performance"] = _performance_summary(benchmark_jobs)
+        payload["instrumentation"] = _instrumentation_summary(benchmark_jobs)
         payload["memory_release"] = _memory_release_summary(benchmark_jobs)
 
         scheduler_smoke = _runner_policy_smoke(scheduler=harness.scheduler)
@@ -291,6 +292,7 @@ def _run_reference_jobs(
             reference_run=reference_run,
         )
         stage_timings = _merged_stage_timings(child_evidence)
+        instrumentation_counters = _merged_instrumentation_counters(child_evidence)
         memory = _child_memory_summary(child_evidence)
         memory["system_memory_cleanup"] = _system_memory_cleanup_gate(
             before=system_memory_before,
@@ -319,6 +321,7 @@ def _run_reference_jobs(
                 "api_top_count": len(_list(top.get("items"))),
                 "parity": parity,
                 "stage_timings": stage_timings,
+                "instrumentation_counters": instrumentation_counters,
                 "service_only_overhead": _service_only_overhead(stage_timings),
                 "cpu_sampling": _mapping(run_result.get("cpu_sampling")),
                 "child_process_evidence": child_evidence,
@@ -1291,6 +1294,51 @@ def _merged_stage_timings(child_evidence: Sequence[Mapping[str, Any]]) -> dict[s
     return dict(sorted(merged.items()))
 
 
+_INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
+    "artifact_load_ms",
+    "signals_pack_ms",
+    "combo_iteration_ms",
+    "proxy_filter_ms",
+    "exact_scoring_ms",
+    "tp_sl_exact_scoring_ms",
+    "top_result_assembly_ms",
+    "rows_before_prefilter",
+    "rows_after_prefilter",
+    "combo_count_planned",
+    "candidates_after_proxy",
+    "exact_candidates",
+    "avg_segments_per_candidate",
+    "avg_trades_per_candidate",
+    "tp_count",
+    "sl_count",
+    "tp_sl_cells",
+    "exact_candidates_per_sec",
+    "trade_cell_evals_per_sec",
+)
+
+
+def _merged_instrumentation_counters(
+    child_evidence: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for item in child_evidence:
+        for key, value in _mapping(item.get("instrumentation_counters")).items():
+            merged[str(key)] = _json_counter_value(value)
+    return {key: merged[key] for key in _INSTRUMENTATION_COUNTER_FIELDS if key in merged}
+
+
+def _json_counter_value(value: Any) -> int | float | str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return value
+    return str(value)
+
+
 def _service_only_overhead(stage_timings: Mapping[str, float]) -> dict[str, float]:
     service_only_names = (
         "artifact_context_resolve",
@@ -1476,6 +1524,41 @@ def _performance_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "pass": all(bool(job.get("stage_timings")) for job in jobs)
         and not failed_speed_jobs
         and not failed_cpu_sampling_jobs,
+    }
+
+
+def _instrumentation_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    missing_by_job: dict[str, list[str]] = {}
+    rows = []
+    for job in jobs:
+        job_name = str(job.get("job_name"))
+        counters = _mapping(job.get("instrumentation_counters"))
+        present_fields = [
+            field for field in _INSTRUMENTATION_COUNTER_FIELDS if field in counters
+        ]
+        missing_fields = [
+            field for field in _INSTRUMENTATION_COUNTER_FIELDS if field not in counters
+        ]
+        rows.append(
+            {
+                "job_name": job_name,
+                "present_fields": present_fields,
+                "null_fields": [
+                    field for field in present_fields if counters.get(field) is None
+                ],
+                "missing_fields": missing_fields,
+                "counters": {field: counters.get(field) for field in present_fields},
+            }
+        )
+        if missing_fields:
+            missing_by_job[job_name] = missing_fields
+    return {
+        "schema": "backtest_stage_01_instrumentation_summary_v1",
+        "required_fields": list(_INSTRUMENTATION_COUNTER_FIELDS),
+        "job_count": len(jobs),
+        "rows": rows,
+        "missing_by_job": missing_by_job,
+        "pass": not missing_by_job,
     }
 
 
@@ -2055,6 +2138,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     api_runner = _mapping(payload.get("api_runner_path"))
     parity = _mapping(payload.get("parity"))
     performance = _mapping(payload.get("performance"))
+    instrumentation = _mapping(payload.get("instrumentation"))
     memory = _mapping(payload.get("memory_release"))
     scheduler = _mapping(payload.get("mixed_scheduler_smoke"))
     lazy = _mapping(payload.get("lazy_cache_hit_memory"))
@@ -2194,6 +2278,41 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "## Stage 01 instrumentation counters",
+            "",
+            f"- Pass: `{'yes' if instrumentation.get('pass') else 'no'}`",
+            f"- Required fields: `{len(_list(instrumentation.get('required_fields')))}`",
+            "",
+            (
+                "| Job | artifact load ms | signal pack ms | combos | "
+                "proxy candidates | exact candidates/s | trade-cell evals/s | "
+                "rows after prefilter | null fields |"
+            ),
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+        ]
+    )
+    instrumentation_rows = {
+        str(row.get("job_name")): _mapping(row)
+        for row in _list(instrumentation.get("rows"))
+    }
+    for job in jobs:
+        row = instrumentation_rows.get(str(job.get("job_name")), {})
+        counters = _mapping(row.get("counters"))
+        lines.append(
+            "| "
+            f"`{job.get('job_name')}` | "
+            f"{_fmt_counter(counters.get('artifact_load_ms'))} | "
+            f"{_fmt_counter(counters.get('signals_pack_ms'))} | "
+            f"{_fmt_counter(counters.get('combo_count_planned'))} | "
+            f"{_fmt_counter(counters.get('candidates_after_proxy'))} | "
+            f"{_fmt_counter(counters.get('exact_candidates_per_sec'))} | "
+            f"{_fmt_counter(counters.get('trade_cell_evals_per_sec'))} | "
+            f"{_fmt_counter(counters.get('rows_after_prefilter'))} | "
+            f"`{_list(row.get('null_fields'))}` |"
+        )
+    lines.extend(
+        [
+            "",
         "## Memory release",
         "",
         f"- Checked jobs: `{memory.get('checked_jobs')}`",
@@ -2274,6 +2393,16 @@ def _fmt_float(value: float | None) -> str:
     if value is None:
         return "n/a"
     return f"{value:.3f}"
+
+
+def _fmt_counter(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return _fmt_float(value)
+    return str(value)
 
 
 def _float_mapping_value(payload: Mapping[str, Any], key: str) -> float | None:

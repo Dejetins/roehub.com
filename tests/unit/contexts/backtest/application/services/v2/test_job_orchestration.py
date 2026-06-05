@@ -55,6 +55,19 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     assert result.stage_timings[SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME] == pytest.approx(
         0.1 + 0.2 + 0.3 + 0.4
     )
+    counters = result.instrumentation_counters
+    assert counters["artifact_load_ms"] is None
+    assert counters["signals_pack_ms"] is None
+    assert counters["combo_iteration_ms"] == pytest.approx(200.0)
+    assert counters["exact_scoring_ms"] == pytest.approx(300.0)
+    assert counters["top_result_assembly_ms"] == pytest.approx(400.0)
+    assert counters["rows_before_prefilter"] is None
+    assert counters["rows_after_prefilter"] == 3
+    assert counters["combo_count_planned"] == 3
+    assert counters["candidates_after_proxy"] == 3
+    assert counters["exact_candidates"] == 3
+    assert counters["exact_candidates_per_sec"] == pytest.approx(10.0)
+    assert counters["trade_cell_evals_per_sec"] is None
 
 
 @dataclass(slots=True)
@@ -75,7 +88,16 @@ class _ComboPlanning:
         del normalized_request
         return SimpleNamespace(
             prepared_rows=int(prepared_result.indicator_pools[0].row_ids.shape[0]),
-            telemetry=SimpleNamespace(stage_timings={"combo_iteration": 0.2}),
+            telemetry=SimpleNamespace(
+                as_mapping=lambda: {
+                    "stage_timings": {"combo_iteration": 0.2},
+                    "cartesian_combinations": 3,
+                    "proxy_candidates_selected": 3,
+                },
+                stage_timings={"combo_iteration": 0.2},
+                cartesian_combinations=3,
+                proxy_candidates_selected=3,
+            ),
         )
 
 
@@ -101,6 +123,7 @@ class _ExactService:
                     "top_results_count": int(normalized_request["top_n"]),
                 },
                 stage_timings={"exact_scoring": 0.3},
+                exact_candidates_evaluated=3,
             ),
             self_check=SimpleNamespace(as_mapping=lambda: {"status": "not_run"}),
             memory_cleanup_evidence=SimpleNamespace(as_mapping=lambda: {"pass": True}),

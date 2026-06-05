@@ -185,6 +185,12 @@ def _write_result_evidence(
         if isinstance(raw_exact_diagnostics, Mapping)
         else {}
     )
+    raw_instrumentation_counters = payload.get("instrumentation_counters")
+    instrumentation_counters = (
+        dict(raw_instrumentation_counters)
+        if isinstance(raw_instrumentation_counters, Mapping)
+        else {}
+    )
     evidence = {
         "schema": "roehub_full_job_child_result_evidence_v1",
         "job_id": str(job_id),
@@ -193,6 +199,7 @@ def _write_result_evidence(
         "summary_hash": payload.get("summary_hash"),
         "cleanup_evidence": cleanup_evidence,
         "exact_diagnostics": exact_diagnostics,
+        "instrumentation_counters": instrumentation_counters,
         "top_variants_count": top_variants_count,
         "process_evidence": dict(process_evidence),
     }

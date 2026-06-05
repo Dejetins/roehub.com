@@ -4,6 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from scripts.backtest.run_api_runner_benchmark_parity import (
+    _INSTRUMENTATION_COUNTER_FIELDS,
+    _instrumentation_summary,
+    _merged_instrumentation_counters,
+)
 from trading.contexts.backtest.application.services.v2.benchmark_accounting import (
     CANONICAL_STAGE_ORDER,
     SERVICE_ONLY_TELEMETRY_FIELDS,
@@ -123,3 +128,42 @@ def test_accounting_rejects_missing_required_total_target() -> None:
             top_results_count=5,
             heap_capacity=5,
         )
+
+
+def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -> None:
+    counters = _merged_instrumentation_counters(
+        [
+            {
+                "instrumentation_counters": {
+                    "trade_cell_evals_per_sec": None,
+                    "artifact_load_ms": 12.5,
+                    "signals_pack_ms": None,
+                    "combo_iteration_ms": 3.0,
+                    "proxy_filter_ms": 4.0,
+                    "exact_scoring_ms": 5.0,
+                    "tp_sl_exact_scoring_ms": None,
+                    "top_result_assembly_ms": 6.0,
+                    "rows_before_prefilter": None,
+                    "rows_after_prefilter": 426,
+                    "combo_count_planned": 1000,
+                    "candidates_after_proxy": 50,
+                    "exact_candidates": 50,
+                    "avg_segments_per_candidate": None,
+                    "avg_trades_per_candidate": None,
+                    "tp_count": None,
+                    "sl_count": None,
+                    "tp_sl_cells": 0,
+                    "exact_candidates_per_sec": 10.0,
+                }
+            }
+        ]
+    )
+
+    assert tuple(counters) == _INSTRUMENTATION_COUNTER_FIELDS
+    summary = _instrumentation_summary(
+        [{"job_name": "none/arity_6/long_only", "instrumentation_counters": counters}]
+    )
+    row = summary["rows"][0]
+    assert summary["pass"] is True
+    assert row["missing_fields"] == []
+    assert "signals_pack_ms" in row["null_fields"]
