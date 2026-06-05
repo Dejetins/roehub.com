@@ -21,6 +21,15 @@
 Benchmark вне `Mac Studio` не считается acceptance evidence. Локальные docs/static
 checks можно записывать как developer evidence, но не как acceptance benchmark.
 
+Для compute acceleration stages из
+`docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md` перед
+первым production-affecting изменением обязателен Stage 00 current-baseline run.
+Следующий stage разрешается только если stage ledger
+`docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md`
+содержит `next_iteration_allowed: true`. Shadow/instrumentation stages могут быть
+`accepted_for_learning`, но не включают новый backend в production path без
+отдельного speedup gate.
+
 Для hot-path replacement итераций evidence дополнительно должен явно фиксировать:
 
 - `combo_iteration_mode` (`ordinal_streaming_pass_through` или active proxy
