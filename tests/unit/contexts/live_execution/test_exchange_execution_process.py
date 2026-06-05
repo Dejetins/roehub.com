@@ -273,6 +273,59 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
     assert adapter.submitted == 1
 
 
+def test_testnet_adapter_canary_can_record_fill_without_cancel() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    adapter = _Adapter(exchange_name="bybit")
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=False,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(adapter,),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.submitted_count == 1
+    assert result.acked_count == 1
+    assert process_repository.observations[0].status == "testnet_submitted"
+    assert process_repository.observations[0].status_reason == "testnet_submit_status_recorded"
+    assert order_repository.orders[intent.intent_id].status == "status_checked"
+    assert len(order_repository.order_events) == 4
+    assert {item.event_type for item in order_repository.order_events} == {
+        "submit_pending",
+        "private_stream_backfill",
+        "submitted",
+        "status_checked",
+    }
+    assert len(order_repository.fills) == 1
+    assert len(order_repository.reconciliation_runs) == 1
+    assert order_repository.reconciliation_runs[0].status == "matched"
+    assert adapter.submitted == 1
+
+
 def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
     process_repository = InMemoryExchangeExecutionProcessRepository()
     intent_repository = InMemoryExecutionIntentRepository()

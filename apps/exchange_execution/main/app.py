@@ -53,6 +53,7 @@ EXCHANGE_EXECUTION_DEFAULT_HOST = "127.0.0.1"
 EXCHANGE_EXECUTION_METRICS_PORT = 9206
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_EXCHANGE_EXECUTION_CONFIG"
+_CANCEL_AFTER_SUBMIT_KEY = "ROEHUB_EXCHANGE_EXECUTION_CANCEL_AFTER_SUBMIT"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _PITR_VERIFIED_KEY = "ROEHUB_EXECUTION_PITR_VERIFIED"
@@ -444,6 +445,12 @@ def resolve_runtime_settings(
         ),
         "ROEHUB_EXCHANGE_EXECUTION_METRICS_PORT",
     )
+    raw_cancel_after_submit = environ.get(_CANCEL_AFTER_SUBMIT_KEY)
+    cancel_after_submit = (
+        _parse_bool(raw_cancel_after_submit)
+        if raw_cancel_after_submit is not None
+        else _parse_bool(str(adapter.get("cancel_after_submit", "true")))
+    )
     process_config = ExchangeExecutionProcessConfig(
         service_id=str(process.get("service_id", "exchange-execution")),
         adapter_mode=str(process.get("adapter_mode", "disabled")),
@@ -469,7 +476,7 @@ def resolve_runtime_settings(
         ),
         rate_limit_burst=_positive_int(str(limiter.get("burst", "10")), "rate_limit.burst"),
         enabled_exchanges=_string_tuple(adapter.get("enabled_exchanges", ("binance", "bybit"))),
-        cancel_after_submit=_parse_bool(str(adapter.get("cancel_after_submit", "true"))),
+        cancel_after_submit=cancel_after_submit,
         ledger_pitr_required=_parse_bool(
             str(ledger.get("pitr_required", "true" if env_name == "prod" else "false"))
         ),

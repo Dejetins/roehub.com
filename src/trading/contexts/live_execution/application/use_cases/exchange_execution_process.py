@@ -745,7 +745,9 @@ class ExchangeExecutionProcessService:
                     ),
                 )
             return "adapter_error", reason
-        return "testnet_submitted", "testnet_submit_status_cancel_recorded"
+        if self._config.cancel_after_submit:
+            return "testnet_submitted", "testnet_submit_status_cancel_recorded"
+        return "testnet_submitted", "testnet_submit_status_recorded"
 
     def _record_order_event(
         self,

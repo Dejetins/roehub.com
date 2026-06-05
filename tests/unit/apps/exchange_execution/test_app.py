@@ -90,3 +90,16 @@ def test_exchange_execution_prod_readiness_accepts_pitr_verification_marker() ->
     )
     assert dependency["status"] == "ready"
     assert dependency["reason"] == "pitr_restore_verified"
+
+
+def test_exchange_execution_cancel_after_submit_env_override_disables_canary_cancel() -> None:
+    app = create_app(
+        environ={
+            "ROEHUB_ENV": "prod",
+            "ROEHUB_EXCHANGE_EXECUTION_CONFIG": "configs/prod/exchange_execution.yaml",
+            "ROEHUB_EXCHANGE_EXECUTION_CANCEL_AFTER_SUBMIT": "false",
+            "STRATEGY_FAIL_FAST": "false",
+        }
+    )
+
+    assert app.state.exchange_execution_service._config.cancel_after_submit is False
