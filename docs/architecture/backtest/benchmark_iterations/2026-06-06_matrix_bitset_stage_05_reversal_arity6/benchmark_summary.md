@@ -72,6 +72,21 @@ Canonical payload hash old/matrix:
 
 Evidence: `ab_top50_parity.json`.
 
+Follow-up Mac Studio A/B for `none/arity_6/long_short_reversal` reran the same
+old-vs-matrix request shape with explicit `quality_constraints.min_closed_trades=1`.
+This removes the automatic `timeframe_sqrt_v1` cutoff of `300` closed trades from
+the comparison while staying inside the public API's positive-integer validation.
+
+| Job | min closed trades | Request hash same | Old backend | Matrix backend | Top count old/matrix | Raw payload hash old | Raw payload hash matrix | Same canonical payload hash | Strategy identity hash old | Strategy identity hash matrix | Same strategy identity | Ordered variant hash same | Max metric abs diff | Exact old s | Exact matrix s |
+| --- | ---: | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
+| `none/arity_6/long_short_reversal` | 1 | true | `event_segments_n_no_risk` | `matrix_bitset_no_risk_v1` | `50 / 50` | `4713aeea9c4c8d9a4f306b0d92cc81d1f86b9d8ce2a4a4b2bff9acd5a3cc92ed` | `854eb39feeb886ae2275bfd003816a70a0f6705b3f292b2d8954aaf55252fb69` | true | `f59ed7ae1f948812e2377144959908b3cb39158e24ef113c5629529c54a778af` | `f59ed7ae1f948812e2377144959908b3cb39158e24ef113c5629529c54a778af` | true | true | `0.000e+00` | 15.419 | 3.049 |
+
+Canonical payload hash old/matrix:
+`ed0ef9d397f8faa7e4b447c2b5b8de1bc3d4b54f1c46fbfd29cb0badfd01f1dd` /
+`ed0ef9d397f8faa7e4b447c2b5b8de1bc3d4b54f1c46fbfd29cb0badfd01f1dd`.
+
+Evidence: `ab_top50_reversal_no_min300_parity.json`.
+
 ## Performance
 
 - Stage timing jobs: `2`
@@ -126,6 +141,8 @@ Evidence: `ab_top50_parity.json`.
 - `benchmark_summary.md`
 - `ab_top50_parity.json`
 - `ab_top50_child_process_evidence/*.json`
+- `ab_top50_reversal_no_min300_parity.json`
+- `ab_top50_reversal_no_min300_child_process_evidence/*.json`
 - `child_process_evidence/*.json`
 
 ## Operator Commands
