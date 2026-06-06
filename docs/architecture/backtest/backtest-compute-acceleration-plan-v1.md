@@ -252,6 +252,32 @@ the env file omits those keys, the benchmark harness fills them and records
 only the key names and path. Evidence may record which keys are present, but
 must not print DSN or password values.
 
+Acceptance benchmark/testing evidence must run on Mac Studio over SSH:
+
+```bash
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && <benchmark-or-test-command>'
+```
+
+Local runs are preflight diagnostics only unless a stage explicitly marks a
+check as local-only. Before SSH testing, the Mac Studio checkout must contain
+the exact candidate code being measured; the evidence must record commit SHA or
+dirty state. Do not benchmark a different runtime copy without recording it.
+
+Canonical source artifacts for these benchmarks are read-only:
+
+| Purpose | Path |
+|---|---|
+| Mac Studio source artifact root | `/opt/roehub/state/backtest_artifacts/v2` |
+| BTCUSDT active pointer | `/opt/roehub/state/backtest_artifacts/v2/BTCUSDT/current.yaml` |
+| Active slot manifest | resolved from `BTCUSDT/current.yaml` |
+
+Stage evidence must be saved under
+`docs/architecture/backtest/benchmark_iterations/<stageNN_dir>/`. Generated
+sidecar/test `.npy` files must be saved under
+`docs/architecture/backtest/benchmark_iterations/<stageNN_dir>/sidecar_artifacts/`
+or another explicitly recorded test overlay. They must not be written into the
+canonical artifact root, `current.yaml`, active slots or publisher outputs.
+
 Current Stage 00 evidence is recorded at:
 
 `docs/architecture/backtest/benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/`

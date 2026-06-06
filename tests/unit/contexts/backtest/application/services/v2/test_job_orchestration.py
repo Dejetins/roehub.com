@@ -20,6 +20,8 @@ from trading.contexts.backtest.application.dto import (
     PreparePoolsTiming,
 )
 from trading.contexts.backtest.application.services.v2.job_orchestration import (
+    MATRIX_BACKEND_MODE_ENV_KEY,
+    MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
     SAMPLE_WARMUP_STAGE_NAME,
     SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME,
     BacktestRuntimeJobOrchestrationService,
@@ -91,6 +93,37 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     }
 
 
+def test_stage_04_matrix_backend_gate_passes_requested_backend_to_no_risk_combo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(rows=3, indicators=("ma.dema", "ma.ema"))
+    combo = _ComboPlanning()
+    service = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(prepared),
+        combo_planning=combo,
+        no_risk_exact=_ExactService(),
+        tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),
+        artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any, _TopResultAssembly()),
+    )
+    monkeypatch.setenv(
+        MATRIX_BACKEND_MODE_ENV_KEY,
+        MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+    )
+
+    service.execute(
+        job_id=uuid4(),
+        preflight=_preflight(top_n=50, risk_mode="none", direction_mode="long_only"),
+        updated_at=datetime.now(UTC),
+    )
+
+    assert [call["requested_backend_id"] for call in combo.calls] == [
+        "matrix_bitset_no_risk_v1",
+        "matrix_bitset_no_risk_v1",
+    ]
+
+
 @dataclass(slots=True)
 class _PreparePools:
     prepared: BacktestPreparePoolsResult
@@ -100,13 +133,18 @@ class _PreparePools:
 
 
 class _ComboPlanning:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, str | None]] = []
+
     def execute(
         self,
         *,
         prepared_result: BacktestPreparePoolsResult,
         normalized_request: Mapping[str, Any],
+        requested_backend_id: str | None = None,
     ) -> SimpleNamespace:
         del normalized_request
+        self.calls.append({"requested_backend_id": requested_backend_id})
         return SimpleNamespace(
             prepared_rows=int(prepared_result.indicator_pools[0].row_ids.shape[0]),
             telemetry=SimpleNamespace(
@@ -165,7 +203,12 @@ class _UnusedService:
         raise AssertionError(f"unexpected service call: {name}")
 
 
-def _preflight(*, top_n: int, risk_mode: str) -> BacktestPreflightResult:
+def _preflight(
+    *,
+    top_n: int,
+    risk_mode: str,
+    direction_mode: str = "long_short_reversal",
+) -> BacktestPreflightResult:
     return BacktestPreflightResult(
         normalized_request={
             "coordinates": {
@@ -174,6 +217,7 @@ def _preflight(*, top_n: int, risk_mode: str) -> BacktestPreflightResult:
                 "symbol": "BTCUSDT",
             },
             "risk": {"mode": risk_mode},
+            "execution": {"direction_mode": direction_mode},
             "top_n": top_n,
         },
         request_hash="request",
@@ -195,11 +239,15 @@ def _preflight(*, top_n: int, risk_mode: str) -> BacktestPreflightResult:
     )
 
 
-def _prepared_result(*, rows: int) -> BacktestPreparePoolsResult:
-    pools = (_pool(indicator_id="ma.dema", rows=rows),)
+def _prepared_result(
+    *,
+    rows: int,
+    indicators: tuple[str, ...] = ("ma.dema",),
+) -> BacktestPreparePoolsResult:
+    pools = tuple(_pool(indicator_id=indicator_id, rows=rows) for indicator_id in indicators)
     return BacktestPreparePoolsResult(
         timeframe="15m",
-        indicator_ids=("ma.dema",),
+        indicator_ids=indicators,
         indicator_pools=pools,
         signal_returns_15m=np.zeros(4, dtype=np.float32),
         execution_mapping=PreparedExecutionMapping(

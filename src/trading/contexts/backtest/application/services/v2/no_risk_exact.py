@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     COMBO_CHUNK_SIZE,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+    MATRIX_BITSET_NO_RISK_V1_BACKEND,
     NEG_INF,
     STREAMING_2_NO_RISK_BACKEND,
     BacktestComboPlanningService,
@@ -41,6 +42,13 @@ from trading.contexts.backtest.application.services.v2.execution_sizing import (
 from trading.contexts.backtest.application.services.v2.execution_sizing import (
     ExecutionSettings as _ExecutionSettings,
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.bitsets import (
+    PackedSignalBitsets,
+    pack_signal_matrix,
+)
+from trading.contexts.backtest.application.services.v2.matrix_backend.no_risk_score import (
+    matrix_bitset_no_risk_long_only,
+)
 from trading.contexts.backtest.application.services.v2.numba_runtime import (
     current_backtest_numba_telemetry,
 )
@@ -56,6 +64,7 @@ NO_RISK_PROXY_FILTER_STAGE_NAME = "proxy_filter"
 NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME = "metric_buffer_allocation"
 NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME = "full_metric_second_pass"
 NO_RISK_TELEMETRY_BUILD_STAGE_NAME = "telemetry_build"
+NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME = "matrix_bitset_backend_pack"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
 NO_RISK_EXACT_SCORED_STATUS = "scored"
 NO_RISK_SELF_CHECK_NOT_RUN_STATUS = "not_run"
@@ -139,6 +148,7 @@ class _TopKContext:
 @dataclass(slots=True)
 class _NoRiskScratch:
     segment_pos_workspace: np.ndarray | None = None
+    matrix_packed_by_indicator: tuple[PackedSignalBitsets, ...] | None = None
 
 
 class _NoRiskHeapEntry(NamedTuple):
@@ -234,6 +244,7 @@ class BacktestNoRiskExactScoringService:
         first_selected_batch: _SelectedCandidateBatch | None = None
         selected_batch: _SelectedCandidateBatch | None = None
         heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] | None = None
+        scratch = _NoRiskScratch()
         try:
             profile_stage_timings = stage_timings if _exact_profile_enabled() else None
             selected_batches_iter = _iter_selected_candidate_batches(
@@ -242,6 +253,15 @@ class BacktestNoRiskExactScoringService:
                 profile_stage_timings=profile_stage_timings,
             )
             first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
+            if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+                pack_start = time.perf_counter()
+                scratch.matrix_packed_by_indicator = tuple(
+                    pack_signal_matrix(pool.trade_T)
+                    for pool in prepared_result.indicator_pools
+                )
+                stage_timings[NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME] = (
+                    time.perf_counter() - pack_start
+                )
             if self.config.run_self_check:
                 check_start = time.perf_counter()
                 self_check_summary = self._run_self_check(
@@ -254,6 +274,7 @@ class BacktestNoRiskExactScoringService:
                     execution_open_1m=execution_open_1m,
                     execution_close_1m=execution_close_1m,
                     backend_logical_name=backend_logical_name,
+                    scratch=scratch,
                 )
                 stage_timings[NO_RISK_SELF_CHECK_STAGE_NAME] = (
                     time.perf_counter() - check_start
@@ -263,7 +284,6 @@ class BacktestNoRiskExactScoringService:
             stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] = 0.0
             stage_timings[NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME] = 0.0
             heap = []
-            scratch = _NoRiskScratch()
             scored_count = 0
             below_min_trades_count = 0
             heap_eligible_count = 0
@@ -332,6 +352,7 @@ class BacktestNoRiskExactScoringService:
                 execution_close_1m=execution_close_1m,
                 top_k_context=top_k_context,
                 stage_timings=stage_timings,
+                scratch=scratch,
             )
             stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
                 time.perf_counter() - top_result_start
@@ -402,6 +423,7 @@ class BacktestNoRiskExactScoringService:
                     "proxy_context",
                     "execution_open_1m",
                     "execution_close_1m",
+                    "matrix_bitsets",
                     "selected_batches_iter",
                     "metric_buffers",
                     "heap",
@@ -505,6 +527,7 @@ class BacktestNoRiskExactScoringService:
         execution_open_1m: np.ndarray,
         execution_close_1m: np.ndarray,
         backend_logical_name: str,
+        scratch: _NoRiskScratch,
     ) -> BacktestNoRiskSelfCheckSummary:
         if selected_rows_by_indicator is not None:
             return run_fast_vs_reference_self_check(
@@ -517,6 +540,7 @@ class BacktestNoRiskExactScoringService:
                 backend_logical_name=backend_logical_name,
                 check_n=self.config.self_check_sample_size,
                 return_tolerance=self.config.self_check_return_tolerance,
+                scratch=scratch,
             )
         return BacktestNoRiskSelfCheckSummary(
             enabled=True,
@@ -543,6 +567,7 @@ def run_fast_vs_reference_self_check(
     backend_logical_name: str,
     check_n: int,
     return_tolerance: float,
+    scratch: _NoRiskScratch | None = None,
 ) -> BacktestNoRiskSelfCheckSummary:
     """
     Compare the selected fast backend against a slow generic reference.
@@ -578,6 +603,7 @@ def run_fast_vs_reference_self_check(
         execution_open_1m=execution_open_1m,
         execution_close_1m=execution_close_1m,
         buffers=buffers,
+        scratch=scratch,
     )
 
     max_abs_diff = 0.0
@@ -775,6 +801,75 @@ def evaluate_no_risk_exact_chunk(
             BARS_PER_YEAR_EXEC_1M,
             execution_settings.close_on_end,
             execution_settings.direction_mode_code,
+            buffers.total_return_pct,
+            buffers.max_drawdown_pct,
+            buffers.return_over_max_drawdown,
+            buffers.profit_factor,
+            buffers.trade_count,
+            buffers.sharpe_trades,
+            buffers.win_rate_pct,
+            buffers.avg_trade_ret_pct,
+            buffers.avg_trade_exec_bars,
+            buffers.exposure_pct,
+        )
+        return
+
+    if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+        arity = len(indicator_ids)
+        if arity not in (2, 3):
+            raise BacktestNoRiskExactRejected(
+                "matrix_bitset_no_risk_v1 supports no-risk arity 2-3 only"
+            )
+        if backend.direction_mode != DIRECTION_MODE_LONG_ONLY:
+            raise BacktestNoRiskExactRejected(
+                "matrix_bitset_no_risk_v1 supports long_only direction only"
+            )
+        if scratch is None or scratch.matrix_packed_by_indicator is None:
+            raise BacktestNoRiskExactRejected(
+                "matrix_bitset_no_risk_v1 requires prepacked runtime bitsets"
+            )
+        packed_by_indicator = scratch.matrix_packed_by_indicator
+        if len(packed_by_indicator) != arity:
+            raise BacktestNoRiskExactRejected(
+                "matrix_bitset_no_risk_v1 packed indicator arity mismatch"
+            )
+        combo_idx_by_indicator = make_combo_idx_matrix(
+            combo_chunk=_synthetic_combo_chunk(
+                indicator_ids=indicator_ids,
+                selected_rows_by_indicator=selected_rows_by_indicator,
+            ),
+            indicator_ids=indicator_ids,
+        )
+        pos_bits_2 = (
+            packed_by_indicator[2].pos_bits
+            if arity == 3
+            else np.empty((0, 0), dtype=np.uint64)
+        )
+        matrix_bitset_no_risk_long_only(
+            combo_idx_by_indicator,
+            packed_by_indicator[0].pos_bits,
+            packed_by_indicator[1].pos_bits,
+            pos_bits_2,
+            np.int32(arity),
+            np.int32(packed_by_indicator[0].signal_length),
+            np.int32(packed_by_indicator[0].word_count),
+            _last_word_mask(packed_by_indicator[0].signal_length),
+            prepared_result.execution_mapping.signal_entry_exec_idx_15m,
+            execution_open_1m,
+            execution_close_1m,
+            np.int32(prepared_result.execution_mapping.t_exec_limit_1m),
+            execution_settings.initial_cash_quote,
+            execution_settings.sizing_mode_code,
+            execution_settings.quote_amount,
+            execution_settings.equity_pct,
+            execution_settings.min_quote,
+            execution_settings.max_quote,
+            execution_settings.fee_rate,
+            execution_settings.slippage_rate,
+            execution_settings.safe_profit_percent,
+            execution_settings.use_profit_lock,
+            BARS_PER_YEAR_EXEC_1M,
+            execution_settings.close_on_end,
             buffers.total_return_pct,
             buffers.max_drawdown_pct,
             buffers.return_over_max_drawdown,
@@ -2284,7 +2379,10 @@ def _validate_backend_for_exact_scoring(*, backend_id: str, arity: int) -> None:
     if arity == 2 and backend_id in (
         EVENT_SEGMENTS_2_NO_RISK_BACKEND,
         STREAMING_2_NO_RISK_BACKEND,
+        MATRIX_BITSET_NO_RISK_V1_BACKEND,
     ):
+        return
+    if arity == 3 and backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
         return
     if backend_id == EVENT_SEGMENTS_N_NO_RISK_BACKEND and 1 <= arity <= 10:
         return
@@ -2297,6 +2395,13 @@ def _backend_logical_name(*, backend_id: str, arity: int) -> str:
     if backend_id == EVENT_SEGMENTS_N_NO_RISK_BACKEND:
         return f"event_segments_{arity}_no_risk"
     return backend_id
+
+
+def _last_word_mask(signal_length: int) -> np.uint64:
+    remainder = int(signal_length) % 64
+    if remainder == 0:
+        return np.uint64(18446744073709551615)
+    return np.uint64((1 << remainder) - 1)
 
 
 def _iter_selected_candidate_batches(
@@ -2773,6 +2878,7 @@ def _top_results_from_heap(
     execution_close_1m: np.ndarray,
     top_k_context: _TopKContext,
     stage_timings: dict[str, float],
+    scratch: _NoRiskScratch,
 ) -> tuple[BacktestNoRiskTopResult, ...]:
     pools_by_id = _pool_by_id(prepared_result)
     sorted_entries = tuple(
@@ -2788,6 +2894,7 @@ def _top_results_from_heap(
         execution_close_1m=execution_close_1m,
         top_k_context=top_k_context,
         stage_timings=stage_timings,
+        scratch=scratch,
     )
     n_intervals = int(prepared_result.signal_returns_15m.shape[0])
     eval_rows_by_pos = tuple(
@@ -2832,6 +2939,7 @@ def _hydrate_full_metric_entries(
     execution_close_1m: np.ndarray,
     top_k_context: _TopKContext,
     stage_timings: dict[str, float],
+    scratch: _NoRiskScratch,
 ) -> tuple[_NoRiskHeapEntry, ...]:
     if not entries or all(entry.metric_values for entry in entries):
         return entries
@@ -2853,7 +2961,7 @@ def _hydrate_full_metric_entries(
         execution_open_1m=execution_open_1m,
         execution_close_1m=execution_close_1m,
         buffers=buffers,
-        scratch=_NoRiskScratch(),
+        scratch=scratch,
     )
     hydrated = tuple(
         entry._replace(metric_values=_metric_values_at(buffers=buffers, index=index))
@@ -2991,6 +3099,7 @@ __all__ = [
     "NO_RISK_EXACT_SCORING_STAGE_NAME",
     "NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME",
     "NO_RISK_HEAP_UPDATE_STAGE_NAME",
+    "NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME",
     "NO_RISK_METRIC_NAMES",
     "NO_RISK_SELF_CHECK_NOT_RUN_STATUS",
     "NO_RISK_SELF_CHECK_PASSED_STATUS",

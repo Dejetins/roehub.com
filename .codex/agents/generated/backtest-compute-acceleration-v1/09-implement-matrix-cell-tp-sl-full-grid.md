@@ -100,6 +100,20 @@ runtime_env_sources:
     - "Never print DSN, password, token, API key, or secret values."
   secret_reporting_rule: "Report only key/path presence, never DSN or password values."
 
+mac_studio_test_execution:
+  ssh_alias: macstudio
+  repo_checkout: /Users/daniildegtyarev/Projects/roehub.com
+  command_prefix: "ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && <command>'"
+  acceptance_testing: "Run acceptance benchmark/testing evidence over SSH on Mac Studio; local runs are preflight only unless explicitly marked local-only."
+  sync_rule: "Before SSH testing, ensure the Mac Studio checkout contains the exact candidate code being measured and record commit SHA or dirty state."
+  source_artifacts:
+    root: /opt/roehub/state/backtest_artifacts/v2
+    symbol_current: /opt/roehub/state/backtest_artifacts/v2/BTCUSDT/current.yaml
+    active_manifest: "resolve from BTCUSDT/current.yaml; read-only"
+  evidence_output_dir: docs/architecture/backtest/benchmark_iterations/<stage09_dir>/
+  sidecar_output_dir: docs/architecture/backtest/benchmark_iterations/<stage09_dir>/sidecar_artifacts/
+  write_policy: "Save benchmark evidence and any generated test sidecars under evidence_output_dir; do not write to source_artifacts.root, current.yaml, active slots, or publisher outputs."
+
 required_literals:
   - "matrix_cell_tp_sl_v1"
   - "tp_sl_exact_scoring"
@@ -198,6 +212,9 @@ Additional context:
 - After an `accepted` stage, update ledger/evidence/docs, run required gates, stage only scoped files, commit them to `main`, and report commit SHA and scoped paths. Do not push unless explicitly requested.
 - For `accepted_for_learning`, commit scoped shadow/telemetry/docs/evidence only when that record is the durable handoff; keep the production-off limitation explicit.
 - For `blocked` or `rejected`, do not commit production runtime changes; commit only ledger/evidence/docs documenting the blocker or rejection when needed, and report residual uncommitted changes.
+- Run acceptance benchmark/testing evidence over SSH on `macstudio`; local runs are preflight only unless explicitly marked local-only.
+- Use `mac_studio_test_execution.source_artifacts` as the read-only source artifact location and write stage evidence to `mac_studio_test_execution.evidence_output_dir`.
+- Save any generated sidecar/test `.npy` files under `mac_studio_test_execution.sidecar_output_dir` or an explicitly recorded test overlay; never write them into canonical artifact root, `current.yaml`, active slots, or publisher outputs.
 - Verify Stage 08 has complete selected-cell parity and layout evidence.
 - Implement full-grid cell-block scoring without approximation.
 - Preserve SL-wins tie-breaking, trade boundaries, fees/slippage, sizing, ranking, and top-N identity.

@@ -31,11 +31,13 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.services.v2 import (
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+    MATRIX_BITSET_NO_RISK_V1_BACKEND,
     NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
     NO_RISK_EXACT_SCORED_STATUS,
     NO_RISK_EXACT_SCORING_STAGE_NAME,
     NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME,
     NO_RISK_HEAP_UPDATE_STAGE_NAME,
+    NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME,
     NO_RISK_METRIC_NAMES,
     NO_RISK_SELF_CHECK_NOT_RUN_STATUS,
     NO_RISK_SELF_CHECK_PASSED_STATUS,
@@ -562,6 +564,96 @@ def test_no_risk_streaming_two_matches_event_segments_two_sample_metrics() -> No
         assert streaming_result.telemetry.sample_metrics[metric_name] == pytest.approx(
             event_result.telemetry.sample_metrics[metric_name],
         )
+
+
+@pytest.mark.parametrize(
+    "indicator_ids,current_backend_id",
+    [
+        (("alpha", "beta"), EVENT_SEGMENTS_2_NO_RISK_BACKEND),
+        (("alpha", "beta", "gamma"), EVENT_SEGMENTS_N_NO_RISK_BACKEND),
+    ],
+)
+def test_no_risk_matrix_bitset_mvp_matches_current_long_only_top_results(
+    indicator_ids: tuple[str, ...],
+    current_backend_id: str,
+) -> None:
+    prepared = _prepared_result(indicator_ids=indicator_ids)
+    request = _normalized_request(direction_mode="long_only", top_n=12)
+
+    current_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=3),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=current_backend_id,
+            direction_mode="long_only",
+        ),
+        normalized_request=request,
+    )
+    matrix_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=3),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            direction_mode="long_only",
+        ),
+        normalized_request=request,
+    )
+
+    assert matrix_result.telemetry.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND
+    assert matrix_result.telemetry.backend_logical_name == MATRIX_BITSET_NO_RISK_V1_BACKEND
+    assert matrix_result.telemetry.backend_implementation_id == MATRIX_BITSET_NO_RISK_V1_BACKEND
+    assert NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME in matrix_result.telemetry.stage_timings
+    assert matrix_result.telemetry.exact_candidates_evaluated == (
+        current_result.telemetry.exact_candidates_evaluated
+    )
+    assert canonical_no_risk_top_results_payload(matrix_result.top_results) == (
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
+    assert canonical_no_risk_top_results_hash(
+        canonical_no_risk_top_results_payload(matrix_result.top_results)
+    ) == canonical_no_risk_top_results_hash(
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
+    assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+
+
+def test_no_risk_matrix_bitset_mvp_rejects_reversal_until_stage_05() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+
+    with pytest.raises(BacktestNoRiskExactRejected, match="long_only"):
+        BacktestNoRiskExactScoringService().execute(
+            prepared_result=prepared,
+            combo_planning_result=_combo_planning_result(
+                prepared=prepared,
+                backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+                direction_mode="long_short_reversal",
+            ),
+            normalized_request=_normalized_request(direction_mode="long_short_reversal"),
+        )
+
+
+def test_no_risk_matrix_bitset_mvp_is_requestable_but_not_default() -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+    request = _normalized_request(direction_mode="long_only")
+
+    default_planning = combo_planning_module.BacktestComboPlanningService().execute(
+        prepared_result=prepared,
+        normalized_request=request,
+    )
+    matrix_planning = combo_planning_module.BacktestComboPlanningService().execute(
+        prepared_result=prepared,
+        normalized_request=request,
+        requested_backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+    )
+
+    assert default_planning.backend.backend_id == EVENT_SEGMENTS_2_NO_RISK_BACKEND
+    assert matrix_planning.backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND
+    assert matrix_planning.backend.requires_exact_context is False
+    assert matrix_planning.backend.role == "matrix_mvp"
 
 
 def test_no_risk_direction_modes_change_long_only_reversal_semantics() -> None:
@@ -1222,6 +1314,8 @@ def _backend_role(backend_id: str) -> str:
         return "default"
     if backend_id == STREAMING_2_NO_RISK_BACKEND:
         return "fallback"
+    if backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+        return "matrix_mvp"
     return "generic"
 
 

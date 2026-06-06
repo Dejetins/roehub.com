@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import math
+import os
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -19,6 +20,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 
+from .combo_planning import MATRIX_BITSET_NO_RISK_V1_BACKEND
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
@@ -36,6 +38,9 @@ SAMPLE_WARMUP_STAGE_NAME = "sample_warmup"
 SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME = "service_total_without_warmup"
 SAMPLE_WARMUP_ROWS_PER_INDICATOR = 2
 SAMPLE_WARMUP_TOP_N = 1
+MATRIX_BACKEND_MODE_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE"
+MATRIX_BACKEND_MODE_OFF = "off"
+MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,13 +120,20 @@ class BacktestRuntimeJobOrchestrationService:
             _ = scheduling_class, light_max_actual_combinations
             confirmed_scheduling_class: BacktestSchedulingClass = "heavy"
             if risk_mode == "none":
+                requested_no_risk_backend_id = _matrix_backend_override(
+                    normalized_request=normalized_request,
+                    prepared_result=prepared_result,
+                )
                 warmup_elapsed_s = self._run_no_risk_sample_warmup(
                     prepared_result=prepared_result,
                     normalized_request=normalized_request,
+                    requested_backend_id=requested_no_risk_backend_id,
                 )
-                combo_result = self.combo_planning.execute(
+                combo_result = _execute_combo_planning(
+                    self.combo_planning,
                     prepared_result=prepared_result,
                     normalized_request=normalized_request,
+                    requested_backend_id=requested_no_risk_backend_id,
                 )
                 exact_result = self.no_risk_exact.execute(
                     prepared_result=prepared_result,
@@ -224,13 +236,16 @@ class BacktestRuntimeJobOrchestrationService:
         *,
         prepared_result: BacktestPreparePoolsResult,
         normalized_request: Mapping[str, Any],
+        requested_backend_id: str | None,
     ) -> float:
         started = time.perf_counter()
         warmup_prepared = _limit_prepared_rows_for_warmup(prepared_result)
         warmup_request = _sample_warmup_request(normalized_request=normalized_request)
-        warmup_combo = self.combo_planning.execute(
+        warmup_combo = _execute_combo_planning(
+            self.combo_planning,
             prepared_result=warmup_prepared,
             normalized_request=warmup_request,
+            requested_backend_id=requested_backend_id,
         )
         warmup_result = self.no_risk_exact.execute(
             prepared_result=warmup_prepared,
@@ -268,6 +283,58 @@ class BacktestRuntimeJobOrchestrationService:
         del warmup_prepared
         gc.collect()
         return time.perf_counter() - started
+
+
+def _execute_combo_planning(
+    combo_planning: Any,
+    *,
+    prepared_result: BacktestPreparePoolsResult,
+    normalized_request: Mapping[str, Any],
+    requested_backend_id: str | None,
+) -> Any:
+    if requested_backend_id is None:
+        return combo_planning.execute(
+            prepared_result=prepared_result,
+            normalized_request=normalized_request,
+        )
+    return combo_planning.execute(
+        prepared_result=prepared_result,
+        normalized_request=normalized_request,
+        requested_backend_id=requested_backend_id,
+    )
+
+
+def _matrix_backend_override(
+    *,
+    normalized_request: Mapping[str, Any],
+    prepared_result: BacktestPreparePoolsResult,
+) -> str | None:
+    mode = os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY, MATRIX_BACKEND_MODE_OFF).strip()
+    if not mode or mode == MATRIX_BACKEND_MODE_OFF:
+        return None
+    if mode not in {
+        MATRIX_BITSET_NO_RISK_V1_BACKEND,
+        MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+    }:
+        allowed = (
+            MATRIX_BACKEND_MODE_OFF,
+            MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+            MATRIX_BITSET_NO_RISK_V1_BACKEND,
+        )
+        raise ValueError(
+            f"{MATRIX_BACKEND_MODE_ENV_KEY} must be one of "
+            f"{allowed!r}"
+        )
+    risk = normalized_request.get("risk")
+    execution = normalized_request.get("execution")
+    risk_mode = risk.get("mode") if isinstance(risk, Mapping) else None
+    direction_mode = (
+        execution.get("direction_mode") if isinstance(execution, Mapping) else None
+    )
+    arity = len(prepared_result.indicator_ids)
+    if risk_mode == "none" and direction_mode == "long_only" and arity in (2, 3):
+        return MATRIX_BITSET_NO_RISK_V1_BACKEND
+    return None
 
 
 def _stage_timings(
