@@ -52,6 +52,26 @@
 - Passed jobs: `2/2`
 - Failed jobs: `[]`
 
+## Old vs Matrix Top-50 A/B
+
+Отдельный Mac Studio A/B прогон для `none/arity_6/long_only` сравнил старый
+`event_segments_n_no_risk` и новый `matrix_bitset_no_risk_v1` на одном request
+hash. Raw API payload hash не используется как identity-сигнал, потому что
+`variant_key` и `links` содержат job id. Для вопроса "те же стратегии?"
+сравнивается canonical strategy identity: rank, `variant_hash`,
+`indicator_variant_hash`, canonical params, TP/SL поля и ordered top-50
+variant sequence; summary metrics проверяются отдельно с числовой дельтой.
+
+| Job | Request hash same | Old backend | Matrix backend | Top count old/matrix | Raw payload hash old | Raw payload hash matrix | Same canonical payload hash | Strategy identity hash old | Strategy identity hash matrix | Same strategy identity | Ordered variant hash same | Max metric abs diff | Exact old s | Exact matrix s |
+| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
+| `none/arity_6/long_only` | true | `event_segments_n_no_risk` | `matrix_bitset_no_risk_v1` | `50 / 50` | `e90723790642810a88fd5054259a6b3f3bcca6d0b28d65170e9c60baeb5e33cd` | `c703fd09e07547682275557c59850a2f667284cc51b543b84ec47e33801f26c7` | false | `30996c11f947d4dafaee2ceff4d51e509acaa468436d29773594d032b75684ab` | `30996c11f947d4dafaee2ceff4d51e509acaa468436d29773594d032b75684ab` | true | true | `1.066e-13` | 15.420 | 1.076 |
+
+Canonical payload hash old/matrix:
+`d924fffbab7daccc4a61b1a088ec9309d4e45131162c407edad4ddaa753143df` /
+`c59ea128b8e0290323a563754d5acf693b6a3898788bf1f23b420fb6ff7ed1d6`.
+
+Evidence: `ab_top50_parity.json`.
+
 ## Performance
 
 - Stage timing jobs: `2`
@@ -104,6 +124,8 @@
 
 - `benchmark_results.json`
 - `benchmark_summary.md`
+- `ab_top50_parity.json`
+- `ab_top50_child_process_evidence/*.json`
 - `child_process_evidence/*.json`
 
 ## Operator Commands
