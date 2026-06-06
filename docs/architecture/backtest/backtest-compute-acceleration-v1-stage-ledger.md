@@ -662,6 +662,87 @@ Stage 06 must still prove deterministic cache keying, hit-rate, top-N parity,
 service wall, memory cleanup and accepted speedup before any cache-backed
 production `on` mode is allowed.
 
+## Stage 06 — consensus signature cache rejected
+
+Stage 06 tested an opt-in consensus signature cache candidate on the accepted
+Stage 05 heavy no-risk matrix rows. The candidate grouped identical consensus
+bitsets inside the matrix no-risk scoring path, compared exact consensus
+payload bytes before reuse, preserved public top-N identity/order in focused
+tests, and exposed explicit benchmark counters for cache hit-rate and digest
+collision count.
+
+Candidate code was copied temporarily to the Mac Studio checkout for benchmark
+execution. The measured checkout reported base commit
+`9ecdb97591d32f1691291ac7c3335cfc3ef530c7` plus dirty candidate source paths;
+the remote checkout was restored after evidence was copied back. Local focused
+preflight for the candidate passed:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py \
+  tests/unit/contexts/backtest/domain/value_objects/test_variant_identity.py \
+  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py
+```
+
+Mac Studio unit preflight passed with `/opt/homebrew/bin/uv`: `65 passed`.
+
+Acceptance benchmark command:
+
+```bash
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  ROEHUB_ENV=prod \
+  ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml \
+  ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_05_no_risk_reversal_arity6 \
+  ROEHUB_BACKTEST_MATRIX_SIGNATURE_CACHE=1 \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-05-no-risk-heavy-rows \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache'
+```
+
+Benchmark evidence:
+
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/`
+
+Overall harness gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `api_runner_path.pass` | true |
+| `parity.pass` | true |
+| `performance.pass` | true versus May 2 reference only |
+| `instrumentation.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Stage 06 acceptance comparison against the immediately accepted Stage 05
+baseline failed:
+
+| Job | Stage 05 exact s | Stage 06 exact s | Stage 05 service wall s | Stage 06 service wall s | Cache hit-rate | Cache hits | Unique consensus | Collision count |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | 1.010 | 4.932 | 1.590 | 5.366 | 0.202396 | 9443 | 37213 | 0 |
+| `none/arity_6/long_short_reversal` | 2.887 | 6.166 | 3.135 | 6.414 | 0.202396 | 9443 | 37213 | 0 |
+
+Decision: Stage 06 is `rejected`. The cache produced a real hit-rate and
+collision-safe keying evidence, but exact scoring and service wall regressed on
+the hot API-runner boundary. No cache-backed production `on` mode is unlocked,
+and the candidate runtime code must not be committed as production code from
+this stage.
+
+Contract impact for the accepted ledger/evidence record: public API `none`;
+port contract `none`; DTO schema `none` for committed runtime because the cache
+candidate is not accepted; persisted schema `none`; config schema `none`;
+request hash/cache identity `none`; service-call semantics `none`;
+benchmark/report semantics `compatible-change`; browser-visible behavior
+`none`.
+
+`next_iteration_allowed` is `true` for Stage 07 sidecar/test bitset artifacts
+only. Stage 07 must not depend on the rejected runtime signature cache and must
+continue to avoid canonical publisher/precompute or manifest changes.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -672,8 +753,8 @@ production `on` mode is allowed.
 | 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
 | 04 | accepted_for_learning | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; raw performance failed on tiny `none/arity_2/long_only` by about `1.1ms`, while `none/arity_3/long_only` ratio was `2.590`; arity-2 no-advantage is waived for learning progression only; production `on` mode remains locked | true |
 | 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/` | Mac Studio API-runner parity `2/2`, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; `none/arity_6/long_only` ratio `15.543`, `none/arity_6/long_short_reversal` ratio `5.323`; production default remains locked | true |
-| 06 | planned | Consensus signature cache | planned | Pending Stage 05 accepted handoff | false |
-| 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Pending Stage 06 | false |
+| 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted | true for Stage 07 sidecar/test bitset artifacts only |
+| 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Stage 06 cache rejected with clear evidence; Stage 07 may start as an independent sidecar/test-bitset stage only | false |
 | 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 | false |
 | 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 | false |
 | 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 | false |
