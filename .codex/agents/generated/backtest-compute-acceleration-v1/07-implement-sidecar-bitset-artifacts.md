@@ -15,7 +15,9 @@ context_sources:
     - path: docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md
       why: "sidecar and no-advantage rules"
     - path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
-      why: "Stage 06 gate"
+      why: "Stage 06 rejection handoff and Stage 07 gate"
+    - path: docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/benchmark_summary.md
+      why: "rejected Stage 06 cache evidence and no-dependency guardrail"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/bitsets.py
       why: "runtime bitset representation"
@@ -52,6 +54,7 @@ hard_requirements:
   no_canonical_manifest_changes: true
   sidecar_only: true
   no_advantage_policy_required: true
+  no_stage_06_signature_cache_dependency: true
 
 task_toggles:
   implementation_allowed: true
@@ -124,11 +127,13 @@ required_literals:
   - "matrix_sidecar_manifest.json"
   - "sidecar_generate_ms"
   - "sidecar_load_ms"
+  - "2026-06-06_matrix_bitset_stage_06_signature_cache"
 
 non_goals:
   - "Modify artifact publisher/precompute."
   - "Modify canonical manifest.yaml/current.yaml."
   - "Enable production on mode based only on sidecar speedup."
+  - "Reuse, revive, or reimplement the rejected Stage 06 runtime signature cache."
 
 final_report_format:
   language: ru
@@ -176,6 +181,7 @@ possible_secondary_touches:
 safety_notes:
   - "Block the stage if canonical publisher/precompute or active manifests change."
   - "Sidecar-dependent speedup is accepted for learning only unless measured generation is included or a publisher plan is approved."
+  - "Stage 06 is rejected; Stage 07 must not import, reuse, or depend on its runtime cache candidate."
 ---
 
 # Task
@@ -193,7 +199,8 @@ Done means:
 Context ledger from the previous iteration:
 
 - completed:
-  - Stage 06 cache was accepted, rejected, or accepted for learning with explicit evidence.
+  - Stage 06 consensus signature cache is `rejected` with explicit Mac Studio evidence at `docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/`.
+  - Stage 06 retained only evidence plus `stage06_signature_cache_candidate.patch`; no runtime cache code is accepted in the active service.
 - open_items:
   - Test whether pre-generated bitsets reduce pack/load cost without changing publisher.
 - contract_changes:
@@ -209,6 +216,8 @@ Context ledger from the previous iteration:
 Additional context:
 
 - Stage 07 cannot enable production `on` by sidecar speedup alone.
+- Stage 07 is allowed to start because Stage 06 was closed by rejection with clear evidence.
+- Do not use the rejected Stage 06 runtime signature cache as a dependency, fallback, helper module, or benchmark shortcut.
 
 ## Requirements (Must)
 
@@ -219,7 +228,8 @@ Additional context:
 - Run acceptance benchmark/testing evidence over SSH on `macstudio`; local runs are preflight only unless explicitly marked local-only.
 - Use `mac_studio_test_execution.source_artifacts` as the read-only source artifact location and write stage evidence to `mac_studio_test_execution.evidence_output_dir`.
 - Save any generated sidecar/test `.npy` files under `mac_studio_test_execution.sidecar_output_dir` or an explicitly recorded test overlay; never write them into canonical artifact root, `current.yaml`, active slots, or publisher outputs.
-- Verify Stage 06 decision permits Stage 07.
+- Verify the ledger marks Stage 06 as `rejected` and permits Stage 07 as an independent sidecar/test-bitset stage.
+- Do not import, copy, re-enable, or adapt the rejected Stage 06 runtime signature cache candidate.
 - Do not modify `backtest_artifacts` publisher/precompute, canonical `manifest.yaml`, `current.yaml`, or active slots.
 - Generate sidecar files outside the canonical artifact store or under explicitly recorded test/evidence overlay.
 - Write `matrix_sidecar_manifest.json` with source manifest hash, source `signals.i8.npy` hash, schema version, shapes, dtypes, padding, timeframe/market/symbol identity.
@@ -268,7 +278,7 @@ Skill routing for this task:
 - `backend-performance-evidence`: use during verification for fair sidecar measurement.
 - `backend-quality-gates`: use if Python gates fail.
 
-1. Verify Stage 06 status and no-publisher constraint.
+1. Verify Stage 06 is rejected with clear evidence, Stage 07 is permitted, and no rejected cache code is being reused.
 2. Implement sidecar generator/helper and metadata schema.
 3. Implement sidecar validation/fallback path in the matrix backend test path.
 4. Add tests for validation, fallback, duplicate map, and no canonical publisher changes.

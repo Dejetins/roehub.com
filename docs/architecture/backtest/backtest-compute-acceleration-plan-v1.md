@@ -196,9 +196,9 @@ tested only under these constraints:
 | Recommendation | Coverage in this plan |
 |---|---|
 | Blockwise matrix / bitset / sparse-event backend | Covered by Stages 03-05 and 08-09 |
-| Deduplicate signal rows before scoring | Covered by Stages 02, 06 and Stage 07 sidecar artifacts |
+| Deduplicate signal rows before scoring | Stage 02 telemetry found no duplicate signal rows on accepted arity-6 rows; Stage 06 runtime cache was tested and rejected; Stage 07 sidecar artifacts may still record duplicate maps for validation/identity expansion |
 | Exact signal bitset `.npy` artifacts | Covered explicitly in Stage 07 sidecar artifact list |
-| Consensus signature cache | Covered by Stage 06 |
+| Consensus signature cache | Covered by Stage 06 and rejected by Mac Studio evidence; do not make later stages depend on the rejected runtime cache candidate |
 | Sparse trade tape for selected candidates | Covered by Stages 04-05 and Stage 11 reuse |
 | TP/SL by-entry hit-times artifacts | Covered explicitly in Stages 08-09 |
 | TP/SL cell-block scoring | Covered by Stages 08-09 |
@@ -407,8 +407,8 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 03 | Runtime bitset pack shadow | Packs `trade_T` into `pos_bits` / `neg_bits`; sample consensus parity; pack overhead measured |
 | 04 | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | Exact parity plus accepted speedup on target rows; service wall no regression |
 | 05 | No-risk reversal and arity 6 | `long_short_reversal` transitions and arity 6 parity; accepted heavy-row speedup |
-| 06 | Consensus signature cache | Exact-safe scoring reuse; identical public top-N ordering or explicit deterministic tie policy; accepted speedup |
-| 07 | Sidecar bitset artifacts | Generate `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy` outside publisher; source-hash validation and runtime pack cost removed or reduced |
+| 06 | Consensus signature cache | Rejected: cache hit-rate was real, but exact scoring and service wall regressed versus Stage 05; no runtime cache code is accepted |
+| 07 | Sidecar bitset artifacts | May proceed independently of Stage 06 cache; generate `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy` outside publisher; source-hash validation and runtime pack cost removed or reduced |
 | 08 | TP/SL selected-cell shadow | `tp_count <= 8`, `sl_count <= 8`; SL tie rule parity; by-entry hit-times layout counters or selected by-entry arrays |
 | 09 | `matrix_cell_tp_sl_v1` full grid blocks | Full request grid exact parity; accepted `tp_sl_exact_scoring` speedup and no service wall regression |
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
@@ -423,7 +423,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 02 | `row_signatures.py`, telemetry-only hook | duplicate/signature potential report |
 | 03 | `bitsets.py`, shadow validation hook | bitset parity sample report |
 | 04-05 | `consensus.py`, `trade_tape.py`, `no_risk_score.py` | no-risk benchmark and parity evidence |
-| 06 | signature cache module and deterministic top merge tests | cache hit-rate and speedup evidence |
+| 06 | no accepted runtime files; rejected candidate retained only as evidence patch under `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | cache hit-rate/regression evidence |
 | 07 | planned sidecar generator `scripts/backtest/generate_matrix_sidecar_artifacts.py` or equivalent benchmark helper; sidecar loader in matrix backend; outputs `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute changes | sidecar source-hash validation, runtime fallback and benchmark evidence |
 | 08-09 | `tp_sl_cells.py`, by-entry hit-times layout validation for `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy` or job-local selected arrays; no publisher/manifest modules unless a later separate publisher plan is approved | selected/full grid TP/SL benchmark evidence |
 | 10 | exact-safe pruning planner | arity 7/10 bounded-search evidence |

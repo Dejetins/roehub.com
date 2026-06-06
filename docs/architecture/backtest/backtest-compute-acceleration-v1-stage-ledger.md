@@ -743,6 +743,24 @@ benchmark/report semantics `compatible-change`; browser-visible behavior
 only. Stage 07 must not depend on the rejected runtime signature cache and must
 continue to avoid canonical publisher/precompute or manifest changes.
 
+## Current Execution Handoff
+
+Next executable stage: Stage 07 sidecar/test bitset artifacts.
+
+Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
+are ledger/evidence files under
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/`,
+including `stage06_signature_cache_candidate.patch` for audit context. No Stage
+06 runtime cache code is accepted as part of the active service, and later stages
+must not reuse, revive or depend on that candidate unless a new benchmark-gated
+plan explicitly reopens the idea.
+
+Stage 07 may start because the Stage 06 blocker is resolved by rejection with
+clear evidence. Stage 07 must be independent sidecar/test artifact work: source
+canonical artifacts are read-only, sidecars are written only under the stage
+evidence directory or a recorded test overlay, and publisher/precompute/current
+manifest paths remain unchanged.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -753,8 +771,8 @@ continue to avoid canonical publisher/precompute or manifest changes.
 | 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
 | 04 | accepted_for_learning | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; raw performance failed on tiny `none/arity_2/long_only` by about `1.1ms`, while `none/arity_3/long_only` ratio was `2.590`; arity-2 no-advantage is waived for learning progression only; production `on` mode remains locked | true |
 | 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/` | Mac Studio API-runner parity `2/2`, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; `none/arity_6/long_only` ratio `15.543`, `none/arity_6/long_short_reversal` ratio `5.323`; production default remains locked | true |
-| 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted | true for Stage 07 sidecar/test bitset artifacts only |
-| 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Stage 06 cache rejected with clear evidence; Stage 07 may start as an independent sidecar/test-bitset stage only | false |
+| 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted; only evidence/patch retained | true for Stage 07 sidecar/test bitset artifacts only |
+| 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Stage 06 cache rejected with clear evidence; Stage 07 may start as an independent sidecar/test-bitset stage and must not depend on rejected cache code | false |
 | 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 | false |
 | 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 | false |
 | 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 | false |
