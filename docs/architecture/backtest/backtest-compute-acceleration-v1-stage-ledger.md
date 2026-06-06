@@ -413,7 +413,7 @@ persisted schema `none`; config schema `none`; request hash/cache identity
 Stage 04 must still produce its own parity, service wall, memory cleanup and
 top-N evidence before any production-affecting backend mode is accepted.
 
-## Stage 04: `matrix_bitset_no_risk_v1` MVP Rejected
+## Stage 04: `matrix_bitset_no_risk_v1` MVP Accepted For Learning
 
 Scope attempted: `matrix_bitset_no_risk_v1` for `none/arity_2/long_only` and
 `none/arity_3/long_only`, default-off and selectable only through internal
@@ -510,13 +510,21 @@ Scoped MVP timings:
 | `none/arity_2/long_only` | `matrix_bitset_no_risk_v1` | 0.003684 | 0.002545 | 0.691 | speed fail |
 | `none/arity_3/long_only` | `matrix_bitset_no_risk_v1` | 0.018385 | 0.047619 | 2.590 | speed pass |
 
-Decision: Stage 04 is `rejected`. Correctness and operational gates passed for
-the scoped Mac Studio API-runner path, but the full MVP scope failed the
-performance gate because `none/arity_2/long_only` regressed against the May 2
-reference. The stage does not unlock Stage 05, production `on` mode, default
-backend switching, reversal, TP/SL, pruning, request-hash changes, cache
-identity changes or sidecar artifacts. Production runtime candidate changes
-must not be committed as an accepted backend.
+Decision: Stage 04 is `accepted_for_learning`. Correctness and operational
+gates passed for the scoped Mac Studio API-runner path. The raw performance
+gate still reports `fail` because `none/arity_2/long_only` regressed against
+the May 2 reference, but that row is a tiny `36`-candidate case where fixed
+runtime overhead dominates the measured exact-scoring timer. The absolute
+delta is about `1.1ms`, while the same backend gives a `2.590x` exact-scoring
+speedup on `none/arity_3/long_only`.
+
+Operator policy decision: the arity-2 no-advantage result is not production
+acceptance evidence, but it is not a blocker for learning progression because
+the expected algorithmic payoff is in later higher-arity/reversal/cache stages.
+This stage unlocks Stage 05 implementation only. It does not unlock production
+`on` mode, default backend switching, TP/SL, pruning, request-hash changes,
+cache identity changes or sidecar artifacts. Production runtime candidate
+changes must not be committed as an accepted production backend.
 
 Contract impact: public API `none`; port contract `none`; DTO schema `none`;
 persisted schema `none`; config schema `compatible-change` for the internal
@@ -533,8 +541,8 @@ benchmark/report semantics `compatible-change`; browser-visible behavior
 | 01 | accepted_for_learning | Add instrumentation counters without behavior changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/` | Counters present; explicit `null` for unavailable current-runtime counters; parity, performance, memory, lazy cache, legacy path and accounting gates passed; overhead stayed within <= 1% limit with no Stage 00 service/exact regression; production `on` mode remains locked | true |
 | 02 | accepted_for_learning | Row/signature telemetry shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/` | Shadow counters present; duplicate rows `0/36` on accepted arity-6 rows; `consensus_signature_count=46656` as deterministic upper bound; collision count `0`; row signature overhead about 10-11ms/job; parity, performance, memory, lazy cache, legacy path and docs drift gates passed; no pruning/scoring/top-N/request-hash/cache change | true |
 | 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
-| 04 | rejected | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; performance failed because `none/arity_2/long_only` ratio `0.691 < 0.8`, while `none/arity_3/long_only` ratio was `2.590`; production `on` mode and Stage 05 remain locked | false |
-| 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 | false |
+| 04 | accepted_for_learning | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; raw performance failed on tiny `none/arity_2/long_only` by about `1.1ms`, while `none/arity_3/long_only` ratio was `2.590`; arity-2 no-advantage is waived for learning progression only; production `on` mode remains locked | true |
+| 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 handoff | false |
 | 06 | planned | Consensus signature cache | planned | Pending Stage 05 | false |
 | 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Pending Stage 06 | false |
 | 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 | false |
