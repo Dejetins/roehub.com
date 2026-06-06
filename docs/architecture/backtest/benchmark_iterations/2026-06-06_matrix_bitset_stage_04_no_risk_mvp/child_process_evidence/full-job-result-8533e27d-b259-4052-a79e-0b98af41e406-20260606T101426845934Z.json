@@ -1,0 +1,514 @@
+{
+  "cleanup_evidence": {
+    "result_contains_heavy_references": false,
+    "runtime_result": {
+      "checked_reference_names": [
+        "prepared_result",
+        "combo_planning_result",
+        "prepared_pools",
+        "exact_context",
+        "proxy_context",
+        "execution_open_1m",
+        "execution_close_1m",
+        "matrix_bitsets",
+        "selected_batches_iter",
+        "metric_buffers",
+        "heap"
+      ],
+      "cleanup_duration_s": 4.582994733937085e-06,
+      "result_contains_heavy_references": false,
+      "result_is_compact": true,
+      "retained_heavy_reference_names": []
+    },
+    "scheduling_class": "heavy",
+    "worker_recycle_required": true,
+    "worker_recycle_strategy": "disposable child process"
+  },
+  "exact_diagnostics": {
+    "combo_planning": {
+      "cartesian_combinations": 36,
+      "combo_chunks_processed": 0,
+      "combo_iteration_mode": "ordinal_streaming_pass_through",
+      "exact_candidates_evaluated": 36,
+      "materialized_candidate_count": 0,
+      "proxy_candidates_seen": 36,
+      "proxy_candidates_selected": 36,
+      "proxy_candidates_valid": 36,
+      "stage_timings": {
+        "build_exact_context": 1.1124997399747372e-05,
+        "build_proxy_context": 1.3584009138867259e-05,
+        "combo_iteration": 0.0,
+        "proxy_filter": 0.0
+      },
+      "streamed_candidate_count": 36
+    },
+    "row_signatures": {
+      "candidate_upper_bound_after_row_dedup": 36,
+      "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+      "consensus_signature_count": 36,
+      "consensus_signature_enumeration_limit": 10000,
+      "consensus_signature_mode": "exact_consensus_enumerated",
+      "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+      "duplicate_row_count": 0,
+      "duplicate_row_fraction": 0.0,
+      "duplicate_signal_row_ids": {
+        "ma.dema": [],
+        "ma.hma": []
+      },
+      "indicators": [
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.dema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.hma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "row_signature_collision_count": 0,
+      "rows_after_prefilter": 12,
+      "schema": "backtest_row_signature_telemetry_v1",
+      "unique_rows_after_dedup": 12,
+      "unique_signal_row_ids": {
+        "ma.dema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.hma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "self_check": {
+      "backend_implementation_id": "matrix_bitset_no_risk_v1",
+      "backend_logical_name": "matrix_bitset_no_risk_v1",
+      "direction_mode": "long_only",
+      "enabled": false,
+      "max_abs_diff": null,
+      "mismatches": 0,
+      "return_tolerance": null,
+      "sample_size": 0,
+      "status": "not_run",
+      "trade_count_equal": null
+    },
+    "signal_bitsets": {
+      "arrays": {
+        "neg_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        },
+        "pos_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        }
+      },
+      "arrays_released_before_return": true,
+      "bit_order": "little_endian_lsb_first_per_uint64_word",
+      "consensus_sample_count": 8,
+      "consensus_sample_mismatches": 0,
+      "consensus_sample_parity": true,
+      "estimated_peak_bytes": 3283788,
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "negative_signal_count": 657719,
+          "neutral_signal_count": 38,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 655721,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        },
+        {
+          "indicator_id": "ma.hma",
+          "negative_signal_count": 743747,
+          "neutral_signal_count": 0,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 569731,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        }
+      ],
+      "packed_bytes": 656832,
+      "padding_bits": 31,
+      "padding_valid": true,
+      "rows_after_prefilter": 12,
+      "schema": "backtest_runtime_bitset_pack_shadow_v1",
+      "signal_length": 218913,
+      "word_count": 3421,
+      "word_count_formula": "W = ceil(T / 64)"
+    },
+    "telemetry": {
+      "arity": 2,
+      "backend_id": "matrix_bitset_no_risk_v1",
+      "backend_implementation_id": "matrix_bitset_no_risk_v1",
+      "backend_logical_name": "matrix_bitset_no_risk_v1",
+      "benchmark_top_k": 5,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 36,
+      "heap_capacity": 50,
+      "metric_names": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "trade_count",
+        "sharpe_trades",
+        "win_rate_pct",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct"
+      ],
+      "metric_profile": "ranking_total_return_trade_count",
+      "min_closed_trades": 300,
+      "numba_num_threads": 12,
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "quality_candidates_below_min_trades": 6,
+      "quality_candidates_heap_eligible": 30,
+      "request_top_n": 50,
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 52.94507924806487,
+        "avg_trade_ret_pct": -0.1579131070943489,
+        "exposure_pct": 6.326188478048271,
+        "max_drawdown_pct": 99.98269925757295,
+        "profit_factor": 0.44254977394322387,
+        "return_over_max_drawdown": -0.9999982815890391,
+        "sharpe_trades": -7.393159086913886,
+        "total_return_pct": -99.98252744620665,
+        "trade_count": 5426.0,
+        "win_rate_pct": 20.18061186877995
+      },
+      "stage_timings": {
+        "exact_scoring": 0.003683957998873666,
+        "full_metric_second_pass": 0.003729874995769933,
+        "heap_update": 6.591700366698205e-05,
+        "matrix_bitset_backend_pack": 0.0010490410058991984,
+        "no_risk_exact_boundary": 3.1042000045999885e-05,
+        "top_result_proxy_fill": 0.01991499999712687
+      },
+      "status": "scored",
+      "top_results_count": 30
+    },
+    "top_results_sample": [
+      {
+        "indicator_rows": {
+          "ma.dema": 5,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 110123,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 5,
+          "ma.dema.source": "close",
+          "ma.dema.window": 10,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -125.84527587890625
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 52.94507924806487,
+          "avg_trade_ret_pct": -0.1579131070943489,
+          "exposure_pct": 6.326188478048271,
+          "max_drawdown_pct": 99.98269925757295,
+          "profit_factor": 0.44254977394322387,
+          "return_over_max_drawdown": -0.9999982815890391,
+          "sharpe_trades": -7.393159086913886,
+          "total_return_pct": -99.98252744620665,
+          "trade_count": 5426.0,
+          "win_rate_pct": 20.18061186877995
+        },
+        "rank": 1,
+        "score": -99.98252744620665
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 4,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 110288,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 4,
+          "ma.dema.source": "close",
+          "ma.dema.window": 9,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -126.21102905273438
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 50.7204738330976,
+          "avg_trade_ret_pct": -0.1574125930039829,
+          "exposure_pct": 6.31726997925403,
+          "max_drawdown_pct": 99.98764255442543,
+          "profit_factor": 0.4517595824585724,
+          "return_over_max_drawdown": -0.9999987726468872,
+          "sharpe_trades": -7.6154191159238005,
+          "total_return_pct": -99.9875198342811,
+          "trade_count": 5656.0,
+          "win_rate_pct": 20.26166902404526
+        },
+        "rank": 2,
+        "score": -99.9875198342811
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 3,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 110424,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 3,
+          "ma.dema.source": "close",
+          "ma.dema.window": 8,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -126.6941146850586
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 48.13900970224155,
+          "avg_trade_ret_pct": -0.16029303816342652,
+          "exposure_pct": 6.337088865463455,
+          "max_drawdown_pct": 99.99372737147023,
+          "profit_factor": 0.4392834753421574,
+          "return_over_max_drawdown": -0.9999993770345479,
+          "sharpe_trades": -8.28998124030546,
+          "total_return_pct": -99.99366507883265,
+          "trade_count": 5978.0,
+          "win_rate_pct": 20.341251254600202
+        },
+        "rank": 3,
+        "score": -99.99366507883265
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 2,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 110458,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 2,
+          "ma.dema.source": "close",
+          "ma.dema.window": 7,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -127.02278900146484
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 45.14368718592965,
+          "avg_trade_ret_pct": -0.1613689680718378,
+          "exposure_pct": 6.330482570060314,
+          "max_drawdown_pct": 99.9968729004777,
+          "profit_factor": 0.4250973641338102,
+          "return_over_max_drawdown": -0.9999996894422044,
+          "sharpe_trades": -8.788259464814965,
+          "total_return_pct": -99.99684184566928,
+          "trade_count": 6368.0,
+          "win_rate_pct": 20.006281407035175
+        },
+        "rank": 4,
+        "score": -99.99684184566928
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 1,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 110495,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 1,
+          "ma.dema.source": "close",
+          "ma.dema.window": 6,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -126.51900482177734
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 42.31363034847816,
+          "avg_trade_ret_pct": -0.16068784466483632,
+          "exposure_pct": 6.337088865463455,
+          "max_drawdown_pct": 99.99837448055568,
+          "profit_factor": 0.4190962674863054,
+          "return_over_max_drawdown": -0.9999998385692073,
+          "sharpe_trades": -9.266120940593485,
+          "total_return_pct": -99.99835833773882,
+          "trade_count": 6801.0,
+          "win_rate_pct": 20.71754153800912
+        },
+        "rank": 5,
+        "score": -99.99835833773882
+      }
+    ]
+  },
+  "instrumentation_counters": {
+    "artifact_load_ms": 77.79187501000706,
+    "avg_segments_per_candidate": null,
+    "avg_trades_per_candidate": null,
+    "bitset_consensus_sample_count": 8,
+    "bitset_consensus_sample_mismatches": 0,
+    "bitset_consensus_sample_parity": true,
+    "bitset_padding_valid": true,
+    "bitset_word_count": 3421,
+    "candidate_upper_bound_after_row_dedup": 36,
+    "candidates_after_proxy": 36,
+    "combo_count_planned": 36,
+    "combo_iteration_ms": 0.0,
+    "consensus_signature_count": 36,
+    "consensus_signature_mode": "exact_consensus_enumerated",
+    "duplicate_signal_row_ids": {
+      "ma.dema": [],
+      "ma.hma": []
+    },
+    "exact_candidates": 36,
+    "exact_candidates_per_sec": 9772.098381959471,
+    "exact_scoring_ms": 3.683957998873666,
+    "proxy_filter_ms": 0.0,
+    "row_signature_collision_count": 0,
+    "row_signature_ms": 42.47833300905768,
+    "rows_after_prefilter": 12,
+    "rows_before_prefilter": null,
+    "signals_pack_arrays_released": true,
+    "signals_pack_bytes": 656832,
+    "signals_pack_estimated_peak_bytes": 3283788,
+    "signals_pack_ms": 28.448042008676566,
+    "sl_count": null,
+    "top_result_assembly_ms": 4.713458998594433,
+    "tp_count": null,
+    "tp_sl_cells": 0,
+    "tp_sl_exact_scoring_ms": null,
+    "trade_cell_evals_per_sec": null,
+    "unique_rows_after_dedup": 12
+  },
+  "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+  "process_evidence": {
+    "cancelled": false,
+    "command": [
+      "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+      "-m",
+      "apps.worker.backtest_job_runner.main.full_job_child",
+      "--job-id",
+      "8533e27d-b259-4052-a79e-0b98af41e406",
+      "--preflight-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/preflight.json",
+      "--output-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/result.json",
+      "--scheduling-class",
+      "heavy",
+      "--light-max-actual-combinations",
+      "50000"
+    ],
+    "elapsed_seconds": 0.856811,
+    "exit_code": 0,
+    "finished_at": "2026-06-06T10:14:26.840861Z",
+    "metadata": {
+      "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+      "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "numba_threads": "12",
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "parent_physical_footprint_after_bytes": null,
+    "parent_physical_footprint_before_bytes": null,
+    "parent_pid": 97602,
+    "parent_retained_physical_footprint_delta_bytes": null,
+    "parent_retained_rss_delta_bytes": 622592,
+    "parent_rss_after_bytes": 117374976,
+    "parent_rss_before_bytes": 116752384,
+    "peak_physical_footprint_bytes": null,
+    "peak_rss_bytes": 181059584,
+    "pid": 97626,
+    "schema": "roehub_child_process_evidence_v1",
+    "started_at": "2026-06-06T10:14:25.984050Z",
+    "stderr_tail": "2026-06-06 13:14:26,283 INFO __main__ backtest child process started: job_id=8533e27d-b259-4052-a79e-0b98af41e406 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-06 13:14:26,749 INFO __main__ backtest child process finished: job_id=8533e27d-b259-4052-a79e-0b98af41e406 status=succeeded elapsed_seconds=0.466\n",
+    "stdout_tail": "",
+    "timed_out": false
+  },
+  "schema": "roehub_full_job_child_result_evidence_v1",
+  "stage_timings": {
+    "artifact_array_mmap_load": 0.0119065830076579,
+    "artifact_array_open": 0.0119065830076579,
+    "artifact_context_resolve": 0.06588529200234916,
+    "artifact_manifest_load": 0.06588529200234916,
+    "build_exact_context": 1.1124997399747372e-05,
+    "build_proxy_context": 1.3584009138867259e-05,
+    "combo_iteration": 0.0,
+    "exact_scoring": 0.003683957998873666,
+    "full_metric_second_pass": 0.003729874995769933,
+    "heap_update": 6.591700366698205e-05,
+    "matrix_bitset_backend_pack": 0.0010490410058991984,
+    "no_risk_exact_boundary": 3.1042000045999885e-05,
+    "persist_top_n_io": 0.0,
+    "prepare_pools_core": 0.08409550000214949,
+    "prepare_pools_total": 0.30862579100357834,
+    "proxy_filter": 0.0,
+    "request_slice_prepare": 0.011203332993318327,
+    "row_prefilter": 0.07627312499971595,
+    "sample_warmup": 0.020601875003194436,
+    "segment_build": 0.0026518749946262687,
+    "service_total_without_warmup": 0.6880140830180608,
+    "service_wall_clock_s": 0.4309869160060771,
+    "signal_row_selection": 0.005164375004824251,
+    "time_range_slice": 0.011203332993318327,
+    "top_result_assembly": 0.004713458998594433,
+    "top_result_proxy_fill": 0.01991499999712687
+  },
+  "status": "succeeded",
+  "summary_hash": "31208549a551c7f6242541b15259e0cc74e7f9cb5b60169b77e85f240e8064a3",
+  "top_variants_count": 30
+}

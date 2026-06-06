@@ -1,47 +1,2433 @@
 {
-  "acceptance_surface": "blocked_before_benchmark",
-  "api_runner_attempt": {
-    "command": "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_04_no_risk_mvp uv run python scripts/backtest/run_api_runner_benchmark_parity.py --stage-04-mvp-rows --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp --system-memory-cleanup-wait-seconds 5 --timeout-seconds 1800 --poll-interval-seconds 0.1 --cpu-sample-interval-seconds 0.5",
-    "exit_code": 1,
-    "blocked_reason": "Postgres DSN is required via STRATEGY_PG_DSN/POSTGRES_DSN or POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD",
-    "jobs_created": 0
+  "api_base": "http://127.0.0.1:8000",
+  "api_runner_path": {
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "jobs": [
+      {
+        "api_top_count": 30,
+        "arity": 2,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "prepared_pools",
+                  "exact_context",
+                  "proxy_context",
+                  "execution_open_1m",
+                  "execution_close_1m",
+                  "matrix_bitsets",
+                  "selected_batches_iter",
+                  "metric_buffers",
+                  "heap"
+                ],
+                "cleanup_duration_s": 4.582994733937085e-06,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 36,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 36,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 36,
+                "proxy_candidates_selected": 36,
+                "proxy_candidates_valid": 36,
+                "stage_timings": {
+                  "build_exact_context": 1.1124997399747372e-05,
+                  "build_proxy_context": 1.3584009138867259e-05,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 36
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 36,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 36,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "exact_consensus_enumerated",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.hma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 12,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 12,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "direction_mode": "long_only",
+                "enabled": false,
+                "max_abs_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 3283788,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 656832,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 12,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "signal_length": 218913,
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 2,
+                "backend_id": "matrix_bitset_no_risk_v1",
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_only",
+                "exact_candidates_evaluated": 36,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct"
+                ],
+                "metric_profile": "ranking_total_return_trade_count",
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 6,
+                "quality_candidates_heap_eligible": 30,
+                "request_top_n": 50,
+                "risk_mode": "none",
+                "sample_metrics": {
+                  "avg_trade_exec_bars": 52.94507924806487,
+                  "avg_trade_ret_pct": -0.1579131070943489,
+                  "exposure_pct": 6.326188478048271,
+                  "max_drawdown_pct": 99.98269925757295,
+                  "profit_factor": 0.44254977394322387,
+                  "return_over_max_drawdown": -0.9999982815890391,
+                  "sharpe_trades": -7.393159086913886,
+                  "total_return_pct": -99.98252744620665,
+                  "trade_count": 5426.0,
+                  "win_rate_pct": 20.18061186877995
+                },
+                "stage_timings": {
+                  "exact_scoring": 0.003683957998873666,
+                  "full_metric_second_pass": 0.003729874995769933,
+                  "heap_update": 6.591700366698205e-05,
+                  "matrix_bitset_backend_pack": 0.0010490410058991984,
+                  "no_risk_exact_boundary": 3.1042000045999885e-05,
+                  "top_result_proxy_fill": 0.01991499999712687
+                },
+                "status": "scored",
+                "top_results_count": 30
+              },
+              "top_results_sample": [
+                {
+                  "indicator_rows": {
+                    "ma.dema": 5,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 110123,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -125.84527587890625
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 52.94507924806487,
+                    "avg_trade_ret_pct": -0.1579131070943489,
+                    "exposure_pct": 6.326188478048271,
+                    "max_drawdown_pct": 99.98269925757295,
+                    "profit_factor": 0.44254977394322387,
+                    "return_over_max_drawdown": -0.9999982815890391,
+                    "sharpe_trades": -7.393159086913886,
+                    "total_return_pct": -99.98252744620665,
+                    "trade_count": 5426.0,
+                    "win_rate_pct": 20.18061186877995
+                  },
+                  "rank": 1,
+                  "score": -99.98252744620665
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 4,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 110288,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 4,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 9,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -126.21102905273438
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 50.7204738330976,
+                    "avg_trade_ret_pct": -0.1574125930039829,
+                    "exposure_pct": 6.31726997925403,
+                    "max_drawdown_pct": 99.98764255442543,
+                    "profit_factor": 0.4517595824585724,
+                    "return_over_max_drawdown": -0.9999987726468872,
+                    "sharpe_trades": -7.6154191159238005,
+                    "total_return_pct": -99.9875198342811,
+                    "trade_count": 5656.0,
+                    "win_rate_pct": 20.26166902404526
+                  },
+                  "rank": 2,
+                  "score": -99.9875198342811
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 3,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 110424,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 3,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 8,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -126.6941146850586
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 48.13900970224155,
+                    "avg_trade_ret_pct": -0.16029303816342652,
+                    "exposure_pct": 6.337088865463455,
+                    "max_drawdown_pct": 99.99372737147023,
+                    "profit_factor": 0.4392834753421574,
+                    "return_over_max_drawdown": -0.9999993770345479,
+                    "sharpe_trades": -8.28998124030546,
+                    "total_return_pct": -99.99366507883265,
+                    "trade_count": 5978.0,
+                    "win_rate_pct": 20.341251254600202
+                  },
+                  "rank": 3,
+                  "score": -99.99366507883265
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 2,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 110458,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 2,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 7,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -127.02278900146484
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 45.14368718592965,
+                    "avg_trade_ret_pct": -0.1613689680718378,
+                    "exposure_pct": 6.330482570060314,
+                    "max_drawdown_pct": 99.9968729004777,
+                    "profit_factor": 0.4250973641338102,
+                    "return_over_max_drawdown": -0.9999996894422044,
+                    "sharpe_trades": -8.788259464814965,
+                    "total_return_pct": -99.99684184566928,
+                    "trade_count": 6368.0,
+                    "win_rate_pct": 20.006281407035175
+                  },
+                  "rank": 4,
+                  "score": -99.99684184566928
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 110495,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -126.51900482177734
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 42.31363034847816,
+                    "avg_trade_ret_pct": -0.16068784466483632,
+                    "exposure_pct": 6.337088865463455,
+                    "max_drawdown_pct": 99.99837448055568,
+                    "profit_factor": 0.4190962674863054,
+                    "return_over_max_drawdown": -0.9999998385692073,
+                    "sharpe_trades": -9.266120940593485,
+                    "total_return_pct": -99.99835833773882,
+                    "trade_count": 6801.0,
+                    "win_rate_pct": 20.71754153800912
+                  },
+                  "rank": 5,
+                  "score": -99.99835833773882
+                }
+              ]
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 77.79187501000706,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 36,
+              "candidates_after_proxy": 36,
+              "combo_count_planned": 36,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 36,
+              "consensus_signature_mode": "exact_consensus_enumerated",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.hma": []
+              },
+              "exact_candidates": 36,
+              "exact_candidates_per_sec": 9772.098381959471,
+              "exact_scoring_ms": 3.683957998873666,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 42.47833300905768,
+              "rows_after_prefilter": 12,
+              "rows_before_prefilter": null,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 656832,
+              "signals_pack_estimated_peak_bytes": 3283788,
+              "signals_pack_ms": 28.448042008676566,
+              "sl_count": null,
+              "top_result_assembly_ms": 4.713458998594433,
+              "tp_count": null,
+              "tp_sl_cells": 0,
+              "tp_sl_exact_scoring_ms": null,
+              "trade_cell_evals_per_sec": null,
+              "unique_rows_after_dedup": 12
+            },
+            "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "8533e27d-b259-4052-a79e-0b98af41e406",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 0.856811,
+              "exit_code": 0,
+              "finished_at": "2026-06-06T10:14:26.840861Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 97602,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 622592,
+              "parent_rss_after_bytes": 117374976,
+              "parent_rss_before_bytes": 116752384,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 181059584,
+              "pid": 97626,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-06T10:14:25.984050Z",
+              "stderr_tail": "2026-06-06 13:14:26,283 INFO __main__ backtest child process started: job_id=8533e27d-b259-4052-a79e-0b98af41e406 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-06 13:14:26,749 INFO __main__ backtest child process finished: job_id=8533e27d-b259-4052-a79e-0b98af41e406 status=succeeded elapsed_seconds=0.466\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.0119065830076579,
+              "artifact_array_open": 0.0119065830076579,
+              "artifact_context_resolve": 0.06588529200234916,
+              "artifact_manifest_load": 0.06588529200234916,
+              "build_exact_context": 1.1124997399747372e-05,
+              "build_proxy_context": 1.3584009138867259e-05,
+              "combo_iteration": 0.0,
+              "exact_scoring": 0.003683957998873666,
+              "full_metric_second_pass": 0.003729874995769933,
+              "heap_update": 6.591700366698205e-05,
+              "matrix_bitset_backend_pack": 0.0010490410058991984,
+              "no_risk_exact_boundary": 3.1042000045999885e-05,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.08409550000214949,
+              "prepare_pools_total": 0.30862579100357834,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.011203332993318327,
+              "row_prefilter": 0.07627312499971595,
+              "sample_warmup": 0.020601875003194436,
+              "segment_build": 0.0026518749946262687,
+              "service_total_without_warmup": 0.6880140830180608,
+              "service_wall_clock_s": 0.4309869160060771,
+              "signal_row_selection": 0.005164375004824251,
+              "time_range_slice": 0.011203332993318327,
+              "top_result_assembly": 0.004713458998594433,
+              "top_result_proxy_fill": 0.01991499999712687
+            },
+            "status": "succeeded",
+            "summary_hash": "31208549a551c7f6242541b15259e0cc74e7f9cb5b60169b77e85f240e8064a3",
+            "top_variants_count": 30
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            97626
+          ],
+          "max_cpu_percent": 75.7,
+          "mean_core_equivalent": 0.757,
+          "mean_cpu_percent": 75.7,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 0.757,
+          "p50_cpu_percent": 75.7,
+          "p95_core_equivalent": 0.757,
+          "p95_cpu_percent": 75.7,
+          "peak_rss_bytes": 169771008,
+          "sample_count": 1,
+          "sample_interval_seconds": 0.5,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 8533e27d-b259-4052-a79e-0b98af41e406 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 75.7,
+              "mem_percent": 0.2,
+              "pid": 97626,
+              "ppid": 97602,
+              "rss_bytes": 169771008,
+              "timestamp": "2026-06-06T10:14:26.518788+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_only",
+        "index": 1,
+        "instrumentation_counters": {
+          "artifact_load_ms": 77.79187501000706,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 36,
+          "candidates_after_proxy": 36,
+          "combo_count_planned": 36,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 36,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.hma': []}",
+          "exact_candidates": 36,
+          "exact_candidates_per_sec": 9772.098381959471,
+          "exact_scoring_ms": 3.683957998873666,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 42.47833300905768,
+          "rows_after_prefilter": 12,
+          "rows_before_prefilter": null,
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 656832,
+          "signals_pack_estimated_peak_bytes": 3283788,
+          "signals_pack_ms": 28.448042008676566,
+          "sl_count": null,
+          "top_result_assembly_ms": 4.713458998594433,
+          "tp_count": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 12
+        },
+        "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+        "job_name": "none/arity_2/long_only",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-06T10:14:26.840861Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 117374976,
+              "parent_rss_before_bytes": 116752384,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 181059584,
+              "pid": 97626,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 622592,
+              "started_at": "2026-06-06T10:14:25.984050Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 17073979392,
+            "available": true,
+            "before_bytes": 16959176704,
+            "delayed_bytes": 17041866752,
+            "immediate_delta_bytes": 114802688,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 82690048,
+            "wait_seconds": 5.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 30,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 2,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_only",
+            "exact_candidates_evaluated": 36,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 6,
+            "quality_candidates_heap_eligible": 30,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "none",
+            "top_results_count": 30
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 0.002544625007431023,
+        "request_hash": "d0d0ff3b95113837a469992c3f107806375716ee73b20e3733f975a8664c4efd",
+        "risk_mode": "none",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 6,
+                "max_ms": 51.258624996989965,
+                "min_ms": 29.998291007359512,
+                "p50_ms": 46.42333400261123,
+                "p95_ms": 51.258624996989965
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  97626
+                ],
+                "max_cpu_percent": 75.7,
+                "mean_core_equivalent": 0.757,
+                "mean_cpu_percent": 75.7,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 0.757,
+                "p50_cpu_percent": 75.7,
+                "p95_core_equivalent": 0.757,
+                "p95_cpu_percent": 75.7,
+                "peak_rss_bytes": 169771008,
+                "sample_count": 1,
+                "sample_interval_seconds": 0.5,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 8533e27d-b259-4052-a79e-0b98af41e406 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 75.7,
+                    "mem_percent": 0.2,
+                    "pid": 97626,
+                    "ppid": 97602,
+                    "rss_bytes": 169771008,
+                    "timestamp": "2026-06-06T10:14:26.518788+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:25.863438Z",
+                  "lease_expires_at": "2026-06-06T10:16:25.863438Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:25.863438Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:25.863438Z",
+                  "lease_expires_at": "2026-06-06T10:16:25.863438Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:25.863438Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:25.863438Z",
+                  "lease_expires_at": "2026-06-06T10:16:25.863438Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:25.863438Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:25.863438Z",
+                  "lease_expires_at": "2026-06-06T10:16:25.863438Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:25.863438Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:25.863438Z",
+                  "lease_expires_at": "2026-06-06T10:16:25.863438Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:25.863438Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              97626
+            ],
+            "max_cpu_percent": 75.7,
+            "mean_core_equivalent": 0.757,
+            "mean_cpu_percent": 75.7,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 0.757,
+            "p50_cpu_percent": 75.7,
+            "p95_core_equivalent": 0.757,
+            "p95_cpu_percent": 75.7,
+            "peak_rss_bytes": 169771008,
+            "sample_count": 1,
+            "sample_interval_seconds": 0.5,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 8533e27d-b259-4052-a79e-0b98af41e406 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-76burd0u/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 75.7,
+                "mem_percent": 0.2,
+                "pid": 97626,
+                "ppid": 97602,
+                "rss_bytes": 169771008,
+                "timestamp": "2026-06-06T10:14:26.518788+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-06T10:14:25.816975Z",
+            "finished_at": "2026-06-06T10:14:26.850001Z",
+            "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+            "last_error": null,
+            "request_hash": "d0d0ff3b95113837a469992c3f107806375716ee73b20e3733f975a8664c4efd",
+            "scheduling": {
+              "arity": 2,
+              "estimated_combinations": 36,
+              "estimated_combinations_upper_bound": 36,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "none",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.hma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-06T10:14:25.863438Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 2,
+          "estimated_combinations": 36,
+          "estimated_combinations_upper_bound": 36,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "none",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.hma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.0119065830076579,
+          "artifact_context_resolve": 0.06588529200234916,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.30862579100357834,
+          "request_slice_prepare": 0.011203332993318327,
+          "service_total_without_warmup": 0.6880140830180608,
+          "service_wall_clock_s": 0.4309869160060771,
+          "top_result_assembly": 0.004713458998594433
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.0119065830076579,
+          "artifact_array_open": 0.0119065830076579,
+          "artifact_context_resolve": 0.06588529200234916,
+          "artifact_manifest_load": 0.06588529200234916,
+          "build_exact_context": 1.1124997399747372e-05,
+          "build_proxy_context": 1.3584009138867259e-05,
+          "combo_iteration": 0.0,
+          "exact_scoring": 0.003683957998873666,
+          "full_metric_second_pass": 0.003729874995769933,
+          "heap_update": 6.591700366698205e-05,
+          "matrix_bitset_backend_pack": 0.0010490410058991984,
+          "no_risk_exact_boundary": 3.1042000045999885e-05,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.08409550000214949,
+          "prepare_pools_total": 0.30862579100357834,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.011203332993318327,
+          "row_prefilter": 0.07627312499971595,
+          "sample_warmup": 0.020601875003194436,
+          "segment_build": 0.0026518749946262687,
+          "service_total_without_warmup": 0.6880140830180608,
+          "service_wall_clock_s": 0.4309869160060771,
+          "signal_row_selection": 0.005164375004824251,
+          "time_range_slice": 0.011203332993318327,
+          "top_result_assembly": 0.004713458998594433,
+          "top_result_proxy_fill": 0.01991499999712687
+        }
+      },
+      {
+        "api_top_count": 50,
+        "arity": 3,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "prepared_pools",
+                  "exact_context",
+                  "proxy_context",
+                  "execution_open_1m",
+                  "execution_close_1m",
+                  "matrix_bitsets",
+                  "selected_batches_iter",
+                  "metric_buffers",
+                  "heap"
+                ],
+                "cleanup_duration_s": 6.374990334734321e-06,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 216,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 216,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 216,
+                "proxy_candidates_selected": 216,
+                "proxy_candidates_valid": 216,
+                "stage_timings": {
+                  "build_exact_context": 1.2374992365948856e-05,
+                  "build_proxy_context": 8.040995453484356e-06,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 216
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 216,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 216,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "exact_consensus_enumerated",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.ema": [],
+                  "ma.hma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.ema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 18,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 18,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.ema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "direction_mode": "long_only",
+                "enabled": false,
+                "max_abs_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 4925682,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.ema",
+                    "negative_signal_count": 637395,
+                    "neutral_signal_count": 24,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 676059,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 985248,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 18,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "signal_length": 218913,
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 3,
+                "backend_id": "matrix_bitset_no_risk_v1",
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_only",
+                "exact_candidates_evaluated": 216,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct"
+                ],
+                "metric_profile": "ranking_total_return_trade_count",
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 36,
+                "quality_candidates_heap_eligible": 180,
+                "request_top_n": 50,
+                "risk_mode": "none",
+                "sample_metrics": {
+                  "avg_trade_exec_bars": 45.58004158004158,
+                  "avg_trade_ret_pct": -0.16090517903847304,
+                  "exposure_pct": 4.827880680615786,
+                  "max_drawdown_pct": 99.95919424914484,
+                  "profit_factor": 0.4030252174348598,
+                  "return_over_max_drawdown": -1.0,
+                  "sharpe_trades": -7.678051161834113,
+                  "total_return_pct": -99.95919424914484,
+                  "trade_count": 4810.0,
+                  "win_rate_pct": 18.33679833679834
+                },
+                "stage_timings": {
+                  "exact_scoring": 0.018385417002718896,
+                  "full_metric_second_pass": 0.00245349999750033,
+                  "heap_update": 0.00031391700031235814,
+                  "matrix_bitset_backend_pack": 0.0013047499960521236,
+                  "no_risk_exact_boundary": 2.724998921621591e-05,
+                  "top_result_proxy_fill": 0.10798595899541397
+                },
+                "status": "scored",
+                "top_results_count": 50
+              },
+              "top_results_sample": [
+                {
+                  "indicator_rows": {
+                    "ma.dema": 5,
+                    "ma.ema": 5,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 80619,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -93.06230163574219
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 45.58004158004158,
+                    "avg_trade_ret_pct": -0.16090517903847304,
+                    "exposure_pct": 4.827880680615786,
+                    "max_drawdown_pct": 99.95919424914484,
+                    "profit_factor": 0.4030252174348598,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -7.678051161834113,
+                    "total_return_pct": -99.95919424914484,
+                    "trade_count": 4810.0,
+                    "win_rate_pct": 18.33679833679834
+                  },
+                  "rank": 1,
+                  "score": -99.95919424914484
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 5,
+                    "ma.ema": 4,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 82624,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 4,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 9,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -95.45382690429688
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 45.84252450980392,
+                    "avg_trade_ret_pct": -0.15972026685106444,
+                    "exposure_pct": 4.9424999058602905,
+                    "max_drawdown_pct": 99.96240280391069,
+                    "profit_factor": 0.40836304200019363,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -7.658840064304606,
+                    "total_return_pct": -99.96240280391069,
+                    "trade_count": 4896.0,
+                    "win_rate_pct": 18.48447712418301
+                  },
+                  "rank": 2,
+                  "score": -99.96240280391069
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 4,
+                    "ma.ema": 5,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 78771,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 4,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 9,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -90.94172668457031
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 43.33535476046088,
+                    "avg_trade_ret_pct": -0.1611698504404082,
+                    "exposure_pct": 4.720858695084894,
+                    "max_drawdown_pct": 99.96770451313871,
+                    "profit_factor": 0.40181262968770487,
+                    "return_over_max_drawdown": -1.0000000000000002,
+                    "sharpe_trades": -7.897937266378895,
+                    "total_return_pct": -99.96770451313873,
+                    "trade_count": 4947.0,
+                    "win_rate_pct": 18.293915504346067
+                  },
+                  "rank": 3,
+                  "score": -99.96770451313873
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 5,
+                    "ma.ema": 3,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 84887,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 3,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 8,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -98.1640396118164
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 45.97682780663204,
+                    "avg_trade_ret_pct": -0.16001079455050793,
+                    "exposure_pct": 5.068349833290136,
+                    "max_drawdown_pct": 99.96895971026993,
+                    "profit_factor": 0.41158090541548265,
+                    "return_over_max_drawdown": -0.9999999999999999,
+                    "sharpe_trades": -7.764755346202531,
+                    "total_return_pct": -99.96895971026991,
+                    "trade_count": 5006.0,
+                    "win_rate_pct": 18.337994406711946
+                  },
+                  "rank": 4,
+                  "score": -99.96895971026991
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 4,
+                    "ma.ema": 4,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "confirm_count": 80778,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 4,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 9,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 4,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 9,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9,
+                    "proxy_score": -93.33135223388672
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 43.62904828134314,
+                    "avg_trade_ret_pct": -0.16001225662972338,
+                    "exposure_pct": 4.8354779203293985,
+                    "max_drawdown_pct": 99.97024390669006,
+                    "profit_factor": 0.4072626207248594,
+                    "return_over_max_drawdown": -1.0000000000000002,
+                    "sharpe_trades": -7.874966531750107,
+                    "total_return_pct": -99.97024390669007,
+                    "trade_count": 5033.0,
+                    "win_rate_pct": 18.478044903636004
+                  },
+                  "rank": 5,
+                  "score": -99.97024390669007
+                }
+              ]
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 89.99495700118132,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 216,
+              "candidates_after_proxy": 216,
+              "combo_count_planned": 216,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 216,
+              "consensus_signature_mode": "exact_consensus_enumerated",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.ema": [],
+                "ma.hma": []
+              },
+              "exact_candidates": 216,
+              "exact_candidates_per_sec": 11748.441711605301,
+              "exact_scoring_ms": 18.385417002718896,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 249.56158400163986,
+              "rows_after_prefilter": 18,
+              "rows_before_prefilter": null,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 985248,
+              "signals_pack_estimated_peak_bytes": 4925682,
+              "signals_pack_ms": 27.50075000221841,
+              "sl_count": null,
+              "top_result_assembly_ms": 8.727332999114878,
+              "tp_count": null,
+              "tp_sl_cells": 0,
+              "tp_sl_exact_scoring_ms": null,
+              "trade_cell_evals_per_sec": null,
+              "unique_rows_after_dedup": 18
+            },
+            "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "92cdb946-c1e6-446c-882c-725f65508a4a",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 1.071897,
+              "exit_code": 0,
+              "finished_at": "2026-06-06T10:14:33.467699Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 97602,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 49152,
+              "parent_rss_after_bytes": 118177792,
+              "parent_rss_before_bytes": 118128640,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 196050944,
+              "pid": 97688,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-06T10:14:32.395802Z",
+              "stderr_tail": "2026-06-06 13:14:32,701 INFO __main__ backtest child process started: job_id=92cdb946-c1e6-446c-882c-725f65508a4a scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-06 13:14:33,361 INFO __main__ backtest child process finished: job_id=92cdb946-c1e6-446c-882c-725f65508a4a status=succeeded elapsed_seconds=0.661\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.024304916005348787,
+              "artifact_array_open": 0.024304916005348787,
+              "artifact_context_resolve": 0.06569004099583253,
+              "artifact_manifest_load": 0.06569004099583253,
+              "build_exact_context": 1.2374992365948856e-05,
+              "build_proxy_context": 8.040995453484356e-06,
+              "combo_iteration": 0.0,
+              "exact_scoring": 0.018385417002718896,
+              "full_metric_second_pass": 0.00245349999750033,
+              "heap_update": 0.00031391700031235814,
+              "matrix_bitset_backend_pack": 0.0013047499960521236,
+              "no_risk_exact_boundary": 2.724998921621591e-05,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.08347629199852236,
+              "prepare_pools_total": 0.18661216599866748,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0009365000005345792,
+              "row_prefilter": 0.07680508399789687,
+              "sample_warmup": 0.021707249994506128,
+              "segment_build": 0.003590667009120807,
+              "service_total_without_warmup": 0.6746398319810396,
+              "service_wall_clock_s": 0.6236217089899583,
+              "signal_row_selection": 0.003074167005252093,
+              "time_range_slice": 0.0009365000005345792,
+              "top_result_assembly": 0.008727332999114878,
+              "top_result_proxy_fill": 0.10798595899541397
+            },
+            "status": "succeeded",
+            "summary_hash": "21abb8383e326efe19c90412b783ee6f5715c651064f9c4deff46fb04d747eef",
+            "top_variants_count": 50
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            97688
+          ],
+          "max_cpu_percent": 86.6,
+          "mean_core_equivalent": 0.433,
+          "mean_cpu_percent": 43.3,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 0.433,
+          "p50_cpu_percent": 43.3,
+          "p95_core_equivalent": 0.8227,
+          "p95_cpu_percent": 82.27,
+          "peak_rss_bytes": 188104704,
+          "sample_count": 2,
+          "sample_interval_seconds": 0.5,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 0.0,
+              "mem_percent": 0.0,
+              "pid": 97688,
+              "ppid": 97602,
+              "rss_bytes": 2228224,
+              "timestamp": "2026-06-06T10:14:32.420165+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 86.6,
+              "mem_percent": 0.3,
+              "pid": 97688,
+              "ppid": 97602,
+              "rss_bytes": 188104704,
+              "timestamp": "2026-06-06T10:14:33.082203+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_only",
+        "index": 2,
+        "instrumentation_counters": {
+          "artifact_load_ms": 89.99495700118132,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 216,
+          "candidates_after_proxy": 216,
+          "combo_count_planned": 216,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 216,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': []}",
+          "exact_candidates": 216,
+          "exact_candidates_per_sec": 11748.441711605301,
+          "exact_scoring_ms": 18.385417002718896,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 249.56158400163986,
+          "rows_after_prefilter": 18,
+          "rows_before_prefilter": null,
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 985248,
+          "signals_pack_estimated_peak_bytes": 4925682,
+          "signals_pack_ms": 27.50075000221841,
+          "sl_count": null,
+          "top_result_assembly_ms": 8.727332999114878,
+          "tp_count": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 18
+        },
+        "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+        "job_name": "none/arity_3/long_only",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-06T10:14:33.467699Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 118177792,
+              "parent_rss_before_bytes": 118128640,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 196050944,
+              "pid": 97688,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 49152,
+              "started_at": "2026-06-06T10:14:32.395802Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 17056792576,
+            "available": true,
+            "before_bytes": 17044946944,
+            "delayed_bytes": 17043456000,
+            "immediate_delta_bytes": 11845632,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": -1490944,
+            "wait_seconds": 5.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 50,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 3,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_only",
+            "exact_candidates_evaluated": 216,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 36,
+            "quality_candidates_heap_eligible": 180,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "none",
+            "top_results_count": 50
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 0.04761862500163261,
+        "request_hash": "e16215a60d6c8b0c9ad559aa1f201aa8afd226ec76c80ab8cc147e7c7a6a393a",
+        "risk_mode": "none",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 7,
+                "max_ms": 51.79916699125897,
+                "min_ms": 35.76762499869801,
+                "p50_ms": 41.92891599086579,
+                "p95_ms": 51.79916699125897
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  97688
+                ],
+                "max_cpu_percent": 86.6,
+                "mean_core_equivalent": 0.433,
+                "mean_cpu_percent": 43.3,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 0.433,
+                "p50_cpu_percent": 43.3,
+                "p95_core_equivalent": 0.8227,
+                "p95_cpu_percent": 82.27,
+                "peak_rss_bytes": 188104704,
+                "sample_count": 2,
+                "sample_interval_seconds": 0.5,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 0.0,
+                    "mem_percent": 0.0,
+                    "pid": 97688,
+                    "ppid": 97602,
+                    "rss_bytes": 2228224,
+                    "timestamp": "2026-06-06T10:14:32.420165+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 86.6,
+                    "mem_percent": 0.3,
+                    "pid": 97688,
+                    "ppid": 97602,
+                    "rss_bytes": 188104704,
+                    "timestamp": "2026-06-06T10:14:33.082203+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:32.253285Z",
+                  "lease_expires_at": "2026-06-06T10:16:32.253285Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:32.253285Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:32.253285Z",
+                  "lease_expires_at": "2026-06-06T10:16:32.253285Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:32.253285Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:32.253285Z",
+                  "lease_expires_at": "2026-06-06T10:16:32.253285Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:32.253285Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:32.253285Z",
+                  "lease_expires_at": "2026-06-06T10:16:32.253285Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:32.253285Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-06T10:14:32.253285Z",
+                  "lease_expires_at": "2026-06-06T10:16:32.253285Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-97602",
+                  "started_at": "2026-06-06T10:14:32.253285Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              97688
+            ],
+            "max_cpu_percent": 86.6,
+            "mean_core_equivalent": 0.433,
+            "mean_cpu_percent": 43.3,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 0.433,
+            "p50_cpu_percent": 43.3,
+            "p95_core_equivalent": 0.8227,
+            "p95_cpu_percent": 82.27,
+            "peak_rss_bytes": 188104704,
+            "sample_count": 2,
+            "sample_interval_seconds": 0.5,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 0.0,
+                "mem_percent": 0.0,
+                "pid": 97688,
+                "ppid": 97602,
+                "rss_bytes": 2228224,
+                "timestamp": "2026-06-06T10:14:32.420165+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 92cdb946-c1e6-446c-882c-725f65508a4a --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 86.6,
+                "mem_percent": 0.3,
+                "pid": 97688,
+                "ppid": 97602,
+                "rss_bytes": 188104704,
+                "timestamp": "2026-06-06T10:14:33.082203+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-06T10:14:32.203109Z",
+            "finished_at": "2026-06-06T10:14:33.480689Z",
+            "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+            "last_error": null,
+            "request_hash": "e16215a60d6c8b0c9ad559aa1f201aa8afd226ec76c80ab8cc147e7c7a6a393a",
+            "scheduling": {
+              "arity": 3,
+              "estimated_combinations": 216,
+              "estimated_combinations_upper_bound": 216,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "none",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.ema": 6,
+                "ma.hma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-06T10:14:32.253285Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 3,
+          "estimated_combinations": 216,
+          "estimated_combinations_upper_bound": 216,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "none",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.ema": 6,
+            "ma.hma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.024304916005348787,
+          "artifact_context_resolve": 0.06569004099583253,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.18661216599866748,
+          "request_slice_prepare": 0.0009365000005345792,
+          "service_total_without_warmup": 0.6746398319810396,
+          "service_wall_clock_s": 0.6236217089899583,
+          "top_result_assembly": 0.008727332999114878
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.024304916005348787,
+          "artifact_array_open": 0.024304916005348787,
+          "artifact_context_resolve": 0.06569004099583253,
+          "artifact_manifest_load": 0.06569004099583253,
+          "build_exact_context": 1.2374992365948856e-05,
+          "build_proxy_context": 8.040995453484356e-06,
+          "combo_iteration": 0.0,
+          "exact_scoring": 0.018385417002718896,
+          "full_metric_second_pass": 0.00245349999750033,
+          "heap_update": 0.00031391700031235814,
+          "matrix_bitset_backend_pack": 0.0013047499960521236,
+          "no_risk_exact_boundary": 2.724998921621591e-05,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.08347629199852236,
+          "prepare_pools_total": 0.18661216599866748,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0009365000005345792,
+          "row_prefilter": 0.07680508399789687,
+          "sample_warmup": 0.021707249994506128,
+          "segment_build": 0.003590667009120807,
+          "service_total_without_warmup": 0.6746398319810396,
+          "service_wall_clock_s": 0.6236217089899583,
+          "signal_row_selection": 0.003074167005252093,
+          "time_range_slice": 0.0009365000005345792,
+          "top_result_assembly": 0.008727332999114878,
+          "top_result_proxy_fill": 0.10798595899541397
+        }
+      }
+    ],
+    "pass": true,
+    "runner_entrypoint": "BacktestJobWorkerUseCase.run_next"
   },
-  "direct_service_attempt": {
-    "artifact_config": "configs/prod/backtest_artifacts.yaml",
-    "exit_code": 1,
-    "blocked_reason": "BacktestArtifactContextUnavailable: missing /opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/current.yaml",
-    "scoring_started": false
+  "artifact_env": {
+    "config_key_present": true,
+    "config_path": "configs/prod/backtest_artifacts.yaml",
+    "env_name_present": true,
+    "filled_keys": [
+      "ROEHUB_ENV",
+      "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"
+    ],
+    "reason": "defaulted to Mac Studio prod artifact config"
   },
-  "contract_impact": {
-    "public_api": "none",
-    "port_contract": "none",
-    "dto_schema": "none",
-    "persisted_schema": "none",
-    "config_schema": "compatible-change",
-    "request_hash_cache_identity": "none",
-    "service_call_semantics": "none",
-    "benchmark_report_semantics": "compatible-change",
-    "browser_visible_behavior": "none"
+  "artifact_reference": {
+    "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+    "artifact_policy": "historical_prefix_compatible",
+    "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
+    "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1"
   },
-  "decision": {
-    "status": "blocked",
-    "next_iteration_allowed": false,
-    "production_on_mode_unlocked": false,
-    "reason": "Focused local tests passed, but required API-runner/Mac Studio parity, service wall and memory evidence could not run in this environment."
+  "backlog_after": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
   },
-  "local_checks": {
-    "pytest": {
-      "command": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_bitsets.py tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",
-      "result": "57 passed"
+  "backlog_before": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "dead_code_audit": {
+    "dead code audit": true,
+    "pass": true,
+    "removed_or_replaced_paths": [
+      "API create path replaced sync_inline compute with background_auto queued jobs",
+      "lazy cache hit replaced monolithic full-detail JSON reads with metadata + JSONL readers",
+      "large-grid production path uses ordinal streaming chunks instead of Cartesian product materialization"
+    ],
+    "retained_helpers": [
+      {
+        "classification": "child-only",
+        "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py"
+      },
+      {
+        "classification": "reference-only for legacy in-memory builders; API path uses cache readers",
+        "path": "src/trading/contexts/backtest/application/services/v2/result_series.py"
+      },
+      {
+        "classification": "reference-only semantic baseline",
+        "path": "tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb"
+      }
+    ]
+  },
+  "docs_drift_audit": {
+    "active_doc_blockers": [],
+    "active_docs_checked": [
+      "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md",
+      "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "docs/architecture/backtest/benchmark_iterations/README.md"
+    ],
+    "docs drift audit": true,
+    "pass": true,
+    "remaining_historical_references": "historical benchmark references remain allowed when labeled historical"
+  },
+  "env_file": {
+    "candidates": [
+      "/Users/daniildegtyarev/.config/roehub/roehub.env",
+      "/etc/roehub/roehub.env"
+    ],
+    "keys_loaded": [
+      "IDENTITY_PG_DSN",
+      "POSTGRES_DB",
+      "POSTGRES_DSN",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "STRATEGY_PG_DSN"
+    ],
+    "keys_loaded_count": 54,
+    "loaded": true,
+    "path": "/Users/daniildegtyarev/.config/roehub/roehub.env",
+    "reason": null
+  },
+  "excluded_reference_job": {
+    "arity": [
+      2,
+      3
+    ],
+    "direction_mode": "long_only",
+    "job_name": null,
+    "reason": "stage_04_mvp_rows: run only no-risk long-only arity 2 and 3 rows for matrix_bitset_no_risk_v1 evidence",
+    "risk_mode": "none"
+  },
+  "finished_at": "2026-06-06T10:14:40.592541+00:00",
+  "generated_at": "2026-06-06T10:14:25.589273+00:00",
+  "git_commit": "3dc4726f30081968687299e38c01a196c8d7e443",
+  "git_status_short": "M scripts/backtest/run_api_runner_benchmark_parity.py\n M src/trading/contexts/backtest/application/services/v2/__init__.py\n M src/trading/contexts/backtest/application/services/v2/combo_planning.py\n M src/trading/contexts/backtest/application/services/v2/job_orchestration.py\n M src/trading/contexts/backtest/application/services/v2/no_risk_exact.py\n M tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py\n M tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py\n?? docs/architecture/backtest/benchmark_iterations/2026-05-22_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-05-23_ai_configurator_assistant_v1/\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/no_risk_score.py\n?? tests/unit/tools/test_stage00_2_lmstudio_act_agent.py\n?? tests/unit/tools/test_stage00_3_protocol_split_structured_finalizer.py\n?? tools/backtest_ai_configurator/",
+  "host": "MacStudioDaniil",
+  "instrumentation": {
+    "job_count": 2,
+    "missing_by_job": {},
+    "pass": true,
+    "required_fields": [
+      "artifact_load_ms",
+      "signals_pack_ms",
+      "signals_pack_bytes",
+      "signals_pack_estimated_peak_bytes",
+      "signals_pack_arrays_released",
+      "bitset_word_count",
+      "bitset_padding_valid",
+      "bitset_consensus_sample_count",
+      "bitset_consensus_sample_mismatches",
+      "bitset_consensus_sample_parity",
+      "combo_iteration_ms",
+      "proxy_filter_ms",
+      "exact_scoring_ms",
+      "tp_sl_exact_scoring_ms",
+      "top_result_assembly_ms",
+      "rows_before_prefilter",
+      "rows_after_prefilter",
+      "row_signature_ms",
+      "unique_rows_after_dedup",
+      "duplicate_signal_row_ids",
+      "row_signature_collision_count",
+      "consensus_signature_count",
+      "consensus_signature_mode",
+      "candidate_upper_bound_after_row_dedup",
+      "combo_count_planned",
+      "candidates_after_proxy",
+      "exact_candidates",
+      "avg_segments_per_candidate",
+      "avg_trades_per_candidate",
+      "tp_count",
+      "sl_count",
+      "tp_sl_cells",
+      "exact_candidates_per_sec",
+      "trade_cell_evals_per_sec"
+    ],
+    "rows": [
+      {
+        "counters": {
+          "artifact_load_ms": 77.79187501000706,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 36,
+          "candidates_after_proxy": 36,
+          "combo_count_planned": 36,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 36,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.hma': []}",
+          "exact_candidates": 36,
+          "exact_candidates_per_sec": 9772.098381959471,
+          "exact_scoring_ms": 3.683957998873666,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 42.47833300905768,
+          "rows_after_prefilter": 12,
+          "rows_before_prefilter": null,
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 656832,
+          "signals_pack_estimated_peak_bytes": 3283788,
+          "signals_pack_ms": 28.448042008676566,
+          "sl_count": null,
+          "top_result_assembly_ms": 4.713458998594433,
+          "tp_count": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 12
+        },
+        "job_name": "none/arity_2/long_only",
+        "missing_fields": [],
+        "null_fields": [
+          "tp_sl_exact_scoring_ms",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "trade_cell_evals_per_sec"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      },
+      {
+        "counters": {
+          "artifact_load_ms": 89.99495700118132,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 216,
+          "candidates_after_proxy": 216,
+          "combo_count_planned": 216,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 216,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': []}",
+          "exact_candidates": 216,
+          "exact_candidates_per_sec": 11748.441711605301,
+          "exact_scoring_ms": 18.385417002718896,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 249.56158400163986,
+          "rows_after_prefilter": 18,
+          "rows_before_prefilter": null,
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 985248,
+          "signals_pack_estimated_peak_bytes": 4925682,
+          "signals_pack_ms": 27.50075000221841,
+          "sl_count": null,
+          "top_result_assembly_ms": 8.727332999114878,
+          "tp_count": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 18
+        },
+        "job_name": "none/arity_3/long_only",
+        "missing_fields": [],
+        "null_fields": [
+          "tp_sl_exact_scoring_ms",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "trade_cell_evals_per_sec"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      }
+    ],
+    "schema": "backtest_stage_instrumentation_summary_v1"
+  },
+  "lazy_cache_hit_memory": {
+    "api_process_memory": {
+      "limit_bytes": 67108864,
+      "pass": true,
+      "pid": 95606,
+      "retained_rss_delta": 65536,
+      "rss_after_bytes": 235700224,
+      "rss_before_bytes": 235634688
     },
-    "ruff": {
-      "command": "uv run ruff check scripts/backtest/run_api_runner_benchmark_parity.py src/trading/contexts/backtest/application/services/v2/job_orchestration.py src/trading/contexts/backtest/application/services/v2/no_risk_exact.py src/trading/contexts/backtest/application/services/v2/combo_planning.py src/trading/contexts/backtest/application/services/v2/matrix_backend/no_risk_score.py tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py",
-      "result": "All checks passed"
+    "bounded_reader_static_audit": {
+      "api_read_methods": {
+        "csv": true,
+        "monthly_stats": true,
+        "paginated_trades": true,
+        "series": true,
+        "symbol_stats": true
+      },
+      "cache_file": "src/trading/contexts/backtest/adapters/outbound/cache_fs/lazy_trades_cache.py",
+      "full_detail_json_read_text_cache_hit_for_api_forbidden": true,
+      "pass": true,
+      "required_symbols_present": {
+        "_iter_trade_slice": true,
+        "_iter_trades": true,
+        "legacy monolithic cache ignored": true,
+        "read_csv": true,
+        "read_monthly_stats": true,
+        "read_page": true,
+        "read_series": true,
+        "read_symbol_stats": true
+      },
+      "use_case_file": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
+    },
+    "cache_files": {
+      "bundle_dir": "/opt/roehub/state/backtest/trades_cache/5f/5f7bc149e4f9e502d9fe2307c8d5271bc8e2a0821b247021c19b3cdb87b8a4b2",
+      "metadata_bytes": 3379,
+      "metadata_exists": true,
+      "trades_jsonl_bytes": 3185128,
+      "trades_jsonl_exists": true,
+      "trades_jsonl_rows": 5426
+    },
+    "cache_hit_reads": {
+      "pass": true,
+      "reads": [
+        {
+          "cache_status": "hit",
+          "latency_ms": 60.70187500154134,
+          "method": "POST",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/trades",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 58.6136659985641,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/trades?page=1&page_size=5",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 153.5364169976674,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/equity?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 78.85725000232924,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/drawdown?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 53.70016700180713,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/monthly-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 51.426542006083764,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/symbol-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "miss",
+          "latency_ms": 20.04641700477805,
+          "method": "GET",
+          "path": "/backtests/jobs/8533e27d-b259-4052-a79e-0b98af41e406/variants/job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e/trades.csv?max_rows=100",
+          "status": 200
+        }
+      ]
+    },
+    "cache_key": "5f7bc149e4f9e502d9fe2307c8d5271bc8e2a0821b247021c19b3cdb87b8a4b2",
+    "lazy_child_process_evidence": [
+      {
+        "cache_path": null,
+        "cache_status": "miss",
+        "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+        "process_evidence": {
+          "cancelled": false,
+          "command": [
+            "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+            "-m",
+            "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "--task-id",
+            "7d83ed04-bea4-43ed-ba98-78c73f47b981",
+            "--job-id",
+            "8533e27d-b259-4052-a79e-0b98af41e406",
+            "--owner-user-id",
+            "6960d466-e9fb-4116-a9fb-8f1589c61914",
+            "--variant-key",
+            "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e",
+            "--output-json",
+            "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-0m0yzq70/result.json"
+          ],
+          "elapsed_seconds": 1.087603,
+          "exit_code": 0,
+          "finished_at": "2026-06-06T10:14:39.949159Z",
+          "metadata": {
+            "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+            "public_variant_key": "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e",
+            "task_id": "7d83ed04-bea4-43ed-ba98-78c73f47b981",
+            "task_kind": "lazy_trades"
+          },
+          "parent_physical_footprint_after_bytes": null,
+          "parent_physical_footprint_before_bytes": null,
+          "parent_pid": 97602,
+          "parent_retained_physical_footprint_delta_bytes": null,
+          "parent_retained_rss_delta_bytes": 32768,
+          "parent_rss_after_bytes": 118898688,
+          "parent_rss_before_bytes": 118865920,
+          "peak_physical_footprint_bytes": null,
+          "peak_rss_bytes": 303300608,
+          "pid": 97758,
+          "schema": "roehub_child_process_evidence_v1",
+          "started_at": "2026-06-06T10:14:38.861556Z",
+          "stderr_tail": "2026-06-06 13:14:39,211 INFO __main__ lazy trades child process started: task_id=7d83ed04-bea4-43ed-ba98-78c73f47b981 job_id=8533e27d-b259-4052-a79e-0b98af41e406\n2026-06-06 13:14:39,676 INFO __main__ lazy trades child process finished: task_id=7d83ed04-bea4-43ed-ba98-78c73f47b981 cache_status=miss elapsed_seconds=0.465\n",
+          "stdout_tail": "",
+          "timed_out": false
+        },
+        "public_variant_key": "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e",
+        "schema": "roehub_lazy_trades_child_result_evidence_v1",
+        "task_id": "7d83ed04-bea4-43ed-ba98-78c73f47b981"
+      }
+    ],
+    "miss_initial": {
+      "cache_status": "miss",
+      "materialization_status": "queued",
+      "status": 202,
+      "task_id": "7d83ed04-bea4-43ed-ba98-78c73f47b981"
+    },
+    "miss_worker": {
+      "cache_path": null,
+      "cache_status": "miss",
+      "claimed": true,
+      "fast_completion_without_observed_running": false,
+      "observed_running": true,
+      "pass": true,
+      "required_path": "queued -> running -> completed",
+      "required_path_pass": true,
+      "status": null,
+      "status_path": "queued -> running -> completed",
+      "task_status": "completed"
+    },
+    "pass": true,
+    "target_job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+    "variant_key": "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e"
+  },
+  "legacy_path_absence": {
+    "checks": [
+      {
+        "forbidden": "build_full_job_compute_executor",
+        "forbidden_present": false,
+        "name": "runner_parent_does_not_construct_full_compute_graph",
+        "pass": true,
+        "path": "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+        "required": "BacktestChildProcessExecutor",
+        "required_present": true
+      },
+      {
+        "forbidden": "build_paginated_trades_read_model(",
+        "forbidden_present": false,
+        "name": "public_api_cache_hit_uses_bounded_cache_methods",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+        "required": "cache.read_page(",
+        "required_present": true
+      },
+      {
+        "forbidden": "itertools.product",
+        "forbidden_present": false,
+        "name": "large_grid_production_no_itertools_product",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/services/v2/no_risk_exact.py",
+        "required": "iter_ordinal_combo_chunks",
+        "required_present": true
+      }
+    ],
+    "legacy path absence": true,
+    "pass": true
+  },
+  "memory_release": {
+    "checked_jobs": 2,
+    "failed_jobs": [],
+    "parent_retained_rss_delta_evidence": true,
+    "pass": true,
+    "physical footprint": false,
+    "system_memory_cleanup_gate": true,
+    "system_memory_cleanup_limit_bytes": 536870912,
+    "system_memory_failed_jobs": [],
+    "vmmap": false
+  },
+  "mixed_scheduler_smoke": {
+    "blocks_when_heavy_active": true,
+    "blocks_when_light_active": true,
+    "configured": {
+      "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": 1,
+      "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 0,
+      "full_job_lane": "heavy_only",
+      "light_promotion_path": "not_used"
+    },
+    "first_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "lazy_after_two_empty_full_probes": {
+      "scheduling_class": "none",
+      "task_kind": "lazy_detail"
+    },
+    "pass": true,
+    "second_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
     }
   },
-  "schema": "backtest_matrix_bitset_stage_04_blocker_v1",
-  "scope": [
-    "none/arity_2/long_only",
-    "none/arity_3/long_only"
-  ]
+  "parity": {
+    "failed_jobs": [],
+    "pass": true,
+    "passed_jobs": 2,
+    "required_jobs": 2
+  },
+  "pass": false,
+  "performance": {
+    "canonical_stage_comparison_policy": "API/runner wall and service-only overhead are recorded separately from May 2 notebook-compatible stage timings.",
+    "cpu_sampling_jobs": 2,
+    "failed_cpu_sampling_jobs": [],
+    "failed_speed_jobs": [
+      "none/arity_2/long_only"
+    ],
+    "pass": false,
+    "reference_speed_ratio_min": 0.8,
+    "service_only_overhead_separate": true,
+    "speed_ratios": [
+      {
+        "job_name": "none/arity_2/long_only",
+        "may2_over_current_ratio": 0.6907312754947307
+      },
+      {
+        "job_name": "none/arity_3/long_only",
+        "may2_over_current_ratio": 2.590021482492924
+      }
+    ],
+    "stage_timing_jobs": 2
+  },
+  "postgres_env": {
+    "component_keys_present": [
+      "POSTGRES_DB",
+      "POSTGRES_USER",
+      "POSTGRES_PASSWORD"
+    ],
+    "dsn_keys_present": [
+      "STRATEGY_PG_DSN",
+      "POSTGRES_DSN",
+      "IDENTITY_PG_DSN"
+    ],
+    "filled_dsn_keys": []
+  },
+  "python": "3.12.13",
+  "reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+  "reference_json": "docs/architecture/backtest/benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/benchmark_results.json",
+  "request": {
+    "benchmark_top_k": 5,
+    "cpu_sample_interval_seconds": 0.5,
+    "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
+    "exclude_heaviest_140s_job": true,
+    "full_jobs": "heavy",
+    "numba_threads": 12,
+    "only_arity": 6,
+    "rows_per_indicator": 6,
+    "runner_concurrency": "one heavy child",
+    "stage_04_mvp_rows": true,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "top_n": 50,
+    "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
+    "warmup_rows_per_indicator": 2
+  },
+  "schema": "backtest_api_runner_compute_memory_parity_v1",
+  "smoke_user_id": "6960d466-e9fb-4116-a9fb-8f1589c61914"
 }

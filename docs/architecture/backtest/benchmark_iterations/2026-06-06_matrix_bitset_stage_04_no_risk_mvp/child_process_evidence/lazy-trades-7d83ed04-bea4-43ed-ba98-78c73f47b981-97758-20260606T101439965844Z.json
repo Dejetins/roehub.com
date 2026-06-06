@@ -1,0 +1,43 @@
+{
+  "cancelled": false,
+  "command": [
+    "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+    "-m",
+    "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "--task-id",
+    "7d83ed04-bea4-43ed-ba98-78c73f47b981",
+    "--job-id",
+    "8533e27d-b259-4052-a79e-0b98af41e406",
+    "--owner-user-id",
+    "6960d466-e9fb-4116-a9fb-8f1589c61914",
+    "--variant-key",
+    "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-0m0yzq70/result.json"
+  ],
+  "elapsed_seconds": 1.087603,
+  "exit_code": 0,
+  "finished_at": "2026-06-06T10:14:39.949159Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "job_id": "8533e27d-b259-4052-a79e-0b98af41e406",
+    "public_variant_key": "job_8533e27de406__dema_close_w10__hma_close_w9__risk_none__vh_45e53f4e",
+    "task_id": "7d83ed04-bea4-43ed-ba98-78c73f47b981",
+    "task_kind": "lazy_trades"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 97602,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 32768,
+  "parent_rss_after_bytes": 118898688,
+  "parent_rss_before_bytes": 118865920,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 303300608,
+  "pid": 97758,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-06-06T10:14:38.861556Z",
+  "stderr_tail": "2026-06-06 13:14:39,211 INFO __main__ lazy trades child process started: task_id=7d83ed04-bea4-43ed-ba98-78c73f47b981 job_id=8533e27d-b259-4052-a79e-0b98af41e406\n2026-06-06 13:14:39,676 INFO __main__ lazy trades child process finished: task_id=7d83ed04-bea4-43ed-ba98-78c73f47b981 cache_status=miss elapsed_seconds=0.465\n",
+  "stdout_tail": "",
+  "timed_out": false
+}

@@ -413,13 +413,13 @@ persisted schema `none`; config schema `none`; request hash/cache identity
 Stage 04 must still produce its own parity, service wall, memory cleanup and
 top-N evidence before any production-affecting backend mode is accepted.
 
-## Stage 04: `matrix_bitset_no_risk_v1` MVP Blocked
+## Stage 04: `matrix_bitset_no_risk_v1` MVP Rejected
 
 Scope attempted: `matrix_bitset_no_risk_v1` for `none/arity_2/long_only` and
 `none/arity_3/long_only`, default-off and selectable only through internal
 benchmark/runtime gates.
 
-Implementation state in the local worktree:
+Implementation state in the local worktree and Mac Studio candidate patch:
 
 - added requestable internal backend id `matrix_bitset_no_risk_v1`;
 - default backend selection remains unchanged;
@@ -430,61 +430,93 @@ Implementation state in the local worktree:
   `direction_mode=long_only`, arity 2 or 3;
 - reversal, TP/SL and higher arity remain out of scope and are not enabled.
 
-Focused local checks passed:
+Mac Studio execution context:
+
+- SSH target: `macstudio`.
+- Remote checkout:
+  `/Users/daniildegtyarev/Projects/roehub.com`.
+- Remote HEAD before candidate sync:
+  `3dc4726f30081968687299e38c01a196c8d7e443`.
+- The measured Mac Studio checkout was dirty by design: only the scoped Stage
+  04 runtime/test/benchmark candidate files were synced for benchmark evidence.
+- Env file loaded:
+  `/Users/daniildegtyarev/.config/roehub/roehub.env`.
+- Additional env file presence was verified at `/etc/roehub/roehub.env`.
+- Runtime artifact config:
+  `configs/prod/backtest_artifacts.yaml`.
+- Active source manifest resolved read-only to:
+  `/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/current.yaml`.
+- Secret values were not recorded.
+
+Focused Mac Studio checks passed:
 
 ```bash
-uv run pytest -q \
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  /opt/homebrew/bin/uv run pytest -q \
   tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py \
   tests/unit/contexts/backtest/application/services/v2/test_bitsets.py \
   tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
-  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py
+  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py'
 
-uv run ruff check \
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  /opt/homebrew/bin/uv run ruff check \
   scripts/backtest/run_api_runner_benchmark_parity.py \
   src/trading/contexts/backtest/application/services/v2/job_orchestration.py \
   src/trading/contexts/backtest/application/services/v2/no_risk_exact.py \
   src/trading/contexts/backtest/application/services/v2/combo_planning.py \
   src/trading/contexts/backtest/application/services/v2/matrix_backend/no_risk_score.py \
   tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
-  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py
+  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py'
 ```
 
 Results: pytest `57 passed`; ruff `All checks passed`.
 
-Benchmark/evidence commands attempted:
+Acceptance benchmark command:
 
 ```bash
-ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_04_no_risk_mvp \
-uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
-  --stage-04-mvp-rows \
-  --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp \
-  --system-memory-cleanup-wait-seconds 5 \
-  --timeout-seconds 1800 \
-  --poll-interval-seconds 0.1 \
-  --cpu-sample-interval-seconds 0.5
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_04_no_risk_mvp \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-04-mvp-rows \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp \
+    --system-memory-cleanup-wait-seconds 5 \
+    --timeout-seconds 1800 \
+    --poll-interval-seconds 0.1 \
+    --cpu-sample-interval-seconds 0.5'
 ```
 
-Blocked before job creation:
+Benchmark evidence:
 
-```text
-RuntimeError: Postgres DSN is required via STRATEGY_PG_DSN/POSTGRES_DSN or
-POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
-```
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/`
 
-Direct service benchmark attempt with `configs/prod/backtest_artifacts.yaml`
-was also blocked before scoring:
+Overall gates:
 
-```text
-BacktestArtifactContextUnavailable: [Errno 2] No such file or directory:
-'/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/current.yaml'
-```
+| Gate | Result |
+|---|---|
+| `api_runner_path.pass` | true |
+| `parity.pass` | true |
+| `performance.pass` | false |
+| `instrumentation.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
 
-Decision: Stage 04 is `blocked` in this environment. Correctness coverage for
-the scoped implementation passes locally, but the required Mac Studio
-API-runner parity, service wall and memory evidence is missing. The stage does
-not unlock Stage 05, production `on` mode, default backend switching, reversal,
-TP/SL, pruning, request-hash changes, cache identity changes or sidecar
-artifacts.
+Scoped MVP timings:
+
+| Job | Backend | Exact current s | May2 exact s | Ratio | Result |
+|---|---|---:|---:|---:|---|
+| `none/arity_2/long_only` | `matrix_bitset_no_risk_v1` | 0.003684 | 0.002545 | 0.691 | speed fail |
+| `none/arity_3/long_only` | `matrix_bitset_no_risk_v1` | 0.018385 | 0.047619 | 2.590 | speed pass |
+
+Decision: Stage 04 is `rejected`. Correctness and operational gates passed for
+the scoped Mac Studio API-runner path, but the full MVP scope failed the
+performance gate because `none/arity_2/long_only` regressed against the May 2
+reference. The stage does not unlock Stage 05, production `on` mode, default
+backend switching, reversal, TP/SL, pruning, request-hash changes, cache
+identity changes or sidecar artifacts. Production runtime candidate changes
+must not be committed as an accepted backend.
 
 Contract impact: public API `none`; port contract `none`; DTO schema `none`;
 persisted schema `none`; config schema `compatible-change` for the internal
@@ -501,7 +533,7 @@ benchmark/report semantics `compatible-change`; browser-visible behavior
 | 01 | accepted_for_learning | Add instrumentation counters without behavior changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/` | Counters present; explicit `null` for unavailable current-runtime counters; parity, performance, memory, lazy cache, legacy path and accounting gates passed; overhead stayed within <= 1% limit with no Stage 00 service/exact regression; production `on` mode remains locked | true |
 | 02 | accepted_for_learning | Row/signature telemetry shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/` | Shadow counters present; duplicate rows `0/36` on accepted arity-6 rows; `consensus_signature_count=46656` as deterministic upper bound; collision count `0`; row signature overhead about 10-11ms/job; parity, performance, memory, lazy cache, legacy path and docs drift gates passed; no pruning/scoring/top-N/request-hash/cache change | true |
 | 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
-| 04 | blocked | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Scoped implementation and local parity tests pass, but required API-runner/Mac Studio evidence is blocked in this environment by missing Postgres DSN and missing local artifact `BTCUSDT/current.yaml`; production `on` mode and Stage 05 remain locked | false |
+| 04 | rejected | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; performance failed because `none/arity_2/long_only` ratio `0.691 < 0.8`, while `none/arity_3/long_only` ratio was `2.590`; production `on` mode and Stage 05 remain locked | false |
 | 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 | false |
 | 06 | planned | Consensus signature cache | planned | Pending Stage 05 | false |
 | 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Pending Stage 06 | false |
@@ -541,6 +573,15 @@ contract impact и финальное решение. Если хотя бы о�
   the evidence is explicitly labeled diagnostic. Sidecar generation, sidecar load,
   warmup/cache state, request semantics, candidate set and top-N/persistence shape
   must be recorded so the new path does not get a hidden advantage.
+- Acceptance benchmark/testing evidence must run over `ssh macstudio` from
+  `/Users/daniildegtyarev/Projects/roehub.com`. The evidence must record whether
+  the Mac Studio checkout matched the measured candidate commit or was dirty.
+- Mac Studio source artifacts are read from
+  `/opt/roehub/state/backtest_artifacts/v2`, with `BTCUSDT/current.yaml`
+  resolving the active slot manifest. Stage evidence is written under
+  `docs/architecture/backtest/benchmark_iterations/<stageNN_dir>/`; generated
+  sidecar/test `.npy` files go under `<stageNN_dir>/sidecar_artifacts/` or an
+  explicitly recorded test overlay, never into canonical artifact slots.
 - While publisher/precompute changes are out of scope, sidecar-dependent speedup
   may be `accepted_for_learning`, but it cannot by itself enable production `on`
   mode or unlock a production-affecting stage.

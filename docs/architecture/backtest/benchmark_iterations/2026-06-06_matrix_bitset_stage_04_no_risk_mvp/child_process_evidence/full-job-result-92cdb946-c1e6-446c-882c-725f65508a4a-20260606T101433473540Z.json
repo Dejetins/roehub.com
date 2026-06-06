@@ -1,0 +1,576 @@
+{
+  "cleanup_evidence": {
+    "result_contains_heavy_references": false,
+    "runtime_result": {
+      "checked_reference_names": [
+        "prepared_result",
+        "combo_planning_result",
+        "prepared_pools",
+        "exact_context",
+        "proxy_context",
+        "execution_open_1m",
+        "execution_close_1m",
+        "matrix_bitsets",
+        "selected_batches_iter",
+        "metric_buffers",
+        "heap"
+      ],
+      "cleanup_duration_s": 6.374990334734321e-06,
+      "result_contains_heavy_references": false,
+      "result_is_compact": true,
+      "retained_heavy_reference_names": []
+    },
+    "scheduling_class": "heavy",
+    "worker_recycle_required": true,
+    "worker_recycle_strategy": "disposable child process"
+  },
+  "exact_diagnostics": {
+    "combo_planning": {
+      "cartesian_combinations": 216,
+      "combo_chunks_processed": 0,
+      "combo_iteration_mode": "ordinal_streaming_pass_through",
+      "exact_candidates_evaluated": 216,
+      "materialized_candidate_count": 0,
+      "proxy_candidates_seen": 216,
+      "proxy_candidates_selected": 216,
+      "proxy_candidates_valid": 216,
+      "stage_timings": {
+        "build_exact_context": 1.2374992365948856e-05,
+        "build_proxy_context": 8.040995453484356e-06,
+        "combo_iteration": 0.0,
+        "proxy_filter": 0.0
+      },
+      "streamed_candidate_count": 216
+    },
+    "row_signatures": {
+      "candidate_upper_bound_after_row_dedup": 216,
+      "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+      "consensus_signature_count": 216,
+      "consensus_signature_enumeration_limit": 10000,
+      "consensus_signature_mode": "exact_consensus_enumerated",
+      "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+      "duplicate_row_count": 0,
+      "duplicate_row_fraction": 0.0,
+      "duplicate_signal_row_ids": {
+        "ma.dema": [],
+        "ma.ema": [],
+        "ma.hma": []
+      },
+      "indicators": [
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.dema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.hma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.ema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "row_signature_collision_count": 0,
+      "rows_after_prefilter": 18,
+      "schema": "backtest_row_signature_telemetry_v1",
+      "unique_rows_after_dedup": 18,
+      "unique_signal_row_ids": {
+        "ma.dema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.ema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.hma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "self_check": {
+      "backend_implementation_id": "matrix_bitset_no_risk_v1",
+      "backend_logical_name": "matrix_bitset_no_risk_v1",
+      "direction_mode": "long_only",
+      "enabled": false,
+      "max_abs_diff": null,
+      "mismatches": 0,
+      "return_tolerance": null,
+      "sample_size": 0,
+      "status": "not_run",
+      "trade_count_equal": null
+    },
+    "signal_bitsets": {
+      "arrays": {
+        "neg_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        },
+        "pos_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        }
+      },
+      "arrays_released_before_return": true,
+      "bit_order": "little_endian_lsb_first_per_uint64_word",
+      "consensus_sample_count": 8,
+      "consensus_sample_mismatches": 0,
+      "consensus_sample_parity": true,
+      "estimated_peak_bytes": 4925682,
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "negative_signal_count": 657719,
+          "neutral_signal_count": 38,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 655721,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        },
+        {
+          "indicator_id": "ma.hma",
+          "negative_signal_count": 743747,
+          "neutral_signal_count": 0,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 569731,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        },
+        {
+          "indicator_id": "ma.ema",
+          "negative_signal_count": 637395,
+          "neutral_signal_count": 24,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 676059,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        }
+      ],
+      "packed_bytes": 985248,
+      "padding_bits": 31,
+      "padding_valid": true,
+      "rows_after_prefilter": 18,
+      "schema": "backtest_runtime_bitset_pack_shadow_v1",
+      "signal_length": 218913,
+      "word_count": 3421,
+      "word_count_formula": "W = ceil(T / 64)"
+    },
+    "telemetry": {
+      "arity": 3,
+      "backend_id": "matrix_bitset_no_risk_v1",
+      "backend_implementation_id": "matrix_bitset_no_risk_v1",
+      "backend_logical_name": "matrix_bitset_no_risk_v1",
+      "benchmark_top_k": 5,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 216,
+      "heap_capacity": 50,
+      "metric_names": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "trade_count",
+        "sharpe_trades",
+        "win_rate_pct",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct"
+      ],
+      "metric_profile": "ranking_total_return_trade_count",
+      "min_closed_trades": 300,
+      "numba_num_threads": 12,
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "quality_candidates_below_min_trades": 36,
+      "quality_candidates_heap_eligible": 180,
+      "request_top_n": 50,
+      "risk_mode": "none",
+      "sample_metrics": {
+        "avg_trade_exec_bars": 45.58004158004158,
+        "avg_trade_ret_pct": -0.16090517903847304,
+        "exposure_pct": 4.827880680615786,
+        "max_drawdown_pct": 99.95919424914484,
+        "profit_factor": 0.4030252174348598,
+        "return_over_max_drawdown": -1.0,
+        "sharpe_trades": -7.678051161834113,
+        "total_return_pct": -99.95919424914484,
+        "trade_count": 4810.0,
+        "win_rate_pct": 18.33679833679834
+      },
+      "stage_timings": {
+        "exact_scoring": 0.018385417002718896,
+        "full_metric_second_pass": 0.00245349999750033,
+        "heap_update": 0.00031391700031235814,
+        "matrix_bitset_backend_pack": 0.0013047499960521236,
+        "no_risk_exact_boundary": 2.724998921621591e-05,
+        "top_result_proxy_fill": 0.10798595899541397
+      },
+      "status": "scored",
+      "top_results_count": 50
+    },
+    "top_results_sample": [
+      {
+        "indicator_rows": {
+          "ma.dema": 5,
+          "ma.ema": 5,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 80619,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 5,
+          "ma.dema.source": "close",
+          "ma.dema.window": 10,
+          "ma.ema.indicator_id": "ma.ema",
+          "ma.ema.row_id": 5,
+          "ma.ema.source": "close",
+          "ma.ema.window": 10,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -93.06230163574219
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 45.58004158004158,
+          "avg_trade_ret_pct": -0.16090517903847304,
+          "exposure_pct": 4.827880680615786,
+          "max_drawdown_pct": 99.95919424914484,
+          "profit_factor": 0.4030252174348598,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -7.678051161834113,
+          "total_return_pct": -99.95919424914484,
+          "trade_count": 4810.0,
+          "win_rate_pct": 18.33679833679834
+        },
+        "rank": 1,
+        "score": -99.95919424914484
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 5,
+          "ma.ema": 4,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 82624,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 5,
+          "ma.dema.source": "close",
+          "ma.dema.window": 10,
+          "ma.ema.indicator_id": "ma.ema",
+          "ma.ema.row_id": 4,
+          "ma.ema.source": "close",
+          "ma.ema.window": 9,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -95.45382690429688
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 45.84252450980392,
+          "avg_trade_ret_pct": -0.15972026685106444,
+          "exposure_pct": 4.9424999058602905,
+          "max_drawdown_pct": 99.96240280391069,
+          "profit_factor": 0.40836304200019363,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -7.658840064304606,
+          "total_return_pct": -99.96240280391069,
+          "trade_count": 4896.0,
+          "win_rate_pct": 18.48447712418301
+        },
+        "rank": 2,
+        "score": -99.96240280391069
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 4,
+          "ma.ema": 5,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 78771,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 4,
+          "ma.dema.source": "close",
+          "ma.dema.window": 9,
+          "ma.ema.indicator_id": "ma.ema",
+          "ma.ema.row_id": 5,
+          "ma.ema.source": "close",
+          "ma.ema.window": 10,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -90.94172668457031
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 43.33535476046088,
+          "avg_trade_ret_pct": -0.1611698504404082,
+          "exposure_pct": 4.720858695084894,
+          "max_drawdown_pct": 99.96770451313871,
+          "profit_factor": 0.40181262968770487,
+          "return_over_max_drawdown": -1.0000000000000002,
+          "sharpe_trades": -7.897937266378895,
+          "total_return_pct": -99.96770451313873,
+          "trade_count": 4947.0,
+          "win_rate_pct": 18.293915504346067
+        },
+        "rank": 3,
+        "score": -99.96770451313873
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 5,
+          "ma.ema": 3,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 84887,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 5,
+          "ma.dema.source": "close",
+          "ma.dema.window": 10,
+          "ma.ema.indicator_id": "ma.ema",
+          "ma.ema.row_id": 3,
+          "ma.ema.source": "close",
+          "ma.ema.window": 8,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -98.1640396118164
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 45.97682780663204,
+          "avg_trade_ret_pct": -0.16001079455050793,
+          "exposure_pct": 5.068349833290136,
+          "max_drawdown_pct": 99.96895971026993,
+          "profit_factor": 0.41158090541548265,
+          "return_over_max_drawdown": -0.9999999999999999,
+          "sharpe_trades": -7.764755346202531,
+          "total_return_pct": -99.96895971026991,
+          "trade_count": 5006.0,
+          "win_rate_pct": 18.337994406711946
+        },
+        "rank": 4,
+        "score": -99.96895971026991
+      },
+      {
+        "indicator_rows": {
+          "ma.dema": 4,
+          "ma.ema": 4,
+          "ma.hma": 4
+        },
+        "metadata": {
+          "confirm_count": 80778,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 4,
+          "ma.dema.source": "close",
+          "ma.dema.window": 9,
+          "ma.ema.indicator_id": "ma.ema",
+          "ma.ema.row_id": 4,
+          "ma.ema.source": "close",
+          "ma.ema.window": 9,
+          "ma.hma.indicator_id": "ma.hma",
+          "ma.hma.row_id": 4,
+          "ma.hma.source": "close",
+          "ma.hma.window": 9,
+          "proxy_score": -93.33135223388672
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 43.62904828134314,
+          "avg_trade_ret_pct": -0.16001225662972338,
+          "exposure_pct": 4.8354779203293985,
+          "max_drawdown_pct": 99.97024390669006,
+          "profit_factor": 0.4072626207248594,
+          "return_over_max_drawdown": -1.0000000000000002,
+          "sharpe_trades": -7.874966531750107,
+          "total_return_pct": -99.97024390669007,
+          "trade_count": 5033.0,
+          "win_rate_pct": 18.478044903636004
+        },
+        "rank": 5,
+        "score": -99.97024390669007
+      }
+    ]
+  },
+  "instrumentation_counters": {
+    "artifact_load_ms": 89.99495700118132,
+    "avg_segments_per_candidate": null,
+    "avg_trades_per_candidate": null,
+    "bitset_consensus_sample_count": 8,
+    "bitset_consensus_sample_mismatches": 0,
+    "bitset_consensus_sample_parity": true,
+    "bitset_padding_valid": true,
+    "bitset_word_count": 3421,
+    "candidate_upper_bound_after_row_dedup": 216,
+    "candidates_after_proxy": 216,
+    "combo_count_planned": 216,
+    "combo_iteration_ms": 0.0,
+    "consensus_signature_count": 216,
+    "consensus_signature_mode": "exact_consensus_enumerated",
+    "duplicate_signal_row_ids": {
+      "ma.dema": [],
+      "ma.ema": [],
+      "ma.hma": []
+    },
+    "exact_candidates": 216,
+    "exact_candidates_per_sec": 11748.441711605301,
+    "exact_scoring_ms": 18.385417002718896,
+    "proxy_filter_ms": 0.0,
+    "row_signature_collision_count": 0,
+    "row_signature_ms": 249.56158400163986,
+    "rows_after_prefilter": 18,
+    "rows_before_prefilter": null,
+    "signals_pack_arrays_released": true,
+    "signals_pack_bytes": 985248,
+    "signals_pack_estimated_peak_bytes": 4925682,
+    "signals_pack_ms": 27.50075000221841,
+    "sl_count": null,
+    "top_result_assembly_ms": 8.727332999114878,
+    "tp_count": null,
+    "tp_sl_cells": 0,
+    "tp_sl_exact_scoring_ms": null,
+    "trade_cell_evals_per_sec": null,
+    "unique_rows_after_dedup": 18
+  },
+  "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+  "process_evidence": {
+    "cancelled": false,
+    "command": [
+      "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+      "-m",
+      "apps.worker.backtest_job_runner.main.full_job_child",
+      "--job-id",
+      "92cdb946-c1e6-446c-882c-725f65508a4a",
+      "--preflight-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/preflight.json",
+      "--output-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-63dz5ncn/result.json",
+      "--scheduling-class",
+      "heavy",
+      "--light-max-actual-combinations",
+      "50000"
+    ],
+    "elapsed_seconds": 1.071897,
+    "exit_code": 0,
+    "finished_at": "2026-06-06T10:14:33.467699Z",
+    "metadata": {
+      "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+      "job_id": "92cdb946-c1e6-446c-882c-725f65508a4a",
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "numba_threads": "12",
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "parent_physical_footprint_after_bytes": null,
+    "parent_physical_footprint_before_bytes": null,
+    "parent_pid": 97602,
+    "parent_retained_physical_footprint_delta_bytes": null,
+    "parent_retained_rss_delta_bytes": 49152,
+    "parent_rss_after_bytes": 118177792,
+    "parent_rss_before_bytes": 118128640,
+    "peak_physical_footprint_bytes": null,
+    "peak_rss_bytes": 196050944,
+    "pid": 97688,
+    "schema": "roehub_child_process_evidence_v1",
+    "started_at": "2026-06-06T10:14:32.395802Z",
+    "stderr_tail": "2026-06-06 13:14:32,701 INFO __main__ backtest child process started: job_id=92cdb946-c1e6-446c-882c-725f65508a4a scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-06 13:14:33,361 INFO __main__ backtest child process finished: job_id=92cdb946-c1e6-446c-882c-725f65508a4a status=succeeded elapsed_seconds=0.661\n",
+    "stdout_tail": "",
+    "timed_out": false
+  },
+  "schema": "roehub_full_job_child_result_evidence_v1",
+  "stage_timings": {
+    "artifact_array_mmap_load": 0.024304916005348787,
+    "artifact_array_open": 0.024304916005348787,
+    "artifact_context_resolve": 0.06569004099583253,
+    "artifact_manifest_load": 0.06569004099583253,
+    "build_exact_context": 1.2374992365948856e-05,
+    "build_proxy_context": 8.040995453484356e-06,
+    "combo_iteration": 0.0,
+    "exact_scoring": 0.018385417002718896,
+    "full_metric_second_pass": 0.00245349999750033,
+    "heap_update": 0.00031391700031235814,
+    "matrix_bitset_backend_pack": 0.0013047499960521236,
+    "no_risk_exact_boundary": 2.724998921621591e-05,
+    "persist_top_n_io": 0.0,
+    "prepare_pools_core": 0.08347629199852236,
+    "prepare_pools_total": 0.18661216599866748,
+    "proxy_filter": 0.0,
+    "request_slice_prepare": 0.0009365000005345792,
+    "row_prefilter": 0.07680508399789687,
+    "sample_warmup": 0.021707249994506128,
+    "segment_build": 0.003590667009120807,
+    "service_total_without_warmup": 0.6746398319810396,
+    "service_wall_clock_s": 0.6236217089899583,
+    "signal_row_selection": 0.003074167005252093,
+    "time_range_slice": 0.0009365000005345792,
+    "top_result_assembly": 0.008727332999114878,
+    "top_result_proxy_fill": 0.10798595899541397
+  },
+  "status": "succeeded",
+  "summary_hash": "21abb8383e326efe19c90412b783ee6f5715c651064f9c4deff46fb04d747eef",
+  "top_variants_count": 50
+}
