@@ -145,6 +145,13 @@ def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -
                     "top_result_assembly_ms": 6.0,
                     "rows_before_prefilter": None,
                     "rows_after_prefilter": 426,
+                    "row_signature_ms": 7.0,
+                    "unique_rows_after_dedup": 36,
+                    "duplicate_signal_row_ids": {"ma.ema": [2, 3]},
+                    "row_signature_collision_count": 0,
+                    "consensus_signature_count": 2_176_782_336,
+                    "consensus_signature_mode": "upper_bound_unique_row_product",
+                    "candidate_upper_bound_after_row_dedup": 2_176_782_336,
                     "combo_count_planned": 1000,
                     "candidates_after_proxy": 50,
                     "exact_candidates": 50,
@@ -167,3 +174,5 @@ def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -
     assert summary["pass"] is True
     assert row["missing_fields"] == []
     assert "signals_pack_ms" in row["null_fields"]
+    assert row["counters"]["unique_rows_after_dedup"] == 36
+    assert row["counters"]["duplicate_signal_row_ids"] == "{'ma.ema': [2, 3]}"

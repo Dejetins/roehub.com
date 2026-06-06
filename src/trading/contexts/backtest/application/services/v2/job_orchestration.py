@@ -23,6 +23,7 @@ from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
 )
+from .matrix_backend.row_signatures import build_row_signature_telemetry
 from .prepare_pools import build_signal_segments, row_metadata_order_hash
 from .top_result_assembly import (
     TOP_RESULT_ASSEMBLY_STAGE_NAME,
@@ -91,11 +92,18 @@ class BacktestRuntimeJobOrchestrationService:
         warmup_combo_result = None
         warmup_prepared_result = None
         warmup_elapsed_s: float | None = None
+        row_signature_telemetry = None
+        row_signature_elapsed_s: float | None = None
         try:
             prepared_result = self.prepare_pools.execute(
                 normalized_request=normalized_request,
                 artifact_metadata=preflight.artifact_metadata,
             )
+            row_signature_started = time.perf_counter()
+            row_signature_telemetry = build_row_signature_telemetry(
+                prepared_result.indicator_pools
+            )
+            row_signature_elapsed_s = time.perf_counter() - row_signature_started
             _ = scheduling_class, light_max_actual_combinations
             confirmed_scheduling_class: BacktestSchedulingClass = "heavy"
             if risk_mode == "none":
@@ -164,6 +172,7 @@ class BacktestRuntimeJobOrchestrationService:
             exact_diagnostics = {
                 "telemetry": exact_result.telemetry.as_mapping(),
                 "combo_planning": combo_result.telemetry.as_mapping(),
+                "row_signatures": row_signature_telemetry.as_mapping(),
                 "self_check": exact_result.self_check.as_mapping(),
                 "top_results_sample": [
                     item.as_mapping() for item in exact_result.top_results[:5]
@@ -176,6 +185,8 @@ class BacktestRuntimeJobOrchestrationService:
                 hit_times_result=hit_times_result,
                 exact_result=exact_result,
                 stage_timings=stage_timings,
+                row_signature_telemetry=row_signature_telemetry,
+                row_signature_elapsed_s=row_signature_elapsed_s,
             )
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,
@@ -192,6 +203,7 @@ class BacktestRuntimeJobOrchestrationService:
             del hit_times_result
             del exact_result
             del combo_result
+            del row_signature_telemetry
             del prepared_result
             gc.collect()
 
@@ -283,6 +295,8 @@ def _instrumentation_counters(
     hit_times_result: Any,
     exact_result: Any,
     stage_timings: Mapping[str, float],
+    row_signature_telemetry: Any,
+    row_signature_elapsed_s: float | None,
 ) -> dict[str, Any]:
     combo_telemetry = combo_result.telemetry
     exact_telemetry = exact_result.telemetry
@@ -295,10 +309,12 @@ def _instrumentation_counters(
     tp_sl_exact_scoring_s = _optional_seconds(stage_timings, "tp_sl_exact_scoring")
     tp_count, sl_count = _tp_sl_grid_counts(hit_times_result=hit_times_result)
     tp_sl_cells = int(preflight.cost_estimate.tp_sl_cells)
+    row_signature_mapping = row_signature_telemetry.as_mapping()
 
     return {
         "artifact_load_ms": _seconds_to_ms(artifact_load_s),
         "signals_pack_ms": None,
+        "row_signature_ms": _seconds_to_ms(row_signature_elapsed_s),
         "combo_iteration_ms": _stage_ms(stage_timings, "combo_iteration"),
         "proxy_filter_ms": _stage_ms(stage_timings, "proxy_filter"),
         "exact_scoring_ms": _stage_ms(stage_timings, "exact_scoring"),
@@ -306,6 +322,16 @@ def _instrumentation_counters(
         "top_result_assembly_ms": _stage_ms(stage_timings, "top_result_assembly"),
         "rows_before_prefilter": None,
         "rows_after_prefilter": _rows_after_prefilter(prepared_result),
+        "unique_rows_after_dedup": row_signature_mapping["unique_rows_after_dedup"],
+        "duplicate_signal_row_ids": row_signature_mapping["duplicate_signal_row_ids"],
+        "row_signature_collision_count": row_signature_mapping[
+            "row_signature_collision_count"
+        ],
+        "consensus_signature_count": row_signature_mapping["consensus_signature_count"],
+        "consensus_signature_mode": row_signature_mapping["consensus_signature_mode"],
+        "candidate_upper_bound_after_row_dedup": row_signature_mapping[
+            "candidate_upper_bound_after_row_dedup"
+        ],
         "combo_count_planned": int(combo_telemetry.cartesian_combinations),
         "candidates_after_proxy": int(combo_telemetry.proxy_candidates_selected),
         "exact_candidates": exact_candidates,

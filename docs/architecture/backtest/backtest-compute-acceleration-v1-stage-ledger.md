@@ -190,13 +190,98 @@ unlock any production-affecting backend `on` mode.
 Git branch: `main`. Scoped commit SHA is recorded in the executor final report
 after the commit is created. Push/deploy: not performed.
 
+## Stage 02 Row/Signature Telemetry Shadow
+
+Evidence:
+
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/`
+
+Mac Studio run from checkout `d9bfa5811e3f5bccab9fb2635166f97e43f100bb`
+with a temporary scoped patch containing the local Stage 01 handoff plus Stage
+02 row-signature telemetry files. The remote patch was removed after evidence
+was copied back; the committed handoff is this local `main` checkout.
+
+Commands:
+
+```bash
+ROEHUB_ENV=prod \
+ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml \
+uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+  --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry
+```
+
+The first Mac Studio attempt failed before compute because the non-interactive
+shell did not export `ROEHUB_ENV` or `ROEHUB_BACKTEST_ARTIFACTS_CONFIG`. A
+second attempt with exact consensus enumeration enabled passed correctness but
+showed unacceptable telemetry overhead (`row_signature_ms` around 43-47s). The
+accepted evidence is the final rerun after lowering the default exact consensus
+enumeration limit so heavy rows report the deterministic unique-row-product
+upper bound instead of enumerating 46,656 consensus vectors.
+
+Overall gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `instrumentation.pass` | true |
+| `performance.pass` | true |
+| `parity.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Stage 02 telemetry counters:
+
+| Job | rows after prefilter | unique rows after dedup | duplicate rows | consensus_signature_count | consensus mode | row_signature_ms | collisions |
+|---|---:|---:|---:|---:|---|---:|---:|
+| `none/arity_6/long_only` | 36 | 36 | 0 | 46656 | `upper_bound_unique_row_product` | 10.388 | 0 |
+| `none/arity_6/long_short_reversal` | 36 | 36 | 0 | 46656 | `upper_bound_unique_row_product` | 10.400 | 0 |
+| `tp_sl_grid/arity_6/long_only` | 36 | 36 | 0 | 46656 | `upper_bound_unique_row_product` | 10.653 | 0 |
+| `tp_sl_grid/arity_6/long_short_reversal` | 36 | 36 | 0 | 46656 | `upper_bound_unique_row_product` | 10.800 | 0 |
+
+Correctness/performance evidence:
+
+| Job | Exact current s | May2 exact s | Ratio | System memory gate |
+|---|---:|---:|---:|---|
+| `none/arity_6/long_only` | 15.446 | 15.694 | 1.016 | pass |
+| `none/arity_6/long_short_reversal` | 15.258 | 15.365 | 1.007 | pass |
+| `tp_sl_grid/arity_6/long_only` | 16.042 | 17.446 | 1.088 | pass |
+| `tp_sl_grid/arity_6/long_short_reversal` | 15.417 | 16.204 | 1.051 | pass |
+
+Decision: Stage 02 is `accepted_for_learning`. The stage adds shadow-only row
+signature telemetry and benchmark reporting fields:
+`unique_rows_after_dedup`, `consensus_signature_count`,
+`duplicate_signal_row_ids`, `row_signature_collision_count`,
+`consensus_signature_mode`, `candidate_upper_bound_after_row_dedup`, and
+`row_signature_ms`.
+
+No production pruning, deduplication, candidate reordering, scoring reuse,
+top-N identity collapse, request-hash change, cache-key change or persistence
+schema change is introduced. Duplicate mapping semantics are explicit:
+`duplicate_signal_row_ids` lists original source row ids whose exact int8 row
+content matches the first stable unique row for the same indicator, and Stage
+02 never removes those rows. Collision strategy is explicit: equality uses full
+SHA-256 row-content signatures; the sidecar-style u64 hash is collision-checked
+only, and any non-zero collision count must disable future dedup/cache stages.
+
+Contract impact: public API `none`; port contract `none`; DTO schema `none`;
+persisted schema `none`; config schema `none`; request hash/cache identity
+`none`; service-call semantics `none`; external side effects `none`; benchmark
+and report semantics `compatible-change`; alert/runbook semantics `none`;
+browser-visible behavior `none`.
+
+`next_iteration_allowed` is `true` for Stage 03 runtime bitset-pack shadow only.
+It does not unlock production pruning, Stage 06 cache reuse, Stage 07 sidecar
+artifacts or any matrix backend `on` mode.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
 |---:|---|---|---|---|---|
 | 00 | accepted | Refresh current heavy baseline on Mac Studio before code changes | `benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/` | Baseline accepted; re-verified on checkout `6dcb62dc918a98564abec9554ae575187b32fa39`; scoped backtest runtime/harness diff from evidence commit is empty; performance, parity, memory, lazy cache, legacy path, accounting and docs drift gates passed | true |
 | 01 | accepted_for_learning | Add instrumentation counters without behavior changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/` | Counters present; explicit `null` for unavailable current-runtime counters; parity, performance, memory, lazy cache, legacy path and accounting gates passed; overhead stayed within <= 1% limit with no Stage 00 service/exact regression; production `on` mode remains locked | true |
-| 02 | planned | Row/signature telemetry shadow | planned | Pending Stage 01 commit handoff; allowed for telemetry-only work after Stage 01 commit | false |
+| 02 | accepted_for_learning | Row/signature telemetry shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/` | Shadow counters present; duplicate rows `0/36` on accepted arity-6 rows; `consensus_signature_count=46656` as deterministic upper bound; collision count `0`; row signature overhead about 10-11ms/job; parity, performance, memory, lazy cache, legacy path and docs drift gates passed; no pruning/scoring/top-N/request-hash/cache change | true |
 | 03 | planned | Runtime bitset pack shadow | planned | Pending Stage 02 | false |
 | 04 | planned | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | planned | Pending Stage 03 | false |
 | 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 | false |

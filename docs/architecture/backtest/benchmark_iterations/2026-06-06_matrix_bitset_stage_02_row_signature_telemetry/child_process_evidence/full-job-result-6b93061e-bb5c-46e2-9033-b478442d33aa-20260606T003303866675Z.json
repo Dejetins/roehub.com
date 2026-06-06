@@ -1,0 +1,376 @@
+{
+  "cleanup_evidence": {
+    "result_contains_heavy_references": false,
+    "runtime_result": {
+      "checked_reference_names": [
+        "prepared_result",
+        "combo_planning_result",
+        "hit_times_subset",
+        "tp_sl_diff_buffers",
+        "score_arrays",
+        "selected_top_rows",
+        "heap"
+      ],
+      "cleanup_duration_s": 0.00010920799832092598,
+      "result_contains_heavy_references": false,
+      "result_is_compact": true,
+      "retained_heavy_reference_names": []
+    },
+    "scheduling_class": "heavy",
+    "worker_recycle_required": true,
+    "worker_recycle_strategy": "disposable child process"
+  },
+  "exact_diagnostics": {
+    "combo_planning": {
+      "cartesian_combinations": 46656,
+      "combo_chunks_processed": 0,
+      "combo_iteration_mode": "ordinal_streaming_pass_through",
+      "exact_candidates_evaluated": 46656,
+      "materialized_candidate_count": 0,
+      "proxy_candidates_seen": 46656,
+      "proxy_candidates_selected": 46656,
+      "proxy_candidates_valid": 46656,
+      "stage_timings": {
+        "build_exact_context": 0.0016442499982076697,
+        "build_proxy_context": 8.709001122042537e-06,
+        "combo_iteration": 0.0,
+        "proxy_filter": 0.0
+      },
+      "streamed_candidate_count": 46656
+    },
+    "row_signatures": {
+      "candidate_upper_bound_after_row_dedup": 46656,
+      "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+      "consensus_signature_count": 46656,
+      "consensus_signature_enumeration_limit": 10000,
+      "consensus_signature_mode": "upper_bound_unique_row_product",
+      "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+      "duplicate_row_count": 0,
+      "duplicate_row_fraction": 0.0,
+      "duplicate_signal_row_ids": {
+        "ma.dema": [],
+        "ma.ema": [],
+        "ma.hma": [],
+        "ma.rma": [],
+        "ma.sma": [],
+        "ma.wma": []
+      },
+      "indicators": [
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.dema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.hma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.ema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.sma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.wma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.rma",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "row_signature_collision_count": 0,
+      "rows_after_prefilter": 36,
+      "schema": "backtest_row_signature_telemetry_v1",
+      "unique_rows_after_dedup": 36,
+      "unique_signal_row_ids": {
+        "ma.dema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.ema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.hma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.rma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.sma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ma.wma": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "self_check": {
+      "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+      "best_cell_equal": null,
+      "direction_mode": "long_short_reversal",
+      "enabled": false,
+      "first_mismatch": null,
+      "max_abs_return_diff": null,
+      "mismatches": 0,
+      "return_tolerance": null,
+      "sample_size": 0,
+      "status": "not_run",
+      "trade_count_equal": null,
+      "valid_tp_sl_indexes": null
+    },
+    "telemetry": {
+      "arity": 6,
+      "backend_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+      "benchmark_top_k": 5,
+      "direction_mode": "long_short_reversal",
+      "exact_candidates_evaluated": 46656,
+      "heap_capacity": 50,
+      "metric_names": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "trade_count",
+        "sharpe_trades",
+        "win_rate_pct",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct",
+        "best_tp_pct",
+        "best_sl_pct"
+      ],
+      "min_closed_trades": 300,
+      "numba_num_threads": 12,
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "quality_candidates_below_min_trades": 46656,
+      "quality_candidates_heap_eligible": 0,
+      "request_top_n": 50,
+      "risk_mode": "tp_sl_grid",
+      "sample_metrics": null,
+      "stage_timings": {
+        "exact_scoring": 15.416793372991378,
+        "heap_update": 0.00023479299852624536,
+        "tp_sl_exact_boundary": 0.0018849580010282807,
+        "tp_sl_exact_scoring": 15.416793372991378,
+        "tp_sl_full_metrics_second_pass": 3.832996299024671e-06
+      },
+      "status": "scored",
+      "top_results_count": 0
+    },
+    "top_results_sample": []
+  },
+  "instrumentation_counters": {
+    "artifact_load_ms": 83.59900099458173,
+    "avg_segments_per_candidate": null,
+    "avg_trades_per_candidate": null,
+    "candidate_upper_bound_after_row_dedup": 46656,
+    "candidates_after_proxy": 46656,
+    "combo_count_planned": 46656,
+    "combo_iteration_ms": 0.0,
+    "consensus_signature_count": 46656,
+    "consensus_signature_mode": "upper_bound_unique_row_product",
+    "duplicate_signal_row_ids": {
+      "ma.dema": [],
+      "ma.ema": [],
+      "ma.hma": [],
+      "ma.rma": [],
+      "ma.sma": [],
+      "ma.wma": []
+    },
+    "exact_candidates": 46656,
+    "exact_candidates_per_sec": 3026.310262530759,
+    "exact_scoring_ms": 15416.793372991378,
+    "proxy_filter_ms": 0.0,
+    "row_signature_collision_count": 0,
+    "row_signature_ms": 10.799708004924469,
+    "rows_after_prefilter": 36,
+    "rows_before_prefilter": null,
+    "signals_pack_ms": null,
+    "sl_count": 47,
+    "top_result_assembly_ms": 0.001624997821636498,
+    "tp_count": 47,
+    "tp_sl_cells": 2209,
+    "tp_sl_exact_scoring_ms": 15416.793372991378,
+    "trade_cell_evals_per_sec": 6685119.369930446,
+    "unique_rows_after_dedup": 36
+  },
+  "job_id": "6b93061e-bb5c-46e2-9033-b478442d33aa",
+  "process_evidence": {
+    "cancelled": false,
+    "command": [
+      "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+      "-m",
+      "apps.worker.backtest_job_runner.main.full_job_child",
+      "--job-id",
+      "6b93061e-bb5c-46e2-9033-b478442d33aa",
+      "--preflight-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-0o5cy38w/preflight.json",
+      "--output-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-0o5cy38w/result.json",
+      "--scheduling-class",
+      "heavy",
+      "--light-max-actual-combinations",
+      "50000"
+    ],
+    "elapsed_seconds": 16.337895,
+    "exit_code": 0,
+    "finished_at": "2026-06-06T00:33:03.857859Z",
+    "metadata": {
+      "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+      "job_id": "6b93061e-bb5c-46e2-9033-b478442d33aa",
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "numba_threads": "12",
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "parent_physical_footprint_after_bytes": null,
+    "parent_physical_footprint_before_bytes": null,
+    "parent_pid": 60184,
+    "parent_retained_physical_footprint_delta_bytes": null,
+    "parent_retained_rss_delta_bytes": 180224,
+    "parent_rss_after_bytes": 124207104,
+    "parent_rss_before_bytes": 124026880,
+    "peak_physical_footprint_bytes": null,
+    "peak_rss_bytes": 481280000,
+    "pid": 61204,
+    "schema": "roehub_child_process_evidence_v1",
+    "started_at": "2026-06-06T00:32:47.519964Z",
+    "stderr_tail": "2026-06-06 03:32:47,819 INFO __main__ backtest child process started: job_id=6b93061e-bb5c-46e2-9033-b478442d33aa scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-06 03:33:03,659 INFO __main__ backtest child process finished: job_id=6b93061e-bb5c-46e2-9033-b478442d33aa status=succeeded elapsed_seconds=15.840\n",
+    "stdout_tail": "",
+    "timed_out": false
+  },
+  "schema": "roehub_full_job_child_result_evidence_v1",
+  "stage_timings": {
+    "artifact_array_mmap_load": 0.01797091699700104,
+    "artifact_array_open": 0.01797091699700104,
+    "artifact_context_resolve": 0.06562808399758069,
+    "artifact_manifest_load": 0.06562808399758069,
+    "build_exact_context": 0.0016442499982076697,
+    "build_proxy_context": 8.709001122042537e-06,
+    "combo_iteration": 0.0,
+    "exact_scoring": 15.416793372991378,
+    "heap_update": 0.00023479299852624536,
+    "load_hit_times": 0.050089874996047,
+    "persist_top_n_io": 0.0,
+    "prepare_pools_core": 0.0838971670018509,
+    "prepare_pools_total": 0.18078083299769787,
+    "proxy_filter": 0.0,
+    "request_slice_prepare": 0.0009179999979096465,
+    "row_prefilter": 0.07706754199898569,
+    "sample_warmup": 0.0649876250026864,
+    "segment_build": 0.0053191670012893155,
+    "service_total_without_warmup": 31.406645999959437,
+    "service_wall_clock_s": 15.800694833000307,
+    "signal_row_selection": 0.0015038749988889322,
+    "time_range_slice": 0.0009179999979096465,
+    "top_result_assembly": 1.624997821636498e-06,
+    "tp_sl_exact_boundary": 0.0018849580010282807,
+    "tp_sl_exact_scoring": 15.416793372991378,
+    "tp_sl_full_metrics_second_pass": 3.832996299024671e-06,
+    "tp_sl_grid_validation": 0.0015886250039329752
+  },
+  "status": "succeeded",
+  "summary_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "top_variants_count": 0
+}

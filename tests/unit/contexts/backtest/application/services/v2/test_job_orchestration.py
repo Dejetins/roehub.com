@@ -58,11 +58,19 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     counters = result.instrumentation_counters
     assert counters["artifact_load_ms"] is None
     assert counters["signals_pack_ms"] is None
+    assert counters["row_signature_ms"] is not None
+    assert counters["row_signature_ms"] >= 0.0
     assert counters["combo_iteration_ms"] == pytest.approx(200.0)
     assert counters["exact_scoring_ms"] == pytest.approx(300.0)
     assert counters["top_result_assembly_ms"] == pytest.approx(400.0)
     assert counters["rows_before_prefilter"] is None
     assert counters["rows_after_prefilter"] == 3
+    assert counters["unique_rows_after_dedup"] == 1
+    assert counters["duplicate_signal_row_ids"] == {"ma.dema": [1, 2]}
+    assert counters["row_signature_collision_count"] == 0
+    assert counters["consensus_signature_count"] == 1
+    assert counters["consensus_signature_mode"] == "exact_consensus_enumerated"
+    assert counters["candidate_upper_bound_after_row_dedup"] == 1
     assert counters["combo_count_planned"] == 3
     assert counters["candidates_after_proxy"] == 3
     assert counters["exact_candidates"] == 3

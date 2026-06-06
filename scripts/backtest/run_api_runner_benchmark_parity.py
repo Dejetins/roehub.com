@@ -1304,6 +1304,13 @@ _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "top_result_assembly_ms",
     "rows_before_prefilter",
     "rows_after_prefilter",
+    "row_signature_ms",
+    "unique_rows_after_dedup",
+    "duplicate_signal_row_ids",
+    "row_signature_collision_count",
+    "consensus_signature_count",
+    "consensus_signature_mode",
+    "candidate_upper_bound_after_row_dedup",
     "combo_count_planned",
     "candidates_after_proxy",
     "exact_candidates",
@@ -1553,7 +1560,7 @@ def _instrumentation_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any
         if missing_fields:
             missing_by_job[job_name] = missing_fields
     return {
-        "schema": "backtest_stage_01_instrumentation_summary_v1",
+        "schema": "backtest_stage_instrumentation_summary_v1",
         "required_fields": list(_INSTRUMENTATION_COUNTER_FIELDS),
         "job_count": len(jobs),
         "rows": rows,
@@ -2286,9 +2293,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             (
                 "| Job | artifact load ms | signal pack ms | combos | "
                 "proxy candidates | exact candidates/s | trade-cell evals/s | "
-                "rows after prefilter | null fields |"
+                "rows after prefilter | unique rows | consensus signatures | "
+                "row signature ms | null fields |"
             ),
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
     )
     instrumentation_rows = {
@@ -2308,6 +2316,9 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             f"{_fmt_counter(counters.get('exact_candidates_per_sec'))} | "
             f"{_fmt_counter(counters.get('trade_cell_evals_per_sec'))} | "
             f"{_fmt_counter(counters.get('rows_after_prefilter'))} | "
+            f"{_fmt_counter(counters.get('unique_rows_after_dedup'))} | "
+            f"{_fmt_counter(counters.get('consensus_signature_count'))} | "
+            f"{_fmt_counter(counters.get('row_signature_ms'))} | "
             f"`{_list(row.get('null_fields'))}` |"
         )
     lines.extend(
