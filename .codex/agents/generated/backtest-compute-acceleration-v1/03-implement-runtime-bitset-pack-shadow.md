@@ -73,6 +73,35 @@ target_envs:
   - local
   - Mac Studio
 
+runtime_env_sources:
+  mac_studio_native:
+    env_file: /Users/daniildegtyarev/.config/roehub/roehub.env
+    launchd_references:
+      - infra/macos/launchd/com.roehub.api.plist
+      - infra/macos/launchd/com.roehub.backtest-job-runner.plist
+    notes:
+      - "The env file is outside the repository and contains the real values."
+      - "Do not print DSN or password values; report only key presence."
+  docker:
+    env_file: /etc/roehub/roehub.env
+    template: infra/docker/.env.example
+    compose_reference: infra/docker/docker-compose.backend.yml
+  benchmark:
+    script: scripts/backtest/run_api_runner_benchmark_parity.py
+    env_file_arg: "--env-file"
+    mac_studio_required_runtime_env:
+      ROEHUB_ENV: prod
+      ROEHUB_BACKTEST_ARTIFACTS_CONFIG: configs/prod/backtest_artifacts.yaml
+    fallback_order:
+      - "$ROEHUB_ENV_FILE"
+      - /Users/daniildegtyarev/.config/roehub/roehub.env
+      - /etc/roehub/roehub.env
+    required_keys:
+      - "STRATEGY_PG_DSN or POSTGRES_DSN or IDENTITY_PG_DSN"
+      - "or POSTGRES_DB + POSTGRES_USER + POSTGRES_PASSWORD"
+      - "ROEHUB_ENV=prod"
+      - "ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml"
+
 required_literals:
   - "signals_pack_ms"
   - "pos_bits"
@@ -175,6 +204,12 @@ Additional context:
 - Preserve current scoring path and production top-N.
 - Prove `+1`, `0`, `-1`, long-only, reversal-relevant masks, padding, and word-count parity.
 - Record `signals_pack_ms`, memory peak/cleanup, and sample consensus parity.
+- For API-runner benchmark evidence, load the runtime env through
+  `--env-file /Users/daniildegtyarev/.config/roehub/roehub.env` on Mac Studio,
+  or rely on `ROEHUB_ENV_FILE`; benchmark runtime must include
+  `ROEHUB_ENV=prod` and
+  `ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml`;
+  never print secret values.
 - Update tests and stage ledger.
 
 ## Requirements (Should)
@@ -277,7 +312,13 @@ Possible secondary touches:
 - `uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py`
 - `python -m tools.docs.generate_docs_index --check`
 - `git diff --check`
-- API-runner shadow benchmark with pack timing and no result drift.
+- API-runner shadow benchmark with pack timing and no result drift:
+
+```bash
+uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+  --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+  --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack
+```
 
 # Final output: report format (strict)
 

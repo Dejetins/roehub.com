@@ -228,11 +228,29 @@ backend change:
 
 ```bash
 uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+  --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
   --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_00_current_baseline
 
 uv run python scripts/backtest/validate_benchmark_accounting.py \
   --out docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_00_current_baseline/local_accounting_validation.json
 ```
+
+Runtime environment source for API-runner benchmarks:
+
+| Runtime | Env source | Notes |
+|---|---|---|
+| Mac Studio native launchd | `/Users/daniildegtyarev/.config/roehub/roehub.env` | This file is outside the repository and contains the real values used by `infra/macos/launchd/com.roehub.api.plist` and `infra/macos/launchd/com.roehub.backtest-job-runner.plist`. |
+| Docker/backend compose | `/etc/roehub/roehub.env` via `ROEHUB_ENV_FILE`; template `infra/docker/.env.example` | Compose derives `IDENTITY_PG_DSN`, `POSTGRES_DSN` and `STRATEGY_PG_DSN` from `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD`. |
+
+`scripts/backtest/run_api_runner_benchmark_parity.py` accepts `--env-file` and
+falls back to `$ROEHUB_ENV_FILE`,
+`/Users/daniildegtyarev/.config/roehub/roehub.env`, then
+`/etc/roehub/roehub.env`. For Mac Studio native benchmark evidence, the harness
+must also run with `ROEHUB_ENV=prod` and
+`ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml`; when
+the env file omits those keys, the benchmark harness fills them and records
+only the key names and path. Evidence may record which keys are present, but
+must not print DSN or password values.
 
 Current Stage 00 evidence is recorded at:
 

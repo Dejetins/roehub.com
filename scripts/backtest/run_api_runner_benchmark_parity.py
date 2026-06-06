@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import platform
+import re
+import shlex
 import subprocess
 import sys
 import time
@@ -70,6 +72,25 @@ _CACHE_HIT_RSS_DELTA_LIMIT_BYTES = 64 * 1024 * 1024
 _SYSTEM_RETAINED_MEMORY_LIMIT_BYTES = 512 * 1024 * 1024
 _REFERENCE_SPEED_RATIO_MIN = 0.8
 _DEFAULT_CPU_SAMPLE_INTERVAL_SECONDS = 1.0
+_DEFAULT_MACOS_ENV_FILE = Path("/Users/daniildegtyarev/.config/roehub/roehub.env")
+_DEFAULT_DOCKER_ENV_FILE = Path("/etc/roehub/roehub.env")
+_DEFAULT_PROD_ARTIFACT_CONFIG = Path("configs/prod/backtest_artifacts.yaml")
+_ARTIFACT_CONFIG_ENV_KEY = "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"
+_ROEHUB_ENV_KEY = "ROEHUB_ENV"
+_PG_DSN_ENV_KEYS = ("STRATEGY_PG_DSN", "POSTGRES_DSN", "IDENTITY_PG_DSN")
+_PG_COMPONENT_ENV_KEYS = ("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD")
+_ENV_REPORT_KEYS = frozenset(
+    (
+        _ARTIFACT_CONFIG_ENV_KEY,
+        _ROEHUB_ENV_KEY,
+        *_PG_DSN_ENV_KEYS,
+        *_PG_COMPONENT_ENV_KEYS,
+    )
+)
+_ENV_REFERENCE_RE = re.compile(
+    r"\$\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)(?::-(?P<default>[^}]*))?\}"
+    r"|\$(?P<plain>[A-Za-z_][A-Za-z0-9_]*)"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +102,9 @@ class _RunnerHarness:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    env_file_report = _load_runtime_env_file(args.env_file)
+    dsn, filled_dsn_keys = _ensure_postgres_dsn_env()
+    artifact_env_report = _ensure_artifact_runtime_env()
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -92,7 +116,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke_only:
         reference_runs = _smoke_subset(reference_runs)
 
-    dsn = prod_smoke._postgres_dsn(environ=os.environ)
     session_id: str | None = None
     started_at = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -103,6 +126,17 @@ def main(argv: list[str] | None = None) -> int:
         "git_commit": _git_commit(),
         "git_status_short": _git_status_short(),
         "api_base": args.api_base,
+        "env_file": env_file_report,
+        "postgres_env": {
+            "dsn_keys_present": [
+                key for key in _PG_DSN_ENV_KEYS if os.environ.get(key, "").strip()
+            ],
+            "component_keys_present": [
+                key for key in _PG_COMPONENT_ENV_KEYS if os.environ.get(key, "").strip()
+            ],
+            "filled_dsn_keys": filled_dsn_keys,
+        },
+        "artifact_env": artifact_env_report,
         "canonical_json": str(args.canonical_json),
         "reference_json": str(args.reference_json),
         "reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
@@ -214,6 +248,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--canonical-json", type=Path, default=DEFAULT_CANONICAL_JSON)
     parser.add_argument("--reference-json", type=Path, default=DEFAULT_REFERENCE_JSON)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument(
+        "--env-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional runtime env file. If omitted, the runner tries "
+            "$ROEHUB_ENV_FILE, then /Users/daniildegtyarev/.config/roehub/roehub.env, "
+            "then /etc/roehub/roehub.env. Values already in the process env win."
+        ),
+    )
     parser.add_argument("--api-base", default=_DEFAULT_API_BASE)
     parser.add_argument("--cookie-name", default=_DEFAULT_COOKIE_NAME)
     parser.add_argument("--timeout-seconds", type=int, default=3600)
@@ -235,6 +279,176 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Sample child process CPU with ps at this interval; <=0 disables sampling.",
     )
     return parser
+
+
+def _load_runtime_env_file(explicit_env_file: Path | None) -> dict[str, Any]:
+    """
+    Load benchmark runtime env from the same source used by native/Docker services.
+
+    The report intentionally records only paths and key names, never values.
+    """
+
+    candidates: list[Path] = []
+    explicit = explicit_env_file is not None
+    if explicit_env_file is not None:
+        candidates.append(explicit_env_file)
+    env_file_value = os.environ.get("ROEHUB_ENV_FILE", "").strip()
+    if env_file_value:
+        candidates.append(Path(env_file_value))
+    candidates.extend((_DEFAULT_MACOS_ENV_FILE, _DEFAULT_DOCKER_ENV_FILE))
+
+    seen: set[Path] = set()
+    unique_candidates: list[Path] = []
+    for candidate in candidates:
+        resolved = candidate.expanduser()
+        if resolved not in seen:
+            seen.add(resolved)
+            unique_candidates.append(resolved)
+
+    selected = next((path for path in unique_candidates if path.is_file()), None)
+    if selected is None:
+        if explicit:
+            raise RuntimeError(f"env file not found: {explicit_env_file}")
+        return {
+            "loaded": False,
+            "path": None,
+            "candidates": [str(path) for path in unique_candidates],
+            "keys_loaded": [],
+            "reason": "no readable env file found",
+        }
+
+    loaded_keys: list[str] = []
+    for key, value in _read_env_file(selected).items():
+        if os.environ.get(key, "").strip():
+            continue
+        os.environ[key] = value
+        loaded_keys.append(key)
+    return {
+        "loaded": True,
+        "path": str(selected),
+        "candidates": [str(path) for path in unique_candidates],
+        "keys_loaded": sorted(key for key in loaded_keys if key in _ENV_REPORT_KEYS),
+        "keys_loaded_count": len(loaded_keys),
+        "reason": None,
+    }
+
+
+def _ensure_postgres_dsn_env() -> tuple[str, list[str]]:
+    dsn = prod_smoke._postgres_dsn(environ=os.environ)
+    filled_keys: list[str] = []
+    for key in _PG_DSN_ENV_KEYS:
+        if not os.environ.get(key, "").strip():
+            os.environ[key] = dsn
+            filled_keys.append(key)
+    return dsn, filled_keys
+
+
+def _ensure_artifact_runtime_env() -> dict[str, Any]:
+    """
+    Ensure API-runner benchmark uses the same artifact root as Mac Studio prod.
+
+    Service wiring already supports `ROEHUB_BACKTEST_ARTIFACTS_CONFIG` and
+    `ROEHUB_ENV`; this helper only supplies the benchmark default when neither
+    is present in the shell/env-file.
+    """
+
+    config_value = os.environ.get(_ARTIFACT_CONFIG_ENV_KEY, "").strip()
+    env_value = os.environ.get(_ROEHUB_ENV_KEY, "").strip()
+    filled_keys: list[str] = []
+    if not env_value:
+        env_value = "prod"
+        os.environ[_ROEHUB_ENV_KEY] = env_value
+        filled_keys.append(_ROEHUB_ENV_KEY)
+    if config_value:
+        return {
+            "config_key_present": True,
+            "env_name_present": True,
+            "filled_keys": filled_keys,
+            "config_path": config_value,
+            "reason": "provided by process env or env file",
+        }
+    if _ROEHUB_ENV_KEY not in filled_keys:
+        return {
+            "config_key_present": False,
+            "env_name_present": True,
+            "filled_keys": filled_keys,
+            "config_path": f"configs/{env_value}/backtest_artifacts.yaml",
+            "reason": "resolved from ROEHUB_ENV",
+        }
+
+    if not _DEFAULT_PROD_ARTIFACT_CONFIG.is_file():
+        raise RuntimeError(
+            "missing artifact runtime config: set "
+            f"{_ARTIFACT_CONFIG_ENV_KEY} or {_ROEHUB_ENV_KEY}"
+        )
+
+    config_path = str(_DEFAULT_PROD_ARTIFACT_CONFIG)
+    os.environ[_ARTIFACT_CONFIG_ENV_KEY] = config_path
+    filled_keys.append(_ARTIFACT_CONFIG_ENV_KEY)
+    return {
+        "config_key_present": True,
+        "env_name_present": True,
+        "filled_keys": filled_keys,
+        "config_path": config_path,
+        "reason": "defaulted to Mac Studio prod artifact config",
+    }
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line.removeprefix("export ").strip()
+        if "=" not in line:
+            continue
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        if not key or not key.replace("_", "").isalnum() or key[0].isdigit():
+            continue
+        values[key] = _parse_env_value(raw_value.strip())
+    return {key: _expand_env_value(value, values=values) for key, value in values.items()}
+
+
+def _parse_env_value(raw_value: str) -> str:
+    if not raw_value:
+        return ""
+    if not raw_value.startswith(("'", '"')):
+        return raw_value.split(" #", 1)[0].strip()
+    try:
+        parsed = shlex.split(raw_value, comments=True, posix=True)
+    except ValueError:
+        return raw_value.strip("'\"")
+    if not parsed:
+        return ""
+    return parsed[0]
+
+
+def _expand_env_value(value: str, *, values: Mapping[str, str]) -> str:
+    expanded = value
+    for _ in range(5):
+        next_value = _ENV_REFERENCE_RE.sub(
+            lambda match: _env_reference_replacement(match=match, values=values),
+            expanded,
+        )
+        if next_value == expanded:
+            return next_value
+        expanded = next_value
+    return expanded
+
+
+def _env_reference_replacement(*, match: re.Match[str], values: Mapping[str, str]) -> str:
+    key = match.group("braced") or match.group("plain") or ""
+    default = match.group("default")
+    current = os.environ.get(key, "")
+    if current:
+        return current
+    value = values.get(key, "")
+    if value:
+        return value
+    return "" if default is None else default
 
 
 def _run_reference_jobs(
@@ -1297,6 +1511,14 @@ def _merged_stage_timings(child_evidence: Sequence[Mapping[str, Any]]) -> dict[s
 _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "artifact_load_ms",
     "signals_pack_ms",
+    "signals_pack_bytes",
+    "signals_pack_estimated_peak_bytes",
+    "signals_pack_arrays_released",
+    "bitset_word_count",
+    "bitset_padding_valid",
+    "bitset_consensus_sample_count",
+    "bitset_consensus_sample_mismatches",
+    "bitset_consensus_sample_parity",
     "combo_iteration_ms",
     "proxy_filter_ms",
     "exact_scoring_ms",
@@ -2149,6 +2371,9 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     memory = _mapping(payload.get("memory_release"))
     scheduler = _mapping(payload.get("mixed_scheduler_smoke"))
     lazy = _mapping(payload.get("lazy_cache_hit_memory"))
+    env_file = _mapping(payload.get("env_file"))
+    postgres_env = _mapping(payload.get("postgres_env"))
+    artifact_env = _mapping(payload.get("artifact_env"))
     jobs = [_mapping(item) for item in _list(api_runner.get("jobs"))]
     ratio_values: list[float] = []
     cpu_mean_values: list[float] = []
@@ -2226,6 +2451,17 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "because `exclude_heaviest_140s_job`."
         ),
         "",
+        "## Runtime env",
+        "",
+        f"- Env file: `{env_file.get('path')}`",
+        f"- Env file loaded: `{'yes' if env_file.get('loaded') else 'no'}`",
+        f"- Postgres DSN keys present: `{postgres_env.get('dsn_keys_present')}`",
+        f"- Postgres component keys present: `{postgres_env.get('component_keys_present')}`",
+        f"- Filled DSN keys: `{postgres_env.get('filled_dsn_keys')}`",
+        f"- Artifact config path: `{artifact_env.get('config_path')}`",
+        f"- Filled runtime keys: `{artifact_env.get('filled_keys')}`",
+        "- Secret values: not recorded.",
+        "",
         "## API-runner path",
         "",
         f"- Required jobs: `{len(_list(api_runner.get('jobs')))}`",
@@ -2285,18 +2521,22 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Stage 01 instrumentation counters",
+            "## Instrumentation counters",
             "",
             f"- Pass: `{'yes' if instrumentation.get('pass') else 'no'}`",
             f"- Required fields: `{len(_list(instrumentation.get('required_fields')))}`",
             "",
             (
-                "| Job | artifact load ms | signal pack ms | combos | "
+                "| Job | artifact load ms | signal pack ms | signal pack bytes | "
+                "W | padding valid | consensus sample parity | combos | "
                 "proxy candidates | exact candidates/s | trade-cell evals/s | "
                 "rows after prefilter | unique rows | consensus signatures | "
                 "row signature ms | null fields |"
             ),
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            (
+                "| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | "
+                "---: | ---: | ---: | ---: | ---: | --- |"
+            ),
         ]
     )
     instrumentation_rows = {
@@ -2311,6 +2551,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             f"`{job.get('job_name')}` | "
             f"{_fmt_counter(counters.get('artifact_load_ms'))} | "
             f"{_fmt_counter(counters.get('signals_pack_ms'))} | "
+            f"{_fmt_counter(counters.get('signals_pack_bytes'))} | "
+            f"{_fmt_counter(counters.get('bitset_word_count'))} | "
+            f"{_fmt_counter(counters.get('bitset_padding_valid'))} | "
+            f"{_fmt_counter(counters.get('bitset_consensus_sample_parity'))} | "
             f"{_fmt_counter(counters.get('combo_count_planned'))} | "
             f"{_fmt_counter(counters.get('candidates_after_proxy'))} | "
             f"{_fmt_counter(counters.get('exact_candidates_per_sec'))} | "

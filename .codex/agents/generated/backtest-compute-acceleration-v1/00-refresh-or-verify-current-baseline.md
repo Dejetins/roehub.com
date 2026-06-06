@@ -64,6 +64,23 @@ target_envs:
   - local
   - Mac Studio
 
+runtime_env_sources:
+  mac_studio_native_env_file: /Users/daniildegtyarev/.config/roehub/roehub.env
+  docker_env_file: /etc/roehub/roehub.env
+  benchmark_env_file_arg: "--env-file"
+  mac_studio_required_runtime_env:
+    ROEHUB_ENV: prod
+    ROEHUB_BACKTEST_ARTIFACTS_CONFIG: configs/prod/backtest_artifacts.yaml
+  source_references:
+    - infra/macos/launchd/com.roehub.api.plist
+    - infra/macos/launchd/com.roehub.backtest-job-runner.plist
+    - infra/docker/.env.example
+    - infra/docker/docker-compose.backend.yml
+  required_postgres_env:
+    - "STRATEGY_PG_DSN or POSTGRES_DSN or IDENTITY_PG_DSN"
+    - "or POSTGRES_DB + POSTGRES_USER + POSTGRES_PASSWORD"
+  secret_reporting_rule: "Report only key/path presence, never DSN or password values."
+
 required_literals:
   - "2026-06-03_matrix_bitset_stage_00_current_baseline"
   - "run_api_runner_benchmark_parity.py"

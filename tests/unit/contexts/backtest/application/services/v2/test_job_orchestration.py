@@ -57,7 +57,16 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     )
     counters = result.instrumentation_counters
     assert counters["artifact_load_ms"] is None
-    assert counters["signals_pack_ms"] is None
+    assert counters["signals_pack_ms"] is not None
+    assert counters["signals_pack_ms"] >= 0.0
+    assert counters["signals_pack_bytes"] == 48
+    assert counters["signals_pack_estimated_peak_bytes"] == 60
+    assert counters["signals_pack_arrays_released"] is True
+    assert counters["bitset_word_count"] == 1
+    assert counters["bitset_padding_valid"] is True
+    assert counters["bitset_consensus_sample_count"] == 3
+    assert counters["bitset_consensus_sample_mismatches"] == 0
+    assert counters["bitset_consensus_sample_parity"] is True
     assert counters["row_signature_ms"] is not None
     assert counters["row_signature_ms"] >= 0.0
     assert counters["combo_iteration_ms"] == pytest.approx(200.0)
@@ -76,6 +85,10 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     assert counters["exact_candidates"] == 3
     assert counters["exact_candidates_per_sec"] == pytest.approx(10.0)
     assert counters["trade_cell_evals_per_sec"] is None
+    assert result.exact_diagnostics["signal_bitsets"]["arrays"] == {
+        "pos_bits": {"dtype": "uint64", "shape": ["rows", "W"]},
+        "neg_bits": {"dtype": "uint64", "shape": ["rows", "W"]},
+    }
 
 
 @dataclass(slots=True)

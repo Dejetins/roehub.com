@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
 from scripts.backtest.run_api_runner_benchmark_parity import (
     _INSTRUMENTATION_COUNTER_FIELDS,
+    _ensure_artifact_runtime_env,
+    _ensure_postgres_dsn_env,
     _instrumentation_summary,
+    _load_runtime_env_file,
     _merged_instrumentation_counters,
+    _read_env_file,
 )
 from trading.contexts.backtest.application.services.v2.benchmark_accounting import (
     CANONICAL_STAGE_ORDER,
@@ -137,7 +142,15 @@ def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -
                 "instrumentation_counters": {
                     "trade_cell_evals_per_sec": None,
                     "artifact_load_ms": 12.5,
-                    "signals_pack_ms": None,
+                    "signals_pack_ms": 1.5,
+                    "signals_pack_bytes": 1152,
+                    "signals_pack_estimated_peak_bytes": 2448,
+                    "signals_pack_arrays_released": True,
+                    "bitset_word_count": 2,
+                    "bitset_padding_valid": True,
+                    "bitset_consensus_sample_count": 16,
+                    "bitset_consensus_sample_mismatches": 0,
+                    "bitset_consensus_sample_parity": True,
                     "combo_iteration_ms": 3.0,
                     "proxy_filter_ms": 4.0,
                     "exact_scoring_ms": 5.0,
@@ -173,6 +186,116 @@ def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -
     row = summary["rows"][0]
     assert summary["pass"] is True
     assert row["missing_fields"] == []
-    assert "signals_pack_ms" in row["null_fields"]
+    assert "signals_pack_ms" not in row["null_fields"]
+    assert row["counters"]["signals_pack_ms"] == 1.5
+    assert row["counters"]["bitset_padding_valid"] == "True"
+    assert row["counters"]["bitset_consensus_sample_parity"] == "True"
     assert row["counters"]["unique_rows_after_dedup"] == 36
     assert row["counters"]["duplicate_signal_row_ids"] == "{'ma.ema': [2, 3]}"
+
+
+def test_api_runner_benchmark_env_file_parser_keeps_conninfo_values(tmp_path: Path) -> None:
+    env_file = tmp_path / "roehub.env"
+    env_file.write_text(
+        "\n".join(
+            (
+                "# comment",
+                "POSTGRES_DB=roehub",
+                "export POSTGRES_USER=roe",
+                "POSTGRES_PASSWORD='secret value'",
+                (
+                    'STRATEGY_PG_DSN="host=127.0.0.1 port=5432 '
+                    "dbname=${POSTGRES_DB} user=${POSTGRES_USER} "
+                    'password=${POSTGRES_PASSWORD}"'
+                ),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    parsed = _read_env_file(env_file)
+
+    assert parsed["POSTGRES_DB"] == "roehub"
+    assert parsed["POSTGRES_USER"] == "roe"
+    assert parsed["POSTGRES_PASSWORD"] == "secret value"
+    assert parsed["STRATEGY_PG_DSN"] == (
+        "host=127.0.0.1 port=5432 dbname=roehub user=roe password=secret value"
+    )
+
+
+def test_api_runner_benchmark_env_file_report_filters_unrelated_secret_key_names(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    for key in (
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    env_file = tmp_path / "roehub.env"
+    env_file.write_text(
+        "\n".join(
+            (
+                "POSTGRES_DB=roehub",
+                "POSTGRES_USER=roe",
+                "POSTGRES_PASSWORD=secret",
+                "ROEHUB_E2E_BYBIT_MAINNET_TRADE_API_KEY=not-reported",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = _load_runtime_env_file(env_file)
+
+    assert report["keys_loaded_count"] == 4
+    assert report["keys_loaded"] == ["POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER"]
+
+
+def test_api_runner_benchmark_derives_dsn_env_from_postgres_components(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in (
+        "STRATEGY_PG_DSN",
+        "POSTGRES_DSN",
+        "IDENTITY_PG_DSN",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("POSTGRES_DB", "roehub")
+    monkeypatch.setenv("POSTGRES_USER", "roe")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "secret")
+
+    dsn, filled_keys = _ensure_postgres_dsn_env()
+
+    assert dsn == "host=127.0.0.1 port=5432 dbname=roehub user=roe password=secret"
+    assert filled_keys == ["STRATEGY_PG_DSN", "POSTGRES_DSN", "IDENTITY_PG_DSN"]
+    assert dsn == os.environ["STRATEGY_PG_DSN"]
+    assert dsn == os.environ["POSTGRES_DSN"]
+    assert dsn == os.environ["IDENTITY_PG_DSN"]
+
+
+def test_api_runner_benchmark_defaults_to_prod_artifact_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("ROEHUB_BACKTEST_ARTIFACTS_CONFIG", raising=False)
+    monkeypatch.delenv("ROEHUB_ENV", raising=False)
+    config_path = tmp_path / "configs" / "prod" / "backtest_artifacts.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("version: 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    report = _ensure_artifact_runtime_env()
+
+    assert report["filled_keys"] == ["ROEHUB_ENV", "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"]
+    assert report["config_path"] == "configs/prod/backtest_artifacts.yaml"
+    assert os.environ["ROEHUB_ENV"] == "prod"
+    assert os.environ["ROEHUB_BACKTEST_ARTIFACTS_CONFIG"] == (
+        "configs/prod/backtest_artifacts.yaml"
+    )

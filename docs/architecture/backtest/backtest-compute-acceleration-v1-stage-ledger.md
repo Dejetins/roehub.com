@@ -275,6 +275,144 @@ browser-visible behavior `none`.
 It does not unlock production pruning, Stage 06 cache reuse, Stage 07 sidecar
 artifacts or any matrix backend `on` mode.
 
+## Stage 03 Runtime Bitset Pack Shadow
+
+Status: `accepted_for_learning`.
+
+Evidence path:
+
+`docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/`
+
+Implementation state on branch `main`, with Mac Studio benchmark run from a
+temporary worktree based on checkout
+`16ab06dc1506edaa7e292c2497595fcc3f008664` plus this scoped Stage 03 patch:
+
+- added isolated runtime bitset helper for `pos_bits` / `neg_bits` with
+  little-endian bit order and `W = ceil(T / 64)`;
+- added shadow-only orchestration hook after `prepare_pools`;
+- added additive benchmark counters for `signals_pack_ms`, packed bytes, word
+  count, padding validity and sample consensus parity;
+- current scoring, combo planning, top-N, public request hash and persistence
+  path are not fed by the bitsets.
+
+Local semantic evidence:
+
+| Check | Result |
+|---|---|
+| `+1/0/-1` round-trip | pass |
+| `long_only` positive mask semantics | pass |
+| `long_short_reversal` negative mask semantics | pass |
+| non-multiple-of-64 padding | pass |
+| word count formula `W = ceil(T / 64)` | pass |
+| sampled consensus parity | pass |
+| current no-risk scoring focused suite | pass |
+
+Focused local commands:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_bitsets.py \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py \
+  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py
+
+uv run ruff check \
+  src/trading/contexts/backtest/application/services/v2/matrix_backend/bitsets.py \
+  src/trading/contexts/backtest/application/services/v2/job_orchestration.py \
+  scripts/backtest/run_api_runner_benchmark_parity.py \
+  tests/unit/contexts/backtest/application/services/v2/test_bitsets.py \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py
+
+git diff --check
+```
+
+Results: pytest `52 passed`; ruff `All checks passed`; pyright
+`0 errors`; docs index `OK`; `git diff --check` passed.
+
+Mac Studio API-runner command:
+
+```bash
+uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+  --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+  --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack
+```
+
+Runtime environment source:
+
+- Mac Studio env file:
+  `/Users/daniildegtyarev/.config/roehub/roehub.env`;
+- benchmark-filled runtime keys when absent from env file:
+  `ROEHUB_ENV=prod` and
+  `ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml`;
+- Postgres keys present in the env file:
+  `STRATEGY_PG_DSN`, `POSTGRES_DSN`, `IDENTITY_PG_DSN`,
+  `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`;
+- artifact root resolved by prod config:
+  `/opt/roehub/state/backtest_artifacts/v2`, with `BTCUSDT/current.yaml` and
+  active slot manifest present on Mac Studio;
+- evidence records only key names and paths, never DSN or password values.
+
+Benchmark harness repair: the runner accepts `--env-file` and falls back to
+`$ROEHUB_ENV_FILE`, `/Users/daniildegtyarev/.config/roehub/roehub.env`, then
+`/etc/roehub/roehub.env`. It expands `${POSTGRES_*}` placeholders in env-file
+DSN values, derives missing `STRATEGY_PG_DSN`, `POSTGRES_DSN` and
+`IDENTITY_PG_DSN` from `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD`,
+and fills `ROEHUB_ENV` plus `ROEHUB_BACKTEST_ARTIFACTS_CONFIG` for Mac Studio
+API-runner evidence when the env file omits them.
+
+Mac Studio acceptance gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `api_runner_path.pass` | true |
+| `instrumentation.pass` | true |
+| `performance.pass` | true |
+| `parity.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Stage 03 telemetry counters:
+
+| Job | W | signals_pack_ms | packed bytes | padding valid | consensus sample parity |
+|---|---:|---:|---:|---|---|
+| `none/arity_6/long_only` | 3421 | 23.617 | 1,970,496 | true | true |
+| `none/arity_6/long_short_reversal` | 3421 | 24.067 | 1,970,496 | true | true |
+| `tp_sl_grid/arity_6/long_only` | 3421 | 24.195 | 1,970,496 | true | true |
+| `tp_sl_grid/arity_6/long_short_reversal` | 3421 | 24.063 | 1,970,496 | true | true |
+
+Correctness/performance evidence:
+
+| Job | Exact current s | May2 exact s | Ratio | System memory gate |
+|---|---:|---:|---:|---|
+| `none/arity_6/long_only` | 15.416 | 15.694 | 1.018 | pass |
+| `none/arity_6/long_short_reversal` | 15.168 | 15.365 | 1.013 | pass |
+| `tp_sl_grid/arity_6/long_only` | 16.077 | 17.446 | 1.085 | pass |
+| `tp_sl_grid/arity_6/long_short_reversal` | 15.175 | 16.204 | 1.068 | pass |
+
+Persisted top-N parity passed for `4/4` API-created runner jobs. The service
+state path reached `queued -> running -> succeeded` for every required job, the
+lazy cache-hit memory check passed with retained RSS delta `0`, and no failed
+memory-release jobs remained in the accepted rerun.
+
+Decision: Stage 03 is `accepted_for_learning`. The stage proves runtime
+bitset-pack shape, padding and sampled consensus parity at the real API-runner
+child boundary, but it is shadow-only and does not feed scoring. It does not
+unlock production `on` mode, pruning, scoring reuse, cache reuse or sidecar
+artifact publication.
+
+Contract impact: public API `none`; port contract `none`; DTO schema `none`;
+persisted schema `none`; config schema `none`; request hash/cache identity
+`none`; service-call semantics `none`; benchmark/report semantics
+`compatible-change`; browser-visible behavior `none`.
+
+`next_iteration_allowed` is `true` for Stage 04 no-risk long-only MVP only.
+Stage 04 must still produce its own parity, service wall, memory cleanup and
+top-N evidence before any production-affecting backend mode is accepted.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -282,8 +420,8 @@ artifacts or any matrix backend `on` mode.
 | 00 | accepted | Refresh current heavy baseline on Mac Studio before code changes | `benchmark_iterations/2026-06-03_matrix_bitset_stage_00_current_baseline/` | Baseline accepted; re-verified on checkout `6dcb62dc918a98564abec9554ae575187b32fa39`; scoped backtest runtime/harness diff from evidence commit is empty; performance, parity, memory, lazy cache, legacy path, accounting and docs drift gates passed | true |
 | 01 | accepted_for_learning | Add instrumentation counters without behavior changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_01_instrumentation/` | Counters present; explicit `null` for unavailable current-runtime counters; parity, performance, memory, lazy cache, legacy path and accounting gates passed; overhead stayed within <= 1% limit with no Stage 00 service/exact regression; production `on` mode remains locked | true |
 | 02 | accepted_for_learning | Row/signature telemetry shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/` | Shadow counters present; duplicate rows `0/36` on accepted arity-6 rows; `consensus_signature_count=46656` as deterministic upper bound; collision count `0`; row signature overhead about 10-11ms/job; parity, performance, memory, lazy cache, legacy path and docs drift gates passed; no pruning/scoring/top-N/request-hash/cache change | true |
-| 03 | planned | Runtime bitset pack shadow | planned | Pending Stage 02 | false |
-| 04 | planned | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | planned | Pending Stage 03 | false |
+| 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
+| 04 | planned | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | planned | Pending Stage 04 implementation; Stage 03 shadow handoff is accepted for learning | false |
 | 05 | planned | No-risk `long_short_reversal` and arity 6 heavy rows | planned | Pending Stage 04 | false |
 | 06 | planned | Consensus signature cache | planned | Pending Stage 05 | false |
 | 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Pending Stage 06 | false |

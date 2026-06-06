@@ -23,6 +23,7 @@ from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
 )
+from .matrix_backend.bitsets import build_runtime_bitset_pack_telemetry
 from .matrix_backend.row_signatures import build_row_signature_telemetry
 from .prepare_pools import build_signal_segments, row_metadata_order_hash
 from .top_result_assembly import (
@@ -94,6 +95,8 @@ class BacktestRuntimeJobOrchestrationService:
         warmup_elapsed_s: float | None = None
         row_signature_telemetry = None
         row_signature_elapsed_s: float | None = None
+        bitset_pack_telemetry = None
+        bitset_pack_elapsed_s: float | None = None
         try:
             prepared_result = self.prepare_pools.execute(
                 normalized_request=normalized_request,
@@ -104,6 +107,11 @@ class BacktestRuntimeJobOrchestrationService:
                 prepared_result.indicator_pools
             )
             row_signature_elapsed_s = time.perf_counter() - row_signature_started
+            bitset_pack_started = time.perf_counter()
+            bitset_pack_telemetry = build_runtime_bitset_pack_telemetry(
+                prepared_result.indicator_pools
+            )
+            bitset_pack_elapsed_s = time.perf_counter() - bitset_pack_started
             _ = scheduling_class, light_max_actual_combinations
             confirmed_scheduling_class: BacktestSchedulingClass = "heavy"
             if risk_mode == "none":
@@ -173,6 +181,7 @@ class BacktestRuntimeJobOrchestrationService:
                 "telemetry": exact_result.telemetry.as_mapping(),
                 "combo_planning": combo_result.telemetry.as_mapping(),
                 "row_signatures": row_signature_telemetry.as_mapping(),
+                "signal_bitsets": bitset_pack_telemetry.as_mapping(),
                 "self_check": exact_result.self_check.as_mapping(),
                 "top_results_sample": [
                     item.as_mapping() for item in exact_result.top_results[:5]
@@ -187,6 +196,8 @@ class BacktestRuntimeJobOrchestrationService:
                 stage_timings=stage_timings,
                 row_signature_telemetry=row_signature_telemetry,
                 row_signature_elapsed_s=row_signature_elapsed_s,
+                bitset_pack_telemetry=bitset_pack_telemetry,
+                bitset_pack_elapsed_s=bitset_pack_elapsed_s,
             )
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,
@@ -204,6 +215,7 @@ class BacktestRuntimeJobOrchestrationService:
             del exact_result
             del combo_result
             del row_signature_telemetry
+            del bitset_pack_telemetry
             del prepared_result
             gc.collect()
 
@@ -297,6 +309,8 @@ def _instrumentation_counters(
     stage_timings: Mapping[str, float],
     row_signature_telemetry: Any,
     row_signature_elapsed_s: float | None,
+    bitset_pack_telemetry: Any,
+    bitset_pack_elapsed_s: float | None,
 ) -> dict[str, Any]:
     combo_telemetry = combo_result.telemetry
     exact_telemetry = exact_result.telemetry
@@ -310,10 +324,27 @@ def _instrumentation_counters(
     tp_count, sl_count = _tp_sl_grid_counts(hit_times_result=hit_times_result)
     tp_sl_cells = int(preflight.cost_estimate.tp_sl_cells)
     row_signature_mapping = row_signature_telemetry.as_mapping()
+    bitset_pack_mapping = bitset_pack_telemetry.as_mapping()
 
     return {
         "artifact_load_ms": _seconds_to_ms(artifact_load_s),
-        "signals_pack_ms": None,
+        "signals_pack_ms": _seconds_to_ms(bitset_pack_elapsed_s),
+        "signals_pack_bytes": bitset_pack_mapping["packed_bytes"],
+        "signals_pack_estimated_peak_bytes": bitset_pack_mapping["estimated_peak_bytes"],
+        "signals_pack_arrays_released": bitset_pack_mapping[
+            "arrays_released_before_return"
+        ],
+        "bitset_word_count": bitset_pack_mapping["word_count"],
+        "bitset_padding_valid": bitset_pack_mapping["padding_valid"],
+        "bitset_consensus_sample_count": bitset_pack_mapping[
+            "consensus_sample_count"
+        ],
+        "bitset_consensus_sample_mismatches": bitset_pack_mapping[
+            "consensus_sample_mismatches"
+        ],
+        "bitset_consensus_sample_parity": bitset_pack_mapping[
+            "consensus_sample_parity"
+        ],
         "row_signature_ms": _seconds_to_ms(row_signature_elapsed_s),
         "combo_iteration_ms": _stage_ms(stage_timings, "combo_iteration"),
         "proxy_filter_ms": _stage_ms(stage_timings, "proxy_filter"),
