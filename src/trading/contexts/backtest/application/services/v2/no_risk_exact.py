@@ -47,6 +47,7 @@ from trading.contexts.backtest.application.services.v2.matrix_backend.bitsets im
     pack_signal_matrix,
 )
 from trading.contexts.backtest.application.services.v2.matrix_backend.no_risk_score import (
+    matrix_bitset_no_risk,
     matrix_bitset_no_risk_long_only,
 )
 from trading.contexts.backtest.application.services.v2.numba_runtime import (
@@ -816,13 +817,9 @@ def evaluate_no_risk_exact_chunk(
 
     if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
         arity = len(indicator_ids)
-        if arity not in (2, 3):
+        if arity not in (2, 3, 6):
             raise BacktestNoRiskExactRejected(
-                "matrix_bitset_no_risk_v1 supports no-risk arity 2-3 only"
-            )
-        if backend.direction_mode != DIRECTION_MODE_LONG_ONLY:
-            raise BacktestNoRiskExactRejected(
-                "matrix_bitset_no_risk_v1 supports long_only direction only"
+                "matrix_bitset_no_risk_v1 supports no-risk arity 2, 3, and 6 only"
             )
         if scratch is None or scratch.matrix_packed_by_indicator is None:
             raise BacktestNoRiskExactRejected(
@@ -842,14 +839,69 @@ def evaluate_no_risk_exact_chunk(
         )
         pos_bits_2 = (
             packed_by_indicator[2].pos_bits
-            if arity == 3
+            if arity >= 3
             else np.empty((0, 0), dtype=np.uint64)
         )
-        matrix_bitset_no_risk_long_only(
+        if backend.direction_mode == DIRECTION_MODE_LONG_ONLY and arity in (2, 3):
+            matrix_bitset_no_risk_long_only(
+                combo_idx_by_indicator,
+                packed_by_indicator[0].pos_bits,
+                packed_by_indicator[1].pos_bits,
+                pos_bits_2,
+                np.int32(arity),
+                np.int32(packed_by_indicator[0].signal_length),
+                np.int32(packed_by_indicator[0].word_count),
+                _last_word_mask(packed_by_indicator[0].signal_length),
+                prepared_result.execution_mapping.signal_entry_exec_idx_15m,
+                execution_open_1m,
+                execution_close_1m,
+                np.int32(prepared_result.execution_mapping.t_exec_limit_1m),
+                execution_settings.initial_cash_quote,
+                execution_settings.sizing_mode_code,
+                execution_settings.quote_amount,
+                execution_settings.equity_pct,
+                execution_settings.min_quote,
+                execution_settings.max_quote,
+                execution_settings.fee_rate,
+                execution_settings.slippage_rate,
+                execution_settings.safe_profit_percent,
+                execution_settings.use_profit_lock,
+                BARS_PER_YEAR_EXEC_1M,
+                execution_settings.close_on_end,
+                buffers.total_return_pct,
+                buffers.max_drawdown_pct,
+                buffers.return_over_max_drawdown,
+                buffers.profit_factor,
+                buffers.trade_count,
+                buffers.sharpe_trades,
+                buffers.win_rate_pct,
+                buffers.avg_trade_ret_pct,
+                buffers.avg_trade_exec_bars,
+                buffers.exposure_pct,
+            )
+            return
+        empty_bits = np.empty((0, 0), dtype=np.uint64)
+        pos_bits_3 = packed_by_indicator[3].pos_bits if arity >= 4 else empty_bits
+        pos_bits_4 = packed_by_indicator[4].pos_bits if arity >= 5 else empty_bits
+        pos_bits_5 = packed_by_indicator[5].pos_bits if arity >= 6 else empty_bits
+        neg_bits_2 = packed_by_indicator[2].neg_bits if arity >= 3 else empty_bits
+        neg_bits_3 = packed_by_indicator[3].neg_bits if arity >= 4 else empty_bits
+        neg_bits_4 = packed_by_indicator[4].neg_bits if arity >= 5 else empty_bits
+        neg_bits_5 = packed_by_indicator[5].neg_bits if arity >= 6 else empty_bits
+        matrix_bitset_no_risk(
             combo_idx_by_indicator,
             packed_by_indicator[0].pos_bits,
             packed_by_indicator[1].pos_bits,
             pos_bits_2,
+            pos_bits_3,
+            pos_bits_4,
+            pos_bits_5,
+            packed_by_indicator[0].neg_bits,
+            packed_by_indicator[1].neg_bits,
+            neg_bits_2,
+            neg_bits_3,
+            neg_bits_4,
+            neg_bits_5,
             np.int32(arity),
             np.int32(packed_by_indicator[0].signal_length),
             np.int32(packed_by_indicator[0].word_count),
@@ -870,6 +922,7 @@ def evaluate_no_risk_exact_chunk(
             execution_settings.use_profit_lock,
             BARS_PER_YEAR_EXEC_1M,
             execution_settings.close_on_end,
+            execution_settings.direction_mode_code,
             buffers.total_return_pct,
             buffers.max_drawdown_pct,
             buffers.return_over_max_drawdown,
@@ -2382,7 +2435,7 @@ def _validate_backend_for_exact_scoring(*, backend_id: str, arity: int) -> None:
         MATRIX_BITSET_NO_RISK_V1_BACKEND,
     ):
         return
-    if arity == 3 and backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+    if arity in (3, 6) and backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
         return
     if backend_id == EVENT_SEGMENTS_N_NO_RISK_BACKEND and 1 <= arity <= 10:
         return

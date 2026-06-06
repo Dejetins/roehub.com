@@ -68,6 +68,8 @@ REFERENCE_ONLY_ARITY = 6
 STAGE_04_MVP_ARITIES = (2, 3)
 STAGE_04_MVP_RISK_MODE = "none"
 STAGE_04_MVP_DIRECTION_MODE = "long_only"
+STAGE_05_NO_RISK_HEAVY_ARITY = 6
+STAGE_05_NO_RISK_HEAVY_DIRECTIONS = ("long_only", "long_short_reversal")
 _DEFAULT_API_BASE = "http://127.0.0.1:8000"
 _DEFAULT_COOKIE_NAME = "roehub_session_id"
 _PARITY_FLOAT_TOLERANCE = 1e-5
@@ -118,6 +120,10 @@ def main(argv: list[str] | None = None) -> int:
     reference_runs, excluded = _reference_runs(canonical=canonical, reference=reference)
     if args.stage_04_mvp_rows:
         reference_runs, excluded = _stage_04_mvp_reference_runs(reference=reference)
+    if args.stage_05_no_risk_heavy_rows:
+        reference_runs, excluded = _stage_05_no_risk_heavy_reference_runs(
+            reference=reference
+        )
     if args.smoke_only:
         reference_runs = _smoke_subset(reference_runs)
 
@@ -152,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             "benchmark_top_k": BENCHMARK_TOP_K,
             "only_arity": REFERENCE_ONLY_ARITY,
             "stage_04_mvp_rows": args.stage_04_mvp_rows,
+            "stage_05_no_risk_heavy_rows": args.stage_05_no_risk_heavy_rows,
             "rows_per_indicator": REFERENCE_ROWS_PER_INDICATOR,
             "warmup_rows_per_indicator": REFERENCE_WARMUP_ROWS_PER_INDICATOR,
             "exclude_heaviest_140s_job": True,
@@ -280,6 +287,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stage-04-mvp-rows",
         action="store_true",
         help="Run only none/arity_2..3/long_only rows for matrix bitset Stage 04.",
+    )
+    parser.add_argument(
+        "--stage-05-no-risk-heavy-rows",
+        action="store_true",
+        help=(
+            "Run only none/arity_6 long_only and long_short_reversal rows for "
+            "matrix bitset Stage 05."
+        ),
     )
     parser.add_argument("--allow-backlog", action="store_true")
     parser.add_argument("--no-fail-on-threshold", action="store_true")
@@ -1181,6 +1196,42 @@ def _stage_04_mvp_reference_runs(
         "reason": (
             "stage_04_mvp_rows: run only no-risk long-only arity 2 and 3 rows "
             "for matrix_bitset_no_risk_v1 evidence"
+        ),
+    }
+
+
+def _stage_05_no_risk_heavy_reference_runs(
+    *,
+    reference: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for item in _list(reference.get("no_risk_regression_runs"))
+    ]
+    required = [
+        item
+        for item in accepted_runs
+        if str(item.get("risk_mode")) == STAGE_04_MVP_RISK_MODE
+        and len(cast(Sequence[Any], item.get("indicator_ids", ())))
+        == STAGE_05_NO_RISK_HEAVY_ARITY
+        and str(item.get("direction_mode")) in STAGE_05_NO_RISK_HEAVY_DIRECTIONS
+    ]
+    seen = {str(item.get("direction_mode")) for item in required}
+    missing = [
+        direction
+        for direction in STAGE_05_NO_RISK_HEAVY_DIRECTIONS
+        if direction not in seen
+    ]
+    if missing:
+        raise RuntimeError(f"missing Stage 05 no-risk heavy directions: {missing!r}")
+    return required, {
+        "job_name": None,
+        "risk_mode": STAGE_04_MVP_RISK_MODE,
+        "arity": STAGE_05_NO_RISK_HEAVY_ARITY,
+        "direction_mode": list(STAGE_05_NO_RISK_HEAVY_DIRECTIONS),
+        "reason": (
+            "stage_05_no_risk_heavy_rows: run only no-risk arity 6 long_only "
+            "and long_short_reversal rows for matrix_bitset_no_risk_v1 evidence"
         ),
     }
 
@@ -2421,19 +2472,27 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     artifact_env = _mapping(payload.get("artifact_env"))
     request = _mapping(payload.get("request"))
     stage_04_mvp_rows = bool(request.get("stage_04_mvp_rows"))
+    stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
     title = (
         "# Stage 04 matrix bitset no-risk MVP API-runner benchmark"
         if stage_04_mvp_rows
+        else "# Stage 05 matrix bitset no-risk heavy API-runner benchmark"
+        if stage_05_no_risk_heavy_rows
         else "# Iteration 15 API runner clean arity-6 CPU/memory benchmark"
     )
     intent_scope = (
         "BTCUSDT / 15m / none / arity 2-3 / long_only"
         if stage_04_mvp_rows
+        else "BTCUSDT / 15m / none / arity 6 / long_only + long_short_reversal"
+        if stage_05_no_risk_heavy_rows
         else "BTCUSDT / 15m / arity 6"
     )
     fixture_scope = (
         "- BTCUSDT / 15m / none/arity_2..3/long_only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
         if stage_04_mvp_rows
+        else "- BTCUSDT / 15m / none/arity_6/long_only + "
+        "none/arity_6/long_short_reversal / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
+        if stage_05_no_risk_heavy_rows
         else "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
     )
     intent_text = (
@@ -2441,6 +2500,11 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "heavy child process с 12 Numba threads для Stage 04 "
         "`matrix_bitset_no_risk_v1` MVP rows и сравнить exact scoring с May 2 reference."
         if stage_04_mvp_rows
+        else "Проверить приемочный путь API-created job -> runner -> одноразовый "
+        "heavy child process с 12 Numba threads для Stage 05 "
+        "`matrix_bitset_no_risk_v1` no-risk arity 6 rows и сравнить exact scoring "
+        "с May 2 reference."
+        if stage_05_no_risk_heavy_rows
         else "Проверить приемочный путь API-created job -> runner -> одноразовый "
         "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 reference."
     )

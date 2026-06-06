@@ -621,19 +621,127 @@ def test_no_risk_matrix_bitset_mvp_matches_current_long_only_top_results(
     assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
 
 
-def test_no_risk_matrix_bitset_mvp_rejects_reversal_until_stage_05() -> None:
-    prepared = _prepared_result(indicator_ids=("alpha", "beta"))
+@pytest.mark.parametrize(
+    "signal_row",
+    [
+        pytest.param([1, 1, -1, -1], id="long -> short"),
+        pytest.param([-1, -1, 1, 1], id="short -> long"),
+        pytest.param([1, 1, 0, 0], id="long -> flat"),
+        pytest.param([-1, -1, 0, 0], id="short -> flat"),
+        pytest.param([0, 1, 1, 1], id="flat -> long"),
+        pytest.param([0, -1, -1, -1], id="flat -> short"),
+    ],
+)
+def test_no_risk_matrix_bitset_stage_05_matches_current_reversal_transitions(
+    signal_row: Sequence[int],
+) -> None:
+    prepared = _single_signal_prepared_result(signal_row=signal_row, arity=2)
+    request = _normalized_request(direction_mode="long_short_reversal", top_n=1)
 
-    with pytest.raises(BacktestNoRiskExactRejected, match="long_only"):
-        BacktestNoRiskExactScoringService().execute(
-            prepared_result=prepared,
-            combo_planning_result=_combo_planning_result(
-                prepared=prepared,
-                backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
-                direction_mode="long_short_reversal",
-            ),
-            normalized_request=_normalized_request(direction_mode="long_short_reversal"),
-        )
+    current_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_2_NO_RISK_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+    matrix_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+
+    assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+    assert canonical_no_risk_top_results_payload(matrix_result.top_results) == (
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
+
+
+def test_no_risk_matrix_bitset_stage_05_matches_current_arity6_reversal_top_results() -> None:
+    indicator_ids = tuple(f"indicator_{index}" for index in range(6))
+    prepared = _single_signal_prepared_result(
+        signal_row=[1, 1, -1, -1, 0, 1, 1, -1],
+        arity=6,
+        indicator_ids=indicator_ids,
+    )
+    request = _normalized_request(direction_mode="long_short_reversal", top_n=1)
+
+    current_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+    matrix_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+
+    assert matrix_result.telemetry.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND
+    assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+    assert canonical_no_risk_top_results_payload(matrix_result.top_results) == (
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
+
+
+def test_no_risk_matrix_bitset_stage_05_matches_current_arity6_long_only_top_results() -> None:
+    indicator_ids = tuple(f"indicator_{index}" for index in range(6))
+    prepared = _single_signal_prepared_result(
+        signal_row=[1, 1, 0, 1, 1, 0, 1, 1],
+        arity=6,
+        indicator_ids=indicator_ids,
+    )
+    request = _normalized_request(direction_mode="long_only", top_n=1)
+
+    current_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+            direction_mode="long_only",
+        ),
+        normalized_request=request,
+    )
+    matrix_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            direction_mode="long_only",
+        ),
+        normalized_request=request,
+    )
+
+    assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+    assert canonical_no_risk_top_results_payload(matrix_result.top_results) == (
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
 
 
 def test_no_risk_matrix_bitset_mvp_is_requestable_but_not_default() -> None:
@@ -1101,6 +1209,61 @@ def _execution_sizing_prepared_result() -> BacktestPreparePoolsResult:
         ),
         execution_open_1m=np.asarray([100.0, 100.0, 110.0, 99.0], dtype=np.float32),
         execution_close_1m=np.asarray([100.0, 100.0, 110.0, 120.0], dtype=np.float32),
+    )
+
+
+def _single_signal_prepared_result(
+    *,
+    signal_row: Sequence[int],
+    arity: int,
+    indicator_ids: Sequence[str] | None = None,
+) -> BacktestPreparePoolsResult:
+    resolved_indicator_ids = tuple(
+        indicator_ids or tuple(f"indicator_{index}" for index in range(arity))
+    )
+    assert len(resolved_indicator_ids) == arity
+    pools = tuple(
+        _pool(
+            indicator_id=indicator_id,
+            trade_rows=[signal_row],
+            eval_rows=[signal_row[:-1]],
+        )
+        for indicator_id in resolved_indicator_ids
+    )
+    signal_length = len(signal_row)
+    return BacktestPreparePoolsResult(
+        timeframe="15m",
+        indicator_ids=resolved_indicator_ids,
+        indicator_pools=pools,
+        signal_returns_15m=np.zeros(max(signal_length - 1, 1), dtype=np.float32),
+        execution_mapping=PreparedExecutionMapping(
+            signal_entry_exec_idx_15m=np.arange(signal_length, dtype=np.int32),
+            run_bar_open_1m_idx_15m=np.arange(signal_length, dtype=np.uint32),
+            run_bar_close_1m_idx_15m=np.arange(signal_length, dtype=np.uint32),
+            t_exec_limit_1m=signal_length,
+        ),
+        time_slice_start_15m=0,
+        time_slice_stop_15m=signal_length,
+        trade_T_length=signal_length,
+        eval_T_length=max(signal_length - 1, 0),
+        row_metadata_order_hash="d" * 64,
+        timing=PreparePoolsTiming(
+            stage_name="prepare_pools_core",
+            wall_time_s=0.0,
+            subsegments={"prepare_pools_core": 0.0},
+        ),
+        execution_open_1m=np.linspace(
+            100.0,
+            100.0 + float(signal_length - 1),
+            signal_length,
+            dtype=np.float32,
+        ),
+        execution_close_1m=np.linspace(
+            100.5,
+            100.5 + float(signal_length - 1),
+            signal_length,
+            dtype=np.float32,
+        ),
     )
 
 

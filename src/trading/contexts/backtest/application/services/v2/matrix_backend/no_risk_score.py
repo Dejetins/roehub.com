@@ -300,6 +300,374 @@ def matrix_bitset_no_risk_long_only(
         )
 
 
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def matrix_bitset_no_risk(
+    combo_idx_by_indicator: np.ndarray,
+    pos_bits_0: np.ndarray,
+    pos_bits_1: np.ndarray,
+    pos_bits_2: np.ndarray,
+    pos_bits_3: np.ndarray,
+    pos_bits_4: np.ndarray,
+    pos_bits_5: np.ndarray,
+    neg_bits_0: np.ndarray,
+    neg_bits_1: np.ndarray,
+    neg_bits_2: np.ndarray,
+    neg_bits_3: np.ndarray,
+    neg_bits_4: np.ndarray,
+    neg_bits_5: np.ndarray,
+    arity: np.int32,
+    signal_length: np.int32,
+    word_count: np.int32,
+    last_word_mask: np.uint64,
+    sig_entry_exec_idx: np.ndarray,
+    exec_open_1m: np.ndarray,
+    exec_close_1m: np.ndarray,
+    t_exec: np.int32,
+    init_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    fee_rate: float,
+    slippage_rate: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+    bars_per_year_exec: float,
+    close_on_end: np.int8,
+    direction_mode: np.int8,
+    out_total_return_pct: np.ndarray,
+    out_max_drawdown_pct: np.ndarray,
+    out_return_over_max_drawdown: np.ndarray,
+    out_profit_factor: np.ndarray,
+    out_trade_count: np.ndarray,
+    out_sharpe_trades: np.ndarray,
+    out_win_rate_pct: np.ndarray,
+    out_avg_trade_ret_pct: np.ndarray,
+    out_avg_trade_exec_bars: np.ndarray,
+    out_exposure_pct: np.ndarray,
+) -> None:
+    combo_count = combo_idx_by_indicator.shape[1]
+    for k in nb.prange(combo_count):
+        row_0 = combo_idx_by_indicator[0, k]
+        row_1 = combo_idx_by_indicator[1, k]
+        row_2 = np.int32(0)
+        row_3 = np.int32(0)
+        row_4 = np.int32(0)
+        row_5 = np.int32(0)
+        if arity >= 3:
+            row_2 = combo_idx_by_indicator[2, k]
+        if arity >= 4:
+            row_3 = combo_idx_by_indicator[3, k]
+        if arity >= 5:
+            row_4 = combo_idx_by_indicator[4, k]
+        if arity >= 6:
+            row_5 = combo_idx_by_indicator[5, k]
+
+        available_quote = init_cash_quote
+        safe_quote = 0.0
+        equity = init_cash_quote
+        peak_equity = equity
+        max_drawdown_pct = 0.0
+        gross_profit_quote = 0.0
+        gross_loss_quote = 0.0
+        closed_trade_count = np.int32(0)
+        win_count = np.int32(0)
+        sum_trade_return = 0.0
+        sum_trade_return_squared = 0.0
+        total_trade_return_pct = 0.0
+        total_trade_exec_bars = 0.0
+        exposure_bars = 0.0
+        current_dir = np.int8(0)
+        current_entry = np.int32(0)
+        stopped = False
+        previous_pos_bit = np.uint64(0)
+        previous_neg_bit = np.uint64(0)
+
+        for word_idx in range(word_count):
+            word_mask = ALL_BITS
+            if word_idx == word_count - 1:
+                word_mask = last_word_mask
+            pos_bits = _consensus_word(
+                pos_bits_0,
+                pos_bits_1,
+                pos_bits_2,
+                pos_bits_3,
+                pos_bits_4,
+                pos_bits_5,
+                row_0,
+                row_1,
+                row_2,
+                row_3,
+                row_4,
+                row_5,
+                word_idx,
+                arity,
+            ) & word_mask
+            neg_bits = np.uint64(0)
+            if direction_mode != np.int8(1):
+                neg_bits = _consensus_word(
+                    neg_bits_0,
+                    neg_bits_1,
+                    neg_bits_2,
+                    neg_bits_3,
+                    neg_bits_4,
+                    neg_bits_5,
+                    row_0,
+                    row_1,
+                    row_2,
+                    row_3,
+                    row_4,
+                    row_5,
+                    word_idx,
+                    arity,
+                ) & word_mask
+
+            shifted_pos = (pos_bits << np.uint64(1)) | previous_pos_bit
+            change_bits = pos_bits ^ shifted_pos
+            if direction_mode != np.int8(1):
+                shifted_neg = (neg_bits << np.uint64(1)) | previous_neg_bit
+                change_bits |= neg_bits ^ shifted_neg
+            change_bits &= word_mask
+
+            while change_bits != 0 and not stopped:
+                change_bit = _ctz_u64(change_bits)
+                signal_idx = np.int32(word_idx * BITS_PER_WORD + change_bit)
+                if signal_idx >= signal_length:
+                    stopped = True
+                    break
+                entry_exec = sig_entry_exec_idx[signal_idx]
+                if entry_exec >= t_exec:
+                    stopped = True
+                    break
+
+                bit_mask = np.uint64(1) << np.uint64(change_bit)
+                dirn = np.int8(0)
+                if (pos_bits & bit_mask) != np.uint64(0):
+                    dirn = np.int8(1)
+                elif (
+                    direction_mode != np.int8(1)
+                    and (neg_bits & bit_mask) != np.uint64(0)
+                ):
+                    dirn = np.int8(-1)
+
+                if dirn == 0:
+                    if direction_mode == np.int8(1) and current_dir != 0:
+                        (
+                            available_quote,
+                            safe_quote,
+                            equity,
+                            peak_equity,
+                            max_drawdown_pct,
+                            gross_profit_quote,
+                            gross_loss_quote,
+                            closed_trade_count,
+                            win_count,
+                            sum_trade_return,
+                            sum_trade_return_squared,
+                            total_trade_return_pct,
+                            total_trade_exec_bars,
+                            exposure_bars,
+                        ) = _apply_matrix_trade_to_state(
+                            current_entry,
+                            current_dir,
+                            np.int32(entry_exec),
+                            float(exec_open_1m[entry_exec]),
+                            exec_open_1m,
+                            available_quote,
+                            safe_quote,
+                            equity,
+                            peak_equity,
+                            max_drawdown_pct,
+                            gross_profit_quote,
+                            gross_loss_quote,
+                            closed_trade_count,
+                            win_count,
+                            sum_trade_return,
+                            sum_trade_return_squared,
+                            total_trade_return_pct,
+                            total_trade_exec_bars,
+                            exposure_bars,
+                            init_cash_quote,
+                            sizing_mode_code,
+                            configured_quote_amount,
+                            equity_pct,
+                            min_quote,
+                            max_quote,
+                            fee_rate,
+                            slippage_rate,
+                            safe_profit_percent,
+                            use_profit_lock,
+                        )
+                        current_dir = np.int8(0)
+                        current_entry = np.int32(0)
+                elif current_dir == 0:
+                    current_dir = dirn
+                    current_entry = np.int32(entry_exec)
+                elif dirn != current_dir:
+                    (
+                        available_quote,
+                        safe_quote,
+                        equity,
+                        peak_equity,
+                        max_drawdown_pct,
+                        gross_profit_quote,
+                        gross_loss_quote,
+                        closed_trade_count,
+                        win_count,
+                        sum_trade_return,
+                        sum_trade_return_squared,
+                        total_trade_return_pct,
+                        total_trade_exec_bars,
+                        exposure_bars,
+                    ) = _apply_matrix_trade_to_state(
+                        current_entry,
+                        current_dir,
+                        np.int32(entry_exec),
+                        float(exec_open_1m[entry_exec]),
+                        exec_open_1m,
+                        available_quote,
+                        safe_quote,
+                        equity,
+                        peak_equity,
+                        max_drawdown_pct,
+                        gross_profit_quote,
+                        gross_loss_quote,
+                        closed_trade_count,
+                        win_count,
+                        sum_trade_return,
+                        sum_trade_return_squared,
+                        total_trade_return_pct,
+                        total_trade_exec_bars,
+                        exposure_bars,
+                        init_cash_quote,
+                        sizing_mode_code,
+                        configured_quote_amount,
+                        equity_pct,
+                        min_quote,
+                        max_quote,
+                        fee_rate,
+                        slippage_rate,
+                        safe_profit_percent,
+                        use_profit_lock,
+                    )
+                    current_dir = dirn
+                    current_entry = np.int32(entry_exec)
+
+                change_bits &= change_bits - np.uint64(1)
+
+            if stopped:
+                break
+            previous_pos_bit = (pos_bits >> np.uint64(BITS_PER_WORD - 1)) & np.uint64(1)
+            previous_neg_bit = (neg_bits >> np.uint64(BITS_PER_WORD - 1)) & np.uint64(1)
+
+        if current_dir != 0 and close_on_end == 1 and t_exec > 0:
+            exit_exec_idx = np.int32(t_exec - 1)
+            (
+                available_quote,
+                safe_quote,
+                equity,
+                peak_equity,
+                max_drawdown_pct,
+                gross_profit_quote,
+                gross_loss_quote,
+                closed_trade_count,
+                win_count,
+                sum_trade_return,
+                sum_trade_return_squared,
+                total_trade_return_pct,
+                total_trade_exec_bars,
+                exposure_bars,
+            ) = _apply_matrix_trade_to_state(
+                current_entry,
+                current_dir,
+                exit_exec_idx,
+                float(exec_close_1m[exit_exec_idx]),
+                exec_open_1m,
+                available_quote,
+                safe_quote,
+                equity,
+                peak_equity,
+                max_drawdown_pct,
+                gross_profit_quote,
+                gross_loss_quote,
+                closed_trade_count,
+                win_count,
+                sum_trade_return,
+                sum_trade_return_squared,
+                total_trade_return_pct,
+                total_trade_exec_bars,
+                exposure_bars,
+                init_cash_quote,
+                sizing_mode_code,
+                configured_quote_amount,
+                equity_pct,
+                min_quote,
+                max_quote,
+                fee_rate,
+                slippage_rate,
+                safe_profit_percent,
+                use_profit_lock,
+            )
+
+        _write_final_metrics(
+            k,
+            equity,
+            init_cash_quote,
+            max_drawdown_pct,
+            gross_profit_quote,
+            gross_loss_quote,
+            closed_trade_count,
+            win_count,
+            sum_trade_return,
+            sum_trade_return_squared,
+            total_trade_return_pct,
+            total_trade_exec_bars,
+            exposure_bars,
+            t_exec,
+            bars_per_year_exec,
+            out_total_return_pct,
+            out_max_drawdown_pct,
+            out_return_over_max_drawdown,
+            out_profit_factor,
+            out_trade_count,
+            out_sharpe_trades,
+            out_win_rate_pct,
+            out_avg_trade_ret_pct,
+            out_avg_trade_exec_bars,
+            out_exposure_pct,
+        )
+
+
+@nb.njit(cache=True, inline="always")
+def _consensus_word(
+    bits_0: np.ndarray,
+    bits_1: np.ndarray,
+    bits_2: np.ndarray,
+    bits_3: np.ndarray,
+    bits_4: np.ndarray,
+    bits_5: np.ndarray,
+    row_0: np.int32,
+    row_1: np.int32,
+    row_2: np.int32,
+    row_3: np.int32,
+    row_4: np.int32,
+    row_5: np.int32,
+    word_idx: int,
+    arity: np.int32,
+) -> np.uint64:
+    bits = bits_0[row_0, word_idx] & bits_1[row_1, word_idx]
+    if arity >= 3:
+        bits &= bits_2[row_2, word_idx]
+    if arity >= 4:
+        bits &= bits_3[row_3, word_idx]
+    if arity >= 5:
+        bits &= bits_4[row_4, word_idx]
+    if arity >= 6:
+        bits &= bits_5[row_5, word_idx]
+    return bits
+
+
 @nb.njit(cache=True, inline="always")
 def _mask_from_bit(bit_idx: int) -> np.uint64:
     return ALL_BITS << np.uint64(bit_idx)
@@ -468,6 +836,168 @@ def _apply_long_trade_to_state(
 
 
 @nb.njit(cache=True, inline="always")
+def _apply_matrix_trade_to_state(
+    entry_idx: np.int32,
+    trade_direction: np.int8,
+    exit_exec_idx: np.int32,
+    exit_price_raw: float,
+    exec_open_1m: np.ndarray,
+    available_quote: float,
+    safe_quote: float,
+    equity: float,
+    peak_equity: float,
+    max_drawdown_pct: float,
+    gross_profit_quote: float,
+    gross_loss_quote: float,
+    closed_trade_count: np.int32,
+    win_count: np.int32,
+    sum_trade_return: float,
+    sum_trade_return_squared: float,
+    total_trade_return_pct: float,
+    total_trade_exec_bars: float,
+    exposure_bars: float,
+    init_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    fee_rate: float,
+    slippage_rate: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+) -> tuple[
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    np.int32,
+    np.int32,
+    float,
+    float,
+    float,
+    float,
+    float,
+]:
+    if available_quote <= 0.0:
+        return (
+            available_quote,
+            safe_quote,
+            equity,
+            peak_equity,
+            max_drawdown_pct,
+            gross_profit_quote,
+            gross_loss_quote,
+            closed_trade_count,
+            win_count,
+            sum_trade_return,
+            sum_trade_return_squared,
+            total_trade_return_pct,
+            total_trade_exec_bars,
+            exposure_bars,
+        )
+
+    quote_amount = execution_quote_amount(
+        available_quote,
+        equity,
+        sizing_mode_code,
+        configured_quote_amount,
+        equity_pct,
+        min_quote,
+        max_quote,
+    )
+    if quote_amount <= 0.0:
+        return (
+            available_quote,
+            safe_quote,
+            equity,
+            peak_equity,
+            max_drawdown_pct,
+            gross_profit_quote,
+            gross_loss_quote,
+            closed_trade_count,
+            win_count,
+            sum_trade_return,
+            sum_trade_return_squared,
+            total_trade_return_pct,
+            total_trade_exec_bars,
+            exposure_bars,
+        )
+
+    entry_price_raw = float(exec_open_1m[entry_idx])
+    if trade_direction == 1:
+        entry_fill_price = entry_price_raw * (1.0 + slippage_rate)
+        exit_fill_price = exit_price_raw * (1.0 - slippage_rate)
+    else:
+        entry_fill_price = entry_price_raw * (1.0 - slippage_rate)
+        exit_fill_price = exit_price_raw * (1.0 + slippage_rate)
+
+    qty_base = quote_amount / entry_fill_price
+    entry_fee_quote = quote_amount * fee_rate
+    available_quote -= quote_amount + entry_fee_quote
+
+    exit_quote_amount = qty_base * exit_fill_price
+    exit_fee_quote = exit_quote_amount * fee_rate
+    if trade_direction == 1:
+        gross_pnl_quote = exit_quote_amount - quote_amount
+    else:
+        gross_pnl_quote = quote_amount - exit_quote_amount
+    available_quote += quote_amount + gross_pnl_quote - exit_fee_quote
+    net_pnl_quote = gross_pnl_quote - entry_fee_quote - exit_fee_quote
+
+    if use_profit_lock == 1 and net_pnl_quote > 0.0:
+        locked_profit_quote = net_pnl_quote * (safe_profit_percent / 100.0)
+        available_quote -= locked_profit_quote
+        safe_quote += locked_profit_quote
+
+    equity = available_quote + safe_quote
+    if equity > peak_equity:
+        peak_equity = equity
+    elif peak_equity > 0.0:
+        drawdown_pct = ((peak_equity - equity) / peak_equity) * 100.0
+        if drawdown_pct > max_drawdown_pct:
+            max_drawdown_pct = drawdown_pct
+
+    trade_return_pct = (net_pnl_quote / quote_amount) * 100.0
+    trade_return = net_pnl_quote / quote_amount
+    bars_held = float(exit_exec_idx - entry_idx)
+    if bars_held < 0.0:
+        bars_held = 0.0
+
+    closed_trade_count += 1
+    if net_pnl_quote > 0.0:
+        win_count += 1
+        gross_profit_quote += net_pnl_quote
+    elif net_pnl_quote < 0.0:
+        gross_loss_quote += abs(net_pnl_quote)
+    sum_trade_return += trade_return
+    sum_trade_return_squared += trade_return * trade_return
+    total_trade_return_pct += trade_return_pct
+    total_trade_exec_bars += bars_held
+    exposure_bars += bars_held
+
+    return (
+        available_quote,
+        safe_quote,
+        equity,
+        peak_equity,
+        max_drawdown_pct,
+        gross_profit_quote,
+        gross_loss_quote,
+        closed_trade_count,
+        win_count,
+        sum_trade_return,
+        sum_trade_return_squared,
+        total_trade_return_pct,
+        total_trade_exec_bars,
+        exposure_bars,
+    )
+
+
+@nb.njit(cache=True, inline="always")
 def _trade_sharpe(
     trade_count: np.int32,
     sum_trade_return: float,
@@ -564,4 +1094,4 @@ def _write_final_metrics(
     out_exposure_pct[k] = exposure_pct
 
 
-__all__ = ["matrix_bitset_no_risk_long_only"]
+__all__ = ["matrix_bitset_no_risk", "matrix_bitset_no_risk_long_only"]

@@ -41,6 +41,9 @@ SAMPLE_WARMUP_TOP_N = 1
 MATRIX_BACKEND_MODE_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE"
 MATRIX_BACKEND_MODE_OFF = "off"
 MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
+MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
+    "stage_05_no_risk_reversal_arity6"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,10 +318,12 @@ def _matrix_backend_override(
     if mode not in {
         MATRIX_BITSET_NO_RISK_V1_BACKEND,
         MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+        MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
     }:
         allowed = (
             MATRIX_BACKEND_MODE_OFF,
             MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+            MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
             MATRIX_BITSET_NO_RISK_V1_BACKEND,
         )
         raise ValueError(
@@ -332,7 +337,26 @@ def _matrix_backend_override(
         execution.get("direction_mode") if isinstance(execution, Mapping) else None
     )
     arity = len(prepared_result.indicator_ids)
-    if risk_mode == "none" and direction_mode == "long_only" and arity in (2, 3):
+    if (
+        mode == MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP
+        and risk_mode == "none"
+        and direction_mode == "long_only"
+        and arity in (2, 3)
+    ):
+        return MATRIX_BITSET_NO_RISK_V1_BACKEND
+    if (
+        mode == MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6
+        and risk_mode == "none"
+        and direction_mode in {"long_only", "long_short_reversal"}
+        and arity == 6
+    ):
+        return MATRIX_BITSET_NO_RISK_V1_BACKEND
+    if (
+        mode == MATRIX_BITSET_NO_RISK_V1_BACKEND
+        and risk_mode == "none"
+        and direction_mode in {"long_only", "long_short_reversal"}
+        and arity in (2, 3, 6)
+    ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
     return None
 

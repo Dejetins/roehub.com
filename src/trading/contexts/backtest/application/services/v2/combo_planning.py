@@ -94,7 +94,7 @@ class BacktestBackendRegistry:
                 _BackendDescriptor(
                     backend_id=MATRIX_BITSET_NO_RISK_V1_BACKEND,
                     risk_mode="none",
-                    arities=(2, 3),
+                    arities=(2, 3, 6),
                     role="matrix_mvp",
                     requires_exact_context=False,
                 ),
