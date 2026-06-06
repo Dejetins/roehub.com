@@ -1,0 +1,69 @@
+{
+  "artifacts": {
+    "duplicate_signal_row_ids.u32.npy": {
+      "dtype": "uint32",
+      "shape": [
+        0
+      ]
+    },
+    "duplicate_unique_signal_row_ids.u32.npy": {
+      "dtype": "uint32",
+      "shape": [
+        0
+      ]
+    },
+    "signal_row_hashes.u64.npy": {
+      "dtype": "uint64",
+      "shape": [
+        1176
+      ]
+    },
+    "signals_neg_bits.u64.npy": {
+      "dtype": "uint64",
+      "shape": [
+        1176,
+        4804
+      ]
+    },
+    "signals_pos_bits.u64.npy": {
+      "dtype": "uint64",
+      "shape": [
+        1176,
+        4804
+      ]
+    },
+    "unique_signal_row_ids.u32.npy": {
+      "dtype": "uint32",
+      "shape": [
+        1176
+      ]
+    }
+  },
+  "bit_order": "little_endian_lsb_first_per_uint64_word",
+  "identity": {
+    "artifact_asof_date": "2026-05-30",
+    "exchange": "binance",
+    "indicator_id": "ma.wma",
+    "market_type": "spot",
+    "root_manifest_sha256": "bc9bf0934f903511c9aa259effa27f74ac1e3ccb3a0e5a8525f652729a1cc226",
+    "slot": "slot_b",
+    "slot_generation": 10,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m"
+  },
+  "padding_bits": 58,
+  "padding_policy": "zeroed_trailing_bits",
+  "schema": "backtest_matrix_sidecar_bitsets_v1",
+  "schema_version": 1,
+  "source_manifest_path": "/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/slot_b/signals/15m/ma.wma/manifest.yaml",
+  "source_manifest_sha256": "bb70f70528f553d73e05171c157a693124acc0037aa1472011bb2240a18ba7c9",
+  "source_signal_dtype": "int8",
+  "source_signal_shape": [
+    1176,
+    307398
+  ],
+  "source_signals_path": "/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/slot_b/signals/15m/ma.wma/signals.i8.npy",
+  "source_signals_sha256": "4e974de6a296a31cbbe0e951456d1cdaebf41b912d22ba28168cf0f4d7310ea2",
+  "word_count": 4804,
+  "word_count_formula": "W = ceil(T / 64)"
+}

@@ -110,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     env_file_report = _load_runtime_env_file(args.env_file)
     dsn, filled_dsn_keys = _ensure_postgres_dsn_env()
     artifact_env_report = _ensure_artifact_runtime_env()
+    matrix_sidecar_report = _matrix_sidecar_report(args.matrix_sidecar_artifact_dir)
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -168,7 +169,13 @@ def main(argv: list[str] | None = None) -> int:
             "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
             "cpu_sample_interval_seconds": args.cpu_sample_interval_seconds,
             "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
+            "matrix_sidecar_artifact_dir": (
+                None
+                if args.matrix_sidecar_artifact_dir is None
+                else str(args.matrix_sidecar_artifact_dir)
+            ),
         },
+        "matrix_sidecar": matrix_sidecar_report,
         "excluded_reference_job": excluded,
         "artifact_reference": {
             "artifact_manifest_hash": reference.get("artifact_manifest_hash"),
@@ -304,7 +311,47 @@ def _build_parser() -> argparse.ArgumentParser:
         default=_DEFAULT_CPU_SAMPLE_INTERVAL_SECONDS,
         help="Sample child process CPU with ps at this interval; <=0 disables sampling.",
     )
+    parser.add_argument(
+        "--matrix-sidecar-artifact-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Benchmark/test-only matrix sidecar root. When set, the child process "
+            "loads sidecars via ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR and falls back "
+            "to runtime packing if validation fails."
+        ),
+    )
     return parser
+
+
+def _matrix_sidecar_report(sidecar_dir: Path | None) -> dict[str, Any]:
+    if sidecar_dir is None:
+        return {
+            "enabled": False,
+            "artifact_dir": None,
+            "generation_report": None,
+            "sidecar_generate_ms": None,
+            "fairness_classification": "no_sidecar",
+        }
+    os.environ["ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"] = str(sidecar_dir)
+    report_path = sidecar_dir / "sidecar_generation_report.json"
+    generation_report = _load_json(report_path) if report_path.is_file() else None
+    sidecar_generate_ms = (
+        None
+        if not isinstance(generation_report, Mapping)
+        else generation_report.get("sidecar_generate_ms")
+    )
+    return {
+        "enabled": True,
+        "artifact_dir": str(sidecar_dir),
+        "generation_report": generation_report,
+        "sidecar_generate_ms": sidecar_generate_ms,
+        "fairness_classification": "accepted_for_learning_sidecar_precomputed",
+        "no_advantage_policy": (
+            "Sidecar speedup is benchmark/test-only unless generation cost is included "
+            "or a publisher plan is approved."
+        ),
+    }
 
 
 def _load_runtime_env_file(explicit_env_file: Path | None) -> dict[str, Any]:
@@ -1607,6 +1654,12 @@ def _merged_stage_timings(child_evidence: Sequence[Mapping[str, Any]]) -> dict[s
 _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "artifact_load_ms",
     "signals_pack_ms",
+    "sidecar_load_ms",
+    "sidecar_used",
+    "sidecar_available",
+    "sidecar_fallback_reason",
+    "sidecar_dir",
+    "signals_pack_source",
     "signals_pack_bytes",
     "signals_pack_estimated_peak_bytes",
     "signals_pack_arrays_released",
@@ -2470,6 +2523,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     env_file = _mapping(payload.get("env_file"))
     postgres_env = _mapping(payload.get("postgres_env"))
     artifact_env = _mapping(payload.get("artifact_env"))
+    matrix_sidecar = _mapping(payload.get("matrix_sidecar"))
     request = _mapping(payload.get("request"))
     stage_04_mvp_rows = bool(request.get("stage_04_mvp_rows"))
     stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
@@ -2592,6 +2646,14 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         f"- Filled runtime keys: `{artifact_env.get('filled_keys')}`",
         "- Secret values: not recorded.",
         "",
+        "## Matrix sidecar",
+        "",
+        f"- Enabled: `{'yes' if matrix_sidecar.get('enabled') else 'no'}`",
+        f"- Artifact dir: `{matrix_sidecar.get('artifact_dir')}`",
+        f"- sidecar_generate_ms: `{_fmt_counter(matrix_sidecar.get('sidecar_generate_ms'))}`",
+        f"- Fairness: `{matrix_sidecar.get('fairness_classification')}`",
+        f"- Policy: {matrix_sidecar.get('no_advantage_policy')}",
+        "",
         "## API-runner path",
         "",
         f"- Required jobs: `{len(_list(api_runner.get('jobs')))}`",
@@ -2657,15 +2719,16 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             f"- Required fields: `{len(_list(instrumentation.get('required_fields')))}`",
             "",
             (
-                "| Job | artifact load ms | signal pack ms | signal pack bytes | "
-                "W | padding valid | consensus sample parity | combos | "
+                "| Job | artifact load ms | signal pack source | signal pack ms | "
+                "sidecar load ms | sidecar used | signal pack bytes | W | padding valid | "
+                "consensus sample parity | combos | "
                 "proxy candidates | exact candidates/s | trade-cell evals/s | "
                 "rows after prefilter | unique rows | consensus signatures | "
-                "row signature ms | null fields |"
+                "row signature ms | sidecar fallback | null fields |"
             ),
             (
-                "| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | "
-                "---: | ---: | ---: | ---: | ---: | --- |"
+                "| --- | ---: | --- | ---: | ---: | --- | ---: | ---: | --- | --- | "
+                "---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
             ),
         ]
     )
@@ -2680,7 +2743,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             "| "
             f"`{job.get('job_name')}` | "
             f"{_fmt_counter(counters.get('artifact_load_ms'))} | "
+            f"{_fmt_counter(counters.get('signals_pack_source'))} | "
             f"{_fmt_counter(counters.get('signals_pack_ms'))} | "
+            f"{_fmt_counter(counters.get('sidecar_load_ms'))} | "
+            f"{_fmt_counter(counters.get('sidecar_used'))} | "
             f"{_fmt_counter(counters.get('signals_pack_bytes'))} | "
             f"{_fmt_counter(counters.get('bitset_word_count'))} | "
             f"{_fmt_counter(counters.get('bitset_padding_valid'))} | "
@@ -2693,6 +2759,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             f"{_fmt_counter(counters.get('unique_rows_after_dedup'))} | "
             f"{_fmt_counter(counters.get('consensus_signature_count'))} | "
             f"{_fmt_counter(counters.get('row_signature_ms'))} | "
+            f"{_fmt_counter(counters.get('sidecar_fallback_reason'))} | "
             f"`{_list(row.get('null_fields'))}` |"
         )
     lines.extend(

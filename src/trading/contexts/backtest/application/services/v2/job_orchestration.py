@@ -7,6 +7,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -44,6 +45,7 @@ MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
     "stage_05_no_risk_reversal_arity6"
 )
+MATRIX_SIDECAR_DIR_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,7 +119,10 @@ class BacktestRuntimeJobOrchestrationService:
             row_signature_elapsed_s = time.perf_counter() - row_signature_started
             bitset_pack_started = time.perf_counter()
             bitset_pack_telemetry = build_runtime_bitset_pack_telemetry(
-                prepared_result.indicator_pools
+                prepared_result.indicator_pools,
+                sidecar_artifact_dir=_matrix_sidecar_artifact_dir(),
+                time_slice_start=prepared_result.time_slice_start_15m,
+                time_slice_stop=prepared_result.time_slice_stop_15m,
             )
             bitset_pack_elapsed_s = time.perf_counter() - bitset_pack_started
             _ = scheduling_class, light_max_actual_combinations
@@ -361,6 +366,13 @@ def _matrix_backend_override(
     return None
 
 
+def _matrix_sidecar_artifact_dir() -> Path | None:
+    raw = os.environ.get(MATRIX_SIDECAR_DIR_ENV_KEY, "").strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
 def _stage_timings(
     *,
     prepared_result: Any,
@@ -420,6 +432,12 @@ def _instrumentation_counters(
     return {
         "artifact_load_ms": _seconds_to_ms(artifact_load_s),
         "signals_pack_ms": _seconds_to_ms(bitset_pack_elapsed_s),
+        "sidecar_load_ms": bitset_pack_mapping["sidecar_load_ms"],
+        "sidecar_used": bitset_pack_mapping["sidecar_used"],
+        "sidecar_available": bitset_pack_mapping["sidecar_available"],
+        "sidecar_fallback_reason": bitset_pack_mapping["sidecar_fallback_reason"],
+        "sidecar_dir": bitset_pack_mapping["sidecar_dir"],
+        "signals_pack_source": bitset_pack_mapping["source"],
         "signals_pack_bytes": bitset_pack_mapping["packed_bytes"],
         "signals_pack_estimated_peak_bytes": bitset_pack_mapping["estimated_peak_bytes"],
         "signals_pack_arrays_released": bitset_pack_mapping[

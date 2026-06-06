@@ -743,9 +743,115 @@ benchmark/report semantics `compatible-change`; browser-visible behavior
 only. Stage 07 must not depend on the rejected runtime signature cache and must
 continue to avoid canonical publisher/precompute or manifest changes.
 
+## Stage 07 — sidecar/test bitset artifacts accepted for learning
+
+Stage 07 implemented sidecar/test bitset artifacts outside the canonical
+publisher. The generator writes benchmark-only artifacts under the stage
+evidence directory, one indicator directory per signal matrix:
+
+- `signals_pos_bits.u64.npy`
+- `signals_neg_bits.u64.npy`
+- `signal_row_hashes.u64.npy`
+- `unique_signal_row_ids.u32.npy`
+- `duplicate_signal_row_ids.u32.npy`
+- `duplicate_unique_signal_row_ids.u32.npy`
+- `matrix_sidecar_manifest.json`
+
+No `backtest_artifacts` publisher/precompute modules, canonical
+`manifest.yaml`, `current.yaml`, active slots, public request hash, top-N
+identity, scoring semantics or persisted schema were changed. The runtime
+sidecar path is opt-in through `ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR`; when the
+directory is absent or invalid, bitset telemetry falls back to runtime packing.
+Sidecar use feeds only the existing shadow/test bitset telemetry path, not
+production scoring or top-N selection.
+
+Mac Studio candidate state was measured from checkout base
+`e985b30123ca9070ef5b1fc3227ffef6dd3fdf35` plus dirty Stage 07 files synced
+from local `main` (`b3cf81f46b65a60c1da1268ead8b2a7c7f768a1e`) and generated
+stage evidence. The remote checkout also had unrelated pre-existing untracked
+files outside this stage.
+
+Sidecar generation command:
+
+```bash
+ssh macstudio 'zsh -lc "cd /Users/daniildegtyarev/Projects/roehub.com && \
+  uv run python scripts/backtest/generate_matrix_sidecar_artifacts.py \
+    --artifact-root /opt/roehub/state/backtest_artifacts/v2 \
+    --output-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts \
+    --indicator ma.dema --indicator ma.hma --indicator ma.ema \
+    --indicator ma.sma --indicator ma.wma --indicator ma.rma"'
+```
+
+Final acceptance benchmark command:
+
+```bash
+ssh macstudio 'zsh -lc "cd /Users/daniildegtyarev/Projects/roehub.com && \
+  ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_05_no_risk_reversal_arity6 \
+  uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-05-no-risk-heavy-rows \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final \
+    --matrix-sidecar-artifact-dir docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts"'
+```
+
+Benchmark evidence:
+
+- Sidecar generation/report/manifests:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/`
+- Final API-runner evidence:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/`
+
+The generated sidecar `.npy` payload was about `519M`. The durable stage commit
+keeps the generator, loader, manifests/report and final benchmark evidence; the
+large generated `.npy` files remain local/Mac Studio evidence and are not a
+publisher artifact.
+
+Overall harness gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `api_runner_path.pass` | true |
+| `parity.pass` | true |
+| `performance.pass` | true versus May 2 reference |
+| `instrumentation.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Measured Stage 07 sidecar timings:
+
+| Job | Stage 05 exact s | Stage 07 exact s | Stage 07 sidecar load ms | Stage 07 signal prep ms | Stage 03 runtime pack ms reference |
+|---|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | 1.010 | 1.028 | 81.530 | 102.640 | about 24.5 |
+| `none/arity_6/long_short_reversal` | 2.887 | 2.990 | 75.238 | 97.899 | about 24.5 |
+
+Decision: Stage 07 is `accepted_for_learning`. The sidecar generator, metadata
+schema, source-manifest/source-signal hash validation, dtype/shape/padding
+validation, duplicate-map validation, fallback behavior and benchmark reporting
+are accepted as benchmark/test infrastructure. Sidecar-dependent speedup is not
+accepted: load time is slower than the Stage 03 runtime pack shadow reference,
+and the Stage 05 exact-scoring/service path shows small overhead. Production
+`on` mode remains locked and later stages must not assume sidecar bitsets are a
+speed win unless a separate publisher/no-advantage plan proves it.
+
+Contract impact for committed Stage 07 work: public API `none`; port contract
+`none`; DTO schema `compatible-change` only for additive internal
+instrumentation counters; persisted schema `none`; canonical artifact
+file/manifest schema `none`; config schema `compatible-change` for optional
+`ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR`; request hash/cache identity `none`;
+service-call semantics `none`; benchmark/report semantics `compatible-change`;
+browser-visible behavior `none`.
+
+`next_iteration_allowed` is `true` for Stage 08 TP/SL selected-cell shadow only.
+Stage 08 may use sidecar artifacts as diagnostic/test overlays, but it must not
+write publisher artifacts or treat sidecar loading as an accepted production
+acceleration.
+
 ## Current Execution Handoff
 
-Next executable stage: Stage 07 sidecar/test bitset artifacts.
+Next executable stage: Stage 08 TP/SL selected-cell shadow.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -755,11 +861,11 @@ including `stage06_signature_cache_candidate.patch` for audit context. No Stage
 must not reuse, revive or depend on that candidate unless a new benchmark-gated
 plan explicitly reopens the idea.
 
-Stage 07 may start because the Stage 06 blocker is resolved by rejection with
-clear evidence. Stage 07 must be independent sidecar/test artifact work: source
-canonical artifacts are read-only, sidecars are written only under the stage
-evidence directory or a recorded test overlay, and publisher/precompute/current
-manifest paths remain unchanged.
+Stage 07 is accepted for learning only. It generated and loaded sidecar/test
+bitsets outside the canonical publisher and passed Mac Studio API-runner parity,
+memory, legacy-path and docs-drift gates, but sidecar load was not faster than
+runtime packing. Stage 08 must continue to avoid canonical publisher/precompute
+or manifest changes unless a separate approved publisher plan exists.
 
 ## Stage Ledger
 
@@ -772,8 +878,8 @@ manifest paths remain unchanged.
 | 04 | accepted_for_learning | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; raw performance failed on tiny `none/arity_2/long_only` by about `1.1ms`, while `none/arity_3/long_only` ratio was `2.590`; arity-2 no-advantage is waived for learning progression only; production `on` mode remains locked | true |
 | 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/` | Mac Studio API-runner parity `2/2`, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; `none/arity_6/long_only` ratio `15.543`, `none/arity_6/long_short_reversal` ratio `5.323`; production default remains locked | true |
 | 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted; only evidence/patch retained | true for Stage 07 sidecar/test bitset artifacts only |
-| 07 | planned | Sidecar/test bitset artifacts generated outside publisher: planned generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | planned | Stage 06 cache rejected with clear evidence; Stage 07 may start as an independent sidecar/test-bitset stage and must not depend on rejected cache code | false |
-| 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 | false |
+| 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
+| 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 learning handoff; must not assume sidecar loading is a speed win | false |
 | 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 | false |
 | 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 | false |
 | 11 | planned | Lazy detail reuse of sparse trade tape | planned | Pending Stage 10 | false |

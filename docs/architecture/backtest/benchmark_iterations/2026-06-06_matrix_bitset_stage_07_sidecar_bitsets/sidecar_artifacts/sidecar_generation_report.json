@@ -1,0 +1,90 @@
+{
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "identity": {
+    "artifact_asof_date": "2026-05-30",
+    "exchange": "binance",
+    "market_type": "spot",
+    "root_manifest_sha256": "bc9bf0934f903511c9aa259effa27f74ac1e3ccb3a0e5a8525f652729a1cc226",
+    "slot": "slot_b",
+    "slot_generation": 10,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m"
+  },
+  "indicators": [
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.dema",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.dema",
+      "sidecar_generate_ms": 1268.6792080057785,
+      "signal_length": 307398,
+      "source_manifest_sha256": "f7fa01cb2458b28050d71f72203dfc8eb73df1e870b65854f311d61f6ee3d4be",
+      "source_signals_sha256": "fe78589e085a1b341ca9b0d3c38f98c2be0f044aec86bebde60fa1c6b6a3c953",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    },
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.hma",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.hma",
+      "sidecar_generate_ms": 1286.9603750004899,
+      "signal_length": 307398,
+      "source_manifest_sha256": "f13da72e903bca3f6026ddd9a2d93b0143b05aec6f7fec8a965559bc19a1b581",
+      "source_signals_sha256": "86d6666963f622d6169a93d0d05a0266c2f9c55ed585d46e0377a5055f6ea499",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    },
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.ema",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.ema",
+      "sidecar_generate_ms": 1270.2762090048054,
+      "signal_length": 307398,
+      "source_manifest_sha256": "5e53ca72f79c66654b9b96b722fd44a32652979442ebadde83203f346e982195",
+      "source_signals_sha256": "c276146fdf46f57335aebbedaf8cc6507cb87050c9e96a2952e76c58d70c9fad",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    },
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.sma",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.sma",
+      "sidecar_generate_ms": 1291.7550419952022,
+      "signal_length": 307398,
+      "source_manifest_sha256": "40e52f2dac09215b587bbc6cf67d516e224aae4c8882f24f711f0abbeab18b9e",
+      "source_signals_sha256": "486a577895c7070450b9d638bae26af67dedb4c02f53fdb128f63fb5ef665288",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    },
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.wma",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.wma",
+      "sidecar_generate_ms": 1325.3569999942556,
+      "signal_length": 307398,
+      "source_manifest_sha256": "bb70f70528f553d73e05171c157a693124acc0037aa1472011bb2240a18ba7c9",
+      "source_signals_sha256": "4e974de6a296a31cbbe0e951456d1cdaebf41b912d22ba28168cf0f4d7310ea2",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    },
+    {
+      "duplicate_signal_row_count": 0,
+      "indicator_id": "ma.rma",
+      "rows": 1176,
+      "sidecar_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts/ma.rma",
+      "sidecar_generate_ms": 1290.2745830069762,
+      "signal_length": 307398,
+      "source_manifest_sha256": "da1708ac10e1d37831c60ffca1afa5e7c65948693c90c49b5b457fc97fc035d3",
+      "source_signals_sha256": "3f61965fc6f9b73ab31b8f34055b87ff37f28eb5176c9232be529d92002390f9",
+      "unique_signal_row_count": 1176,
+      "word_count": 4804
+    }
+  ],
+  "output_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/sidecar_artifacts",
+  "schema": "backtest_matrix_sidecar_generation_report_v1",
+  "sidecar_generate_ms": 7882.282499995199
+}
