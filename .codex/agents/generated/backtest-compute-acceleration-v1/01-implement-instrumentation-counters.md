@@ -82,6 +82,11 @@ runtime_env_sources:
   mac_studio_required_runtime_env:
     ROEHUB_ENV: prod
     ROEHUB_BACKTEST_ARTIFACTS_CONFIG: configs/prod/backtest_artifacts.yaml
+  mac_studio_artifact_root: /opt/roehub/state/backtest_artifacts/v2
+  benchmark_env_fallback_order:
+    - "$ROEHUB_ENV_FILE"
+    - /Users/daniildegtyarev/.config/roehub/roehub.env
+    - /etc/roehub/roehub.env
   source_references:
     - infra/macos/launchd/com.roehub.api.plist
     - infra/macos/launchd/com.roehub.backtest-job-runner.plist
@@ -90,6 +95,9 @@ runtime_env_sources:
   required_postgres_env:
     - "STRATEGY_PG_DSN or POSTGRES_DSN or IDENTITY_PG_DSN"
     - "or POSTGRES_DB + POSTGRES_USER + POSTGRES_PASSWORD"
+  benchmark_report_contract:
+    - "Report env file path, runtime key names, and artifact config path only."
+    - "Never print DSN, password, token, API key, or secret values."
   secret_reporting_rule: "Report only key/path presence, never DSN or password values."
 
 required_literals:

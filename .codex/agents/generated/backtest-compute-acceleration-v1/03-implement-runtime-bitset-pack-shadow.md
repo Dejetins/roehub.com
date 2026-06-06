@@ -74,6 +74,10 @@ target_envs:
   - Mac Studio
 
 runtime_env_sources:
+  mac_studio_native_env_file: /Users/daniildegtyarev/.config/roehub/roehub.env
+  docker_env_file: /etc/roehub/roehub.env
+  benchmark_env_file_arg: "--env-file"
+  mac_studio_artifact_root: /opt/roehub/state/backtest_artifacts/v2
   mac_studio_native:
     env_file: /Users/daniildegtyarev/.config/roehub/roehub.env
     launchd_references:
@@ -92,6 +96,7 @@ runtime_env_sources:
     mac_studio_required_runtime_env:
       ROEHUB_ENV: prod
       ROEHUB_BACKTEST_ARTIFACTS_CONFIG: configs/prod/backtest_artifacts.yaml
+    mac_studio_artifact_root: /opt/roehub/state/backtest_artifacts/v2
     fallback_order:
       - "$ROEHUB_ENV_FILE"
       - /Users/daniildegtyarev/.config/roehub/roehub.env
@@ -101,6 +106,9 @@ runtime_env_sources:
       - "or POSTGRES_DB + POSTGRES_USER + POSTGRES_PASSWORD"
       - "ROEHUB_ENV=prod"
       - "ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml"
+    benchmark_report_contract:
+      - "Report env file path, runtime key names, and artifact config path only."
+      - "Never print DSN, password, token, API key, or secret values."
 
 required_literals:
   - "signals_pack_ms"
