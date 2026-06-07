@@ -47,6 +47,9 @@ from scripts.backtest import (
 from scripts.backtest import (
     run_iteration_6_tp_sl_exact_scoring_benchmark as tp_sl_bench,  # noqa: E402,E501
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.tp_sl_cells import (  # noqa: E402,E501
+    TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
+)
 
 DEFAULT_CANONICAL_JSON = Path(
     "docs/architecture/backtest/benchmark_iterations/"
@@ -70,6 +73,11 @@ STAGE_04_MVP_RISK_MODE = "none"
 STAGE_04_MVP_DIRECTION_MODE = "long_only"
 STAGE_05_NO_RISK_HEAVY_ARITY = 6
 STAGE_05_NO_RISK_HEAVY_DIRECTIONS = ("long_only", "long_short_reversal")
+STAGE_08_TP_SL_SELECTED_ARITIES = (1, 2)
+STAGE_08_TP_SL_SELECTED_DIRECTIONS = ("long_only", "long_short_reversal")
+STAGE_08_TP_SL_SELECTED_START_PCT = 2.0
+STAGE_08_TP_SL_SELECTED_STOP_PCT = 5.5
+STAGE_08_TP_SL_SELECTED_STEP_PCT = 0.5
 _DEFAULT_API_BASE = "http://127.0.0.1:8000"
 _DEFAULT_COOKIE_NAME = "roehub_session_id"
 _PARITY_FLOAT_TOLERANCE = 1e-5
@@ -111,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
     dsn, filled_dsn_keys = _ensure_postgres_dsn_env()
     artifact_env_report = _ensure_artifact_runtime_env()
     matrix_sidecar_report = _matrix_sidecar_report(args.matrix_sidecar_artifact_dir)
+    if args.stage_08_tp_sl_selected_cells:
+        os.environ[TP_SL_SELECTED_CELL_SHADOW_ENV_KEY] = "1"
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -123,6 +133,10 @@ def main(argv: list[str] | None = None) -> int:
         reference_runs, excluded = _stage_04_mvp_reference_runs(reference=reference)
     if args.stage_05_no_risk_heavy_rows:
         reference_runs, excluded = _stage_05_no_risk_heavy_reference_runs(
+            reference=reference
+        )
+    if args.stage_08_tp_sl_selected_cells:
+        reference_runs, excluded = _stage_08_tp_sl_selected_reference_runs(
             reference=reference
         )
     if args.smoke_only:
@@ -160,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
             "only_arity": REFERENCE_ONLY_ARITY,
             "stage_04_mvp_rows": args.stage_04_mvp_rows,
             "stage_05_no_risk_heavy_rows": args.stage_05_no_risk_heavy_rows,
+            "stage_08_tp_sl_selected_cells": args.stage_08_tp_sl_selected_cells,
+            "tp_sl_selected_cell_shadow_env_key": TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
             "rows_per_indicator": REFERENCE_ROWS_PER_INDICATOR,
             "warmup_rows_per_indicator": REFERENCE_WARMUP_ROWS_PER_INDICATOR,
             "exclude_heaviest_140s_job": True,
@@ -216,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
             poll_interval_seconds=args.poll_interval_seconds,
             system_memory_cleanup_wait_seconds=args.system_memory_cleanup_wait_seconds,
             cpu_sample_interval_seconds=args.cpu_sample_interval_seconds,
+            stage_08_tp_sl_selected_cells=args.stage_08_tp_sl_selected_cells,
         )
         payload["api_runner_path"] = {
             "runner_entrypoint": "BacktestJobWorkerUseCase.run_next",
@@ -301,6 +318,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Run only none/arity_6 long_only and long_short_reversal rows for "
             "matrix bitset Stage 05."
+        ),
+    )
+    parser.add_argument(
+        "--stage-08-tp-sl-selected-cells",
+        action="store_true",
+        help=(
+            "Run only small TP/SL selected-cell rows with an 8x8 grid and "
+            "ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW enabled."
         ),
     )
     parser.add_argument("--allow-backlog", action="store_true")
@@ -536,11 +561,16 @@ def _run_reference_jobs(
     poll_interval_seconds: float,
     system_memory_cleanup_wait_seconds: float,
     cpu_sample_interval_seconds: float,
+    stage_08_tp_sl_selected_cells: bool = False,
 ) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for index, reference_run in enumerate(reference_runs, start=1):
         job_name = _reference_job_name(run=reference_run)
-        request = _request_for_reference_run(canonical=canonical, run=reference_run)
+        request = _request_for_reference_run(
+            canonical=canonical,
+            run=reference_run,
+            stage_08_tp_sl_selected_cells=stage_08_tp_sl_selected_cells,
+        )
         created = client.request_json(
             "POST",
             "/backtests/jobs",
@@ -577,6 +607,7 @@ def _run_reference_jobs(
             api_top=top,
             child_evidence=child_evidence,
             reference_run=reference_run,
+            stage_08_tp_sl_selected_cells=stage_08_tp_sl_selected_cells,
         )
         stage_timings = _merged_stage_timings(child_evidence)
         instrumentation_counters = _merged_instrumentation_counters(child_evidence)
@@ -1283,6 +1314,50 @@ def _stage_05_no_risk_heavy_reference_runs(
     }
 
 
+def _stage_08_tp_sl_selected_reference_runs(
+    *,
+    reference: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for item in _list(reference.get("tp_sl_regression_runs"))
+    ]
+    required = [
+        item
+        for item in accepted_runs
+        if str(item.get("risk_mode")) == "tp_sl_grid"
+        and len(cast(Sequence[Any], item.get("indicator_ids", ())))
+        in STAGE_08_TP_SL_SELECTED_ARITIES
+        and str(item.get("direction_mode")) in STAGE_08_TP_SL_SELECTED_DIRECTIONS
+    ]
+    by_key = {
+        (
+            len(cast(Sequence[Any], item.get("indicator_ids", ()))),
+            str(item.get("direction_mode")),
+        ): item
+        for item in required
+    }
+    wanted = (
+        (STAGE_08_TP_SL_SELECTED_ARITIES[0], STAGE_08_TP_SL_SELECTED_DIRECTIONS[0]),
+        (STAGE_08_TP_SL_SELECTED_ARITIES[1], STAGE_08_TP_SL_SELECTED_DIRECTIONS[1]),
+    )
+    missing = [key for key in wanted if key not in by_key]
+    if missing:
+        raise RuntimeError(f"missing Stage 08 TP/SL selected reference rows: {missing!r}")
+    return [by_key[key] for key in wanted], {
+        "job_name": None,
+        "risk_mode": "tp_sl_grid",
+        "arity": list(STAGE_08_TP_SL_SELECTED_ARITIES),
+        "direction_mode": list(STAGE_08_TP_SL_SELECTED_DIRECTIONS),
+        "tp_count <= 8": True,
+        "sl_count <= 8": True,
+        "reason": (
+            "stage_08_tp_sl_selected_cells: run small TP/SL selected-cell grid "
+            "with shadow parity and by-entry layout evidence"
+        ),
+    }
+
+
 def _smoke_subset(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     wanted = {
         ("none", 1, "long_only"),
@@ -1310,6 +1385,7 @@ def _request_for_reference_run(
     canonical: Mapping[str, Any],
     run: Mapping[str, Any],
     rows_per_indicator: int | None = REFERENCE_ROWS_PER_INDICATOR,
+    stage_08_tp_sl_selected_cells: bool = False,
 ) -> dict[str, Any]:
     risk_mode = str(run["risk_mode"])
     arity = len(cast(Sequence[Any], run.get("indicator_ids", ())))
@@ -1335,8 +1411,29 @@ def _request_for_reference_run(
         )
     else:
         request = dict(request)
+    if stage_08_tp_sl_selected_cells and risk_mode == "tp_sl_grid":
+        request = _with_stage_08_selected_tp_sl_grid(request=request)
     request["top_n"] = REQUEST_TOP_N
     return request
+
+
+def _with_stage_08_selected_tp_sl_grid(*, request: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(request)
+    risk = dict(_mapping(out.get("risk")))
+    risk["tp"] = {
+        "enabled": True,
+        "start_pct": STAGE_08_TP_SL_SELECTED_START_PCT,
+        "stop_pct": STAGE_08_TP_SL_SELECTED_STOP_PCT,
+        "step_pct": STAGE_08_TP_SL_SELECTED_STEP_PCT,
+    }
+    risk["sl"] = {
+        "enabled": True,
+        "start_pct": STAGE_08_TP_SL_SELECTED_START_PCT,
+        "stop_pct": STAGE_08_TP_SL_SELECTED_STOP_PCT,
+        "step_pct": STAGE_08_TP_SL_SELECTED_STEP_PCT,
+    }
+    out["risk"] = risk
+    return out
 
 
 def _with_limited_indicator_windows(
@@ -1407,10 +1504,12 @@ def _compare_reference_results(
     api_top: Mapping[str, Any],
     child_evidence: Sequence[Mapping[str, Any]],
     reference_run: Mapping[str, Any],
+    stage_08_tp_sl_selected_cells: bool = False,
 ) -> dict[str, Any]:
     items = [cast(Mapping[str, Any], item) for item in _list(api_top.get("items"))]
     diagnostics = _latest_exact_diagnostics(child_evidence=child_evidence)
     telemetry = _mapping(diagnostics.get("telemetry", {}))
+    selected_cell_shadow = _mapping(diagnostics.get("tp_sl_selected_cells"))
     top_results_sample = [
         cast(Mapping[str, Any], item)
         for item in _list(diagnostics.get("top_results_sample"))
@@ -1423,7 +1522,7 @@ def _compare_reference_results(
     quality_gate_enabled = _quality_gate_enabled(telemetry=telemetry)
     sample_mismatches = (
         []
-        if quality_gate_enabled
+        if quality_gate_enabled or stage_08_tp_sl_selected_cells
         else _compare_sample_metrics(
             telemetry=telemetry,
             reference_run=reference_run,
@@ -1435,7 +1534,7 @@ def _compare_reference_results(
     ]
     accepted_top_mismatches = (
         []
-        if quality_gate_enabled
+        if quality_gate_enabled or stage_08_tp_sl_selected_cells
         else _compare_top_result_samples(
             actual_items=top_results_sample,
             expected_items=reference_top_results,
@@ -1444,7 +1543,7 @@ def _compare_reference_results(
     )
     api_child_mismatches = (
         []
-        if quality_top_zero
+        if quality_top_zero or stage_08_tp_sl_selected_cells
         else _compare_top_result_samples(
             actual_items=items,
             expected_items=top_results_sample[:BENCHMARK_TOP_K],
@@ -1454,7 +1553,20 @@ def _compare_reference_results(
     api_shape_pass = int(api_top.get("_status") or 200) == 200 and (
         bool(items) or quality_top_zero
     )
-    accepted_top_required = bool(reference_top_results) and not quality_gate_enabled
+    selected_cell_pass = (
+        not stage_08_tp_sl_selected_cells
+        or (
+            selected_cell_shadow.get("status") == "passed"
+            and selected_cell_shadow.get("parity_pass") is True
+            and selected_cell_shadow.get("tp_count") <= 8
+            and selected_cell_shadow.get("sl_count") <= 8
+        )
+    )
+    accepted_top_required = (
+        bool(reference_top_results)
+        and not quality_gate_enabled
+        and not stage_08_tp_sl_selected_cells
+    )
     accepted_top_pass = not accepted_top_required or not accepted_top_mismatches
     pass_value = (
         api_shape_pass
@@ -1462,9 +1574,11 @@ def _compare_reference_results(
         and not sample_mismatches
         and accepted_top_pass
         and not api_child_mismatches
+        and selected_cell_pass
     )
     return {
         "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+        "stage_08_tp_sl_selected_cells": stage_08_tp_sl_selected_cells,
         "api_items": len(items),
         "api_shape_pass": api_shape_pass,
         "exact_telemetry": {
@@ -1492,6 +1606,8 @@ def _compare_reference_results(
         "accepted_top_results_required": accepted_top_required,
         "accepted_top_results_mismatches": accepted_top_mismatches,
         "api_child_top_mismatches": api_child_mismatches,
+        "selected_cell_shadow": selected_cell_shadow,
+        "selected_cell_shadow_pass": selected_cell_pass,
         "pass": pass_value,
     }
 
@@ -1690,6 +1806,11 @@ _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "tp_count",
     "sl_count",
     "tp_sl_cells",
+    "tp_sl_selected_cell_shadow_status",
+    "tp_sl_selected_cell_parity_pass",
+    "tp_sl_selected_cell_scores",
+    "tp_sl_selected_cell_elapsed_ms",
+    "tp_sl_by_entry_selected_arrays_bytes",
     "exact_candidates_per_sec",
     "trade_cell_evals_per_sec",
 )
@@ -1907,6 +2028,7 @@ def _performance_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 def _instrumentation_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     missing_by_job: dict[str, list[str]] = {}
+    failed_selected_cell_shadow_jobs: list[str] = []
     rows = []
     for job in jobs:
         job_name = str(job.get("job_name"))
@@ -1930,13 +2052,19 @@ def _instrumentation_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any
         )
         if missing_fields:
             missing_by_job[job_name] = missing_fields
+        if counters.get("tp_sl_selected_cell_shadow_status") is not None and (
+            counters.get("tp_sl_selected_cell_shadow_status") != "passed"
+            or counters.get("tp_sl_selected_cell_parity_pass") not in {True, "True"}
+        ):
+            failed_selected_cell_shadow_jobs.append(job_name)
     return {
         "schema": "backtest_stage_instrumentation_summary_v1",
         "required_fields": list(_INSTRUMENTATION_COUNTER_FIELDS),
         "job_count": len(jobs),
         "rows": rows,
         "missing_by_job": missing_by_job,
-        "pass": not missing_by_job,
+        "failed_selected_cell_shadow_jobs": failed_selected_cell_shadow_jobs,
+        "pass": not missing_by_job and not failed_selected_cell_shadow_jobs,
     }
 
 
@@ -2257,6 +2385,7 @@ def _overall_pass(payload: Mapping[str, Any]) -> bool:
             "api_runner_path",
             "parity",
             "performance",
+            "instrumentation",
             "memory_release",
             "mixed_scheduler_smoke",
             "lazy_cache_hit_memory",
@@ -2527,11 +2656,14 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     request = _mapping(payload.get("request"))
     stage_04_mvp_rows = bool(request.get("stage_04_mvp_rows"))
     stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
+    stage_08_tp_sl_selected_cells = bool(request.get("stage_08_tp_sl_selected_cells"))
     title = (
         "# Stage 04 matrix bitset no-risk MVP API-runner benchmark"
         if stage_04_mvp_rows
         else "# Stage 05 matrix bitset no-risk heavy API-runner benchmark"
         if stage_05_no_risk_heavy_rows
+        else "# Stage 08 TP/SL selected-cell API-runner benchmark"
+        if stage_08_tp_sl_selected_cells
         else "# Iteration 15 API runner clean arity-6 CPU/memory benchmark"
     )
     intent_scope = (
@@ -2539,6 +2671,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_04_mvp_rows
         else "BTCUSDT / 15m / none / arity 6 / long_only + long_short_reversal"
         if stage_05_no_risk_heavy_rows
+        else "BTCUSDT / 15m / tp_sl_grid / selected 8x8 cells"
+        if stage_08_tp_sl_selected_cells
         else "BTCUSDT / 15m / arity 6"
     )
     fixture_scope = (
@@ -2547,6 +2681,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         else "- BTCUSDT / 15m / none/arity_6/long_only + "
         "none/arity_6/long_short_reversal / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
         if stage_05_no_risk_heavy_rows
+        else "- BTCUSDT / 15m / tp_sl_grid selected `tp_count <= 8`, "
+        "`sl_count <= 8` / long_only + long_short_reversal / REQUEST_TOP_N = 50 / "
+        "BENCHMARK_TOP_K = 5"
+        if stage_08_tp_sl_selected_cells
         else "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
     )
     intent_text = (
@@ -2559,6 +2697,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "`matrix_bitset_no_risk_v1` no-risk arity 6 rows и сравнить exact scoring "
         "с May 2 reference."
         if stage_05_no_risk_heavy_rows
+        else "Проверить Stage 08 TP/SL selected-cell shadow: parity для `tp_count <= 8` "
+        "и `sl_count <= 8`, правило `SL wins`, by-entry hit-times layout counters "
+        "и отсутствие production top-N feed из shadow path."
+        if stage_08_tp_sl_selected_cells
         else "Проверить приемочный путь API-created job -> runner -> одноразовый "
         "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 reference."
     )

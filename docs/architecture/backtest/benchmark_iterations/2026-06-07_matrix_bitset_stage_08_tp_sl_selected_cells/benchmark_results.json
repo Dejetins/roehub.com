@@ -1,0 +1,2973 @@
+{
+  "api_base": "http://127.0.0.1:8000",
+  "api_runner_path": {
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "jobs": [
+      {
+        "api_top_count": 6,
+        "arity": 1,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "hit_times_subset",
+                  "tp_sl_diff_buffers",
+                  "score_arrays",
+                  "selected_top_rows",
+                  "heap"
+                ],
+                "cleanup_duration_s": 0.00011704201460815966,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 6,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 6,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 6,
+                "proxy_candidates_selected": 6,
+                "proxy_candidates_valid": 6,
+                "stage_timings": {
+                  "build_exact_context": 0.0005244170024525374,
+                  "build_proxy_context": 7.875001756474376e-06,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 6
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 6,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 6,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "exact_consensus_enumerated",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 6,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 6,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_logical_name": "event_segments_1_tp_sl_15m_grid",
+                "best_cell_equal": null,
+                "direction_mode": "long_only",
+                "enabled": false,
+                "first_mismatch": null,
+                "max_abs_return_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null,
+                "valid_tp_sl_indexes": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 6,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 1641894,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 328416,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 6,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 1,
+                "backend_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_logical_name": "event_segments_1_tp_sl_15m_grid",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_only",
+                "exact_candidates_evaluated": 6,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct",
+                  "best_tp_pct",
+                  "best_sl_pct"
+                ],
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 0,
+                "quality_candidates_heap_eligible": 6,
+                "request_top_n": 50,
+                "risk_mode": "tp_sl_grid",
+                "sample_metrics": {
+                  "best_sl_pct": 5.0,
+                  "best_tp_pct": 5.5,
+                  "total_return_pct": -100.0,
+                  "trade_count": 41393.0
+                },
+                "stage_timings": {
+                  "exact_scoring": 0.0028804169851355255,
+                  "heap_update": 4.254200030118227e-05,
+                  "tp_sl_exact_boundary": 0.0020092079939786345,
+                  "tp_sl_exact_scoring": 0.0028804169851355255,
+                  "tp_sl_full_metrics_second_pass": 0.7943188330100384
+                },
+                "status": "scored",
+                "top_results_count": 6
+              },
+              "top_results_sample": [
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 7,
+                  "indicator_rows": {
+                    "ma.dema": 2
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 2,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 2,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 7
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 3.0662467663929815,
+                    "avg_trade_ret_pct": -0.15035626387134057,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 5.5,
+                    "exposure_pct": 36.02129936709697,
+                    "max_drawdown_pct": 100.0,
+                    "profit_factor": 0.421632506540432,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -17.004509631820884,
+                    "total_return_pct": -100.0,
+                    "trade_count": 35564.0,
+                    "win_rate_pct": 21.029692947924868
+                  },
+                  "rank": 1,
+                  "score": -100.0
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 7,
+                  "indicator_rows": {
+                    "ma.dema": 3
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 3,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 3,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 8
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 3.2648871865461726,
+                    "avg_trade_ret_pct": -0.14935366326739918,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 5.5,
+                    "exposure_pct": 36.04045822707874,
+                    "max_drawdown_pct": 100.0,
+                    "profit_factor": 0.42915391077686205,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -15.889428608296205,
+                    "total_return_pct": -100.0,
+                    "trade_count": 33418.0,
+                    "win_rate_pct": 20.973726734095397
+                  },
+                  "rank": 2,
+                  "score": -100.0
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 7,
+                  "indicator_rows": {
+                    "ma.dema": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 4,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 4,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 3.455276827568732,
+                    "avg_trade_ret_pct": -0.1481993468575107,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 5.5,
+                    "exposure_pct": 36.03517302432515,
+                    "max_drawdown_pct": 100.0,
+                    "profit_factor": 0.43417451391815814,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -14.851648494895684,
+                    "total_return_pct": -100.0,
+                    "trade_count": 31572.0,
+                    "win_rate_pct": 20.844419105536552
+                  },
+                  "rank": 3,
+                  "score": -100.0
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 7,
+                  "indicator_rows": {
+                    "ma.dema": 5
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 5,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 3.63561352142667,
+                    "avg_trade_ret_pct": -0.14764359658851473,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 5.5,
+                    "exposure_pct": 36.09529220564724,
+                    "max_drawdown_pct": 100.0,
+                    "profit_factor": 0.45646953746738117,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -14.160796007587527,
+                    "total_return_pct": -100.0,
+                    "trade_count": 30056.0,
+                    "win_rate_pct": 20.77122704285334
+                  },
+                  "rank": 4,
+                  "score": -100.0
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 7,
+                  "indicator_rows": {
+                    "ma.dema": 0
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 0,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 0,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 5
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 2.6351557026550383,
+                    "avg_trade_ret_pct": -0.14986064772964064,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 5.5,
+                    "exposure_pct": 36.03087879708785,
+                    "max_drawdown_pct": 100.0,
+                    "profit_factor": 0.4129616079967502,
+                    "return_over_max_drawdown": -1.0,
+                    "sharpe_trades": -19.66953961347067,
+                    "total_return_pct": -100.0,
+                    "trade_count": 41393.0,
+                    "win_rate_pct": 21.643756190660255
+                  },
+                  "rank": 5,
+                  "score": -100.0
+                }
+              ],
+              "tp_sl_selected_cells": {
+                "best_cell_equal": true,
+                "by_entry_layout": {
+                  "arrays": {
+                    "long_sl_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        55823,
+                        8
+                      ]
+                    },
+                    "long_tp_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        55823,
+                        8
+                      ]
+                    },
+                    "short_sl_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        55823,
+                        8
+                      ]
+                    },
+                    "short_tp_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        55823,
+                        8
+                      ]
+                    }
+                  },
+                  "materialize_ms": 2.1245410025585443,
+                  "required_sidecar_names": [
+                    "long_tp_by_entry.u32.npy",
+                    "long_sl_by_entry.u32.npy",
+                    "short_tp_by_entry.u32.npy",
+                    "short_sl_by_entry.u32.npy"
+                  ],
+                  "schema": "backtest_tp_sl_by_entry_hit_times_layout_v1",
+                  "selected_arrays_bytes": 7145344,
+                  "selected_entry_count": 55823,
+                  "sidecar_policy": "job-local selected arrays only; no publisher or manifest write",
+                  "sl_count": 8,
+                  "tp_count": 8
+                },
+                "candidate_count": 6,
+                "elapsed_ms": 383.13079200452194,
+                "enabled": true,
+                "first_mismatch": null,
+                "limit": {
+                  "sl_count <= 8": true,
+                  "tp_count <= 8": true
+                },
+                "max_abs_return_diff_pct": 0.0,
+                "parity_pass": true,
+                "production_topn_feed": "current_path_only",
+                "schema": "backtest_tp_sl_selected_cell_shadow_v1",
+                "selected_cell_scores": 384,
+                "skip_reason": null,
+                "sl_count": 8,
+                "sl_wins_tie_rule": "SL wins",
+                "status": "passed",
+                "tp_count": 8,
+                "tp_sl_cells": 64,
+                "trade_count_equal": true,
+                "trade_tape": {
+                  "candidate_count": 6,
+                  "long_trade_count": 210113,
+                  "sample": [
+                    {
+                      "entry_abs_max": 302725,
+                      "entry_abs_min": 83822,
+                      "local_indices": [
+                        0
+                      ],
+                      "long_trade_count": 41393,
+                      "short_trade_count": 0,
+                      "trade_count": 41393
+                    },
+                    {
+                      "entry_abs_max": 302725,
+                      "entry_abs_min": 83822,
+                      "local_indices": [
+                        1
+                      ],
+                      "long_trade_count": 38110,
+                      "short_trade_count": 0,
+                      "trade_count": 38110
+                    },
+                    {
+                      "entry_abs_max": 302725,
+                      "entry_abs_min": 83823,
+                      "local_indices": [
+                        2
+                      ],
+                      "long_trade_count": 35564,
+                      "short_trade_count": 0,
+                      "trade_count": 35564
+                    },
+                    {
+                      "entry_abs_max": 302725,
+                      "entry_abs_min": 83823,
+                      "local_indices": [
+                        3
+                      ],
+                      "long_trade_count": 33418,
+                      "short_trade_count": 0,
+                      "trade_count": 33418
+                    },
+                    {
+                      "entry_abs_max": 302725,
+                      "entry_abs_min": 83823,
+                      "local_indices": [
+                        4
+                      ],
+                      "long_trade_count": 31572,
+                      "short_trade_count": 0,
+                      "trade_count": 31572
+                    }
+                  ],
+                  "schema": "backtest_tp_sl_sparse_trade_tape_v1",
+                  "selected_entry_count": 55823,
+                  "selected_entry_max": 302725,
+                  "selected_entry_min": 83822,
+                  "short_trade_count": 0,
+                  "trade_count": 210113
+                }
+              }
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 73.77754198387265,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 6,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 6,
+              "candidates_after_proxy": 6,
+              "combo_count_planned": 6,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 6,
+              "consensus_signature_mode": "exact_consensus_enumerated",
+              "duplicate_signal_row_ids": {
+                "ma.dema": []
+              },
+              "exact_candidates": 6,
+              "exact_candidates_per_sec": 2083.0317384473055,
+              "exact_scoring_ms": 2.8804169851355255,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 12.039624998578802,
+              "rows_after_prefilter": 6,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 328416,
+              "signals_pack_estimated_peak_bytes": 1641894,
+              "signals_pack_ms": 31.324124982347712,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": 8,
+              "top_result_assembly_ms": 1.1949170148000121,
+              "tp_count": 8,
+              "tp_sl_by_entry_selected_arrays_bytes": 7145344,
+              "tp_sl_cells": 64,
+              "tp_sl_exact_scoring_ms": 2.8804169851355255,
+              "tp_sl_selected_cell_elapsed_ms": 383.13079200452194,
+              "tp_sl_selected_cell_parity_pass": true,
+              "tp_sl_selected_cell_scores": 384,
+              "tp_sl_selected_cell_shadow_status": "passed",
+              "trade_cell_evals_per_sec": 133314.03126062755,
+              "unique_rows_after_dedup": 6
+            },
+            "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 2.135791,
+              "exit_code": 0,
+              "finished_at": "2026-06-07T11:41:16.905692Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 89602,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 458752,
+              "parent_rss_after_bytes": 118423552,
+              "parent_rss_before_bytes": 117964800,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 267059200,
+              "pid": 89626,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-07T11:41:14.769901Z",
+              "stderr_tail": "2026-06-07 14:41:15,071 INFO __main__ backtest child process started: job_id=d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-07 14:41:16,759 INFO __main__ backtest child process finished: job_id=d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 status=succeeded elapsed_seconds=1.688\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.00847362499916926,
+              "artifact_array_open": 0.00847362499916926,
+              "artifact_context_resolve": 0.06530391698470339,
+              "artifact_manifest_load": 0.06530391698470339,
+              "build_exact_context": 0.0005244170024525374,
+              "build_proxy_context": 7.875001756474376e-06,
+              "combo_iteration": 0.0,
+              "exact_scoring": 0.0028804169851355255,
+              "heap_update": 4.254200030118227e-05,
+              "load_hit_times": 0.014442583022173494,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.07713024999247864,
+              "prepare_pools_total": 0.16371062499820255,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0009138750028796494,
+              "row_prefilter": 0.0741355000063777,
+              "sample_warmup": 0.1792351669864729,
+              "segment_build": 0.0026872080052271485,
+              "service_total_without_warmup": 1.286659000965301,
+              "service_wall_clock_s": 1.6526503329805564,
+              "signal_row_selection": 0.00030174999847076833,
+              "time_range_slice": 0.0009138750028796494,
+              "top_result_assembly": 0.0011949170148000121,
+              "tp_sl_exact_boundary": 0.0020092079939786345,
+              "tp_sl_exact_scoring": 0.0028804169851355255,
+              "tp_sl_full_metrics_second_pass": 0.7943188330100384,
+              "tp_sl_grid_validation": 0.0010096249752677977
+            },
+            "status": "succeeded",
+            "summary_hash": "533f9793a9a21f6b7c29e640bcd4dc665d934aa916245e4ac391f96106c101f4",
+            "top_variants_count": 6
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            89626
+          ],
+          "max_cpu_percent": 98.0,
+          "mean_core_equivalent": 0.98,
+          "mean_cpu_percent": 98.0,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 0.98,
+          "p50_cpu_percent": 98.0,
+          "p95_core_equivalent": 0.98,
+          "p95_cpu_percent": 98.0,
+          "peak_rss_bytes": 254509056,
+          "sample_count": 1,
+          "sample_interval_seconds": 1.0,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 98.0,
+              "mem_percent": 0.4,
+              "pid": 89626,
+              "ppid": 89602,
+              "rss_bytes": 254509056,
+              "timestamp": "2026-06-07T11:41:15.809260+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_only",
+        "index": 1,
+        "instrumentation_counters": {
+          "artifact_load_ms": 73.77754198387265,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 6,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 6,
+          "candidates_after_proxy": 6,
+          "combo_count_planned": 6,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 6,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': []}",
+          "exact_candidates": 6,
+          "exact_candidates_per_sec": 2083.0317384473055,
+          "exact_scoring_ms": 2.8804169851355255,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 12.039624998578802,
+          "rows_after_prefilter": 6,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 328416,
+          "signals_pack_estimated_peak_bytes": 1641894,
+          "signals_pack_ms": 31.324124982347712,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 8,
+          "top_result_assembly_ms": 1.1949170148000121,
+          "tp_count": 8,
+          "tp_sl_by_entry_selected_arrays_bytes": 7145344,
+          "tp_sl_cells": 64,
+          "tp_sl_exact_scoring_ms": 2.8804169851355255,
+          "tp_sl_selected_cell_elapsed_ms": 383.13079200452194,
+          "tp_sl_selected_cell_parity_pass": "True",
+          "tp_sl_selected_cell_scores": 384,
+          "tp_sl_selected_cell_shadow_status": "passed",
+          "trade_cell_evals_per_sec": 133314.03126062755,
+          "unique_rows_after_dedup": 6
+        },
+        "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+        "job_name": "tp_sl_grid/arity_1/long_only",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-07T11:41:16.905692Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 118423552,
+              "parent_rss_before_bytes": 117964800,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 267059200,
+              "pid": 89626,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 458752,
+              "started_at": "2026-06-07T11:41:14.769901Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 26241236992,
+            "available": true,
+            "before_bytes": 26224820224,
+            "delayed_bytes": 26261929984,
+            "immediate_delta_bytes": 16416768,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 37109760,
+            "wait_seconds": 30.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 6,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 1,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_only",
+            "exact_candidates_evaluated": 6,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 0,
+            "quality_candidates_heap_eligible": 6,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "tp_sl_grid",
+            "top_results_count": 6
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {
+            "best_cell_equal": true,
+            "by_entry_layout": {
+              "arrays": {
+                "long_sl_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    55823,
+                    8
+                  ]
+                },
+                "long_tp_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    55823,
+                    8
+                  ]
+                },
+                "short_sl_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    55823,
+                    8
+                  ]
+                },
+                "short_tp_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    55823,
+                    8
+                  ]
+                }
+              },
+              "materialize_ms": 2.1245410025585443,
+              "required_sidecar_names": [
+                "long_tp_by_entry.u32.npy",
+                "long_sl_by_entry.u32.npy",
+                "short_tp_by_entry.u32.npy",
+                "short_sl_by_entry.u32.npy"
+              ],
+              "schema": "backtest_tp_sl_by_entry_hit_times_layout_v1",
+              "selected_arrays_bytes": 7145344,
+              "selected_entry_count": 55823,
+              "sidecar_policy": "job-local selected arrays only; no publisher or manifest write",
+              "sl_count": 8,
+              "tp_count": 8
+            },
+            "candidate_count": 6,
+            "elapsed_ms": 383.13079200452194,
+            "enabled": true,
+            "first_mismatch": null,
+            "limit": {
+              "sl_count <= 8": true,
+              "tp_count <= 8": true
+            },
+            "max_abs_return_diff_pct": 0.0,
+            "parity_pass": true,
+            "production_topn_feed": "current_path_only",
+            "schema": "backtest_tp_sl_selected_cell_shadow_v1",
+            "selected_cell_scores": 384,
+            "skip_reason": null,
+            "sl_count": 8,
+            "sl_wins_tie_rule": "SL wins",
+            "status": "passed",
+            "tp_count": 8,
+            "tp_sl_cells": 64,
+            "trade_count_equal": true,
+            "trade_tape": {
+              "candidate_count": 6,
+              "long_trade_count": 210113,
+              "sample": [
+                {
+                  "entry_abs_max": 302725,
+                  "entry_abs_min": 83822,
+                  "local_indices": [
+                    0
+                  ],
+                  "long_trade_count": 41393,
+                  "short_trade_count": 0,
+                  "trade_count": 41393
+                },
+                {
+                  "entry_abs_max": 302725,
+                  "entry_abs_min": 83822,
+                  "local_indices": [
+                    1
+                  ],
+                  "long_trade_count": 38110,
+                  "short_trade_count": 0,
+                  "trade_count": 38110
+                },
+                {
+                  "entry_abs_max": 302725,
+                  "entry_abs_min": 83823,
+                  "local_indices": [
+                    2
+                  ],
+                  "long_trade_count": 35564,
+                  "short_trade_count": 0,
+                  "trade_count": 35564
+                },
+                {
+                  "entry_abs_max": 302725,
+                  "entry_abs_min": 83823,
+                  "local_indices": [
+                    3
+                  ],
+                  "long_trade_count": 33418,
+                  "short_trade_count": 0,
+                  "trade_count": 33418
+                },
+                {
+                  "entry_abs_max": 302725,
+                  "entry_abs_min": 83823,
+                  "local_indices": [
+                    4
+                  ],
+                  "long_trade_count": 31572,
+                  "short_trade_count": 0,
+                  "trade_count": 31572
+                }
+              ],
+              "schema": "backtest_tp_sl_sparse_trade_tape_v1",
+              "selected_entry_count": 55823,
+              "selected_entry_max": 302725,
+              "selected_entry_min": 83822,
+              "short_trade_count": 0,
+              "trade_count": 210113
+            }
+          },
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": true,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 0.003654708998510614,
+        "request_hash": "6f3056e90dec02e94f2ea2827f81de1acbd9969bc9da5aa1af475f8c1e6f47e6",
+        "risk_mode": "tp_sl_grid",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 13,
+                "max_ms": 51.19850000482984,
+                "min_ms": 21.165624988498166,
+                "p50_ms": 49.49354098062031,
+                "p95_ms": 51.19850000482984
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  89626
+                ],
+                "max_cpu_percent": 98.0,
+                "mean_core_equivalent": 0.98,
+                "mean_cpu_percent": 98.0,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 0.98,
+                "p50_cpu_percent": 98.0,
+                "p95_core_equivalent": 0.98,
+                "p95_cpu_percent": 98.0,
+                "peak_rss_bytes": 254509056,
+                "sample_count": 1,
+                "sample_interval_seconds": 1.0,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 98.0,
+                    "mem_percent": 0.4,
+                    "pid": 89626,
+                    "ppid": 89602,
+                    "rss_bytes": 254509056,
+                    "timestamp": "2026-06-07T11:41:15.809260+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:14.652346Z",
+                  "lease_expires_at": "2026-06-07T11:43:14.652346Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:14.652346Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:14.652346Z",
+                  "lease_expires_at": "2026-06-07T11:43:14.652346Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:14.652346Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:14.652346Z",
+                  "lease_expires_at": "2026-06-07T11:43:14.652346Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:14.652346Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:14.652346Z",
+                  "lease_expires_at": "2026-06-07T11:43:14.652346Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:14.652346Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:14.652346Z",
+                  "lease_expires_at": "2026-06-07T11:43:14.652346Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:14.652346Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              89626
+            ],
+            "max_cpu_percent": 98.0,
+            "mean_core_equivalent": 0.98,
+            "mean_cpu_percent": 98.0,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 0.98,
+            "p50_cpu_percent": 98.0,
+            "p95_core_equivalent": 0.98,
+            "p95_cpu_percent": 98.0,
+            "peak_rss_bytes": 254509056,
+            "sample_count": 1,
+            "sample_interval_seconds": 1.0,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 98.0,
+                "mem_percent": 0.4,
+                "pid": 89626,
+                "ppid": 89602,
+                "rss_bytes": 254509056,
+                "timestamp": "2026-06-07T11:41:15.809260+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-07T11:41:14.605857Z",
+            "finished_at": "2026-06-07T11:41:16.914023Z",
+            "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+            "last_error": null,
+            "request_hash": "6f3056e90dec02e94f2ea2827f81de1acbd9969bc9da5aa1af475f8c1e6f47e6",
+            "scheduling": {
+              "arity": 1,
+              "estimated_combinations": 6,
+              "estimated_combinations_upper_bound": 6,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "tp_sl_grid",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-07T11:41:14.652346Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 1,
+          "estimated_combinations": 6,
+          "estimated_combinations_upper_bound": 6,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "tp_sl_grid",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.00847362499916926,
+          "artifact_context_resolve": 0.06530391698470339,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.16371062499820255,
+          "request_slice_prepare": 0.0009138750028796494,
+          "service_total_without_warmup": 1.286659000965301,
+          "service_wall_clock_s": 1.6526503329805564,
+          "top_result_assembly": 0.0011949170148000121
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.00847362499916926,
+          "artifact_array_open": 0.00847362499916926,
+          "artifact_context_resolve": 0.06530391698470339,
+          "artifact_manifest_load": 0.06530391698470339,
+          "build_exact_context": 0.0005244170024525374,
+          "build_proxy_context": 7.875001756474376e-06,
+          "combo_iteration": 0.0,
+          "exact_scoring": 0.0028804169851355255,
+          "heap_update": 4.254200030118227e-05,
+          "load_hit_times": 0.014442583022173494,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.07713024999247864,
+          "prepare_pools_total": 0.16371062499820255,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0009138750028796494,
+          "row_prefilter": 0.0741355000063777,
+          "sample_warmup": 0.1792351669864729,
+          "segment_build": 0.0026872080052271485,
+          "service_total_without_warmup": 1.286659000965301,
+          "service_wall_clock_s": 1.6526503329805564,
+          "signal_row_selection": 0.00030174999847076833,
+          "time_range_slice": 0.0009138750028796494,
+          "top_result_assembly": 0.0011949170148000121,
+          "tp_sl_exact_boundary": 0.0020092079939786345,
+          "tp_sl_exact_scoring": 0.0028804169851355255,
+          "tp_sl_full_metrics_second_pass": 0.7943188330100384,
+          "tp_sl_grid_validation": 0.0010096249752677977
+        }
+      },
+      {
+        "api_top_count": 6,
+        "arity": 2,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "hit_times_subset",
+                  "tp_sl_diff_buffers",
+                  "score_arrays",
+                  "selected_top_rows",
+                  "heap"
+                ],
+                "cleanup_duration_s": 8.150000940077007e-05,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 36,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 36,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 36,
+                "proxy_candidates_selected": 36,
+                "proxy_candidates_valid": 36,
+                "stage_timings": {
+                  "build_exact_context": 0.0008318340114783496,
+                  "build_proxy_context": 7.541995728388429e-06,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 36
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 36,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 36,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "exact_consensus_enumerated",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.hma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 12,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 12,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_logical_name": "event_segments_2_tp_sl_15m_grid",
+                "best_cell_equal": null,
+                "direction_mode": "long_short_reversal",
+                "enabled": false,
+                "first_mismatch": null,
+                "max_abs_return_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null,
+                "valid_tp_sl_indexes": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 3283788,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 656832,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 12,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 2,
+                "backend_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+                "backend_logical_name": "event_segments_2_tp_sl_15m_grid",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_short_reversal",
+                "exact_candidates_evaluated": 36,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct",
+                  "best_tp_pct",
+                  "best_sl_pct"
+                ],
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 30,
+                "quality_candidates_heap_eligible": 6,
+                "request_top_n": 50,
+                "risk_mode": "tp_sl_grid",
+                "sample_metrics": {
+                  "best_sl_pct": 5.5,
+                  "best_tp_pct": 3.5,
+                  "total_return_pct": -67.57860779762268,
+                  "trade_count": 1077.0
+                },
+                "stage_timings": {
+                  "exact_scoring": 0.008126625005388632,
+                  "heap_update": 5.062500713393092e-05,
+                  "tp_sl_exact_boundary": 0.0019906660018023103,
+                  "tp_sl_exact_scoring": 0.008126625005388632,
+                  "tp_sl_full_metrics_second_pass": 0.1494872919865884
+                },
+                "status": "scored",
+                "top_results_count": 6
+              },
+              "top_results_sample": [
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 2,
+                  "indicator_rows": {
+                    "ma.dema": 4,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 28,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 4,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 9,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 13.443729903536978,
+                    "avg_trade_ret_pct": -0.06538834352312858,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 3.0,
+                    "exposure_pct": 4.1432686336429585,
+                    "max_drawdown_pct": 52.03536791263951,
+                    "profit_factor": 0.811805040234587,
+                    "return_over_max_drawdown": -0.9383920542223564,
+                    "sharpe_trades": -0.6004754071013737,
+                    "total_return_pct": -48.829641938209534,
+                    "trade_count": 933.0,
+                    "win_rate_pct": 31.72561629153269
+                  },
+                  "rank": 1,
+                  "score": -48.829641938209534
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 2,
+                  "indicator_rows": {
+                    "ma.dema": 5,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 34,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 5,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 13.634850166481687,
+                    "avg_trade_ret_pct": -0.07962657515192803,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 3.0,
+                    "exposure_pct": 4.05804473924131,
+                    "max_drawdown_pct": 57.72545797692317,
+                    "profit_factor": 0.7769142896111207,
+                    "return_over_max_drawdown": -0.9352810957084403,
+                    "sharpe_trades": -0.7130205914934414,
+                    "total_return_pct": -53.989577293395996,
+                    "trade_count": 901.0,
+                    "win_rate_pct": 31.076581576026634
+                  },
+                  "rank": 2,
+                  "score": -53.989577293395996
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 2,
+                  "indicator_rows": {
+                    "ma.dema": 3,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 22,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 3,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 8,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 12.871794871794872,
+                    "avg_trade_ret_pct": -0.08590135660392688,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 3.0,
+                    "exposure_pct": 4.145580909847654,
+                    "max_drawdown_pct": 63.058198954315735,
+                    "profit_factor": 0.765088749047152,
+                    "return_over_max_drawdown": -0.9414430027404832,
+                    "sharpe_trades": -0.8055052305523333,
+                    "total_return_pct": -59.36571955680847,
+                    "trade_count": 975.0,
+                    "win_rate_pct": 31.897435897435898
+                  },
+                  "rank": 3,
+                  "score": -59.36571955680847
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 2,
+                  "indicator_rows": {
+                    "ma.dema": 2,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 16,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 2,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 7,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 12.318670576735093,
+                    "avg_trade_ret_pct": -0.0996500472016036,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 3.0,
+                    "exposure_pct": 4.162757818796823,
+                    "max_drawdown_pct": 69.51760680173312,
+                    "profit_factor": 0.7149626273207168,
+                    "return_over_max_drawdown": -0.9514565144476252,
+                    "sharpe_trades": -0.9772095300138463,
+                    "total_return_pct": -66.14299416542053,
+                    "trade_count": 1023.0,
+                    "win_rate_pct": 31.28054740957967
+                  },
+                  "rank": 4,
+                  "score": -66.14299416542053
+                },
+                {
+                  "best_sl_idx": 7,
+                  "best_tp_idx": 3,
+                  "indicator_rows": {
+                    "ma.dema": 0,
+                    "ma.hma": 4
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 4,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 0,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 4,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 9
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 12.385329619312905,
+                    "avg_trade_ret_pct": -0.09830412877596069,
+                    "best_sl_pct": 5.5,
+                    "best_tp_pct": 3.5,
+                    "exposure_pct": 4.406207470634092,
+                    "max_drawdown_pct": 71.62248890253602,
+                    "profit_factor": 0.6991155414363298,
+                    "return_over_max_drawdown": -0.9435389487343929,
+                    "sharpe_trades": -0.9834264629379293,
+                    "total_return_pct": -67.57860779762268,
+                    "trade_count": 1077.0,
+                    "win_rate_pct": 30.8263695450325
+                  },
+                  "rank": 5,
+                  "score": -67.57860779762268
+                }
+              ],
+              "tp_sl_selected_cells": {
+                "best_cell_equal": true,
+                "by_entry_layout": {
+                  "arrays": {
+                    "long_sl_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        1661,
+                        8
+                      ]
+                    },
+                    "long_tp_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        1661,
+                        8
+                      ]
+                    },
+                    "short_sl_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        1661,
+                        8
+                      ]
+                    },
+                    "short_tp_by_entry.u32.npy": {
+                      "c_contiguous": true,
+                      "dtype": "uint32",
+                      "shape": [
+                        1661,
+                        8
+                      ]
+                    }
+                  },
+                  "materialize_ms": 0.12450001668184996,
+                  "required_sidecar_names": [
+                    "long_tp_by_entry.u32.npy",
+                    "long_sl_by_entry.u32.npy",
+                    "short_tp_by_entry.u32.npy",
+                    "short_sl_by_entry.u32.npy"
+                  ],
+                  "schema": "backtest_tp_sl_by_entry_hit_times_layout_v1",
+                  "selected_arrays_bytes": 212608,
+                  "selected_entry_count": 1661,
+                  "sidecar_policy": "job-local selected arrays only; no publisher or manifest write",
+                  "sl_count": 8,
+                  "tp_count": 8
+                },
+                "candidate_count": 8,
+                "elapsed_ms": 182.04099999275059,
+                "enabled": true,
+                "first_mismatch": null,
+                "limit": {
+                  "sl_count <= 8": true,
+                  "tp_count <= 8": true
+                },
+                "max_abs_return_diff_pct": 2.9510889032025034e-05,
+                "parity_pass": true,
+                "production_topn_feed": "current_path_only",
+                "schema": "backtest_tp_sl_selected_cell_shadow_v1",
+                "selected_cell_scores": 512,
+                "skip_reason": null,
+                "sl_count": 8,
+                "sl_wins_tie_rule": "SL wins",
+                "status": "passed",
+                "tp_count": 8,
+                "tp_sl_cells": 64,
+                "trade_count_equal": true,
+                "trade_tape": {
+                  "candidate_count": 8,
+                  "long_trade_count": 965,
+                  "sample": [
+                    {
+                      "entry_abs_max": 150142,
+                      "entry_abs_min": 83822,
+                      "local_indices": [
+                        0,
+                        0
+                      ],
+                      "long_trade_count": 114,
+                      "short_trade_count": 114,
+                      "trade_count": 228
+                    },
+                    {
+                      "entry_abs_max": 249837,
+                      "entry_abs_min": 83822,
+                      "local_indices": [
+                        0,
+                        1
+                      ],
+                      "long_trade_count": 53,
+                      "short_trade_count": 53,
+                      "trade_count": 106
+                    },
+                    {
+                      "entry_abs_max": 83822,
+                      "entry_abs_min": 83822,
+                      "local_indices": [
+                        0,
+                        2
+                      ],
+                      "long_trade_count": 1,
+                      "short_trade_count": 0,
+                      "trade_count": 1
+                    },
+                    {
+                      "entry_abs_max": 83820,
+                      "entry_abs_min": 83820,
+                      "local_indices": [
+                        0,
+                        3
+                      ],
+                      "long_trade_count": 0,
+                      "short_trade_count": 1,
+                      "trade_count": 1
+                    },
+                    {
+                      "entry_abs_max": 264712,
+                      "entry_abs_min": 83820,
+                      "local_indices": [
+                        0,
+                        4
+                      ],
+                      "long_trade_count": 538,
+                      "short_trade_count": 539,
+                      "trade_count": 1077
+                    }
+                  ],
+                  "schema": "backtest_tp_sl_sparse_trade_tape_v1",
+                  "selected_entry_count": 1661,
+                  "selected_entry_max": 264712,
+                  "selected_entry_min": 83820,
+                  "short_trade_count": 966,
+                  "trade_count": 1931
+                }
+              }
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 76.25645800726488,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 36,
+              "candidates_after_proxy": 36,
+              "combo_count_planned": 36,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 36,
+              "consensus_signature_mode": "exact_consensus_enumerated",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.hma": []
+              },
+              "exact_candidates": 36,
+              "exact_candidates_per_sec": 4429.883251181024,
+              "exact_scoring_ms": 8.126625005388632,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 43.05608299910091,
+              "rows_after_prefilter": 12,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 656832,
+              "signals_pack_estimated_peak_bytes": 3283788,
+              "signals_pack_ms": 25.969999987864867,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": 8,
+              "top_result_assembly_ms": 1.3440830225590616,
+              "tp_count": 8,
+              "tp_sl_by_entry_selected_arrays_bytes": 212608,
+              "tp_sl_cells": 64,
+              "tp_sl_exact_scoring_ms": 8.126625005388632,
+              "tp_sl_selected_cell_elapsed_ms": 182.04099999275059,
+              "tp_sl_selected_cell_parity_pass": true,
+              "tp_sl_selected_cell_scores": 512,
+              "tp_sl_selected_cell_shadow_status": "passed",
+              "trade_cell_evals_per_sec": 283512.52807558555,
+              "unique_rows_after_dedup": 12
+            },
+            "job_id": "c9ab1327-475b-4973-9f1f-d860d160591d",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "c9ab1327-475b-4973-9f1f-d860d160591d",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 1.286818,
+              "exit_code": 0,
+              "finished_at": "2026-06-07T11:41:48.660380Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "c9ab1327-475b-4973-9f1f-d860d160591d",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 89602,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 1327104,
+              "parent_rss_after_bytes": 120291328,
+              "parent_rss_before_bytes": 118964224,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 255524864,
+              "pid": 89758,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-07T11:41:47.373562Z",
+              "stderr_tail": "2026-06-07 14:41:47,680 INFO __main__ backtest child process started: job_id=c9ab1327-475b-4973-9f1f-d860d160591d scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-07 14:41:48,404 INFO __main__ backtest child process finished: job_id=c9ab1327-475b-4973-9f1f-d860d160591d status=succeeded elapsed_seconds=0.724\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.01108620801824145,
+              "artifact_array_open": 0.01108620801824145,
+              "artifact_context_resolve": 0.06517024998902343,
+              "artifact_manifest_load": 0.06517024998902343,
+              "build_exact_context": 0.0008318340114783496,
+              "build_proxy_context": 7.541995728388429e-06,
+              "combo_iteration": 0.0,
+              "exact_scoring": 0.008126625005388632,
+              "heap_update": 5.062500713393092e-05,
+              "load_hit_times": 0.014553874992998317,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.07750120901619084,
+              "prepare_pools_total": 0.16681620897725224,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0009239579958375543,
+              "row_prefilter": 0.074296000006143,
+              "sample_warmup": 0.024800624989438802,
+              "segment_build": 0.0026600419951137155,
+              "service_total_without_warmup": 0.6616979170357808,
+              "service_wall_clock_s": 0.6870078750071116,
+              "signal_row_selection": 0.0005394580075517297,
+              "time_range_slice": 0.0009239579958375543,
+              "top_result_assembly": 0.0013440830225590616,
+              "tp_sl_exact_boundary": 0.0019906660018023103,
+              "tp_sl_exact_scoring": 0.008126625005388632,
+              "tp_sl_full_metrics_second_pass": 0.1494872919865884,
+              "tp_sl_grid_validation": 0.0010049999982584268
+            },
+            "status": "succeeded",
+            "summary_hash": "395bce3c338e7894eb1a12a6b49f80c98d9956d7ed40cfe8be454e5a93053360",
+            "top_variants_count": 6
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            89758
+          ],
+          "max_cpu_percent": 109.0,
+          "mean_core_equivalent": 1.09,
+          "mean_cpu_percent": 109.0,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 1.09,
+          "p50_cpu_percent": 109.0,
+          "p95_core_equivalent": 1.09,
+          "p95_cpu_percent": 109.0,
+          "peak_rss_bytes": 255492096,
+          "sample_count": 1,
+          "sample_interval_seconds": 1.0,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id c9ab1327-475b-4973-9f1f-d860d160591d --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 109.0,
+              "mem_percent": 0.4,
+              "pid": 89758,
+              "ppid": 89602,
+              "rss_bytes": 255492096,
+              "timestamp": "2026-06-07T11:41:48.414887+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_short_reversal",
+        "index": 2,
+        "instrumentation_counters": {
+          "artifact_load_ms": 76.25645800726488,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 36,
+          "candidates_after_proxy": 36,
+          "combo_count_planned": 36,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 36,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.hma': []}",
+          "exact_candidates": 36,
+          "exact_candidates_per_sec": 4429.883251181024,
+          "exact_scoring_ms": 8.126625005388632,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 43.05608299910091,
+          "rows_after_prefilter": 12,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 656832,
+          "signals_pack_estimated_peak_bytes": 3283788,
+          "signals_pack_ms": 25.969999987864867,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 8,
+          "top_result_assembly_ms": 1.3440830225590616,
+          "tp_count": 8,
+          "tp_sl_by_entry_selected_arrays_bytes": 212608,
+          "tp_sl_cells": 64,
+          "tp_sl_exact_scoring_ms": 8.126625005388632,
+          "tp_sl_selected_cell_elapsed_ms": 182.04099999275059,
+          "tp_sl_selected_cell_parity_pass": "True",
+          "tp_sl_selected_cell_scores": 512,
+          "tp_sl_selected_cell_shadow_status": "passed",
+          "trade_cell_evals_per_sec": 283512.52807558555,
+          "unique_rows_after_dedup": 12
+        },
+        "job_id": "c9ab1327-475b-4973-9f1f-d860d160591d",
+        "job_name": "tp_sl_grid/arity_2/long_short_reversal",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-07T11:41:48.660380Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 120291328,
+              "parent_rss_before_bytes": 118964224,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 255524864,
+              "pid": 89758,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 1327104,
+              "started_at": "2026-06-07T11:41:47.373562Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 26275102720,
+            "available": true,
+            "before_bytes": 26264223744,
+            "delayed_bytes": 26271825920,
+            "immediate_delta_bytes": 10878976,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 7602176,
+            "wait_seconds": 30.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 6,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 2,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_short_reversal",
+            "exact_candidates_evaluated": 36,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 30,
+            "quality_candidates_heap_eligible": 6,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "tp_sl_grid",
+            "top_results_count": 6
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {
+            "best_cell_equal": true,
+            "by_entry_layout": {
+              "arrays": {
+                "long_sl_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    1661,
+                    8
+                  ]
+                },
+                "long_tp_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    1661,
+                    8
+                  ]
+                },
+                "short_sl_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    1661,
+                    8
+                  ]
+                },
+                "short_tp_by_entry.u32.npy": {
+                  "c_contiguous": true,
+                  "dtype": "uint32",
+                  "shape": [
+                    1661,
+                    8
+                  ]
+                }
+              },
+              "materialize_ms": 0.12450001668184996,
+              "required_sidecar_names": [
+                "long_tp_by_entry.u32.npy",
+                "long_sl_by_entry.u32.npy",
+                "short_tp_by_entry.u32.npy",
+                "short_sl_by_entry.u32.npy"
+              ],
+              "schema": "backtest_tp_sl_by_entry_hit_times_layout_v1",
+              "selected_arrays_bytes": 212608,
+              "selected_entry_count": 1661,
+              "sidecar_policy": "job-local selected arrays only; no publisher or manifest write",
+              "sl_count": 8,
+              "tp_count": 8
+            },
+            "candidate_count": 8,
+            "elapsed_ms": 182.04099999275059,
+            "enabled": true,
+            "first_mismatch": null,
+            "limit": {
+              "sl_count <= 8": true,
+              "tp_count <= 8": true
+            },
+            "max_abs_return_diff_pct": 2.9510889032025034e-05,
+            "parity_pass": true,
+            "production_topn_feed": "current_path_only",
+            "schema": "backtest_tp_sl_selected_cell_shadow_v1",
+            "selected_cell_scores": 512,
+            "skip_reason": null,
+            "sl_count": 8,
+            "sl_wins_tie_rule": "SL wins",
+            "status": "passed",
+            "tp_count": 8,
+            "tp_sl_cells": 64,
+            "trade_count_equal": true,
+            "trade_tape": {
+              "candidate_count": 8,
+              "long_trade_count": 965,
+              "sample": [
+                {
+                  "entry_abs_max": 150142,
+                  "entry_abs_min": 83822,
+                  "local_indices": [
+                    0,
+                    0
+                  ],
+                  "long_trade_count": 114,
+                  "short_trade_count": 114,
+                  "trade_count": 228
+                },
+                {
+                  "entry_abs_max": 249837,
+                  "entry_abs_min": 83822,
+                  "local_indices": [
+                    0,
+                    1
+                  ],
+                  "long_trade_count": 53,
+                  "short_trade_count": 53,
+                  "trade_count": 106
+                },
+                {
+                  "entry_abs_max": 83822,
+                  "entry_abs_min": 83822,
+                  "local_indices": [
+                    0,
+                    2
+                  ],
+                  "long_trade_count": 1,
+                  "short_trade_count": 0,
+                  "trade_count": 1
+                },
+                {
+                  "entry_abs_max": 83820,
+                  "entry_abs_min": 83820,
+                  "local_indices": [
+                    0,
+                    3
+                  ],
+                  "long_trade_count": 0,
+                  "short_trade_count": 1,
+                  "trade_count": 1
+                },
+                {
+                  "entry_abs_max": 264712,
+                  "entry_abs_min": 83820,
+                  "local_indices": [
+                    0,
+                    4
+                  ],
+                  "long_trade_count": 538,
+                  "short_trade_count": 539,
+                  "trade_count": 1077
+                }
+              ],
+              "schema": "backtest_tp_sl_sparse_trade_tape_v1",
+              "selected_entry_count": 1661,
+              "selected_entry_max": 264712,
+              "selected_entry_min": 83820,
+              "short_trade_count": 966,
+              "trade_count": 1931
+            }
+          },
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": true,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 0.006966958011616953,
+        "request_hash": "a9c205684c0d71d5c3266db234ad0715092c7210d1d39678a1e9921ae486ee21",
+        "risk_mode": "tp_sl_grid",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 9,
+                "max_ms": 53.70266697718762,
+                "min_ms": 17.546124989166856,
+                "p50_ms": 49.765665986342356,
+                "p95_ms": 53.70266697718762
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  89758
+                ],
+                "max_cpu_percent": 109.0,
+                "mean_core_equivalent": 1.09,
+                "mean_cpu_percent": 109.0,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 1.09,
+                "p50_cpu_percent": 109.0,
+                "p95_core_equivalent": 1.09,
+                "p95_cpu_percent": 109.0,
+                "peak_rss_bytes": 255492096,
+                "sample_count": 1,
+                "sample_interval_seconds": 1.0,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id c9ab1327-475b-4973-9f1f-d860d160591d --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 109.0,
+                    "mem_percent": 0.4,
+                    "pid": 89758,
+                    "ppid": 89602,
+                    "rss_bytes": 255492096,
+                    "timestamp": "2026-06-07T11:41:48.414887+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running",
+                "succeeded"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:47.230674Z",
+                  "lease_expires_at": "2026-06-07T11:43:47.230674Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:47.230674Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:47.230674Z",
+                  "lease_expires_at": "2026-06-07T11:43:47.230674Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:47.230674Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:47.230674Z",
+                  "lease_expires_at": "2026-06-07T11:43:47.230674Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:47.230674Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:47.230674Z",
+                  "lease_expires_at": "2026-06-07T11:43:47.230674Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:47.230674Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-07T11:41:47.230674Z",
+                  "lease_expires_at": "2026-06-07T11:43:47.230674Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-89602",
+                  "started_at": "2026-06-07T11:41:47.230674Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              89758
+            ],
+            "max_cpu_percent": 109.0,
+            "mean_core_equivalent": 1.09,
+            "mean_cpu_percent": 109.0,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 1.09,
+            "p50_cpu_percent": 109.0,
+            "p95_core_equivalent": 1.09,
+            "p95_cpu_percent": 109.0,
+            "peak_rss_bytes": 255492096,
+            "sample_count": 1,
+            "sample_interval_seconds": 1.0,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id c9ab1327-475b-4973-9f1f-d860d160591d --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-6e0i0ifs/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 109.0,
+                "mem_percent": 0.4,
+                "pid": 89758,
+                "ppid": 89602,
+                "rss_bytes": 255492096,
+                "timestamp": "2026-06-07T11:41:48.414887+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-07T11:41:47.185301Z",
+            "finished_at": "2026-06-07T11:41:48.682458Z",
+            "job_id": "c9ab1327-475b-4973-9f1f-d860d160591d",
+            "last_error": null,
+            "request_hash": "a9c205684c0d71d5c3266db234ad0715092c7210d1d39678a1e9921ae486ee21",
+            "scheduling": {
+              "arity": 2,
+              "estimated_combinations": 36,
+              "estimated_combinations_upper_bound": 36,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "tp_sl_grid",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.hma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-07T11:41:47.230674Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 2,
+          "estimated_combinations": 36,
+          "estimated_combinations_upper_bound": 36,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "tp_sl_grid",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.hma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.01108620801824145,
+          "artifact_context_resolve": 0.06517024998902343,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.16681620897725224,
+          "request_slice_prepare": 0.0009239579958375543,
+          "service_total_without_warmup": 0.6616979170357808,
+          "service_wall_clock_s": 0.6870078750071116,
+          "top_result_assembly": 0.0013440830225590616
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.01108620801824145,
+          "artifact_array_open": 0.01108620801824145,
+          "artifact_context_resolve": 0.06517024998902343,
+          "artifact_manifest_load": 0.06517024998902343,
+          "build_exact_context": 0.0008318340114783496,
+          "build_proxy_context": 7.541995728388429e-06,
+          "combo_iteration": 0.0,
+          "exact_scoring": 0.008126625005388632,
+          "heap_update": 5.062500713393092e-05,
+          "load_hit_times": 0.014553874992998317,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.07750120901619084,
+          "prepare_pools_total": 0.16681620897725224,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0009239579958375543,
+          "row_prefilter": 0.074296000006143,
+          "sample_warmup": 0.024800624989438802,
+          "segment_build": 0.0026600419951137155,
+          "service_total_without_warmup": 0.6616979170357808,
+          "service_wall_clock_s": 0.6870078750071116,
+          "signal_row_selection": 0.0005394580075517297,
+          "time_range_slice": 0.0009239579958375543,
+          "top_result_assembly": 0.0013440830225590616,
+          "tp_sl_exact_boundary": 0.0019906660018023103,
+          "tp_sl_exact_scoring": 0.008126625005388632,
+          "tp_sl_full_metrics_second_pass": 0.1494872919865884,
+          "tp_sl_grid_validation": 0.0010049999982584268
+        }
+      }
+    ],
+    "pass": true,
+    "runner_entrypoint": "BacktestJobWorkerUseCase.run_next"
+  },
+  "artifact_env": {
+    "config_key_present": true,
+    "config_path": "configs/prod/backtest_artifacts.yaml",
+    "env_name_present": true,
+    "filled_keys": [
+      "ROEHUB_ENV",
+      "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"
+    ],
+    "reason": "defaulted to Mac Studio prod artifact config"
+  },
+  "artifact_reference": {
+    "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+    "artifact_policy": "historical_prefix_compatible",
+    "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
+    "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1"
+  },
+  "backlog_after": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "backlog_before": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "dead_code_audit": {
+    "dead code audit": true,
+    "pass": true,
+    "removed_or_replaced_paths": [
+      "API create path replaced sync_inline compute with background_auto queued jobs",
+      "lazy cache hit replaced monolithic full-detail JSON reads with metadata + JSONL readers",
+      "large-grid production path uses ordinal streaming chunks instead of Cartesian product materialization"
+    ],
+    "retained_helpers": [
+      {
+        "classification": "child-only",
+        "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py"
+      },
+      {
+        "classification": "reference-only for legacy in-memory builders; API path uses cache readers",
+        "path": "src/trading/contexts/backtest/application/services/v2/result_series.py"
+      },
+      {
+        "classification": "reference-only semantic baseline",
+        "path": "tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb"
+      }
+    ]
+  },
+  "docs_drift_audit": {
+    "active_doc_blockers": [],
+    "active_docs_checked": [
+      "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md",
+      "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "docs/architecture/backtest/benchmark_iterations/README.md"
+    ],
+    "docs drift audit": true,
+    "pass": true,
+    "remaining_historical_references": "historical benchmark references remain allowed when labeled historical"
+  },
+  "env_file": {
+    "candidates": [
+      "/Users/daniildegtyarev/.config/roehub/roehub.env",
+      "/etc/roehub/roehub.env"
+    ],
+    "keys_loaded": [
+      "IDENTITY_PG_DSN",
+      "POSTGRES_DB",
+      "POSTGRES_DSN",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "STRATEGY_PG_DSN"
+    ],
+    "keys_loaded_count": 54,
+    "loaded": true,
+    "path": "/Users/daniildegtyarev/.config/roehub/roehub.env",
+    "reason": null
+  },
+  "excluded_reference_job": {
+    "arity": [
+      1,
+      2
+    ],
+    "direction_mode": [
+      "long_only",
+      "long_short_reversal"
+    ],
+    "job_name": null,
+    "reason": "stage_08_tp_sl_selected_cells: run small TP/SL selected-cell grid with shadow parity and by-entry layout evidence",
+    "risk_mode": "tp_sl_grid",
+    "sl_count <= 8": true,
+    "tp_count <= 8": true
+  },
+  "finished_at": "2026-06-07T11:42:23.387961+00:00",
+  "generated_at": "2026-06-07T11:41:14.378045+00:00",
+  "git_commit": "e985b30123ca9070ef5b1fc3227ffef6dd3fdf35",
+  "git_status_short": "M .codex/agents/generated/backtest-compute-acceleration-v1/07-implement-sidecar-bitset-artifacts.md\n M docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md\n M docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md\n M scripts/backtest/run_api_runner_benchmark_parity.py\n M src/trading/contexts/backtest/application/services/v2/job_orchestration.py\n M src/trading/contexts/backtest/application/services/v2/matrix_backend/bitsets.py\n M tests/unit/contexts/backtest/application/services/v2/test_bitsets.py\n M tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py\n?? docs/architecture/backtest/benchmark_iterations/2026-05-22_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-05-23_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_bitset_backend/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_optimized/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/\n?? scripts/backtest/generate_matrix_sidecar_artifacts.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/trade_tape.py\n?? tests/unit/tools/test_stage00_2_lmstudio_act_agent.py\n?? tests/unit/tools/test_stage00_3_protocol_split_structured_finalizer.py\n?? tools/backtest_ai_configurator/",
+  "host": "MacStudioDaniil",
+  "instrumentation": {
+    "failed_selected_cell_shadow_jobs": [],
+    "job_count": 2,
+    "missing_by_job": {},
+    "pass": true,
+    "required_fields": [
+      "artifact_load_ms",
+      "signals_pack_ms",
+      "sidecar_load_ms",
+      "sidecar_used",
+      "sidecar_available",
+      "sidecar_fallback_reason",
+      "sidecar_dir",
+      "signals_pack_source",
+      "signals_pack_bytes",
+      "signals_pack_estimated_peak_bytes",
+      "signals_pack_arrays_released",
+      "bitset_word_count",
+      "bitset_padding_valid",
+      "bitset_consensus_sample_count",
+      "bitset_consensus_sample_mismatches",
+      "bitset_consensus_sample_parity",
+      "combo_iteration_ms",
+      "proxy_filter_ms",
+      "exact_scoring_ms",
+      "tp_sl_exact_scoring_ms",
+      "top_result_assembly_ms",
+      "rows_before_prefilter",
+      "rows_after_prefilter",
+      "row_signature_ms",
+      "unique_rows_after_dedup",
+      "duplicate_signal_row_ids",
+      "row_signature_collision_count",
+      "consensus_signature_count",
+      "consensus_signature_mode",
+      "candidate_upper_bound_after_row_dedup",
+      "combo_count_planned",
+      "candidates_after_proxy",
+      "exact_candidates",
+      "avg_segments_per_candidate",
+      "avg_trades_per_candidate",
+      "tp_count",
+      "sl_count",
+      "tp_sl_cells",
+      "tp_sl_selected_cell_shadow_status",
+      "tp_sl_selected_cell_parity_pass",
+      "tp_sl_selected_cell_scores",
+      "tp_sl_selected_cell_elapsed_ms",
+      "tp_sl_by_entry_selected_arrays_bytes",
+      "exact_candidates_per_sec",
+      "trade_cell_evals_per_sec"
+    ],
+    "rows": [
+      {
+        "counters": {
+          "artifact_load_ms": 73.77754198387265,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 6,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 6,
+          "candidates_after_proxy": 6,
+          "combo_count_planned": 6,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 6,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': []}",
+          "exact_candidates": 6,
+          "exact_candidates_per_sec": 2083.0317384473055,
+          "exact_scoring_ms": 2.8804169851355255,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 12.039624998578802,
+          "rows_after_prefilter": 6,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 328416,
+          "signals_pack_estimated_peak_bytes": 1641894,
+          "signals_pack_ms": 31.324124982347712,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 8,
+          "top_result_assembly_ms": 1.1949170148000121,
+          "tp_count": 8,
+          "tp_sl_by_entry_selected_arrays_bytes": 7145344,
+          "tp_sl_cells": 64,
+          "tp_sl_exact_scoring_ms": 2.8804169851355255,
+          "tp_sl_selected_cell_elapsed_ms": 383.13079200452194,
+          "tp_sl_selected_cell_parity_pass": "True",
+          "tp_sl_selected_cell_scores": 384,
+          "tp_sl_selected_cell_shadow_status": "passed",
+          "trade_cell_evals_per_sec": 133314.03126062755,
+          "unique_rows_after_dedup": 6
+        },
+        "job_name": "tp_sl_grid/arity_1/long_only",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      },
+      {
+        "counters": {
+          "artifact_load_ms": 76.25645800726488,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 36,
+          "candidates_after_proxy": 36,
+          "combo_count_planned": 36,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 36,
+          "consensus_signature_mode": "exact_consensus_enumerated",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.hma': []}",
+          "exact_candidates": 36,
+          "exact_candidates_per_sec": 4429.883251181024,
+          "exact_scoring_ms": 8.126625005388632,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 43.05608299910091,
+          "rows_after_prefilter": 12,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 656832,
+          "signals_pack_estimated_peak_bytes": 3283788,
+          "signals_pack_ms": 25.969999987864867,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 8,
+          "top_result_assembly_ms": 1.3440830225590616,
+          "tp_count": 8,
+          "tp_sl_by_entry_selected_arrays_bytes": 212608,
+          "tp_sl_cells": 64,
+          "tp_sl_exact_scoring_ms": 8.126625005388632,
+          "tp_sl_selected_cell_elapsed_ms": 182.04099999275059,
+          "tp_sl_selected_cell_parity_pass": "True",
+          "tp_sl_selected_cell_scores": 512,
+          "tp_sl_selected_cell_shadow_status": "passed",
+          "trade_cell_evals_per_sec": 283512.52807558555,
+          "unique_rows_after_dedup": 12
+        },
+        "job_name": "tp_sl_grid/arity_2/long_short_reversal",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      }
+    ],
+    "schema": "backtest_stage_instrumentation_summary_v1"
+  },
+  "lazy_cache_hit_memory": {
+    "api_process_memory": {
+      "limit_bytes": 67108864,
+      "pass": true,
+      "pid": 1109,
+      "retained_rss_delta": 0,
+      "rss_after_bytes": 195837952,
+      "rss_before_bytes": 195837952
+    },
+    "bounded_reader_static_audit": {
+      "api_read_methods": {
+        "csv": true,
+        "monthly_stats": true,
+        "paginated_trades": true,
+        "series": true,
+        "symbol_stats": true
+      },
+      "cache_file": "src/trading/contexts/backtest/adapters/outbound/cache_fs/lazy_trades_cache.py",
+      "full_detail_json_read_text_cache_hit_for_api_forbidden": true,
+      "pass": true,
+      "required_symbols_present": {
+        "_iter_trade_slice": true,
+        "_iter_trades": true,
+        "legacy monolithic cache ignored": true,
+        "read_csv": true,
+        "read_monthly_stats": true,
+        "read_page": true,
+        "read_series": true,
+        "read_symbol_stats": true
+      },
+      "use_case_file": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
+    },
+    "cache_files": {
+      "bundle_dir": "/opt/roehub/state/backtest/trades_cache/28/2882ea4e2bcc4b87a19a8d6920191c36d502cc83fa8a4344f742da7351c543f5",
+      "metadata_bytes": 3608,
+      "metadata_exists": true,
+      "trades_jsonl_bytes": 20590379,
+      "trades_jsonl_exists": true,
+      "trades_jsonl_rows": 35564
+    },
+    "cache_hit_reads": {
+      "pass": true,
+      "reads": [
+        {
+          "cache_status": "hit",
+          "latency_ms": 58.47849999554455,
+          "method": "POST",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/trades",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 57.193333021132275,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/trades?page=1&page_size=5",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 429.8115419805981,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/equity?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 367.22924999776296,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/drawdown?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 211.82966700871475,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/monthly-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 212.92375001939945,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/symbol-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "miss",
+          "latency_ms": 28.39795799809508,
+          "method": "GET",
+          "path": "/backtests/jobs/d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6/variants/job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a/trades.csv?max_rows=100",
+          "status": 200
+        }
+      ]
+    },
+    "cache_key": "2882ea4e2bcc4b87a19a8d6920191c36d502cc83fa8a4344f742da7351c543f5",
+    "lazy_child_process_evidence": [
+      {
+        "cache_path": null,
+        "cache_status": "miss",
+        "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+        "process_evidence": {
+          "cancelled": false,
+          "command": [
+            "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+            "-m",
+            "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "--task-id",
+            "eb287d14-d2af-4979-888e-262ab48a52dd",
+            "--job-id",
+            "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+            "--owner-user-id",
+            "6960d466-e9fb-4116-a9fb-8f1589c61914",
+            "--variant-key",
+            "job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a",
+            "--output-json",
+            "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-8k7f9doq/result.json"
+          ],
+          "elapsed_seconds": 2.583609,
+          "exit_code": 0,
+          "finished_at": "2026-06-07T11:42:21.823589Z",
+          "metadata": {
+            "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+            "public_variant_key": "job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a",
+            "task_id": "eb287d14-d2af-4979-888e-262ab48a52dd",
+            "task_kind": "lazy_trades"
+          },
+          "parent_physical_footprint_after_bytes": null,
+          "parent_physical_footprint_before_bytes": null,
+          "parent_pid": 89602,
+          "parent_retained_physical_footprint_delta_bytes": null,
+          "parent_retained_rss_delta_bytes": 327680,
+          "parent_rss_after_bytes": 120848384,
+          "parent_rss_before_bytes": 120520704,
+          "peak_physical_footprint_bytes": null,
+          "peak_rss_bytes": 461783040,
+          "pid": 89857,
+          "schema": "roehub_child_process_evidence_v1",
+          "started_at": "2026-06-07T11:42:19.239980Z",
+          "stderr_tail": "2026-06-07 14:42:19,589 INFO __main__ lazy trades child process started: task_id=eb287d14-d2af-4979-888e-262ab48a52dd job_id=d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6\n2026-06-07 14:42:21,560 INFO __main__ lazy trades child process finished: task_id=eb287d14-d2af-4979-888e-262ab48a52dd cache_status=miss elapsed_seconds=1.971\n",
+          "stdout_tail": "",
+          "timed_out": false
+        },
+        "public_variant_key": "job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a",
+        "schema": "roehub_lazy_trades_child_result_evidence_v1",
+        "task_id": "eb287d14-d2af-4979-888e-262ab48a52dd"
+      }
+    ],
+    "miss_initial": {
+      "cache_status": "miss",
+      "materialization_status": "queued",
+      "status": 202,
+      "task_id": "eb287d14-d2af-4979-888e-262ab48a52dd"
+    },
+    "miss_worker": {
+      "cache_path": null,
+      "cache_status": "miss",
+      "claimed": true,
+      "fast_completion_without_observed_running": false,
+      "observed_running": true,
+      "pass": true,
+      "required_path": "queued -> running -> completed",
+      "required_path_pass": true,
+      "status": null,
+      "status_path": "queued -> running -> completed",
+      "task_status": "completed"
+    },
+    "pass": true,
+    "target_job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+    "variant_key": "job_d7b7a61da5c6__dema_close_w7__risk_tp_sl_grid__tp_5_5__sl_5_5__vh_eeac473a"
+  },
+  "legacy_path_absence": {
+    "checks": [
+      {
+        "forbidden": "build_full_job_compute_executor",
+        "forbidden_present": false,
+        "name": "runner_parent_does_not_construct_full_compute_graph",
+        "pass": true,
+        "path": "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+        "required": "BacktestChildProcessExecutor",
+        "required_present": true
+      },
+      {
+        "forbidden": "build_paginated_trades_read_model(",
+        "forbidden_present": false,
+        "name": "public_api_cache_hit_uses_bounded_cache_methods",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+        "required": "cache.read_page(",
+        "required_present": true
+      },
+      {
+        "forbidden": "itertools.product",
+        "forbidden_present": false,
+        "name": "large_grid_production_no_itertools_product",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/services/v2/no_risk_exact.py",
+        "required": "iter_ordinal_combo_chunks",
+        "required_present": true
+      }
+    ],
+    "legacy path absence": true,
+    "pass": true
+  },
+  "matrix_sidecar": {
+    "artifact_dir": null,
+    "enabled": false,
+    "fairness_classification": "no_sidecar",
+    "generation_report": null,
+    "sidecar_generate_ms": null
+  },
+  "memory_release": {
+    "checked_jobs": 2,
+    "failed_jobs": [],
+    "parent_retained_rss_delta_evidence": true,
+    "pass": true,
+    "physical footprint": false,
+    "system_memory_cleanup_gate": true,
+    "system_memory_cleanup_limit_bytes": 536870912,
+    "system_memory_failed_jobs": [],
+    "vmmap": false
+  },
+  "mixed_scheduler_smoke": {
+    "blocks_when_heavy_active": true,
+    "blocks_when_light_active": true,
+    "configured": {
+      "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": 1,
+      "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 0,
+      "full_job_lane": "heavy_only",
+      "light_promotion_path": "not_used"
+    },
+    "first_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "lazy_after_two_empty_full_probes": {
+      "scheduling_class": "none",
+      "task_kind": "lazy_detail"
+    },
+    "pass": true,
+    "second_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    }
+  },
+  "parity": {
+    "failed_jobs": [],
+    "pass": true,
+    "passed_jobs": 2,
+    "required_jobs": 2
+  },
+  "pass": true,
+  "performance": {
+    "canonical_stage_comparison_policy": "API/runner wall and service-only overhead are recorded separately from May 2 notebook-compatible stage timings.",
+    "cpu_sampling_jobs": 2,
+    "failed_cpu_sampling_jobs": [],
+    "failed_speed_jobs": [],
+    "pass": true,
+    "reference_speed_ratio_min": 0.8,
+    "service_only_overhead_separate": true,
+    "speed_ratios": [
+      {
+        "job_name": "tp_sl_grid/arity_1/long_only",
+        "may2_over_current_ratio": 1.2688124731144292
+      },
+      {
+        "job_name": "tp_sl_grid/arity_2/long_short_reversal",
+        "may2_over_current_ratio": 0.8573002946484274
+      }
+    ],
+    "stage_timing_jobs": 2
+  },
+  "postgres_env": {
+    "component_keys_present": [
+      "POSTGRES_DB",
+      "POSTGRES_USER",
+      "POSTGRES_PASSWORD"
+    ],
+    "dsn_keys_present": [
+      "STRATEGY_PG_DSN",
+      "POSTGRES_DSN",
+      "IDENTITY_PG_DSN"
+    ],
+    "filled_dsn_keys": []
+  },
+  "python": "3.12.13",
+  "reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+  "reference_json": "docs/architecture/backtest/benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/benchmark_results.json",
+  "request": {
+    "benchmark_top_k": 5,
+    "cpu_sample_interval_seconds": 1.0,
+    "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
+    "exclude_heaviest_140s_job": true,
+    "full_jobs": "heavy",
+    "matrix_sidecar_artifact_dir": null,
+    "numba_threads": 12,
+    "only_arity": 6,
+    "rows_per_indicator": 6,
+    "runner_concurrency": "one heavy child",
+    "stage_04_mvp_rows": false,
+    "stage_05_no_risk_heavy_rows": false,
+    "stage_08_tp_sl_selected_cells": true,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "top_n": 50,
+    "tp_sl_selected_cell_shadow_env_key": "ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW",
+    "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
+    "warmup_rows_per_indicator": 2
+  },
+  "schema": "backtest_api_runner_compute_memory_parity_v1",
+  "smoke_user_id": "6960d466-e9fb-4116-a9fb-8f1589c61914"
+}

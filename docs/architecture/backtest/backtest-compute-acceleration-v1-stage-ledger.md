@@ -849,9 +849,102 @@ Stage 08 may use sidecar artifacts as diagnostic/test overlays, but it must not
 write publisher artifacts or treat sidecar loading as an accepted production
 acceleration.
 
+## Stage 08 — TP/SL selected-cell shadow accepted for learning
+
+Stage 08 implemented an opt-in TP/SL selected-cell shadow validator for
+`tp_count <= 8` and `sl_count <= 8`. The validator is enabled only through
+`ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW`; default production top-N remains
+fed by the existing `event_segments_n_tp_sl_15m_grid` path.
+
+Implementation scope:
+
+- added `matrix_backend/trade_tape.py` to extract selected sparse TP/SL trade
+  tapes from prepared candidate rows;
+- added `matrix_backend/tp_sl_cells.py` to score selected TP/SL cells against
+  the current exact scorer and record by-entry hit-times layout counters;
+- added API-runner benchmark flag `--stage-08-tp-sl-selected-cells`, which uses
+  a selected 8x8 TP/SL grid and enables shadow diagnostics for that benchmark
+  run only;
+- added focused unit coverage for long/short selected-cell parity, the
+  same-bar `SL wins` rule, and job-local by-entry array layout.
+
+No `backtest_artifacts` publisher/precompute modules, canonical `manifest.yaml`,
+`current.yaml`, active slots, public API payloads, request hash, cache identity,
+persisted schema or production top-N selection were changed. If by-entry
+hit-times are persisted later, they must remain sidecar/test-only until a
+separate publisher/manifest plan is approved.
+
+Mac Studio candidate state was measured from checkout base
+`e985b30123ca9070ef5b1fc3227ffef6dd3fdf35` plus dirty Stage 07/Stage 08 files
+synced from local `main` (`e44750d4ee662523ca1c5115fd4e06b52e39becf`) for the
+acceptance run. The remote checkout had pre-existing dirty Stage 07 files.
+
+Acceptance benchmark command:
+
+```bash
+ssh macstudio 'zsh -lc "cd /Users/daniildegtyarev/Projects/roehub.com && \
+  uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-08-tp-sl-selected-cells \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells"'
+```
+
+Benchmark evidence:
+
+- `docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/benchmark_results.json`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/benchmark_summary.md`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/child_process_evidence/`
+
+Overall harness gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `api_runner_path.pass` | true |
+| `parity.pass` | true |
+| `performance.pass` | true |
+| `instrumentation.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `dead_code_audit.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Measured Stage 08 selected-cell evidence:
+
+| Job | TP | SL | Cells | Shadow status | Selected cell scores | By-entry selected bytes | Max return diff pct | Exact ratio |
+|---|---:|---:|---:|---|---:|---:|---:|---:|
+| `tp_sl_grid/arity_1/long_only` | 8 | 8 | 64 | passed | 384 | 7,145,344 | 0.0 | 1.269 |
+| `tp_sl_grid/arity_2/long_short_reversal` | 8 | 8 | 64 | passed | 512 | 212,608 | 0.000029510889 | 0.857 |
+
+The by-entry layout materialized job-local contiguous arrays named
+`long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`,
+`short_tp_by_entry.u32.npy`, and `short_sl_by_entry.u32.npy` in memory only.
+The benchmark did not write those arrays to canonical artifact roots, active
+slots or publisher outputs.
+
+Decision: Stage 08 is `accepted_for_learning`. Selected-cell TP/SL parity
+passed for long-only and long-short selected rows, the `SL wins` tie rule is
+covered by unit tests and recorded in shadow diagnostics, and by-entry layout
+memory/timing counters are present. This stage does not unlock production `on`
+mode or a production TP/SL cell backend; it only allows Stage 09 full-grid
+cell-block work to start.
+
+Contract impact for committed Stage 08 work: public API `none`; port contract
+`none`; DTO schema `none`; persisted schema `none`; canonical artifact
+file/manifest schema `none`; config schema `compatible-change` for optional
+benchmark-only `ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW`; request hash/cache
+identity `none`; service-call semantics `none`; benchmark/report semantics
+`compatible-change`; browser-visible behavior `none`.
+
+`next_iteration_allowed` is `true` for Stage 09 `matrix_cell_tp_sl_v1` full-grid
+blocks only. Stage 09 must prove full-grid parity, cell-block size, accepted
+`tp_sl_exact_scoring` speedup and no service wall regression before any
+production-affecting backend mode is accepted.
+
 ## Current Execution Handoff
 
-Next executable stage: Stage 08 TP/SL selected-cell shadow.
+Next executable stage: Stage 09 `matrix_cell_tp_sl_v1` full-grid blocks.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -864,8 +957,10 @@ plan explicitly reopens the idea.
 Stage 07 is accepted for learning only. It generated and loaded sidecar/test
 bitsets outside the canonical publisher and passed Mac Studio API-runner parity,
 memory, legacy-path and docs-drift gates, but sidecar load was not faster than
-runtime packing. Stage 08 must continue to avoid canonical publisher/precompute
-or manifest changes unless a separate approved publisher plan exists.
+runtime packing. Stage 08 is also accepted for learning only after proving
+selected-cell TP/SL parity and by-entry layout. Stage 09 must continue to avoid
+canonical publisher/precompute or manifest changes unless a separate approved
+publisher plan exists.
 
 ## Stage Ledger
 
@@ -879,8 +974,8 @@ or manifest changes unless a separate approved publisher plan exists.
 | 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/` | Mac Studio API-runner parity `2/2`, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; `none/arity_6/long_only` ratio `15.543`, `none/arity_6/long_short_reversal` ratio `5.323`; production default remains locked | true |
 | 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted; only evidence/patch retained | true for Stage 07 sidecar/test bitset artifacts only |
 | 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
-| 08 | planned | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | planned | Pending Stage 07 learning handoff; must not assume sidecar loading is a speed win | false |
-| 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 | false |
+| 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
+| 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 learning handoff; must prove full-grid parity, accepted `tp_sl_exact_scoring` speedup and no service wall regression | false |
 | 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 | false |
 | 11 | planned | Lazy detail reuse of sparse trade tape | planned | Pending Stage 10 | false |
 

@@ -1,0 +1,612 @@
+{
+  "cleanup_evidence": {
+    "result_contains_heavy_references": false,
+    "runtime_result": {
+      "checked_reference_names": [
+        "prepared_result",
+        "combo_planning_result",
+        "hit_times_subset",
+        "tp_sl_diff_buffers",
+        "score_arrays",
+        "selected_top_rows",
+        "heap"
+      ],
+      "cleanup_duration_s": 0.00011704201460815966,
+      "result_contains_heavy_references": false,
+      "result_is_compact": true,
+      "retained_heavy_reference_names": []
+    },
+    "scheduling_class": "heavy",
+    "worker_recycle_required": true,
+    "worker_recycle_strategy": "disposable child process"
+  },
+  "exact_diagnostics": {
+    "combo_planning": {
+      "cartesian_combinations": 6,
+      "combo_chunks_processed": 0,
+      "combo_iteration_mode": "ordinal_streaming_pass_through",
+      "exact_candidates_evaluated": 6,
+      "materialized_candidate_count": 0,
+      "proxy_candidates_seen": 6,
+      "proxy_candidates_selected": 6,
+      "proxy_candidates_valid": 6,
+      "stage_timings": {
+        "build_exact_context": 0.0005244170024525374,
+        "build_proxy_context": 7.875001756474376e-06,
+        "combo_iteration": 0.0,
+        "proxy_filter": 0.0
+      },
+      "streamed_candidate_count": 6
+    },
+    "row_signatures": {
+      "candidate_upper_bound_after_row_dedup": 6,
+      "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+      "consensus_signature_count": 6,
+      "consensus_signature_enumeration_limit": 10000,
+      "consensus_signature_mode": "exact_consensus_enumerated",
+      "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+      "duplicate_row_count": 0,
+      "duplicate_row_fraction": 0.0,
+      "duplicate_signal_row_ids": {
+        "ma.dema": []
+      },
+      "indicators": [
+        {
+          "duplicate_signal_row_ids": [],
+          "indicator_id": "ma.dema",
+          "row_signature_collision_count": 0,
+          "rows_after_prefilter": 6,
+          "unique_rows_after_dedup": 6,
+          "unique_signal_row_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "row_signature_collision_count": 0,
+      "rows_after_prefilter": 6,
+      "schema": "backtest_row_signature_telemetry_v1",
+      "unique_rows_after_dedup": 6,
+      "unique_signal_row_ids": {
+        "ma.dema": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "self_check": {
+      "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_logical_name": "event_segments_1_tp_sl_15m_grid",
+      "best_cell_equal": null,
+      "direction_mode": "long_only",
+      "enabled": false,
+      "first_mismatch": null,
+      "max_abs_return_diff": null,
+      "mismatches": 0,
+      "return_tolerance": null,
+      "sample_size": 0,
+      "status": "not_run",
+      "trade_count_equal": null,
+      "valid_tp_sl_indexes": null
+    },
+    "signal_bitsets": {
+      "arrays": {
+        "neg_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        },
+        "pos_bits": {
+          "dtype": "uint64",
+          "shape": [
+            "rows",
+            "W"
+          ]
+        }
+      },
+      "arrays_released_before_return": true,
+      "bit_order": "little_endian_lsb_first_per_uint64_word",
+      "consensus_sample_count": 6,
+      "consensus_sample_mismatches": 0,
+      "consensus_sample_parity": true,
+      "estimated_peak_bytes": 1641894,
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "negative_signal_count": 657719,
+          "neutral_signal_count": 38,
+          "packed_bytes": 328416,
+          "padding_bits": 31,
+          "padding_valid": true,
+          "positive_signal_count": 655721,
+          "rows_after_prefilter": 6,
+          "signal_length": 218913,
+          "word_count": 3421
+        }
+      ],
+      "packed_bytes": 328416,
+      "padding_bits": 31,
+      "padding_valid": true,
+      "rows_after_prefilter": 6,
+      "schema": "backtest_runtime_bitset_pack_shadow_v1",
+      "sidecar_available": false,
+      "sidecar_dir": null,
+      "sidecar_fallback_reason": null,
+      "sidecar_load_ms": null,
+      "sidecar_used": false,
+      "signal_length": 218913,
+      "source": "runtime_pack",
+      "word_count": 3421,
+      "word_count_formula": "W = ceil(T / 64)"
+    },
+    "telemetry": {
+      "arity": 1,
+      "backend_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_implementation_id": "event_segments_n_tp_sl_15m_grid",
+      "backend_logical_name": "event_segments_1_tp_sl_15m_grid",
+      "benchmark_top_k": 5,
+      "direction_mode": "long_only",
+      "exact_candidates_evaluated": 6,
+      "heap_capacity": 50,
+      "metric_names": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "trade_count",
+        "sharpe_trades",
+        "win_rate_pct",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct",
+        "best_tp_pct",
+        "best_sl_pct"
+      ],
+      "min_closed_trades": 300,
+      "numba_num_threads": 12,
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "quality_candidates_below_min_trades": 0,
+      "quality_candidates_heap_eligible": 6,
+      "request_top_n": 50,
+      "risk_mode": "tp_sl_grid",
+      "sample_metrics": {
+        "best_sl_pct": 5.0,
+        "best_tp_pct": 5.5,
+        "total_return_pct": -100.0,
+        "trade_count": 41393.0
+      },
+      "stage_timings": {
+        "exact_scoring": 0.0028804169851355255,
+        "heap_update": 4.254200030118227e-05,
+        "tp_sl_exact_boundary": 0.0020092079939786345,
+        "tp_sl_exact_scoring": 0.0028804169851355255,
+        "tp_sl_full_metrics_second_pass": 0.7943188330100384
+      },
+      "status": "scored",
+      "top_results_count": 6
+    },
+    "top_results_sample": [
+      {
+        "best_sl_idx": 7,
+        "best_tp_idx": 7,
+        "indicator_rows": {
+          "ma.dema": 2
+        },
+        "metadata": {
+          "candidate_ordinal": 2,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 2,
+          "ma.dema.source": "close",
+          "ma.dema.window": 7
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 3.0662467663929815,
+          "avg_trade_ret_pct": -0.15035626387134057,
+          "best_sl_pct": 5.5,
+          "best_tp_pct": 5.5,
+          "exposure_pct": 36.02129936709697,
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.421632506540432,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -17.004509631820884,
+          "total_return_pct": -100.0,
+          "trade_count": 35564.0,
+          "win_rate_pct": 21.029692947924868
+        },
+        "rank": 1,
+        "score": -100.0
+      },
+      {
+        "best_sl_idx": 7,
+        "best_tp_idx": 7,
+        "indicator_rows": {
+          "ma.dema": 3
+        },
+        "metadata": {
+          "candidate_ordinal": 3,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 3,
+          "ma.dema.source": "close",
+          "ma.dema.window": 8
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 3.2648871865461726,
+          "avg_trade_ret_pct": -0.14935366326739918,
+          "best_sl_pct": 5.5,
+          "best_tp_pct": 5.5,
+          "exposure_pct": 36.04045822707874,
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.42915391077686205,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -15.889428608296205,
+          "total_return_pct": -100.0,
+          "trade_count": 33418.0,
+          "win_rate_pct": 20.973726734095397
+        },
+        "rank": 2,
+        "score": -100.0
+      },
+      {
+        "best_sl_idx": 7,
+        "best_tp_idx": 7,
+        "indicator_rows": {
+          "ma.dema": 4
+        },
+        "metadata": {
+          "candidate_ordinal": 4,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 4,
+          "ma.dema.source": "close",
+          "ma.dema.window": 9
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 3.455276827568732,
+          "avg_trade_ret_pct": -0.1481993468575107,
+          "best_sl_pct": 5.5,
+          "best_tp_pct": 5.5,
+          "exposure_pct": 36.03517302432515,
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.43417451391815814,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -14.851648494895684,
+          "total_return_pct": -100.0,
+          "trade_count": 31572.0,
+          "win_rate_pct": 20.844419105536552
+        },
+        "rank": 3,
+        "score": -100.0
+      },
+      {
+        "best_sl_idx": 7,
+        "best_tp_idx": 7,
+        "indicator_rows": {
+          "ma.dema": 5
+        },
+        "metadata": {
+          "candidate_ordinal": 5,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 5,
+          "ma.dema.source": "close",
+          "ma.dema.window": 10
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 3.63561352142667,
+          "avg_trade_ret_pct": -0.14764359658851473,
+          "best_sl_pct": 5.5,
+          "best_tp_pct": 5.5,
+          "exposure_pct": 36.09529220564724,
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.45646953746738117,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -14.160796007587527,
+          "total_return_pct": -100.0,
+          "trade_count": 30056.0,
+          "win_rate_pct": 20.77122704285334
+        },
+        "rank": 4,
+        "score": -100.0
+      },
+      {
+        "best_sl_idx": 6,
+        "best_tp_idx": 7,
+        "indicator_rows": {
+          "ma.dema": 0
+        },
+        "metadata": {
+          "candidate_ordinal": 0,
+          "ma.dema.indicator_id": "ma.dema",
+          "ma.dema.row_id": 0,
+          "ma.dema.source": "close",
+          "ma.dema.window": 5
+        },
+        "metrics": {
+          "avg_trade_exec_bars": 2.6351557026550383,
+          "avg_trade_ret_pct": -0.14986064772964064,
+          "best_sl_pct": 5.0,
+          "best_tp_pct": 5.5,
+          "exposure_pct": 36.03087879708785,
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.4129616079967502,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -19.66953961347067,
+          "total_return_pct": -100.0,
+          "trade_count": 41393.0,
+          "win_rate_pct": 21.643756190660255
+        },
+        "rank": 5,
+        "score": -100.0
+      }
+    ],
+    "tp_sl_selected_cells": {
+      "best_cell_equal": true,
+      "by_entry_layout": {
+        "arrays": {
+          "long_sl_by_entry.u32.npy": {
+            "c_contiguous": true,
+            "dtype": "uint32",
+            "shape": [
+              55823,
+              8
+            ]
+          },
+          "long_tp_by_entry.u32.npy": {
+            "c_contiguous": true,
+            "dtype": "uint32",
+            "shape": [
+              55823,
+              8
+            ]
+          },
+          "short_sl_by_entry.u32.npy": {
+            "c_contiguous": true,
+            "dtype": "uint32",
+            "shape": [
+              55823,
+              8
+            ]
+          },
+          "short_tp_by_entry.u32.npy": {
+            "c_contiguous": true,
+            "dtype": "uint32",
+            "shape": [
+              55823,
+              8
+            ]
+          }
+        },
+        "materialize_ms": 2.1245410025585443,
+        "required_sidecar_names": [
+          "long_tp_by_entry.u32.npy",
+          "long_sl_by_entry.u32.npy",
+          "short_tp_by_entry.u32.npy",
+          "short_sl_by_entry.u32.npy"
+        ],
+        "schema": "backtest_tp_sl_by_entry_hit_times_layout_v1",
+        "selected_arrays_bytes": 7145344,
+        "selected_entry_count": 55823,
+        "sidecar_policy": "job-local selected arrays only; no publisher or manifest write",
+        "sl_count": 8,
+        "tp_count": 8
+      },
+      "candidate_count": 6,
+      "elapsed_ms": 383.13079200452194,
+      "enabled": true,
+      "first_mismatch": null,
+      "limit": {
+        "sl_count <= 8": true,
+        "tp_count <= 8": true
+      },
+      "max_abs_return_diff_pct": 0.0,
+      "parity_pass": true,
+      "production_topn_feed": "current_path_only",
+      "schema": "backtest_tp_sl_selected_cell_shadow_v1",
+      "selected_cell_scores": 384,
+      "skip_reason": null,
+      "sl_count": 8,
+      "sl_wins_tie_rule": "SL wins",
+      "status": "passed",
+      "tp_count": 8,
+      "tp_sl_cells": 64,
+      "trade_count_equal": true,
+      "trade_tape": {
+        "candidate_count": 6,
+        "long_trade_count": 210113,
+        "sample": [
+          {
+            "entry_abs_max": 302725,
+            "entry_abs_min": 83822,
+            "local_indices": [
+              0
+            ],
+            "long_trade_count": 41393,
+            "short_trade_count": 0,
+            "trade_count": 41393
+          },
+          {
+            "entry_abs_max": 302725,
+            "entry_abs_min": 83822,
+            "local_indices": [
+              1
+            ],
+            "long_trade_count": 38110,
+            "short_trade_count": 0,
+            "trade_count": 38110
+          },
+          {
+            "entry_abs_max": 302725,
+            "entry_abs_min": 83823,
+            "local_indices": [
+              2
+            ],
+            "long_trade_count": 35564,
+            "short_trade_count": 0,
+            "trade_count": 35564
+          },
+          {
+            "entry_abs_max": 302725,
+            "entry_abs_min": 83823,
+            "local_indices": [
+              3
+            ],
+            "long_trade_count": 33418,
+            "short_trade_count": 0,
+            "trade_count": 33418
+          },
+          {
+            "entry_abs_max": 302725,
+            "entry_abs_min": 83823,
+            "local_indices": [
+              4
+            ],
+            "long_trade_count": 31572,
+            "short_trade_count": 0,
+            "trade_count": 31572
+          }
+        ],
+        "schema": "backtest_tp_sl_sparse_trade_tape_v1",
+        "selected_entry_count": 55823,
+        "selected_entry_max": 302725,
+        "selected_entry_min": 83822,
+        "short_trade_count": 0,
+        "trade_count": 210113
+      }
+    }
+  },
+  "instrumentation_counters": {
+    "artifact_load_ms": 73.77754198387265,
+    "avg_segments_per_candidate": null,
+    "avg_trades_per_candidate": null,
+    "bitset_consensus_sample_count": 6,
+    "bitset_consensus_sample_mismatches": 0,
+    "bitset_consensus_sample_parity": true,
+    "bitset_padding_valid": true,
+    "bitset_word_count": 3421,
+    "candidate_upper_bound_after_row_dedup": 6,
+    "candidates_after_proxy": 6,
+    "combo_count_planned": 6,
+    "combo_iteration_ms": 0.0,
+    "consensus_signature_count": 6,
+    "consensus_signature_mode": "exact_consensus_enumerated",
+    "duplicate_signal_row_ids": {
+      "ma.dema": []
+    },
+    "exact_candidates": 6,
+    "exact_candidates_per_sec": 2083.0317384473055,
+    "exact_scoring_ms": 2.8804169851355255,
+    "proxy_filter_ms": 0.0,
+    "row_signature_collision_count": 0,
+    "row_signature_ms": 12.039624998578802,
+    "rows_after_prefilter": 6,
+    "rows_before_prefilter": null,
+    "sidecar_available": false,
+    "sidecar_dir": null,
+    "sidecar_fallback_reason": null,
+    "sidecar_load_ms": null,
+    "sidecar_used": false,
+    "signals_pack_arrays_released": true,
+    "signals_pack_bytes": 328416,
+    "signals_pack_estimated_peak_bytes": 1641894,
+    "signals_pack_ms": 31.324124982347712,
+    "signals_pack_source": "runtime_pack",
+    "sl_count": 8,
+    "top_result_assembly_ms": 1.1949170148000121,
+    "tp_count": 8,
+    "tp_sl_by_entry_selected_arrays_bytes": 7145344,
+    "tp_sl_cells": 64,
+    "tp_sl_exact_scoring_ms": 2.8804169851355255,
+    "tp_sl_selected_cell_elapsed_ms": 383.13079200452194,
+    "tp_sl_selected_cell_parity_pass": true,
+    "tp_sl_selected_cell_scores": 384,
+    "tp_sl_selected_cell_shadow_status": "passed",
+    "trade_cell_evals_per_sec": 133314.03126062755,
+    "unique_rows_after_dedup": 6
+  },
+  "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+  "process_evidence": {
+    "cancelled": false,
+    "command": [
+      "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+      "-m",
+      "apps.worker.backtest_job_runner.main.full_job_child",
+      "--job-id",
+      "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+      "--preflight-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/preflight.json",
+      "--output-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-7x7_16ra/result.json",
+      "--scheduling-class",
+      "heavy",
+      "--light-max-actual-combinations",
+      "50000"
+    ],
+    "elapsed_seconds": 2.135791,
+    "exit_code": 0,
+    "finished_at": "2026-06-07T11:41:16.905692Z",
+    "metadata": {
+      "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+      "job_id": "d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6",
+      "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+      "numba_threads": "12",
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "parent_physical_footprint_after_bytes": null,
+    "parent_physical_footprint_before_bytes": null,
+    "parent_pid": 89602,
+    "parent_retained_physical_footprint_delta_bytes": null,
+    "parent_retained_rss_delta_bytes": 458752,
+    "parent_rss_after_bytes": 118423552,
+    "parent_rss_before_bytes": 117964800,
+    "peak_physical_footprint_bytes": null,
+    "peak_rss_bytes": 267059200,
+    "pid": 89626,
+    "schema": "roehub_child_process_evidence_v1",
+    "started_at": "2026-06-07T11:41:14.769901Z",
+    "stderr_tail": "2026-06-07 14:41:15,071 INFO __main__ backtest child process started: job_id=d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-07 14:41:16,759 INFO __main__ backtest child process finished: job_id=d7b7a61d-ff59-4044-b0a0-8d5a58fea5c6 status=succeeded elapsed_seconds=1.688\n",
+    "stdout_tail": "",
+    "timed_out": false
+  },
+  "schema": "roehub_full_job_child_result_evidence_v1",
+  "stage_timings": {
+    "artifact_array_mmap_load": 0.00847362499916926,
+    "artifact_array_open": 0.00847362499916926,
+    "artifact_context_resolve": 0.06530391698470339,
+    "artifact_manifest_load": 0.06530391698470339,
+    "build_exact_context": 0.0005244170024525374,
+    "build_proxy_context": 7.875001756474376e-06,
+    "combo_iteration": 0.0,
+    "exact_scoring": 0.0028804169851355255,
+    "heap_update": 4.254200030118227e-05,
+    "load_hit_times": 0.014442583022173494,
+    "persist_top_n_io": 0.0,
+    "prepare_pools_core": 0.07713024999247864,
+    "prepare_pools_total": 0.16371062499820255,
+    "proxy_filter": 0.0,
+    "request_slice_prepare": 0.0009138750028796494,
+    "row_prefilter": 0.0741355000063777,
+    "sample_warmup": 0.1792351669864729,
+    "segment_build": 0.0026872080052271485,
+    "service_total_without_warmup": 1.286659000965301,
+    "service_wall_clock_s": 1.6526503329805564,
+    "signal_row_selection": 0.00030174999847076833,
+    "time_range_slice": 0.0009138750028796494,
+    "top_result_assembly": 0.0011949170148000121,
+    "tp_sl_exact_boundary": 0.0020092079939786345,
+    "tp_sl_exact_scoring": 0.0028804169851355255,
+    "tp_sl_full_metrics_second_pass": 0.7943188330100384,
+    "tp_sl_grid_validation": 0.0010096249752677977
+  },
+  "status": "succeeded",
+  "summary_hash": "533f9793a9a21f6b7c29e640bcd4dc665d934aa916245e4ac391f96106c101f4",
+  "top_variants_count": 6
+}

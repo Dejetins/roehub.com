@@ -39,6 +39,10 @@ from trading.contexts.backtest.application.services.v2 import (
     build_segment_stack,
     build_signal_segments,
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.tp_sl_cells import (
+    SL_WINS_TIE_RULE_LITERAL,
+    build_tp_sl_selected_cell_shadow,
+)
 
 
 def test_tp_sl_exact_applies_same_bar_sl_tie_rule() -> None:
@@ -502,6 +506,90 @@ def test_tp_sl_result_does_not_build_iteration_7_identity_fields() -> None:
     assert result.memory_cleanup_evidence.result_is_compact is True
     assert result.telemetry.status == TP_SL_EXACT_SCORED_STATUS
     assert TP_SL_HEAP_UPDATE_STAGE_NAME in result.telemetry.stage_timings
+
+
+def test_tp_sl_selected_cell_shadow_validates_long_and_short_cells() -> None:
+    prepared = _prepared_result(
+        indicator_ids=("alpha",),
+        trade_rows_by_id={"alpha": [[1, -1, 0, 0]]},
+        open_1m=[100.0, 100.0, 100.0, 100.0],
+        close_1m=[100.0, 100.0, 100.0, 100.0],
+    )
+    hit_times = _hit_times_result(
+        tp_values=(0.02, 0.10),
+        sl_values=(0.02, 0.05),
+        long_tp=[
+            [4, 4, 2, 4],
+            [4, 4, 2, 4],
+        ],
+        long_sl=[
+            [4, 4, 4, 4],
+            [4, 4, 4, 4],
+        ],
+        short_tp=[
+            [4, 4, 4, 3],
+            [4, 4, 4, 3],
+        ],
+        short_sl=[
+            [4, 4, 4, 4],
+            [4, 4, 4, 4],
+        ],
+    )
+
+    validation = build_tp_sl_selected_cell_shadow(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_short_reversal",
+        ),
+        hit_times_result=hit_times,
+        normalized_request=_normalized_request(
+            direction_mode="long_short_reversal",
+            fee_rate=0.0,
+        ),
+    )
+    mapping = validation.as_mapping()
+
+    assert mapping["status"] == "passed"
+    assert mapping["parity_pass"] is True
+    assert mapping["tp_count"] == 2
+    assert mapping["sl_count"] == 2
+    assert mapping["selected_cell_scores"] == 4
+    assert mapping["trade_tape"]["long_trade_count"] == 1
+    assert mapping["trade_tape"]["short_trade_count"] == 1
+    assert mapping["by_entry_layout"]["arrays"]["long_tp_by_entry.u32.npy"][
+        "shape"
+    ] == [2, 2]
+    assert mapping["production_topn_feed"] == "current_path_only"
+
+
+def test_tp_sl_selected_cell_shadow_records_sl_wins_tie_rule() -> None:
+    prepared = _prepared_result(
+        indicator_ids=("alpha",),
+        trade_rows_by_id={"alpha": [[1, 1, 0, 0]]},
+        open_1m=[100.0, 100.0, 100.0, 101.0],
+        close_1m=[100.0, 100.0, 100.0, 101.0],
+    )
+    hit_times = _hit_times_result(
+        tp_values=(0.10,),
+        sl_values=(0.05,),
+        long_tp=[[4, 4, 2, 4]],
+        long_sl=[[4, 4, 2, 4]],
+    )
+
+    validation = build_tp_sl_selected_cell_shadow(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_only",
+        ),
+        hit_times_result=hit_times,
+        normalized_request=_normalized_request(direction_mode="long_only", fee_rate=0.0),
+    )
+
+    assert validation.status == "passed"
+    assert validation.parity_pass is True
+    assert validation.sl_wins_tie_rule == SL_WINS_TIE_RULE_LITERAL
 
 
 def _prepared_result(

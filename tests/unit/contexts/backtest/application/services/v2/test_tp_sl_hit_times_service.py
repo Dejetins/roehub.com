@@ -26,6 +26,9 @@ from trading.contexts.backtest.application.services.v2 import (
     BacktestTpSlHitTimesRejected,
     BacktestTpSlHitTimesService,
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.tp_sl_cells import (
+    build_selected_by_entry_hit_times_layout,
+)
 
 
 def test_tp_sl_hit_times_service_selects_requested_contiguous_subset(
@@ -99,6 +102,38 @@ def test_tp_sl_hit_times_service_materializes_disabled_tp_as_never_hit(
     assert result.hit_times.long_tp.tolist() == [[2, 2]]
     assert result.hit_times.short_tp.tolist() == [[2, 2]]
     assert result.hit_times.sl_values.tolist() == pytest.approx([0.01])
+
+
+def test_tp_sl_hit_times_by_entry_layout_is_job_local_and_contiguous(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
+    service = BacktestTpSlHitTimesService(artifact_array_loader=loader)
+    result = service.execute(
+        normalized_request=_normalized_request(
+            tp_start=1.0,
+            tp_stop=2.0,
+            sl_start=1.0,
+            sl_stop=2.0,
+        ),
+        context=_context(store=store, loader=loader),
+    )
+
+    layout = build_selected_by_entry_hit_times_layout(
+        hit_times=result.hit_times,
+        selected_entries=np.asarray([0, 1], dtype=np.int32),
+    )
+    mapping = layout.as_mapping()
+
+    assert mapping["selected_entry_count"] == 2
+    assert mapping["tp_count"] == 2
+    assert mapping["sl_count"] == 2
+    assert mapping["sidecar_policy"] == (
+        "job-local selected arrays only; no publisher or manifest write"
+    )
+    assert mapping["arrays"]["long_tp_by_entry.u32.npy"]["shape"] == [2, 2]
+    assert mapping["arrays"]["short_sl_by_entry.u32.npy"]["c_contiguous"] is True
 
 
 def test_tp_sl_hit_times_service_rejects_missing_tp_before_table_load(

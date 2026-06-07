@@ -28,6 +28,10 @@ from .job_scheduling import (
 )
 from .matrix_backend.bitsets import build_runtime_bitset_pack_telemetry
 from .matrix_backend.row_signatures import build_row_signature_telemetry
+from .matrix_backend.tp_sl_cells import (
+    build_tp_sl_selected_cell_shadow,
+    tp_sl_selected_cell_shadow_enabled,
+)
 from .prepare_pools import build_signal_segments, row_metadata_order_hash
 from .top_result_assembly import (
     TOP_RESULT_ASSEMBLY_STAGE_NAME,
@@ -107,6 +111,7 @@ class BacktestRuntimeJobOrchestrationService:
         row_signature_elapsed_s: float | None = None
         bitset_pack_telemetry = None
         bitset_pack_elapsed_s: float | None = None
+        tp_sl_selected_cells = None
         try:
             prepared_result = self.prepare_pools.execute(
                 normalized_request=normalized_request,
@@ -172,6 +177,13 @@ class BacktestRuntimeJobOrchestrationService:
                     hit_times_result=hit_times_result,
                     normalized_request=normalized_request,
                 )
+                if tp_sl_selected_cell_shadow_enabled():
+                    tp_sl_selected_cells = build_tp_sl_selected_cell_shadow(
+                        prepared_result=prepared_result,
+                        combo_planning_result=combo_result,
+                        hit_times_result=hit_times_result,
+                        normalized_request=normalized_request,
+                    )
             else:
                 raise ValueError(f"unsupported risk.mode for job execution: {risk_mode!r}")
 
@@ -202,6 +214,9 @@ class BacktestRuntimeJobOrchestrationService:
                 "combo_planning": combo_result.telemetry.as_mapping(),
                 "row_signatures": row_signature_telemetry.as_mapping(),
                 "signal_bitsets": bitset_pack_telemetry.as_mapping(),
+                "tp_sl_selected_cells": None
+                if tp_sl_selected_cells is None
+                else tp_sl_selected_cells.as_mapping(),
                 "self_check": exact_result.self_check.as_mapping(),
                 "top_results_sample": [
                     item.as_mapping() for item in exact_result.top_results[:5]
@@ -218,6 +233,7 @@ class BacktestRuntimeJobOrchestrationService:
                 row_signature_elapsed_s=row_signature_elapsed_s,
                 bitset_pack_telemetry=bitset_pack_telemetry,
                 bitset_pack_elapsed_s=bitset_pack_elapsed_s,
+                tp_sl_selected_cells=tp_sl_selected_cells,
             )
             return BacktestJobExecutionResult(
                 top_variants=assembly.top_variants,
@@ -236,6 +252,7 @@ class BacktestRuntimeJobOrchestrationService:
             del combo_result
             del row_signature_telemetry
             del bitset_pack_telemetry
+            del tp_sl_selected_cells
             del prepared_result
             gc.collect()
 
@@ -414,6 +431,7 @@ def _instrumentation_counters(
     row_signature_elapsed_s: float | None,
     bitset_pack_telemetry: Any,
     bitset_pack_elapsed_s: float | None,
+    tp_sl_selected_cells: Any,
 ) -> dict[str, Any]:
     combo_telemetry = combo_result.telemetry
     exact_telemetry = exact_result.telemetry
@@ -428,6 +446,9 @@ def _instrumentation_counters(
     tp_sl_cells = int(preflight.cost_estimate.tp_sl_cells)
     row_signature_mapping = row_signature_telemetry.as_mapping()
     bitset_pack_mapping = bitset_pack_telemetry.as_mapping()
+    tp_sl_selected_mapping = (
+        None if tp_sl_selected_cells is None else tp_sl_selected_cells.as_mapping()
+    )
 
     return {
         "artifact_load_ms": _seconds_to_ms(artifact_load_s),
@@ -480,6 +501,22 @@ def _instrumentation_counters(
         "tp_count": tp_count,
         "sl_count": sl_count,
         "tp_sl_cells": tp_sl_cells,
+        "tp_sl_selected_cell_shadow_status": None
+        if tp_sl_selected_mapping is None
+        else tp_sl_selected_mapping["status"],
+        "tp_sl_selected_cell_parity_pass": None
+        if tp_sl_selected_mapping is None
+        else tp_sl_selected_mapping["parity_pass"],
+        "tp_sl_selected_cell_scores": None
+        if tp_sl_selected_mapping is None
+        else tp_sl_selected_mapping["selected_cell_scores"],
+        "tp_sl_selected_cell_elapsed_ms": None
+        if tp_sl_selected_mapping is None
+        else tp_sl_selected_mapping["elapsed_ms"],
+        "tp_sl_by_entry_selected_arrays_bytes": None
+        if tp_sl_selected_mapping is None
+        or tp_sl_selected_mapping.get("by_entry_layout") is None
+        else tp_sl_selected_mapping["by_entry_layout"]["selected_arrays_bytes"],
         "exact_candidates_per_sec": _rate(
             numerator=exact_candidates,
             denominator_s=exact_scoring_s,
