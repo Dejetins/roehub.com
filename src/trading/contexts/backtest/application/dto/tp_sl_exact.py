@@ -36,6 +36,8 @@ class BacktestTpSlExactConfig:
     default_initial_cash_quote: float = 10000.0
     default_fixed_quote: float = 100.0
     default_safe_profit_percent: float = 30.0
+    cell_block_tp_count: int = 16
+    cell_block_sl_count: int = 16
 
     def __post_init__(self) -> None:
         if self.benchmark_top_k <= 0:
@@ -56,6 +58,10 @@ class BacktestTpSlExactConfig:
             raise ValueError("default_fixed_quote must be > 0")
         if self.default_safe_profit_percent < 0.0:
             raise ValueError("default_safe_profit_percent must be >= 0")
+        if self.cell_block_tp_count <= 0:
+            raise ValueError("cell_block_tp_count must be > 0")
+        if self.cell_block_sl_count <= 0:
+            raise ValueError("cell_block_sl_count must be > 0")
 
     @property
     def heap_capacity(self) -> int:
@@ -225,6 +231,7 @@ class BacktestTpSlExactTelemetry:
     min_closed_trades: int = 0
     quality_candidates_below_min_trades: int = 0
     quality_candidates_heap_eligible: int = 0
+    cell_backend: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.request_top_n <= 0:
@@ -247,6 +254,12 @@ class BacktestTpSlExactTelemetry:
             raise ValueError("quality_candidates_heap_eligible must be >= 0")
         if self.numba_num_threads is not None and self.numba_num_threads <= 0:
             raise ValueError("numba_num_threads must be > 0 when provided")
+        if self.cell_backend is not None:
+            object.__setattr__(
+                self,
+                "cell_backend",
+                MappingProxyType(dict(self.cell_backend)),
+            )
         object.__setattr__(
             self,
             "stage_timings",
@@ -286,6 +299,9 @@ class BacktestTpSlExactTelemetry:
             "min_closed_trades": self.min_closed_trades,
             "quality_candidates_below_min_trades": self.quality_candidates_below_min_trades,
             "quality_candidates_heap_eligible": self.quality_candidates_heap_eligible,
+            "cell_backend": None
+            if self.cell_backend is None
+            else dict(self.cell_backend),
         }
 
 

@@ -27,6 +27,7 @@ EVENT_SEGMENTS_2_NO_RISK_BACKEND = "event_segments_2_no_risk"
 STREAMING_2_NO_RISK_BACKEND = "streaming_2_no_risk"
 EVENT_SEGMENTS_N_NO_RISK_BACKEND = "event_segments_n_no_risk"
 MATRIX_BITSET_NO_RISK_V1_BACKEND = "matrix_bitset_no_risk_v1"
+MATRIX_CELL_TP_SL_V1_BACKEND = "matrix_cell_tp_sl_v1"
 EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND = "event_segments_n_tp_sl_15m_grid"
 BUILD_EXACT_CONTEXT_STAGE_NAME = "build_exact_context"
 BUILD_PROXY_CONTEXT_STAGE_NAME = "build_proxy_context"
@@ -103,6 +104,13 @@ class BacktestBackendRegistry:
                     risk_mode="tp_sl_grid",
                     arities=_SUPPORTED_ARITIES,
                     role="generic",
+                    requires_exact_context=True,
+                ),
+                _BackendDescriptor(
+                    backend_id=MATRIX_CELL_TP_SL_V1_BACKEND,
+                    risk_mode="tp_sl_grid",
+                    arities=_SUPPORTED_ARITIES,
+                    role="matrix_full_grid",
                     requires_exact_context=True,
                 ),
             )
@@ -921,6 +929,7 @@ __all__ = [
     "EVENT_SEGMENTS_N_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND",
     "LEGACY_PRODUCT_HELPER_MAX_COMBINATIONS",
+    "MATRIX_CELL_TP_SL_V1_BACKEND",
     "NEG_INF",
     "PROXY_FILTER_STAGE_NAME",
     "STREAMING_2_NO_RISK_BACKEND",

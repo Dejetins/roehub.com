@@ -1,0 +1,51 @@
+{
+  "cache_path": null,
+  "cache_status": "miss",
+  "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+  "process_evidence": {
+    "cancelled": false,
+    "command": [
+      "/private/tmp/roehub-stage09-candidate/.venv/bin/python3",
+      "-m",
+      "apps.worker.backtest_job_runner.main.lazy_trades_child",
+      "--task-id",
+      "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc",
+      "--job-id",
+      "3021d77f-be1b-464c-bf36-2e543c7156e3",
+      "--owner-user-id",
+      "6960d466-e9fb-4116-a9fb-8f1589c61914",
+      "--variant-key",
+      "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+      "--output-json",
+      "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-ps1j5375/result.json"
+    ],
+    "elapsed_seconds": 0.878775,
+    "exit_code": 0,
+    "finished_at": "2026-06-09T22:49:06.243683Z",
+    "metadata": {
+      "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+      "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+      "public_variant_key": "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+      "task_id": "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc",
+      "task_kind": "lazy_trades"
+    },
+    "parent_physical_footprint_after_bytes": null,
+    "parent_physical_footprint_before_bytes": null,
+    "parent_pid": 12105,
+    "parent_retained_physical_footprint_delta_bytes": null,
+    "parent_retained_rss_delta_bytes": 16384,
+    "parent_rss_after_bytes": 130498560,
+    "parent_rss_before_bytes": 130482176,
+    "peak_physical_footprint_bytes": null,
+    "peak_rss_bytes": 535232512,
+    "pid": 12790,
+    "schema": "roehub_child_process_evidence_v1",
+    "started_at": "2026-06-09T22:49:05.364908Z",
+    "stderr_tail": "2026-06-10 01:49:05,718 INFO __main__ lazy trades child process started: task_id=e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc job_id=3021d77f-be1b-464c-bf36-2e543c7156e3\n2026-06-10 01:49:06,040 INFO __main__ lazy trades child process finished: task_id=e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc cache_status=miss elapsed_seconds=0.322\n",
+    "stdout_tail": "",
+    "timed_out": false
+  },
+  "public_variant_key": "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+  "schema": "roehub_lazy_trades_child_result_evidence_v1",
+  "task_id": "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc"
+}

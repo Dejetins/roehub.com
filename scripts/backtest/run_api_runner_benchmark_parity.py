@@ -78,6 +78,14 @@ STAGE_08_TP_SL_SELECTED_DIRECTIONS = ("long_only", "long_short_reversal")
 STAGE_08_TP_SL_SELECTED_START_PCT = 2.0
 STAGE_08_TP_SL_SELECTED_STOP_PCT = 5.5
 STAGE_08_TP_SL_SELECTED_STEP_PCT = 0.5
+STAGE_09_TP_SL_FULL_GRID_ARITY = 6
+STAGE_09_TP_SL_FULL_GRID_DIRECTIONS = ("long_only", "long_short_reversal")
+STAGE_09_MATRIX_BACKEND_MODE = "stage_09_tp_sl_full_grid"
+MATRIX_BACKEND_MODE_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE"
+TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT"
+TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT"
+STAGE_09_DEFAULT_CELL_BLOCK_TP_COUNT = 64
+STAGE_09_DEFAULT_CELL_BLOCK_SL_COUNT = 64
 _DEFAULT_API_BASE = "http://127.0.0.1:8000"
 _DEFAULT_COOKIE_NAME = "roehub_session_id"
 _PARITY_FLOAT_TOLERANCE = 1e-5
@@ -121,6 +129,14 @@ def main(argv: list[str] | None = None) -> int:
     matrix_sidecar_report = _matrix_sidecar_report(args.matrix_sidecar_artifact_dir)
     if args.stage_08_tp_sl_selected_cells:
         os.environ[TP_SL_SELECTED_CELL_SHADOW_ENV_KEY] = "1"
+    if args.stage_09_tp_sl_full_grid:
+        os.environ[MATRIX_BACKEND_MODE_ENV_KEY] = STAGE_09_MATRIX_BACKEND_MODE
+        os.environ[TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY] = str(
+            args.tp_sl_cell_block_tp_count
+        )
+        os.environ[TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY] = str(
+            args.tp_sl_cell_block_sl_count
+        )
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -137,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.stage_08_tp_sl_selected_cells:
         reference_runs, excluded = _stage_08_tp_sl_selected_reference_runs(
+            reference=reference
+        )
+    if args.stage_09_tp_sl_full_grid:
+        reference_runs, excluded = _stage_09_tp_sl_full_grid_reference_runs(
             reference=reference
         )
     if args.smoke_only:
@@ -175,7 +195,18 @@ def main(argv: list[str] | None = None) -> int:
             "stage_04_mvp_rows": args.stage_04_mvp_rows,
             "stage_05_no_risk_heavy_rows": args.stage_05_no_risk_heavy_rows,
             "stage_08_tp_sl_selected_cells": args.stage_08_tp_sl_selected_cells,
+            "stage_09_tp_sl_full_grid": args.stage_09_tp_sl_full_grid,
             "tp_sl_selected_cell_shadow_env_key": TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
+            "matrix_backend_mode_env_key": MATRIX_BACKEND_MODE_ENV_KEY,
+            "matrix_backend_mode": os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY),
+            "tp_sl_cell_block_tp_count_env_key": TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY,
+            "tp_sl_cell_block_sl_count_env_key": TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY,
+            "tp_sl_cell_block_tp_count": os.environ.get(
+                TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY
+            ),
+            "tp_sl_cell_block_sl_count": os.environ.get(
+                TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY
+            ),
             "rows_per_indicator": REFERENCE_ROWS_PER_INDICATOR,
             "warmup_rows_per_indicator": REFERENCE_WARMUP_ROWS_PER_INDICATOR,
             "exclude_heaviest_140s_job": True,
@@ -327,6 +358,26 @@ def _build_parser() -> argparse.ArgumentParser:
             "Run only small TP/SL selected-cell rows with an 8x8 grid and "
             "ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW enabled."
         ),
+    )
+    parser.add_argument(
+        "--stage-09-tp-sl-full-grid",
+        action="store_true",
+        help=(
+            "Run TP/SL arity-6 full-grid rows with matrix_cell_tp_sl_v1 "
+            "enabled through ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
+        ),
+    )
+    parser.add_argument(
+        "--tp-sl-cell-block-tp-count",
+        type=int,
+        default=STAGE_09_DEFAULT_CELL_BLOCK_TP_COUNT,
+        help="TP dimension block size for Stage 09 matrix_cell_tp_sl_v1.",
+    )
+    parser.add_argument(
+        "--tp-sl-cell-block-sl-count",
+        type=int,
+        default=STAGE_09_DEFAULT_CELL_BLOCK_SL_COUNT,
+        help="SL dimension block size for Stage 09 matrix_cell_tp_sl_v1.",
     )
     parser.add_argument("--allow-backlog", action="store_true")
     parser.add_argument("--no-fail-on-threshold", action="store_true")
@@ -1358,6 +1409,43 @@ def _stage_08_tp_sl_selected_reference_runs(
     }
 
 
+def _stage_09_tp_sl_full_grid_reference_runs(
+    *,
+    reference: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for item in _list(reference.get("tp_sl_regression_runs"))
+    ]
+    required = [
+        item
+        for item in accepted_runs
+        if str(item.get("risk_mode")) == "tp_sl_grid"
+        and len(cast(Sequence[Any], item.get("indicator_ids", ())))
+        == STAGE_09_TP_SL_FULL_GRID_ARITY
+        and str(item.get("direction_mode")) in STAGE_09_TP_SL_FULL_GRID_DIRECTIONS
+    ]
+    by_direction = {str(item.get("direction_mode")): item for item in required}
+    missing = [
+        direction
+        for direction in STAGE_09_TP_SL_FULL_GRID_DIRECTIONS
+        if direction not in by_direction
+    ]
+    if missing:
+        raise RuntimeError(f"missing Stage 09 TP/SL full-grid directions: {missing!r}")
+    return [by_direction[direction] for direction in STAGE_09_TP_SL_FULL_GRID_DIRECTIONS], {
+        "job_name": None,
+        "risk_mode": "tp_sl_grid",
+        "arity": STAGE_09_TP_SL_FULL_GRID_ARITY,
+        "direction_mode": list(STAGE_09_TP_SL_FULL_GRID_DIRECTIONS),
+        "matrix_backend_mode": STAGE_09_MATRIX_BACKEND_MODE,
+        "reason": (
+            "stage_09_tp_sl_full_grid: run TP/SL arity 6 full request grids "
+            "for matrix_cell_tp_sl_v1 evidence"
+        ),
+    }
+
+
 def _smoke_subset(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     wanted = {
         ("none", 1, "long_only"),
@@ -1553,13 +1641,17 @@ def _compare_reference_results(
     api_shape_pass = int(api_top.get("_status") or 200) == 200 and (
         bool(items) or quality_top_zero
     )
+    selected_tp_count = selected_cell_shadow.get("tp_count")
+    selected_sl_count = selected_cell_shadow.get("sl_count")
     selected_cell_pass = (
         not stage_08_tp_sl_selected_cells
         or (
             selected_cell_shadow.get("status") == "passed"
             and selected_cell_shadow.get("parity_pass") is True
-            and selected_cell_shadow.get("tp_count") <= 8
-            and selected_cell_shadow.get("sl_count") <= 8
+            and isinstance(selected_tp_count, int)
+            and selected_tp_count <= 8
+            and isinstance(selected_sl_count, int)
+            and selected_sl_count <= 8
         )
     )
     accepted_top_required = (
@@ -1806,6 +1898,11 @@ _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "tp_count",
     "sl_count",
     "tp_sl_cells",
+    "tp_sl_cell_backend_id",
+    "tp_sl_cell_block_shape",
+    "tp_sl_cell_blocks_per_candidate",
+    "tp_sl_cell_block_estimated_peak_bytes",
+    "tp_sl_cell_trade_cell_evals",
     "tp_sl_selected_cell_shadow_status",
     "tp_sl_selected_cell_parity_pass",
     "tp_sl_selected_cell_scores",
@@ -2657,6 +2754,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     stage_04_mvp_rows = bool(request.get("stage_04_mvp_rows"))
     stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
     stage_08_tp_sl_selected_cells = bool(request.get("stage_08_tp_sl_selected_cells"))
+    stage_09_tp_sl_full_grid = bool(request.get("stage_09_tp_sl_full_grid"))
     title = (
         "# Stage 04 matrix bitset no-risk MVP API-runner benchmark"
         if stage_04_mvp_rows
@@ -2664,6 +2762,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_05_no_risk_heavy_rows
         else "# Stage 08 TP/SL selected-cell API-runner benchmark"
         if stage_08_tp_sl_selected_cells
+        else "# Stage 09 TP/SL full-grid cell backend API-runner benchmark"
+        if stage_09_tp_sl_full_grid
         else "# Iteration 15 API runner clean arity-6 CPU/memory benchmark"
     )
     intent_scope = (
@@ -2673,6 +2773,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_05_no_risk_heavy_rows
         else "BTCUSDT / 15m / tp_sl_grid / selected 8x8 cells"
         if stage_08_tp_sl_selected_cells
+        else "BTCUSDT / 15m / tp_sl_grid / arity 6 / full request grid"
+        if stage_09_tp_sl_full_grid
         else "BTCUSDT / 15m / arity 6"
     )
     fixture_scope = (
@@ -2685,6 +2787,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "`sl_count <= 8` / long_only + long_short_reversal / REQUEST_TOP_N = 50 / "
         "BENCHMARK_TOP_K = 5"
         if stage_08_tp_sl_selected_cells
+        else "- BTCUSDT / 15m / tp_sl_grid/arity_6/long_only + "
+        "tp_sl_grid/arity_6/long_short_reversal / full grid / "
+        "REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
+        if stage_09_tp_sl_full_grid
         else "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
     )
     intent_text = (
@@ -2701,6 +2807,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "и `sl_count <= 8`, правило `SL wins`, by-entry hit-times layout counters "
         "и отсутствие production top-N feed из shadow path."
         if stage_08_tp_sl_selected_cells
+        else "Проверить Stage 09 `matrix_cell_tp_sl_v1` full-grid TP/SL path: "
+        "exact parity, cell-block counters, `trade_cell_evals_per_sec`, memory "
+        "cleanup и service wall против May 2 reference."
+        if stage_09_tp_sl_full_grid
         else "Проверить приемочный путь API-created job -> runner -> одноразовый "
         "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 reference."
     )
@@ -2903,6 +3013,27 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
             f"{_fmt_counter(counters.get('row_signature_ms'))} | "
             f"{_fmt_counter(counters.get('sidecar_fallback_reason'))} | "
             f"`{_list(row.get('null_fields'))}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## TP/SL cell backend",
+            "",
+            "| Job | backend | block | blocks/candidate | block bytes | trade-cell evals |",
+            "| --- | --- | --- | ---: | ---: | ---: |",
+        ]
+    )
+    for job in jobs:
+        row = instrumentation_rows.get(str(job.get("job_name")), {})
+        counters = _mapping(row.get("counters"))
+        lines.append(
+            "| "
+            f"`{job.get('job_name')}` | "
+            f"{_fmt_counter(counters.get('tp_sl_cell_backend_id'))} | "
+            f"{_fmt_counter(counters.get('tp_sl_cell_block_shape'))} | "
+            f"{_fmt_counter(counters.get('tp_sl_cell_blocks_per_candidate'))} | "
+            f"{_fmt_counter(counters.get('tp_sl_cell_block_estimated_peak_bytes'))} | "
+            f"{_fmt_counter(counters.get('tp_sl_cell_trade_cell_evals'))} |"
         )
     lines.extend(
         [

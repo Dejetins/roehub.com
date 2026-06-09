@@ -942,9 +942,133 @@ blocks only. Stage 09 must prove full-grid parity, cell-block size, accepted
 `tp_sl_exact_scoring` speedup and no service wall regression before any
 production-affecting backend mode is accepted.
 
+## Stage 09 — TP/SL full-grid cell blocks accepted
+
+Stage 09 implemented `matrix_cell_tp_sl_v1` as an opt-in internal TP/SL exact
+backend selected by `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_09_tp_sl_full_grid`
+or `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=matrix_cell_tp_sl_v1`.
+
+Implementation scope:
+
+- added `matrix_cell_tp_sl_v1` to the internal backend registry for
+  `risk.mode = tp_sl_grid`;
+- added a Numba full-grid cell-block scorer that materializes each candidate's
+  sparse trade tape once, scores the full TP/SL grid in configurable TP/SL cell
+  blocks, preserves the same `SL wins` same-bar rule and the existing best-cell
+  tie ordering;
+- added internal block-size knobs
+  `ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT` and
+  `ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT`;
+- added Stage 09 API-runner benchmark mode `--stage-09-tp-sl-full-grid` and
+  markdown/JSON counters for backend id, block shape, blocks per candidate,
+  block bytes, `tp_count`, `sl_count`, `tp_sl_cells` and
+  `trade_cell_evals_per_sec`;
+- added focused unit coverage comparing the full-grid matrix backend against the
+  existing `event_segments_n_tp_sl_15m_grid` backend for canonical top-N payload,
+  row identity, cell telemetry and `SL wins` reporting.
+
+No `backtest_artifacts` publisher/precompute modules, canonical manifests,
+`current.yaml`, active artifact slots, public API payload shape, DB schema,
+request hash, cache identity, fees/slippage, sizing, TP/SL hit-time generation or
+browser-visible behavior were changed. The backend remains opt-in through the
+internal matrix backend env mode; the default TP/SL backend remains unchanged.
+
+Mac Studio acceptance was run from isolated candidate copy
+`/tmp/roehub-stage09-candidate` because the primary Mac checkout had
+pre-existing dirty Stage 07/08 files, including overlapping benchmark harness
+paths. Candidate provenance: local `main`
+`c3d38bcaca98e1837e0a55ea652fa4c28b0ac09e` plus dirty candidate diff hash
+`986c4daba9c7960cfea06c69dd0f0c74b11c1215dbfc65f8e9faa81c27cf921c`.
+
+Diagnostic `16 x 16` benchmark command:
+
+```bash
+ssh macstudio 'cd /tmp/roehub-stage09-candidate && \
+  ROEHUB_BENCHMARK_GIT_COMMIT=c3d38bcaca98e1837e0a55ea652fa4c28b0ac09e+dirty-f7acc0d6 \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid \
+    --stage-09-tp-sl-full-grid \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5'
+```
+
+The `16 x 16` diagnostic passed full-grid parity, instrumentation and memory
+for both jobs, but failed the speed gate on `tp_sl_grid/arity_6/long_only`
+(`May2/current = 0.697`, below the `0.8` threshold). This shape is recorded as
+diagnostic evidence only and is not the accepted runtime shape.
+
+Accepted `64 x 64` benchmark command:
+
+```bash
+ssh macstudio 'cd /tmp/roehub-stage09-candidate && \
+  ROEHUB_BENCHMARK_GIT_COMMIT=c3d38bcaca98e1837e0a55ea652fa4c28b0ac09e+dirty-986c4dab \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun \
+    --stage-09-tp-sl-full-grid \
+    --tp-sl-cell-block-tp-count 64 \
+    --tp-sl-cell-block-sl-count 64 \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5 \
+    --system-memory-cleanup-wait-seconds 90'
+```
+
+Benchmark evidence:
+
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid/`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64/`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/`
+
+Overall accepted rerun gates:
+
+| Gate | Result |
+|---|---|
+| `pass` | true |
+| `api_runner_path.pass` | true |
+| `parity.pass` | true |
+| `performance.pass` | true |
+| `instrumentation.pass` | true |
+| `memory_release.pass` | true |
+| `lazy_cache_hit_memory.pass` | true |
+| `legacy_path_absence.pass` | true |
+| `dead_code_audit.pass` | true |
+| `docs_drift_audit.pass` | true |
+
+Measured accepted Stage 09 evidence:
+
+| Job | TP | SL | Cells | Block | Blocks/candidate | `tp_sl_exact_scoring` s | May2/current | Trade-cell evals/s | System memory delta |
+|---|---:|---:|---:|---|---:|---:|---:|---:|---:|
+| `tp_sl_grid/arity_6/long_only` | 47 | 47 | 2,209 | `64 x 64` | 1 | 18.178 | 0.960 | 5,669,734 | 55,050,240 |
+| `tp_sl_grid/arity_6/long_short_reversal` | 47 | 47 | 2,209 | `64 x 64` | 1 | 17.399 | 0.931 | 5,923,657 | -262,406,144 |
+
+Both jobs evaluated `103,063,104` trade-cell cells, recorded
+`matrix_cell_tp_sl_v1`, passed full-grid top-N parity, and retained no heavy
+runtime references in the compact result. The first `64 x 64` run passed parity,
+instrumentation and speed but failed only the system memory cleanup gate on the
+first job; the accepted rerun with a longer cleanup wait passed memory for both
+jobs.
+
+Decision: Stage 09 is `accepted`. Full-grid parity passed for both heavy TP/SL
+arity-6 rows, the accepted `64 x 64` block shape passed the
+`tp_sl_exact_scoring` threshold and memory cleanup gates, and the implementation
+keeps the backend opt-in. Stage 10 exact-safe high-arity pruning may start.
+
+Contract impact for committed Stage 09 work: public API `none`; port contract
+`none`; DTO schema `compatible-change` for internal telemetry fields only;
+persisted schema `none`; canonical artifact file/manifest schema `none`; config
+schema `compatible-change` for optional internal env keys
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE`,
+`ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT`, and
+`ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT`; request hash/cache identity `none`;
+service-call semantics `none`; benchmark/report semantics `compatible-change`;
+browser-visible behavior `none`.
+
+`next_iteration_allowed` is `true` for Stage 10 exact-safe high-arity pruning.
+
 ## Current Execution Handoff
 
-Next executable stage: Stage 09 `matrix_cell_tp_sl_v1` full-grid blocks.
+Next executable stage: Stage 10 exact-safe high-arity pruning.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -958,9 +1082,9 @@ Stage 07 is accepted for learning only. It generated and loaded sidecar/test
 bitsets outside the canonical publisher and passed Mac Studio API-runner parity,
 memory, legacy-path and docs-drift gates, but sidecar load was not faster than
 runtime packing. Stage 08 is also accepted for learning only after proving
-selected-cell TP/SL parity and by-entry layout. Stage 09 must continue to avoid
-canonical publisher/precompute or manifest changes unless a separate approved
-publisher plan exists.
+selected-cell TP/SL parity and by-entry layout. Stage 09 is accepted as an
+opt-in full-grid TP/SL backend and still avoids canonical publisher/precompute
+or manifest changes unless a separate approved publisher plan exists.
 
 ## Stage Ledger
 
@@ -975,8 +1099,8 @@ publisher plan exists.
 | 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted; only evidence/patch retained | true for Stage 07 sidecar/test bitset artifacts only |
 | 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
-| 09 | planned | `matrix_cell_tp_sl_v1` full grid blocks | planned | Pending Stage 08 learning handoff; must prove full-grid parity, accepted `tp_sl_exact_scoring` speedup and no service wall regression | false |
-| 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 | false |
+| 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
+| 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 accepted handoff | false |
 | 11 | planned | Lazy detail reuse of sparse trade tape | planned | Pending Stage 10 | false |
 
 ## Stage Acceptance Requirements

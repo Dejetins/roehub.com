@@ -1,0 +1,3546 @@
+{
+  "api_base": "http://127.0.0.1:8000",
+  "api_runner_path": {
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "jobs": [
+      {
+        "api_top_count": 50,
+        "arity": 6,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "hit_times_subset",
+                  "tp_sl_diff_buffers",
+                  "score_arrays",
+                  "selected_top_rows",
+                  "heap"
+                ],
+                "cleanup_duration_s": 8.199999865610152e-05,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 46656,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 46656,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 46656,
+                "proxy_candidates_selected": 46656,
+                "proxy_candidates_valid": 46656,
+                "stage_timings": {
+                  "build_exact_context": 0.0014849159924779087,
+                  "build_proxy_context": 8.25000461190939e-06,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 46656
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 46656,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 46656,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "upper_bound_unique_row_product",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.ema": [],
+                  "ma.hma": [],
+                  "ma.rma": [],
+                  "ma.sma": [],
+                  "ma.wma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.ema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.sma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.wma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.rma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 36,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.ema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.rma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.sma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.wma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_cell_tp_sl_v1",
+                "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+                "best_cell_equal": null,
+                "direction_mode": "long_only",
+                "enabled": false,
+                "first_mismatch": null,
+                "max_abs_return_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null,
+                "valid_tp_sl_indexes": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 9851364,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.ema",
+                    "negative_signal_count": 637395,
+                    "neutral_signal_count": 24,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 676059,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.sma",
+                    "negative_signal_count": 640855,
+                    "neutral_signal_count": 28,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 672595,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.wma",
+                    "negative_signal_count": 1033679,
+                    "neutral_signal_count": 1,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 279798,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.rma",
+                    "negative_signal_count": 633678,
+                    "neutral_signal_count": 19,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 679781,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 1970496,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 6,
+                "backend_id": "matrix_cell_tp_sl_v1",
+                "backend_implementation_id": "matrix_cell_tp_sl_v1",
+                "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+                "benchmark_top_k": 5,
+                "cell_backend": {
+                  "backend_id": "matrix_cell_tp_sl_v1",
+                  "cell_block_estimated_peak_bytes": 6664,
+                  "cell_block_shape": "16 x 16",
+                  "cell_block_sl_count": 16,
+                  "cell_block_tp_count": 16,
+                  "cell_blocks_per_candidate": 9,
+                  "full_grid_parity_required": true,
+                  "reference_backend_id": "event_segments_n_tp_sl_15m_grid",
+                  "required_literal_block_shape": "16 x 16",
+                  "schema": "backtest_tp_sl_full_grid_cell_backend_v1",
+                  "sl_count": 47,
+                  "sl_wins_tie_rule": "SL wins",
+                  "tp_count": 47,
+                  "tp_sl_cells": 2209,
+                  "trade_cell_evals": 103063104,
+                  "trade_cell_evals_per_sec": 4117253.1699901577
+                },
+                "direction_mode": "long_only",
+                "exact_candidates_evaluated": 46656,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct",
+                  "best_tp_pct",
+                  "best_sl_pct"
+                ],
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 27216,
+                "quality_candidates_heap_eligible": 19440,
+                "request_top_n": 50,
+                "risk_mode": "tp_sl_grid",
+                "sample_metrics": {
+                  "best_sl_pct": 5.0,
+                  "best_tp_pct": 13.500000953674316,
+                  "total_return_pct": -44.4582462310791,
+                  "trade_count": 347.0
+                },
+                "stage_timings": {
+                  "exact_scoring": 25.032005500950618,
+                  "heap_update": 0.0024588759697508067,
+                  "tp_sl_exact_boundary": 0.0019678749958984554,
+                  "tp_sl_exact_scoring": 25.032005500950618,
+                  "tp_sl_full_metrics_second_pass": 0.9927974169986555
+                },
+                "status": "scored",
+                "top_results_count": 50
+              },
+              "top_results_sample": [
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 23,
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 0,
+                    "ma.hma": 0,
+                    "ma.rma": 4,
+                    "ma.sma": 0,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 7786,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 0,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 4,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 9,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 0,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 5,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 1.5319148936170213,
+                    "avg_trade_ret_pct": -0.14767437310262763,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 13.500000953674316,
+                    "exposure_pct": 0.166483886738105,
+                    "max_drawdown_pct": 41.1605988807476,
+                    "profit_factor": 0.6354867526229652,
+                    "return_over_max_drawdown": -0.9771171742036396,
+                    "sharpe_trades": -0.6823742786497509,
+                    "total_return_pct": -40.21872878074646,
+                    "trade_count": 329.0,
+                    "win_rate_pct": 28.267477203647417
+                  },
+                  "rank": 1,
+                  "score": -40.21872878074646
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 23,
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 0,
+                    "ma.hma": 0,
+                    "ma.rma": 4,
+                    "ma.sma": 1,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 7822,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 0,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 4,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 9,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 1,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 6,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 1.5319148936170213,
+                    "avg_trade_ret_pct": -0.14767437310262763,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 13.500000953674316,
+                    "exposure_pct": 0.166483886738105,
+                    "max_drawdown_pct": 41.1605988807476,
+                    "profit_factor": 0.6354867526229652,
+                    "return_over_max_drawdown": -0.9771171742036396,
+                    "sharpe_trades": -0.6823742786497509,
+                    "total_return_pct": -40.21872878074646,
+                    "trade_count": 329.0,
+                    "win_rate_pct": 28.267477203647417
+                  },
+                  "rank": 2,
+                  "score": -40.21872878074646
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 23,
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 0,
+                    "ma.hma": 0,
+                    "ma.rma": 4,
+                    "ma.sma": 2,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 7858,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 0,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 4,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 9,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 2,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 7,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 1.5319148936170213,
+                    "avg_trade_ret_pct": -0.14767437310262763,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 13.500000953674316,
+                    "exposure_pct": 0.166483886738105,
+                    "max_drawdown_pct": 41.1605988807476,
+                    "profit_factor": 0.6354867526229652,
+                    "return_over_max_drawdown": -0.9771171742036396,
+                    "sharpe_trades": -0.6823742786497509,
+                    "total_return_pct": -40.21872878074646,
+                    "trade_count": 329.0,
+                    "win_rate_pct": 28.267477203647417
+                  },
+                  "rank": 3,
+                  "score": -40.21872878074646
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 23,
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 0,
+                    "ma.hma": 0,
+                    "ma.rma": 4,
+                    "ma.sma": 3,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 7894,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 0,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 4,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 9,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 3,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 8,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 1.5319148936170213,
+                    "avg_trade_ret_pct": -0.14767437310262763,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 13.500000953674316,
+                    "exposure_pct": 0.166483886738105,
+                    "max_drawdown_pct": 41.1605988807476,
+                    "profit_factor": 0.6354867526229652,
+                    "return_over_max_drawdown": -0.9771171742036396,
+                    "sharpe_trades": -0.6823742786497509,
+                    "total_return_pct": -40.21872878074646,
+                    "trade_count": 329.0,
+                    "win_rate_pct": 28.267477203647417
+                  },
+                  "rank": 4,
+                  "score": -40.21872878074646
+                },
+                {
+                  "best_sl_idx": 6,
+                  "best_tp_idx": 23,
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 0,
+                    "ma.hma": 0,
+                    "ma.rma": 4,
+                    "ma.sma": 4,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "candidate_ordinal": 7930,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 0,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 5,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 4,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 9,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 4,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 9,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 1.5319148936170213,
+                    "avg_trade_ret_pct": -0.14767437310262763,
+                    "best_sl_pct": 5.0,
+                    "best_tp_pct": 13.500000953674316,
+                    "exposure_pct": 0.166483886738105,
+                    "max_drawdown_pct": 41.1605988807476,
+                    "profit_factor": 0.6354867526229652,
+                    "return_over_max_drawdown": -0.9771171742036396,
+                    "sharpe_trades": -0.6823742786497509,
+                    "total_return_pct": -40.21872878074646,
+                    "trade_count": 329.0,
+                    "win_rate_pct": 28.267477203647417
+                  },
+                  "rank": 5,
+                  "score": -40.21872878074646
+                }
+              ],
+              "tp_sl_selected_cells": null
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 85.76824999181554,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 46656,
+              "candidates_after_proxy": 46656,
+              "combo_count_planned": 46656,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 46656,
+              "consensus_signature_mode": "upper_bound_unique_row_product",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.ema": [],
+                "ma.hma": [],
+                "ma.rma": [],
+                "ma.sma": [],
+                "ma.wma": []
+              },
+              "exact_candidates": 46656,
+              "exact_candidates_per_sec": 1863.8538569443901,
+              "exact_scoring_ms": 25032.005500950618,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 10.656625003321096,
+              "rows_after_prefilter": 36,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 1970496,
+              "signals_pack_estimated_peak_bytes": 9851364,
+              "signals_pack_ms": 28.019125005812384,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": 47,
+              "top_result_assembly_ms": 13.160542002879083,
+              "tp_count": 47,
+              "tp_sl_by_entry_selected_arrays_bytes": null,
+              "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+              "tp_sl_cell_block_estimated_peak_bytes": 6664,
+              "tp_sl_cell_block_shape": "16 x 16",
+              "tp_sl_cell_blocks_per_candidate": 9,
+              "tp_sl_cell_trade_cell_evals": 103063104,
+              "tp_sl_cells": 2209,
+              "tp_sl_exact_scoring_ms": 25032.005500950618,
+              "tp_sl_selected_cell_elapsed_ms": null,
+              "tp_sl_selected_cell_parity_pass": null,
+              "tp_sl_selected_cell_scores": null,
+              "tp_sl_selected_cell_shadow_status": null,
+              "trade_cell_evals_per_sec": 4117253.1699901577,
+              "unique_rows_after_dedup": 36
+            },
+            "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/private/tmp/roehub-stage09-candidate/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "3021d77f-be1b-464c-bf36-2e543c7156e3",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 27.755452,
+              "exit_code": 0,
+              "finished_at": "2026-06-09T22:47:45.674407Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 12105,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 3538944,
+              "parent_rss_after_bytes": 128991232,
+              "parent_rss_before_bytes": 125452288,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 585121792,
+              "pid": 12129,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-09T22:47:17.918955Z",
+              "stderr_tail": "2026-06-10 01:47:18,223 INFO __main__ backtest child process started: job_id=3021d77f-be1b-464c-bf36-2e543c7156e3 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-10 01:47:45,435 INFO __main__ backtest child process finished: job_id=3021d77f-be1b-464c-bf36-2e543c7156e3 status=succeeded elapsed_seconds=27.212\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.020467249996727332,
+              "artifact_array_open": 0.020467249996727332,
+              "artifact_context_resolve": 0.0653009999950882,
+              "artifact_manifest_load": 0.0653009999950882,
+              "build_exact_context": 0.0014849159924779087,
+              "build_proxy_context": 8.25000461190939e-06,
+              "combo_iteration": 0.0,
+              "exact_scoring": 25.032005500950618,
+              "heap_update": 0.0024588759697508067,
+              "load_hit_times": 0.35884962500131223,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.3465629589918535,
+              "prepare_pools_total": 0.5749900829978287,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.010496999995666556,
+              "row_prefilter": 0.3263237920036772,
+              "sample_warmup": 0.07712724999873899,
+              "segment_build": 0.00547020799422171,
+              "service_total_without_warmup": 52.89696679484041,
+              "service_wall_clock_s": 27.16427812501206,
+              "signal_row_selection": 0.014760750011191703,
+              "time_range_slice": 0.010496999995666556,
+              "top_result_assembly": 0.013160542002879083,
+              "tp_sl_exact_boundary": 0.0019678749958984554,
+              "tp_sl_exact_scoring": 25.032005500950618,
+              "tp_sl_full_metrics_second_pass": 0.9927974169986555,
+              "tp_sl_grid_validation": 0.0015899999998509884
+            },
+            "status": "succeeded",
+            "summary_hash": "8dd37bd114ac748852f77eba4fdd05c95ad3d838120a3a27a66cebf13bd336d6",
+            "top_variants_count": 50
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            12129
+          ],
+          "max_cpu_percent": 1188.2,
+          "mean_core_equivalent": 10.235111111111111,
+          "mean_cpu_percent": 1023.5111111111112,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 11.6325,
+          "p50_cpu_percent": 1163.25,
+          "p95_core_equivalent": 11.87605,
+          "p95_cpu_percent": 1187.605,
+          "peak_rss_bytes": 497876992,
+          "sample_count": 18,
+          "sample_interval_seconds": 1.0,
+          "samples": [
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 50.5,
+              "mem_percent": 0.6,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 419184640,
+              "timestamp": "2026-06-09T22:47:19.105636+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1122.2,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 496320512,
+              "timestamp": "2026-06-09T22:47:20.201346+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1185.1,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 496353280,
+              "timestamp": "2026-06-09T22:47:21.377724+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1188.2,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 496697344,
+              "timestamp": "2026-06-09T22:47:23.434488+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1174.1,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 496844800,
+              "timestamp": "2026-06-09T22:47:25.624344+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1015.0,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497221632,
+              "timestamp": "2026-06-09T22:47:27.114525+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1162.8,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497238016,
+              "timestamp": "2026-06-09T22:47:28.190907+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1121.1,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497434624,
+              "timestamp": "2026-06-09T22:47:29.356273+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 869.4,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497434624,
+              "timestamp": "2026-06-09T22:47:30.724543+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1187.5,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497434624,
+              "timestamp": "2026-06-09T22:47:32.641547+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1163.7,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497532928,
+              "timestamp": "2026-06-09T22:47:33.866660+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 819.2,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497532928,
+              "timestamp": "2026-06-09T22:47:34.997991+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1173.1,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497549312,
+              "timestamp": "2026-06-09T22:47:36.668863+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1165.4,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497549312,
+              "timestamp": "2026-06-09T22:47:38.301960+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 570.2,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497549312,
+              "timestamp": "2026-06-09T22:47:39.415951+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1186.7,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497549312,
+              "timestamp": "2026-06-09T22:47:41.181228+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1176.9,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497582080,
+              "timestamp": "2026-06-09T22:47:42.864413+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1092.1,
+              "mem_percent": 0.7,
+              "pid": 12129,
+              "ppid": 12105,
+              "rss_bytes": 497876992,
+              "timestamp": "2026-06-09T22:47:44.350362+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_only",
+        "index": 1,
+        "instrumentation_counters": {
+          "artifact_load_ms": 85.76824999181554,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 1863.8538569443901,
+          "exact_scoring_ms": 25032.005500950618,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.656625003321096,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 28.019125005812384,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 47,
+          "top_result_assembly_ms": 13.160542002879083,
+          "tp_count": 47,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+          "tp_sl_cell_block_estimated_peak_bytes": 6664,
+          "tp_sl_cell_block_shape": "16 x 16",
+          "tp_sl_cell_blocks_per_candidate": 9,
+          "tp_sl_cell_trade_cell_evals": 103063104,
+          "tp_sl_cells": 2209,
+          "tp_sl_exact_scoring_ms": 25032.005500950618,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": 4117253.1699901577,
+          "unique_rows_after_dedup": 36
+        },
+        "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+        "job_name": "tp_sl_grid/arity_6/long_only",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-09T22:47:45.674407Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 128991232,
+              "parent_rss_before_bytes": 125452288,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 585121792,
+              "pid": 12129,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 3538944,
+              "started_at": "2026-06-09T22:47:17.918955Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 31100600320,
+            "available": true,
+            "before_bytes": 30712037376,
+            "delayed_bytes": 31104679936,
+            "immediate_delta_bytes": 388562944,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 392642560,
+            "wait_seconds": 30.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 50,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 6,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_only",
+            "exact_candidates_evaluated": 46656,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 27216,
+            "quality_candidates_heap_eligible": 19440,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "tp_sl_grid",
+            "top_results_count": 50
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {},
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": false,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 17.445688457009965,
+        "request_hash": "7637858767009161ebff37f46af077beb2fcab138a375b4b86da0714195dfd7c",
+        "risk_mode": "tp_sl_grid",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 31,
+                "max_ms": 1219.3269999988843,
+                "min_ms": 23.418333003064618,
+                "p50_ms": 233.42658299952745,
+                "p95_ms": 1219.3269999988843
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  12129
+                ],
+                "max_cpu_percent": 1188.2,
+                "mean_core_equivalent": 10.235111111111111,
+                "mean_cpu_percent": 1023.5111111111112,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 11.6325,
+                "p50_cpu_percent": 1163.25,
+                "p95_core_equivalent": 11.87605,
+                "p95_cpu_percent": 1187.605,
+                "peak_rss_bytes": 497876992,
+                "sample_count": 18,
+                "sample_interval_seconds": 1.0,
+                "samples": [
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 50.5,
+                    "mem_percent": 0.6,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 419184640,
+                    "timestamp": "2026-06-09T22:47:19.105636+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1122.2,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 496320512,
+                    "timestamp": "2026-06-09T22:47:20.201346+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1185.1,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 496353280,
+                    "timestamp": "2026-06-09T22:47:21.377724+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1188.2,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 496697344,
+                    "timestamp": "2026-06-09T22:47:23.434488+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1174.1,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 496844800,
+                    "timestamp": "2026-06-09T22:47:25.624344+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1015.0,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497221632,
+                    "timestamp": "2026-06-09T22:47:27.114525+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1162.8,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497238016,
+                    "timestamp": "2026-06-09T22:47:28.190907+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1121.1,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497434624,
+                    "timestamp": "2026-06-09T22:47:29.356273+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 869.4,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497434624,
+                    "timestamp": "2026-06-09T22:47:30.724543+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1187.5,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497434624,
+                    "timestamp": "2026-06-09T22:47:32.641547+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1163.7,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497532928,
+                    "timestamp": "2026-06-09T22:47:33.866660+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 819.2,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497532928,
+                    "timestamp": "2026-06-09T22:47:34.997991+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1173.1,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497549312,
+                    "timestamp": "2026-06-09T22:47:36.668863+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1165.4,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497549312,
+                    "timestamp": "2026-06-09T22:47:38.301960+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 570.2,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497549312,
+                    "timestamp": "2026-06-09T22:47:39.415951+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1186.7,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497549312,
+                    "timestamp": "2026-06-09T22:47:41.181228+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1176.9,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497582080,
+                    "timestamp": "2026-06-09T22:47:42.864413+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1092.1,
+                    "mem_percent": 0.7,
+                    "pid": 12129,
+                    "ppid": 12105,
+                    "rss_bytes": 497876992,
+                    "timestamp": "2026-06-09T22:47:44.350362+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:47:17.787099Z",
+                  "lease_expires_at": "2026-06-09T22:49:17.787099Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:47:17.787099Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:47:17.787099Z",
+                  "lease_expires_at": "2026-06-09T22:49:17.787099Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:47:17.787099Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:47:18.926528Z",
+                  "lease_expires_at": "2026-06-09T22:49:18.926528Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:47:17.787099Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:47:20.010097Z",
+                  "lease_expires_at": "2026-06-09T22:49:20.010097Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:47:17.787099Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:47:21.130830Z",
+                  "lease_expires_at": "2026-06-09T22:49:21.130830Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:47:17.787099Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              12129
+            ],
+            "max_cpu_percent": 1188.2,
+            "mean_core_equivalent": 10.235111111111111,
+            "mean_cpu_percent": 1023.5111111111112,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 11.6325,
+            "p50_cpu_percent": 1163.25,
+            "p95_core_equivalent": 11.87605,
+            "p95_cpu_percent": 1187.605,
+            "peak_rss_bytes": 497876992,
+            "sample_count": 18,
+            "sample_interval_seconds": 1.0,
+            "samples": [
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 50.5,
+                "mem_percent": 0.6,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 419184640,
+                "timestamp": "2026-06-09T22:47:19.105636+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1122.2,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 496320512,
+                "timestamp": "2026-06-09T22:47:20.201346+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1185.1,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 496353280,
+                "timestamp": "2026-06-09T22:47:21.377724+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1188.2,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 496697344,
+                "timestamp": "2026-06-09T22:47:23.434488+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1174.1,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 496844800,
+                "timestamp": "2026-06-09T22:47:25.624344+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1015.0,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497221632,
+                "timestamp": "2026-06-09T22:47:27.114525+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1162.8,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497238016,
+                "timestamp": "2026-06-09T22:47:28.190907+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1121.1,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497434624,
+                "timestamp": "2026-06-09T22:47:29.356273+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 869.4,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497434624,
+                "timestamp": "2026-06-09T22:47:30.724543+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1187.5,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497434624,
+                "timestamp": "2026-06-09T22:47:32.641547+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1163.7,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497532928,
+                "timestamp": "2026-06-09T22:47:33.866660+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 819.2,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497532928,
+                "timestamp": "2026-06-09T22:47:34.997991+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1173.1,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497549312,
+                "timestamp": "2026-06-09T22:47:36.668863+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1165.4,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497549312,
+                "timestamp": "2026-06-09T22:47:38.301960+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 570.2,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497549312,
+                "timestamp": "2026-06-09T22:47:39.415951+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1186.7,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497549312,
+                "timestamp": "2026-06-09T22:47:41.181228+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1176.9,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497582080,
+                "timestamp": "2026-06-09T22:47:42.864413+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 3021d77f-be1b-464c-bf36-2e543c7156e3 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-jxsu8thy/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1092.1,
+                "mem_percent": 0.7,
+                "pid": 12129,
+                "ppid": 12105,
+                "rss_bytes": 497876992,
+                "timestamp": "2026-06-09T22:47:44.350362+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-09T22:47:17.722569Z",
+            "finished_at": "2026-06-09T22:47:45.707278Z",
+            "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+            "last_error": null,
+            "request_hash": "7637858767009161ebff37f46af077beb2fcab138a375b4b86da0714195dfd7c",
+            "scheduling": {
+              "arity": 6,
+              "estimated_combinations": 46656,
+              "estimated_combinations_upper_bound": 46656,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "tp_sl_grid",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.ema": 6,
+                "ma.hma": 6,
+                "ma.rma": 6,
+                "ma.sma": 6,
+                "ma.wma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-09T22:47:17.787099Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 6,
+          "estimated_combinations": 46656,
+          "estimated_combinations_upper_bound": 46656,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "tp_sl_grid",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.ema": 6,
+            "ma.hma": 6,
+            "ma.rma": 6,
+            "ma.sma": 6,
+            "ma.wma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.020467249996727332,
+          "artifact_context_resolve": 0.0653009999950882,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.5749900829978287,
+          "request_slice_prepare": 0.010496999995666556,
+          "service_total_without_warmup": 52.89696679484041,
+          "service_wall_clock_s": 27.16427812501206,
+          "top_result_assembly": 0.013160542002879083
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.020467249996727332,
+          "artifact_array_open": 0.020467249996727332,
+          "artifact_context_resolve": 0.0653009999950882,
+          "artifact_manifest_load": 0.0653009999950882,
+          "build_exact_context": 0.0014849159924779087,
+          "build_proxy_context": 8.25000461190939e-06,
+          "combo_iteration": 0.0,
+          "exact_scoring": 25.032005500950618,
+          "heap_update": 0.0024588759697508067,
+          "load_hit_times": 0.35884962500131223,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.3465629589918535,
+          "prepare_pools_total": 0.5749900829978287,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.010496999995666556,
+          "row_prefilter": 0.3263237920036772,
+          "sample_warmup": 0.07712724999873899,
+          "segment_build": 0.00547020799422171,
+          "service_total_without_warmup": 52.89696679484041,
+          "service_wall_clock_s": 27.16427812501206,
+          "signal_row_selection": 0.014760750011191703,
+          "time_range_slice": 0.010496999995666556,
+          "top_result_assembly": 0.013160542002879083,
+          "tp_sl_exact_boundary": 0.0019678749958984554,
+          "tp_sl_exact_scoring": 25.032005500950618,
+          "tp_sl_full_metrics_second_pass": 0.9927974169986555,
+          "tp_sl_grid_validation": 0.0015899999998509884
+        }
+      },
+      {
+        "api_top_count": 0,
+        "arity": 6,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "hit_times_subset",
+                  "tp_sl_diff_buffers",
+                  "score_arrays",
+                  "selected_top_rows",
+                  "heap"
+                ],
+                "cleanup_duration_s": 0.00014187498891260475,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 46656,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 46656,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 46656,
+                "proxy_candidates_selected": 46656,
+                "proxy_candidates_valid": 46656,
+                "stage_timings": {
+                  "build_exact_context": 0.0014797920011915267,
+                  "build_proxy_context": 1.375000283587724e-05,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 46656
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 46656,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 46656,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "upper_bound_unique_row_product",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.ema": [],
+                  "ma.hma": [],
+                  "ma.rma": [],
+                  "ma.sma": [],
+                  "ma.wma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.ema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.sma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.wma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.rma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 36,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.ema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.rma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.sma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.wma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_cell_tp_sl_v1",
+                "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+                "best_cell_equal": null,
+                "direction_mode": "long_short_reversal",
+                "enabled": false,
+                "first_mismatch": null,
+                "max_abs_return_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null,
+                "valid_tp_sl_indexes": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 9851364,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.ema",
+                    "negative_signal_count": 637395,
+                    "neutral_signal_count": 24,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 676059,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.sma",
+                    "negative_signal_count": 640855,
+                    "neutral_signal_count": 28,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 672595,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.wma",
+                    "negative_signal_count": 1033679,
+                    "neutral_signal_count": 1,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 279798,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.rma",
+                    "negative_signal_count": 633678,
+                    "neutral_signal_count": 19,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 679781,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 1970496,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 6,
+                "backend_id": "matrix_cell_tp_sl_v1",
+                "backend_implementation_id": "matrix_cell_tp_sl_v1",
+                "backend_logical_name": "event_segments_6_tp_sl_15m_grid",
+                "benchmark_top_k": 5,
+                "cell_backend": {
+                  "backend_id": "matrix_cell_tp_sl_v1",
+                  "cell_block_estimated_peak_bytes": 6664,
+                  "cell_block_shape": "16 x 16",
+                  "cell_block_sl_count": 16,
+                  "cell_block_tp_count": 16,
+                  "cell_blocks_per_candidate": 9,
+                  "full_grid_parity_required": true,
+                  "reference_backend_id": "event_segments_n_tp_sl_15m_grid",
+                  "required_literal_block_shape": "16 x 16",
+                  "schema": "backtest_tp_sl_full_grid_cell_backend_v1",
+                  "sl_count": 47,
+                  "sl_wins_tie_rule": "SL wins",
+                  "tp_count": 47,
+                  "tp_sl_cells": 2209,
+                  "trade_cell_evals": 103063104,
+                  "trade_cell_evals_per_sec": 5961029.8138944525
+                },
+                "direction_mode": "long_short_reversal",
+                "exact_candidates_evaluated": 46656,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct",
+                  "best_tp_pct",
+                  "best_sl_pct"
+                ],
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 46656,
+                "quality_candidates_heap_eligible": 0,
+                "request_top_n": 50,
+                "risk_mode": "tp_sl_grid",
+                "sample_metrics": null,
+                "stage_timings": {
+                  "exact_scoring": 17.289479706974817,
+                  "heap_update": 0.00021808499877806753,
+                  "tp_sl_exact_boundary": 0.0020893330074613914,
+                  "tp_sl_exact_scoring": 17.289479706974817,
+                  "tp_sl_full_metrics_second_pass": 3.6669953260570765e-06
+                },
+                "status": "scored",
+                "top_results_count": 0
+              },
+              "top_results_sample": [],
+              "tp_sl_selected_cells": null
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 78.94162498996593,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 46656,
+              "candidates_after_proxy": 46656,
+              "combo_count_planned": 46656,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 46656,
+              "consensus_signature_mode": "upper_bound_unique_row_product",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.ema": [],
+                "ma.hma": [],
+                "ma.rma": [],
+                "ma.sma": [],
+                "ma.wma": []
+              },
+              "exact_candidates": 46656,
+              "exact_candidates_per_sec": 2698.5196079196253,
+              "exact_scoring_ms": 17289.479706974817,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 10.405124994576909,
+              "rows_after_prefilter": 36,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 1970496,
+              "signals_pack_estimated_peak_bytes": 9851364,
+              "signals_pack_ms": 24.332583998329937,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": 47,
+              "top_result_assembly_ms": 0.0018749997252598405,
+              "tp_count": 47,
+              "tp_sl_by_entry_selected_arrays_bytes": null,
+              "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+              "tp_sl_cell_block_estimated_peak_bytes": 6664,
+              "tp_sl_cell_block_shape": "16 x 16",
+              "tp_sl_cell_blocks_per_candidate": 9,
+              "tp_sl_cell_trade_cell_evals": 103063104,
+              "tp_sl_cells": 2209,
+              "tp_sl_exact_scoring_ms": 17289.479706974817,
+              "tp_sl_selected_cell_elapsed_ms": null,
+              "tp_sl_selected_cell_parity_pass": null,
+              "tp_sl_selected_cell_scores": null,
+              "tp_sl_selected_cell_shadow_status": null,
+              "trade_cell_evals_per_sec": 5961029.8138944525,
+              "unique_rows_after_dedup": 36
+            },
+            "job_id": "e182e3dc-05b0-4e84-bb15-6f60d8adbed5",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/private/tmp/roehub-stage09-candidate/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "e182e3dc-05b0-4e84-bb15-6f60d8adbed5",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 18.132329,
+              "exit_code": 0,
+              "finished_at": "2026-06-09T22:48:34.614938Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "e182e3dc-05b0-4e84-bb15-6f60d8adbed5",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 12105,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 360448,
+              "parent_rss_after_bytes": 130498560,
+              "parent_rss_before_bytes": 130138112,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 637763584,
+              "pid": 12532,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-09T22:48:16.482609Z",
+              "stderr_tail": "2026-06-10 01:48:16,791 INFO __main__ backtest child process started: job_id=e182e3dc-05b0-4e84-bb15-6f60d8adbed5 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-10 01:48:34,509 INFO __main__ backtest child process finished: job_id=e182e3dc-05b0-4e84-bb15-6f60d8adbed5 status=succeeded elapsed_seconds=17.718\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.013385541999014094,
+              "artifact_array_open": 0.013385541999014094,
+              "artifact_context_resolve": 0.06555608299095184,
+              "artifact_manifest_load": 0.06555608299095184,
+              "build_exact_context": 0.0014797920011915267,
+              "build_proxy_context": 1.375000283587724e-05,
+              "combo_iteration": 0.0,
+              "exact_scoring": 17.289479706974817,
+              "heap_update": 0.00021808499877806753,
+              "load_hit_times": 0.04621887599932961,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.08389508399704937,
+              "prepare_pools_total": 0.17584270899533294,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0009304580016760156,
+              "row_prefilter": 0.07712054200237617,
+              "sample_warmup": 0.05501275000278838,
+              "segment_build": 0.005250917005469091,
+              "service_total_without_warmup": 35.13397491793148,
+              "service_wall_clock_s": 17.67899854198913,
+              "signal_row_selection": 0.0015164579963311553,
+              "time_range_slice": 0.0009304580016760156,
+              "top_result_assembly": 1.8749997252598405e-06,
+              "tp_sl_exact_boundary": 0.0020893330074613914,
+              "tp_sl_exact_scoring": 17.289479706974817,
+              "tp_sl_full_metrics_second_pass": 3.6669953260570765e-06,
+              "tp_sl_grid_validation": 0.0016202499973587692
+            },
+            "status": "succeeded",
+            "summary_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "top_variants_count": 0
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            12532
+          ],
+          "max_cpu_percent": 1190.2,
+          "mean_core_equivalent": 11.816636363636363,
+          "mean_cpu_percent": 1181.6636363636362,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 11.864,
+          "p50_cpu_percent": 1186.4,
+          "p95_core_equivalent": 11.8975,
+          "p95_cpu_percent": 1189.75,
+          "peak_rss_bytes": 489963520,
+          "sample_count": 11,
+          "sample_interval_seconds": 1.0,
+          "samples": [
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1139.9,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 488833024,
+              "timestamp": "2026-06-09T22:48:18.140765+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1186.4,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489209856,
+              "timestamp": "2026-06-09T22:48:19.878191+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1175.4,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489603072,
+              "timestamp": "2026-06-09T22:48:21.531285+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1189.3,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489684992,
+              "timestamp": "2026-06-09T22:48:23.565717+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1184.1,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489701376,
+              "timestamp": "2026-06-09T22:48:24.992323+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1189.1,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489766912,
+              "timestamp": "2026-06-09T22:48:26.655190+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1188.6,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489947136,
+              "timestamp": "2026-06-09T22:48:28.144530+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1180.2,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489947136,
+              "timestamp": "2026-06-09T22:48:29.606845+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1188.7,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489947136,
+              "timestamp": "2026-06-09T22:48:31.070070+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1190.2,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489947136,
+              "timestamp": "2026-06-09T22:48:32.297829+00:00"
+            },
+            {
+              "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 1186.4,
+              "mem_percent": 0.7,
+              "pid": 12532,
+              "ppid": 12105,
+              "rss_bytes": 489963520,
+              "timestamp": "2026-06-09T22:48:33.810114+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_short_reversal",
+        "index": 2,
+        "instrumentation_counters": {
+          "artifact_load_ms": 78.94162498996593,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 2698.5196079196253,
+          "exact_scoring_ms": 17289.479706974817,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.405124994576909,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 24.332583998329937,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 47,
+          "top_result_assembly_ms": 0.0018749997252598405,
+          "tp_count": 47,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+          "tp_sl_cell_block_estimated_peak_bytes": 6664,
+          "tp_sl_cell_block_shape": "16 x 16",
+          "tp_sl_cell_blocks_per_candidate": 9,
+          "tp_sl_cell_trade_cell_evals": 103063104,
+          "tp_sl_cells": 2209,
+          "tp_sl_exact_scoring_ms": 17289.479706974817,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": 5961029.8138944525,
+          "unique_rows_after_dedup": 36
+        },
+        "job_id": "e182e3dc-05b0-4e84-bb15-6f60d8adbed5",
+        "job_name": "tp_sl_grid/arity_6/long_short_reversal",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-09T22:48:34.614938Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 130498560,
+              "parent_rss_before_bytes": 130138112,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 637763584,
+              "pid": 12532,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 360448,
+              "started_at": "2026-06-09T22:48:16.482609Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 31132237824,
+            "available": true,
+            "before_bytes": 31107530752,
+            "delayed_bytes": 31133302784,
+            "immediate_delta_bytes": 24707072,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 25772032,
+            "wait_seconds": 30.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 0,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 6,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_short_reversal",
+            "exact_candidates_evaluated": 46656,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 46656,
+            "quality_candidates_heap_eligible": 0,
+            "quality_gate_enabled": true,
+            "quality_top_zero": true,
+            "request_top_n": 50,
+            "risk_mode": "tp_sl_grid",
+            "top_results_count": 0
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {},
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": false,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 16.204077916001552,
+        "request_hash": "f9f3fd19a2b37955bd14826dc9257aa61ee5b56cefe5ca93806e0136bee3f17e",
+        "risk_mode": "tp_sl_grid",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 19,
+                "max_ms": 962.5694580026902,
+                "min_ms": 19.613417010987177,
+                "p50_ms": 398.3646249980666,
+                "p95_ms": 962.5694580026902
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  12532
+                ],
+                "max_cpu_percent": 1190.2,
+                "mean_core_equivalent": 11.816636363636363,
+                "mean_cpu_percent": 1181.6636363636362,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 11.864,
+                "p50_cpu_percent": 1186.4,
+                "p95_core_equivalent": 11.8975,
+                "p95_cpu_percent": 1189.75,
+                "peak_rss_bytes": 489963520,
+                "sample_count": 11,
+                "sample_interval_seconds": 1.0,
+                "samples": [
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1139.9,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 488833024,
+                    "timestamp": "2026-06-09T22:48:18.140765+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1186.4,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489209856,
+                    "timestamp": "2026-06-09T22:48:19.878191+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1175.4,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489603072,
+                    "timestamp": "2026-06-09T22:48:21.531285+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1189.3,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489684992,
+                    "timestamp": "2026-06-09T22:48:23.565717+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1184.1,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489701376,
+                    "timestamp": "2026-06-09T22:48:24.992323+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1189.1,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489766912,
+                    "timestamp": "2026-06-09T22:48:26.655190+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1188.6,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489947136,
+                    "timestamp": "2026-06-09T22:48:28.144530+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1180.2,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489947136,
+                    "timestamp": "2026-06-09T22:48:29.606845+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1188.7,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489947136,
+                    "timestamp": "2026-06-09T22:48:31.070070+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1190.2,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489947136,
+                    "timestamp": "2026-06-09T22:48:32.297829+00:00"
+                  },
+                  {
+                    "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 1186.4,
+                    "mem_percent": 0.7,
+                    "pid": 12532,
+                    "ppid": 12105,
+                    "rss_bytes": 489963520,
+                    "timestamp": "2026-06-09T22:48:33.810114+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:48:16.342022Z",
+                  "lease_expires_at": "2026-06-09T22:50:16.342022Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:48:16.342022Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:48:16.342022Z",
+                  "lease_expires_at": "2026-06-09T22:50:16.342022Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:48:16.342022Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:48:17.492003Z",
+                  "lease_expires_at": "2026-06-09T22:50:17.492003Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:48:16.342022Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:48:18.528692Z",
+                  "lease_expires_at": "2026-06-09T22:50:18.528692Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:48:16.342022Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-09T22:48:19.734733Z",
+                  "lease_expires_at": "2026-06-09T22:50:19.734733Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-12105",
+                  "started_at": "2026-06-09T22:48:16.342022Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              12532
+            ],
+            "max_cpu_percent": 1190.2,
+            "mean_core_equivalent": 11.816636363636363,
+            "mean_cpu_percent": 1181.6636363636362,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 11.864,
+            "p50_cpu_percent": 1186.4,
+            "p95_core_equivalent": 11.8975,
+            "p95_cpu_percent": 1189.75,
+            "peak_rss_bytes": 489963520,
+            "sample_count": 11,
+            "sample_interval_seconds": 1.0,
+            "samples": [
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1139.9,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 488833024,
+                "timestamp": "2026-06-09T22:48:18.140765+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1186.4,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489209856,
+                "timestamp": "2026-06-09T22:48:19.878191+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1175.4,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489603072,
+                "timestamp": "2026-06-09T22:48:21.531285+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1189.3,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489684992,
+                "timestamp": "2026-06-09T22:48:23.565717+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1184.1,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489701376,
+                "timestamp": "2026-06-09T22:48:24.992323+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1189.1,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489766912,
+                "timestamp": "2026-06-09T22:48:26.655190+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1188.6,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489947136,
+                "timestamp": "2026-06-09T22:48:28.144530+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1180.2,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489947136,
+                "timestamp": "2026-06-09T22:48:29.606845+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1188.7,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489947136,
+                "timestamp": "2026-06-09T22:48:31.070070+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1190.2,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489947136,
+                "timestamp": "2026-06-09T22:48:32.297829+00:00"
+              },
+              {
+                "command": "/private/tmp/roehub-stage09-candidate/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id e182e3dc-05b0-4e84-bb15-6f60d8adbed5 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-y221h3j2/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 1186.4,
+                "mem_percent": 0.7,
+                "pid": 12532,
+                "ppid": 12105,
+                "rss_bytes": 489963520,
+                "timestamp": "2026-06-09T22:48:33.810114+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-09T22:48:16.299691Z",
+            "finished_at": "2026-06-09T22:48:34.620835Z",
+            "job_id": "e182e3dc-05b0-4e84-bb15-6f60d8adbed5",
+            "last_error": null,
+            "request_hash": "f9f3fd19a2b37955bd14826dc9257aa61ee5b56cefe5ca93806e0136bee3f17e",
+            "scheduling": {
+              "arity": 6,
+              "estimated_combinations": 46656,
+              "estimated_combinations_upper_bound": 46656,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "tp_sl_grid",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.ema": 6,
+                "ma.hma": 6,
+                "ma.rma": 6,
+                "ma.sma": 6,
+                "ma.wma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-09T22:48:16.342022Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 6,
+          "estimated_combinations": 46656,
+          "estimated_combinations_upper_bound": 46656,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "tp_sl_grid",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.ema": 6,
+            "ma.hma": 6,
+            "ma.rma": 6,
+            "ma.sma": 6,
+            "ma.wma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.013385541999014094,
+          "artifact_context_resolve": 0.06555608299095184,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.17584270899533294,
+          "request_slice_prepare": 0.0009304580016760156,
+          "service_total_without_warmup": 35.13397491793148,
+          "service_wall_clock_s": 17.67899854198913,
+          "top_result_assembly": 1.8749997252598405e-06
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.013385541999014094,
+          "artifact_array_open": 0.013385541999014094,
+          "artifact_context_resolve": 0.06555608299095184,
+          "artifact_manifest_load": 0.06555608299095184,
+          "build_exact_context": 0.0014797920011915267,
+          "build_proxy_context": 1.375000283587724e-05,
+          "combo_iteration": 0.0,
+          "exact_scoring": 17.289479706974817,
+          "heap_update": 0.00021808499877806753,
+          "load_hit_times": 0.04621887599932961,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.08389508399704937,
+          "prepare_pools_total": 0.17584270899533294,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0009304580016760156,
+          "row_prefilter": 0.07712054200237617,
+          "sample_warmup": 0.05501275000278838,
+          "segment_build": 0.005250917005469091,
+          "service_total_without_warmup": 35.13397491793148,
+          "service_wall_clock_s": 17.67899854198913,
+          "signal_row_selection": 0.0015164579963311553,
+          "time_range_slice": 0.0009304580016760156,
+          "top_result_assembly": 1.8749997252598405e-06,
+          "tp_sl_exact_boundary": 0.0020893330074613914,
+          "tp_sl_exact_scoring": 17.289479706974817,
+          "tp_sl_full_metrics_second_pass": 3.6669953260570765e-06,
+          "tp_sl_grid_validation": 0.0016202499973587692
+        }
+      }
+    ],
+    "pass": true,
+    "runner_entrypoint": "BacktestJobWorkerUseCase.run_next"
+  },
+  "artifact_env": {
+    "config_key_present": true,
+    "config_path": "configs/prod/backtest_artifacts.yaml",
+    "env_name_present": true,
+    "filled_keys": [
+      "ROEHUB_ENV",
+      "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"
+    ],
+    "reason": "defaulted to Mac Studio prod artifact config"
+  },
+  "artifact_reference": {
+    "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+    "artifact_policy": "historical_prefix_compatible",
+    "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
+    "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1"
+  },
+  "backlog_after": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "backlog_before": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "dead_code_audit": {
+    "dead code audit": true,
+    "pass": true,
+    "removed_or_replaced_paths": [
+      "API create path replaced sync_inline compute with background_auto queued jobs",
+      "lazy cache hit replaced monolithic full-detail JSON reads with metadata + JSONL readers",
+      "large-grid production path uses ordinal streaming chunks instead of Cartesian product materialization"
+    ],
+    "retained_helpers": [
+      {
+        "classification": "child-only",
+        "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py"
+      },
+      {
+        "classification": "reference-only for legacy in-memory builders; API path uses cache readers",
+        "path": "src/trading/contexts/backtest/application/services/v2/result_series.py"
+      },
+      {
+        "classification": "reference-only semantic baseline",
+        "path": "tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb"
+      }
+    ]
+  },
+  "docs_drift_audit": {
+    "active_doc_blockers": [],
+    "active_docs_checked": [
+      "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md",
+      "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "docs/architecture/backtest/benchmark_iterations/README.md"
+    ],
+    "docs drift audit": true,
+    "pass": true,
+    "remaining_historical_references": "historical benchmark references remain allowed when labeled historical"
+  },
+  "env_file": {
+    "candidates": [
+      "/Users/daniildegtyarev/.config/roehub/roehub.env",
+      "/etc/roehub/roehub.env"
+    ],
+    "keys_loaded": [
+      "IDENTITY_PG_DSN",
+      "POSTGRES_DB",
+      "POSTGRES_DSN",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "STRATEGY_PG_DSN"
+    ],
+    "keys_loaded_count": 54,
+    "loaded": true,
+    "path": "/Users/daniildegtyarev/.config/roehub/roehub.env",
+    "reason": null
+  },
+  "excluded_reference_job": {
+    "arity": 6,
+    "direction_mode": [
+      "long_only",
+      "long_short_reversal"
+    ],
+    "job_name": null,
+    "matrix_backend_mode": "stage_09_tp_sl_full_grid",
+    "reason": "stage_09_tp_sl_full_grid: run TP/SL arity 6 full request grids for matrix_cell_tp_sl_v1 evidence",
+    "risk_mode": "tp_sl_grid"
+  },
+  "finished_at": "2026-06-09T22:49:06.907931+00:00",
+  "generated_at": "2026-06-09T22:47:17.487745+00:00",
+  "git_commit": "c3d38bcaca98e1837e0a55ea652fa4c28b0ac09e+dirty-f7acc0d6",
+  "git_status_short": "unavailable",
+  "host": "MacStudioDaniil",
+  "instrumentation": {
+    "failed_selected_cell_shadow_jobs": [],
+    "job_count": 2,
+    "missing_by_job": {},
+    "pass": true,
+    "required_fields": [
+      "artifact_load_ms",
+      "signals_pack_ms",
+      "sidecar_load_ms",
+      "sidecar_used",
+      "sidecar_available",
+      "sidecar_fallback_reason",
+      "sidecar_dir",
+      "signals_pack_source",
+      "signals_pack_bytes",
+      "signals_pack_estimated_peak_bytes",
+      "signals_pack_arrays_released",
+      "bitset_word_count",
+      "bitset_padding_valid",
+      "bitset_consensus_sample_count",
+      "bitset_consensus_sample_mismatches",
+      "bitset_consensus_sample_parity",
+      "combo_iteration_ms",
+      "proxy_filter_ms",
+      "exact_scoring_ms",
+      "tp_sl_exact_scoring_ms",
+      "top_result_assembly_ms",
+      "rows_before_prefilter",
+      "rows_after_prefilter",
+      "row_signature_ms",
+      "unique_rows_after_dedup",
+      "duplicate_signal_row_ids",
+      "row_signature_collision_count",
+      "consensus_signature_count",
+      "consensus_signature_mode",
+      "candidate_upper_bound_after_row_dedup",
+      "combo_count_planned",
+      "candidates_after_proxy",
+      "exact_candidates",
+      "avg_segments_per_candidate",
+      "avg_trades_per_candidate",
+      "tp_count",
+      "sl_count",
+      "tp_sl_cells",
+      "tp_sl_cell_backend_id",
+      "tp_sl_cell_block_shape",
+      "tp_sl_cell_blocks_per_candidate",
+      "tp_sl_cell_block_estimated_peak_bytes",
+      "tp_sl_cell_trade_cell_evals",
+      "tp_sl_selected_cell_shadow_status",
+      "tp_sl_selected_cell_parity_pass",
+      "tp_sl_selected_cell_scores",
+      "tp_sl_selected_cell_elapsed_ms",
+      "tp_sl_by_entry_selected_arrays_bytes",
+      "exact_candidates_per_sec",
+      "trade_cell_evals_per_sec"
+    ],
+    "rows": [
+      {
+        "counters": {
+          "artifact_load_ms": 85.76824999181554,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 1863.8538569443901,
+          "exact_scoring_ms": 25032.005500950618,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.656625003321096,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 28.019125005812384,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 47,
+          "top_result_assembly_ms": 13.160542002879083,
+          "tp_count": 47,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+          "tp_sl_cell_block_estimated_peak_bytes": 6664,
+          "tp_sl_cell_block_shape": "16 x 16",
+          "tp_sl_cell_blocks_per_candidate": 9,
+          "tp_sl_cell_trade_cell_evals": 103063104,
+          "tp_sl_cells": 2209,
+          "tp_sl_exact_scoring_ms": 25032.005500950618,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": 4117253.1699901577,
+          "unique_rows_after_dedup": 36
+        },
+        "job_name": "tp_sl_grid/arity_6/long_only",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      },
+      {
+        "counters": {
+          "artifact_load_ms": 78.94162498996593,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 2698.5196079196253,
+          "exact_scoring_ms": 17289.479706974817,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.405124994576909,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 24.332583998329937,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": 47,
+          "top_result_assembly_ms": 0.0018749997252598405,
+          "tp_count": 47,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": "matrix_cell_tp_sl_v1",
+          "tp_sl_cell_block_estimated_peak_bytes": 6664,
+          "tp_sl_cell_block_shape": "16 x 16",
+          "tp_sl_cell_blocks_per_candidate": 9,
+          "tp_sl_cell_trade_cell_evals": 103063104,
+          "tp_sl_cells": 2209,
+          "tp_sl_exact_scoring_ms": 17289.479706974817,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": 5961029.8138944525,
+          "unique_rows_after_dedup": 36
+        },
+        "job_name": "tp_sl_grid/arity_6/long_short_reversal",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      }
+    ],
+    "schema": "backtest_stage_instrumentation_summary_v1"
+  },
+  "lazy_cache_hit_memory": {
+    "api_process_memory": {
+      "limit_bytes": 67108864,
+      "pass": true,
+      "pid": 475,
+      "retained_rss_delta": 49152,
+      "rss_after_bytes": 200114176,
+      "rss_before_bytes": 200065024
+    },
+    "bounded_reader_static_audit": {
+      "api_read_methods": {
+        "csv": true,
+        "monthly_stats": true,
+        "paginated_trades": true,
+        "series": true,
+        "symbol_stats": true
+      },
+      "cache_file": "src/trading/contexts/backtest/adapters/outbound/cache_fs/lazy_trades_cache.py",
+      "full_detail_json_read_text_cache_hit_for_api_forbidden": true,
+      "pass": true,
+      "required_symbols_present": {
+        "_iter_trade_slice": true,
+        "_iter_trades": true,
+        "legacy monolithic cache ignored": true,
+        "read_csv": true,
+        "read_monthly_stats": true,
+        "read_page": true,
+        "read_series": true,
+        "read_symbol_stats": true
+      },
+      "use_case_file": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
+    },
+    "cache_files": {
+      "bundle_dir": "/opt/roehub/state/backtest/trades_cache/7e/7eb6e8c1130e72a28c255fb1a216aa3c8cac0e670f8440973680920b76d12d61",
+      "metadata_bytes": 4486,
+      "metadata_exists": true,
+      "trades_jsonl_bytes": 183125,
+      "trades_jsonl_exists": true,
+      "trades_jsonl_rows": 329
+    },
+    "cache_hit_reads": {
+      "pass": true,
+      "reads": [
+        {
+          "cache_status": "hit",
+          "latency_ms": 68.59100000292528,
+          "method": "POST",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/trades",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 60.73462500353344,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/trades?page=1&page_size=5",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 78.90433400461916,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/equity?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 55.40979199577123,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/drawdown?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 46.55087499122601,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/monthly-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 59.62158300098963,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/symbol-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "miss",
+          "latency_ms": 47.448750003241,
+          "method": "GET",
+          "path": "/backtests/jobs/3021d77f-be1b-464c-bf36-2e543c7156e3/variants/job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5/trades.csv?max_rows=100",
+          "status": 200
+        }
+      ]
+    },
+    "cache_key": "7eb6e8c1130e72a28c255fb1a216aa3c8cac0e670f8440973680920b76d12d61",
+    "lazy_child_process_evidence": [
+      {
+        "cache_path": null,
+        "cache_status": "miss",
+        "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+        "process_evidence": {
+          "cancelled": false,
+          "command": [
+            "/private/tmp/roehub-stage09-candidate/.venv/bin/python3",
+            "-m",
+            "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "--task-id",
+            "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc",
+            "--job-id",
+            "3021d77f-be1b-464c-bf36-2e543c7156e3",
+            "--owner-user-id",
+            "6960d466-e9fb-4116-a9fb-8f1589c61914",
+            "--variant-key",
+            "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+            "--output-json",
+            "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-ps1j5375/result.json"
+          ],
+          "elapsed_seconds": 0.878775,
+          "exit_code": 0,
+          "finished_at": "2026-06-09T22:49:06.243683Z",
+          "metadata": {
+            "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+            "public_variant_key": "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+            "task_id": "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc",
+            "task_kind": "lazy_trades"
+          },
+          "parent_physical_footprint_after_bytes": null,
+          "parent_physical_footprint_before_bytes": null,
+          "parent_pid": 12105,
+          "parent_retained_physical_footprint_delta_bytes": null,
+          "parent_retained_rss_delta_bytes": 16384,
+          "parent_rss_after_bytes": 130498560,
+          "parent_rss_before_bytes": 130482176,
+          "peak_physical_footprint_bytes": null,
+          "peak_rss_bytes": 535232512,
+          "pid": 12790,
+          "schema": "roehub_child_process_evidence_v1",
+          "started_at": "2026-06-09T22:49:05.364908Z",
+          "stderr_tail": "2026-06-10 01:49:05,718 INFO __main__ lazy trades child process started: task_id=e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc job_id=3021d77f-be1b-464c-bf36-2e543c7156e3\n2026-06-10 01:49:06,040 INFO __main__ lazy trades child process finished: task_id=e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc cache_status=miss elapsed_seconds=0.322\n",
+          "stdout_tail": "",
+          "timed_out": false
+        },
+        "public_variant_key": "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+        "schema": "roehub_lazy_trades_child_result_evidence_v1",
+        "task_id": "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc"
+      }
+    ],
+    "miss_initial": {
+      "cache_status": "miss",
+      "materialization_status": "queued",
+      "status": 202,
+      "task_id": "e88ad4a8-fe84-48ac-bd3e-f71d5d9b1edc"
+    },
+    "miss_worker": {
+      "cache_path": null,
+      "cache_status": "miss",
+      "claimed": true,
+      "fast_completion_without_observed_running": false,
+      "observed_running": true,
+      "pass": true,
+      "required_path": "queued -> running -> completed",
+      "required_path_pass": true,
+      "status": null,
+      "status_path": "queued -> running -> completed",
+      "task_status": "completed"
+    },
+    "pass": true,
+    "target_job_id": "3021d77f-be1b-464c-bf36-2e543c7156e3",
+    "variant_key": "job_3021d77f56e3__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5"
+  },
+  "legacy_path_absence": {
+    "checks": [
+      {
+        "forbidden": "build_full_job_compute_executor",
+        "forbidden_present": false,
+        "name": "runner_parent_does_not_construct_full_compute_graph",
+        "pass": true,
+        "path": "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+        "required": "BacktestChildProcessExecutor",
+        "required_present": true
+      },
+      {
+        "forbidden": "build_paginated_trades_read_model(",
+        "forbidden_present": false,
+        "name": "public_api_cache_hit_uses_bounded_cache_methods",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+        "required": "cache.read_page(",
+        "required_present": true
+      },
+      {
+        "forbidden": "itertools.product",
+        "forbidden_present": false,
+        "name": "large_grid_production_no_itertools_product",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/services/v2/no_risk_exact.py",
+        "required": "iter_ordinal_combo_chunks",
+        "required_present": true
+      }
+    ],
+    "legacy path absence": true,
+    "pass": true
+  },
+  "matrix_sidecar": {
+    "artifact_dir": null,
+    "enabled": false,
+    "fairness_classification": "no_sidecar",
+    "generation_report": null,
+    "sidecar_generate_ms": null
+  },
+  "memory_release": {
+    "checked_jobs": 2,
+    "failed_jobs": [],
+    "parent_retained_rss_delta_evidence": true,
+    "pass": true,
+    "physical footprint": false,
+    "system_memory_cleanup_gate": true,
+    "system_memory_cleanup_limit_bytes": 536870912,
+    "system_memory_failed_jobs": [],
+    "vmmap": false
+  },
+  "mixed_scheduler_smoke": {
+    "blocks_when_heavy_active": true,
+    "blocks_when_light_active": true,
+    "configured": {
+      "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": 1,
+      "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 0,
+      "full_job_lane": "heavy_only",
+      "light_promotion_path": "not_used"
+    },
+    "first_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "lazy_after_two_empty_full_probes": {
+      "scheduling_class": "none",
+      "task_kind": "lazy_detail"
+    },
+    "pass": true,
+    "second_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    }
+  },
+  "parity": {
+    "failed_jobs": [],
+    "pass": true,
+    "passed_jobs": 2,
+    "required_jobs": 2
+  },
+  "pass": false,
+  "performance": {
+    "canonical_stage_comparison_policy": "API/runner wall and service-only overhead are recorded separately from May 2 notebook-compatible stage timings.",
+    "cpu_sampling_jobs": 2,
+    "failed_cpu_sampling_jobs": [],
+    "failed_speed_jobs": [
+      "tp_sl_grid/arity_6/long_only"
+    ],
+    "pass": false,
+    "reference_speed_ratio_min": 0.8,
+    "service_only_overhead_separate": true,
+    "speed_ratios": [
+      {
+        "job_name": "tp_sl_grid/arity_6/long_only",
+        "may2_over_current_ratio": 0.6969353077342303
+      },
+      {
+        "job_name": "tp_sl_grid/arity_6/long_short_reversal",
+        "may2_over_current_ratio": 0.9372218360894111
+      }
+    ],
+    "stage_timing_jobs": 2
+  },
+  "postgres_env": {
+    "component_keys_present": [
+      "POSTGRES_DB",
+      "POSTGRES_USER",
+      "POSTGRES_PASSWORD"
+    ],
+    "dsn_keys_present": [
+      "STRATEGY_PG_DSN",
+      "POSTGRES_DSN",
+      "IDENTITY_PG_DSN"
+    ],
+    "filled_dsn_keys": []
+  },
+  "python": "3.12.13",
+  "reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+  "reference_json": "docs/architecture/backtest/benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/benchmark_results.json",
+  "request": {
+    "benchmark_top_k": 5,
+    "cpu_sample_interval_seconds": 1.0,
+    "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
+    "exclude_heaviest_140s_job": true,
+    "full_jobs": "heavy",
+    "matrix_backend_mode": "stage_09_tp_sl_full_grid",
+    "matrix_backend_mode_env_key": "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE",
+    "matrix_sidecar_artifact_dir": null,
+    "numba_threads": 12,
+    "only_arity": 6,
+    "rows_per_indicator": 6,
+    "runner_concurrency": "one heavy child",
+    "stage_04_mvp_rows": false,
+    "stage_05_no_risk_heavy_rows": false,
+    "stage_08_tp_sl_selected_cells": false,
+    "stage_09_tp_sl_full_grid": true,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "top_n": 50,
+    "tp_sl_selected_cell_shadow_env_key": "ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW",
+    "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
+    "warmup_rows_per_indicator": 2
+  },
+  "schema": "backtest_api_runner_compute_memory_parity_v1",
+  "smoke_user_id": "6960d466-e9fb-4116-a9fb-8f1589c61914"
+}

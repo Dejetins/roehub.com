@@ -21,7 +21,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 
-from .combo_planning import MATRIX_BITSET_NO_RISK_V1_BACKEND
+from .combo_planning import MATRIX_BITSET_NO_RISK_V1_BACKEND, MATRIX_CELL_TP_SL_V1_BACKEND
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
@@ -49,6 +49,7 @@ MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
     "stage_05_no_risk_reversal_arity6"
 )
+MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID = "stage_09_tp_sl_full_grid"
 MATRIX_SIDECAR_DIR_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"
 
 
@@ -167,9 +168,15 @@ class BacktestRuntimeJobOrchestrationService:
                     hit_times_result=hit_times_result,
                     normalized_request=normalized_request,
                 )
-                combo_result = self.combo_planning.execute(
+                requested_tp_sl_backend_id = _matrix_backend_override(
+                    normalized_request=normalized_request,
+                    prepared_result=prepared_result,
+                )
+                combo_result = _execute_combo_planning(
+                    self.combo_planning,
                     prepared_result=prepared_result,
                     normalized_request=normalized_request,
+                    requested_backend_id=requested_tp_sl_backend_id,
                 )
                 exact_result = self.tp_sl_exact.execute(
                     prepared_result=prepared_result,
@@ -339,14 +346,18 @@ def _matrix_backend_override(
         return None
     if mode not in {
         MATRIX_BITSET_NO_RISK_V1_BACKEND,
+        MATRIX_CELL_TP_SL_V1_BACKEND,
         MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
         MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
+        MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
     }:
         allowed = (
             MATRIX_BACKEND_MODE_OFF,
             MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
             MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
+            MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
             MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            MATRIX_CELL_TP_SL_V1_BACKEND,
         )
         raise ValueError(
             f"{MATRIX_BACKEND_MODE_ENV_KEY} must be one of "
@@ -380,6 +391,17 @@ def _matrix_backend_override(
         and arity in (2, 3, 6)
     ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
+    if (
+        mode
+        in {
+            MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
+            MATRIX_CELL_TP_SL_V1_BACKEND,
+        }
+        and risk_mode == "tp_sl_grid"
+        and direction_mode in {"long_only", "long_short_reversal"}
+        and 1 <= arity <= 10
+    ):
+        return MATRIX_CELL_TP_SL_V1_BACKEND
     return None
 
 
@@ -449,6 +471,12 @@ def _instrumentation_counters(
     tp_sl_selected_mapping = (
         None if tp_sl_selected_cells is None else tp_sl_selected_cells.as_mapping()
     )
+    exact_telemetry_mapping = exact_telemetry.as_mapping()
+    cell_backend = (
+        exact_telemetry_mapping.get("cell_backend")
+        if isinstance(exact_telemetry_mapping.get("cell_backend"), Mapping)
+        else None
+    )
 
     return {
         "artifact_load_ms": _seconds_to_ms(artifact_load_s),
@@ -501,6 +529,19 @@ def _instrumentation_counters(
         "tp_count": tp_count,
         "sl_count": sl_count,
         "tp_sl_cells": tp_sl_cells,
+        "tp_sl_cell_backend_id": None if cell_backend is None else cell_backend["backend_id"],
+        "tp_sl_cell_block_shape": None
+        if cell_backend is None
+        else cell_backend["cell_block_shape"],
+        "tp_sl_cell_blocks_per_candidate": None
+        if cell_backend is None
+        else cell_backend["cell_blocks_per_candidate"],
+        "tp_sl_cell_block_estimated_peak_bytes": None
+        if cell_backend is None
+        else cell_backend["cell_block_estimated_peak_bytes"],
+        "tp_sl_cell_trade_cell_evals": None
+        if cell_backend is None
+        else cell_backend["trade_cell_evals"],
         "tp_sl_selected_cell_shadow_status": None
         if tp_sl_selected_mapping is None
         else tp_sl_selected_mapping["status"],

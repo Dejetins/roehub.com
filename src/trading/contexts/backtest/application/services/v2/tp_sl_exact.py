@@ -28,6 +28,7 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.services.v2.combo_planning import (
     COMBO_CHUNK_SIZE,
     EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+    MATRIX_CELL_TP_SL_V1_BACKEND,
     BacktestComboPlanningService,
     build_local_row_pools,
     iter_ordinal_combo_chunks,
@@ -69,6 +70,9 @@ TP_SL_COMBO_CHUNK_DECODE_STAGE_NAME = "combo_chunk_decode"
 TP_SL_PROXY_FILTER_STAGE_NAME = "proxy_filter"
 TP_SL_SCORE_BUFFER_ALLOCATION_STAGE_NAME = "score_buffer_allocation"
 TP_SL_TELEMETRY_BUILD_STAGE_NAME = "telemetry_build"
+TP_SL_CELL_BLOCK_SHAPE_LITERAL = "16 x 16"
+TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT"
+TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT"
 TP_SL_EXACT_SCORED_STATUS = "scored"
 TP_SL_SELF_CHECK_NOT_RUN_STATUS = "not_run"
 TP_SL_SELF_CHECK_PASSED_STATUS = "passed"
@@ -210,10 +214,14 @@ class BacktestTpSlExactScoringService:
                 f"TP/SL exact boundary requires risk.mode='tp_sl_grid'; got {risk_mode!r}"
             )
         backend = combo_planning_result.backend
-        if backend.backend_id != EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND:
+        if backend.backend_id not in {
+            EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+            MATRIX_CELL_TP_SL_V1_BACKEND,
+        }:
             raise BacktestTpSlExactRejected(
                 f"TP/SL exact boundary requires backend "
-                f"{EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND!r}; got {backend.backend_id!r}"
+                f"{EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND!r} or "
+                f"{MATRIX_CELL_TP_SL_V1_BACKEND!r}; got {backend.backend_id!r}"
             )
         if backend.risk_mode != "tp_sl_grid":
             raise BacktestTpSlExactRejected(
@@ -246,6 +254,9 @@ class BacktestTpSlExactScoringService:
         min_closed_trades = _min_closed_trades_from_normalized(normalized_request)
         top_k_context = _top_k_context_from_prepared(prepared_result)
         backend_logical_name = _backend_logical_name(arity=arity)
+        cell_block_tp_count, cell_block_sl_count = _tp_sl_cell_block_counts_from_env(
+            self.config
+        )
         stage_timings = {TP_SL_EXACT_BOUNDARY_STAGE_NAME: time.perf_counter() - boundary_start}
         execution_context = BacktestTpSlExecutionContext(
             timeframe=prepared_result.timeframe,
@@ -321,6 +332,8 @@ class BacktestTpSlExactScoringService:
                     top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
+                    cell_block_tp_count=cell_block_tp_count,
+                    cell_block_sl_count=cell_block_sl_count,
                 )
                 scored_count += scored
                 below_min_trades_count += below_min_trades
@@ -346,6 +359,8 @@ class BacktestTpSlExactScoringService:
                     top_k=request_top_n,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
+                    cell_block_tp_count=cell_block_tp_count,
+                    cell_block_sl_count=cell_block_sl_count,
                 )
                 scored_count += scored
                 below_min_trades_count += below_min_trades
@@ -392,6 +407,15 @@ class BacktestTpSlExactScoringService:
                 min_closed_trades=min_closed_trades,
                 quality_candidates_below_min_trades=below_min_trades_count,
                 quality_candidates_heap_eligible=heap_eligible_count,
+                cell_backend=_cell_backend_telemetry(
+                    backend_id=backend.backend_id,
+                    scored_count=scored_count,
+                    tp_count=int(hit_times.tp_values.shape[0]),
+                    sl_count=int(hit_times.sl_values.shape[0]),
+                    tp_block_count=cell_block_tp_count,
+                    sl_block_count=cell_block_sl_count,
+                    exact_scoring_s=stage_timings[TP_SL_EXACT_SCORING_ALIAS_STAGE_NAME],
+                ),
             )
         finally:
             cleanup_start = time.perf_counter()
@@ -448,6 +472,8 @@ class BacktestTpSlExactScoringService:
         top_k: int,
         candidate_ordinal_start: int,
         min_closed_trades: int,
+        cell_block_tp_count: int,
+        cell_block_sl_count: int,
     ) -> tuple[int, Mapping[str, float] | None, int, int]:
         selected_rows_by_indicator = selected_batch.rows_by_indicator
         selected_size = _selected_size(selected_rows_by_indicator)
@@ -468,6 +494,8 @@ class BacktestTpSlExactScoringService:
             hit_times=hit_times,
             runtime=runtime,
             buffers=buffers,
+            cell_block_tp_count=cell_block_tp_count,
+            cell_block_sl_count=cell_block_sl_count,
         )
         elapsed = time.perf_counter() - exact_start
         stage_timings[TP_SL_EXACT_SCORING_STAGE_NAME] += elapsed
@@ -546,6 +574,8 @@ def evaluate_tp_sl_exact_chunk(
     hit_times: BacktestTpSlHitTimesSubset,
     runtime: _TpSlRuntimeContext,
     buffers: _TpSlScoreBuffers,
+    cell_block_tp_count: int = 16,
+    cell_block_sl_count: int = 16,
 ) -> None:
     exact_context = combo_planning_result.exact_context
     if (
@@ -574,6 +604,47 @@ def evaluate_tp_sl_exact_chunk(
         and runtime.use_profit_lock == 0
         and runtime.close_on_end == 1
     ):
+        if combo_planning_result.backend.backend_id == MATRIX_CELL_TP_SL_V1_BACKEND:
+            event_segments_n_tp_sl_15m_grid_cell_blocks(
+                combo_idx_by_indicator,
+                exact_context.starts,
+                exact_context.ends,
+                exact_context.values,
+                exact_context.counts,
+                segment_pos_workspace,
+                runtime.run_abs_start_15m,
+                runtime.t_exec_abs_15m,
+                runtime.price_open_15m,
+                runtime.log_open_15m,
+                runtime.last_close_15m,
+                runtime.log_last_close_15m,
+                hit_times.long_tp,
+                hit_times.long_sl,
+                hit_times.short_tp,
+                hit_times.short_sl,
+                runtime.log_fac_tp_long,
+                runtime.log_fac_sl_long,
+                runtime.log_fac_tp_short,
+                runtime.log_fac_sl_short,
+                runtime.log_fee_two_sides,
+                runtime.close_on_end,
+                _direction_mode_code(combo_planning_result.backend.direction_mode),
+                np.int32(cell_block_tp_count),
+                np.int32(cell_block_sl_count),
+                buffers.best_tp_idx,
+                buffers.best_sl_idx,
+                best_ret,
+                buffers.trade_count,
+            )
+            buffers.total_return_pct[:] = best_ret.astype(np.float64) * 100.0
+            return
+        if combo_planning_result.backend.backend_id not in {
+            EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+        }:
+            raise BacktestTpSlExactRejected(
+                f"unsupported TP/SL exact backend: "
+                f"{combo_planning_result.backend.backend_id!r}"
+            )
         event_segments_n_tp_sl_15m_grid(
             combo_idx_by_indicator,
             exact_context.starts,
@@ -604,6 +675,11 @@ def evaluate_tp_sl_exact_chunk(
             buffers.trade_count,
         )
     else:
+        if combo_planning_result.backend.backend_id == MATRIX_CELL_TP_SL_V1_BACKEND:
+            raise BacktestTpSlExactRejected(
+                "matrix_cell_tp_sl_v1 currently supports all_in sizing, "
+                "profit_lock=false, and close_on_end=true only"
+            )
         event_segments_n_tp_sl_15m_grid_execution_sizing(
             combo_idx_by_indicator,
             exact_context.starts,
@@ -1023,6 +1099,461 @@ def _tp_sl_apply_trade_to_diff(
             while i_ptr < i_end and np.int32(hit_tp[i_ptr, start]) < t_sl:
                 i_ptr = np.int32(i_ptr + 1)
             _tp_sl_add_col_range(col_diff, i_ptr, n_tp, np.int32(j), float(log_sl_arr[j]))
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_add_row_range_block(
+    row_diff: np.ndarray,
+    row_i: np.int32,
+    col_start: np.int32,
+    col_stop: np.int32,
+    value: float,
+    tp_block_start: np.int32,
+    sl_block_start: np.int32,
+) -> None:
+    local_i = np.int32(row_i - tp_block_start)
+    if local_i < 0 or local_i >= row_diff.shape[0]:
+        return
+    block_sl_stop = np.int32(sl_block_start + row_diff.shape[1] - 1)
+    clipped_start = col_start if col_start > sl_block_start else sl_block_start
+    clipped_stop = col_stop if col_stop < block_sl_stop else block_sl_stop
+    if clipped_start < clipped_stop:
+        local_start = np.int32(clipped_start - sl_block_start)
+        local_stop = np.int32(clipped_stop - sl_block_start)
+        row_diff[local_i, local_start] += value
+        row_diff[local_i, local_stop] -= value
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_add_col_range_block(
+    col_diff: np.ndarray,
+    row_start: np.int32,
+    row_stop: np.int32,
+    col_i: np.int32,
+    value: float,
+    tp_block_start: np.int32,
+    sl_block_start: np.int32,
+) -> None:
+    local_j = np.int32(col_i - sl_block_start)
+    if local_j < 0 or local_j >= col_diff.shape[1]:
+        return
+    block_tp_stop = np.int32(tp_block_start + col_diff.shape[0] - 1)
+    clipped_start = row_start if row_start > tp_block_start else tp_block_start
+    clipped_stop = row_stop if row_stop < block_tp_stop else block_tp_stop
+    if clipped_start < clipped_stop:
+        local_start = np.int32(clipped_start - tp_block_start)
+        local_stop = np.int32(clipped_stop - tp_block_start)
+        col_diff[local_start, local_j] += value
+        col_diff[local_stop, local_j] -= value
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_add_rect_block(
+    rect_diff: np.ndarray,
+    row_start: np.int32,
+    col_start: np.int32,
+    row_stop: np.int32,
+    col_stop: np.int32,
+    value: float,
+    tp_block_start: np.int32,
+    sl_block_start: np.int32,
+) -> None:
+    block_tp_stop = np.int32(tp_block_start + rect_diff.shape[0] - 1)
+    block_sl_stop = np.int32(sl_block_start + rect_diff.shape[1] - 1)
+    clipped_row_start = row_start if row_start > tp_block_start else tp_block_start
+    clipped_col_start = col_start if col_start > sl_block_start else sl_block_start
+    clipped_row_stop = row_stop if row_stop < block_tp_stop else block_tp_stop
+    clipped_col_stop = col_stop if col_stop < block_sl_stop else block_sl_stop
+    if clipped_row_start < clipped_row_stop and clipped_col_start < clipped_col_stop:
+        local_row_start = np.int32(clipped_row_start - tp_block_start)
+        local_col_start = np.int32(clipped_col_start - sl_block_start)
+        local_row_stop = np.int32(clipped_row_stop - tp_block_start)
+        local_col_stop = np.int32(clipped_col_stop - sl_block_start)
+        rect_diff[local_row_start, local_col_start] += value
+        rect_diff[local_row_stop, local_col_start] -= value
+        rect_diff[local_row_start, local_col_stop] -= value
+        rect_diff[local_row_stop, local_col_stop] += value
+
+
+@nb.njit(cache=True, inline="always")
+def _tp_sl_apply_trade_to_block_diff(
+    dirn: np.int8,
+    entry_abs: np.int32,
+    sig_exit_abs: np.int32,
+    price_open: np.ndarray,
+    log_open: np.ndarray,
+    last_close: float,
+    log_last_close: float,
+    t_exec_abs: np.int32,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    row_diff: np.ndarray,
+    col_diff: np.ndarray,
+    rect_diff: np.ndarray,
+    tp_block_start: np.int32,
+    sl_block_start: np.int32,
+) -> None:
+    n_tp = np.int32(hit_long_tp.shape[0])
+    n_sl = np.int32(hit_long_sl.shape[0])
+    if float(price_open[entry_abs]) <= 0.0:
+        return
+    start = np.int32(entry_abs + 1)
+    if dirn == 1:
+        hit_tp = hit_long_tp
+        hit_sl = hit_long_sl
+        log_tp_arr = log_fac_tp_long
+        log_sl_arr = log_fac_sl_long
+    else:
+        hit_tp = hit_short_tp
+        hit_sl = hit_short_sl
+        log_tp_arr = log_fac_tp_short
+        log_sl_arr = log_fac_sl_short
+
+    if start >= t_exec_abs:
+        if sig_exit_abs < t_exec_abs:
+            contrib = _tp_sl_signal_exit_log_contrib(
+                dirn,
+                entry_abs,
+                sig_exit_abs,
+                price_open,
+                log_open,
+                log_fee_two_sides,
+            )
+            _tp_sl_add_rect_block(
+                rect_diff,
+                np.int32(0),
+                np.int32(0),
+                n_tp,
+                n_sl,
+                contrib,
+                tp_block_start,
+                sl_block_start,
+            )
+        elif close_on_end == 1 and t_exec_abs > 0:
+            contrib = _tp_sl_final_close_log_contrib(
+                dirn,
+                entry_abs,
+                price_open,
+                log_open,
+                last_close,
+                log_last_close,
+                log_fee_two_sides,
+            )
+            _tp_sl_add_rect_block(
+                rect_diff,
+                np.int32(0),
+                np.int32(0),
+                n_tp,
+                n_sl,
+                contrib,
+                tp_block_start,
+                sl_block_start,
+            )
+        return
+
+    if sig_exit_abs < t_exec_abs:
+        i_sig = _tp_sl_lower_bound_ge_hit(hit_tp, start, n_tp, sig_exit_abs)
+        j_sig = _tp_sl_lower_bound_ge_hit(hit_sl, start, n_sl, sig_exit_abs)
+        contrib = _tp_sl_signal_exit_log_contrib(
+            dirn,
+            entry_abs,
+            sig_exit_abs,
+            price_open,
+            log_open,
+            log_fee_two_sides,
+        )
+        _tp_sl_add_rect_block(
+            rect_diff,
+            i_sig,
+            j_sig,
+            n_tp,
+            n_sl,
+            contrib,
+            tp_block_start,
+            sl_block_start,
+        )
+
+        j_ptr = np.int32(0)
+        for i in range(i_sig):
+            t_tp = np.int32(hit_tp[i, start])
+            while j_ptr < j_sig and np.int32(hit_sl[j_ptr, start]) <= t_tp:
+                j_ptr = np.int32(j_ptr + 1)
+            _tp_sl_add_row_range_block(
+                row_diff,
+                np.int32(i),
+                j_ptr,
+                n_sl,
+                float(log_tp_arr[i]),
+                tp_block_start,
+                sl_block_start,
+            )
+
+        i_ptr = np.int32(0)
+        for j in range(j_sig):
+            t_sl = np.int32(hit_sl[j, start])
+            while i_ptr < i_sig and np.int32(hit_tp[i_ptr, start]) < t_sl:
+                i_ptr = np.int32(i_ptr + 1)
+            _tp_sl_add_col_range_block(
+                col_diff,
+                i_ptr,
+                n_tp,
+                np.int32(j),
+                float(log_sl_arr[j]),
+                tp_block_start,
+                sl_block_start,
+            )
+    else:
+        i_end = _tp_sl_lower_bound_ge_hit(hit_tp, start, n_tp, t_exec_abs)
+        j_end = _tp_sl_lower_bound_ge_hit(hit_sl, start, n_sl, t_exec_abs)
+        if close_on_end == 1 and t_exec_abs > 0:
+            contrib = _tp_sl_final_close_log_contrib(
+                dirn,
+                entry_abs,
+                price_open,
+                log_open,
+                last_close,
+                log_last_close,
+                log_fee_two_sides,
+            )
+            _tp_sl_add_rect_block(
+                rect_diff,
+                i_end,
+                j_end,
+                n_tp,
+                n_sl,
+                contrib,
+                tp_block_start,
+                sl_block_start,
+            )
+
+        j_ptr = np.int32(0)
+        for i in range(i_end):
+            t_tp = np.int32(hit_tp[i, start])
+            while j_ptr < n_sl and np.int32(hit_sl[j_ptr, start]) <= t_tp:
+                j_ptr = np.int32(j_ptr + 1)
+            _tp_sl_add_row_range_block(
+                row_diff,
+                np.int32(i),
+                j_ptr,
+                n_sl,
+                float(log_tp_arr[i]),
+                tp_block_start,
+                sl_block_start,
+            )
+
+        i_ptr = np.int32(0)
+        for j in range(j_end):
+            t_sl = np.int32(hit_sl[j, start])
+            while i_ptr < i_end and np.int32(hit_tp[i_ptr, start]) < t_sl:
+                i_ptr = np.int32(i_ptr + 1)
+            _tp_sl_add_col_range_block(
+                col_diff,
+                i_ptr,
+                n_tp,
+                np.int32(j),
+                float(log_sl_arr[j]),
+                tp_block_start,
+                sl_block_start,
+            )
+
+
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def event_segments_n_tp_sl_15m_grid_cell_blocks(
+    combo_idx_by_indicator: np.ndarray,
+    segment_starts: np.ndarray,
+    segment_ends: np.ndarray,
+    segment_values: np.ndarray,
+    segment_counts: np.ndarray,
+    segment_pos_workspace: np.ndarray,
+    run_abs_start: np.int32,
+    t_exec_abs: np.int32,
+    price_open: np.ndarray,
+    log_open: np.ndarray,
+    last_close: float,
+    log_last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    direction_mode: np.int8,
+    tp_block_count: np.int32,
+    sl_block_count: np.int32,
+    out_best_tp_idx: np.ndarray,
+    out_best_sl_idx: np.ndarray,
+    out_best_ret: np.ndarray,
+    out_trade_count: np.ndarray,
+) -> None:
+    arity = combo_idx_by_indicator.shape[0]
+    combo_count = combo_idx_by_indicator.shape[1]
+    n_tp = hit_long_tp.shape[0]
+    n_sl = hit_long_sl.shape[0]
+    max_trade_count = max(np.int32(1), np.int32(t_exec_abs - run_abs_start + 1))
+
+    for k in nb.prange(combo_count):
+        for indicator_pos in range(arity):
+            segment_pos_workspace[k, indicator_pos] = np.int32(0)
+        entry_abs_arr = np.empty(max_trade_count, dtype=np.int32)
+        direction_arr = np.empty(max_trade_count, dtype=np.int8)
+        signal_exit_arr = np.empty(max_trade_count, dtype=np.int32)
+        current_dir = np.int8(0)
+        current_entry_abs = np.int32(0)
+        trade_count = np.int32(0)
+
+        while True:
+            active = True
+            segment_start = np.int32(0)
+            segment_end = np.int32(2147483647)
+            for indicator_pos in range(arity):
+                row_idx = combo_idx_by_indicator[indicator_pos, k]
+                segment_idx = segment_pos_workspace[k, indicator_pos]
+                if segment_idx >= segment_counts[indicator_pos, row_idx]:
+                    active = False
+                    break
+                start_value = segment_starts[indicator_pos, row_idx, segment_idx]
+                end_value = segment_ends[indicator_pos, row_idx, segment_idx]
+                if start_value > segment_start:
+                    segment_start = start_value
+                if end_value < segment_end:
+                    segment_end = end_value
+            if not active:
+                break
+
+            if segment_start < segment_end:
+                first_row_idx = combo_idx_by_indicator[0, k]
+                first_segment_idx = segment_pos_workspace[k, 0]
+                raw_dir = segment_values[0, first_row_idx, first_segment_idx]
+                if raw_dir != 0:
+                    for indicator_pos in range(1, arity):
+                        row_idx = combo_idx_by_indicator[indicator_pos, k]
+                        segment_idx = segment_pos_workspace[k, indicator_pos]
+                        if segment_values[indicator_pos, row_idx, segment_idx] != raw_dir:
+                            raw_dir = np.int8(0)
+                            break
+                dirn = _tp_sl_apply_direction_mode(raw_dir, direction_mode)
+                if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                    entry_abs = np.int32(run_abs_start + segment_start + 1)
+                    if entry_abs >= t_exec_abs:
+                        break
+                    if dirn == 0:
+                        entry_abs_arr[trade_count] = current_entry_abs
+                        direction_arr[trade_count] = current_dir
+                        signal_exit_arr[trade_count] = entry_abs
+                        trade_count += np.int32(1)
+                        current_dir = np.int8(0)
+                        current_entry_abs = np.int32(0)
+                    elif current_dir == 0:
+                        current_dir = dirn
+                        current_entry_abs = entry_abs
+                    elif dirn != current_dir:
+                        entry_abs_arr[trade_count] = current_entry_abs
+                        direction_arr[trade_count] = current_dir
+                        signal_exit_arr[trade_count] = entry_abs
+                        trade_count += np.int32(1)
+                        current_dir = dirn
+                        current_entry_abs = entry_abs
+
+            for indicator_pos in range(arity):
+                row_idx = combo_idx_by_indicator[indicator_pos, k]
+                segment_idx = segment_pos_workspace[k, indicator_pos]
+                if segment_ends[indicator_pos, row_idx, segment_idx] == segment_end:
+                    segment_pos_workspace[k, indicator_pos] = np.int32(segment_idx + 1)
+
+        if current_dir != 0 and close_on_end == 1 and t_exec_abs > 0:
+            entry_abs_arr[trade_count] = current_entry_abs
+            direction_arr[trade_count] = current_dir
+            signal_exit_arr[trade_count] = t_exec_abs
+            trade_count += np.int32(1)
+
+        best_log = -1.0e300
+        best_tp = np.int32(0)
+        best_sl = np.int32(0)
+        for tp_block_start in range(0, n_tp, tp_block_count):
+            tp_stop = min(tp_block_start + tp_block_count, n_tp)
+            block_tp = np.int32(tp_stop - tp_block_start)
+            for sl_block_start in range(0, n_sl, sl_block_count):
+                sl_stop = min(sl_block_start + sl_block_count, n_sl)
+                block_sl = np.int32(sl_stop - sl_block_start)
+                row_diff = np.zeros((block_tp, block_sl + 1), dtype=np.float64)
+                col_diff = np.zeros((block_tp + 1, block_sl), dtype=np.float64)
+                rect_diff = np.zeros((block_tp + 1, block_sl + 1), dtype=np.float64)
+
+                for trade_idx in range(trade_count):
+                    _tp_sl_apply_trade_to_block_diff(
+                        direction_arr[trade_idx],
+                        entry_abs_arr[trade_idx],
+                        signal_exit_arr[trade_idx],
+                        price_open,
+                        log_open,
+                        last_close,
+                        log_last_close,
+                        t_exec_abs,
+                        hit_long_tp,
+                        hit_long_sl,
+                        hit_short_tp,
+                        hit_short_sl,
+                        log_fac_tp_long,
+                        log_fac_sl_long,
+                        log_fac_tp_short,
+                        log_fac_sl_short,
+                        log_fee_two_sides,
+                        close_on_end,
+                        row_diff,
+                        col_diff,
+                        rect_diff,
+                        np.int32(tp_block_start),
+                        np.int32(sl_block_start),
+                    )
+
+                for i in range(block_tp):
+                    run = 0.0
+                    for j in range(block_sl):
+                        run += row_diff[i, j]
+                        row_diff[i, j] = run
+                for j in range(block_sl):
+                    run = 0.0
+                    for i in range(block_tp):
+                        run += col_diff[i, j]
+                        col_diff[i, j] = run
+                for i in range(block_tp):
+                    row_run = 0.0
+                    for j in range(block_sl):
+                        row_run += rect_diff[i, j]
+                        if i == 0:
+                            rect_diff[i, j] = row_run
+                        else:
+                            rect_diff[i, j] = row_run + rect_diff[i - 1, j]
+
+                for i in range(block_tp):
+                    for j in range(block_sl):
+                        value = row_diff[i, j] + col_diff[i, j] + rect_diff[i, j]
+                        if value > best_log:
+                            best_log = value
+                            best_tp = np.int32(tp_block_start + i)
+                            best_sl = np.int32(sl_block_start + j)
+
+        out_best_tp_idx[k] = best_tp
+        out_best_sl_idx[k] = best_sl
+        out_trade_count[k] = trade_count
+        if trade_count <= 0:
+            out_best_ret[k] = np.float32(0.0)
+        elif best_log <= -1.0e200:
+            out_best_ret[k] = np.float32(-1.0)
+        else:
+            out_best_ret[k] = np.float32(math.exp(best_log) - 1.0)
 
 
 @nb.njit(cache=True, parallel=True, fastmath=True)
@@ -1997,6 +2528,77 @@ def _sample_metrics_at(
         "best_tp_pct": float(hit_times.tp_values[best_tp_idx] * np.float32(100.0)),
         "best_sl_pct": float(hit_times.sl_values[best_sl_idx] * np.float32(100.0)),
     }
+
+
+def _cell_backend_telemetry(
+    *,
+    backend_id: str,
+    scored_count: int,
+    tp_count: int,
+    sl_count: int,
+    tp_block_count: int,
+    sl_block_count: int,
+    exact_scoring_s: float,
+) -> Mapping[str, Any] | None:
+    if backend_id != MATRIX_CELL_TP_SL_V1_BACKEND:
+        return None
+    tp_blocks = math.ceil(tp_count / tp_block_count) if tp_count > 0 else 0
+    sl_blocks = math.ceil(sl_count / sl_block_count) if sl_count > 0 else 0
+    tp_sl_cells = tp_count * sl_count
+    trade_cell_evals = scored_count * tp_sl_cells
+    cell_block_bytes = (
+        tp_block_count * (sl_block_count + 1)
+        + (tp_block_count + 1) * sl_block_count
+        + (tp_block_count + 1) * (sl_block_count + 1)
+    ) * np.dtype(np.float64).itemsize
+    return {
+        "schema": "backtest_tp_sl_full_grid_cell_backend_v1",
+        "backend_id": MATRIX_CELL_TP_SL_V1_BACKEND,
+        "reference_backend_id": EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+        "full_grid_parity_required": True,
+        "tp_count": tp_count,
+        "sl_count": sl_count,
+        "tp_sl_cells": tp_sl_cells,
+        "cell_block_tp_count": tp_block_count,
+        "cell_block_sl_count": sl_block_count,
+        "cell_block_shape": f"{tp_block_count} x {sl_block_count}",
+        "required_literal_block_shape": TP_SL_CELL_BLOCK_SHAPE_LITERAL,
+        "cell_blocks_per_candidate": tp_blocks * sl_blocks,
+        "cell_block_estimated_peak_bytes": cell_block_bytes,
+        "trade_cell_evals": trade_cell_evals,
+        "trade_cell_evals_per_sec": None
+        if exact_scoring_s <= 0.0
+        else trade_cell_evals / exact_scoring_s,
+        "sl_wins_tie_rule": "SL wins",
+    }
+
+
+def _tp_sl_cell_block_counts_from_env(
+    config: BacktestTpSlExactConfig,
+) -> tuple[int, int]:
+    return (
+        _positive_int_env(
+            TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY,
+            default=config.cell_block_tp_count,
+        ),
+        _positive_int_env(
+            TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY,
+            default=config.cell_block_sl_count,
+        ),
+    )
+
+
+def _positive_int_env(key: str, *, default: int) -> int:
+    raw = os.environ.get(key)
+    if raw is None or not raw.strip():
+        return int(default)
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise BacktestTpSlExactRejected(f"{key} must be a positive integer") from exc
+    if value <= 0:
+        raise BacktestTpSlExactRejected(f"{key} must be a positive integer")
+    return value
 
 
 def _first_quality_eligible_index(

@@ -1,0 +1,43 @@
+{
+  "cancelled": false,
+  "command": [
+    "/private/tmp/roehub-stage09-candidate/.venv/bin/python3",
+    "-m",
+    "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "--task-id",
+    "2ecf8675-d7e5-4ea3-a06a-6a4e5af92453",
+    "--job-id",
+    "31aac8ee-0175-42fa-8ec9-a14bbb4b0ea0",
+    "--owner-user-id",
+    "6960d466-e9fb-4116-a9fb-8f1589c61914",
+    "--variant-key",
+    "job_31aac8ee0ea0__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-v2zn4dg3/result.json"
+  ],
+  "elapsed_seconds": 0.879156,
+  "exit_code": 0,
+  "finished_at": "2026-06-09T22:58:58.628445Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "job_id": "31aac8ee-0175-42fa-8ec9-a14bbb4b0ea0",
+    "public_variant_key": "job_31aac8ee0ea0__dema_close_w6__hma_close_w5__ema_close_w5__sma_close_w5__wma_close_w6__rma_close_w9__risk_tp_sl___vh_232dd1f5",
+    "task_id": "2ecf8675-d7e5-4ea3-a06a-6a4e5af92453",
+    "task_kind": "lazy_trades"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 13765,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 0,
+  "parent_rss_after_bytes": 124125184,
+  "parent_rss_before_bytes": 124125184,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 428539904,
+  "pid": 14438,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-06-09T22:58:57.749289Z",
+  "stderr_tail": "2026-06-10 01:58:58,104 INFO __main__ lazy trades child process started: task_id=2ecf8675-d7e5-4ea3-a06a-6a4e5af92453 job_id=31aac8ee-0175-42fa-8ec9-a14bbb4b0ea0\n2026-06-10 01:58:58,419 INFO __main__ lazy trades child process finished: task_id=2ecf8675-d7e5-4ea3-a06a-6a4e5af92453 cache_status=miss elapsed_seconds=0.315\n",
+  "stdout_tail": "",
+  "timed_out": false
+}

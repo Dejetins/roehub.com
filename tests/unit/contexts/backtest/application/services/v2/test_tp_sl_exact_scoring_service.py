@@ -27,6 +27,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+    MATRIX_CELL_TP_SL_V1_BACKEND,
     TP_SL_EXACT_SCORED_STATUS,
     TP_SL_EXACT_SCORING_ALIAS_STAGE_NAME,
     TP_SL_EXACT_SCORING_STAGE_NAME,
@@ -412,6 +413,78 @@ def test_tp_sl_heap_uses_request_top_n_and_not_benchmark_top_k(
     ]
 
 
+def test_tp_sl_matrix_cell_full_grid_matches_reference_backend() -> None:
+    prepared = _prepared_result(
+        indicator_ids=("alpha", "beta"),
+        trade_rows_by_id={
+            "alpha": [[1, 1, 0, 0], [1, -1, 0, 0]],
+            "beta": [[1, 1, 0, 0], [1, -1, 0, 0]],
+        },
+        open_1m=[100.0, 100.0, 110.0, 99.0],
+        close_1m=[100.0, 100.0, 110.0, 120.0],
+    )
+    hit_times = _hit_times_result(
+        tp_values=(0.02, 0.05, 0.10),
+        sl_values=(0.02, 0.05),
+        long_tp=[
+            [4, 4, 2, 4],
+            [4, 4, 4, 4],
+            [4, 4, 4, 4],
+        ],
+        long_sl=[
+            [4, 4, 4, 4],
+            [4, 4, 3, 4],
+        ],
+        short_tp=[
+            [4, 4, 4, 3],
+            [4, 4, 4, 4],
+            [4, 4, 4, 4],
+        ],
+        short_sl=[
+            [4, 4, 4, 4],
+            [4, 4, 2, 4],
+        ],
+    )
+    request = _normalized_request(
+        direction_mode="long_short_reversal",
+        fee_rate=0.0,
+        top_n=4,
+    )
+
+    reference = BacktestTpSlExactScoringService().execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_short_reversal",
+        ),
+        hit_times_result=hit_times,
+        normalized_request=request,
+    )
+    matrix = BacktestTpSlExactScoringService().execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            direction_mode="long_short_reversal",
+            backend_id=MATRIX_CELL_TP_SL_V1_BACKEND,
+        ),
+        hit_times_result=hit_times,
+        normalized_request=request,
+    )
+
+    assert matrix.canonical_top_results_payload() == pytest.approx(
+        reference.canonical_top_results_payload()
+    )
+    assert [
+        dict(item.indicator_rows) for item in matrix.top_results
+    ] == [dict(item.indicator_rows) for item in reference.top_results]
+    cell_backend = matrix.telemetry.cell_backend
+    assert cell_backend is not None
+    assert cell_backend["backend_id"] == MATRIX_CELL_TP_SL_V1_BACKEND
+    assert cell_backend["cell_block_shape"] == "16 x 16"
+    assert cell_backend["tp_sl_cells"] == 6
+    assert cell_backend["sl_wins_tie_rule"] == "SL wins"
+
+
 def test_tp_sl_quality_gate_filters_final_trade_count_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -685,6 +758,7 @@ def _combo_planning_result(
     *,
     prepared: BacktestPreparePoolsResult,
     direction_mode: str = "long_short_reversal",
+    backend_id: str = EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
 ) -> BacktestComboPlanningResult:
     exact_context = build_segment_stack(
         indicator_ids=prepared.indicator_ids,
@@ -692,7 +766,7 @@ def _combo_planning_result(
     )
     return BacktestComboPlanningResult(
         backend=BacktestSelectedBackend(
-            backend_id=EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
+            backend_id=backend_id,
             risk_mode="tp_sl_grid",
             arity=len(prepared.indicator_ids),
             direction_mode=direction_mode,
