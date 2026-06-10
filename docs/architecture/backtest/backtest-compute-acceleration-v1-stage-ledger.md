@@ -1066,9 +1066,82 @@ browser-visible behavior `none`.
 
 `next_iteration_allowed` is `true` for Stage 10 exact-safe high-arity pruning.
 
+## Stage 10 — high-arity min-trade pruning rejected
+
+Stage 10 tested an exact-safe branch-and-bound rule for high-arity planning:
+`monotonic_min_closed_trades`.
+
+Rule and proof:
+
+- For a partial indicator prefix, direction-adjusted consensus bars are
+  monotonic: adding indicators can only keep an existing nonzero consensus bar or
+  turn it to zero.
+- Every current no-risk and TP/SL closed trade requires an entry on a nonzero
+  consensus bar.
+- Therefore a subtree whose partial consensus has fewer nonzero bars than
+  `quality_constraints.min_closed_trades` cannot produce a heap-eligible
+  candidate and can be pruned without removing a valid top candidate.
+- This is not a score upper bound. It does not justify approximate beam search,
+  product-level approximate ranking, or pruning candidates that can still satisfy
+  the min-trade gate.
+
+Mac Studio candidate evidence was run from isolated copy
+`/tmp/roehub-stage10-candidate` because the primary Mac checkout had pre-existing
+dirty Stage 07-09 files. Candidate provenance: local `main`
+`d00e6afc7445d255533c9b97c5ea40c1167e819c` plus scoped dirty diff hash
+`91dc3b6247ebc001288504ed241a4e9ee39fe4db33ee432b81280033b8b57c2e`.
+
+Partial benchmark command:
+
+```bash
+ssh macstudio 'cd /tmp/roehub-stage10-candidate && \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7 \
+    --stage-10-high-arity-pruning \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5 \
+    --system-memory-cleanup-wait-seconds 90'
+```
+
+Evidence:
+
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/`
+
+Completed arity-7 row counters:
+
+| Metric | Value |
+|---|---:|
+| `combo_count_planned` | `279,936` |
+| `candidates_after_proxy` | `116,640` |
+| `exact_candidates` | `116,640` |
+| `combo_pruning_pruned_subtrees` | `3,246` |
+| `combo_pruning_pruned_candidate_upper_bound` | `163,296` |
+| `combo_iteration` | `59.350s` |
+| `exact_scoring` | `58.182s` |
+| `service_total_without_warmup` | `119.252s` |
+
+Decision: Stage 10 is `rejected` for this candidate. The rule is exact-safe, but
+the candidate did not complete accepted arity-7 evidence, no comparable
+baseline-off speedup was completed, and the first completed row shows the Python
+branch traversal adds a large `combo_iteration` cost. Arity-10 acceptance is also
+blocked by the current canonical fixture: it contains only seven indicators.
+
+Contract impact for the rejected runtime candidate if left uncommitted: public
+API `none`; port contract `none`; DTO schema `compatible-change` for additive
+internal telemetry fields only; persisted schema `none`; canonical artifact
+file/manifest schema `none`; config schema `compatible-change` for optional
+internal `ROEHUB_BACKTEST_HIGH_ARITY_PRUNING`; request hash/cache identity
+`none`; service-call semantics `none`; benchmark/report semantics
+`compatible-change`; browser-visible behavior `none`.
+
+`next_iteration_allowed` is `false`. A new Stage 10 attempt needs either a
+tighter exact-safe score/eligibility bound that beats the baseline through the
+API-runner path, or an approved benchmark fixture that can cover arity 10.
+
 ## Current Execution Handoff
 
-Next executable stage: Stage 10 exact-safe high-arity pruning.
+Next executable stage: Stage 10 exact-safe high-arity pruning retry.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -1100,7 +1173,7 @@ or manifest changes unless a separate approved publisher plan exists.
 | 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
-| 10 | planned | Exact-safe high-arity pruning | planned | Pending Stage 09 accepted handoff | false |
+| 10 | rejected | Exact-safe high-arity pruning candidate using `monotonic_min_closed_trades`; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture | false |
 | 11 | planned | Lazy detail reuse of sparse trade tape | planned | Pending Stage 10 | false |
 
 ## Stage Acceptance Requirements
