@@ -51,8 +51,8 @@ ROEHUB_BACKTEST_ARTIFACTS_CONFIG=configs/prod/backtest_artifacts.yaml \
 | `none` | 2.869005 | 2.855623 | -0.466% | 0.000305 | 0.000299 | -2.090% | pass |
 | `tp_sl_grid` | 4.334214 | 4.292836 | -0.955% | 0.000301 | 0.000301 | -0.207% | pass |
 
-Interpretation: Stage 11 preserves selected-variant lazy payload/cache identity
-and reuses the sparse trade tape backend for TP/SL lazy materialization, but the
-same-workload latency delta is small enough to treat as no material speedup.
-The stage is accepted as a safe reuse and parity gate, not as a major latency
-acceleration.
+Interpretation: the candidate preserved selected-variant lazy payload/cache
+identity and reused the sparse trade tape backend for TP/SL lazy
+materialization, but the same-workload latency delta is too small to treat as a
+material speedup. Stage 11 is rejected; the runtime candidate must not be used
+as accepted lazy-detail acceleration without a new benchmark-gated plan.
