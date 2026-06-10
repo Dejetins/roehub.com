@@ -1,0 +1,86 @@
+{
+  "schema": "backtest_stage05_default_on_ab_v1",
+  "generated_at": "2026-06-10T20:09:18.911268+00:00",
+  "host": "MacStudioDaniil",
+  "git_commit": "e985b30123ca9070ef5b1fc3227ffef6dd3fdf35",
+  "git_status_short": "M .codex/agents/generated/backtest-compute-acceleration-v1/07-implement-sidecar-bitset-artifacts.md\n M .codex/agents/generated/backtest-compute-acceleration-v1/11-implement-lazy-detail-reuse-sparse-trade-tape.md\n M docs/architecture/README.md\n M docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md\n M docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md\n M scripts/backtest/run_api_runner_benchmark_parity.py\n M src/trading/contexts/backtest/application/dto/tp_sl_exact.py\n M src/trading/contexts/backtest/application/services/v2/__init__.py\n M src/trading/contexts/backtest/application/services/v2/combo_planning.py\n M src/trading/contexts/backtest/application/services/v2/job_orchestration.py\n M src/trading/contexts/backtest/application/services/v2/matrix_backend/bitsets.py\n M src/trading/contexts/backtest/application/services/v2/tp_sl_exact.py\n M tests/unit/contexts/backtest/application/services/v2/test_bitsets.py\n M tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py\n?? docs/architecture/backtest/benchmark_iterations/2026-05-22_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-05-23_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_bitset_backend/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_optimized/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/\n?? scripts/backtest/generate_matrix_sidecar_artifacts.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/trade_tape.py\n?? tests/unit/tools/test_stage00_2_lmstudio_act_agent.py\n?? tests/unit/tools/test_stage00_3_protocol_split_structured_finalizer.py\n?? tools/backtest_ai_configurator/",
+  "env_file": "/Users/daniildegtyarev/.config/roehub/roehub.env",
+  "baseline_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline",
+  "candidate_dir": "docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate",
+  "matrix_backend_mode_env_key": "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE",
+  "baseline_mode": "off",
+  "candidate_mode": "default_on_env_unset",
+  "pass": true,
+  "comparisons": [
+    {
+      "job": "none/arity_6/long_only",
+      "old": {
+        "job_id": "bc2ee3a1-b2ad-4435-a688-8fab2be249f2",
+        "request_hash": "4067c433e4bc85b7974102a8a4bdab68c8c115d5fecaad51eccdd913a7ca8af7",
+        "backend_id": "event_segments_n_no_risk",
+        "top_count": 50,
+        "exact_scoring_s": 15.475651208020281,
+        "service_wall_clock_s": 16.38349679199746,
+        "service_total_without_warmup_s": 17.215954372048145,
+        "strategy_identity_hash": "30996c11f947d4dafaee2ceff4d51e509acaa468436d29773594d032b75684ab",
+        "variant_hash_order_hash": "01723b892868f16abeca8ff65225d6e165f1edf0569fdf51cf71c952693d124d",
+        "canonical_payload_hash": "77ec4cadabff393725ec3504943e54a8e18b1532737b5564446defd39fa3b5ee"
+      },
+      "default_on": {
+        "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+        "request_hash": "4067c433e4bc85b7974102a8a4bdab68c8c115d5fecaad51eccdd913a7ca8af7",
+        "backend_id": "matrix_bitset_no_risk_v1",
+        "top_count": 50,
+        "exact_scoring_s": 0.9983842089714017,
+        "service_wall_clock_s": 1.4265352920047008,
+        "service_total_without_warmup_s": 1.6920445848663803,
+        "strategy_identity_hash": "30996c11f947d4dafaee2ceff4d51e509acaa468436d29773594d032b75684ab",
+        "variant_hash_order_hash": "01723b892868f16abeca8ff65225d6e165f1edf0569fdf51cf71c952693d124d",
+        "canonical_payload_hash": "77ec4cadabff393725ec3504943e54a8e18b1532737b5564446defd39fa3b5ee"
+      },
+      "same_request_hash": true,
+      "same_top_count": true,
+      "same_strategy_identity_hash": true,
+      "same_strategy_identity_items_exact": true,
+      "same_variant_hash_order": true,
+      "max_metric_abs_diff": 0.0,
+      "exact_speedup_ratio_off_over_default": 15.500697095323925,
+      "service_wall_ratio_off_over_default": 11.4848170135166
+    },
+    {
+      "job": "none/arity_6/long_short_reversal/min_closed_trades=1",
+      "old": {
+        "job_id": "9edb5306-e30c-4988-9fc2-44d8999f099c",
+        "request_hash": "3b6f58e24f72a058cc4d2205ed0e816a73b111e40cb201d7941c2ea0f9149099",
+        "backend_id": "event_segments_n_no_risk",
+        "top_count": 50,
+        "exact_scoring_s": 15.103203084989218,
+        "service_wall_clock_s": 15.601866707991576,
+        "service_total_without_warmup_s": 15.86114950090996,
+        "strategy_identity_hash": "f59ed7ae1f948812e2377144959908b3cb39158e24ef113c5629529c54a778af",
+        "variant_hash_order_hash": "241e2c1bfb0374365853fcf135878209acea224779f8f9292d7f5ad7e924fb26",
+        "canonical_payload_hash": "d8b25e9ed3ae143736a425d89f595435e982be776198af818711cf1e742f86a1"
+      },
+      "default_on": {
+        "job_id": "6b0d67ea-c9d9-480c-ab76-079f544aabd5",
+        "request_hash": "3b6f58e24f72a058cc4d2205ed0e816a73b111e40cb201d7941c2ea0f9149099",
+        "backend_id": "matrix_bitset_no_risk_v1",
+        "top_count": 50,
+        "exact_scoring_s": 2.916978290944826,
+        "service_wall_clock_s": 3.3591712079942226,
+        "service_total_without_warmup_s": 3.626159043953521,
+        "strategy_identity_hash": "f59ed7ae1f948812e2377144959908b3cb39158e24ef113c5629529c54a778af",
+        "variant_hash_order_hash": "241e2c1bfb0374365853fcf135878209acea224779f8f9292d7f5ad7e924fb26",
+        "canonical_payload_hash": "d8b25e9ed3ae143736a425d89f595435e982be776198af818711cf1e742f86a1"
+      },
+      "same_request_hash": true,
+      "same_top_count": true,
+      "same_strategy_identity_hash": true,
+      "same_strategy_identity_items_exact": true,
+      "same_variant_hash_order": true,
+      "max_metric_abs_diff": 0.0,
+      "exact_speedup_ratio_off_over_default": 5.177687860027647,
+      "service_wall_ratio_off_over_default": 4.644558357389449
+    }
+  ]
+}

@@ -26,6 +26,7 @@ from trading.contexts.backtest.application.services.v2.job_orchestration import 
     SAMPLE_WARMUP_STAGE_NAME,
     SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME,
     BacktestRuntimeJobOrchestrationService,
+    _matrix_backend_override,
 )
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
     build_signal_segments,
@@ -163,6 +164,108 @@ def test_stage_05_matrix_backend_gate_passes_requested_backend_for_arity6_revers
         "matrix_bitset_no_risk_v1",
         "matrix_bitset_no_risk_v1",
     ]
+
+
+def test_stage_05_matrix_backend_is_default_for_no_risk_arity6_reversal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(
+        rows=3,
+        indicators=tuple(f"indicator_{index}" for index in range(6)),
+    )
+    combo = _ComboPlanning()
+    service = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(prepared),
+        combo_planning=combo,
+        no_risk_exact=_ExactService(),
+        tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),
+        artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any, _TopResultAssembly()),
+    )
+    monkeypatch.delenv(MATRIX_BACKEND_MODE_ENV_KEY, raising=False)
+
+    service.execute(
+        job_id=uuid4(),
+        preflight=_preflight(
+            top_n=50,
+            risk_mode="none",
+            direction_mode="long_short_reversal",
+        ),
+        updated_at=datetime.now(UTC),
+    )
+
+    assert [call["requested_backend_id"] for call in combo.calls] == [
+        "matrix_bitset_no_risk_v1",
+        "matrix_bitset_no_risk_v1",
+    ]
+
+
+def test_stage_05_matrix_backend_default_can_be_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(
+        rows=3,
+        indicators=tuple(f"indicator_{index}" for index in range(6)),
+    )
+    combo = _ComboPlanning()
+    service = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(prepared),
+        combo_planning=combo,
+        no_risk_exact=_ExactService(),
+        tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),
+        artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any, _TopResultAssembly()),
+    )
+    monkeypatch.setenv(MATRIX_BACKEND_MODE_ENV_KEY, "off")
+
+    service.execute(
+        job_id=uuid4(),
+        preflight=_preflight(
+            top_n=50,
+            risk_mode="none",
+            direction_mode="long_short_reversal",
+        ),
+        updated_at=datetime.now(UTC),
+    )
+
+    assert [call["requested_backend_id"] for call in combo.calls] == [None, None]
+
+
+def test_matrix_backend_default_does_not_cover_stage04_or_tp_sl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(MATRIX_BACKEND_MODE_ENV_KEY, raising=False)
+
+    assert (
+        _matrix_backend_override(
+            normalized_request=_preflight(
+                top_n=50,
+                risk_mode="none",
+                direction_mode="long_only",
+            ).normalized_request,
+            prepared_result=_prepared_result(
+                rows=3,
+                indicators=("ma.dema", "ma.ema"),
+            ),
+        )
+        is None
+    )
+    assert (
+        _matrix_backend_override(
+            normalized_request=_preflight(
+                top_n=50,
+                risk_mode="tp_sl_grid",
+                direction_mode="long_short_reversal",
+            ).normalized_request,
+            prepared_result=_prepared_result(
+                rows=3,
+                indicators=tuple(f"indicator_{index}" for index in range(6)),
+            ),
+        )
+        is None
+    )
 
 
 @dataclass(slots=True)

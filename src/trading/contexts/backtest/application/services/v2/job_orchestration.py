@@ -49,6 +49,7 @@ MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
     "stage_05_no_risk_reversal_arity6"
 )
+MATRIX_BACKEND_MODE_DEFAULT = MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6
 MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID = "stage_09_tp_sl_full_grid"
 MATRIX_SIDECAR_DIR_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"
 
@@ -341,8 +342,13 @@ def _matrix_backend_override(
     normalized_request: Mapping[str, Any],
     prepared_result: BacktestPreparePoolsResult,
 ) -> str | None:
-    mode = os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY, MATRIX_BACKEND_MODE_OFF).strip()
-    if not mode or mode == MATRIX_BACKEND_MODE_OFF:
+    raw_mode = os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY)
+    mode = (
+        MATRIX_BACKEND_MODE_DEFAULT
+        if raw_mode is None or not raw_mode.strip()
+        else raw_mode.strip()
+    )
+    if mode == MATRIX_BACKEND_MODE_OFF:
         return None
     if mode not in {
         MATRIX_BITSET_NO_RISK_V1_BACKEND,

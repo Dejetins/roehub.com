@@ -1,0 +1,43 @@
+{
+  "cancelled": false,
+  "command": [
+    "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+    "-m",
+    "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "--task-id",
+    "325422e7-bc07-447e-9a75-4750436475b4",
+    "--job-id",
+    "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+    "--owner-user-id",
+    "6960d466-e9fb-4116-a9fb-8f1589c61914",
+    "--variant-key",
+    "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-iorswc36/result.json"
+  ],
+  "elapsed_seconds": 0.659376,
+  "exit_code": 0,
+  "finished_at": "2026-06-10T20:02:57.047387Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+    "public_variant_key": "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+    "task_id": "325422e7-bc07-447e-9a75-4750436475b4",
+    "task_kind": "lazy_trades"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 94128,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 0,
+  "parent_rss_after_bytes": 123944960,
+  "parent_rss_before_bytes": 123944960,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 106217472,
+  "pid": 94399,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-06-10T20:02:56.388011Z",
+  "stderr_tail": "2026-06-10 23:02:56,741 INFO __main__ lazy trades child process started: task_id=325422e7-bc07-447e-9a75-4750436475b4 job_id=9e195ee2-30e4-4259-aaf5-2e2f787a58c1\n2026-06-10 23:02:56,974 INFO __main__ lazy trades child process finished: task_id=325422e7-bc07-447e-9a75-4750436475b4 cache_status=miss elapsed_seconds=0.234\n",
+  "stdout_tail": "",
+  "timed_out": false
+}

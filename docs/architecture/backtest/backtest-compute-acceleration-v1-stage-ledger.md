@@ -536,8 +536,8 @@ benchmark/report semantics `compatible-change`; browser-visible behavior
 ## Stage 05: `matrix_bitset_no_risk_v1` Reversal And Arity 6 Accepted
 
 Scope accepted: `matrix_bitset_no_risk_v1` for no-risk arity 6 heavy rows and
-`long_short_reversal`, still default-off and selectable only through the internal
-benchmark/runtime gate.
+`long_short_reversal`. At original Stage 05 acceptance this remained
+default-off and selectable only through the internal benchmark/runtime gate.
 
 Implementation state in the local worktree and Mac Studio candidate patch:
 
@@ -646,9 +646,9 @@ limitation, not a scoring correctness gap.
 
 Decision: Stage 05 is `accepted`. Correctness, parity, performance, memory,
 lazy cache, legacy path and docs drift gates passed on the Mac Studio
-API-runner boundary. The matrix backend remains default-off and does not unlock
-production default switching, TP/SL, pruning, request-hash changes, cache
-identity changes or sidecar artifacts.
+API-runner boundary. The original Stage 05 handoff kept the matrix backend
+default-off and did not unlock production default switching, TP/SL, pruning,
+request-hash changes, cache identity changes or sidecar artifacts.
 
 Contract impact: public API `none`; port contract `none`; DTO schema `none`;
 persisted schema `none`; config schema `compatible-change` for the internal
@@ -661,6 +661,123 @@ behavior `none`.
 Stage 06 must still prove deterministic cache keying, hit-rate, top-N parity,
 service wall, memory cleanup and accepted speedup before any cache-backed
 production `on` mode is allowed.
+
+### Stage 05 Default-On Productionization - 2026-06-10
+
+Scope accepted: make `matrix_bitset_no_risk_v1` the default compute backend only
+for `risk.mode=none`, arity `6`, and `direction_mode in {long_only,
+long_short_reversal}`. The rollback/comparison override remains
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off`.
+
+Implementation state:
+
+- default selector now resolves unset/empty `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE`
+  to `stage_05_no_risk_reversal_arity6`;
+- explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` still routes to the legacy
+  `event_segments_n_no_risk` backend for A/B and rollback;
+- no default enablement was added for arity 2/3, TP/SL, sidecar artifacts,
+  pruning, cache reuse or publisher/precompute changes.
+
+Focused local checks:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py
+
+uv run ruff check \
+  src/trading/contexts/backtest/application/services/v2/job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py
+```
+
+Results: local focused pytest `55 passed`; local ruff `All checks passed`.
+
+Mac Studio focused checks:
+
+```bash
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  /opt/homebrew/bin/uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py'
+
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  /opt/homebrew/bin/uv run ruff check \
+  src/trading/contexts/backtest/application/services/v2/job_orchestration.py \
+  tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py'
+```
+
+Results: Mac Studio focused pytest `55 passed`; Mac Studio ruff
+`All checks passed`.
+
+Mac Studio benchmark evidence:
+
+- baseline-off:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline/`
+- default-on candidate:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate/`
+- full top-50 A/B:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate/ab_default_on_parity.json`
+
+Benchmark commands:
+
+```bash
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-05-no-risk-heavy-rows \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline \
+    --system-memory-cleanup-wait-seconds 5 \
+    --timeout-seconds 1800 \
+    --poll-interval-seconds 0.1 \
+    --cpu-sample-interval-seconds 0.5'
+
+ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && \
+  env -u ROEHUB_BACKTEST_MATRIX_BACKEND_MODE \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --stage-05-no-risk-heavy-rows \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate \
+    --system-memory-cleanup-wait-seconds 5 \
+    --timeout-seconds 1800 \
+    --poll-interval-seconds 0.1 \
+    --cpu-sample-interval-seconds 0.5'
+```
+
+The measured Mac Studio checkout reported commit
+`e985b30123ca9070ef5b1fc3227ffef6dd3fdf35` with a dirty status because the
+local tracked checkout was copied onto the older Mac Studio worktree for this
+candidate benchmark. Generated sidecar `.npy` files were not used.
+
+Default-off versus default-on timings:
+
+| Job | Old backend | Default backend | Exact off s | Exact default s | Exact speedup | Wall off s | Wall default s | Wall speedup |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | `event_segments_n_no_risk` | `matrix_bitset_no_risk_v1` | 15.476 | 0.998 | 15.501 | 16.383 | 1.427 | 11.485 |
+| `none/arity_6/long_short_reversal` | `event_segments_n_no_risk` | `matrix_bitset_no_risk_v1` | 15.005 | 2.911 | 5.155 | 15.281 | 3.155 | 4.843 |
+
+Full top-50 A/B evidence:
+
+| Job | Request hash same | Top count old/default | Strategy identity same | Variant order same | Max metric abs diff | Exact speedup | Wall speedup |
+|---|---|---:|---|---|---:|---:|---:|
+| `none/arity_6/long_only` | true | `50 / 50` | true | true | 0.0 | 15.501 | 11.485 |
+| `none/arity_6/long_short_reversal/min_closed_trades=1` | true | `50 / 50` | true | true | 0.0 | 5.178 | 4.645 |
+
+The standard Stage 05 long-short request still has zero top variants at
+`min_closed_trades=300`; the full top-50 long-short parity check therefore uses
+the accepted Stage 05 A/B contour with explicit `min_closed_trades=1`.
+
+Decision: Stage 05 default-on productionization is `accepted`. Correctness,
+top-50 identity/order, metric parity, exact scoring speedup, service wall
+speedup, memory, lazy cache and legacy path gates passed on Mac Studio for the
+accepted scope.
+
+Contract impact: public API `none`; port contract `none`; DTO schema `none`;
+persisted schema `none`; config schema `compatible-change` because the absence
+of `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` now means Stage 05 default-on for the
+accepted no-risk arity-6 scope; request hash/cache identity `none`;
+service-call semantics `none`; benchmark/report semantics `compatible-change`;
+browser-visible behavior `none`.
 
 ## Stage 06 — consensus signature cache rejected
 
@@ -1246,7 +1363,7 @@ or manifest changes unless a separate approved publisher plan exists.
 | 02 | accepted_for_learning | Row/signature telemetry shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_02_row_signature_telemetry/` | Shadow counters present; duplicate rows `0/36` on accepted arity-6 rows; `consensus_signature_count=46656` as deterministic upper bound; collision count `0`; row signature overhead about 10-11ms/job; parity, performance, memory, lazy cache, legacy path and docs drift gates passed; no pruning/scoring/top-N/request-hash/cache change | true |
 | 03 | accepted_for_learning | Runtime bitset pack shadow | `benchmark_iterations/2026-06-06_matrix_bitset_stage_03_runtime_bitset_pack/` | Shadow bitsets recorded `signals_pack_ms` about 24ms/job with `W=3421`, packed bytes `1,970,496`, padding valid and consensus sample parity true; API-runner parity `4/4`, performance, memory release, lazy cache, legacy path and docs drift gates passed; scoring/top-N/request hash/cache/persistence unchanged | true |
 | 04 | accepted_for_learning | `matrix_bitset_no_risk_v1` for `none/arity_2..3/long_only` | `benchmark_iterations/2026-06-06_matrix_bitset_stage_04_no_risk_mvp/` | Mac Studio API-runner parity `2/2`, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; raw performance failed on tiny `none/arity_2/long_only` by about `1.1ms`, while `none/arity_3/long_only` ratio was `2.590`; arity-2 no-advantage is waived for learning progression only; production `on` mode remains locked | true |
-| 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/` | Mac Studio API-runner parity `2/2`, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; `none/arity_6/long_only` ratio `15.543`, `none/arity_6/long_short_reversal` ratio `5.323`; production default remains locked | true |
+| 05 | accepted | No-risk `long_short_reversal` and arity 6 heavy rows; default-on only for `none/arity_6/long_only` and `none/arity_6/long_short_reversal` after 2026-06-10 productionization gate | `benchmark_iterations/2026-06-06_matrix_bitset_stage_05_reversal_arity6/`, `benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline/`, `benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_on_candidate/` | Original Mac Studio API-runner parity, performance, memory, instrumentation, lazy cache, legacy path and docs drift gates passed; default-on A/B kept request hash, top-50 identity/order and metric parity, with exact speedup `15.501x` long-only and `5.178x` long-short A/B; `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains rollback/comparison path | true |
 | 06 | rejected | Consensus signature cache | `benchmark_iterations/2026-06-06_matrix_bitset_stage_06_signature_cache/` | Cache hit-rate `0.202396` and collision count `0`, but Mac Studio API-runner exact scoring regressed versus Stage 05: `1.010s -> 4.932s` long-only and `2.887s -> 6.166s` reversal; cache runtime candidate not accepted; only evidence/patch retained | true for Stage 07 sidecar/test bitset artifacts only |
 | 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
@@ -1259,9 +1376,10 @@ or manifest changes unless a separate approved publisher plan exists.
 Backtest compute acceleration v1 produced durable benchmark evidence for row
 telemetry, runtime bitset packing, no-risk matrix paths, TP/SL selected cells,
 TP/SL full-grid cells, high-arity pruning learning and rejected lazy detail
-reuse. The
-accepted production-affecting compute path is still constrained by explicit
-backend selection and benchmark gates; rejected or learning-only candidates
+reuse. The only default production acceleration accepted from this rollout is
+Stage 05 `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
+`direction_mode in {long_only, long_short_reversal}`. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off`
+remains the rollback/comparison path. Rejected or learning-only candidates
 remain documented but must not be silently reused as default acceleration.
 
 ## Stage Acceptance Requirements

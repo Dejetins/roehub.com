@@ -1,0 +1,2978 @@
+{
+  "api_base": "http://127.0.0.1:8000",
+  "api_runner_path": {
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "jobs": [
+      {
+        "api_top_count": 50,
+        "arity": 6,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "prepared_pools",
+                  "exact_context",
+                  "proxy_context",
+                  "execution_open_1m",
+                  "execution_close_1m",
+                  "matrix_bitsets",
+                  "selected_batches_iter",
+                  "metric_buffers",
+                  "heap"
+                ],
+                "cleanup_duration_s": 4.954199539497495e-05,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 46656,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 46656,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 46656,
+                "proxy_candidates_selected": 46656,
+                "proxy_candidates_valid": 46656,
+                "stage_timings": {
+                  "build_exact_context": 1.3291981304064393e-05,
+                  "build_proxy_context": 7.708993507549167e-06,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 46656
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 46656,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 46656,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "upper_bound_unique_row_product",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.ema": [],
+                  "ma.hma": [],
+                  "ma.rma": [],
+                  "ma.sma": [],
+                  "ma.wma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.ema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.sma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.wma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.rma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 36,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.ema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.rma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.sma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.wma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "direction_mode": "long_only",
+                "enabled": false,
+                "max_abs_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 9851364,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.ema",
+                    "negative_signal_count": 637395,
+                    "neutral_signal_count": 24,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 676059,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.sma",
+                    "negative_signal_count": 640855,
+                    "neutral_signal_count": 28,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 672595,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.wma",
+                    "negative_signal_count": 1033679,
+                    "neutral_signal_count": 1,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 279798,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.rma",
+                    "negative_signal_count": 633678,
+                    "neutral_signal_count": 19,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 679781,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 1970496,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 6,
+                "backend_id": "matrix_bitset_no_risk_v1",
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_only",
+                "exact_candidates_evaluated": 46656,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct"
+                ],
+                "metric_profile": "ranking_total_return_trade_count",
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 27216,
+                "quality_candidates_heap_eligible": 19440,
+                "request_top_n": 50,
+                "risk_mode": "none",
+                "sample_metrics": {
+                  "avg_trade_exec_bars": 22.960122699386503,
+                  "avg_trade_ret_pct": -0.20921579442037264,
+                  "exposure_pct": 0.16482707030837968,
+                  "max_drawdown_pct": 51.09916480891342,
+                  "profit_factor": 0.49806472321189776,
+                  "return_over_max_drawdown": -0.9889301968499422,
+                  "sharpe_trades": -1.1217554516588146,
+                  "total_return_pct": -50.53350711334639,
+                  "trade_count": 326.0,
+                  "win_rate_pct": 26.38036809815951
+                },
+                "stage_timings": {
+                  "exact_scoring": 0.9983842089714017,
+                  "full_metric_second_pass": 0.0004182080156169832,
+                  "heap_update": 0.024762998917140067,
+                  "matrix_bitset_backend_pack": 0.0023301250184886158,
+                  "no_risk_exact_boundary": 2.8542010113596916e-05,
+                  "top_result_proxy_fill": 0.14616991599905305
+                },
+                "status": "scored",
+                "top_results_count": 50
+              },
+              "top_results_sample": [
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 5,
+                    "ma.hma": 0,
+                    "ma.rma": 5,
+                    "ma.sma": 5,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "confirm_count": 25051,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 5,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 10,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 5,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 10,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6,
+                    "proxy_score": -28.810348510742188
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 22.960122699386503,
+                    "avg_trade_ret_pct": -0.20921579442037264,
+                    "exposure_pct": 0.16482707030837968,
+                    "max_drawdown_pct": 51.09916480891342,
+                    "profit_factor": 0.49806472321189776,
+                    "return_over_max_drawdown": -0.9889301968499422,
+                    "sharpe_trades": -1.1217554516588146,
+                    "total_return_pct": -50.53350711334639,
+                    "trade_count": 326.0,
+                    "win_rate_pct": 26.38036809815951
+                  },
+                  "rank": 1,
+                  "score": -50.53350711334639
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 5,
+                    "ma.hma": 0,
+                    "ma.rma": 5,
+                    "ma.sma": 4,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "confirm_count": 25186,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 5,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 10,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 4,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 9,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6,
+                    "proxy_score": -29.026506423950195
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 22.960122699386503,
+                    "avg_trade_ret_pct": -0.20921579442037264,
+                    "exposure_pct": 0.16482707030837968,
+                    "max_drawdown_pct": 51.09916480891342,
+                    "profit_factor": 0.49806472321189776,
+                    "return_over_max_drawdown": -0.9889301968499422,
+                    "sharpe_trades": -1.1217554516588146,
+                    "total_return_pct": -50.53350711334639,
+                    "trade_count": 326.0,
+                    "win_rate_pct": 26.38036809815951
+                  },
+                  "rank": 2,
+                  "score": -50.53350711334639
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 5,
+                    "ma.hma": 0,
+                    "ma.rma": 5,
+                    "ma.sma": 3,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "confirm_count": 25360,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 5,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 10,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 3,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 8,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6,
+                    "proxy_score": -29.187543869018555
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 22.960122699386503,
+                    "avg_trade_ret_pct": -0.20921579442037264,
+                    "exposure_pct": 0.16482707030837968,
+                    "max_drawdown_pct": 51.09916480891342,
+                    "profit_factor": 0.49806472321189776,
+                    "return_over_max_drawdown": -0.9889301968499422,
+                    "sharpe_trades": -1.1217554516588146,
+                    "total_return_pct": -50.53350711334639,
+                    "trade_count": 326.0,
+                    "win_rate_pct": 26.38036809815951
+                  },
+                  "rank": 3,
+                  "score": -50.53350711334639
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 5,
+                    "ma.hma": 0,
+                    "ma.rma": 5,
+                    "ma.sma": 2,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "confirm_count": 25543,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 5,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 10,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 2,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 7,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6,
+                    "proxy_score": -29.412921905517578
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 22.960122699386503,
+                    "avg_trade_ret_pct": -0.20921579442037264,
+                    "exposure_pct": 0.16482707030837968,
+                    "max_drawdown_pct": 51.09916480891342,
+                    "profit_factor": 0.49806472321189776,
+                    "return_over_max_drawdown": -0.9889301968499422,
+                    "sharpe_trades": -1.1217554516588146,
+                    "total_return_pct": -50.53350711334639,
+                    "trade_count": 326.0,
+                    "win_rate_pct": 26.38036809815951
+                  },
+                  "rank": 4,
+                  "score": -50.53350711334639
+                },
+                {
+                  "indicator_rows": {
+                    "ma.dema": 1,
+                    "ma.ema": 5,
+                    "ma.hma": 0,
+                    "ma.rma": 5,
+                    "ma.sma": 1,
+                    "ma.wma": 1
+                  },
+                  "metadata": {
+                    "confirm_count": 25766,
+                    "ma.dema.indicator_id": "ma.dema",
+                    "ma.dema.row_id": 1,
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 6,
+                    "ma.ema.indicator_id": "ma.ema",
+                    "ma.ema.row_id": 5,
+                    "ma.ema.source": "close",
+                    "ma.ema.window": 10,
+                    "ma.hma.indicator_id": "ma.hma",
+                    "ma.hma.row_id": 0,
+                    "ma.hma.source": "close",
+                    "ma.hma.window": 5,
+                    "ma.rma.indicator_id": "ma.rma",
+                    "ma.rma.row_id": 5,
+                    "ma.rma.source": "close",
+                    "ma.rma.window": 10,
+                    "ma.sma.indicator_id": "ma.sma",
+                    "ma.sma.row_id": 1,
+                    "ma.sma.source": "close",
+                    "ma.sma.window": 6,
+                    "ma.wma.indicator_id": "ma.wma",
+                    "ma.wma.row_id": 1,
+                    "ma.wma.source": "close",
+                    "ma.wma.window": 6,
+                    "proxy_score": -29.666587829589844
+                  },
+                  "metrics": {
+                    "avg_trade_exec_bars": 22.960122699386503,
+                    "avg_trade_ret_pct": -0.20921579442037264,
+                    "exposure_pct": 0.16482707030837968,
+                    "max_drawdown_pct": 51.09916480891342,
+                    "profit_factor": 0.49806472321189776,
+                    "return_over_max_drawdown": -0.9889301968499422,
+                    "sharpe_trades": -1.1217554516588146,
+                    "total_return_pct": -50.53350711334639,
+                    "trade_count": 326.0,
+                    "win_rate_pct": 26.38036809815951
+                  },
+                  "rank": 5,
+                  "score": -50.53350711334639
+                }
+              ],
+              "tp_sl_selected_cells": null
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 80.3914169955533,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 46656,
+              "candidates_after_proxy": 46656,
+              "combo_count_planned": 46656,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 46656,
+              "consensus_signature_mode": "upper_bound_unique_row_product",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.ema": [],
+                "ma.hma": [],
+                "ma.rma": [],
+                "ma.sma": [],
+                "ma.wma": []
+              },
+              "exact_candidates": 46656,
+              "exact_candidates_per_sec": 46731.508351947945,
+              "exact_scoring_ms": 998.3842089714017,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 10.68412500899285,
+              "rows_after_prefilter": 36,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 1970496,
+              "signals_pack_estimated_peak_bytes": 9851364,
+              "signals_pack_ms": 26.719000015873462,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": null,
+              "top_result_assembly_ms": 11.934874986764044,
+              "tp_count": null,
+              "tp_sl_by_entry_selected_arrays_bytes": null,
+              "tp_sl_cell_backend_id": null,
+              "tp_sl_cell_block_estimated_peak_bytes": null,
+              "tp_sl_cell_block_shape": null,
+              "tp_sl_cell_blocks_per_candidate": null,
+              "tp_sl_cell_trade_cell_evals": null,
+              "tp_sl_cells": 0,
+              "tp_sl_exact_scoring_ms": null,
+              "tp_sl_selected_cell_elapsed_ms": null,
+              "tp_sl_selected_cell_parity_pass": null,
+              "tp_sl_selected_cell_scores": null,
+              "tp_sl_selected_cell_shadow_status": null,
+              "trade_cell_evals_per_sec": null,
+              "unique_rows_after_dedup": 36
+            },
+            "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 1.927207,
+              "exit_code": 0,
+              "finished_at": "2026-06-10T20:02:41.638401Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 94128,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 2211840,
+              "parent_rss_after_bytes": 120061952,
+              "parent_rss_before_bytes": 117850112,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 214155264,
+              "pid": 94152,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-10T20:02:39.711194Z",
+              "stderr_tail": "2026-06-10 23:02:40,011 INFO __main__ backtest child process started: job_id=9e195ee2-30e4-4259-aaf5-2e2f787a58c1 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-10 23:02:41,478 INFO __main__ backtest child process finished: job_id=9e195ee2-30e4-4259-aaf5-2e2f787a58c1 status=succeeded elapsed_seconds=1.467\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.014901666989317164,
+              "artifact_array_open": 0.014901666989317164,
+              "artifact_context_resolve": 0.06548975000623614,
+              "artifact_manifest_load": 0.06548975000623614,
+              "build_exact_context": 1.3291981304064393e-05,
+              "build_proxy_context": 7.708993507549167e-06,
+              "combo_iteration": 0.0,
+              "exact_scoring": 0.9983842089714017,
+              "full_metric_second_pass": 0.0004182080156169832,
+              "heap_update": 0.024762998917140067,
+              "matrix_bitset_backend_pack": 0.0023301250184886158,
+              "no_risk_exact_boundary": 2.8542010113596916e-05,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.08396904199616984,
+              "prepare_pools_total": 0.17739100000471808,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0009449589997529984,
+              "row_prefilter": 0.0770144579873886,
+              "sample_warmup": 0.025372708012582734,
+              "segment_build": 0.005433374986751005,
+              "service_total_without_warmup": 1.6920445848663803,
+              "service_wall_clock_s": 1.4265352920047008,
+              "signal_row_selection": 0.001514083007350564,
+              "time_range_slice": 0.0009449589997529984,
+              "top_result_assembly": 0.011934874986764044,
+              "top_result_proxy_fill": 0.14616991599905305
+            },
+            "status": "succeeded",
+            "summary_hash": "16eb92dad3cf89858d3ff1d99be6bd8089edad2272d7f6784c27a02dafb51d5d",
+            "top_variants_count": 50
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            94152
+          ],
+          "max_cpu_percent": 558.6,
+          "mean_core_equivalent": 3.765,
+          "mean_cpu_percent": 376.5,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 4.9510000000000005,
+          "p50_cpu_percent": 495.1,
+          "p95_core_equivalent": 5.5225,
+          "p95_cpu_percent": 552.25,
+          "peak_rss_bytes": 214548480,
+          "sample_count": 3,
+          "sample_interval_seconds": 0.5,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 75.8,
+              "mem_percent": 0.3,
+              "pid": 94152,
+              "ppid": 94128,
+              "rss_bytes": 206618624,
+              "timestamp": "2026-06-10T20:02:40.243713+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 558.6,
+              "mem_percent": 0.3,
+              "pid": 94152,
+              "ppid": 94128,
+              "rss_bytes": 213925888,
+              "timestamp": "2026-06-10T20:02:40.894312+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 495.1,
+              "mem_percent": 0.3,
+              "pid": 94152,
+              "ppid": 94128,
+              "rss_bytes": 214548480,
+              "timestamp": "2026-06-10T20:02:41.510821+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_only",
+        "index": 1,
+        "instrumentation_counters": {
+          "artifact_load_ms": 80.3914169955533,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 46731.508351947945,
+          "exact_scoring_ms": 998.3842089714017,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.68412500899285,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 26.719000015873462,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": null,
+          "top_result_assembly_ms": 11.934874986764044,
+          "tp_count": null,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": null,
+          "tp_sl_cell_block_estimated_peak_bytes": null,
+          "tp_sl_cell_block_shape": null,
+          "tp_sl_cell_blocks_per_candidate": null,
+          "tp_sl_cell_trade_cell_evals": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 36
+        },
+        "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+        "job_name": "none/arity_6/long_only",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-10T20:02:41.638401Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 120061952,
+              "parent_rss_before_bytes": 117850112,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 214155264,
+              "pid": 94152,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 2211840,
+              "started_at": "2026-06-10T20:02:39.711194Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 41135013888,
+            "available": true,
+            "before_bytes": 41114025984,
+            "delayed_bytes": 41135734784,
+            "immediate_delta_bytes": 20987904,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 21708800,
+            "wait_seconds": 5.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 50,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 6,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_only",
+            "exact_candidates_evaluated": 46656,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 27216,
+            "quality_candidates_heap_eligible": 19440,
+            "quality_gate_enabled": true,
+            "quality_top_zero": false,
+            "request_top_n": 50,
+            "risk_mode": "none",
+            "top_results_count": 50
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {},
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": false,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 15.694043542011059,
+        "request_hash": "4067c433e4bc85b7974102a8a4bdab68c8c115d5fecaad51eccdd913a7ca8af7",
+        "risk_mode": "none",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 13,
+                "max_ms": 52.74779201135971,
+                "min_ms": 26.462332985829562,
+                "p50_ms": 40.53937498247251,
+                "p95_ms": 52.74779201135971
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  94152
+                ],
+                "max_cpu_percent": 558.6,
+                "mean_core_equivalent": 3.765,
+                "mean_cpu_percent": 376.5,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 4.9510000000000005,
+                "p50_cpu_percent": 495.1,
+                "p95_core_equivalent": 5.5225,
+                "p95_cpu_percent": 552.25,
+                "peak_rss_bytes": 214548480,
+                "sample_count": 3,
+                "sample_interval_seconds": 0.5,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 75.8,
+                    "mem_percent": 0.3,
+                    "pid": 94152,
+                    "ppid": 94128,
+                    "rss_bytes": 206618624,
+                    "timestamp": "2026-06-10T20:02:40.243713+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 558.6,
+                    "mem_percent": 0.3,
+                    "pid": 94152,
+                    "ppid": 94128,
+                    "rss_bytes": 213925888,
+                    "timestamp": "2026-06-10T20:02:40.894312+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 495.1,
+                    "mem_percent": 0.3,
+                    "pid": 94152,
+                    "ppid": 94128,
+                    "rss_bytes": 214548480,
+                    "timestamp": "2026-06-10T20:02:41.510821+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:39.588826Z",
+                  "lease_expires_at": "2026-06-10T20:04:39.588826Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:39.588826Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:39.588826Z",
+                  "lease_expires_at": "2026-06-10T20:04:39.588826Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:39.588826Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:39.588826Z",
+                  "lease_expires_at": "2026-06-10T20:04:39.588826Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:39.588826Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:39.588826Z",
+                  "lease_expires_at": "2026-06-10T20:04:39.588826Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:39.588826Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:39.588826Z",
+                  "lease_expires_at": "2026-06-10T20:04:39.588826Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:39.588826Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              94152
+            ],
+            "max_cpu_percent": 558.6,
+            "mean_core_equivalent": 3.765,
+            "mean_cpu_percent": 376.5,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 4.9510000000000005,
+            "p50_cpu_percent": 495.1,
+            "p95_core_equivalent": 5.5225,
+            "p95_cpu_percent": 552.25,
+            "peak_rss_bytes": 214548480,
+            "sample_count": 3,
+            "sample_interval_seconds": 0.5,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 75.8,
+                "mem_percent": 0.3,
+                "pid": 94152,
+                "ppid": 94128,
+                "rss_bytes": 206618624,
+                "timestamp": "2026-06-10T20:02:40.243713+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 558.6,
+                "mem_percent": 0.3,
+                "pid": 94152,
+                "ppid": 94128,
+                "rss_bytes": 213925888,
+                "timestamp": "2026-06-10T20:02:40.894312+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id 9e195ee2-30e4-4259-aaf5-2e2f787a58c1 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-clatnp2n/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 495.1,
+                "mem_percent": 0.3,
+                "pid": 94152,
+                "ppid": 94128,
+                "rss_bytes": 214548480,
+                "timestamp": "2026-06-10T20:02:41.510821+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-10T20:02:39.544285Z",
+            "finished_at": "2026-06-10T20:02:41.658838Z",
+            "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+            "last_error": null,
+            "request_hash": "4067c433e4bc85b7974102a8a4bdab68c8c115d5fecaad51eccdd913a7ca8af7",
+            "scheduling": {
+              "arity": 6,
+              "estimated_combinations": 46656,
+              "estimated_combinations_upper_bound": 46656,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "none",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.ema": 6,
+                "ma.hma": 6,
+                "ma.rma": 6,
+                "ma.sma": 6,
+                "ma.wma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-10T20:02:39.588826Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 6,
+          "estimated_combinations": 46656,
+          "estimated_combinations_upper_bound": 46656,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "none",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.ema": 6,
+            "ma.hma": 6,
+            "ma.rma": 6,
+            "ma.sma": 6,
+            "ma.wma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.014901666989317164,
+          "artifact_context_resolve": 0.06548975000623614,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.17739100000471808,
+          "request_slice_prepare": 0.0009449589997529984,
+          "service_total_without_warmup": 1.6920445848663803,
+          "service_wall_clock_s": 1.4265352920047008,
+          "top_result_assembly": 0.011934874986764044
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.014901666989317164,
+          "artifact_array_open": 0.014901666989317164,
+          "artifact_context_resolve": 0.06548975000623614,
+          "artifact_manifest_load": 0.06548975000623614,
+          "build_exact_context": 1.3291981304064393e-05,
+          "build_proxy_context": 7.708993507549167e-06,
+          "combo_iteration": 0.0,
+          "exact_scoring": 0.9983842089714017,
+          "full_metric_second_pass": 0.0004182080156169832,
+          "heap_update": 0.024762998917140067,
+          "matrix_bitset_backend_pack": 0.0023301250184886158,
+          "no_risk_exact_boundary": 2.8542010113596916e-05,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.08396904199616984,
+          "prepare_pools_total": 0.17739100000471808,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0009449589997529984,
+          "row_prefilter": 0.0770144579873886,
+          "sample_warmup": 0.025372708012582734,
+          "segment_build": 0.005433374986751005,
+          "service_total_without_warmup": 1.6920445848663803,
+          "service_wall_clock_s": 1.4265352920047008,
+          "signal_row_selection": 0.001514083007350564,
+          "time_range_slice": 0.0009449589997529984,
+          "top_result_assembly": 0.011934874986764044,
+          "top_result_proxy_fill": 0.14616991599905305
+        }
+      },
+      {
+        "api_top_count": 0,
+        "arity": 6,
+        "child_process_evidence": [
+          {
+            "cleanup_evidence": {
+              "result_contains_heavy_references": false,
+              "runtime_result": {
+                "checked_reference_names": [
+                  "prepared_result",
+                  "combo_planning_result",
+                  "prepared_pools",
+                  "exact_context",
+                  "proxy_context",
+                  "execution_open_1m",
+                  "execution_close_1m",
+                  "matrix_bitsets",
+                  "selected_batches_iter",
+                  "metric_buffers",
+                  "heap"
+                ],
+                "cleanup_duration_s": 6.283301627263427e-05,
+                "result_contains_heavy_references": false,
+                "result_is_compact": true,
+                "retained_heavy_reference_names": []
+              },
+              "scheduling_class": "heavy",
+              "worker_recycle_required": true,
+              "worker_recycle_strategy": "disposable child process"
+            },
+            "exact_diagnostics": {
+              "combo_planning": {
+                "cartesian_combinations": 46656,
+                "combo_chunks_processed": 0,
+                "combo_iteration_mode": "ordinal_streaming_pass_through",
+                "exact_candidates_evaluated": 46656,
+                "materialized_candidate_count": 0,
+                "proxy_candidates_seen": 46656,
+                "proxy_candidates_selected": 46656,
+                "proxy_candidates_valid": 46656,
+                "stage_timings": {
+                  "build_exact_context": 1.329201040789485e-05,
+                  "build_proxy_context": 1.233298098668456e-05,
+                  "combo_iteration": 0.0,
+                  "proxy_filter": 0.0
+                },
+                "streamed_candidate_count": 46656
+              },
+              "row_signatures": {
+                "candidate_upper_bound_after_row_dedup": 46656,
+                "collision_strategy": "telemetry groups exact SHA-256 row-content signatures; the derived u64 sidecar-style signature is collision-checked only and must disable future dedup/cache if collisions are non-zero",
+                "consensus_signature_count": 46656,
+                "consensus_signature_enumeration_limit": 10000,
+                "consensus_signature_mode": "upper_bound_unique_row_product",
+                "duplicate_mapping_semantics": "duplicate_signal_row_ids lists original source row ids whose exact signal row content matches the first stable unique row for the same indicator; Stage 02 never removes or reorders those rows",
+                "duplicate_row_count": 0,
+                "duplicate_row_fraction": 0.0,
+                "duplicate_signal_row_ids": {
+                  "ma.dema": [],
+                  "ma.ema": [],
+                  "ma.hma": [],
+                  "ma.rma": [],
+                  "ma.sma": [],
+                  "ma.wma": []
+                },
+                "indicators": [
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.dema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.hma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.ema",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.sma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.wma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  },
+                  {
+                    "duplicate_signal_row_ids": [],
+                    "indicator_id": "ma.rma",
+                    "row_signature_collision_count": 0,
+                    "rows_after_prefilter": 6,
+                    "unique_rows_after_dedup": 6,
+                    "unique_signal_row_ids": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                ],
+                "row_signature_collision_count": 0,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_row_signature_telemetry_v1",
+                "unique_rows_after_dedup": 36,
+                "unique_signal_row_ids": {
+                  "ma.dema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.ema": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.hma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.rma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.sma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "ma.wma": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              },
+              "self_check": {
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "direction_mode": "long_short_reversal",
+                "enabled": false,
+                "max_abs_diff": null,
+                "mismatches": 0,
+                "return_tolerance": null,
+                "sample_size": 0,
+                "status": "not_run",
+                "trade_count_equal": null
+              },
+              "signal_bitsets": {
+                "arrays": {
+                  "neg_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  },
+                  "pos_bits": {
+                    "dtype": "uint64",
+                    "shape": [
+                      "rows",
+                      "W"
+                    ]
+                  }
+                },
+                "arrays_released_before_return": true,
+                "bit_order": "little_endian_lsb_first_per_uint64_word",
+                "consensus_sample_count": 8,
+                "consensus_sample_mismatches": 0,
+                "consensus_sample_parity": true,
+                "estimated_peak_bytes": 9851364,
+                "indicators": [
+                  {
+                    "indicator_id": "ma.dema",
+                    "negative_signal_count": 657719,
+                    "neutral_signal_count": 38,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 655721,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.hma",
+                    "negative_signal_count": 743747,
+                    "neutral_signal_count": 0,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 569731,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.ema",
+                    "negative_signal_count": 637395,
+                    "neutral_signal_count": 24,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 676059,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.sma",
+                    "negative_signal_count": 640855,
+                    "neutral_signal_count": 28,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 672595,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.wma",
+                    "negative_signal_count": 1033679,
+                    "neutral_signal_count": 1,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 279798,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  },
+                  {
+                    "indicator_id": "ma.rma",
+                    "negative_signal_count": 633678,
+                    "neutral_signal_count": 19,
+                    "packed_bytes": 328416,
+                    "padding_bits": 31,
+                    "padding_valid": true,
+                    "positive_signal_count": 679781,
+                    "rows_after_prefilter": 6,
+                    "signal_length": 218913,
+                    "word_count": 3421
+                  }
+                ],
+                "packed_bytes": 1970496,
+                "padding_bits": 31,
+                "padding_valid": true,
+                "rows_after_prefilter": 36,
+                "schema": "backtest_runtime_bitset_pack_shadow_v1",
+                "sidecar_available": false,
+                "sidecar_dir": null,
+                "sidecar_fallback_reason": null,
+                "sidecar_load_ms": null,
+                "sidecar_used": false,
+                "signal_length": 218913,
+                "source": "runtime_pack",
+                "word_count": 3421,
+                "word_count_formula": "W = ceil(T / 64)"
+              },
+              "telemetry": {
+                "arity": 6,
+                "backend_id": "matrix_bitset_no_risk_v1",
+                "backend_implementation_id": "matrix_bitset_no_risk_v1",
+                "backend_logical_name": "matrix_bitset_no_risk_v1",
+                "benchmark_top_k": 5,
+                "direction_mode": "long_short_reversal",
+                "exact_candidates_evaluated": 46656,
+                "heap_capacity": 50,
+                "metric_names": [
+                  "total_return_pct",
+                  "max_drawdown_pct",
+                  "return_over_max_drawdown",
+                  "profit_factor",
+                  "trade_count",
+                  "sharpe_trades",
+                  "win_rate_pct",
+                  "avg_trade_ret_pct",
+                  "avg_trade_exec_bars",
+                  "exposure_pct"
+                ],
+                "metric_profile": "ranking_total_return_trade_count",
+                "min_closed_trades": 300,
+                "numba_num_threads": 12,
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "quality_candidates_below_min_trades": 46656,
+                "quality_candidates_heap_eligible": 0,
+                "request_top_n": 50,
+                "risk_mode": "none",
+                "sample_metrics": null,
+                "stage_timings": {
+                  "exact_scoring": 2.9112957899924368,
+                  "full_metric_second_pass": 0.0,
+                  "heap_update": 0.0033518329728394747,
+                  "matrix_bitset_backend_pack": 0.002347750007174909,
+                  "no_risk_exact_boundary": 3.070899401791394e-05,
+                  "top_result_proxy_fill": 2.0041014067828655e-05
+                },
+                "status": "scored",
+                "top_results_count": 0
+              },
+              "top_results_sample": [],
+              "tp_sl_selected_cells": null
+            },
+            "instrumentation_counters": {
+              "artifact_load_ms": 78.78470799187198,
+              "avg_segments_per_candidate": null,
+              "avg_trades_per_candidate": null,
+              "bitset_consensus_sample_count": 8,
+              "bitset_consensus_sample_mismatches": 0,
+              "bitset_consensus_sample_parity": true,
+              "bitset_padding_valid": true,
+              "bitset_word_count": 3421,
+              "candidate_upper_bound_after_row_dedup": 46656,
+              "candidates_after_proxy": 46656,
+              "combo_count_planned": 46656,
+              "combo_iteration_ms": 0.0,
+              "consensus_signature_count": 46656,
+              "consensus_signature_mode": "upper_bound_unique_row_product",
+              "duplicate_signal_row_ids": {
+                "ma.dema": [],
+                "ma.ema": [],
+                "ma.hma": [],
+                "ma.rma": [],
+                "ma.sma": [],
+                "ma.wma": []
+              },
+              "exact_candidates": 46656,
+              "exact_candidates_per_sec": 16025.853559909558,
+              "exact_scoring_ms": 2911.2957899924368,
+              "proxy_filter_ms": 0.0,
+              "row_signature_collision_count": 0,
+              "row_signature_ms": 10.901417001150548,
+              "rows_after_prefilter": 36,
+              "rows_before_prefilter": null,
+              "sidecar_available": false,
+              "sidecar_dir": null,
+              "sidecar_fallback_reason": null,
+              "sidecar_load_ms": null,
+              "sidecar_used": false,
+              "signals_pack_arrays_released": true,
+              "signals_pack_bytes": 1970496,
+              "signals_pack_estimated_peak_bytes": 9851364,
+              "signals_pack_ms": 25.853458006167784,
+              "signals_pack_source": "runtime_pack",
+              "sl_count": null,
+              "top_result_assembly_ms": 0.0021250161807984114,
+              "tp_count": null,
+              "tp_sl_by_entry_selected_arrays_bytes": null,
+              "tp_sl_cell_backend_id": null,
+              "tp_sl_cell_block_estimated_peak_bytes": null,
+              "tp_sl_cell_block_shape": null,
+              "tp_sl_cell_blocks_per_candidate": null,
+              "tp_sl_cell_trade_cell_evals": null,
+              "tp_sl_cells": 0,
+              "tp_sl_exact_scoring_ms": null,
+              "tp_sl_selected_cell_elapsed_ms": null,
+              "tp_sl_selected_cell_parity_pass": null,
+              "tp_sl_selected_cell_scores": null,
+              "tp_sl_selected_cell_shadow_status": null,
+              "trade_cell_evals_per_sec": null,
+              "unique_rows_after_dedup": 36
+            },
+            "job_id": "a18420ef-c386-4046-893c-29abc535a1c4",
+            "process_evidence": {
+              "cancelled": false,
+              "command": [
+                "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+                "-m",
+                "apps.worker.backtest_job_runner.main.full_job_child",
+                "--job-id",
+                "a18420ef-c386-4046-893c-29abc535a1c4",
+                "--preflight-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json",
+                "--output-json",
+                "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json",
+                "--scheduling-class",
+                "heavy",
+                "--light-max-actual-combinations",
+                "50000"
+              ],
+              "elapsed_seconds": 3.693435,
+              "exit_code": 0,
+              "finished_at": "2026-06-10T20:02:50.931813Z",
+              "metadata": {
+                "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+                "job_id": "a18420ef-c386-4046-893c-29abc535a1c4",
+                "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+                "numba_threads": "12",
+                "scheduling_class": "heavy",
+                "task_kind": "full_job"
+              },
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_pid": 94128,
+              "parent_retained_physical_footprint_delta_bytes": null,
+              "parent_retained_rss_delta_bytes": 1376256,
+              "parent_rss_after_bytes": 123781120,
+              "parent_rss_before_bytes": 122404864,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 214450176,
+              "pid": 94258,
+              "schema": "roehub_child_process_evidence_v1",
+              "started_at": "2026-06-10T20:02:47.238378Z",
+              "stderr_tail": "2026-06-10 23:02:47,547 INFO __main__ backtest child process started: job_id=a18420ef-c386-4046-893c-29abc535a1c4 scheduling_class=heavy numba_threads=12 numba_thread_source=ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS\n2026-06-10 23:02:50,739 INFO __main__ backtest child process finished: job_id=a18420ef-c386-4046-893c-29abc535a1c4 status=succeeded elapsed_seconds=3.192\n",
+              "stdout_tail": "",
+              "timed_out": false
+            },
+            "schema": "roehub_full_job_child_result_evidence_v1",
+            "stage_timings": {
+              "artifact_array_mmap_load": 0.013216332998126745,
+              "artifact_array_open": 0.013216332998126745,
+              "artifact_context_resolve": 0.06556837499374524,
+              "artifact_manifest_load": 0.06556837499374524,
+              "build_exact_context": 1.329201040789485e-05,
+              "build_proxy_context": 1.233298098668456e-05,
+              "combo_iteration": 0.0,
+              "exact_scoring": 2.9112957899924368,
+              "full_metric_second_pass": 0.0,
+              "heap_update": 0.0033518329728394747,
+              "matrix_bitset_backend_pack": 0.002347750007174909,
+              "no_risk_exact_boundary": 3.070899401791394e-05,
+              "persist_top_n_io": 0.0,
+              "prepare_pools_core": 0.08424199998262338,
+              "prepare_pools_total": 0.1766571250045672,
+              "proxy_filter": 0.0,
+              "request_slice_prepare": 0.0010019589972216636,
+              "row_prefilter": 0.0770802500192076,
+              "sample_warmup": 0.022681041999021545,
+              "segment_build": 0.0055274580081459135,
+              "service_total_without_warmup": 3.4217812069691718,
+              "service_wall_clock_s": 3.155481416004477,
+              "signal_row_selection": 0.0016271669883280993,
+              "time_range_slice": 0.0010019589972216636,
+              "top_result_assembly": 2.1250161807984114e-06,
+              "top_result_proxy_fill": 2.0041014067828655e-05
+            },
+            "status": "succeeded",
+            "summary_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "top_variants_count": 0
+          }
+        ],
+        "cpu_sampling": {
+          "available": true,
+          "child_pids": [
+            94258
+          ],
+          "max_cpu_percent": 961.9,
+          "mean_core_equivalent": 7.625,
+          "mean_cpu_percent": 762.5,
+          "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+          "p50_core_equivalent": 8.8545,
+          "p50_cpu_percent": 885.45,
+          "p95_core_equivalent": 9.59825,
+          "p95_cpu_percent": 959.825,
+          "peak_rss_bytes": 214482944,
+          "sample_count": 6,
+          "sample_interval_seconds": 0.5,
+          "samples": [
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 82.5,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 202948608,
+              "timestamp": "2026-06-10T20:02:47.771809+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 806.1,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 214056960,
+              "timestamp": "2026-06-10T20:02:48.322531+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 953.6,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 214155264,
+              "timestamp": "2026-06-10T20:02:48.887652+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 961.9,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 214450176,
+              "timestamp": "2026-06-10T20:02:49.474062+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 945.1,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 214450176,
+              "timestamp": "2026-06-10T20:02:50.055831+00:00"
+            },
+            {
+              "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+              "cpu_percent": 825.8,
+              "mem_percent": 0.3,
+              "pid": 94258,
+              "ppid": 94128,
+              "rss_bytes": 214482944,
+              "timestamp": "2026-06-10T20:02:50.760454+00:00"
+            }
+          ]
+        },
+        "created_state": "queued",
+        "direction_mode": "long_short_reversal",
+        "index": 2,
+        "instrumentation_counters": {
+          "artifact_load_ms": 78.78470799187198,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 16025.853559909558,
+          "exact_scoring_ms": 2911.2957899924368,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.901417001150548,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 25.853458006167784,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": null,
+          "top_result_assembly_ms": 0.0021250161807984114,
+          "tp_count": null,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": null,
+          "tp_sl_cell_block_estimated_peak_bytes": null,
+          "tp_sl_cell_block_shape": null,
+          "tp_sl_cell_blocks_per_candidate": null,
+          "tp_sl_cell_trade_cell_evals": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 36
+        },
+        "job_id": "a18420ef-c386-4046-893c-29abc535a1c4",
+        "job_name": "none/arity_6/long_short_reversal",
+        "memory": {
+          "child_processes_exited": true,
+          "items": [
+            {
+              "exit_code": 0,
+              "finished_at": "2026-06-10T20:02:50.931813Z",
+              "parent_physical_footprint_after_bytes": null,
+              "parent_physical_footprint_before_bytes": null,
+              "parent_rss_after_bytes": 123781120,
+              "parent_rss_before_bytes": 122404864,
+              "peak_physical_footprint_bytes": null,
+              "peak_rss_bytes": 214450176,
+              "pid": 94258,
+              "retained_physical_footprint_delta_bytes": null,
+              "retained_rss_delta": 1376256,
+              "started_at": "2026-06-10T20:02:47.238378Z"
+            }
+          ],
+          "pass": true,
+          "system_memory_cleanup": {
+            "after_bytes": 41158164480,
+            "available": true,
+            "before_bytes": 41138143232,
+            "delayed_bytes": 41162407936,
+            "immediate_delta_bytes": 20021248,
+            "limit_bytes": 536870912,
+            "metric": "anonymous_or_wired_bytes",
+            "pass": true,
+            "retained_delta_bytes": 24264704,
+            "wait_seconds": 5.0
+          },
+          "vmmap_or_physical_footprint_available": false
+        },
+        "parity": {
+          "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+          "accepted_top_results_mismatches": [],
+          "accepted_top_results_required": false,
+          "api_child_top_mismatches": [],
+          "api_items": 0,
+          "api_shape_pass": true,
+          "exact_telemetry": {
+            "arity": 6,
+            "benchmark_top_k": 5,
+            "direction_mode": "long_short_reversal",
+            "exact_candidates_evaluated": 46656,
+            "min_closed_trades": 300,
+            "numba_num_threads": 12,
+            "numba_thread_source": "ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS",
+            "quality_candidates_below_min_trades": 46656,
+            "quality_candidates_heap_eligible": 0,
+            "quality_gate_enabled": true,
+            "quality_top_zero": true,
+            "request_top_n": 50,
+            "risk_mode": "none",
+            "top_results_count": 0
+          },
+          "pass": true,
+          "sample_metrics_mismatches": [],
+          "selected_cell_shadow": {},
+          "selected_cell_shadow_pass": true,
+          "stage_08_tp_sl_selected_cells": false,
+          "telemetry_mismatches": []
+        },
+        "pass": true,
+        "reference_exact_scoring_s": 15.365323083999101,
+        "request_hash": "9bac0404052f7372f92fa401371ed178eedcce9f06accc9cccf0fea6a1deb35d",
+        "risk_mode": "none",
+        "runner": {
+          "attempts": [
+            {
+              "api_responsiveness": {
+                "count": 17,
+                "max_ms": 261.17512499331497,
+                "min_ms": 17.952624999452382,
+                "p50_ms": 57.07691700081341,
+                "p95_ms": 261.17512499331497
+              },
+              "claimed": true,
+              "cpu_sampling": {
+                "available": true,
+                "child_pids": [
+                  94258
+                ],
+                "max_cpu_percent": 961.9,
+                "mean_core_equivalent": 7.625,
+                "mean_cpu_percent": 762.5,
+                "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+                "p50_core_equivalent": 8.8545,
+                "p50_cpu_percent": 885.45,
+                "p95_core_equivalent": 9.59825,
+                "p95_cpu_percent": 959.825,
+                "peak_rss_bytes": 214482944,
+                "sample_count": 6,
+                "sample_interval_seconds": 0.5,
+                "samples": [
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 82.5,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 202948608,
+                    "timestamp": "2026-06-10T20:02:47.771809+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 806.1,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 214056960,
+                    "timestamp": "2026-06-10T20:02:48.322531+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 953.6,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 214155264,
+                    "timestamp": "2026-06-10T20:02:48.887652+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 961.9,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 214450176,
+                    "timestamp": "2026-06-10T20:02:49.474062+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 945.1,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 214450176,
+                    "timestamp": "2026-06-10T20:02:50.055831+00:00"
+                  },
+                  {
+                    "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                    "cpu_percent": 825.8,
+                    "mem_percent": 0.3,
+                    "pid": 94258,
+                    "ppid": 94128,
+                    "rss_bytes": 214482944,
+                    "timestamp": "2026-06-10T20:02:50.760454+00:00"
+                  }
+                ]
+              },
+              "job_state": "succeeded",
+              "lease_lost": false,
+              "observed_states": [
+                "queued",
+                "running"
+              ],
+              "running_samples": [
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:47.095329Z",
+                  "lease_expires_at": "2026-06-10T20:04:47.095329Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:47.095329Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:47.095329Z",
+                  "lease_expires_at": "2026-06-10T20:04:47.095329Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:47.095329Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:47.095329Z",
+                  "lease_expires_at": "2026-06-10T20:04:47.095329Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:47.095329Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:47.095329Z",
+                  "lease_expires_at": "2026-06-10T20:04:47.095329Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:47.095329Z",
+                  "state": "running"
+                },
+                {
+                  "attempt": 1,
+                  "heartbeat_at": "2026-06-10T20:02:47.095329Z",
+                  "lease_expires_at": "2026-06-10T20:04:47.095329Z",
+                  "locked_by": "backtest-job-runner:MacStudioDaniil-94128",
+                  "started_at": "2026-06-10T20:02:47.095329Z",
+                  "state": "running"
+                }
+              ],
+              "worker_status": null
+            }
+          ],
+          "cpu_sampling": {
+            "available": true,
+            "child_pids": [
+              94258
+            ],
+            "max_cpu_percent": 961.9,
+            "mean_core_equivalent": 7.625,
+            "mean_cpu_percent": 762.5,
+            "method": "ps -axww -o pid=,ppid=,%cpu=,%mem=,rss=,command= filtered by full_job_child --job-id",
+            "p50_core_equivalent": 8.8545,
+            "p50_cpu_percent": 885.45,
+            "p95_core_equivalent": 9.59825,
+            "p95_cpu_percent": 959.825,
+            "peak_rss_bytes": 214482944,
+            "sample_count": 6,
+            "sample_interval_seconds": 0.5,
+            "samples": [
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 82.5,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 202948608,
+                "timestamp": "2026-06-10T20:02:47.771809+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 806.1,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 214056960,
+                "timestamp": "2026-06-10T20:02:48.322531+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 953.6,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 214155264,
+                "timestamp": "2026-06-10T20:02:48.887652+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 961.9,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 214450176,
+                "timestamp": "2026-06-10T20:02:49.474062+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 945.1,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 214450176,
+                "timestamp": "2026-06-10T20:02:50.055831+00:00"
+              },
+              {
+                "command": "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3 -m apps.worker.backtest_job_runner.main.full_job_child --job-id a18420ef-c386-4046-893c-29abc535a1c4 --preflight-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/preflight.json --output-json /var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-backtest-child-9xhorj2c/result.json --scheduling-class heavy --light-max-actual-combinations 50000",
+                "cpu_percent": 825.8,
+                "mem_percent": 0.3,
+                "pid": 94258,
+                "ppid": 94128,
+                "rss_bytes": 214482944,
+                "timestamp": "2026-06-10T20:02:50.760454+00:00"
+              }
+            ]
+          },
+          "pass": true,
+          "required_path": "queued -> running -> succeeded",
+          "required_path_pass": true,
+          "state_path": "queued -> running -> succeeded",
+          "terminal": {
+            "attempt": 1,
+            "created_at": "2026-06-10T20:02:47.044188Z",
+            "finished_at": "2026-06-10T20:02:50.941699Z",
+            "job_id": "a18420ef-c386-4046-893c-29abc535a1c4",
+            "last_error": null,
+            "request_hash": "9bac0404052f7372f92fa401371ed178eedcce9f06accc9cccf0fea6a1deb35d",
+            "scheduling": {
+              "arity": 6,
+              "estimated_combinations": 46656,
+              "estimated_combinations_upper_bound": 46656,
+              "requested_range": {
+                "end": "2026-04-11T20:08:00Z",
+                "start": "2020-01-11T20:08:00Z"
+              },
+              "requested_top_n": 50,
+              "risk_mode": "none",
+              "row_count_upper_bounds_by_indicator": {
+                "ma.dema": 6,
+                "ma.ema": 6,
+                "ma.hma": 6,
+                "ma.rma": 6,
+                "ma.sma": 6,
+                "ma.wma": 6
+              },
+              "scheduling_class": "heavy",
+              "source": "preflight",
+              "version": 1
+            },
+            "started_at": "2026-06-10T20:02:47.095329Z",
+            "state": "succeeded"
+          }
+        },
+        "scheduling": {
+          "arity": 6,
+          "estimated_combinations": 46656,
+          "estimated_combinations_upper_bound": 46656,
+          "requested_range": {
+            "end": "2026-04-11T20:08:00Z",
+            "start": "2020-01-11T20:08:00Z"
+          },
+          "requested_top_n": 50,
+          "risk_mode": "none",
+          "row_count_upper_bounds_by_indicator": {
+            "ma.dema": 6,
+            "ma.ema": 6,
+            "ma.hma": 6,
+            "ma.rma": 6,
+            "ma.sma": 6,
+            "ma.wma": 6
+          },
+          "scheduling_class": "heavy",
+          "source": "preflight",
+          "version": 1
+        },
+        "service_only_overhead": {
+          "artifact_array_open": 0.013216332998126745,
+          "artifact_context_resolve": 0.06556837499374524,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_total": 0.1766571250045672,
+          "request_slice_prepare": 0.0010019589972216636,
+          "service_total_without_warmup": 3.4217812069691718,
+          "service_wall_clock_s": 3.155481416004477,
+          "top_result_assembly": 2.1250161807984114e-06
+        },
+        "stage_timings": {
+          "artifact_array_mmap_load": 0.013216332998126745,
+          "artifact_array_open": 0.013216332998126745,
+          "artifact_context_resolve": 0.06556837499374524,
+          "artifact_manifest_load": 0.06556837499374524,
+          "build_exact_context": 1.329201040789485e-05,
+          "build_proxy_context": 1.233298098668456e-05,
+          "combo_iteration": 0.0,
+          "exact_scoring": 2.9112957899924368,
+          "full_metric_second_pass": 0.0,
+          "heap_update": 0.0033518329728394747,
+          "matrix_bitset_backend_pack": 0.002347750007174909,
+          "no_risk_exact_boundary": 3.070899401791394e-05,
+          "persist_top_n_io": 0.0,
+          "prepare_pools_core": 0.08424199998262338,
+          "prepare_pools_total": 0.1766571250045672,
+          "proxy_filter": 0.0,
+          "request_slice_prepare": 0.0010019589972216636,
+          "row_prefilter": 0.0770802500192076,
+          "sample_warmup": 0.022681041999021545,
+          "segment_build": 0.0055274580081459135,
+          "service_total_without_warmup": 3.4217812069691718,
+          "service_wall_clock_s": 3.155481416004477,
+          "signal_row_selection": 0.0016271669883280993,
+          "time_range_slice": 0.0010019589972216636,
+          "top_result_assembly": 2.1250161807984114e-06,
+          "top_result_proxy_fill": 2.0041014067828655e-05
+        }
+      }
+    ],
+    "pass": true,
+    "runner_entrypoint": "BacktestJobWorkerUseCase.run_next"
+  },
+  "artifact_env": {
+    "config_key_present": true,
+    "config_path": "configs/prod/backtest_artifacts.yaml",
+    "env_name_present": true,
+    "filled_keys": [
+      "ROEHUB_ENV",
+      "ROEHUB_BACKTEST_ARTIFACTS_CONFIG"
+    ],
+    "reason": "defaulted to Mac Studio prod artifact config"
+  },
+  "artifact_reference": {
+    "artifact_manifest_hash": "595be8b41c7d50d9d7456f4cc49ec625b7b9f0de557ace7cbdf3c066f091d0af",
+    "artifact_policy": "historical_prefix_compatible",
+    "hit_times_manifest_hash": "09143b055123190d6c919ca758817fa89915245d70719437f037340cdc4196fc",
+    "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1"
+  },
+  "backlog_after": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "backlog_before": {
+    "full_jobs_queued": 0,
+    "full_jobs_running": 0,
+    "lazy_detail_queued": 0,
+    "lazy_detail_running": 0
+  },
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "dead_code_audit": {
+    "dead code audit": true,
+    "pass": true,
+    "removed_or_replaced_paths": [
+      "API create path replaced sync_inline compute with background_auto queued jobs",
+      "lazy cache hit replaced monolithic full-detail JSON reads with metadata + JSONL readers",
+      "large-grid production path uses ordinal streaming chunks instead of Cartesian product materialization"
+    ],
+    "retained_helpers": [
+      {
+        "classification": "child-only",
+        "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py"
+      },
+      {
+        "classification": "reference-only for legacy in-memory builders; API path uses cache readers",
+        "path": "src/trading/contexts/backtest/application/services/v2/result_series.py"
+      },
+      {
+        "classification": "reference-only semantic baseline",
+        "path": "tests/notebook_tests/engine_test/btcusdt_15m_research_engine.ipynb"
+      }
+    ]
+  },
+  "docs_drift_audit": {
+    "active_doc_blockers": [],
+    "active_docs_checked": [
+      "docs/architecture/backtest/backtest-job-runner-production-plan-v1.md",
+      "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "docs/architecture/backtest/benchmark_iterations/README.md"
+    ],
+    "docs drift audit": true,
+    "pass": true,
+    "remaining_historical_references": "historical benchmark references remain allowed when labeled historical"
+  },
+  "env_file": {
+    "candidates": [
+      "/Users/daniildegtyarev/.config/roehub/roehub.env",
+      "/etc/roehub/roehub.env"
+    ],
+    "keys_loaded": [
+      "IDENTITY_PG_DSN",
+      "POSTGRES_DB",
+      "POSTGRES_DSN",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_USER",
+      "STRATEGY_PG_DSN"
+    ],
+    "keys_loaded_count": 54,
+    "loaded": true,
+    "path": "/Users/daniildegtyarev/.config/roehub/roehub.env",
+    "reason": null
+  },
+  "excluded_reference_job": {
+    "arity": 6,
+    "direction_mode": [
+      "long_only",
+      "long_short_reversal"
+    ],
+    "job_name": null,
+    "reason": "stage_05_no_risk_heavy_rows: run only no-risk arity 6 long_only and long_short_reversal rows for matrix_bitset_no_risk_v1 evidence",
+    "risk_mode": "none"
+  },
+  "finished_at": "2026-06-10T20:02:57.654980+00:00",
+  "generated_at": "2026-06-10T20:02:39.313316+00:00",
+  "git_commit": "e985b30123ca9070ef5b1fc3227ffef6dd3fdf35",
+  "git_status_short": "M .codex/agents/generated/backtest-compute-acceleration-v1/07-implement-sidecar-bitset-artifacts.md\n M .codex/agents/generated/backtest-compute-acceleration-v1/11-implement-lazy-detail-reuse-sparse-trade-tape.md\n M docs/architecture/README.md\n M docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md\n M docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md\n M scripts/backtest/run_api_runner_benchmark_parity.py\n M src/trading/contexts/backtest/application/dto/tp_sl_exact.py\n M src/trading/contexts/backtest/application/services/v2/__init__.py\n M src/trading/contexts/backtest/application/services/v2/combo_planning.py\n M src/trading/contexts/backtest/application/services/v2/job_orchestration.py\n M src/trading/contexts/backtest/application/services/v2/matrix_backend/bitsets.py\n M src/trading/contexts/backtest/application/services/v2/tp_sl_exact.py\n M tests/unit/contexts/backtest/application/services/v2/test_bitsets.py\n M tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py\n M tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py\n?? docs/architecture/backtest/benchmark_iterations/2026-05-22_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-05-23_ai_configurator_assistant_v1/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_bitset_backend/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_optimized/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_05_default_off_baseline/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/\n?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/\n?? scripts/backtest/generate_matrix_sidecar_artifacts.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py\n?? src/trading/contexts/backtest/application/services/v2/matrix_backend/trade_tape.py\n?? tests/unit/tools/test_stage00_2_lmstudio_act_agent.py\n?? tests/unit/tools/test_stage00_3_protocol_split_structured_finalizer.py\n?? tools/backtest_ai_configurator/",
+  "host": "MacStudioDaniil",
+  "instrumentation": {
+    "failed_selected_cell_shadow_jobs": [],
+    "job_count": 2,
+    "missing_by_job": {},
+    "pass": true,
+    "required_fields": [
+      "artifact_load_ms",
+      "signals_pack_ms",
+      "sidecar_load_ms",
+      "sidecar_used",
+      "sidecar_available",
+      "sidecar_fallback_reason",
+      "sidecar_dir",
+      "signals_pack_source",
+      "signals_pack_bytes",
+      "signals_pack_estimated_peak_bytes",
+      "signals_pack_arrays_released",
+      "bitset_word_count",
+      "bitset_padding_valid",
+      "bitset_consensus_sample_count",
+      "bitset_consensus_sample_mismatches",
+      "bitset_consensus_sample_parity",
+      "combo_iteration_ms",
+      "proxy_filter_ms",
+      "exact_scoring_ms",
+      "tp_sl_exact_scoring_ms",
+      "top_result_assembly_ms",
+      "rows_before_prefilter",
+      "rows_after_prefilter",
+      "row_signature_ms",
+      "unique_rows_after_dedup",
+      "duplicate_signal_row_ids",
+      "row_signature_collision_count",
+      "consensus_signature_count",
+      "consensus_signature_mode",
+      "candidate_upper_bound_after_row_dedup",
+      "combo_count_planned",
+      "candidates_after_proxy",
+      "exact_candidates",
+      "avg_segments_per_candidate",
+      "avg_trades_per_candidate",
+      "tp_count",
+      "sl_count",
+      "tp_sl_cells",
+      "tp_sl_cell_backend_id",
+      "tp_sl_cell_block_shape",
+      "tp_sl_cell_blocks_per_candidate",
+      "tp_sl_cell_block_estimated_peak_bytes",
+      "tp_sl_cell_trade_cell_evals",
+      "tp_sl_selected_cell_shadow_status",
+      "tp_sl_selected_cell_parity_pass",
+      "tp_sl_selected_cell_scores",
+      "tp_sl_selected_cell_elapsed_ms",
+      "tp_sl_by_entry_selected_arrays_bytes",
+      "exact_candidates_per_sec",
+      "trade_cell_evals_per_sec"
+    ],
+    "rows": [
+      {
+        "counters": {
+          "artifact_load_ms": 80.3914169955533,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 46731.508351947945,
+          "exact_scoring_ms": 998.3842089714017,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.68412500899285,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 26.719000015873462,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": null,
+          "top_result_assembly_ms": 11.934874986764044,
+          "tp_count": null,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": null,
+          "tp_sl_cell_block_estimated_peak_bytes": null,
+          "tp_sl_cell_block_shape": null,
+          "tp_sl_cell_blocks_per_candidate": null,
+          "tp_sl_cell_trade_cell_evals": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 36
+        },
+        "job_name": "none/arity_6/long_only",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "tp_sl_exact_scoring_ms",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "trade_cell_evals_per_sec"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      },
+      {
+        "counters": {
+          "artifact_load_ms": 78.78470799187198,
+          "avg_segments_per_candidate": null,
+          "avg_trades_per_candidate": null,
+          "bitset_consensus_sample_count": 8,
+          "bitset_consensus_sample_mismatches": 0,
+          "bitset_consensus_sample_parity": "True",
+          "bitset_padding_valid": "True",
+          "bitset_word_count": 3421,
+          "candidate_upper_bound_after_row_dedup": 46656,
+          "candidates_after_proxy": 46656,
+          "combo_count_planned": 46656,
+          "combo_iteration_ms": 0.0,
+          "consensus_signature_count": 46656,
+          "consensus_signature_mode": "upper_bound_unique_row_product",
+          "duplicate_signal_row_ids": "{'ma.dema': [], 'ma.ema': [], 'ma.hma': [], 'ma.rma': [], 'ma.sma': [], 'ma.wma': []}",
+          "exact_candidates": 46656,
+          "exact_candidates_per_sec": 16025.853559909558,
+          "exact_scoring_ms": 2911.2957899924368,
+          "proxy_filter_ms": 0.0,
+          "row_signature_collision_count": 0,
+          "row_signature_ms": 10.901417001150548,
+          "rows_after_prefilter": 36,
+          "rows_before_prefilter": null,
+          "sidecar_available": "False",
+          "sidecar_dir": null,
+          "sidecar_fallback_reason": null,
+          "sidecar_load_ms": null,
+          "sidecar_used": "False",
+          "signals_pack_arrays_released": "True",
+          "signals_pack_bytes": 1970496,
+          "signals_pack_estimated_peak_bytes": 9851364,
+          "signals_pack_ms": 25.853458006167784,
+          "signals_pack_source": "runtime_pack",
+          "sl_count": null,
+          "top_result_assembly_ms": 0.0021250161807984114,
+          "tp_count": null,
+          "tp_sl_by_entry_selected_arrays_bytes": null,
+          "tp_sl_cell_backend_id": null,
+          "tp_sl_cell_block_estimated_peak_bytes": null,
+          "tp_sl_cell_block_shape": null,
+          "tp_sl_cell_blocks_per_candidate": null,
+          "tp_sl_cell_trade_cell_evals": null,
+          "tp_sl_cells": 0,
+          "tp_sl_exact_scoring_ms": null,
+          "tp_sl_selected_cell_elapsed_ms": null,
+          "tp_sl_selected_cell_parity_pass": null,
+          "tp_sl_selected_cell_scores": null,
+          "tp_sl_selected_cell_shadow_status": null,
+          "trade_cell_evals_per_sec": null,
+          "unique_rows_after_dedup": 36
+        },
+        "job_name": "none/arity_6/long_short_reversal",
+        "missing_fields": [],
+        "null_fields": [
+          "sidecar_load_ms",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "tp_sl_exact_scoring_ms",
+          "rows_before_prefilter",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "trade_cell_evals_per_sec"
+        ],
+        "present_fields": [
+          "artifact_load_ms",
+          "signals_pack_ms",
+          "sidecar_load_ms",
+          "sidecar_used",
+          "sidecar_available",
+          "sidecar_fallback_reason",
+          "sidecar_dir",
+          "signals_pack_source",
+          "signals_pack_bytes",
+          "signals_pack_estimated_peak_bytes",
+          "signals_pack_arrays_released",
+          "bitset_word_count",
+          "bitset_padding_valid",
+          "bitset_consensus_sample_count",
+          "bitset_consensus_sample_mismatches",
+          "bitset_consensus_sample_parity",
+          "combo_iteration_ms",
+          "proxy_filter_ms",
+          "exact_scoring_ms",
+          "tp_sl_exact_scoring_ms",
+          "top_result_assembly_ms",
+          "rows_before_prefilter",
+          "rows_after_prefilter",
+          "row_signature_ms",
+          "unique_rows_after_dedup",
+          "duplicate_signal_row_ids",
+          "row_signature_collision_count",
+          "consensus_signature_count",
+          "consensus_signature_mode",
+          "candidate_upper_bound_after_row_dedup",
+          "combo_count_planned",
+          "candidates_after_proxy",
+          "exact_candidates",
+          "avg_segments_per_candidate",
+          "avg_trades_per_candidate",
+          "tp_count",
+          "sl_count",
+          "tp_sl_cells",
+          "tp_sl_cell_backend_id",
+          "tp_sl_cell_block_shape",
+          "tp_sl_cell_blocks_per_candidate",
+          "tp_sl_cell_block_estimated_peak_bytes",
+          "tp_sl_cell_trade_cell_evals",
+          "tp_sl_selected_cell_shadow_status",
+          "tp_sl_selected_cell_parity_pass",
+          "tp_sl_selected_cell_scores",
+          "tp_sl_selected_cell_elapsed_ms",
+          "tp_sl_by_entry_selected_arrays_bytes",
+          "exact_candidates_per_sec",
+          "trade_cell_evals_per_sec"
+        ]
+      }
+    ],
+    "schema": "backtest_stage_instrumentation_summary_v1"
+  },
+  "lazy_cache_hit_memory": {
+    "api_process_memory": {
+      "limit_bytes": 67108864,
+      "pass": true,
+      "pid": 475,
+      "retained_rss_delta": 0,
+      "rss_after_bytes": 200949760,
+      "rss_before_bytes": 200949760
+    },
+    "bounded_reader_static_audit": {
+      "api_read_methods": {
+        "csv": true,
+        "monthly_stats": true,
+        "paginated_trades": true,
+        "series": true,
+        "symbol_stats": true
+      },
+      "cache_file": "src/trading/contexts/backtest/adapters/outbound/cache_fs/lazy_trades_cache.py",
+      "full_detail_json_read_text_cache_hit_for_api_forbidden": true,
+      "pass": true,
+      "required_symbols_present": {
+        "_iter_trade_slice": true,
+        "_iter_trades": true,
+        "legacy monolithic cache ignored": true,
+        "read_csv": true,
+        "read_monthly_stats": true,
+        "read_page": true,
+        "read_series": true,
+        "read_symbol_stats": true
+      },
+      "use_case_file": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py"
+    },
+    "cache_files": {
+      "bundle_dir": "/opt/roehub/state/backtest/trades_cache/aa/aaf95d37e47b6585d0238395d36895f4db3ae002583ffc9c1ec7011d5abade52",
+      "metadata_bytes": 4092,
+      "metadata_exists": true,
+      "trades_jsonl_bytes": 188814,
+      "trades_jsonl_exists": true,
+      "trades_jsonl_rows": 326
+    },
+    "cache_hit_reads": {
+      "pass": true,
+      "reads": [
+        {
+          "cache_status": "hit",
+          "latency_ms": 62.71149998065084,
+          "method": "POST",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/trades",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 54.95529199833982,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/trades?page=1&page_size=5",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 80.2453340147622,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/equity?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 58.49629099247977,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/drawdown?points=100",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 46.515958005329594,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/monthly-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "hit",
+          "latency_ms": 61.377417005132884,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/symbol-stats",
+          "status": 200
+        },
+        {
+          "cache_status": "miss",
+          "latency_ms": 50.66108301980421,
+          "method": "GET",
+          "path": "/backtests/jobs/9e195ee2-30e4-4259-aaf5-2e2f787a58c1/variants/job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e/trades.csv?max_rows=100",
+          "status": 200
+        }
+      ]
+    },
+    "cache_key": "aaf95d37e47b6585d0238395d36895f4db3ae002583ffc9c1ec7011d5abade52",
+    "lazy_child_process_evidence": [
+      {
+        "cache_path": null,
+        "cache_status": "miss",
+        "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+        "process_evidence": {
+          "cancelled": false,
+          "command": [
+            "/Users/daniildegtyarev/projects/roehub.com/.venv/bin/python3",
+            "-m",
+            "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "--task-id",
+            "325422e7-bc07-447e-9a75-4750436475b4",
+            "--job-id",
+            "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+            "--owner-user-id",
+            "6960d466-e9fb-4116-a9fb-8f1589c61914",
+            "--variant-key",
+            "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+            "--output-json",
+            "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-iorswc36/result.json"
+          ],
+          "elapsed_seconds": 0.659376,
+          "exit_code": 0,
+          "finished_at": "2026-06-10T20:02:57.047387Z",
+          "metadata": {
+            "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+            "job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+            "public_variant_key": "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+            "task_id": "325422e7-bc07-447e-9a75-4750436475b4",
+            "task_kind": "lazy_trades"
+          },
+          "parent_physical_footprint_after_bytes": null,
+          "parent_physical_footprint_before_bytes": null,
+          "parent_pid": 94128,
+          "parent_retained_physical_footprint_delta_bytes": null,
+          "parent_retained_rss_delta_bytes": 0,
+          "parent_rss_after_bytes": 123944960,
+          "parent_rss_before_bytes": 123944960,
+          "peak_physical_footprint_bytes": null,
+          "peak_rss_bytes": 106217472,
+          "pid": 94399,
+          "schema": "roehub_child_process_evidence_v1",
+          "started_at": "2026-06-10T20:02:56.388011Z",
+          "stderr_tail": "2026-06-10 23:02:56,741 INFO __main__ lazy trades child process started: task_id=325422e7-bc07-447e-9a75-4750436475b4 job_id=9e195ee2-30e4-4259-aaf5-2e2f787a58c1\n2026-06-10 23:02:56,974 INFO __main__ lazy trades child process finished: task_id=325422e7-bc07-447e-9a75-4750436475b4 cache_status=miss elapsed_seconds=0.234\n",
+          "stdout_tail": "",
+          "timed_out": false
+        },
+        "public_variant_key": "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+        "schema": "roehub_lazy_trades_child_result_evidence_v1",
+        "task_id": "325422e7-bc07-447e-9a75-4750436475b4"
+      }
+    ],
+    "miss_initial": {
+      "cache_status": "miss",
+      "materialization_status": "queued",
+      "status": 202,
+      "task_id": "325422e7-bc07-447e-9a75-4750436475b4"
+    },
+    "miss_worker": {
+      "cache_path": null,
+      "cache_status": "miss",
+      "claimed": true,
+      "fast_completion_without_observed_running": false,
+      "observed_running": true,
+      "pass": true,
+      "required_path": "queued -> running -> completed",
+      "required_path_pass": true,
+      "status": null,
+      "status_path": "queued -> running -> completed",
+      "task_status": "completed"
+    },
+    "pass": true,
+    "target_job_id": "9e195ee2-30e4-4259-aaf5-2e2f787a58c1",
+    "variant_key": "job_9e195ee258c1__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e"
+  },
+  "legacy_path_absence": {
+    "checks": [
+      {
+        "forbidden": "build_full_job_compute_executor",
+        "forbidden_present": false,
+        "name": "runner_parent_does_not_construct_full_compute_graph",
+        "pass": true,
+        "path": "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+        "required": "BacktestChildProcessExecutor",
+        "required_present": true
+      },
+      {
+        "forbidden": "build_paginated_trades_read_model(",
+        "forbidden_present": false,
+        "name": "public_api_cache_hit_uses_bounded_cache_methods",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+        "required": "cache.read_page(",
+        "required_present": true
+      },
+      {
+        "forbidden": "itertools.product",
+        "forbidden_present": false,
+        "name": "large_grid_production_no_itertools_product",
+        "pass": true,
+        "path": "src/trading/contexts/backtest/application/services/v2/no_risk_exact.py",
+        "required": "iter_ordinal_combo_chunks",
+        "required_present": true
+      }
+    ],
+    "legacy path absence": true,
+    "pass": true
+  },
+  "matrix_sidecar": {
+    "artifact_dir": null,
+    "enabled": false,
+    "fairness_classification": "no_sidecar",
+    "generation_report": null,
+    "sidecar_generate_ms": null
+  },
+  "memory_release": {
+    "checked_jobs": 2,
+    "failed_jobs": [],
+    "parent_retained_rss_delta_evidence": true,
+    "pass": true,
+    "physical footprint": false,
+    "system_memory_cleanup_gate": true,
+    "system_memory_cleanup_limit_bytes": 536870912,
+    "system_memory_failed_jobs": [],
+    "vmmap": false
+  },
+  "mixed_scheduler_smoke": {
+    "blocks_when_heavy_active": true,
+    "blocks_when_light_active": true,
+    "configured": {
+      "ROEHUB_BACKTEST_HEAVY_CONCURRENCY": 1,
+      "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": 0,
+      "full_job_lane": "heavy_only",
+      "light_promotion_path": "not_used"
+    },
+    "first_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    },
+    "lazy_after_two_empty_full_probes": {
+      "scheduling_class": "none",
+      "task_kind": "lazy_detail"
+    },
+    "pass": true,
+    "second_full_probe": {
+      "scheduling_class": "heavy",
+      "task_kind": "full_job"
+    }
+  },
+  "parity": {
+    "failed_jobs": [],
+    "pass": true,
+    "passed_jobs": 2,
+    "required_jobs": 2
+  },
+  "pass": true,
+  "performance": {
+    "canonical_stage_comparison_policy": "API/runner wall and service-only overhead are recorded separately from May 2 notebook-compatible stage timings.",
+    "cpu_sampling_jobs": 2,
+    "failed_cpu_sampling_jobs": [],
+    "failed_speed_jobs": [],
+    "pass": true,
+    "reference_speed_ratio_min": 0.8,
+    "service_only_overhead_separate": true,
+    "speed_ratios": [
+      {
+        "job_name": "none/arity_6/long_only",
+        "may2_over_current_ratio": 15.719442876785934
+      },
+      {
+        "job_name": "none/arity_6/long_short_reversal",
+        "may2_over_current_ratio": 5.277829596297743
+      }
+    ],
+    "stage_timing_jobs": 2
+  },
+  "postgres_env": {
+    "component_keys_present": [
+      "POSTGRES_DB",
+      "POSTGRES_USER",
+      "POSTGRES_PASSWORD"
+    ],
+    "dsn_keys_present": [
+      "STRATEGY_PG_DSN",
+      "POSTGRES_DSN",
+      "IDENTITY_PG_DSN"
+    ],
+    "filled_dsn_keys": []
+  },
+  "python": "3.12.13",
+  "reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
+  "reference_json": "docs/architecture/backtest/benchmark_iterations/2026-05-02_iteration_8_execution_sizing_completion/benchmark_results.json",
+  "request": {
+    "benchmark_top_k": 5,
+    "cpu_sample_interval_seconds": 0.5,
+    "cpu_sampler": "ps %cpu/%mem/rss by full_job_child --job-id",
+    "exclude_heaviest_140s_job": true,
+    "full_jobs": "heavy",
+    "matrix_backend_mode": null,
+    "matrix_backend_mode_env_key": "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE",
+    "matrix_sidecar_artifact_dir": null,
+    "numba_threads": 12,
+    "only_arity": 6,
+    "rows_per_indicator": 6,
+    "runner_concurrency": "one heavy child",
+    "stage_04_mvp_rows": false,
+    "stage_05_no_risk_heavy_rows": true,
+    "stage_08_tp_sl_selected_cells": false,
+    "stage_09_tp_sl_full_grid": false,
+    "symbol": "BTCUSDT",
+    "timeframe": "15m",
+    "top_n": 50,
+    "tp_sl_cell_block_sl_count": null,
+    "tp_sl_cell_block_sl_count_env_key": "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT",
+    "tp_sl_cell_block_tp_count": null,
+    "tp_sl_cell_block_tp_count_env_key": "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT",
+    "tp_sl_selected_cell_shadow_env_key": "ROEHUB_BACKTEST_TP_SL_SELECTED_CELL_SHADOW",
+    "vmmap_observation": "disabled by default; old vmmap-contaminated results are excluded",
+    "warmup_rows_per_indicator": 2
+  },
+  "schema": "backtest_api_runner_compute_memory_parity_v1",
+  "smoke_user_id": "6960d466-e9fb-4116-a9fb-8f1589c61914"
+}
