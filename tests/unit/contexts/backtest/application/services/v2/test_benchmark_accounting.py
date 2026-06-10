@@ -136,47 +136,47 @@ def test_accounting_rejects_missing_required_total_target() -> None:
 
 
 def test_stage_01_instrumentation_counters_are_ordered_and_nulls_are_present() -> None:
+    instrumentation_counters = dict.fromkeys(_INSTRUMENTATION_COUNTER_FIELDS)
+    instrumentation_counters.update(
+        {
+            "trade_cell_evals_per_sec": None,
+            "artifact_load_ms": 12.5,
+            "signals_pack_ms": 1.5,
+            "signals_pack_bytes": 1152,
+            "signals_pack_estimated_peak_bytes": 2448,
+            "signals_pack_arrays_released": True,
+            "bitset_word_count": 2,
+            "bitset_padding_valid": True,
+            "bitset_consensus_sample_count": 16,
+            "bitset_consensus_sample_mismatches": 0,
+            "bitset_consensus_sample_parity": True,
+            "combo_iteration_ms": 3.0,
+            "proxy_filter_ms": 4.0,
+            "exact_scoring_ms": 5.0,
+            "tp_sl_exact_scoring_ms": None,
+            "top_result_assembly_ms": 6.0,
+            "rows_before_prefilter": None,
+            "rows_after_prefilter": 426,
+            "row_signature_ms": 7.0,
+            "unique_rows_after_dedup": 36,
+            "duplicate_signal_row_ids": {"ma.ema": [2, 3]},
+            "row_signature_collision_count": 0,
+            "consensus_signature_count": 2_176_782_336,
+            "consensus_signature_mode": "upper_bound_unique_row_product",
+            "candidate_upper_bound_after_row_dedup": 2_176_782_336,
+            "combo_count_planned": 1000,
+            "candidates_after_proxy": 50,
+            "exact_candidates": 50,
+            "avg_segments_per_candidate": None,
+            "avg_trades_per_candidate": None,
+            "tp_count": None,
+            "sl_count": None,
+            "tp_sl_cells": 0,
+            "exact_candidates_per_sec": 10.0,
+        }
+    )
     counters = _merged_instrumentation_counters(
-        [
-            {
-                "instrumentation_counters": {
-                    "trade_cell_evals_per_sec": None,
-                    "artifact_load_ms": 12.5,
-                    "signals_pack_ms": 1.5,
-                    "signals_pack_bytes": 1152,
-                    "signals_pack_estimated_peak_bytes": 2448,
-                    "signals_pack_arrays_released": True,
-                    "bitset_word_count": 2,
-                    "bitset_padding_valid": True,
-                    "bitset_consensus_sample_count": 16,
-                    "bitset_consensus_sample_mismatches": 0,
-                    "bitset_consensus_sample_parity": True,
-                    "combo_iteration_ms": 3.0,
-                    "proxy_filter_ms": 4.0,
-                    "exact_scoring_ms": 5.0,
-                    "tp_sl_exact_scoring_ms": None,
-                    "top_result_assembly_ms": 6.0,
-                    "rows_before_prefilter": None,
-                    "rows_after_prefilter": 426,
-                    "row_signature_ms": 7.0,
-                    "unique_rows_after_dedup": 36,
-                    "duplicate_signal_row_ids": {"ma.ema": [2, 3]},
-                    "row_signature_collision_count": 0,
-                    "consensus_signature_count": 2_176_782_336,
-                    "consensus_signature_mode": "upper_bound_unique_row_product",
-                    "candidate_upper_bound_after_row_dedup": 2_176_782_336,
-                    "combo_count_planned": 1000,
-                    "candidates_after_proxy": 50,
-                    "exact_candidates": 50,
-                    "avg_segments_per_candidate": None,
-                    "avg_trades_per_candidate": None,
-                    "tp_count": None,
-                    "sl_count": None,
-                    "tp_sl_cells": 0,
-                    "exact_candidates_per_sec": 10.0,
-                }
-            }
-        ]
+        [{"instrumentation_counters": instrumentation_counters}]
     )
 
     assert tuple(counters) == _INSTRUMENTATION_COUNTER_FIELDS
