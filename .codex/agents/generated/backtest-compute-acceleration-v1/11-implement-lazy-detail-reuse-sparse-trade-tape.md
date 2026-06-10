@@ -189,7 +189,10 @@ Done means:
 Context ledger from the previous iteration:
 
 - completed:
-  - Stage 10 accepted exact-safe high-arity pruning or recorded a terminal blocker.
+  - Stage 10 accepted the `monotonic_min_closed_trades` rule and evidence for
+    learning only.
+  - Stage 10 runtime pruning implementation was rejected as an acceleration and
+    must not be reused as a Stage 11 dependency.
 - open_items:
   - Improve perceived latency for selected variant details without changing bulk scoring.
 - contract_changes:
@@ -215,7 +218,8 @@ Additional context:
 - Run acceptance benchmark/testing evidence over SSH on `macstudio`; local runs are preflight only unless explicitly marked local-only.
 - Use `mac_studio_test_execution.source_artifacts` as the read-only source artifact location and write stage evidence to `mac_studio_test_execution.evidence_output_dir`.
 - Save any generated sidecar/test `.npy` files under `mac_studio_test_execution.sidecar_output_dir` or an explicitly recorded test overlay; never write them into canonical artifact root, `current.yaml`, active slots, or publisher outputs.
-- Verify Stage 10 accepted or explicitly allows Stage 11.
+- Verify Stage 10 explicitly allows Stage 11 and keep Stage 11 independent from
+  the rejected Stage 10 runtime pruning candidate.
 - Reuse sparse trade tape only for lazy selected-variant materialization.
 - Do not change bulk top-N scoring.
 - Preserve lazy payload shape, cache key, materialization identity, fees/slippage, sizing, and trade boundaries.
@@ -262,7 +266,7 @@ Skill routing for this task:
 - `backend-performance-evidence`: use during verification for lazy latency benchmark.
 - `backend-quality-gates`: use if Python gates fail.
 
-1. Verify Stage 10 status and lazy contract.
+1. Verify Stage 10 learning-handoff status and lazy contract.
 2. Add sparse trade tape reuse behind explicit lazy adapter path.
 3. Preserve fallback to current lazy materialization.
 4. Add parity/cache identity tests.

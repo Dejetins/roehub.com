@@ -1,7 +1,8 @@
 # Stage 10 high-arity pruning partial evidence
 
 This directory records a stopped Mac Studio Stage 10 candidate run for exact-safe
-high-arity pruning. The runtime candidate is not accepted.
+high-arity pruning. The exact-safe rule and evidence are accepted for learning;
+the runtime candidate is not accepted as an acceleration.
 
 ## Scope
 
@@ -68,12 +69,14 @@ Completed row counters:
 
 ## Decision
 
-Stage 10 is rejected for this candidate. The pruning rule is exact-safe but not
-accepted: the branch traversal adds a large `combo_iteration` cost, no comparable
-baseline-off speedup was completed, the full arity-7 API-runner matrix did not
-complete, and arity-10 acceptance is blocked because the current canonical
-benchmark fixture contains only seven indicators.
+Stage 10 is `accepted_for_learning` as a rule/evidence handoff only. The pruning
+rule is exact-safe, but the runtime candidate is not accepted: the branch
+traversal adds a large `combo_iteration` cost, no comparable baseline-off speedup
+was completed, the full arity-7 API-runner matrix did not complete, and arity-10
+acceptance is blocked because the current canonical benchmark fixture contains
+only seven indicators.
 
-Next Stage 10 attempt should use a tighter exact-safe score or eligibility bound,
-or add an approved ten-indicator benchmark fixture before claiming arity-10
-evidence.
+Stage 11 lazy detail reuse may proceed from this learning handoff, but it must
+not depend on the rejected Stage 10 runtime pruning implementation. A future
+Stage 10 retry should use a tighter exact-safe score or eligibility bound, or add
+an approved ten-indicator benchmark fixture before claiming arity-10 evidence.

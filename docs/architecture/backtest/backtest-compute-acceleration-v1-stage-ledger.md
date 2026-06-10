@@ -1066,7 +1066,7 @@ browser-visible behavior `none`.
 
 `next_iteration_allowed` is `true` for Stage 10 exact-safe high-arity pruning.
 
-## Stage 10 — high-arity min-trade pruning rejected
+## Stage 10 — high-arity min-trade pruning accepted for learning
 
 Stage 10 tested an exact-safe branch-and-bound rule for high-arity planning:
 `monotonic_min_closed_trades`.
@@ -1121,11 +1121,14 @@ Completed arity-7 row counters:
 | `exact_scoring` | `58.182s` |
 | `service_total_without_warmup` | `119.252s` |
 
-Decision: Stage 10 is `rejected` for this candidate. The rule is exact-safe, but
-the candidate did not complete accepted arity-7 evidence, no comparable
-baseline-off speedup was completed, and the first completed row shows the Python
-branch traversal adds a large `combo_iteration` cost. Arity-10 acceptance is also
-blocked by the current canonical fixture: it contains only seven indicators.
+Decision: Stage 10 is `accepted_for_learning` as a rule/evidence handoff only.
+The `monotonic_min_closed_trades` rule is exact-safe and may inform later exact
+pruning designs, but the measured Python branch-and-bound runtime candidate is
+not accepted as an acceleration. It did not complete accepted arity-7 evidence,
+no comparable baseline-off speedup was completed, and the first completed row
+shows the traversal adds a large `combo_iteration` cost. Arity-10 acceptance is
+also blocked by the current canonical fixture: it contains only seven
+indicators.
 
 Contract impact for the rejected runtime candidate if left uncommitted: public
 API `none`; port contract `none`; DTO schema `compatible-change` for additive
@@ -1135,13 +1138,15 @@ internal `ROEHUB_BACKTEST_HIGH_ARITY_PRUNING`; request hash/cache identity
 `none`; service-call semantics `none`; benchmark/report semantics
 `compatible-change`; browser-visible behavior `none`.
 
-`next_iteration_allowed` is `false`. A new Stage 10 attempt needs either a
-tighter exact-safe score/eligibility bound that beats the baseline through the
-API-runner path, or an approved benchmark fixture that can cover arity 10.
+`next_iteration_allowed` is `true` for Stage 11 lazy detail reuse only. Stage 11
+must not depend on the rejected Stage 10 runtime pruning implementation. A
+future Stage 10 retry needs either a tighter exact-safe score/eligibility bound
+that beats the baseline through the API-runner path, or an approved benchmark
+fixture that can cover arity 10.
 
 ## Current Execution Handoff
 
-Next executable stage: Stage 10 exact-safe high-arity pruning retry.
+Next executable stage: Stage 11 lazy detail reuse of sparse trade tape.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -1173,8 +1178,8 @@ or manifest changes unless a separate approved publisher plan exists.
 | 07 | accepted_for_learning | Sidecar/test bitset artifacts generated outside publisher; generator/helper, explicit sidecar path, `signals_pos_bits.u64.npy`, `signals_neg_bits.u64.npy`, `signal_row_hashes.u64.npy`, `unique_signal_row_ids.u32.npy`, `duplicate_signal_row_ids.u32.npy`, `matrix_sidecar_manifest.json`; no `backtest_artifacts` publisher/precompute or canonical manifest changes | `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets/` and `benchmark_iterations/2026-06-06_matrix_bitset_stage_07_sidecar_bitsets_final/` | Mac Studio API-runner parity `2/2`, memory, legacy path and docs drift passed; sidecar generation `7882.282ms`, sidecar load `75.238..81.530ms/job`, but runtime pack Stage 03 reference was about `24.5ms/job`; accepted only as test/benchmark infrastructure, no production sidecar speedup unlocked | true for Stage 08 TP/SL selected-cell shadow only |
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
-| 10 | rejected | Exact-safe high-arity pruning candidate using `monotonic_min_closed_trades`; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture | false |
-| 11 | planned | Lazy detail reuse of sparse trade tape | planned | Pending Stage 10 | false |
+| 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
+| 11 | planned | Lazy detail reuse of sparse trade tape | planned | Ready to start after Stage 10 learning handoff; must not depend on Stage 10 runtime pruning | false |
 
 ## Stage Acceptance Requirements
 
