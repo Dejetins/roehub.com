@@ -131,8 +131,28 @@ def extract_selected_trade_tapes(
     )
 
 
+def extract_trade_tape_for_local_indices(
+    *,
+    prepared_result: BacktestPreparePoolsResult,
+    local_indices: tuple[int, ...],
+    direction_mode: str,
+) -> CandidateTradeTape:
+    entry_abs, direction, signal_exit_abs = build_trade_list_15m_for_indicator_rows_slow(
+        prepared_result=prepared_result,
+        local_indices=local_indices,
+        direction_mode=direction_mode,
+    )
+    return CandidateTradeTape(
+        local_indices=local_indices,
+        entry_abs=np.ascontiguousarray(entry_abs, dtype=np.int32),
+        direction=np.ascontiguousarray(direction, dtype=np.int8),
+        signal_exit_abs=np.ascontiguousarray(signal_exit_abs, dtype=np.int32),
+    )
+
+
 __all__ = [
     "CandidateTradeTape",
     "SparseTradeTapeExtraction",
+    "extract_trade_tape_for_local_indices",
     "extract_selected_trade_tapes",
 ]

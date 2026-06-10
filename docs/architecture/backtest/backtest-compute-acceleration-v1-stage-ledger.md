@@ -1144,9 +1144,91 @@ future Stage 10 retry needs either a tighter exact-safe score/eligibility bound
 that beats the baseline through the API-runner path, or an approved benchmark
 fixture that can cover arity 10.
 
+## Stage 11 — lazy detail sparse trade tape reuse accepted
+
+Stage 11 reused the existing sparse trade tape backend for TP/SL lazy selected
+variant materialization only. Bulk top-N scoring, matrix backend selection,
+public lazy trades payload shape, cache key components and materialization
+identity were not changed. The old direct lazy materialization remains as an
+explicit fallback if sparse tape extraction fails.
+
+Implementation:
+
+- `src/trading/contexts/backtest/application/services/v2/matrix_backend/trade_tape.py`
+  adds a single-candidate `extract_trade_tape_for_local_indices` helper over the
+  existing sparse trade tape representation.
+- `src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py`
+  uses that helper only inside TP/SL lazy detail recompute, then feeds the same
+  selected TP/SL cell summary and trade-row builders as before.
+- Sparse tape backend selection is recorded in internal cached
+  `detail_metadata.trade_tape`. `BacktestLazyTradesDetailReadModel.as_mapping()`
+  still omits `detail_metadata`, so the public lazy response shape does not
+  change.
+
+Mac Studio candidate evidence used isolated worktrees:
+
+- Baseline worktree: `/tmp/roehub-stage11-baseline`
+- Candidate worktree: `/tmp/roehub-stage11-candidate`
+- Base commit: `34fac40074bcf082e86a4396daae3ab6dbdde1a3`
+- Candidate patch SHA-256:
+  `c410a8783202c2fcb2cf9008899bb0c0ff05b1011b92e53a5be1f6ce8cc06d92`
+
+Evidence:
+
+- Candidate:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/`
+- Comparable baseline:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/`
+
+Focused Mac Studio gate:
+
+```bash
+/opt/homebrew/bin/uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py \
+  tests/unit/contexts/backtest/adapters/outbound/cache_fs/test_lazy_trades_cache.py
+```
+
+Result: `12 passed`.
+
+Selected-variant latency benchmark comparison:
+
+| Risk mode | Baseline miss s | Candidate miss s | Miss delta | Baseline hit s | Candidate hit s | Hit delta | Parity |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `none` | 2.869005 | 2.855623 | -0.466% | 0.000305 | 0.000299 | -2.090% | pass |
+| `tp_sl_grid` | 4.334214 | 4.292836 | -0.955% | 0.000301 | 0.000301 | -0.207% | pass |
+
+Decision: Stage 11 is `accepted` as a safe reuse and parity gate. The benchmark
+does not prove a material selected-variant latency acceleration; it shows no
+regression on the comparable workload and a small TP/SL miss improvement within
+normal timing noise. Stage 11 must therefore not be reported as a major speed
+win.
+
+Contract impact: public API `none`; port contract `none`; DTO schema `none`;
+persisted schema `none`; config schema `none`; request hash/cache identity
+`none`; service-call semantics `none`; external side effects `none`; benchmark,
+ledger and internal cached metadata semantics `compatible-change`;
+browser-visible behavior `none`.
+
+Git branch: `main`. Scoped paths:
+
+- `docs/architecture/README.md`
+- `docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/`
+- `docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/`
+- `src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py`
+- `src/trading/contexts/backtest/application/services/v2/matrix_backend/trade_tape.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py`
+
+Scoped commit SHA is recorded in the executor final report after commit.
+Push/deploy: not performed.
+
+`next_iteration_allowed` is `false` because this v1 compute-acceleration rollout
+has no Stage 12 in the current plan. Future lazy-detail acceleration should open
+a new benchmark-gated stage with a stronger dominant-cost change.
+
 ## Current Execution Handoff
 
-Next executable stage: Stage 11 lazy detail reuse of sparse trade tape.
+Next executable stage: none for backtest compute acceleration v1.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -1179,7 +1261,16 @@ or manifest changes unless a separate approved publisher plan exists.
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
-| 11 | planned | Lazy detail reuse of sparse trade tape | planned | Ready to start after Stage 10 learning handoff; must not depend on Stage 10 runtime pruning | false |
+| 11 | accepted | TP/SL lazy selected-variant materialization reuses sparse trade tape with fallback to current lazy materialization; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`; cache identity and public payload shape preserved; TP/SL miss changed from `4.334214s` to `4.292836s`, a non-material `-0.955%`; accepted as safe reuse, not a major speed win | false |
+
+## Final Rollout Summary
+
+Backtest compute acceleration v1 produced durable benchmark evidence for row
+telemetry, runtime bitset packing, no-risk matrix paths, TP/SL selected cells,
+TP/SL full-grid cells, high-arity pruning learning and lazy detail reuse. The
+accepted production-affecting compute path is still constrained by explicit
+backend selection and benchmark gates; rejected or learning-only candidates
+remain documented but must not be silently reused as default acceleration.
 
 ## Stage Acceptance Requirements
 

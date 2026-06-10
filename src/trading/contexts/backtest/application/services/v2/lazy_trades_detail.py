@@ -29,6 +29,10 @@ from trading.contexts.backtest.application.services.v2.execution_sizing import (
     execution_quote_amount_py,
     execution_settings_from_normalized,
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.trade_tape import (
+    CandidateTradeTape,
+    extract_trade_tape_for_local_indices,
+)
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
     BacktestPreparePoolsService,
 )
@@ -375,13 +379,14 @@ class BacktestLazyTradesDetailService:
             axis="best_sl_pct",
             enabled=_risk_axis_enabled(normalized_request, "sl"),
         )
-        entry_abs, dir_arr, sig_exit_abs = (
-            tp_sl_module.build_trade_list_15m_for_indicator_rows_slow(
-                prepared_result=prepared,
-                local_indices=local_indices,
-                direction_mode=execution_settings.direction_mode,
-            )
+        tape, tape_metadata = _lazy_tp_sl_sparse_trade_tape(
+            prepared=prepared,
+            local_indices=local_indices,
+            direction_mode=execution_settings.direction_mode,
         )
+        entry_abs = tape.entry_abs
+        dir_arr = tape.direction
+        sig_exit_abs = tape.signal_exit_abs
         trade_returns, bars_held = tp_sl_module._selected_cell_trade_returns(
             entry_abs=entry_abs,
             dir_arr=dir_arr,
@@ -423,6 +428,7 @@ class BacktestLazyTradesDetailService:
                 "hit_times_path": "hit_times/15m",
                 "best_tp_idx": best_tp_idx,
                 "best_sl_idx": best_sl_idx,
+                "trade_tape": tape_metadata,
             },
         )
 
@@ -583,6 +589,51 @@ def _row_ids_by_indicator_from_top_variant(
         indicator_id = str(item.get("indicator_id"))
         row_ids_by_indicator[indicator_id] = (int(item.get("row_id", -1)),)
     return row_ids_by_indicator
+
+
+def _lazy_tp_sl_sparse_trade_tape(
+    *,
+    prepared: BacktestPreparePoolsResult,
+    local_indices: tuple[int, ...],
+    direction_mode: str,
+) -> tuple[CandidateTradeTape, dict[str, Any]]:
+    try:
+        tape = extract_trade_tape_for_local_indices(
+            prepared_result=prepared,
+            local_indices=local_indices,
+            direction_mode=direction_mode,
+        )
+        return tape, {
+            "schema": "backtest_lazy_sparse_trade_tape_reuse_v1",
+            "backend": "sparse_trade_tape",
+            "fallback": False,
+            "trade_count": tape.trade_count,
+            "long_trade_count": tape.long_trade_count,
+            "short_trade_count": tape.short_trade_count,
+        }
+    except Exception as error:  # noqa: BLE001
+        entry_abs, direction, signal_exit_abs = (
+            tp_sl_module.build_trade_list_15m_for_indicator_rows_slow(
+                prepared_result=prepared,
+                local_indices=local_indices,
+                direction_mode=direction_mode,
+            )
+        )
+        tape = CandidateTradeTape(
+            local_indices=local_indices,
+            entry_abs=np.ascontiguousarray(entry_abs, dtype=np.int32),
+            direction=np.ascontiguousarray(direction, dtype=np.int8),
+            signal_exit_abs=np.ascontiguousarray(signal_exit_abs, dtype=np.int32),
+        )
+        return tape, {
+            "schema": "backtest_lazy_sparse_trade_tape_reuse_v1",
+            "backend": "current_lazy_materialization",
+            "fallback": True,
+            "fallback_reason": type(error).__name__,
+            "trade_count": tape.trade_count,
+            "long_trade_count": tape.long_trade_count,
+            "short_trade_count": tape.short_trade_count,
+        }
 
 
 def _no_risk_trade_rows(

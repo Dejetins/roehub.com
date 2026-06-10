@@ -195,6 +195,66 @@ def test_lazy_trades_tp_sl_payload_preserves_selected_cell(tmp_path: Path) -> No
     }
 
 
+def test_lazy_trades_tp_sl_uses_sparse_trade_tape_without_public_payload_drift(
+    tmp_path: Path,
+) -> None:
+    service, cache, job, row = _service_fixture(tmp_path=tmp_path, risk_mode="tp_sl_grid")
+
+    result = service.execute(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+
+    public_payload = result.as_mapping()
+    assert "detail_metadata" not in public_payload
+    assert len(cache.writes) == 1
+    _cache_key, cached_payload = cache.writes[0]
+    trade_tape = cached_payload["detail_metadata"]["trade_tape"]
+    assert trade_tape["backend"] == "sparse_trade_tape"
+    assert trade_tape["fallback"] is False
+    assert trade_tape["trade_count"] == len(result.trades)
+
+
+def test_lazy_trades_tp_sl_sparse_trade_tape_fallback_preserves_payload_and_cache_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, cache, job, row = _service_fixture(tmp_path=tmp_path, risk_mode="tp_sl_grid")
+    sparse_result = service.execute(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+    sparse_cache_key = cache.writes[-1][0]
+
+    def _raise_sparse_failure(**kwargs: Any) -> None:
+        _ = kwargs
+        raise RuntimeError("sparse tape unavailable")
+
+    monkeypatch.setattr(
+        detail_module,
+        "extract_trade_tape_for_local_indices",
+        _raise_sparse_failure,
+    )
+    fallback_result = service.execute(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+    fallback_cache_key, fallback_payload = cache.writes[-1]
+
+    assert fallback_cache_key.as_mapping() == sparse_cache_key.as_mapping()
+    assert fallback_result.summary_metrics == sparse_result.summary_metrics
+    assert fallback_result.canonical_variant_params == sparse_result.canonical_variant_params
+    assert fallback_result.readable_params == sparse_result.readable_params
+    assert fallback_result.trades == sparse_result.trades
+    trade_tape = fallback_payload["detail_metadata"]["trade_tape"]
+    assert trade_tape["backend"] == "current_lazy_materialization"
+    assert trade_tape["fallback"] is True
+    assert trade_tape["fallback_reason"] == "RuntimeError"
+
+
 def test_lazy_trades_tp_only_payload_uses_disabled_sl_sentinel(tmp_path: Path) -> None:
     service, _cache, job, row = _service_fixture(
         tmp_path=tmp_path,

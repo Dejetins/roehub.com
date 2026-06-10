@@ -1,0 +1,159 @@
+{
+  "artifact_config_path": "configs/prod/backtest_artifacts.yaml",
+  "artifact_manifest_hash": "bc9bf0934f903511c9aa259effa27f74ac1e3ccb3a0e5a8525f652729a1cc226",
+  "artifact_policy": "historical_prefix_compatible",
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+  "cache_root": "docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/sidecar_artifacts/lazy_trades_cache",
+  "cache_ttl_seconds": 1209600,
+  "canonical_json": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+  "generated_at": "2026-06-10T18:37:50.531358Z",
+  "git_commit": "34fac40074bcf082e86a4396daae3ab6dbdde1a3",
+  "git_status_short": "?? docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/",
+  "hit_times_manifest_hash": "56f140eb4ff3b028b7d872d06010a9871eaaf357373947c1230f791966f947b6",
+  "host": "MacStudioDaniil",
+  "numba": "0.60.0",
+  "pass": true,
+  "python": "3.12.13",
+  "request": {
+    "arity": 1,
+    "benchmark_top_k": 5,
+    "direction_mode": "long_short_reversal",
+    "rows_per_indicator": 6,
+    "top_n": 100
+  },
+  "runs": [
+    {
+      "arity": 1,
+      "artifact_manifest_hash": "bc9bf0934f903511c9aa259effa27f74ac1e3ccb3a0e5a8525f652729a1cc226",
+      "artifact_policy": "historical_prefix_compatible",
+      "cache": {
+        "compute_status": "miss",
+        "hit_status": "hit"
+      },
+      "cache_key": "b45ae4d568f5fb887284815327db011361af125f42c6f509452f73a72be51715",
+      "cache_root": "docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/sidecar_artifacts/lazy_trades_cache",
+      "cache_ttl_seconds": 1209600,
+      "close_on_end": true,
+      "direction_mode": "long_short_reversal",
+      "engine_params_hash": "8701d60fcceaa440ea1f0b3ca42bb9d90d2da662cbd50c11e6c0949a5a39dbff",
+      "hit_times_manifest_hash": null,
+      "lazy_trades_cache_hit": 0.0003050000232178718,
+      "lazy_trades_compute": 2.869005374988774,
+      "pass": true,
+      "request_hash": "6595133637427af080b35bd90878f4dc8c49bd01e910a3814b52c70ccb17a6ce",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "cache_hit": {
+          "process_cpu_time_s": 0.0003140000000012577,
+          "rss_after": 1011400704,
+          "rss_before": 1011400704
+        },
+        "compute": {
+          "process_cpu_time_s": 2.907012999999999,
+          "rss_after": 1011400704,
+          "rss_before": 513572864
+        }
+      },
+      "sizing_mode": "all_in",
+      "summary_parity": {
+        "checks": {
+          "total_return_pct": {
+            "abs_diff": 0.0,
+            "actual": -100.0,
+            "expected": -100.0,
+            "pass": true
+          },
+          "trade_count": {
+            "abs_diff": 0.0,
+            "actual": 60108.0,
+            "expected": 60108.0,
+            "pass": true
+          }
+        },
+        "pass": true
+      },
+      "timing": {
+        "lazy_trades_cache_hit": 0.0003050000232178718,
+        "lazy_trades_compute": 2.869005374988774
+      },
+      "trade_count": 60108,
+      "variant_hash": "8f2a641908745dd7241336e3dd08ee8b5d4779e2fdb8c4128973164873347bb8",
+      "variant_key": "job_34e1e7ca1581__dema_close_w10__risk_none__vh_8f2a6419"
+    },
+    {
+      "arity": 1,
+      "artifact_manifest_hash": "bc9bf0934f903511c9aa259effa27f74ac1e3ccb3a0e5a8525f652729a1cc226",
+      "artifact_policy": "historical_prefix_compatible",
+      "cache": {
+        "compute_status": "miss",
+        "hit_status": "hit"
+      },
+      "cache_key": "412279ecc81b94f865b17e04c3be80de98bd4c836bed81f66808243fc9c44a30",
+      "cache_root": "docs/architecture/backtest/benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/sidecar_artifacts/lazy_trades_cache",
+      "cache_ttl_seconds": 1209600,
+      "close_on_end": true,
+      "direction_mode": "long_short_reversal",
+      "engine_params_hash": "82b76177320720d18359f2587bb2ccc6e7249a90ddfb44c8a7194c391bedc39a",
+      "hit_times_manifest_hash": "56f140eb4ff3b028b7d872d06010a9871eaaf357373947c1230f791966f947b6",
+      "lazy_trades_cache_hit": 0.0003012089873664081,
+      "lazy_trades_compute": 4.334214292000979,
+      "pass": true,
+      "request_hash": "165b71125dc8ff7ec196081631562c266ea0f68d54e18c359b9ceaf4cf90f0c3",
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "cache_hit": {
+          "process_cpu_time_s": 0.0003059999999948104,
+          "rss_after": 2177777664,
+          "rss_before": 2177777664
+        },
+        "compute": {
+          "process_cpu_time_s": 4.403944000000003,
+          "rss_after": 2177777664,
+          "rss_before": 1462452224
+        }
+      },
+      "sizing_mode": "all_in",
+      "summary_parity": {
+        "checks": {
+          "best_sl_pct": {
+            "abs_diff": 0.0,
+            "actual": 11.0,
+            "expected": 11.0,
+            "pass": true
+          },
+          "best_tp_pct": {
+            "abs_diff": 0.0,
+            "actual": 7.500000476837158,
+            "expected": 7.500000476837158,
+            "pass": true
+          },
+          "total_return_pct": {
+            "abs_diff": 0.0,
+            "actual": -100.0,
+            "expected": -100.0,
+            "pass": true
+          },
+          "trade_count": {
+            "abs_diff": 0.0,
+            "actual": 82783.0,
+            "expected": 82783.0,
+            "pass": true
+          }
+        },
+        "pass": true
+      },
+      "timing": {
+        "lazy_trades_cache_hit": 0.0003012089873664081,
+        "lazy_trades_compute": 4.334214292000979
+      },
+      "trade_count": 82783,
+      "variant_hash": "53826f615006949eca675ae2f69f4b59d7c57bed7d769c0939959e7c9955c30e",
+      "variant_key": "job_7762e8665a88__dema_close_w5__risk_tp_sl_grid__tp_7_5__sl_11__vh_53826f61"
+    }
+  ],
+  "service_only_stages": [
+    "lazy_trades_compute",
+    "lazy_trades_cache_hit"
+  ],
+  "total_without_warmup_excludes_lazy_trades": true
+}
