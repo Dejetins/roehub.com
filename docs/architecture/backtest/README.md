@@ -9,6 +9,7 @@
 - `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md` — целевой production-план для повторного ввода `backtest-job-runner`, lazy trades materialization, tier limits, Mac Studio service, metrics и smoke evidence.
 - `docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md` — staged-план ускорения compute-ядра через row/signature dedup, bitset consensus, sparse trade tape и TP/SL cell blocks.
 - `docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md` — журнал stages и benchmark gate для compute acceleration; production-affecting stages не двигаются дальше без `next_iteration_allowed: true`.
+- `docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md` — реестр методов ускорения, которые не дали material speedup или не должны считаться production acceleration без нового benchmark-gated плана.
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — companion/reference copy; если расходится с русским документом, для реализации побеждает `.ru.md`.
 - `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md` — executable prompt pack для Iteration 0/1 реализации.
 - `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.
