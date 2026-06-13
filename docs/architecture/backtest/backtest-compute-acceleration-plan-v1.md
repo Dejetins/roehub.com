@@ -5,10 +5,10 @@
 
 ## Статус
 
-План внедрения перед кодовыми изменениями и последующими continuation stages.
-Никакой новый backend не считается разрешенным к production path, пока для него
-не записано сопоставимое benchmark evidence на Mac Studio и в журнале stages не
-выставлено `next_iteration_allowed: true`.
+План внедрения и последующих continuation stages. Никакой новый backend не
+считается разрешенным к production path, пока для него не записано сопоставимое
+benchmark evidence на Mac Studio и в журнале stages не выставлено
+`next_iteration_allowed: true`.
 
 ## Цель
 
@@ -48,10 +48,22 @@ Continuation update от 2026-06-13 добавляет Stage 12+ после nega
 | Stage 05 default-on | `risk.mode=none`, arity `6`, `long_only` / `long_short_reversal`; rollback/comparison через `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` | `2026-06-10_matrix_bitset_stage_05_default_off_baseline/`, `2026-06-10_matrix_bitset_stage_05_default_on_candidate/` |
 | Stage 09 opt-in | `risk.mode=tp_sl_grid`, arity `6`, full-grid cell blocks, accepted shape `64 x 64`; still internal/opt-in | `2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` |
 | Stage 10 learning only | exact-safe min-trade rule is valid, but Python traversal is not accepted acceleration | `2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` |
+| Stage 12 opt-in | `risk.mode=none`, arity `6` and `7`, `long_only` / `long_short_reversal`; compiled prefix product traversal enabled only by `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` or direct backend id | `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/` |
 
 Новые stages должны сравниваться с ближайшим accepted baseline, а не с rejected
 candidate. Stage 12+ нельзя делать зависимыми от Stage 06 cache, Stage 07
 sidecar load, Stage 10 Python traversal или Stage 11 lazy reuse.
+
+После принятия Stage 12 baseline делится на два уровня:
+
+- accepted-code baseline: checkout содержит commit `1fda2264` или более новый и
+  использует Stage 12 как accepted opt-in comparison path для no-risk arity `6`
+  и `7`;
+- live-production baseline: runtime, который реально обслуживает API/runner,
+  содержит тот же accepted code и его env/default state явно записан в evidence.
+
+Нельзя называть benchmark "updated production baseline", если измерялась только
+копия репозитория, а фактический live runtime не был обновлен и smoke-verified.
 
 ## Что не входит
 
@@ -98,13 +110,10 @@ prepare_pools
 application/services/v2/matrix_backend/
   bitsets.py
   row_signatures.py
-  combo_blocks.py
-  consensus.py
   trade_tape.py
   no_risk_score.py
+  prefix_traversal.py
   tp_sl_cells.py
-  topn.py
-  validation.py
 ```
 
 Planned backend ids:
@@ -113,7 +122,7 @@ Planned backend ids:
 |---|---|---|---|
 | `matrix_bitset_no_risk_v1` | `none` | accepted default only for arity 6 long-only/reversal | blockwise bitset consensus plus sparse no-risk scoring |
 | `matrix_cell_tp_sl_v1` | `tp_sl_grid` | accepted opt-in full grid, shape `64 x 64` | sparse trade tape plus TP/SL cell-block scoring |
-| `compiled_prefix_product_traversal_v1` | `none`, later shared candidate production | arity 6/7 product-form pools | fused compiled prefix traversal, selectivity ordering, exact-safe prefix pruning and scoring handoff |
+| `compiled_prefix_product_traversal_v1` | `none` | accepted opt-in for arity 6/7 product-form pools; not default yet | fused compiled prefix traversal, selectivity ordering, exact-safe prefix pruning and scoring handoff |
 | `tp_sl_monotonic_cell_kernel_v1` | `tp_sl_grid` | arity 6 full grid | monotonic TP/SL cell classification within accepted cell-block backend |
 | `dynamic_backtest_backend_selector_v1` | `none`, `tp_sl_grid` | exact accepted modes only | choose current vs matrix/cell backend by estimated work and measured overhead, not arity alone |
 
@@ -122,7 +131,7 @@ Backend selector is additive:
 ```yaml
 backtest_compute:
   matrix_backend:
-    mode: off  # off | shadow | on
+    mode: stage_05_no_risk_reversal_arity6  # off | stage_05_no_risk_reversal_arity6 | stage_12_compiled_prefix_traversal | stage_09_tp_sl_full_grid | shadow/on aliases where supported
     candidate_block_size: 4096
     tp_block_size: 16
     sl_block_size: 16
@@ -308,6 +317,16 @@ check as local-only. Before SSH testing, the Mac Studio checkout must contain
 the exact candidate code being measured; the evidence must record commit SHA or
 dirty state. Do not benchmark a different runtime copy without recording it.
 
+For stages after Stage 12, the minimum accepted-code baseline is commit
+`1fda2264` or a later descendant. No-risk arity `6` and `7` stages must compare
+against the accepted Stage 12 opt-in backend when their cost center overlaps
+prefix traversal or no-risk scoring. TP/SL stages keep Stage 09/current exact as
+their TP/SL comparison paths, but the checkout/runtime for both control and
+candidate must still include Stage 12 code or explicitly record why it does not.
+If the benchmark claims "production" rather than "repo checkout" evidence, it
+must also verify the active runtime path, env file path and
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` state.
+
 Canonical source artifacts for these benchmarks are read-only:
 
 | Purpose | Path |
@@ -402,9 +421,10 @@ An optimization stage passes only when all are true:
 - memory cleanup does not regress relative to Stage 00;
 - no public API, persistence identity, cache identity, TP/SL tie-breaking or
   ranking semantics changed silently;
-- Stage 12+ stages must compare against the nearest accepted baseline: Stage 05
-  for no-risk arity-6/default-on rows, the current exact path for arity-7 where
-  no accepted prefix baseline exists, and Stage 09 for TP/SL full-grid rows;
+- Stage 12+ stages must compare against the nearest accepted baseline: Stage 12
+  opt-in for no-risk arity `6` and `7` prefix/no-risk work, Stage 05 only as
+  the no-risk arity-6 default/rollback comparison, and Stage 09/current exact
+  for TP/SL full-grid rows on a Stage-12-or-later checkout/runtime;
 - the ledger row records `next_iteration_allowed: true`.
 
 If a stage is only instrumentation or shadow validation, it may be marked
@@ -501,7 +521,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark; separate UX/perceived-latency gate |
 | 12 | Compiled prefix product traversal | Accepted 2026-06-13: opt-in `compiled_prefix_product_traversal_v1`; `none/arity_6` improved `76.573%..90.449%`, `none/arity_7` service wall improved `85.798%..95.286%`, stable top-50 `variant_hash`/rank/metrics matched baseline |
-| 13 | TP/SL `64 x 64` production gate and block autotune | Same top-N, `best_tp`, `best_sl`; service wall >= 15% better than current exact path or Stage 09 opt-in baseline; memory peak bounded |
+| 13 | TP/SL `64 x 64` production gate and block autotune | Same top-N, `best_tp`, `best_sl`; service wall >= 15% better than current exact path or Stage 09 opt-in baseline on a Stage-12-or-later checkout/runtime; memory peak bounded |
 | 14 | TP/SL monotonic cell kernel | Exact output same as Stage 13 winner; cell comparisons/trade lower, trade-cell/sec higher, service wall better than best Stage 13 |
 | 15 | TP/SL total-return early abandon | Exact-safe bound proof for `total_return_pct desc`; same output, lower scored cells/candidates and service wall no regression |
 | 16 | TP/SL trade-window reuse telemetry | Counters only; no runtime cache; record whether reuse is high enough to justify later compiled grouping |
@@ -525,7 +545,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 08-09 | `tp_sl_cells.py`, by-entry hit-times layout validation for `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy` or job-local selected arrays; no publisher/manifest modules unless a later separate publisher plan is approved | selected/full grid TP/SL benchmark evidence |
 | 10 | exact-safe pruning planner | arity 7/10 bounded-search evidence |
 | 11 | lazy materialization backend adapter | lazy trades benchmark evidence |
-| 12 | compiled prefix traversal module or Numba/Cython/Rust equivalent under existing matrix backend boundary; no Python recursion in hot path | `benchmark_iterations/<date>_matrix_bitset_stage_12_compiled_prefix_traversal/` |
+| 12 | `prefix_traversal.py` registered as `compiled_prefix_product_traversal_v1`; no Python recursion in hot path; opt-in env override only | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/` |
 | 13 | TP/SL block-shape autotune harness and selector guard; accepted shape remains opt-in until gate passes | `benchmark_iterations/<date>_matrix_bitset_stage_13_tp_sl_block_autotune/` |
 | 14 | monotonic TP/SL cell classification kernel behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_14_tp_sl_monotonic_kernel/` |
 | 15 | exact-safe total-return early-abandon implementation behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |
@@ -546,7 +566,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Persisted schema | `none` initially | Bitset artifacts are file artifacts, not DB schema |
 | Canonical artifact file/manifest schema | `none` initially | Stage 07 sidecar files do not change canonical `manifest.yaml`, `current.yaml` or active-slot artifacts |
 | Test sidecar artifact metadata | `compatible-change` | New benchmark/test-only `matrix_sidecar_manifest.json` records source hashes, shapes, dtypes and schema version |
-| Config schema | `compatible-change` | Optional `backtest_compute.matrix_backend` block, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
+| Config schema | `compatible-change` | Optional matrix backend modes/env overrides, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
 | Worker/thread config | `compatible-change` | Stage 19 may add workload-specific thread policy only after benchmark evidence; fixed current behavior remains rollback |
 | Request hash / cache identity | `none` | Result-affecting backend must not enter public request hash unless semantics change, which is out of scope |
 | Service-call semantics | `none` | Same API/runner/child process topology |
@@ -564,6 +584,9 @@ merge must prove the relevant rows below before it can be `accepted`.
 - Stage 12+ feature flags/env overrides must support default-off/default-on A/B
   benchmark comparisons. A feature cannot become default unless the ledger records
   the rollback override and accepted comparison path.
+- Repo/main acceptance is not the same as live production activation. Evidence
+  must record whether the measured path is the Mac Studio project checkout, an
+  isolated benchmark copy, or the active live runtime under `/opt/roehub/app`.
 - Sidecar artifacts are generated from the canonical active artifacts and are
   addressed by explicit benchmark/test path. Canonical publisher output stays
   unchanged, old manifests stay readable and runtime packing remains the fallback.
@@ -601,14 +624,18 @@ Each row must record:
   deterministic tie-breaking are not preserved.
 - TP/SL full grid still has inherent `candidate x trade x cell` cost; cell-blocks
   reduce constants but do not remove the need for pruning/finalist strategy later.
-- Arity 7/10 exhaustive search may remain impractical without exact-safe pruning;
-  approximate beam search requires explicit product approval and separate contract.
-- Compiled prefix traversal can improve traversal cost but still fail if exact
-  scoring dominates or if compile/setup overhead offsets the win on arity 6.
+- Arity 10 exhaustive search may remain impractical even after Stage 12; any
+  broader high-arity expansion still needs exact-safe pruning and comparable
+  evidence. Approximate beam search requires explicit product approval and a
+  separate contract.
+- Compiled prefix traversal is accepted for no-risk arity `6` and `7` as opt-in,
+  but it is not a default selector policy yet; enabling it by default requires a
+  separate default/selector gate and rollback evidence.
 - TP/SL monotonic and early-abandon stages can only apply to exact-safe surfaces;
   unsupported rankings must fall back to current exact scoring.
-- Dynamic selector mistakes can silently erase Stage 05 wins or re-enable arity
-  2/3 regressions, so selector telemetry and rollback override are mandatory.
+- Dynamic selector mistakes can silently erase Stage 12 no-risk wins, Stage 05
+  rollback/default behavior, or re-enable arity 2/3 regressions, so selector
+  telemetry and rollback override are mandatory.
 - Thread scaling may be hardware-specific; accepted Mac Studio thread policy must
   not be generalized to different hardware without fresh evidence.
 - Full pair cache can regress memory and wall-clock even when isolated pair lookup

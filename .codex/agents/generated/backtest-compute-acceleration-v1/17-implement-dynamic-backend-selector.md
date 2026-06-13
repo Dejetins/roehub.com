@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_17_dynamic_backend_selector
 repo: roehub.com
 branch: main
-scope: "Replace brittle arity-only backend choice with an estimated-work selector while preserving Stage 05 wins and arity 1/2/3 safety."
+scope: "Replace brittle arity-only backend choice with an estimated-work selector while preserving Stage 12 no-risk wins, Stage 05 rollback/default comparison and arity 1/2/3 safety."
 
 language:
   implementation: python
@@ -58,6 +58,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "16 accepted_for_learning with negligible telemetry overhead and explicit reuse decision"
+  baseline_code_required: "Benchmark control and candidate must run from a Stage-12-or-later accepted-code checkout/runtime. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   implementation_allowed: true
   benchmark_required: true
   docs_update_required: true
@@ -89,6 +90,7 @@ task:
     - "none/arity_1..3"
     - "none/arity_6/long_only"
     - "none/arity_6/long_short_reversal"
+    - "none/arity_7/long_only and long_short_reversal when Stage 12 remains eligible"
     - "TP/SL rows only if a TP/SL backend is eligible from prior accepted stages"
 
 acceptance:
@@ -97,7 +99,8 @@ acceptance:
     - "Selector decision, fallback reason and override state are visible in telemetry."
   performance:
     - "arity 1/2/3 service wall does not regress."
-    - "arity 6 keeps accepted Stage 05 speed."
+    - "arity 6/7 keeps accepted Stage 12 speed where the selector chooses compiled prefix traversal."
+    - "Stage 05 remains available as rollback/default comparison for arity 6."
     - "Any TP/SL selector path must compare against its accepted baseline."
   decision:
     - "If selector cannot avoid known losing rows, reject or keep default-off."
@@ -129,4 +132,5 @@ final_report_format:
 # Task
 
 Implement Stage 17 dynamic backend selector. The selector must protect small
-workloads and preserve accepted Stage 05 behavior.
+workloads, preserve accepted Stage 12 no-risk behavior where eligible, and keep
+Stage 05 as rollback/default comparison.

@@ -61,6 +61,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "13 accepted"
+  baseline_code_required: "Benchmark control and candidate must run from a Stage-12-or-later accepted-code checkout/runtime. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   implementation_allowed: true
   benchmark_required: true
   docs_update_required: true

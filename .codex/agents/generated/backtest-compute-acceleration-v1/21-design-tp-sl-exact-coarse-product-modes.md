@@ -58,6 +58,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "20 accepted"
+  baseline_code_required: "Architecture and any optional benchmark references must treat Stage 12 commit 1fda2264 or later as the minimum accepted-code baseline; live-production claims require /opt/roehub/app code/env state verification."
   implementation_allowed: false
   benchmark_required: false
   docs_update_required: true

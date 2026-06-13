@@ -1336,13 +1336,13 @@ new dominant cost centers; it does not convert Stage 11 into accepted accelerati
 
 ## Stage 12+ Continuation Planning - 2026-06-13
 
-Status: `planned`. This is a docs/prompt-pack update only; no runtime code or
-benchmark evidence is accepted by this entry.
+Status: `superseded_by_stage_12_acceptance`. This entry is the planning handoff
+that opened Stage 12-21; Stage 12 itself is now accepted in the section below.
 
 Source recommendation:
 `/Users/daniildegtyarev/.codex/attachments/592a9119-4350-4c95-8400-3ae7a245ace7/pasted-text.txt`.
 
-Planning decision:
+Original planning decision:
 
 - Keep Stage 05 as the only default production acceleration:
   `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
@@ -1358,9 +1358,10 @@ Planning decision:
   batch reduction, thread scaling, allocation reuse and exact/coarse TP/SL
   architecture policy.
 
-`next_iteration_allowed` is `true` for Stage 12 only. Later Stage 13+ prompts
-may exist in the prompt pack, but execution remains ledger-gated and must not
-advance if the immediately preceding required stage fails its acceptance gates.
+Stage 12 has since passed its gate. `next_iteration_allowed` is now `true` for
+Stage 13 only. Later Stage 14+ prompts may exist in the prompt pack, but
+execution remains ledger-gated and must not advance if the immediately preceding
+required stage fails its acceptance gates.
 
 ## Current Execution Handoff
 
@@ -1383,11 +1384,14 @@ selected-cell TP/SL parity and by-entry layout. Stage 09 is accepted as an
 opt-in full-grid TP/SL backend and still avoids canonical publisher/precompute
 or manifest changes unless a separate approved publisher plan exists.
 
-Stage 12+ starts from the 2026-06-13 continuation plan. It must read
+Stage 13+ starts from the 2026-06-13 continuation plan plus the accepted Stage
+12 code. It must read
 `docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md`
 before implementation and must compare against the nearest accepted baseline:
-Stage 05 for no-risk default rows, current exact path for high-arity rows with no
-accepted prefix baseline, and Stage 09 for TP/SL full-grid rows.
+Stage 12 opt-in for no-risk arity `6`/`7` prefix or no-risk work, Stage 05 as
+the no-risk arity-6 default/rollback comparison, and Stage 09/current exact for
+TP/SL full-grid rows. All Stage 13+ benchmark evidence must record whether it
+used a repo checkout, an isolated candidate copy, or the active live runtime.
 
 ## Stage 12 - compiled prefix product traversal accepted
 
@@ -1494,6 +1498,34 @@ schema, fees/slippage/sizing, close-on-end, ranking, persisted top-N shape or
 browser-visible behavior changed. The new backend is selected only by internal
 env override and falls back to accepted current paths otherwise.
 
+## Production/default state audit - 2026-06-13
+
+This audit distinguishes accepted repository code from live production runtime:
+
+- local `main` contains Stage 12 commit
+  `1fda22642ac8f9194322a5b91d39e3f676f42ee7` and is ahead of
+  `origin/main` at `d05d26f80509816f3251063cd1e3c99f3b361050`;
+- Mac Studio project checkout `/Users/daniildegtyarev/Projects/roehub.com` is
+  at `origin/main` `d05d26f80509816f3251063cd1e3c99f3b361050`, so it contains
+  accepted Stage 05/09 history but not Stage 12 until push/sync;
+- Mac Studio native launchd plist working directories point to
+  `/opt/roehub/app`, not the project checkout;
+- observed `/opt/roehub/app` is not a Git checkout and does not contain
+  `matrix_backend/prefix_traversal.py`, `matrix_backend/tp_sl_cells.py`,
+  `matrix_backend/trade_tape.py`, Stage 05 mode strings, Stage 09 mode strings
+  or Stage 12 mode strings;
+- observed `/Users/daniildegtyarev/.config/roehub/roehub.env` has no explicit
+  `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` override.
+
+Conclusion: Stage 05, Stage 09 and Stage 12 are accepted in the repository
+history as documented, but the observed native live runtime under
+`/opt/roehub/app` is older and should not be treated as updated production for
+future benchmarks. A future benchmark may use the Mac Studio project checkout as
+accepted-code evidence only if it records commit/dirty state. A benchmark may
+claim live-production baseline only after the active runtime is refreshed,
+contains the accepted code, and passes a smoke/benchmark precheck with its env
+state recorded.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -1515,7 +1547,7 @@ env override and falls back to accepted current paths otherwise.
 | 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
 | 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
 | 16 | planned | TP/SL trade-window reuse telemetry only | none yet | Counters only; no cache/grouped implementation unless telemetry proves high reuse and a later stage is opened | blocked until Stage 15 accepted |
-| 17 | planned | Dynamic backend selector by estimated work | none yet | Must avoid arity 1/2/3 regressions, retain Stage 05 accepted speed and record selector decisions | blocked until Stage 16 accepted_for_learning with negligible overhead and explicit reuse decision |
+| 17 | planned | Dynamic backend selector by estimated work | none yet | Must avoid arity 1/2/3 regressions, retain accepted Stage 12 no-risk arity 6/7 speed where eligible, preserve Stage 05 as rollback/default comparison and record selector decisions | blocked until Stage 16 accepted_for_learning with negligible overhead and explicit reuse decision |
 | 18 | planned | Top-N/result assembly telemetry and optional stable block top-M merge | none yet | Must first show assembly is hot; optional merge must preserve stable tie-break and persisted top-N shape | blocked until Stage 17 accepted |
 | 19 | planned | Numba thread scaling benchmark by workload | none yet | Must benchmark `1,2,4,6,8,12` threads on Mac Studio and update worker config only after service-wall evidence | blocked until Stage 18 accepted or accepted_for_learning with assembly-not-hot decision |
 | 20 | planned | Allocation telemetry and per-child scratch-buffer reuse | none yet | Must improve allocation/RSS or wall-clock without cleanup regression; no global cross-job cache | blocked until Stage 19 accepted_for_learning with thread policy decision, or accepted if config changed |
@@ -1525,15 +1557,22 @@ env override and falls back to accepted current paths otherwise.
 
 Backtest compute acceleration v1 produced durable benchmark evidence for row
 telemetry, runtime bitset packing, no-risk matrix paths, TP/SL selected cells,
-TP/SL full-grid cells, high-arity pruning learning and rejected lazy detail
-reuse. The only default production acceleration accepted from this rollout is
-Stage 05 `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
-`direction_mode in {long_only, long_short_reversal}`. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off`
-remains the rollback/comparison path. Rejected or learning-only candidates
-remain documented but must not be silently reused as default acceleration.
+TP/SL full-grid cells, high-arity pruning learning, rejected lazy detail reuse
+and accepted Stage 12 compiled prefix traversal. The only default backend policy
+accepted from this rollout remains Stage 05 `matrix_bitset_no_risk_v1` for
+`risk.mode=none`, arity `6`, and
+`direction_mode in {long_only, long_short_reversal}`. Stage 12 is an accepted
+opt-in acceleration for no-risk arity `6`/`7` and is the comparison baseline
+for future no-risk prefix/scoring work, but it is not default until a later
+selector/default gate passes. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains
+the rollback/comparison path for Stage 05, and
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` is the
+Stage 12 opt-in comparison path.
 
-The 2026-06-13 continuation update extends the roadmap but does not change
-accepted runtime behavior. The next implementation prompt is Stage 12.
+The observed native runtime under `/opt/roehub/app` was not updated to the
+accepted repository state during this audit. Future evidence must distinguish
+accepted-code checkout benchmarks from live-production benchmarks. The next
+implementation prompt is Stage 13.
 
 ## Stage Acceptance Requirements
 
@@ -1562,7 +1601,7 @@ contract impact и финальное решение. Если хотя бы о�
 | 14 | TP/SL monotonic cell kernel | Exact monotonic boundary/classification kernel; same full-grid result as Stage 13 winner; SL-wins tie rule preserved | Reject if any metric/tie result drifts, cell comparisons/trade do not fall, trade-cell/sec does not rise, or service wall is not better than Stage 13 |
 | 15 | TP/SL total-return early abandon | Exact-safe upper bound for `ranking=total_return_pct desc` and supported sizing only; unsupported rankings fall back to current exact path | Reject if bound is not proven exact-safe, applies to unsupported ranking/sizing, removes a valid top candidate, or service wall does not improve |
 | 16 | TP/SL trade-window reuse telemetry | Add counters for total/unique trade windows, weighted reuse and savings estimate only; no cache or grouped scoring implementation | Close as `accepted_for_learning` only if telemetry overhead is negligible; do not open grouped implementation if reuse is low |
-| 17 | Dynamic backend selector | Deterministic estimated-work selector with logged decision/reason and env override; protects arity 1/2/3 and keeps Stage 05 arity-6 wins | Reject if selector picks matrix path for known losing rows, hides decision telemetry, changes request identity, or regresses service wall |
+| 17 | Dynamic backend selector | Deterministic estimated-work selector with logged decision/reason and env override; protects arity 1/2/3, retains Stage 12 no-risk arity 6/7 wins where eligible, and preserves Stage 05 as rollback/default comparison | Reject if selector picks matrix path for known losing rows, hides decision telemetry, changes request identity, or regresses service wall |
 | 18 | Top-N/result assembly batch reduction | First measure heap/update/hash/payload timers; optional block top-M merge must use stable tie-break by metric, `variant_hash`, combo ordinal | Reject if assembly is not hot, top-N identity/order drifts, persisted payload shape changes, or service wall does not improve |
 | 19 | Thread scaling benchmark | Mac Studio matrix for `NUMBA_NUM_THREADS=1,2,4,6,8,12` on required no-risk, TP/SL and high-arity rows; same artifacts/request/warmup | Do not update worker config if best thread count is workload-specific without a safe selector, causes oversubscription, or service wall evidence is inconclusive |
 | 20 | Allocation reuse and scratch buffers | Allocation counters first; per-child scratch buffers only; cleanup/RSS evidence required | Reject if global cross-job cache is introduced, cleanup regresses, memory peak worsens, or wall-clock gain is only local/micro |
@@ -1582,6 +1621,11 @@ contract impact и финальное решение. Если хотя бы о�
 - Acceptance benchmark/testing evidence must run over `ssh macstudio` from
   `/Users/daniildegtyarev/Projects/roehub.com`. The evidence must record whether
   the Mac Studio checkout matched the measured candidate commit or was dirty.
+- Stage 13+ evidence must use a checkout/runtime containing Stage 12 commit
+  `1fda2264` or a later descendant. If the active live runtime under
+  `/opt/roehub/app` is used or described as production, the stage must record
+  that runtime's code state and `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` state
+  before comparing results.
 - Mac Studio source artifacts are read from
   `/opt/roehub/state/backtest_artifacts/v2`, with `BTCUSDT/current.yaml`
   resolving the active slot manifest. Stage evidence is written under

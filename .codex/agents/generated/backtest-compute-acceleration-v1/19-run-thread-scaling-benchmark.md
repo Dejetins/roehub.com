@@ -60,6 +60,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "18 accepted, or accepted_for_learning with assembly-not-hot decision and no runtime merge"
+  baseline_code_required: "Benchmark control and candidate must run from a Stage-12-or-later accepted-code checkout/runtime. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   implementation_allowed: true
   benchmark_required: true
   docs_update_required: true
@@ -89,7 +90,7 @@ task:
     - "none/arity_6/long_short_reversal"
     - "tp_sl_grid/arity_6/long_only"
     - "tp_sl_grid/arity_6/long_short_reversal"
-    - "none/arity_7 if Stage 12 exists or current exact high-arity fixture is available"
+    - "none/arity_7 through accepted Stage 12 opt-in backend"
   required_metrics:
     - "service wall"
     - "exact_scoring"
