@@ -48,7 +48,7 @@ Continuation update от 2026-06-13 добавляет Stage 12+ после nega
 | Stage 05 default-on | `risk.mode=none`, arity `6`, `long_only` / `long_short_reversal`; production composite default keeps this path for arity `6`; rollback/comparison через `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` | `2026-06-10_matrix_bitset_stage_05_default_off_baseline/`, `2026-06-10_matrix_bitset_stage_05_default_on_candidate/` |
 | Stage 09 opt-in | `risk.mode=tp_sl_grid`, arity `6`, full-grid cell blocks, accepted shape `64 x 64`; still internal/opt-in | `2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` |
 | Stage 10 learning only | exact-safe min-trade rule is valid, but Python traversal is not accepted acceleration | `2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` |
-| Stage 12 production/default for arity 7, opt-in for arity 6 | `risk.mode=none`, arity `7`, `long_only` / `long_short_reversal` through production composite default; explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` still runs compiled prefix for arity `6` and `7` benchmark/comparison | `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/` |
+| Stage 12 production/default for arity 7, opt-in for arity 6 | `risk.mode=none`, arity `7`, `long_only` / `long_short_reversal` through production composite default; explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` still runs compiled prefix for arity `6` and `7` benchmark/comparison | `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `2026-06-13_matrix_bitset_stage_05_12_production_default_live/` |
 
 Новые stages должны сравниваться с ближайшим accepted baseline, а не с rejected
 candidate. Stage 12+ нельзя делать зависимыми от Stage 06 cache, Stage 07
@@ -61,6 +61,10 @@ sidecar load, Stage 10 Python traversal или Stage 11 lazy reuse.
   no-risk arity `6`, Stage 12 для no-risk arity `7`;
 - live-production baseline: runtime, который реально обслуживает API/runner,
   содержит тот же accepted code и его env/default state явно записан в evidence.
+  Текущий accepted live-production evidence: commit `1bd7a1e4`, runtime
+  `/opt/roehub/app`, env override unset, command flag
+  `--stage-05-12-production-default-rows`, evidence
+  `2026-06-13_matrix_bitset_stage_05_12_production_default_live/`.
 
 Нельзя называть benchmark "updated production baseline", если измерялась только
 копия репозитория, а фактический live runtime не был обновлен и smoke-verified.
@@ -326,7 +330,12 @@ as their TP/SL comparison paths, but the checkout/runtime for both control and
 candidate must still include Stage 12 code or explicitly record why it does not.
 If the benchmark claims "production" rather than "repo checkout" evidence, it
 must also verify the active runtime path, env file path and
-`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` state.
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` state. For no-risk production-default
+rows, use `--stage-05-12-production-default-rows`. Acceptance evidence is valid
+only when each heavy job is claimed by the benchmark harness process; if the
+live `com.roehub.backtest-job-runner` launchd service claims a benchmark job,
+record that run as diagnostic and rerun with isolation or explicit claim
+verification.
 
 Canonical source artifacts for these benchmarks are read-only:
 
@@ -547,7 +556,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 08-09 | `tp_sl_cells.py`, by-entry hit-times layout validation for `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy` or job-local selected arrays; no publisher/manifest modules unless a later separate publisher plan is approved | selected/full grid TP/SL benchmark evidence |
 | 10 | exact-safe pruning planner | arity 7/10 bounded-search evidence |
 | 11 | lazy materialization backend adapter | lazy trades benchmark evidence |
-| 12 | `prefix_traversal.py` registered as `compiled_prefix_product_traversal_v1`; no Python recursion in hot path; production composite default mode `stage_05_and_12_no_risk` | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, productionization evidence under a 2026-06-13 Stage 05+12 directory |
+| 12 | `prefix_traversal.py` registered as `compiled_prefix_product_traversal_v1`; no Python recursion in hot path; production composite default mode `stage_05_and_12_no_risk` | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/` |
 | 13 | TP/SL block-shape autotune harness and selector guard; accepted shape remains opt-in until gate passes | `benchmark_iterations/<date>_matrix_bitset_stage_13_tp_sl_block_autotune/` |
 | 14 | monotonic TP/SL cell classification kernel behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_14_tp_sl_monotonic_kernel/` |
 | 15 | exact-safe total-return early-abandon implementation behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |

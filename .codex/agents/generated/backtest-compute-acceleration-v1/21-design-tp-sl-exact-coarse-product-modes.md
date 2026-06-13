@@ -60,6 +60,7 @@ hard_requirements:
   previous_stage_required: "20 accepted"
   baseline_code_required: "Architecture and any optional benchmark references must treat the Stage 05+12 production default as the minimum accepted-code baseline; live-production claims require /opt/roehub/app code/env state verification."
   production_default_benchmark_command: "Optional cost-model refresh command: uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage21_reference"
+  benchmark_claim_rule: "Any optional live-production benchmark reference is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
   implementation_allowed: false
   benchmark_required: false
   docs_update_required: true

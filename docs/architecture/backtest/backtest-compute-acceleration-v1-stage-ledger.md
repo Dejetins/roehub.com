@@ -1502,7 +1502,7 @@ backend mode policy and falls back to accepted current paths otherwise.
 
 ## Stage 05+12 production default rollout - 2026-06-13
 
-Status: `running`.
+Status: `accepted`.
 
 Rollout policy:
 
@@ -1521,7 +1521,7 @@ Rollout policy:
 - explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains the full legacy
   rollback/comparison path.
 
-Acceptance gate before marking this rollout accepted:
+Acceptance gate:
 
 - focused unit tests prove default arity-6 routes to Stage 05 and default
   arity-7 routes to Stage 12;
@@ -1531,14 +1531,67 @@ Acceptance gate before marking this rollout accepted:
 - production-mode benchmark evidence through the API-runner path records
   default composite results for Stage 05 arity-6 rows and Stage 12 arity-7 rows;
 - top-50 identity/order and metric tolerance match the accepted baselines;
-- service wall does not regress versus accepted Stage 05/Stage 12 evidence for
-  the rows each backend owns.
+- service wall does not materially regress versus accepted Stage 05/Stage 12
+  evidence for the rows each backend owns.
 
-Evidence: pending.
+Evidence:
 
-## Production/default state audit - 2026-06-13
+- code commit: `1bd7a1e4` on `main`;
+- CI: run `27477340161` passed;
+- deploy: `Deploy Backend` run `27477461091` passed and refreshed
+  `/opt/roehub/app`;
+- post-deploy smoke: `ssh macstudio 'cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh'`
+  passed;
+- live runtime check: `/opt/roehub/app` contains
+  `--stage-05-12-production-default-rows`, `MATRIX_BACKEND_MODE_DEFAULT` is
+  `stage_05_and_12_no_risk`, `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` is unset in
+  `/Users/daniildegtyarev/.config/roehub/roehub.env`, and launchd services
+  `com.roehub.api` / `com.roehub.backtest-job-runner` were running;
+- accepted benchmark evidence:
+  `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/`;
+- diagnostic rerun evidence:
+  `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live_rerun2/`.
 
-This audit distinguishes accepted repository code from live production runtime:
+Accepted benchmark command:
+
+```bash
+ssh macstudio 'cd /opt/roehub/app && \
+  env -u ROEHUB_BACKTEST_MATRIX_BACKEND_MODE \
+  ROEHUB_BENCHMARK_GIT_COMMIT=1bd7a1e4 \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live \
+    --stage-05-12-production-default-rows \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5 \
+    --system-memory-cleanup-wait-seconds 90'
+```
+
+Live production-default benchmark result:
+
+| Job | Backend owner | Exact current s | May2 exact s | Exact ratio | Service wall s | Service no-warmup s | Notes |
+|---|---|---:|---:|---:|---:|---:|---|
+| `none/arity_6/long_only` | Stage 05 | `1.056` | `15.694` | `14.858x` | `10.031` | `1.974` | cold `sample_warmup=8.403s`; warm rerun recorded `1.471s` wall / `1.044s` exact |
+| `none/arity_6/long_short_reversal` | Stage 05 | `3.076` | `15.365` | `4.995x` | `3.322` | `3.594` | accepted run passed; rerun diagnostic was invalid because launchd production worker claimed the job |
+| `none/arity_7/long_only` | Stage 12 | `5.241` | `138.755` | `26.474x` | `6.562` | `6.535` | prefix selected `116640`, pruned `163296` |
+| `none/arity_7/long_short_reversal` | Stage 12 | `17.682` | `136.630` | `7.727x` | `19.205` | `19.484` | prefix selected `264384`, pruned `15552` |
+
+Acceptance decision: accepted. The accepted run passed parity `4/4`,
+performance, instrumentation, memory release, lazy cache memory, scheduler
+smoke, legacy path, dead-code audit and docs-drift audit. Stage 05 arity-6
+live timings remain materially faster than the legacy exact path, while small
+differences versus the earlier Stage 05 default-on checkout evidence are
+treated as live-runtime timing variance rather than a new algorithmic
+regression because the routed backend is unchanged. Stage 12 arity-7 timings
+match the accepted Stage 12 evidence. The diagnostic rerun is not acceptance
+evidence because `com.roehub.backtest-job-runner` claimed one benchmark job
+instead of the harness process; future live benchmarks must verify harness job
+ownership or isolate the launchd worker.
+
+## Production/default state audit - 2026-06-13 pre-deploy snapshot
+
+This superseded audit distinguished accepted repository code from live
+production runtime before the `1bd7a1e4` deploy:
 
 - local `main` contains Stage 12 commit
   `1fda22642ac8f9194322a5b91d39e3f676f42ee7` and is ahead of
@@ -1555,14 +1608,10 @@ This audit distinguishes accepted repository code from live production runtime:
 - observed `/Users/daniildegtyarev/.config/roehub/roehub.env` has no explicit
   `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` override.
 
-Conclusion: Stage 05, Stage 09 and Stage 12 are accepted in the repository
-history as documented, but the observed native live runtime under
-`/opt/roehub/app` is older and should not be treated as updated production for
-future benchmarks. A future benchmark may use the Mac Studio project checkout as
-accepted-code evidence only if it records commit/dirty state. A benchmark may
-claim live-production baseline only after the active runtime is refreshed,
-contains the accepted code, and passes a smoke/benchmark precheck with its env
-state recorded.
+Conclusion at the time: Stage 05, Stage 09 and Stage 12 were accepted in
+repository history, but the observed native live runtime under `/opt/roehub/app`
+was older and could not be treated as updated production. This is superseded by
+the accepted Stage 05+12 production default rollout above.
 
 ## Stage Ledger
 
@@ -1580,7 +1629,7 @@ state recorded.
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
 | 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
-| 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; production composite default uses Stage 12 for no-risk arity `7` and keeps Stage 05 for arity `6`; explicit Stage 12 mode remains available for arity `6`/`7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`; production rollout evidence pending | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal; arity-6 explicit-mode evidence improved `90.449%` and `76.573%`; composite default keeps Stage 05 for arity-6 because that was the accepted default service path; stable top-50 `variant_hash`/rank/metrics matched baseline | true for Stage 13 only |
+| 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; production composite default uses Stage 12 for no-risk arity `7` and keeps Stage 05 for arity `6`; explicit Stage 12 mode remains available for arity `6`/`7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/`; diagnostic race rerun `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live_rerun2/` | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal in isolated Stage 12 evidence; production default evidence passed `4/4` parity with Stage 05 exact ratios `14.858x` / `4.995x` and Stage 12 exact ratios `26.474x` / `7.727x` versus May2; composite default keeps Stage 05 for arity-6 because that was the accepted default service path; stable top-50 `variant_hash`/rank/metrics matched baseline where top-N is non-empty | true for Stage 13 only |
 | 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | true for Stage 13 only |
 | 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
 | 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
@@ -1597,7 +1646,7 @@ Backtest compute acceleration v1 produced durable benchmark evidence for row
 telemetry, runtime bitset packing, no-risk matrix paths, TP/SL selected cells,
 TP/SL full-grid cells, high-arity pruning learning, rejected lazy detail reuse
 and accepted Stage 12 compiled prefix traversal. The production default backend
-policy is moving to `stage_05_and_12_no_risk`: Stage 05
+policy is now `stage_05_and_12_no_risk`: Stage 05
 `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
 `direction_mode in {long_only, long_short_reversal}`, plus Stage 12
 `compiled_prefix_product_traversal_v1` for the same no-risk directions at arity
@@ -1606,10 +1655,12 @@ rollback/comparison path, `stage_05_no_risk_reversal_arity6` isolates Stage 05,
 and `stage_12_compiled_prefix_traversal` isolates Stage 12 for benchmark
 comparison.
 
-The observed native runtime under `/opt/roehub/app` was not updated to the
-accepted repository state during this audit. Future evidence must distinguish
-accepted-code checkout benchmarks from live-production benchmarks. The next
-implementation prompt is Stage 13.
+The native runtime under `/opt/roehub/app` is updated through commit
+`1bd7a1e4`, smoke-verified, and benchmarked with the live production default.
+Future evidence must still distinguish accepted-code checkout benchmarks from
+live-production benchmarks, and live API-runner benchmark evidence must verify
+that the benchmark harness, not the long-running launchd worker, claimed each
+measured job. The next implementation prompt is Stage 13.
 
 ## Stage Acceptance Requirements
 
