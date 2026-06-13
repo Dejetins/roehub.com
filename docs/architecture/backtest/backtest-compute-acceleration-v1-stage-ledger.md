@@ -1330,13 +1330,41 @@ Rejection commit scope:
 Git branch: `main`. Scoped rejection commit SHA is recorded in the executor
 final report after commit. Push/deploy: not performed.
 
-`next_iteration_allowed` is `false` because this v1 compute-acceleration rollout
-has no Stage 12 in the current plan. Future lazy-detail acceleration should open
-a new benchmark-gated stage with a stronger dominant-cost change.
+`next_iteration_allowed` is `false` for the Stage 11 lazy-detail path. The
+2026-06-13 continuation update below opens a separate Stage 12+ roadmap based on
+new dominant cost centers; it does not convert Stage 11 into accepted acceleration.
+
+## Stage 12+ Continuation Planning - 2026-06-13
+
+Status: `planned`. This is a docs/prompt-pack update only; no runtime code or
+benchmark evidence is accepted by this entry.
+
+Source recommendation:
+`/Users/daniildegtyarev/.codex/attachments/592a9119-4350-4c95-8400-3ae7a245ace7/pasted-text.txt`.
+
+Planning decision:
+
+- Keep Stage 05 as the only default production acceleration:
+  `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
+  `direction_mode in {long_only, long_short_reversal}`.
+- Keep Stage 09 `matrix_cell_tp_sl_v1` as accepted but opt-in/internal until a
+  dedicated production gate passes.
+- Do not revive Stage 06 runtime consensus cache, Stage 07 sidecar load as
+  production speedup, Stage 10 Python traversal, or Stage 11 lazy reuse.
+- Open Stage 12 as the next executable stage, focused on compiled/fused prefix
+  product traversal with selectivity ordering and exact-safe prefix pruning.
+- Add Stage 13-21 prompts for TP/SL block autotune, monotonic cell kernel,
+  total-return early abandon, trade-window telemetry, dynamic selector, top-N
+  batch reduction, thread scaling, allocation reuse and exact/coarse TP/SL
+  architecture policy.
+
+`next_iteration_allowed` is `true` for Stage 12 only. Later Stage 13+ prompts
+may exist in the prompt pack, but execution remains ledger-gated and must not
+advance if the immediately preceding required stage fails its acceptance gates.
 
 ## Current Execution Handoff
 
-Next executable stage: none for backtest compute acceleration v1.
+Next executable stage: Stage 12 compiled prefix product traversal.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -1354,6 +1382,12 @@ selected-cell TP/SL parity and by-entry layout. Stage 09 is accepted as an
 opt-in full-grid TP/SL backend and still avoids canonical publisher/precompute
 or manifest changes unless a separate approved publisher plan exists.
 
+Stage 12+ starts from the 2026-06-13 continuation plan. It must read
+`docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md`
+before implementation and must compare against the nearest accepted baseline:
+Stage 05 for no-risk default rows, current exact path for high-arity rows with no
+accepted prefix baseline, and Stage 09 for TP/SL full-grid rows.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -1369,7 +1403,17 @@ or manifest changes unless a separate approved publisher plan exists.
 | 08 | accepted_for_learning | TP/SL selected-cell shadow with by-entry hit-times layout or selected by-entry arrays; sidecar-only if persisted for testing, no publisher/manifest changes without a separate approved plan | `benchmark_iterations/2026-06-07_matrix_bitset_stage_08_tp_sl_selected_cells/` | Mac Studio API-runner selected 8x8 TP/SL parity `2/2`; `SL wins` tie rule covered; by-entry selected arrays recorded job-locally as `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy`; production top-N remains current path only | true for Stage 09 full-grid TP/SL cell blocks only |
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
-| 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false |
+| 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
+| 12 | planned | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; no Python traversal hot path | none yet | Must prove top-N identity/order, canonical output order and >=20% arity-7 service-wall improvement with no arity-6 regression before any next stage can execute | true for Stage 12 only |
+| 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | blocked until Stage 12 accepted |
+| 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
+| 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
+| 16 | planned | TP/SL trade-window reuse telemetry only | none yet | Counters only; no cache/grouped implementation unless telemetry proves high reuse and a later stage is opened | blocked until Stage 15 accepted |
+| 17 | planned | Dynamic backend selector by estimated work | none yet | Must avoid arity 1/2/3 regressions, retain Stage 05 accepted speed and record selector decisions | blocked until Stage 16 accepted_for_learning with negligible overhead and explicit reuse decision |
+| 18 | planned | Top-N/result assembly telemetry and optional stable block top-M merge | none yet | Must first show assembly is hot; optional merge must preserve stable tie-break and persisted top-N shape | blocked until Stage 17 accepted |
+| 19 | planned | Numba thread scaling benchmark by workload | none yet | Must benchmark `1,2,4,6,8,12` threads on Mac Studio and update worker config only after service-wall evidence | blocked until Stage 18 accepted or accepted_for_learning with assembly-not-hot decision |
+| 20 | planned | Allocation telemetry and per-child scratch-buffer reuse | none yet | Must improve allocation/RSS or wall-clock without cleanup regression; no global cross-job cache | blocked until Stage 19 accepted_for_learning with thread policy decision, or accepted if config changed |
+| 21 | planned | TP/SL exact/coarse product-mode architecture decision | none yet | Architecture/product policy only unless exact semantics remain unchanged or product approves approximate mode | blocked until Stage 20 accepted |
 
 ## Final Rollout Summary
 
@@ -1381,6 +1425,9 @@ Stage 05 `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
 `direction_mode in {long_only, long_short_reversal}`. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off`
 remains the rollback/comparison path. Rejected or learning-only candidates
 remain documented but must not be silently reused as default acceleration.
+
+The 2026-06-13 continuation update extends the roadmap but does not change
+accepted runtime behavior. The next implementation prompt is Stage 12.
 
 ## Stage Acceptance Requirements
 
@@ -1404,11 +1451,24 @@ contract impact и финальное решение. Если хотя бы о�
 | 09 | `matrix_cell_tp_sl_v1` full grid blocks | Full grid parity, cell-block size recorded, `tp_sl_exact_scoring` speedup, trade-cell eval/sec, memory peak/cleanup, service wall no regression | Reject if selected-cell speedup does not hold on full grid or memory dominates |
 | 10 | Exact-safe high-arity pruning | Exact-safe proof for pruning rule, arity 7/10 bounded evidence, no approximate beam in default path, parity on retained candidates, speedup and no result-shape drift | Block if pruning can remove a valid top candidate or requires product-level approximation approval |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark, cache identity parity, no bulk top-N scoring change, fallback to current lazy materialization | Reject if it improves perceived latency while invalidating persisted/lazy detail identity |
+| 12 | Compiled prefix product traversal | Compiled/iterative hot path; selectivity order internal only; exact-safe prefix pruning allowed only for eligibility bounds; no Stage 10 Python traversal dependency | Reject if top-N identity/order drifts, canonical `variant_hash` changes, arity-7 service wall improves <20%, `combo_iteration` is not materially lower, or arity-6 regresses |
+| 13 | TP/SL block autotune and `64 x 64` production gate | Compare `64 x 64`, `128 x 32`, `32 x 128`, `128 x 64`, `64 x 128` through API-runner with Stage 09/current exact baselines | Reject if best shape changes top-N/best TP/SL, memory peak worsens >10%, or service wall improves <15% |
+| 14 | TP/SL monotonic cell kernel | Exact monotonic boundary/classification kernel; same full-grid result as Stage 13 winner; SL-wins tie rule preserved | Reject if any metric/tie result drifts, cell comparisons/trade do not fall, trade-cell/sec does not rise, or service wall is not better than Stage 13 |
+| 15 | TP/SL total-return early abandon | Exact-safe upper bound for `ranking=total_return_pct desc` and supported sizing only; unsupported rankings fall back to current exact path | Reject if bound is not proven exact-safe, applies to unsupported ranking/sizing, removes a valid top candidate, or service wall does not improve |
+| 16 | TP/SL trade-window reuse telemetry | Add counters for total/unique trade windows, weighted reuse and savings estimate only; no cache or grouped scoring implementation | Close as `accepted_for_learning` only if telemetry overhead is negligible; do not open grouped implementation if reuse is low |
+| 17 | Dynamic backend selector | Deterministic estimated-work selector with logged decision/reason and env override; protects arity 1/2/3 and keeps Stage 05 arity-6 wins | Reject if selector picks matrix path for known losing rows, hides decision telemetry, changes request identity, or regresses service wall |
+| 18 | Top-N/result assembly batch reduction | First measure heap/update/hash/payload timers; optional block top-M merge must use stable tie-break by metric, `variant_hash`, combo ordinal | Reject if assembly is not hot, top-N identity/order drifts, persisted payload shape changes, or service wall does not improve |
+| 19 | Thread scaling benchmark | Mac Studio matrix for `NUMBA_NUM_THREADS=1,2,4,6,8,12` on required no-risk, TP/SL and high-arity rows; same artifacts/request/warmup | Do not update worker config if best thread count is workload-specific without a safe selector, causes oversubscription, or service wall evidence is inconclusive |
+| 20 | Allocation reuse and scratch buffers | Allocation counters first; per-child scratch buffers only; cleanup/RSS evidence required | Reject if global cross-job cache is introduced, cleanup regresses, memory peak worsens, or wall-clock gain is only local/micro |
+| 21 | TP/SL exact/coarse mode architecture decision | ADR/product policy for exact full grid, approximate coarse grid, optional exact refine and cost-aware admission; exact mode remains default | Block runtime work unless product approval exists and approximate mode is visibly separated from exact semantics |
 
 ## Cross-Stage Acceptance Rules
 
 - No stage may advance only on a local kernel/microbenchmark result; API-runner
   service wall and memory evidence must not regress.
+- Stage 12+ executors must read
+  `docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md`
+  and state which rejected methods remain non-goals.
 - Acceptance speedup must use the same current-service pipeline boundary unless
   the evidence is explicitly labeled diagnostic. Sidecar generation, sidecar load,
   warmup/cache state, request semantics, candidate set and top-N/persistence shape

@@ -1,0 +1,132 @@
+---
+prompt_name: backtest_compute_acceleration_stage_17_dynamic_backend_selector
+repo: roehub.com
+branch: main
+scope: "Replace brittle arity-only backend choice with an estimated-work selector while preserving Stage 05 wins and arity 1/2/3 safety."
+
+language:
+  implementation: python
+  agent_report: ru
+
+context_sources:
+  always_read:
+    - path: .codex/AGENTS.md
+      why: "repo contract"
+    - path: docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md
+      why: "Stage 17 selector policy"
+    - path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
+      why: "prior accepted/rejected modes"
+    - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
+      why: "arity 2/3 and sidecar/cache stop-list"
+  task_entrypoints:
+    - path: src/trading/contexts/backtest/application/services/v2/
+      why: "backend selection and scoring orchestration"
+    - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/
+      why: "matrix/cell backend ids and telemetry"
+
+skill_routing:
+  - skill: contract-impact-analysis
+    use_when: "backend default, request hash, result identity or config semantics may change"
+    timing: before implementation
+  - skill: backend-performance-evidence
+    use_when: "A/B testing selector decisions and service wall"
+    timing: during verification
+  - skill: backend-quality-gates
+    use_when: "Python gates fail"
+    timing: during verification
+
+runtime_env_sources:
+  mac_studio_native_env_file: /Users/daniildegtyarev/.config/roehub/roehub.env
+  benchmark_env_file_arg: "--env-file"
+  mac_studio_required_runtime_env:
+    ROEHUB_ENV: prod
+    ROEHUB_BACKTEST_ARTIFACTS_CONFIG: configs/prod/backtest_artifacts.yaml
+  mac_studio_artifact_root: /opt/roehub/state/backtest_artifacts/v2
+  secret_reporting_rule: "Report only paths/key names, never secret values."
+
+mac_studio_test_execution:
+  ssh_alias: macstudio
+  repo_checkout: /Users/daniildegtyarev/Projects/roehub.com
+  command_prefix: "ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && <command>'"
+  acceptance_testing: "Run selector A/B benchmark over SSH on Mac Studio; local runs are preflight only."
+  source_artifacts:
+    root: /opt/roehub/state/backtest_artifacts/v2
+    symbol_current: /opt/roehub/state/backtest_artifacts/v2/BTCUSDT/current.yaml
+    active_manifest: "resolve from BTCUSDT/current.yaml; read-only"
+  evidence_output_dir: docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_17_dynamic_selector/
+  write_policy: "Evidence only under evidence_output_dir; no canonical artifact writes."
+
+hard_requirements:
+  previous_stage_required: "16 accepted_for_learning with negligible telemetry overhead and explicit reuse decision"
+  implementation_allowed: true
+  benchmark_required: true
+  docs_update_required: true
+
+delivery_requirements:
+  - "Work from branch main; stop and report a blocker if the checkout is not main."
+  - "After accepted or accepted_for_learning, update ledger/evidence/docs, stage only scoped files, and commit to main with a stage-specific message."
+  - "For blocked or rejected, do not commit production runtime changes; commit only docs/evidence needed to preserve the decision."
+  - "Do not push or deploy unless the user explicitly asks."
+
+non_goals:
+  - "Do not enable matrix_bitset_no_risk_v1 default for arity 2/3."
+  - "Do not enable TP/SL backend default unless Stage 13/14/15 accepted that path."
+  - "Do not use sidecar load as a default speedup."
+  - "Do not change request hash or result semantics based on backend choice."
+
+task:
+  summary: "Implement a deterministic backend selector based on estimated work and fixed overhead, with explicit telemetry and env override."
+  selector_inputs:
+    - "risk_mode"
+    - "arity"
+    - "direction_mode"
+    - "candidate_count"
+    - "word_count"
+    - "estimated_bit_ops"
+    - "estimated_trade_cell_ops"
+    - "estimated_fixed_overhead"
+  required_rows:
+    - "none/arity_1..3"
+    - "none/arity_6/long_only"
+    - "none/arity_6/long_short_reversal"
+    - "TP/SL rows only if a TP/SL backend is eligible from prior accepted stages"
+
+acceptance:
+  correctness:
+    - "Top-N identity/order and result hashes unchanged on all selector rows."
+    - "Selector decision, fallback reason and override state are visible in telemetry."
+  performance:
+    - "arity 1/2/3 service wall does not regress."
+    - "arity 6 keeps accepted Stage 05 speed."
+    - "Any TP/SL selector path must compare against its accepted baseline."
+  decision:
+    - "If selector cannot avoid known losing rows, reject or keep default-off."
+
+quality_gates:
+  - cmd: "uv run pytest -q tests/unit/contexts/backtest/application/services/v2"
+    expect: "focused selector and backend parity tests pass or narrower justified equivalent"
+  - cmd: "python -m tools.docs.generate_docs_index --check"
+    expect: "passes if docs changed"
+  - cmd: "git diff --check"
+    expect: "passes"
+
+stage_execution_ledger:
+  path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
+  required_update: true
+  current_stage: "17"
+
+final_report_format:
+  language: ru
+  sections:
+    - "Stage status"
+    - "Selector policy"
+    - "Parity"
+    - "Benchmark"
+    - "Rollback"
+    - "Ledger and commit"
+---
+
+# Task
+
+Implement Stage 17 dynamic backend selector. The selector must protect small
+workloads and preserve accepted Stage 05 behavior.

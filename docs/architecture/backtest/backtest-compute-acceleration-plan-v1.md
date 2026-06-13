@@ -1,13 +1,14 @@
 # Backtest Compute Acceleration Plan v1
 
 Документ фиксирует staged-план ускорения compute-ядра backtest service по линии
-`row/signature dedup -> bitset artifacts -> bitset consensus -> sparse trade tape -> TP/SL cell blocks`.
+`row/signature dedup -> bitset artifacts -> bitset consensus -> sparse trade tape -> TP/SL cell blocks -> fused compiled traversal/scoring`.
 
 ## Статус
 
-План внедрения перед кодовыми изменениями. Никакой новый backend не считается
-разрешенным к production path, пока для него не записано сопоставимое benchmark
-evidence на Mac Studio и в журнале stages не выставлено `next_iteration_allowed: true`.
+План внедрения перед кодовыми изменениями и последующими continuation stages.
+Никакой новый backend не считается разрешенным к production path, пока для него
+не записано сопоставимое benchmark evidence на Mac Studio и в журнале stages не
+выставлено `next_iteration_allowed: true`.
 
 ## Цель
 
@@ -39,6 +40,19 @@ Iteration 16 is a hard guardrail for this plan: локальный выигры�
 timer недостаточен, если full service boundary, top-N shape, parity или memory gate
 регрессируют.
 
+Continuation update от 2026-06-13 добавляет Stage 12+ после negative review.
+Текущие accepted baselines:
+
+| Baseline | Scope | Evidence |
+|---|---|---|
+| Stage 05 default-on | `risk.mode=none`, arity `6`, `long_only` / `long_short_reversal`; rollback/comparison через `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` | `2026-06-10_matrix_bitset_stage_05_default_off_baseline/`, `2026-06-10_matrix_bitset_stage_05_default_on_candidate/` |
+| Stage 09 opt-in | `risk.mode=tp_sl_grid`, arity `6`, full-grid cell blocks, accepted shape `64 x 64`; still internal/opt-in | `2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` |
+| Stage 10 learning only | exact-safe min-trade rule is valid, but Python traversal is not accepted acceleration | `2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` |
+
+Новые stages должны сравниваться с ближайшим accepted baseline, а не с rejected
+candidate. Stage 12+ нельзя делать зависимыми от Stage 06 cache, Stage 07
+sidecar load, Stage 10 Python traversal или Stage 11 lazy reuse.
+
 ## Что не входит
 
 - GPU-first rewrite.
@@ -55,6 +69,13 @@ timer недостаточен, если full service boundary, top-N shape, par
 - Full pair cache как default production artifact или default runtime path.
   Pair cache допускается только как bounded/shadow optimization после отдельного
   memory benchmark.
+- Runtime consensus signature cache из Stage 06, Python high-arity traversal из
+  Stage 10, lazy detail sparse reuse из Stage 11 и sidecar `.npy` load как
+  production speedup. Эти методы можно вернуть только как новый benchmark-gated
+  stage с другим dominant cost center.
+- Approximate TP/SL coarse grid как замена exact semantics. Это может быть
+  только отдельный product/UX режим после явного approval и маркировки как
+  approximate.
 - RMQ/sparse table для drawdown. Текущий no-risk drawdown считается по closed
   equity на trade close; если контракт изменится на mark-to-market drawdown,
   это будет отдельный stage с новой correctness моделью.
@@ -90,8 +111,11 @@ Planned backend ids:
 
 | Backend | Risk mode | Initial scope | Role |
 |---|---|---|---|
-| `matrix_bitset_no_risk_v1` | `none` | arity 2/3, then arity 1..10 | blockwise bitset consensus plus sparse no-risk scoring |
-| `matrix_cell_tp_sl_v1` | `tp_sl_grid` | selected cell blocks, then full grid | sparse trade tape plus TP/SL cell-block scoring |
+| `matrix_bitset_no_risk_v1` | `none` | accepted default only for arity 6 long-only/reversal | blockwise bitset consensus plus sparse no-risk scoring |
+| `matrix_cell_tp_sl_v1` | `tp_sl_grid` | accepted opt-in full grid, shape `64 x 64` | sparse trade tape plus TP/SL cell-block scoring |
+| `compiled_prefix_product_traversal_v1` | `none`, later shared candidate production | arity 6/7 product-form pools | fused compiled prefix traversal, selectivity ordering, exact-safe prefix pruning and scoring handoff |
+| `tp_sl_monotonic_cell_kernel_v1` | `tp_sl_grid` | arity 6 full grid | monotonic TP/SL cell classification within accepted cell-block backend |
+| `dynamic_backtest_backend_selector_v1` | `none`, `tp_sl_grid` | exact accepted modes only | choose current vs matrix/cell backend by estimated work and measured overhead, not arity alone |
 
 Backend selector is additive:
 
@@ -106,6 +130,14 @@ backtest_compute:
     hit_times_layout: by_entry
     sidecar_artifact_dir: null  # benchmark/test only; canonical publisher is unchanged
     max_pair_cache_rows: 0  # disabled by default; research/shadow only
+    dynamic_selector:
+      enabled: false
+      min_estimated_bit_ops: null
+      thread_policy: fixed
+    tp_sl:
+      monotonic_cell_kernel: false
+      early_abandon_total_return: false
+      approximate_coarse_grid: false
 ```
 
 `shadow` mode computes bounded samples and parity/hash evidence but does not feed
@@ -218,6 +250,19 @@ tested only under these constraints:
 | GPU-first rewrite | Deferred; CPU-first only |
 | Worker/lazy priority | Separate perceived-latency concern; only Stage 11 reuses compute artifacts |
 | Publisher-level bitset artifacts | Intentionally deferred; Stage 07 uses sidecar artifacts first per current rollout constraint |
+| Stop-list после failed stages | Covered by `backtest-compute-acceleration-negative-results-v1.md`; Stage 12+ prompts must read it and list the rejected methods as non-goals |
+| Compiled prefix product traversal | Stage 12; must be compiled/iterative hot path, not Python recursion/traversal |
+| Exact-safe prefix pruning inside traversal | Stage 12; may use eligibility upper bounds such as active bars, possible closed trades and exposure, not score/ranking upper bounds unless separately proven |
+| Selectivity-based indicator dimension order | Stage 12; compute order may change, but public variant order, `variant_hash`, result assembly and tie-break must remain canonical |
+| TP/SL full-grid `64 x 64` production candidate and block autotune | Stage 13; compares `64 x 64`, `128 x 32`, `32 x 128`, `128 x 64`, `64 x 128` against Stage 09 accepted opt-in baseline |
+| TP/SL monotonic cell kernel | Stage 14; exact kernel only, same `best_tp`/`best_sl`, same SL-wins tie rule |
+| TP/SL total-return early abandon | Stage 15; exact-safe only for `ranking=total_return_pct desc` and safe sizing/log-return bounds |
+| TP/SL reusable trade-window telemetry | Stage 16; telemetry only before any grouped/cache implementation; Python dict runtime cache is not allowed |
+| Dynamic backend selector by estimated work | Stage 17; protects arity 1/2/3 and small workloads from matrix fixed overhead |
+| Top-N/result assembly batch reduction | Stage 18; first measures assembly timers, then optional stable block top-M merge if assembly is hot |
+| Numba thread scaling by workload | Stage 19; benchmark matrix first, config update only after service-wall evidence |
+| Allocation reuse / per-child scratch buffers | Stage 20; starts with allocation telemetry, then per-child scratch only; no global cross-job cache |
+| Exact/coarse TP/SL product modes | Stage 21; architecture/product admission policy only unless exact semantics remain unchanged or product approves approximate mode |
 
 ## Benchmark Model
 
@@ -299,6 +344,18 @@ Additional MVP rows are required when the stage targets no-risk matrix backend:
 | `none/arity_3/long_only` | first generic bitset consensus target |
 | `none/arity_3/long_short_reversal` | reversal transition parity |
 
+Additional continuation rows are required for Stage 12+ when the stage targets
+the corresponding cost center:
+
+| Job | Required when | Purpose |
+|---|---|---|
+| `none/arity_7/long_only` | Stage 12 | prove `combo_iteration` is materially lower on the high-arity product fixture |
+| `none/arity_7/long_short_reversal` | Stage 12 if fixture/request is available | prove reversal semantics under fused traversal |
+| `tp_sl_grid/arity_6/long_only` | Stages 13-16, 18-20 | compare with Stage 09 accepted `64 x 64` opt-in baseline |
+| `tp_sl_grid/arity_6/long_short_reversal` | Stages 13-16, 18-20 | compare with Stage 09 accepted `64 x 64` opt-in baseline under reversal |
+| `none/arity_1..3` | Stage 17 | prove dynamic selector avoids small-workload regressions |
+| Stage-specific thread matrix | Stage 19 | compare `NUMBA_NUM_THREADS=1,2,4,6,8,12` with same request and artifact set |
+
 ### Metrics
 
 Every stage record must include:
@@ -312,6 +369,23 @@ Every stage record must include:
   `candidates_after_proxy`, `exact_candidates`, `avg_segments_per_candidate`,
   `avg_trades_per_candidate`, `tp_count`, `sl_count`, `tp_sl_cells`,
   `exact_candidates_per_sec`, `trade_cell_evals_per_sec` when applicable;
+- Stage 12 prefix traversal counters: `prefix_nodes_visited`,
+  `prefix_nodes_reused`, `prefix_pruned_subtrees`, `prefix_pruned_candidate_upper_bound`,
+  `selectivity_order`, `combo_iteration_candidates_per_sec` and compiled-loop
+  entry/exit timing;
+- Stage 13-16 TP/SL counters: `tp_sl_block_shape`, `cell_comparisons_per_trade`,
+  `cell_classification_ms`, `early_abandon_cells`, `early_abandon_candidates`,
+  `tp_sl_total_trade_windows`, `tp_sl_unique_trade_windows`,
+  `tp_sl_trade_window_reuse_ratio`,
+  `tp_sl_weighted_reuse_by_cell_count`,
+  `tp_sl_top_reused_window_count`,
+  `tp_sl_cache_candidate_savings_estimate`;
+- Stage 17-20 overhead counters: backend selector decision/reason, estimated bit
+  ops, estimated trade-cell ops, `heap_update_ms`, `top_result_proxy_fill_ms`,
+  `variant_hash_ms`, `canonical_params_build_ms`, `payload_json_ms`,
+  `db_persist_ms`, `matrix_buffers_allocated`, `matrix_buffer_bytes`,
+  `cell_metric_buffer_bytes`, `trade_tape_buffer_bytes`, `temporary_array_count`,
+  `scratch_buffer_reuse_count`;
 - child CPU samples, Numba threads, warmup policy, artifact manifest hashes and
   request hashes.
 
@@ -328,6 +402,9 @@ An optimization stage passes only when all are true:
 - memory cleanup does not regress relative to Stage 00;
 - no public API, persistence identity, cache identity, TP/SL tie-breaking or
   ranking semantics changed silently;
+- Stage 12+ stages must compare against the nearest accepted baseline: Stage 05
+  for no-risk arity-6/default-on rows, the current exact path for arity-7 where
+  no accepted prefix baseline exists, and Stage 09 for TP/SL full-grid rows;
 - the ledger row records `next_iteration_allowed: true`.
 
 If a stage is only instrumentation or shadow validation, it may be marked
@@ -396,6 +473,16 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Sidecar safety | source manifest hash, source `signals.i8.npy` hash, shape, dtype, padding and duplicate map validate before use; missing sidecar falls back to runtime packing | 07 |
 | Cell blocks | selected cells first, then full grid; `16 x 16`, `32 x 8` or `8 x 32` cell blocks must be recorded with memory and timing evidence | 08-09 |
 | High arity pruning | only exact-safe monotonic pruning or branch-and-bound in default path; approximate beam remains off unless separately approved | 10 |
+| Fused prefix traversal | compiled/iterative traversal only; same candidate identity, canonical variant order, stable `variant_hash`, top-N identity/order and no Python object allocation in hot path | 12 |
+| Selectivity order | compute-order reordering is internal only; output order and tie-break use canonical order | 12 |
+| TP/SL autotune and monotonic kernel | same top-N, `best_tp`, `best_sl`, metric tolerance, full-grid exact semantics and SL-wins tie rule | 13-14 |
+| TP/SL early abandon | exact-safe upper bound proof for `total_return_pct desc`; disabled for unsupported rankings/sizing modes | 15 |
+| Trade-window reuse telemetry | counters only unless a later plan accepts compiled grouping; no Python dict cache in production hot path | 16 |
+| Dynamic selector | selector decisions are logged, deterministic and do not change public result identity; arity 1/2/3 no-regression is mandatory | 17 |
+| Top-N/result assembly | stable tie-break by ranking metric, `variant_hash` and combo ordinal; persisted top-N shape unchanged | 18 |
+| Thread scaling | no oversubscription, same request/artifacts per run, best thread count does not regress service wall or memory | 19 |
+| Allocation reuse | per-child scratch buffers only, no global cross-job cache, cleanup and RSS peak do not regress | 20 |
+| Product TP/SL coarse mode | exact mode remains default; approximate/coarse mode requires explicit product approval and visible mode semantics | 21 |
 
 ## План Внедрения
 
@@ -413,6 +500,16 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 09 | `matrix_cell_tp_sl_v1` full grid blocks | Full request grid exact parity; accepted `tp_sl_exact_scoring` speedup and no service wall regression |
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark; separate UX/perceived-latency gate |
+| 12 | Compiled prefix product traversal | `none/arity_6` no regression, `none/arity_7` service wall improvement >= 20%, `combo_iteration` materially lower, top-N identity/order and canonical output unchanged |
+| 13 | TP/SL `64 x 64` production gate and block autotune | Same top-N, `best_tp`, `best_sl`; service wall >= 15% better than current exact path or Stage 09 opt-in baseline; memory peak bounded |
+| 14 | TP/SL monotonic cell kernel | Exact output same as Stage 13 winner; cell comparisons/trade lower, trade-cell/sec higher, service wall better than best Stage 13 |
+| 15 | TP/SL total-return early abandon | Exact-safe bound proof for `total_return_pct desc`; same output, lower scored cells/candidates and service wall no regression |
+| 16 | TP/SL trade-window reuse telemetry | Counters only; no runtime cache; record whether reuse is high enough to justify later compiled grouping |
+| 17 | Dynamic backend selector | No regression on arity 1/2/3, accepted speed retained on arity 6, selector decision telemetry recorded |
+| 18 | Top-N/result assembly batch reduction | Assembly timers measured first; optional stable block top-M merge only if assembly is hot and top-N identity/order is unchanged |
+| 19 | Thread scaling benchmark | `NUMBA_NUM_THREADS=1,2,4,6,8,12` matrix; worker config change only after service-wall evidence |
+| 20 | Allocation reuse and scratch buffers | Allocation telemetry first; per-child scratch buffers only if service wall or RSS improves without cleanup regression |
+| 21 | TP/SL exact/coarse mode architecture decision | Product-visible approximate mode policy, admission cost model and exact refine rules; no exact default change without separate approval |
 
 ## Планируемые Файлы И Артефакты По Stages
 
@@ -428,6 +525,16 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 08-09 | `tp_sl_cells.py`, by-entry hit-times layout validation for `long_tp_by_entry.u32.npy`, `long_sl_by_entry.u32.npy`, `short_tp_by_entry.u32.npy`, `short_sl_by_entry.u32.npy` or job-local selected arrays; no publisher/manifest modules unless a later separate publisher plan is approved | selected/full grid TP/SL benchmark evidence |
 | 10 | exact-safe pruning planner | arity 7/10 bounded-search evidence |
 | 11 | lazy materialization backend adapter | lazy trades benchmark evidence |
+| 12 | compiled prefix traversal module or Numba/Cython/Rust equivalent under existing matrix backend boundary; no Python recursion in hot path | `benchmark_iterations/<date>_matrix_bitset_stage_12_compiled_prefix_traversal/` |
+| 13 | TP/SL block-shape autotune harness and selector guard; accepted shape remains opt-in until gate passes | `benchmark_iterations/<date>_matrix_bitset_stage_13_tp_sl_block_autotune/` |
+| 14 | monotonic TP/SL cell classification kernel behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_14_tp_sl_monotonic_kernel/` |
+| 15 | exact-safe total-return early-abandon implementation behind env override | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |
+| 16 | TP/SL trade-window reuse counters only | `benchmark_iterations/<date>_matrix_bitset_stage_16_trade_window_reuse_telemetry/` |
+| 17 | dynamic backend selector and decision telemetry | `benchmark_iterations/<date>_matrix_bitset_stage_17_dynamic_selector/` |
+| 18 | top-N/result assembly timers and optional stable block top-M merge | `benchmark_iterations/<date>_matrix_bitset_stage_18_topn_batch_reduction/` |
+| 19 | thread-scaling benchmark harness/report; config update only if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_19_thread_scaling/` |
+| 20 | allocation counters and per-child scratch buffers if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_20_allocation_reuse/` |
+| 21 | architecture/product decision record for exact vs coarse TP/SL modes | `docs/architecture/backtest/` ADR plus optional benchmark cost model |
 
 ## Контракты И Влияние
 
@@ -440,6 +547,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Canonical artifact file/manifest schema | `none` initially | Stage 07 sidecar files do not change canonical `manifest.yaml`, `current.yaml` or active-slot artifacts |
 | Test sidecar artifact metadata | `compatible-change` | New benchmark/test-only `matrix_sidecar_manifest.json` records source hashes, shapes, dtypes and schema version |
 | Config schema | `compatible-change` | Optional `backtest_compute.matrix_backend` block, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
+| Worker/thread config | `compatible-change` | Stage 19 may add workload-specific thread policy only after benchmark evidence; fixed current behavior remains rollback |
 | Request hash / cache identity | `none` | Result-affecting backend must not enter public request hash unless semantics change, which is out of scope |
 | Service-call semantics | `none` | Same API/runner/child process topology |
 | Logs/metrics/report semantics | `compatible-change` | Additive benchmark and telemetry counters |
@@ -453,6 +561,9 @@ merge must prove the relevant rows below before it can be `accepted`.
   policy.
 - Child process remains the isolation boundary for heavy compute and memory cleanup.
 - Runtime backend mode must be visible in telemetry and benchmark evidence.
+- Stage 12+ feature flags/env overrides must support default-off/default-on A/B
+  benchmark comparisons. A feature cannot become default unless the ledger records
+  the rollback override and accepted comparison path.
 - Sidecar artifacts are generated from the canonical active artifacts and are
   addressed by explicit benchmark/test path. Canonical publisher output stays
   unchanged, old manifests stay readable and runtime packing remains the fallback.
@@ -492,6 +603,14 @@ Each row must record:
   reduce constants but do not remove the need for pruning/finalist strategy later.
 - Arity 7/10 exhaustive search may remain impractical without exact-safe pruning;
   approximate beam search requires explicit product approval and separate contract.
+- Compiled prefix traversal can improve traversal cost but still fail if exact
+  scoring dominates or if compile/setup overhead offsets the win on arity 6.
+- TP/SL monotonic and early-abandon stages can only apply to exact-safe surfaces;
+  unsupported rankings must fall back to current exact scoring.
+- Dynamic selector mistakes can silently erase Stage 05 wins or re-enable arity
+  2/3 regressions, so selector telemetry and rollback override are mandatory.
+- Thread scaling may be hardware-specific; accepted Mac Studio thread policy must
+  not be generalized to different hardware without fresh evidence.
 - Full pair cache can regress memory and wall-clock even when isolated pair lookup
   gets faster; it is excluded from default production path until bounded evidence
   proves otherwise.
