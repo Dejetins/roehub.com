@@ -84,6 +84,12 @@ STAGE_09_MATRIX_BACKEND_MODE = "stage_09_tp_sl_full_grid"
 STAGE_12_COMPILED_PREFIX_ARITIES = (6, 7)
 STAGE_12_COMPILED_PREFIX_DIRECTIONS = ("long_only", "long_short_reversal")
 STAGE_12_MATRIX_BACKEND_MODE = "stage_12_compiled_prefix_traversal"
+STAGE_05_12_PRODUCTION_DEFAULT_ARITIES = (6, 7)
+STAGE_05_12_PRODUCTION_DEFAULT_DIRECTIONS = (
+    "long_only",
+    "long_short_reversal",
+)
+STAGE_05_12_PRODUCTION_DEFAULT_BACKEND_MODE = "stage_05_and_12_no_risk"
 MATRIX_BACKEND_MODE_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE"
 TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT"
 TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT"
@@ -144,6 +150,18 @@ def main(argv: list[str] | None = None) -> int:
         MATRIX_BACKEND_MODE_ENV_KEY
     ):
         os.environ[MATRIX_BACKEND_MODE_ENV_KEY] = STAGE_12_MATRIX_BACKEND_MODE
+    if args.stage_05_12_production_default_rows:
+        matrix_backend_mode = os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY, "")
+        if (
+            matrix_backend_mode
+            and matrix_backend_mode != STAGE_05_12_PRODUCTION_DEFAULT_BACKEND_MODE
+        ):
+            raise RuntimeError(
+                "--stage-05-12-production-default-rows must run with "
+                f"{MATRIX_BACKEND_MODE_ENV_KEY} unset or "
+                f"{STAGE_05_12_PRODUCTION_DEFAULT_BACKEND_MODE!r}; got "
+                f"{matrix_backend_mode!r}"
+            )
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -168,6 +186,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.stage_12_compiled_prefix_rows:
         reference_runs, excluded = _stage_12_compiled_prefix_reference_runs(
+            reference=reference
+        )
+    if args.stage_05_12_production_default_rows:
+        reference_runs, excluded = _stage_05_12_production_default_reference_runs(
             reference=reference
         )
     if args.smoke_only:
@@ -208,6 +230,9 @@ def main(argv: list[str] | None = None) -> int:
             "stage_08_tp_sl_selected_cells": args.stage_08_tp_sl_selected_cells,
             "stage_09_tp_sl_full_grid": args.stage_09_tp_sl_full_grid,
             "stage_12_compiled_prefix_rows": args.stage_12_compiled_prefix_rows,
+            "stage_05_12_production_default_rows": (
+                args.stage_05_12_production_default_rows
+            ),
             "tp_sl_selected_cell_shadow_env_key": TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
             "matrix_backend_mode_env_key": MATRIX_BACKEND_MODE_ENV_KEY,
             "matrix_backend_mode": os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY),
@@ -277,6 +302,9 @@ def main(argv: list[str] | None = None) -> int:
             cpu_sample_interval_seconds=args.cpu_sample_interval_seconds,
             stage_08_tp_sl_selected_cells=args.stage_08_tp_sl_selected_cells,
             stage_12_compiled_prefix_rows=args.stage_12_compiled_prefix_rows,
+            stage_05_12_production_default_rows=(
+                args.stage_05_12_production_default_rows
+            ),
         )
         payload["api_runner_path"] = {
             "runner_entrypoint": "BacktestJobWorkerUseCase.run_next",
@@ -387,6 +415,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "Run no-risk arity-6 and arity-7 rows with "
             "compiled_prefix_product_traversal_v1 enabled through "
             "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
+        ),
+    )
+    parser.add_argument(
+        "--stage-05-12-production-default-rows",
+        action="store_true",
+        help=(
+            "Run no-risk arity-6 and arity-7 rows through the production "
+            "composite default: Stage 05 for arity 6 and Stage 12 for arity 7. "
+            "Requires ROEHUB_BACKTEST_MATRIX_BACKEND_MODE to be unset or "
+            "stage_05_and_12_no_risk."
         ),
     )
     parser.add_argument(
@@ -636,6 +674,7 @@ def _run_reference_jobs(
     cpu_sample_interval_seconds: float,
     stage_08_tp_sl_selected_cells: bool = False,
     stage_12_compiled_prefix_rows: bool = False,
+    stage_05_12_production_default_rows: bool = False,
 ) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for index, reference_run in enumerate(reference_runs, start=1):
@@ -683,6 +722,7 @@ def _run_reference_jobs(
             reference_run=reference_run,
             stage_08_tp_sl_selected_cells=stage_08_tp_sl_selected_cells,
             stage_12_compiled_prefix_rows=stage_12_compiled_prefix_rows,
+            stage_05_12_production_default_rows=stage_05_12_production_default_rows,
         )
         stage_timings = _merged_stage_timings(child_evidence)
         instrumentation_counters = _merged_instrumentation_counters(child_evidence)
@@ -1510,6 +1550,50 @@ def _stage_12_compiled_prefix_reference_runs(
     }
 
 
+def _stage_05_12_production_default_reference_runs(
+    *,
+    reference: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for item in _list(reference.get("no_risk_regression_runs"))
+    ]
+    by_key = {
+        (
+            len(cast(Sequence[Any], item.get("indicator_ids", ()))),
+            str(item.get("direction_mode")),
+        ): item
+        for item in accepted_runs
+        if str(item.get("risk_mode")) == "none"
+        and len(cast(Sequence[Any], item.get("indicator_ids", ())))
+        in STAGE_05_12_PRODUCTION_DEFAULT_ARITIES
+        and str(item.get("direction_mode"))
+        in STAGE_05_12_PRODUCTION_DEFAULT_DIRECTIONS
+    }
+    wanted = [
+        (arity, direction)
+        for arity in STAGE_05_12_PRODUCTION_DEFAULT_ARITIES
+        for direction in STAGE_05_12_PRODUCTION_DEFAULT_DIRECTIONS
+    ]
+    missing = [key for key in wanted if key not in by_key]
+    if missing:
+        raise RuntimeError(
+            f"missing Stage 05+12 production default rows: {missing!r}"
+        )
+    return [by_key[key] for key in wanted], {
+        "job_name": None,
+        "risk_mode": "none",
+        "arity": list(STAGE_05_12_PRODUCTION_DEFAULT_ARITIES),
+        "direction_mode": list(STAGE_05_12_PRODUCTION_DEFAULT_DIRECTIONS),
+        "matrix_backend_mode": "default_unset_or_stage_05_and_12_no_risk",
+        "reason": (
+            "stage_05_12_production_default_rows: run no-risk arity 6 rows "
+            "through Stage 05 and arity 7 rows through Stage 12 using the "
+            "production composite default"
+        ),
+    }
+
+
 def _smoke_subset(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     wanted = {
         ("none", 1, "long_only"),
@@ -1658,6 +1742,7 @@ def _compare_reference_results(
     reference_run: Mapping[str, Any],
     stage_08_tp_sl_selected_cells: bool = False,
     stage_12_compiled_prefix_rows: bool = False,
+    stage_05_12_production_default_rows: bool = False,
 ) -> dict[str, Any]:
     items = [cast(Mapping[str, Any], item) for item in _list(api_top.get("items"))]
     diagnostics = _latest_exact_diagnostics(child_evidence=child_evidence)
@@ -1670,7 +1755,9 @@ def _compare_reference_results(
     telemetry_mismatches = _compare_telemetry(
         telemetry=telemetry,
         reference_run=reference_run,
-        allow_pruned_exact_candidates=stage_12_compiled_prefix_rows
+        allow_pruned_exact_candidates=(
+            stage_12_compiled_prefix_rows or stage_05_12_production_default_rows
+        )
         and isinstance(telemetry.get("prefix_traversal"), Mapping),
     )
     quality_top_zero = _quality_top_zero_result(telemetry=telemetry, api_items=len(items))
@@ -2857,6 +2944,9 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     stage_08_tp_sl_selected_cells = bool(request.get("stage_08_tp_sl_selected_cells"))
     stage_09_tp_sl_full_grid = bool(request.get("stage_09_tp_sl_full_grid"))
     stage_12_compiled_prefix_rows = bool(request.get("stage_12_compiled_prefix_rows"))
+    stage_05_12_production_default_rows = bool(
+        request.get("stage_05_12_production_default_rows")
+    )
     title = (
         "# Stage 04 matrix bitset no-risk MVP API-runner benchmark"
         if stage_04_mvp_rows
@@ -2868,6 +2958,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_09_tp_sl_full_grid
         else "# Stage 12 compiled prefix traversal API-runner benchmark"
         if stage_12_compiled_prefix_rows
+        else "# Stage 05+12 no-risk production default API-runner benchmark"
+        if stage_05_12_production_default_rows
         else "# Iteration 15 API runner clean arity-6 CPU/memory benchmark"
     )
     intent_scope = (
@@ -2881,6 +2973,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_09_tp_sl_full_grid
         else "BTCUSDT / 15m / none / arity 6-7 / long_only + long_short_reversal"
         if stage_12_compiled_prefix_rows
+        else "BTCUSDT / 15m / none / production default arity 6-7 / long_only + long_short_reversal"
+        if stage_05_12_production_default_rows
         else "BTCUSDT / 15m / arity 6"
     )
     fixture_scope = (
@@ -2901,6 +2995,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "none/arity_6..7/long_short_reversal / REQUEST_TOP_N = 50 / "
         "BENCHMARK_TOP_K = 5"
         if stage_12_compiled_prefix_rows
+        else "- BTCUSDT / 15m / none/arity_6 Stage 05 + none/arity_7 "
+        "Stage 12 production default / long_only + long_short_reversal / "
+        "REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
+        if stage_05_12_production_default_rows
         else "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
     )
     intent_text = (
@@ -2925,6 +3023,11 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "compiled prefix counters, arity-7 service wall, arity-6 no-regression, "
         "top-N parity and canonical output identity."
         if stage_12_compiled_prefix_rows
+        else "Проверить production composite default `stage_05_and_12_no_risk`: "
+        "Stage 05 `matrix_bitset_no_risk_v1` для no-risk arity 6, Stage 12 "
+        "`compiled_prefix_product_traversal_v1` для no-risk arity 7, parity, "
+        "service wall and exact-scoring speed against accepted evidence."
+        if stage_05_12_production_default_rows
         else "Проверить приемочный путь API-created job -> runner -> одноразовый "
         "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 reference."
     )

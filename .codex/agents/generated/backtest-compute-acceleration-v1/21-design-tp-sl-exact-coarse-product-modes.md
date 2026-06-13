@@ -59,6 +59,7 @@ mac_studio_test_execution:
 hard_requirements:
   previous_stage_required: "20 accepted"
   baseline_code_required: "Architecture and any optional benchmark references must treat the Stage 05+12 production default as the minimum accepted-code baseline; live-production claims require /opt/roehub/app code/env state verification."
+  production_default_benchmark_command: "Optional cost-model refresh command: uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage21_reference"
   implementation_allowed: false
   benchmark_required: false
   docs_update_required: true
