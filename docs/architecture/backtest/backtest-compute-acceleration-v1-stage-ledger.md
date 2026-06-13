@@ -1630,8 +1630,8 @@ the accepted Stage 05+12 production default rollout above.
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
 | 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
 | 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; production composite default uses Stage 12 for no-risk arity `7` and keeps Stage 05 for arity `6`; explicit Stage 12 mode remains available for arity `6`/`7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/`; diagnostic race rerun `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live_rerun2/` | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal in isolated Stage 12 evidence; production default evidence passed `4/4` parity with Stage 05 exact ratios `14.858x` / `4.995x` and Stage 12 exact ratios `26.474x` / `7.727x` versus May2; composite default keeps Stage 05 for arity-6 because that was the accepted default service path; stable top-50 `variant_hash`/rank/metrics matched baseline where top-N is non-empty | true for Stage 13 only |
-| 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | true for Stage 13 only |
-| 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
+| 13 | rejected | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1`; benchmark harness/reporting only, no production runtime change | `benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/` plus Stage 05+12 baseline `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_stage13_baseline/` | All complete candidate shapes preserved top sample identity/order and stayed within memory gate, but no global shape improved both TP/SL heavy rows by `>=15%` versus Stage 09 `64 x 64`; long-only gains were offset by reversal no-op/regression; TP/SL backend remains opt-in/internal | false; Stage 14 blocked |
+| 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat an accepted Stage 13 or replacement TP/SL baseline | blocked until a TP/SL production gate is accepted |
 | 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
 | 16 | planned | TP/SL trade-window reuse telemetry only | none yet | Counters only; no cache/grouped implementation unless telemetry proves high reuse and a later stage is opened | blocked until Stage 15 accepted |
 | 17 | planned | Dynamic backend selector by estimated work | none yet | Must avoid arity 1/2/3 regressions, retain accepted Stage 12 no-risk arity 6/7 speed where eligible, preserve Stage 05 as rollback/default comparison and record selector decisions | blocked until Stage 16 accepted_for_learning with negligible overhead and explicit reuse decision |
@@ -1660,7 +1660,91 @@ The native runtime under `/opt/roehub/app` is updated through commit
 Future evidence must still distinguish accepted-code checkout benchmarks from
 live-production benchmarks, and live API-runner benchmark evidence must verify
 that the benchmark harness, not the long-running launchd worker, claimed each
-measured job. The next implementation prompt is Stage 13.
+measured job.
+
+Stage 13 has since been rejected on Mac Studio accepted-code checkout evidence.
+No later production-affecting stage is unblocked until a new Stage 13 repair or
+replacement gate is explicitly opened and accepted.
+
+## Stage 13 - TP/SL block autotune rejected
+
+Stage 13 added benchmark tooling only:
+
+- `scripts/backtest/run_stage_13_tp_sl_block_autotune_gate.py`;
+- `--stage-13-tp-sl-current-exact-rows` in
+  `scripts/backtest/run_api_runner_benchmark_parity.py`.
+
+The benchmark ran on Mac Studio project checkout
+`/Users/daniildegtyarev/Projects/roehub.com` at commit
+`8508592a857a2229c9c0c70922eeb9e3f44678d9` with a scoped dirty patch:
+
+- `scripts/backtest/run_api_runner_benchmark_parity.py`;
+- `scripts/backtest/run_stage_13_tp_sl_block_autotune_gate.py`;
+- `tests/unit/contexts/backtest/application/services/v2/test_stage_13_tp_sl_block_autotune_gate.py`.
+
+The required Stage 05+12 production-default baseline also passed on the same
+dirty checkout:
+
+`benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_stage13_baseline/`
+
+| Job | Backend policy | Service wall s | Exact s | Result |
+|---|---|---:|---:|---|
+| `none/arity_6/long_only` | Stage 05 | `9.946` | `1.054` | pass |
+| `none/arity_6/long_short_reversal` | Stage 05 | `3.327` | `3.086` | pass |
+| `none/arity_7/long_only` | Stage 12 | `6.564` | `5.268` | pass |
+| `none/arity_7/long_short_reversal` | Stage 12 | `19.196` | `17.685` | pass |
+
+Stage 13 TP/SL evidence:
+
+`benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/`
+
+The first wrapper attempt produced diagnostic queue-race directories for some
+shapes. The accepted aggregate report was regenerated from successful subruns,
+including reruns for `32 x 128`, `128 x 64`, and `64 x 128`; the original
+diagnostic directories remain in the evidence folder and are not acceptance
+inputs.
+
+| Shape | `tp_sl_grid/arity_6/long_only` wall s | Improvement vs Stage 09 | `tp_sl_grid/arity_6/long_short_reversal` wall s | Improvement vs Stage 09 | Decision |
+|---|---:|---:|---:|---:|---|
+| `64 x 64` | `27.060` | `0.000%` | `17.819` | `0.000%` | accepted Stage 09 control only |
+| `128 x 32` | `20.399` | `24.615%` | `17.817` | `0.011%` | rejected; reversal below 15% |
+| `32 x 128` | `20.304` | `24.969%` | `17.879` | `-0.340%` | rejected; reversal regressed |
+| `128 x 64` | `19.991` | `26.124%` | `18.154` | `-1.882%` | rejected; reversal regressed |
+| `64 x 128` | `19.603` | `27.558%` | `17.834` | `-0.086%` | rejected; reversal regressed |
+
+Current-exact control service wall was `38.663s` for `long_only` and `15.599s`
+for `long_short_reversal`. Every accepted-input shape preserved the available
+top sample identity/order, `best_tp`, `best_sl`, and metrics against both
+current-exact and Stage 09 controls, and memory peak stayed within the `>10%`
+regression limit. The best total wall shape was `64 x 128`, but its reversal row
+regressed versus Stage 09 by `0.086%`, so the required per-row `>=15%` service
+wall gate did not pass.
+
+Decision: Stage 13 is `rejected`. `matrix_cell_tp_sl_v1` remains opt-in/internal
+with accepted Stage 09 `64 x 64`; no TP/SL backend default or selector change is
+allowed from this evidence. Stage 14 remains blocked.
+
+Contract impact: public API `none`; port contract `none`; DTO schema `none`;
+persisted schema `none`; config schema `none`; request hash/cache/persistence
+identity `none`; benchmark/report semantics `compatible-change`; verified hot
+path production behavior `none` because no production default changed.
+
+Local verification:
+
+```bash
+uv run ruff check scripts/backtest/run_api_runner_benchmark_parity.py \
+  scripts/backtest/run_stage_13_tp_sl_block_autotune_gate.py \
+  tests/unit/contexts/backtest/application/services/v2/test_stage_13_tp_sl_block_autotune_gate.py
+
+uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_stage_13_tp_sl_block_autotune_gate.py \
+  tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py
+
+uv run pytest -q tests/unit/contexts/backtest/application/services/v2
+
+git diff --check
+```
+
+All listed local gates passed. Push/deploy: not performed.
 
 ## Stage Acceptance Requirements
 

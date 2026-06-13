@@ -38,6 +38,7 @@
 | TP/SL full-grid block shape `16 x 16` | diagnostic fail | parity прошла, но speed gate failed; accepted shape была `64 x 64` |
 | High-arity min-trade pruning Python traversal | accepted_for_learning only | exact-safe rule полезен, но traversal cost съел потенциальный выигрыш |
 | Lazy detail sparse trade tape reuse | rejected | latency delta меньше 1%, недостаточно для runtime change |
+| TP/SL block-shape autotune after Stage 09 | rejected | long-only rows improved, but no global shape improved both TP/SL heavy rows by >=15%; reversal was no-op/regression |
 | Full pair cache / dense tensor | not accepted | memory/cost risk dominates; dense tensor explicitly rejected |
 
 ## Подробности По Методам
@@ -240,6 +241,33 @@ Evidence:
 Stage 09 shape - `64 x 64` из
 `2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/`.
 
+### Stage 13 TP/SL Block-Shape Autotune
+
+Evidence:
+`docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/`.
+
+Scope: compare Stage 09 accepted `64 x 64` against `128 x 32`, `32 x 128`,
+`128 x 64`, and `64 x 128` on the same TP/SL full-grid arity-6 rows.
+
+Result:
+
+| Shape | Long-only wall delta vs Stage 09 | Reversal wall delta vs Stage 09 | Decision |
+|---|---:|---:|---|
+| `128 x 32` | `+24.615%` | `+0.011%` | rejected |
+| `32 x 128` | `+24.969%` | `-0.340%` | rejected |
+| `128 x 64` | `+26.124%` | `-1.882%` | rejected |
+| `64 x 128` | `+27.558%` | `-0.086%` | rejected |
+
+Top sample identity/order, `best_tp`, `best_sl` and metrics matched current exact
+and Stage 09 controls for accepted-input runs, and memory stayed inside the
+`>10%` regression limit. The stage is still rejected because the gate required a
+single global shape to improve both required TP/SL rows by at least `15%`.
+
+Запрет на повтор: не делать TP/SL backend default только на основании long-only
+ускорения. Любой возврат block autotune должен быть новым gate с отдельным
+решением для reversal cost center или selector policy; текущий Stage 13 не
+разблокирует Stage 14.
+
 ### Stage 10 High-Arity Min-Trade Pruning
 
 Evidence:
@@ -326,6 +354,8 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не включать `matrix_bitset_no_risk_v1` default для arity 2/3.
 - Не включать TP/SL selected-cell shadow как production backend.
 - Не использовать TP/SL block shape `16 x 16` как accepted shape.
+- Не принимать Stage 13 TP/SL block autotune как production gate: long-only
+  выигрывает, но reversal не проходит `>=15%` service-wall threshold.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.
@@ -348,3 +378,6 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
   `64 x 64`, opt-in через internal env mode;
 - Stage 01/02/03/07/08/10 learning/telemetry/shadow artifacts только как
   диагностическая база, не как доказанное production speedup.
+
+Stage 13 TP/SL block autotune не accepted: он сохраняет полезную evidence
+matrix, но не меняет production/default policy.

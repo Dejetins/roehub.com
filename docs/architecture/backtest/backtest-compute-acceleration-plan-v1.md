@@ -532,8 +532,8 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark; separate UX/perceived-latency gate |
 | 12 | Compiled prefix product traversal | Accepted 2026-06-13 and productionized through composite default: Stage 05 remains default for `none/arity_6`, `compiled_prefix_product_traversal_v1` becomes default for `none/arity_7`; explicit Stage 12 mode still supports arity `6`/`7`; stable top-50 `variant_hash`/rank/metrics matched baseline |
-| 13 | TP/SL `64 x 64` production gate and block autotune | Same top-N, `best_tp`, `best_sl`; service wall >= 15% better than current exact path or Stage 09 opt-in baseline on a Stage 05+12 production-default checkout/runtime; memory peak bounded |
-| 14 | TP/SL monotonic cell kernel | Exact output same as Stage 13 winner; cell comparisons/trade lower, trade-cell/sec higher, service wall better than best Stage 13 |
+| 13 | TP/SL `64 x 64` production gate and block autotune | Rejected 2026-06-13: shape matrix preserved parity and memory, but no block shape improved both TP/SL heavy rows by `>=15%` versus Stage 09 `64 x 64`; backend remains opt-in/internal |
+| 14 | TP/SL monotonic cell kernel | Blocked until a Stage 13 repair/replacement TP/SL production gate is accepted; exact output must match the accepted TP/SL baseline |
 | 15 | TP/SL total-return early abandon | Exact-safe bound proof for `total_return_pct desc`; same output, lower scored cells/candidates and service wall no regression |
 | 16 | TP/SL trade-window reuse telemetry | Counters only; no runtime cache; record whether reuse is high enough to justify later compiled grouping |
 | 17 | Dynamic backend selector | No regression on arity 1/2/3, accepted speed retained on arity 6, selector decision telemetry recorded |
