@@ -268,6 +268,17 @@ single global shape to improve both required TP/SL rows by at least `15%`.
 решением для reversal cost center или selector policy; текущий Stage 13 не
 разблокирует Stage 14.
 
+Разрешенный следующий путь после этого rejection:
+
+- Stage 13S может проверить narrow selector policy, где только
+  `tp_sl_grid/arity_6/long_only` с достаточно большой сеткой (`tp_count >= 64`,
+  `sl_count >= 32`) получает `matrix_cell_tp_sl_v1` shape `64 x 128`, а
+  `long_short_reversal` и меньшие сетки явно остаются на current exact path.
+- Stage 13R может добавить telemetry-only counters для диагностики reversal, но
+  это `accepted_for_learning`, не production speedup.
+- Старый Stage 14 monotonic-cell prompt нельзя исполнять против rejected Stage
+  13 winner; replacement должен опираться на Stage 13R evidence.
+
 ### Stage 10 High-Arity Min-Trade Pruning
 
 Evidence:
@@ -356,6 +367,10 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не использовать TP/SL block shape `16 x 16` как accepted shape.
 - Не принимать Stage 13 TP/SL block autotune как production gate: long-only
   выигрывает, но reversal не проходит `>=15%` service-wall threshold.
+- Не включать `64 x 128` глобально. Его можно рассматривать только в Stage 13S
+  narrow selector с reversal exact fallback и rollback env.
+- Не запускать старый Stage 14 monotonic-cell kernel без Stage 13R reversal
+  diagnostics и нового replacement gate.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.

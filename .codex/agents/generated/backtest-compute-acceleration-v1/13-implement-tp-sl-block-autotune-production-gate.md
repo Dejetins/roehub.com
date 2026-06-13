@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_13_tp_sl_block_autotune_production_gate
 repo: roehub.com
 branch: main
-scope: "Turn the accepted opt-in TP/SL 64x64 cell-block backend into a production candidate only if block autotune proves service-wall speedup."
+scope: "Completed/rejected historical prompt: Stage 13 block autotune failed the global production gate; use Stage 13S/13R next."
 
 language:
   implementation: python
@@ -18,6 +18,8 @@ context_sources:
       why: "Stage 12 accepted-code baseline policy and Stage 09 TP/SL baseline"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "Stage 09 16x16 failure and stop-list"
+    - path: docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md
+      why: "Stage 13 rejection handoff and replacement-stage recommendations"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py
       why: "Stage 09 TP/SL cell-block backend"
@@ -66,8 +68,8 @@ hard_requirements:
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is not updated, label evidence as Mac Studio project-checkout evidence, not live-production baseline."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage13_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
-  implementation_allowed: true
-  benchmark_required: true
+  implementation_allowed: false
+  benchmark_required: false
   docs_update_required: true
 
 delivery_requirements:
@@ -83,7 +85,7 @@ non_goals:
   - "Do not make TP/SL backend default without passing this gate."
 
 task:
-  summary: "Benchmark and, if justified, implement block-shape selection for the accepted Stage 09 full-grid TP/SL backend."
+  summary: "Do not rerun as the next stage. Stage 13 is already rejected; use Stage 13S for selective long-only production gate or Stage 13R for reversal diagnostics."
   shapes:
     - "64x64"
     - "128x32"
@@ -136,5 +138,7 @@ final_report_format:
 
 # Task
 
-Implement Stage 13 TP/SL block autotune production gate. Keep the accepted
-Stage 09 backend opt-in unless the full Mac Studio gate passes.
+Do not execute this prompt as the next stage. Stage 13 has already been run and
+rejected because no global block shape improved both required TP/SL rows. Use
+Stage 13S for the selective long-only production gate or Stage 13R for reversal
+diagnostics.

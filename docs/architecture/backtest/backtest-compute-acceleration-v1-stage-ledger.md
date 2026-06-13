@@ -1630,11 +1630,14 @@ the accepted Stage 05+12 production default rollout above.
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
 | 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
 | 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; production composite default uses Stage 12 for no-risk arity `7` and keeps Stage 05 for arity `6`; explicit Stage 12 mode remains available for arity `6`/`7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/`; diagnostic race rerun `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live_rerun2/` | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal in isolated Stage 12 evidence; production default evidence passed `4/4` parity with Stage 05 exact ratios `14.858x` / `4.995x` and Stage 12 exact ratios `26.474x` / `7.727x` versus May2; composite default keeps Stage 05 for arity-6 because that was the accepted default service path; stable top-50 `variant_hash`/rank/metrics matched baseline where top-N is non-empty | true for Stage 13 only |
-| 13 | rejected | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1`; benchmark harness/reporting only, no production runtime change | `benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/` plus Stage 05+12 baseline `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_stage13_baseline/` | All complete candidate shapes preserved top sample identity/order and stayed within memory gate, but no global shape improved both TP/SL heavy rows by `>=15%` versus Stage 09 `64 x 64`; long-only gains were offset by reversal no-op/regression; TP/SL backend remains opt-in/internal | false; Stage 14 blocked |
-| 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat an accepted Stage 13 or replacement TP/SL baseline | blocked until a TP/SL production gate is accepted |
-| 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
-| 16 | planned | TP/SL trade-window reuse telemetry only | none yet | Counters only; no cache/grouped implementation unless telemetry proves high reuse and a later stage is opened | blocked until Stage 15 accepted |
-| 17 | planned | Dynamic backend selector by estimated work | none yet | Must avoid arity 1/2/3 regressions, retain accepted Stage 12 no-risk arity 6/7 speed where eligible, preserve Stage 05 as rollback/default comparison and record selector decisions | blocked until Stage 16 accepted_for_learning with negligible overhead and explicit reuse decision |
+| 13 | rejected | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1`; benchmark harness/reporting only, no production runtime change | `benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/` plus Stage 05+12 baseline `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_stage13_baseline/` and handoff `benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md` | All complete candidate shapes preserved top sample identity/order and stayed within memory gate, but no global shape improved both TP/SL heavy rows by `>=15%` versus Stage 09 `64 x 64`; long-only gains were offset by reversal no-op/regression; TP/SL backend remains opt-in/internal | true for Stage 13S selector gate and Stage 13R diagnostics only |
+| 13S | planned | Narrow TP/SL production selector: `long_only` with `tp_count >= 64` and `sl_count >= 32` may use `matrix_cell_tp_sl_v1` shape `64 x 128`; `long_short_reversal` and smaller grids must use current exact; rollback `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=off` | none yet | Must preserve top-N/best TP/best SL/metrics and prove long-only `>=25%` vs current exact, `>=15%` vs Stage 09, reversal no worse than `2%` vs current exact, combined mandatory TP/SL rows `>=20%` faster vs current exact | next executable stage |
+| 13R | planned | Telemetry-only TP/SL reversal diagnostics across current exact and matrix-cell paths; no behavior/default change | none yet | Must keep top-N/metrics unchanged, add reversal cost counters, and keep telemetry overhead `<=3%`; accepted_for_learning only | unblocked after Stage 13; may run after 13S decision or as diagnostic fallback |
+| 14 | superseded | Original TP/SL monotonic cell kernel prompt depended on a rejected Stage 13 winner | none | Do not execute; replaced by Stage 14R after Stage 13R | blocked |
+| 14R | planned | TP/SL reversal kernel repair, likely split-by-side; optional signal-exit shortcut only if Stage 13R supports it | none yet | Must preserve exact semantics and improve `long_short_reversal` service wall by `>=10-15%` vs current exact with long-only no regression | blocked until Stage 13R accepted_for_learning |
+| 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14R or equivalent exact-safe TP/SL repair gate accepted |
+| 16 | superseded_or_deferred | Trade-window reuse telemetry was pulled forward into Stage 13R; grouped scoring/cache remains future-only | none yet | Reopen only if Stage 13R proves high reuse; no Python dict cache or grouped scoring without compiled sort/group gate | blocked |
+| 17 | planned | Later global dynamic backend selector by estimated work; Stage 13S owns the narrow TP/SL selector | none yet | Must avoid arity 1/2/3 regressions, retain accepted Stage 12 no-risk arity 6/7 speed where eligible, preserve Stage 05 as rollback/default comparison and record selector decisions | blocked until relevant TP/SL selector/diagnostic decisions are complete |
 | 18 | planned | Top-N/result assembly telemetry and optional stable block top-M merge | none yet | Must first show assembly is hot; optional merge must preserve stable tie-break and persisted top-N shape | blocked until Stage 17 accepted |
 | 19 | planned | Numba thread scaling benchmark by workload | none yet | Must benchmark `1,2,4,6,8,12` threads on Mac Studio and update worker config only after service-wall evidence | blocked until Stage 18 accepted or accepted_for_learning with assembly-not-hot decision |
 | 20 | planned | Allocation telemetry and per-child scratch-buffer reuse | none yet | Must improve allocation/RSS or wall-clock without cleanup regression; no global cross-job cache | blocked until Stage 19 accepted_for_learning with thread policy decision, or accepted if config changed |
@@ -1663,8 +1666,11 @@ that the benchmark harness, not the long-running launchd worker, claimed each
 measured job.
 
 Stage 13 has since been rejected on Mac Studio accepted-code checkout evidence.
-No later production-affecting stage is unblocked until a new Stage 13 repair or
-replacement gate is explicitly opened and accepted.
+The next TP/SL path is split into explicit replacement stages: Stage 13S for a
+narrow production selector gate, Stage 13R for telemetry-only reversal
+diagnostics, and Stage 14R for any exact-safe reversal repair after Stage 13R.
+The original Stage 14 monotonic-cell prompt is superseded and must not be
+executed against the rejected Stage 13 winner.
 
 ## Stage 13 - TP/SL block autotune rejected
 
@@ -1721,8 +1727,32 @@ regressed versus Stage 09 by `0.086%`, so the required per-row `>=15%` service
 wall gate did not pass.
 
 Decision: Stage 13 is `rejected`. `matrix_cell_tp_sl_v1` remains opt-in/internal
-with accepted Stage 09 `64 x 64`; no TP/SL backend default or selector change is
-allowed from this evidence. Stage 14 remains blocked.
+with accepted Stage 09 `64 x 64`; no global TP/SL backend default change is
+allowed from this evidence. The `64 x 128` shape may only be reconsidered by the
+new Stage 13S selector gate, where `long_short_reversal` must fall back to the
+current exact path unless a later accepted repair proves otherwise.
+
+Stage 13S is the next executable production-affecting TP/SL gate. It must prove:
+
+- `tp_sl_grid/arity_6/long_only` with `tp_count >= 64` and `sl_count >= 32`
+  routes to `matrix_cell_tp_sl_v1` shape `64 x 128`;
+- smaller TP/SL grids and `tp_sl_grid/arity_6/long_short_reversal` route to
+  current exact;
+- long-only service wall improves `>=25%` versus current exact and `>=15%`
+  versus Stage 09 `64 x 64`;
+- reversal service wall regresses by no more than `2%` versus current exact;
+- combined mandatory TP/SL service wall improves `>=20%` versus current exact;
+- top-N identity/order, `best_tp`, `best_sl`, metric tolerance, SL-wins tie rule,
+  selector telemetry and rollback `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=off` pass.
+
+Stage 13R is also opened as an accepted-for-learning diagnostic stage for
+`long_short_reversal`. It may add counters only, with no behavior/default change
+and service-wall overhead `<=3%`, to decide whether the next repair is
+split-by-side kernel, signal-exit dominated shortcut, compiled trade-window
+grouping, thread policy, allocation cleanup, or no-op.
+
+Stage 14R replaces the original Stage 14. It remains blocked until Stage 13R is
+accepted_for_learning and points to a dominant reversal cost center.
 
 Contract impact: public API `none`; port contract `none`; DTO schema `none`;
 persisted schema `none`; config schema `none`; request hash/cache/persistence
@@ -1769,11 +1799,14 @@ contract impact и финальное решение. Если хотя бы о�
 | 10 | Exact-safe high-arity pruning | Exact-safe proof for pruning rule, arity 7/10 bounded evidence, no approximate beam in default path, parity on retained candidates, speedup and no result-shape drift | Block if pruning can remove a valid top candidate or requires product-level approximation approval |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark, cache identity parity, no bulk top-N scoring change, fallback to current lazy materialization | Reject if it improves perceived latency while invalidating persisted/lazy detail identity |
 | 12 | Compiled prefix product traversal | Compiled/iterative hot path; selectivity order internal only; exact-safe prefix pruning allowed only for eligibility bounds; no Stage 10 Python traversal dependency | Reject if top-N identity/order drifts, canonical `variant_hash` changes, arity-7 service wall improves <20%, `combo_iteration` is not materially lower, or arity-6 regresses |
-| 13 | TP/SL block autotune and `64 x 64` production gate | Compare `64 x 64`, `128 x 32`, `32 x 128`, `128 x 64`, `64 x 128` through API-runner with Stage 09/current exact baselines | Reject if best shape changes top-N/best TP/SL, memory peak worsens >10%, or service wall improves <15% |
-| 14 | TP/SL monotonic cell kernel | Exact monotonic boundary/classification kernel; same full-grid result as Stage 13 winner; SL-wins tie rule preserved | Reject if any metric/tie result drifts, cell comparisons/trade do not fall, trade-cell/sec does not rise, or service wall is not better than Stage 13 |
+| 13 | TP/SL block autotune and `64 x 64` production gate | Completed and rejected; preserved shape matrix and handoff evidence only | Do not accept global `64 x 128`; do not unblock original Stage 14 from this evidence |
+| 13S | Selective TP/SL production selector | Route `tp_sl_grid/arity_6/long_only` with `tp_count >= 64` and `sl_count >= 32` to `matrix_cell_tp_sl_v1` shape `64 x 128`, route smaller grids and `long_short_reversal` to current exact, log selector reason/block shape/fallback, provide rollback env | Reject if long-only improves <25% vs current exact, <15% vs Stage 09, reversal regresses >2% vs current exact, combined mandatory TP/SL rows improve <20%, or parity/selector telemetry/rollback fails |
+| 13R | Reversal diagnostic telemetry | Add workload shape, cell work, exit reason, time breakdown, hit-time access, trade-window reuse and allocation counters for current exact and matrix-cell paths; no behavior/default change | Accept_for_learning only if top-N/metrics unchanged, overhead <=3%, and evidence identifies or rules out the dominant reversal cost center |
+| 14 | Original TP/SL monotonic cell kernel | Superseded by Stage 14R | Block any execution of the old prompt until it is explicitly rewritten |
+| 14R | TP/SL reversal kernel repair | Split-by-side reversal kernel first; optional signal-exit shortcut only if Stage 13R shows signal-exit-dominant cells; SL-wins tie rule preserved | Reject if any metric/tie result drifts, reversal service wall improves <10-15% vs current exact, long-only regresses, or evidence is only local/microbenchmark |
 | 15 | TP/SL total-return early abandon | Exact-safe upper bound for `ranking=total_return_pct desc` and supported sizing only; unsupported rankings fall back to current exact path | Reject if bound is not proven exact-safe, applies to unsupported ranking/sizing, removes a valid top candidate, or service wall does not improve |
-| 16 | TP/SL trade-window reuse telemetry | Add counters for total/unique trade windows, weighted reuse and savings estimate only; no cache or grouped scoring implementation | Close as `accepted_for_learning` only if telemetry overhead is negligible; do not open grouped implementation if reuse is low |
-| 17 | Dynamic backend selector | Deterministic estimated-work selector with logged decision/reason and env override; protects arity 1/2/3, retains Stage 12 no-risk arity 6/7 wins where eligible, and preserves Stage 05 as rollback/default comparison | Reject if selector picks matrix path for known losing rows, hides decision telemetry, changes request identity, or regresses service wall |
+| 16 | Trade-window grouping decision | Reopen only after Stage 13R proves high weighted reuse; compiled sort/group only, no Python dict cache | Block if reuse is low or the grouping design would alter result ordering, request identity, or path-dependent sizing semantics |
+| 17 | Dynamic backend selector | Later global deterministic estimated-work selector with logged decision/reason and env override; Stage 13S owns the narrow TP/SL selector | Reject if selector picks known losing rows, hides decision telemetry, changes request identity, regresses service wall, or bypasses Stage 13S/13R decisions |
 | 18 | Top-N/result assembly batch reduction | First measure heap/update/hash/payload timers; optional block top-M merge must use stable tie-break by metric, `variant_hash`, combo ordinal | Reject if assembly is not hot, top-N identity/order drifts, persisted payload shape changes, or service wall does not improve |
 | 19 | Thread scaling benchmark | Mac Studio matrix for `NUMBA_NUM_THREADS=1,2,4,6,8,12` on required no-risk, TP/SL and high-arity rows; same artifacts/request/warmup | Do not update worker config if best thread count is workload-specific without a safe selector, causes oversubscription, or service wall evidence is inconclusive |
 | 20 | Allocation reuse and scratch buffers | Allocation counters first; per-child scratch buffers only; cleanup/RSS evidence required | Reject if global cross-job cache is introduced, cleanup regresses, memory peak worsens, or wall-clock gain is only local/micro |
