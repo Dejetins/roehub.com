@@ -58,7 +58,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "16 accepted_for_learning with negligible telemetry overhead and explicit reuse decision"
-  baseline_code_required: "Benchmark control and candidate must run from a Stage-12-or-later accepted-code checkout/runtime. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
+  baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   implementation_allowed: true
   benchmark_required: true
   docs_update_required: true

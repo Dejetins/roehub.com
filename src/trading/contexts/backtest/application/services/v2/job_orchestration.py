@@ -53,11 +53,12 @@ MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
     "stage_05_no_risk_reversal_arity6"
 )
-MATRIX_BACKEND_MODE_DEFAULT = MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6
 MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID = "stage_09_tp_sl_full_grid"
 MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL = (
     "stage_12_compiled_prefix_traversal"
 )
+MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK = "stage_05_and_12_no_risk"
+MATRIX_BACKEND_MODE_DEFAULT = MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK
 MATRIX_SIDECAR_DIR_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"
 
 
@@ -364,6 +365,7 @@ def _matrix_backend_override(
         MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
         MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
         MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
+        MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
         COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     }:
         allowed = (
@@ -372,6 +374,7 @@ def _matrix_backend_override(
             MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
             MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
             MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
+            MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
             MATRIX_BITSET_NO_RISK_V1_BACKEND,
             COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
             MATRIX_CELL_TP_SL_V1_BACKEND,
@@ -395,7 +398,11 @@ def _matrix_backend_override(
     ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
     if (
-        mode == MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6
+        mode
+        in {
+            MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
+            MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
+        }
         and risk_mode == "none"
         and direction_mode in {"long_only", "long_short_reversal"}
         and arity == 6
@@ -412,11 +419,18 @@ def _matrix_backend_override(
         mode
         in {
             MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
+            MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
             COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
         }
         and risk_mode == "none"
         and direction_mode in {"long_only", "long_short_reversal"}
-        and arity in (6, 7)
+        and (
+            arity == 7
+            or (
+                mode != MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK
+                and arity == 6
+            )
+        )
     ):
         return COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
     if (

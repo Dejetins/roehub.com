@@ -22,6 +22,7 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.services.v2.job_orchestration import (
     MATRIX_BACKEND_MODE_ENV_KEY,
     MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
+    MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
     MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
     MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
     SAMPLE_WARMUP_STAGE_NAME,
@@ -234,6 +235,65 @@ def test_stage_05_matrix_backend_is_default_for_no_risk_arity6_reversal(
         "matrix_bitset_no_risk_v1",
         "matrix_bitset_no_risk_v1",
     ]
+
+
+def test_default_matrix_backend_uses_stage_12_for_no_risk_arity7_reversal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(
+        rows=3,
+        indicators=tuple(f"indicator_{index}" for index in range(7)),
+    )
+    combo = _ComboPlanning()
+    service = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(prepared),
+        combo_planning=combo,
+        no_risk_exact=_ExactService(),
+        tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),
+        artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any, _TopResultAssembly()),
+    )
+    monkeypatch.delenv(MATRIX_BACKEND_MODE_ENV_KEY, raising=False)
+
+    service.execute(
+        job_id=uuid4(),
+        preflight=_preflight(
+            top_n=50,
+            risk_mode="none",
+            direction_mode="long_short_reversal",
+        ),
+        updated_at=datetime.now(UTC),
+    )
+
+    assert [call["requested_backend_id"] for call in combo.calls] == [
+        "compiled_prefix_product_traversal_v1",
+        "compiled_prefix_product_traversal_v1",
+    ]
+
+
+def test_stage_05_and_12_mode_keeps_stage_05_for_no_risk_arity6(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        MATRIX_BACKEND_MODE_ENV_KEY,
+        MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
+    )
+
+    assert (
+        _matrix_backend_override(
+            normalized_request=_preflight(
+                top_n=50,
+                risk_mode="none",
+                direction_mode="long_short_reversal",
+            ).normalized_request,
+            prepared_result=_prepared_result(
+                rows=3,
+                indicators=tuple(f"indicator_{index}" for index in range(6)),
+            ),
+        )
+        == "matrix_bitset_no_risk_v1"
+    )
 
 
 def test_stage_05_matrix_backend_default_can_be_disabled(

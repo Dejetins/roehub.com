@@ -52,8 +52,8 @@ mac_studio_test_execution:
   repo_checkout: /Users/daniildegtyarev/Projects/roehub.com
   command_prefix: "ssh macstudio 'cd /Users/daniildegtyarev/Projects/roehub.com && <command>'"
   acceptance_testing: "Run A/B and shape matrix benchmarks over SSH on Mac Studio; local runs are preflight only."
-  sync_rule: "Before benchmark, verify the checkout/runtime contains Stage 12 commit 1fda2264 or later; record measured commit SHA or dirty state."
-  production_runtime_rule: "If using or claiming live production baseline, verify /opt/roehub/app contains the accepted code and record ROEHUB_BACKTEST_MATRIX_BACKEND_MODE state from /Users/daniildegtyarev/.config/roehub/roehub.env."
+  sync_rule: "Before benchmark, verify the checkout/runtime contains the Stage 05+12 production default code and record measured commit SHA or dirty state."
+  production_runtime_rule: "If using or claiming live production baseline, verify /opt/roehub/app contains the accepted code and records default/unset ROEHUB_BACKTEST_MATRIX_BACKEND_MODE as stage_05_and_12_no_risk, or records any explicit override from /Users/daniildegtyarev/.config/roehub/roehub.env."
   source_artifacts:
     root: /opt/roehub/state/backtest_artifacts/v2
     symbol_current: /opt/roehub/state/backtest_artifacts/v2/BTCUSDT/current.yaml
@@ -63,7 +63,7 @@ mac_studio_test_execution:
 
 hard_requirements:
   previous_stage_required: "12 accepted"
-  baseline_code_required: "Benchmark control and candidate must run from a Stage-12-or-later accepted-code checkout/runtime. If live production runtime is not updated, label evidence as Mac Studio project-checkout evidence, not live-production baseline."
+  baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is not updated, label evidence as Mac Studio project-checkout evidence, not live-production baseline."
   implementation_allowed: true
   benchmark_required: true
   docs_update_required: true
@@ -92,7 +92,7 @@ task:
     - "tp_sl_grid/arity_6/long_only"
     - "tp_sl_grid/arity_6/long_short_reversal"
   required_controls:
-    - "Stage-12-or-later accepted-code checkout/runtime"
+    - "Stage 05+12 production-default checkout/runtime"
     - "default/current exact path"
     - "Stage 09 accepted 64x64 opt-in path"
     - "candidate shape path"

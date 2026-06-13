@@ -1344,7 +1344,8 @@ Source recommendation:
 
 Original planning decision:
 
-- Keep Stage 05 as the only default production acceleration:
+- Superseded by the Stage 05+12 production default rollout: the original plan
+  kept Stage 05 as the only default production acceleration:
   `matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
   `direction_mode in {long_only, long_short_reversal}`.
 - Keep Stage 09 `matrix_cell_tp_sl_v1` as accepted but opt-in/internal until a
@@ -1398,7 +1399,8 @@ used a repo checkout, an isolated candidate copy, or the active live runtime.
 Stage 12 added `compiled_prefix_product_traversal_v1` as an opt-in no-risk
 backend for arity `6` and `7` with
 `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` or the
-direct backend id. The default Stage 05 no-risk path remains unchanged.
+direct backend id. The production composite default added after Stage 12 keeps
+Stage 05 for no-risk arity `6` and enables Stage 12 for no-risk arity `7`.
 
 Implementation:
 
@@ -1495,8 +1497,44 @@ Parity and memory:
 Contract impact: `compatible-change`. No public API payload shape, request hash,
 artifact publisher/precompute path, `current.yaml`, active artifact slot, DB
 schema, fees/slippage/sizing, close-on-end, ranking, persisted top-N shape or
-browser-visible behavior changed. The new backend is selected only by internal
-env override and falls back to accepted current paths otherwise.
+browser-visible behavior changed. The new backend is selected by internal
+backend mode policy and falls back to accepted current paths otherwise.
+
+## Stage 05+12 production default rollout - 2026-06-13
+
+Status: `running`.
+
+Rollout policy:
+
+- default/unset `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` resolves to
+  `stage_05_and_12_no_risk`;
+- `stage_05_and_12_no_risk` selects Stage 05 `matrix_bitset_no_risk_v1` for
+  `risk.mode=none`, arity `6`, and
+  `direction_mode in {long_only, long_short_reversal}`;
+- the same default selects Stage 12 `compiled_prefix_product_traversal_v1` for
+  `risk.mode=none`, arity `7`, and
+  `direction_mode in {long_only, long_short_reversal}`;
+- explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_05_no_risk_reversal_arity6`
+  isolates Stage 05-only rollback/comparison behavior;
+- explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal`
+  isolates Stage 12 for arity `6`/`7` benchmark comparison;
+- explicit `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains the full legacy
+  rollback/comparison path.
+
+Acceptance gate before marking this rollout accepted:
+
+- focused unit tests prove default arity-6 routes to Stage 05 and default
+  arity-7 routes to Stage 12;
+- Mac Studio live runtime under `/opt/roehub/app` contains the accepted code and
+  launchd services have been restarted;
+- `scripts/macos/smoke_prod.sh` passes after deploy;
+- production-mode benchmark evidence through the API-runner path records
+  default composite results for Stage 05 arity-6 rows and Stage 12 arity-7 rows;
+- top-50 identity/order and metric tolerance match the accepted baselines;
+- service wall does not regress versus accepted Stage 05/Stage 12 evidence for
+  the rows each backend owns.
+
+Evidence: pending.
 
 ## Production/default state audit - 2026-06-13
 
@@ -1542,7 +1580,7 @@ state recorded.
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
 | 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
-| 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; opt-in no-risk arity `6` and `7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/` | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal; arity-6 improved `90.449%` and `76.573%`; stable top-50 `variant_hash`/rank/metrics matched baseline; contract impact is compatible opt-in only | true for Stage 13 only |
+| 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; production composite default uses Stage 12 for no-risk arity `7` and keeps Stage 05 for arity `6`; explicit Stage 12 mode remains available for arity `6`/`7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`; production rollout evidence pending | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal; arity-6 explicit-mode evidence improved `90.449%` and `76.573%`; composite default keeps Stage 05 for arity-6 because that was the accepted default service path; stable top-50 `variant_hash`/rank/metrics matched baseline | true for Stage 13 only |
 | 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | true for Stage 13 only |
 | 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
 | 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
@@ -1558,16 +1596,15 @@ state recorded.
 Backtest compute acceleration v1 produced durable benchmark evidence for row
 telemetry, runtime bitset packing, no-risk matrix paths, TP/SL selected cells,
 TP/SL full-grid cells, high-arity pruning learning, rejected lazy detail reuse
-and accepted Stage 12 compiled prefix traversal. The only default backend policy
-accepted from this rollout remains Stage 05 `matrix_bitset_no_risk_v1` for
-`risk.mode=none`, arity `6`, and
-`direction_mode in {long_only, long_short_reversal}`. Stage 12 is an accepted
-opt-in acceleration for no-risk arity `6`/`7` and is the comparison baseline
-for future no-risk prefix/scoring work, but it is not default until a later
-selector/default gate passes. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains
-the rollback/comparison path for Stage 05, and
-`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` is the
-Stage 12 opt-in comparison path.
+and accepted Stage 12 compiled prefix traversal. The production default backend
+policy is moving to `stage_05_and_12_no_risk`: Stage 05
+`matrix_bitset_no_risk_v1` for `risk.mode=none`, arity `6`, and
+`direction_mode in {long_only, long_short_reversal}`, plus Stage 12
+`compiled_prefix_product_traversal_v1` for the same no-risk directions at arity
+`7`. `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off` remains the full legacy
+rollback/comparison path, `stage_05_no_risk_reversal_arity6` isolates Stage 05,
+and `stage_12_compiled_prefix_traversal` isolates Stage 12 for benchmark
+comparison.
 
 The observed native runtime under `/opt/roehub/app` was not updated to the
 accepted repository state during this audit. Future evidence must distinguish
