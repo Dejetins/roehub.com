@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.services.v2 import (
     BUILD_EXACT_CONTEXT_STAGE_NAME,
     BUILD_PROXY_CONTEXT_STAGE_NAME,
     COMBO_ITERATION_STAGE_NAME,
+    COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND,
@@ -62,6 +63,12 @@ def test_backend_registry_selects_supported_v1_backends() -> None:
         arity=10,
         direction_mode="long_short_reversal",
     ).backend_id == EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND
+    assert registry.select(
+        risk_mode="none",
+        arity=7,
+        direction_mode="long_short_reversal",
+        requested_backend_id=COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+    ).backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
 
 
 def test_backend_registry_rejects_unsupported_combinations() -> None:

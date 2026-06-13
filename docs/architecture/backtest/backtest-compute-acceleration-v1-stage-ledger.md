@@ -1364,7 +1364,8 @@ advance if the immediately preceding required stage fails its acceptance gates.
 
 ## Current Execution Handoff
 
-Next executable stage: Stage 12 compiled prefix product traversal.
+Next executable stage: Stage 13 TP/SL `64 x 64` production gate and block
+autotune.
 
 Stage 06 is closed as `rejected`, not skipped silently. Its only durable outputs
 are ledger/evidence files under
@@ -1388,6 +1389,111 @@ before implementation and must compare against the nearest accepted baseline:
 Stage 05 for no-risk default rows, current exact path for high-arity rows with no
 accepted prefix baseline, and Stage 09 for TP/SL full-grid rows.
 
+## Stage 12 - compiled prefix product traversal accepted
+
+Stage 12 added `compiled_prefix_product_traversal_v1` as an opt-in no-risk
+backend for arity `6` and `7` with
+`ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=stage_12_compiled_prefix_traversal` or the
+direct backend id. The default Stage 05 no-risk path remains unchanged.
+
+Implementation:
+
+- compiled Numba iterative DFS over a selectivity-ordered product tree;
+- prefix `pos`/`neg` bitset consensus is reused across levels;
+- pruning is limited to the exact-safe `min_closed_trades` eligibility bound:
+  descendants of a prefix with fewer active consensus bars than the quality gate
+  cannot become heap-eligible;
+- selected candidates are sorted back to canonical ordinal order before Stage 05
+  matrix bitset scoring, preserving stable ranking and `variant_hash` semantics.
+
+Mac Studio candidate provenance:
+
+- isolated candidate copy:
+  `/tmp/roehub-stage12-candidate-20260613-compiled-prefix`;
+- base commit: `d05d26f80509816f3251063cd1e3c99f3b361050`;
+- scoped dirty diff hash:
+  `62caaca6cac54b97d516d220cfc728485112c0cecaf4f6ce127640e744891332`;
+- env file: `/Users/daniildegtyarev/.config/roehub/roehub.env`;
+- artifact config: `configs/prod/backtest_artifacts.yaml`;
+- source artifacts: read-only `/opt/roehub/state/backtest_artifacts/v2`;
+- secret values: not recorded.
+
+Baseline command:
+
+```bash
+ssh macstudio 'cd /tmp/roehub-stage12-candidate-20260613-compiled-prefix && \
+  ROEHUB_BENCHMARK_GIT_COMMIT=d05d26f80509816f3251063cd1e3c99f3b361050+dirty-62caaca6 \
+  ROEHUB_BACKTEST_MATRIX_BACKEND_MODE=off \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off \
+    --stage-12-compiled-prefix-rows \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5 \
+    --system-memory-cleanup-wait-seconds 90'
+```
+
+Accepted candidate command:
+
+```bash
+ssh macstudio 'cd /tmp/roehub-stage12-candidate-20260613-compiled-prefix && \
+  ROEHUB_BENCHMARK_GIT_COMMIT=d05d26f80509816f3251063cd1e3c99f3b361050+dirty-62caaca6 \
+  /opt/homebrew/bin/uv run python scripts/backtest/run_api_runner_benchmark_parity.py \
+    --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
+    --out-dir docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2 \
+    --stage-12-compiled-prefix-rows \
+    --timeout-seconds 7200 \
+    --poll-interval-seconds 0.5 \
+    --system-memory-cleanup-wait-seconds 90'
+```
+
+Evidence:
+
+- baseline-off:
+  `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`;
+- accepted candidate:
+  `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`.
+
+Mac Studio A/B:
+
+| Job | Baseline service s | Candidate service s | Service improvement | Baseline exact s | Candidate exact s | Exact speedup | Candidate `combo_iteration` s |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | `17.161` | `1.639` | `90.449%` | `15.441` | `0.871` | `17.725x` | `0.075` |
+| `none/arity_6/long_short_reversal` | `15.562` | `3.646` | `76.573%` | `15.053` | `2.922` | `5.152x` | `0.206` |
+| `none/arity_7/long_only` | `138.070` | `6.509` | `95.286%` | `137.120` | `5.242` | `26.160x` | `0.400` |
+| `none/arity_7/long_short_reversal` | `136.117` | `19.331` | `85.798%` | `135.552` | `17.549` | `7.724x` | `1.241` |
+
+Prefix counters:
+
+| Job | Selected | Pruned | Pruned subtrees | Pruned upper bound | Selectivity order | Prefix total s | Compiled loop s |
+|---|---:|---:|---:|---:|---|---:|---:|
+| `none/arity_6/long_only` | `19,440` | `27,216` | `11` | `27,216` | `[4, 1, 0, 3, 2, 5]` | `0.075` | `0.072` |
+| `none/arity_6/long_short_reversal` | `44,064` | `2,592` | `2,592` | `2,592` | `[0, 3, 2, 5, 4, 1]` | `0.206` | `0.202` |
+| `none/arity_7/long_only` | `116,640` | `163,296` | `11` | `163,296` | `[4, 1, 0, 6, 3, 2, 5]` | `0.400` | `0.391` |
+| `none/arity_7/long_short_reversal` | `264,384` | `15,552` | `15,552` | `15,552` | `[0, 6, 3, 2, 5, 4, 1]` | `1.241` | `1.221` |
+
+Parity and memory:
+
+- baseline-off parity passed `4/4`, performance passed, but the baseline run
+  failed the generic memory-release gate on
+  `none/arity_7/long_short_reversal`;
+- accepted candidate parity, performance, instrumentation, memory release, lazy
+  cache memory, scheduler smoke, legacy path, dead-code audit and docs-drift
+  audit all passed;
+- full API top-50 comparison by stable fields (`rank`, `variant_hash`,
+  `summary_metrics`) matched baseline for both non-empty rows; reversal rows
+  stayed quality-gated zero-result rows; `variant_key` differs only by embedded
+  job id;
+- Stage 10 rejected Python traversal remains on the stop-list. Stage 12
+  candidate `combo_iteration` is `0.400s` / `1.241s` for arity-7, versus the
+  rejected Stage 10 completed row's `59.350s` Python traversal.
+
+Contract impact: `compatible-change`. No public API payload shape, request hash,
+artifact publisher/precompute path, `current.yaml`, active artifact slot, DB
+schema, fees/slippage/sizing, close-on-end, ranking, persisted top-N shape or
+browser-visible behavior changed. The new backend is selected only by internal
+env override and falls back to accepted current paths otherwise.
+
 ## Stage Ledger
 
 | Stage | Status | Scope | Evidence | Decision | next_iteration_allowed |
@@ -1404,8 +1510,8 @@ accepted prefix baseline, and Stage 09 for TP/SL full-grid rows.
 | 09 | accepted | `matrix_cell_tp_sl_v1` full grid blocks with configurable TP/SL cell block shape; no publisher/precompute or default-backend change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/` plus diagnostic `16 x 16` and first `64 x 64` runs | Mac Studio API-runner full-grid parity `2/2`, instrumentation and memory passed; accepted `64 x 64` shape recorded `tp_count=47`, `sl_count=47`, `tp_sl_cells=2209`, `trade_cell_evals_per_sec` about `5.67M..5.92M`; exact speed ratios `0.960` and `0.931`; backend remains opt-in through internal env mode | true for Stage 10 exact-safe high-arity pruning |
 | 10 | accepted_for_learning | Exact-safe `monotonic_min_closed_trades` rule and negative performance evidence retained; runtime pruning candidate rejected; approximate beam remains off | `benchmark_iterations/2026-06-10_matrix_bitset_stage_10_high_arity_pruning_arity7_partial/` | Exact-safe proof holds for the min-trade eligibility bound, but Mac Studio arity-7 evidence did not complete accepted gates; first completed row pruned `163,296 / 279,936` candidates yet spent `59.350s` in branch traversal and `58.182s` in exact scoring; no comparable baseline-off speedup completed; arity-10 blocked by seven-indicator canonical fixture; do not reuse the Python branch-and-bound runtime candidate as accepted acceleration | true for Stage 11 lazy detail reuse only |
 | 11 | rejected | TP/SL lazy selected-variant sparse trade tape reuse candidate; production runtime/test candidate removed after review; no bulk top-N scoring change | `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse/` plus comparable baseline `benchmark_iterations/2026-06-10_matrix_bitset_stage_11_lazy_detail_reuse_baseline/` | Mac Studio lazy parity passed for `none` and `tp_sl_grid`, but TP/SL miss changed only from `4.334214s` to `4.292836s` (`-0.955%`) and cache hit stayed effectively unchanged; no material speedup, so the candidate is rejected and must not be treated as accepted acceleration | false for lazy path; superseded by Stage 12+ continuation plan |
-| 12 | planned | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; no Python traversal hot path | none yet | Must prove top-N identity/order, canonical output order and >=20% arity-7 service-wall improvement with no arity-6 regression before any next stage can execute | true for Stage 12 only |
-| 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | blocked until Stage 12 accepted |
+| 12 | accepted | Compiled prefix product traversal with selectivity order and exact-safe prefix pruning; opt-in no-risk arity `6` and `7`; no Python traversal hot path | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/` | Mac Studio API-runner candidate passed parity, performance, instrumentation, memory release, lazy cache, scheduler, legacy path, dead-code and docs-drift gates; arity-7 service wall improved `95.286%` long-only and `85.798%` reversal; arity-6 improved `90.449%` and `76.573%`; stable top-50 `variant_hash`/rank/metrics matched baseline; contract impact is compatible opt-in only | true for Stage 13 only |
+| 13 | planned | TP/SL `64 x 64` production gate and block autotune for accepted `matrix_cell_tp_sl_v1` | none yet | Must compare accepted shapes against Stage 09/current exact path, preserve top-N/best TP/SL and improve service wall >=15% before production candidate status | true for Stage 13 only |
 | 14 | planned | TP/SL monotonic cell kernel | none yet | Must preserve exact full-grid output, lower cell comparisons/trade and beat best Stage 13 service wall | blocked until Stage 13 accepted |
 | 15 | planned | TP/SL total-return early abandon with exact-safe log-return upper bound | none yet | Must be disabled outside supported ranking/sizing and prove same output plus service-wall improvement | blocked until Stage 14 accepted |
 | 16 | planned | TP/SL trade-window reuse telemetry only | none yet | Counters only; no cache/grouped implementation unless telemetry proves high reuse and a later stage is opened | blocked until Stage 15 accepted |

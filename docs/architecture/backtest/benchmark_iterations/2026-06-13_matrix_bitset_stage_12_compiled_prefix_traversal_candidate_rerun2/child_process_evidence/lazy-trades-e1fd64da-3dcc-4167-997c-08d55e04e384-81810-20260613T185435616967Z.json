@@ -1,0 +1,43 @@
+{
+  "cancelled": false,
+  "command": [
+    "/private/tmp/roehub-stage12-candidate-20260613-compiled-prefix/.venv/bin/python3",
+    "-m",
+    "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "--task-id",
+    "e1fd64da-3dcc-4167-997c-08d55e04e384",
+    "--job-id",
+    "25d9ad3a-c4f7-4195-913d-c5329c3fe609",
+    "--owner-user-id",
+    "6960d466-e9fb-4116-a9fb-8f1589c61914",
+    "--variant-key",
+    "job_25d9ad3ae609__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+    "--output-json",
+    "/var/folders/cs/_gr0d4nj1lsc6cllc9gtql980000gn/T/roehub-lazy-trades-child-xiag_88m/result.json"
+  ],
+  "elapsed_seconds": 0.661587,
+  "exit_code": 0,
+  "finished_at": "2026-06-13T18:54:35.613140Z",
+  "metadata": {
+    "child_module": "apps.worker.backtest_job_runner.main.lazy_trades_child",
+    "job_id": "25d9ad3a-c4f7-4195-913d-c5329c3fe609",
+    "public_variant_key": "job_25d9ad3ae609__dema_close_w6__hma_close_w5__ema_close_w10__sma_close_w10__wma_close_w6__rma_close_w10__risk_non__vh_8caafc0e",
+    "task_id": "e1fd64da-3dcc-4167-997c-08d55e04e384",
+    "task_kind": "lazy_trades"
+  },
+  "parent_physical_footprint_after_bytes": null,
+  "parent_physical_footprint_before_bytes": null,
+  "parent_pid": 80869,
+  "parent_retained_physical_footprint_delta_bytes": null,
+  "parent_retained_rss_delta_bytes": 16384,
+  "parent_rss_after_bytes": 126042112,
+  "parent_rss_before_bytes": 126025728,
+  "peak_physical_footprint_bytes": null,
+  "peak_rss_bytes": 105857024,
+  "pid": 81810,
+  "schema": "roehub_child_process_evidence_v1",
+  "started_at": "2026-06-13T18:54:34.951553Z",
+  "stderr_tail": "2026-06-13 21:54:35,301 INFO __main__ lazy trades child process started: task_id=e1fd64da-3dcc-4167-997c-08d55e04e384 job_id=25d9ad3a-c4f7-4195-913d-c5329c3fe609\n2026-06-13 21:54:35,538 INFO __main__ lazy trades child process finished: task_id=e1fd64da-3dcc-4167-997c-08d55e04e384 cache_status=miss elapsed_seconds=0.237\n",
+  "stdout_tail": "",
+  "timed_out": false
+}

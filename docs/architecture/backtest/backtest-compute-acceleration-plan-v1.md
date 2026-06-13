@@ -500,7 +500,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 09 | `matrix_cell_tp_sl_v1` full grid blocks | Full request grid exact parity; accepted `tp_sl_exact_scoring` speedup and no service wall regression |
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark; separate UX/perceived-latency gate |
-| 12 | Compiled prefix product traversal | `none/arity_6` no regression, `none/arity_7` service wall improvement >= 20%, `combo_iteration` materially lower, top-N identity/order and canonical output unchanged |
+| 12 | Compiled prefix product traversal | Accepted 2026-06-13: opt-in `compiled_prefix_product_traversal_v1`; `none/arity_6` improved `76.573%..90.449%`, `none/arity_7` service wall improved `85.798%..95.286%`, stable top-50 `variant_hash`/rank/metrics matched baseline |
 | 13 | TP/SL `64 x 64` production gate and block autotune | Same top-N, `best_tp`, `best_sl`; service wall >= 15% better than current exact path or Stage 09 opt-in baseline; memory peak bounded |
 | 14 | TP/SL monotonic cell kernel | Exact output same as Stage 13 winner; cell comparisons/trade lower, trade-cell/sec higher, service wall better than best Stage 13 |
 | 15 | TP/SL total-return early abandon | Exact-safe bound proof for `total_return_pct desc`; same output, lower scored cells/candidates and service wall no regression |

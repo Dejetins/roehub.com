@@ -23,6 +23,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.services.v2.combo_planning import (
     COMBO_CHUNK_SIZE,
+    COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
@@ -49,6 +50,9 @@ from trading.contexts.backtest.application.services.v2.matrix_backend.bitsets im
 from trading.contexts.backtest.application.services.v2.matrix_backend.no_risk_score import (
     matrix_bitset_no_risk,
     matrix_bitset_no_risk_long_only,
+)
+from trading.contexts.backtest.application.services.v2.matrix_backend.prefix_traversal import (
+    collect_compiled_prefix_candidates,
 )
 from trading.contexts.backtest.application.services.v2.numba_runtime import (
     current_backtest_numba_telemetry,
@@ -150,6 +154,7 @@ class _TopKContext:
 class _NoRiskScratch:
     segment_pos_workspace: np.ndarray | None = None
     matrix_packed_by_indicator: tuple[PackedSignalBitsets, ...] | None = None
+    prefix_traversal_telemetry: Mapping[str, Any] | None = None
 
 
 class _NoRiskHeapEntry(NamedTuple):
@@ -248,13 +253,10 @@ class BacktestNoRiskExactScoringService:
         scratch = _NoRiskScratch()
         try:
             profile_stage_timings = stage_timings if _exact_profile_enabled() else None
-            selected_batches_iter = _iter_selected_candidate_batches(
-                prepared_result=prepared_result,
-                combo_planning_result=combo_planning_result,
-                profile_stage_timings=profile_stage_timings,
-            )
-            first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
-            if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+            if backend.backend_id in {
+                MATRIX_BITSET_NO_RISK_V1_BACKEND,
+                COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+            }:
                 pack_start = time.perf_counter()
                 scratch.matrix_packed_by_indicator = tuple(
                     pack_signal_matrix(pool.trade_T)
@@ -263,6 +265,16 @@ class BacktestNoRiskExactScoringService:
                 stage_timings[NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME] = (
                     time.perf_counter() - pack_start
                 )
+            selected_batches_iter = _iter_selected_candidate_batches(
+                prepared_result=prepared_result,
+                combo_planning_result=combo_planning_result,
+                profile_stage_timings=stage_timings
+                if backend.backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
+                else profile_stage_timings,
+                min_closed_trades=min_closed_trades,
+                scratch=scratch,
+            )
+            first_selected_batch = _next_selected_candidate_batch(selected_batches_iter)
             if self.config.run_self_check:
                 check_start = time.perf_counter()
                 self_check_summary = self._run_self_check(
@@ -389,6 +401,7 @@ class BacktestNoRiskExactScoringService:
                 quality_candidates_below_min_trades=below_min_trades_count,
                 quality_candidates_heap_eligible=heap_eligible_count,
                 metric_profile=metric_profile,
+                prefix_traversal=scratch.prefix_traversal_telemetry,
             )
         finally:
             cleanup_start = time.perf_counter()
@@ -815,15 +828,25 @@ def evaluate_no_risk_exact_chunk(
         )
         return
 
-    if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
+    if backend.backend_id in {
+        MATRIX_BITSET_NO_RISK_V1_BACKEND,
+        COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+    }:
         arity = len(indicator_ids)
-        if arity not in (2, 3, 6):
+        if backend.backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND and arity not in (2, 3, 6):
             raise BacktestNoRiskExactRejected(
                 "matrix_bitset_no_risk_v1 supports no-risk arity 2, 3, and 6 only"
             )
+        if (
+            backend.backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
+            and arity not in (6, 7)
+        ):
+            raise BacktestNoRiskExactRejected(
+                "compiled_prefix_product_traversal_v1 supports no-risk arity 6 and 7 only"
+            )
         if scratch is None or scratch.matrix_packed_by_indicator is None:
             raise BacktestNoRiskExactRejected(
-                "matrix_bitset_no_risk_v1 requires prepacked runtime bitsets"
+                f"{backend.backend_id} requires prepacked runtime bitsets"
             )
         packed_by_indicator = scratch.matrix_packed_by_indicator
         if len(packed_by_indicator) != arity:
@@ -884,10 +907,12 @@ def evaluate_no_risk_exact_chunk(
         pos_bits_3 = packed_by_indicator[3].pos_bits if arity >= 4 else empty_bits
         pos_bits_4 = packed_by_indicator[4].pos_bits if arity >= 5 else empty_bits
         pos_bits_5 = packed_by_indicator[5].pos_bits if arity >= 6 else empty_bits
+        pos_bits_6 = packed_by_indicator[6].pos_bits if arity >= 7 else empty_bits
         neg_bits_2 = packed_by_indicator[2].neg_bits if arity >= 3 else empty_bits
         neg_bits_3 = packed_by_indicator[3].neg_bits if arity >= 4 else empty_bits
         neg_bits_4 = packed_by_indicator[4].neg_bits if arity >= 5 else empty_bits
         neg_bits_5 = packed_by_indicator[5].neg_bits if arity >= 6 else empty_bits
+        neg_bits_6 = packed_by_indicator[6].neg_bits if arity >= 7 else empty_bits
         matrix_bitset_no_risk(
             combo_idx_by_indicator,
             packed_by_indicator[0].pos_bits,
@@ -896,12 +921,14 @@ def evaluate_no_risk_exact_chunk(
             pos_bits_3,
             pos_bits_4,
             pos_bits_5,
+            pos_bits_6,
             packed_by_indicator[0].neg_bits,
             packed_by_indicator[1].neg_bits,
             neg_bits_2,
             neg_bits_3,
             neg_bits_4,
             neg_bits_5,
+            neg_bits_6,
             np.int32(arity),
             np.int32(packed_by_indicator[0].signal_length),
             np.int32(packed_by_indicator[0].word_count),
@@ -2437,6 +2464,8 @@ def _validate_backend_for_exact_scoring(*, backend_id: str, arity: int) -> None:
         return
     if arity in (3, 6) and backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
         return
+    if arity in (6, 7) and backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND:
+        return
     if backend_id == EVENT_SEGMENTS_N_NO_RISK_BACKEND and 1 <= arity <= 10:
         return
     raise BacktestNoRiskExactRejected(
@@ -2462,7 +2491,44 @@ def _iter_selected_candidate_batches(
     prepared_result: BacktestPreparePoolsResult,
     combo_planning_result: BacktestComboPlanningResult,
     profile_stage_timings: dict[str, float] | None = None,
+    min_closed_trades: int = 1,
+    scratch: _NoRiskScratch | None = None,
 ) -> Iterator[_SelectedCandidateBatch]:
+    if (
+        combo_planning_result.backend.backend_id
+        == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
+        and not combo_planning_result.proxy_context.active
+        and scratch is not None
+        and scratch.matrix_packed_by_indicator is not None
+    ):
+        traversal_start = time.perf_counter()
+        traversal = collect_compiled_prefix_candidates(
+            indicator_ids=prepared_result.indicator_ids,
+            packed_by_indicator=scratch.matrix_packed_by_indicator,
+            min_closed_trades=min_closed_trades,
+            direction_mode=combo_planning_result.backend.direction_mode,
+        )
+        traversal_elapsed = time.perf_counter() - traversal_start
+        prefix_telemetry = dict(traversal.telemetry)
+        prefix_telemetry["prefix_total_elapsed_s"] = traversal_elapsed
+        combo_count_planned = float(prefix_telemetry["combo_count_planned"])
+        prefix_telemetry["combo_iteration_candidates_per_sec"] = (
+            None
+            if traversal_elapsed <= 0.0
+            else combo_count_planned / traversal_elapsed
+        )
+        _add_timing(
+            stage_timings=profile_stage_timings,
+            key="combo_iteration",
+            elapsed=traversal_elapsed,
+        )
+        scratch.prefix_traversal_telemetry = prefix_telemetry
+        yield from _iter_materialized_selected_batches(
+            rows_by_indicator=traversal.rows_by_indicator,
+            chunk_size=COMBO_CHUNK_SIZE,
+        )
+        return
+
     local_row_pools = build_local_row_pools(prepared_result=prepared_result)
     filter_service = BacktestComboPlanningService()
     combo_chunks = iter_ordinal_combo_chunks(
@@ -2509,6 +2575,26 @@ def _iter_selected_candidate_batches(
                 confirm=filter_result.confirm,
                 proxy=filter_result.proxy,
             )
+
+
+def _iter_materialized_selected_batches(
+    *,
+    rows_by_indicator: Mapping[str, np.ndarray],
+    chunk_size: int,
+) -> Iterator[_SelectedCandidateBatch]:
+    selected_size = _selected_size(rows_by_indicator)
+    if selected_size <= 0:
+        return
+    for start in range(0, selected_size, chunk_size):
+        stop = min(start + chunk_size, selected_size)
+        yield _SelectedCandidateBatch(
+            rows_by_indicator={
+                indicator_id: np.ascontiguousarray(rows[start:stop], dtype=np.int32)
+                for indicator_id, rows in rows_by_indicator.items()
+            },
+            confirm=None,
+            proxy=None,
+        )
 
 
 def _exact_profile_enabled() -> bool:

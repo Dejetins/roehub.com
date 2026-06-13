@@ -29,6 +29,7 @@ from trading.contexts.backtest.application.dto import (
     canonical_no_risk_top_results_payload,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
@@ -740,6 +741,50 @@ def test_no_risk_matrix_bitset_stage_05_matches_current_arity6_long_only_top_res
 
     assert matrix_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
     assert canonical_no_risk_top_results_payload(matrix_result.top_results) == (
+        canonical_no_risk_top_results_payload(current_result.top_results)
+    )
+
+
+def test_no_risk_compiled_prefix_stage_12_matches_current_arity7_top_results() -> None:
+    indicator_ids = tuple(f"indicator_{index}" for index in range(7))
+    prepared = _single_signal_prepared_result(
+        signal_row=[1, 1, -1, -1, 0, 1, 1, -1],
+        arity=7,
+        indicator_ids=indicator_ids,
+    )
+    request = _normalized_request(direction_mode="long_short_reversal", top_n=1)
+    request["quality_constraints"] = {"min_closed_trades": 2}
+
+    current_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+    compiled_result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(run_self_check=True, self_check_sample_size=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared,
+            backend_id=COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+            direction_mode="long_short_reversal",
+        ),
+        normalized_request=request,
+    )
+
+    prefix = compiled_result.telemetry.prefix_traversal
+    assert prefix is not None
+    assert prefix["prefix_candidates_selected"] == 1
+    assert prefix["selectivity_order"] == list(range(7))
+    assert compiled_result.telemetry.backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
+    assert compiled_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
+    assert canonical_no_risk_top_results_payload(compiled_result.top_results) == (
         canonical_no_risk_top_results_payload(current_result.top_results)
     )
 
@@ -1479,6 +1524,8 @@ def _backend_role(backend_id: str) -> str:
         return "fallback"
     if backend_id == MATRIX_BITSET_NO_RISK_V1_BACKEND:
         return "matrix_mvp"
+    if backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND:
+        return "compiled_prefix_traversal"
     return "generic"
 
 

@@ -28,6 +28,9 @@ from trading.contexts.backtest.application.services.v2.matrix_backend.bitsets im
     unpack_signal_bitsets,
     word_count_for_signal_length,
 )
+from trading.contexts.backtest.application.services.v2.matrix_backend.prefix_traversal import (
+    collect_compiled_prefix_candidates,
+)
 
 
 def test_pack_signal_matrix_round_trips_positive_neutral_negative_and_padding() -> None:
@@ -74,6 +77,46 @@ def test_bitset_consensus_matches_reference_for_long_only_and_reversal_masks() -
 
     assert bitset_consensus_row(packed, (0, 0)).tolist() == [1, 1, 0, -1, 0]
     assert bitset_consensus_row(packed, (1, 1)).tolist() == [0, 0, 1, -1, 0]
+
+
+def test_compiled_prefix_traversal_prunes_and_returns_canonical_order() -> None:
+    packed = tuple(
+        pack_signal_matrix(
+            np.asarray(
+                [
+                    [1, 1, 1, 1, 1],
+                    [1, 0, 0, 0, 0],
+                ],
+                dtype=np.int8,
+            )
+        )
+        for _ in range(6)
+    )
+
+    result = collect_compiled_prefix_candidates(
+        indicator_ids=tuple(f"i{index}" for index in range(6)),
+        packed_by_indicator=packed,
+        min_closed_trades=2,
+        direction_mode="long_only",
+    )
+    telemetry = dict(result.telemetry)
+
+    assert result.candidate_count == 1
+    assert [rows.tolist() for rows in result.rows_by_indicator.values()] == [
+        [0],
+        [0],
+        [0],
+        [0],
+        [0],
+        [0],
+    ]
+    assert telemetry["combo_count_planned"] == 64
+    assert telemetry["prefix_candidates_selected"] == 1
+    assert telemetry["prefix_candidates_pruned"] == 63
+    assert telemetry["prefix_pruned_subtrees"] > 0
+    assert telemetry["prefix_pruned_candidate_upper_bound"] == 63
+    assert telemetry["first_canonical_ordinal"] == 0
+    assert telemetry["last_canonical_ordinal"] == 0
 
 
 def test_runtime_bitset_pack_telemetry_is_shadow_compact_and_checks_samples() -> None:

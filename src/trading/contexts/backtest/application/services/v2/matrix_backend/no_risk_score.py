@@ -309,12 +309,14 @@ def matrix_bitset_no_risk(
     pos_bits_3: np.ndarray,
     pos_bits_4: np.ndarray,
     pos_bits_5: np.ndarray,
+    pos_bits_6: np.ndarray,
     neg_bits_0: np.ndarray,
     neg_bits_1: np.ndarray,
     neg_bits_2: np.ndarray,
     neg_bits_3: np.ndarray,
     neg_bits_4: np.ndarray,
     neg_bits_5: np.ndarray,
+    neg_bits_6: np.ndarray,
     arity: np.int32,
     signal_length: np.int32,
     word_count: np.int32,
@@ -355,6 +357,7 @@ def matrix_bitset_no_risk(
         row_3 = np.int32(0)
         row_4 = np.int32(0)
         row_5 = np.int32(0)
+        row_6 = np.int32(0)
         if arity >= 3:
             row_2 = combo_idx_by_indicator[2, k]
         if arity >= 4:
@@ -363,6 +366,8 @@ def matrix_bitset_no_risk(
             row_4 = combo_idx_by_indicator[4, k]
         if arity >= 6:
             row_5 = combo_idx_by_indicator[5, k]
+        if arity >= 7:
+            row_6 = combo_idx_by_indicator[6, k]
 
         available_quote = init_cash_quote
         safe_quote = 0.0
@@ -395,12 +400,14 @@ def matrix_bitset_no_risk(
                 pos_bits_3,
                 pos_bits_4,
                 pos_bits_5,
+                pos_bits_6,
                 row_0,
                 row_1,
                 row_2,
                 row_3,
                 row_4,
                 row_5,
+                row_6,
                 word_idx,
                 arity,
             ) & word_mask
@@ -413,12 +420,14 @@ def matrix_bitset_no_risk(
                     neg_bits_3,
                     neg_bits_4,
                     neg_bits_5,
+                    neg_bits_6,
                     row_0,
                     row_1,
                     row_2,
                     row_3,
                     row_4,
                     row_5,
+                    row_6,
                     word_idx,
                     arity,
                 ) & word_mask
@@ -647,12 +656,14 @@ def _consensus_word(
     bits_3: np.ndarray,
     bits_4: np.ndarray,
     bits_5: np.ndarray,
+    bits_6: np.ndarray,
     row_0: np.int32,
     row_1: np.int32,
     row_2: np.int32,
     row_3: np.int32,
     row_4: np.int32,
     row_5: np.int32,
+    row_6: np.int32,
     word_idx: int,
     arity: np.int32,
 ) -> np.uint64:
@@ -665,6 +676,8 @@ def _consensus_word(
         bits &= bits_4[row_4, word_idx]
     if arity >= 6:
         bits &= bits_5[row_5, word_idx]
+    if arity >= 7:
+        bits &= bits_6[row_6, word_idx]
     return bits
 
 

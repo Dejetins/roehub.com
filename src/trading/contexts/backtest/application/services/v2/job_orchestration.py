@@ -21,7 +21,11 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 
-from .combo_planning import MATRIX_BITSET_NO_RISK_V1_BACKEND, MATRIX_CELL_TP_SL_V1_BACKEND
+from .combo_planning import (
+    COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+    MATRIX_BITSET_NO_RISK_V1_BACKEND,
+    MATRIX_CELL_TP_SL_V1_BACKEND,
+)
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
@@ -51,6 +55,9 @@ MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
 )
 MATRIX_BACKEND_MODE_DEFAULT = MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6
 MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID = "stage_09_tp_sl_full_grid"
+MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL = (
+    "stage_12_compiled_prefix_traversal"
+)
 MATRIX_SIDECAR_DIR_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_SIDECAR_DIR"
 
 
@@ -356,13 +363,17 @@ def _matrix_backend_override(
         MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
         MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
         MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
+        MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
+        COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     }:
         allowed = (
             MATRIX_BACKEND_MODE_OFF,
             MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
             MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
             MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
+            MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
             MATRIX_BITSET_NO_RISK_V1_BACKEND,
+            COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
             MATRIX_CELL_TP_SL_V1_BACKEND,
         )
         raise ValueError(
@@ -397,6 +408,17 @@ def _matrix_backend_override(
         and arity in (2, 3, 6)
     ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
+    if (
+        mode
+        in {
+            MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
+            COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+        }
+        and risk_mode == "none"
+        and direction_mode in {"long_only", "long_short_reversal"}
+        and arity in (6, 7)
+    ):
+        return COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
     if (
         mode
         in {
@@ -478,6 +500,11 @@ def _instrumentation_counters(
         None if tp_sl_selected_cells is None else tp_sl_selected_cells.as_mapping()
     )
     exact_telemetry_mapping = exact_telemetry.as_mapping()
+    prefix_traversal = (
+        exact_telemetry_mapping.get("prefix_traversal")
+        if isinstance(exact_telemetry_mapping.get("prefix_traversal"), Mapping)
+        else None
+    )
     cell_backend = (
         exact_telemetry_mapping.get("cell_backend")
         if isinstance(exact_telemetry_mapping.get("cell_backend"), Mapping)
@@ -530,6 +557,36 @@ def _instrumentation_counters(
         "combo_count_planned": int(combo_telemetry.cartesian_combinations),
         "candidates_after_proxy": int(combo_telemetry.proxy_candidates_selected),
         "exact_candidates": exact_candidates,
+        "prefix_nodes_visited": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_nodes_visited"],
+        "prefix_nodes_reused": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_nodes_reused"],
+        "prefix_pruned_subtrees": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_pruned_subtrees"],
+        "prefix_pruned_candidate_upper_bound": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_pruned_candidate_upper_bound"],
+        "prefix_candidates_selected": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_candidates_selected"],
+        "prefix_candidates_pruned": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_candidates_pruned"],
+        "selectivity_order": None
+        if prefix_traversal is None
+        else prefix_traversal["selectivity_order"],
+        "combo_iteration_candidates_per_sec": None
+        if prefix_traversal is None
+        else prefix_traversal["combo_iteration_candidates_per_sec"],
+        "prefix_total_elapsed_s": None
+        if prefix_traversal is None
+        else prefix_traversal["prefix_total_elapsed_s"],
+        "prefix_compiled_loop_elapsed_s": None
+        if prefix_traversal is None
+        else prefix_traversal["compiled_loop_elapsed_s"],
         "avg_segments_per_candidate": None,
         "avg_trades_per_candidate": None,
         "tp_count": tp_count,

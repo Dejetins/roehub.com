@@ -218,6 +218,7 @@ class BacktestNoRiskExactTelemetry:
     quality_candidates_below_min_trades: int = 0
     quality_candidates_heap_eligible: int = 0
     metric_profile: str = "full"
+    prefix_traversal: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.request_top_n <= 0:
@@ -254,6 +255,12 @@ class BacktestNoRiskExactTelemetry:
                     {str(key): float(value) for key, value in self.sample_metrics.items()}
                 ),
             )
+        if self.prefix_traversal is not None:
+            object.__setattr__(
+                self,
+                "prefix_traversal",
+                MappingProxyType(dict(self.prefix_traversal)),
+            )
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -280,6 +287,9 @@ class BacktestNoRiskExactTelemetry:
             "quality_candidates_below_min_trades": self.quality_candidates_below_min_trades,
             "quality_candidates_heap_eligible": self.quality_candidates_heap_eligible,
             "metric_profile": self.metric_profile,
+            "prefix_traversal": None
+            if self.prefix_traversal is None
+            else dict(self.prefix_traversal),
         }
 
 

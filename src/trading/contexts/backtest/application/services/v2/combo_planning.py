@@ -27,6 +27,9 @@ EVENT_SEGMENTS_2_NO_RISK_BACKEND = "event_segments_2_no_risk"
 STREAMING_2_NO_RISK_BACKEND = "streaming_2_no_risk"
 EVENT_SEGMENTS_N_NO_RISK_BACKEND = "event_segments_n_no_risk"
 MATRIX_BITSET_NO_RISK_V1_BACKEND = "matrix_bitset_no_risk_v1"
+COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND = (
+    "compiled_prefix_product_traversal_v1"
+)
 MATRIX_CELL_TP_SL_V1_BACKEND = "matrix_cell_tp_sl_v1"
 EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND = "event_segments_n_tp_sl_15m_grid"
 BUILD_EXACT_CONTEXT_STAGE_NAME = "build_exact_context"
@@ -97,6 +100,13 @@ class BacktestBackendRegistry:
                     risk_mode="none",
                     arities=(2, 3, 6),
                     role="matrix_mvp",
+                    requires_exact_context=False,
+                ),
+                _BackendDescriptor(
+                    backend_id=COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
+                    risk_mode="none",
+                    arities=(6, 7),
+                    role="compiled_prefix_traversal",
                     requires_exact_context=False,
                 ),
                 _BackendDescriptor(
@@ -925,6 +935,7 @@ __all__ = [
     "BUILD_PROXY_CONTEXT_STAGE_NAME",
     "COMBO_CHUNK_SIZE",
     "COMBO_ITERATION_STAGE_NAME",
+    "COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND",
     "EVENT_SEGMENTS_2_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_NO_RISK_BACKEND",
     "EVENT_SEGMENTS_N_TP_SL_15M_GRID_BACKEND",

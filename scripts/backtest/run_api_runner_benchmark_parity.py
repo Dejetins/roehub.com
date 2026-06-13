@@ -81,6 +81,9 @@ STAGE_08_TP_SL_SELECTED_STEP_PCT = 0.5
 STAGE_09_TP_SL_FULL_GRID_ARITY = 6
 STAGE_09_TP_SL_FULL_GRID_DIRECTIONS = ("long_only", "long_short_reversal")
 STAGE_09_MATRIX_BACKEND_MODE = "stage_09_tp_sl_full_grid"
+STAGE_12_COMPILED_PREFIX_ARITIES = (6, 7)
+STAGE_12_COMPILED_PREFIX_DIRECTIONS = ("long_only", "long_short_reversal")
+STAGE_12_MATRIX_BACKEND_MODE = "stage_12_compiled_prefix_traversal"
 MATRIX_BACKEND_MODE_ENV_KEY = "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE"
 TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_TP_COUNT"
 TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY = "ROEHUB_BACKTEST_TP_SL_CELL_BLOCK_SL_COUNT"
@@ -137,6 +140,10 @@ def main(argv: list[str] | None = None) -> int:
         os.environ[TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY] = str(
             args.tp_sl_cell_block_sl_count
         )
+    if args.stage_12_compiled_prefix_rows and not os.environ.get(
+        MATRIX_BACKEND_MODE_ENV_KEY
+    ):
+        os.environ[MATRIX_BACKEND_MODE_ENV_KEY] = STAGE_12_MATRIX_BACKEND_MODE
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     child_evidence_dir = out_dir / "child_process_evidence"
@@ -157,6 +164,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.stage_09_tp_sl_full_grid:
         reference_runs, excluded = _stage_09_tp_sl_full_grid_reference_runs(
+            reference=reference
+        )
+    if args.stage_12_compiled_prefix_rows:
+        reference_runs, excluded = _stage_12_compiled_prefix_reference_runs(
             reference=reference
         )
     if args.smoke_only:
@@ -196,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             "stage_05_no_risk_heavy_rows": args.stage_05_no_risk_heavy_rows,
             "stage_08_tp_sl_selected_cells": args.stage_08_tp_sl_selected_cells,
             "stage_09_tp_sl_full_grid": args.stage_09_tp_sl_full_grid,
+            "stage_12_compiled_prefix_rows": args.stage_12_compiled_prefix_rows,
             "tp_sl_selected_cell_shadow_env_key": TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
             "matrix_backend_mode_env_key": MATRIX_BACKEND_MODE_ENV_KEY,
             "matrix_backend_mode": os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY),
@@ -264,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
             system_memory_cleanup_wait_seconds=args.system_memory_cleanup_wait_seconds,
             cpu_sample_interval_seconds=args.cpu_sample_interval_seconds,
             stage_08_tp_sl_selected_cells=args.stage_08_tp_sl_selected_cells,
+            stage_12_compiled_prefix_rows=args.stage_12_compiled_prefix_rows,
         )
         payload["api_runner_path"] = {
             "runner_entrypoint": "BacktestJobWorkerUseCase.run_next",
@@ -365,6 +378,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Run TP/SL arity-6 full-grid rows with matrix_cell_tp_sl_v1 "
             "enabled through ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
+        ),
+    )
+    parser.add_argument(
+        "--stage-12-compiled-prefix-rows",
+        action="store_true",
+        help=(
+            "Run no-risk arity-6 and arity-7 rows with "
+            "compiled_prefix_product_traversal_v1 enabled through "
+            "ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
         ),
     )
     parser.add_argument(
@@ -613,6 +635,7 @@ def _run_reference_jobs(
     system_memory_cleanup_wait_seconds: float,
     cpu_sample_interval_seconds: float,
     stage_08_tp_sl_selected_cells: bool = False,
+    stage_12_compiled_prefix_rows: bool = False,
 ) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for index, reference_run in enumerate(reference_runs, start=1):
@@ -659,6 +682,7 @@ def _run_reference_jobs(
             child_evidence=child_evidence,
             reference_run=reference_run,
             stage_08_tp_sl_selected_cells=stage_08_tp_sl_selected_cells,
+            stage_12_compiled_prefix_rows=stage_12_compiled_prefix_rows,
         )
         stage_timings = _merged_stage_timings(child_evidence)
         instrumentation_counters = _merged_instrumentation_counters(child_evidence)
@@ -1446,6 +1470,46 @@ def _stage_09_tp_sl_full_grid_reference_runs(
     }
 
 
+def _stage_12_compiled_prefix_reference_runs(
+    *,
+    reference: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    accepted_runs = [
+        cast(Mapping[str, Any], item)
+        for item in _list(reference.get("no_risk_regression_runs"))
+    ]
+    by_key = {
+        (
+            len(cast(Sequence[Any], item.get("indicator_ids", ()))),
+            str(item.get("direction_mode")),
+        ): item
+        for item in accepted_runs
+        if str(item.get("risk_mode")) == "none"
+        and len(cast(Sequence[Any], item.get("indicator_ids", ())))
+        in STAGE_12_COMPILED_PREFIX_ARITIES
+        and str(item.get("direction_mode")) in STAGE_12_COMPILED_PREFIX_DIRECTIONS
+    }
+    wanted = [
+        (arity, direction)
+        for arity in STAGE_12_COMPILED_PREFIX_ARITIES
+        for direction in STAGE_12_COMPILED_PREFIX_DIRECTIONS
+    ]
+    missing = [key for key in wanted if key not in by_key]
+    if missing:
+        raise RuntimeError(f"missing Stage 12 compiled-prefix rows: {missing!r}")
+    return [by_key[key] for key in wanted], {
+        "job_name": None,
+        "risk_mode": "none",
+        "arity": list(STAGE_12_COMPILED_PREFIX_ARITIES),
+        "direction_mode": list(STAGE_12_COMPILED_PREFIX_DIRECTIONS),
+        "matrix_backend_mode": STAGE_12_MATRIX_BACKEND_MODE,
+        "reason": (
+            "stage_12_compiled_prefix_rows: run no-risk arity 6 and 7 rows "
+            "for compiled_prefix_product_traversal_v1 evidence"
+        ),
+    }
+
+
 def _smoke_subset(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     wanted = {
         ("none", 1, "long_only"),
@@ -1593,6 +1657,7 @@ def _compare_reference_results(
     child_evidence: Sequence[Mapping[str, Any]],
     reference_run: Mapping[str, Any],
     stage_08_tp_sl_selected_cells: bool = False,
+    stage_12_compiled_prefix_rows: bool = False,
 ) -> dict[str, Any]:
     items = [cast(Mapping[str, Any], item) for item in _list(api_top.get("items"))]
     diagnostics = _latest_exact_diagnostics(child_evidence=child_evidence)
@@ -1605,6 +1670,8 @@ def _compare_reference_results(
     telemetry_mismatches = _compare_telemetry(
         telemetry=telemetry,
         reference_run=reference_run,
+        allow_pruned_exact_candidates=stage_12_compiled_prefix_rows
+        and isinstance(telemetry.get("prefix_traversal"), Mapping),
     )
     quality_top_zero = _quality_top_zero_result(telemetry=telemetry, api_items=len(items))
     quality_gate_enabled = _quality_gate_enabled(telemetry=telemetry)
@@ -1741,13 +1808,37 @@ def _compare_telemetry(
     *,
     telemetry: Mapping[str, Any],
     reference_run: Mapping[str, Any],
+    allow_pruned_exact_candidates: bool = False,
 ) -> list[dict[str, Any]]:
     mismatches: list[dict[str, Any]] = []
-    for key in ("risk_mode", "arity", "direction_mode", "exact_candidates_evaluated"):
+    for key in ("risk_mode", "arity", "direction_mode"):
         expected = reference_run.get(key)
         actual = telemetry.get(key)
         if expected != actual:
             mismatches.append({"field": key, "expected": expected, "actual": actual})
+    expected_candidates = reference_run.get("exact_candidates_evaluated")
+    actual_candidates = telemetry.get("exact_candidates_evaluated")
+    if allow_pruned_exact_candidates:
+        if (
+            not isinstance(expected_candidates, int)
+            or not isinstance(actual_candidates, int)
+            or actual_candidates > expected_candidates
+        ):
+            mismatches.append(
+                {
+                    "field": "exact_candidates_evaluated",
+                    "expected": f"<= {expected_candidates}",
+                    "actual": actual_candidates,
+                }
+            )
+    elif expected_candidates != actual_candidates:
+        mismatches.append(
+            {
+                "field": "exact_candidates_evaluated",
+                "expected": expected_candidates,
+                "actual": actual_candidates,
+            }
+        )
     if telemetry.get("request_top_n") != REQUEST_TOP_N:
         mismatches.append(
             {
@@ -1893,6 +1984,16 @@ _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
     "combo_count_planned",
     "candidates_after_proxy",
     "exact_candidates",
+    "prefix_nodes_visited",
+    "prefix_nodes_reused",
+    "prefix_pruned_subtrees",
+    "prefix_pruned_candidate_upper_bound",
+    "prefix_candidates_selected",
+    "prefix_candidates_pruned",
+    "selectivity_order",
+    "combo_iteration_candidates_per_sec",
+    "prefix_total_elapsed_s",
+    "prefix_compiled_loop_elapsed_s",
     "avg_segments_per_candidate",
     "avg_trades_per_candidate",
     "tp_count",
@@ -2755,6 +2856,7 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
     stage_08_tp_sl_selected_cells = bool(request.get("stage_08_tp_sl_selected_cells"))
     stage_09_tp_sl_full_grid = bool(request.get("stage_09_tp_sl_full_grid"))
+    stage_12_compiled_prefix_rows = bool(request.get("stage_12_compiled_prefix_rows"))
     title = (
         "# Stage 04 matrix bitset no-risk MVP API-runner benchmark"
         if stage_04_mvp_rows
@@ -2764,6 +2866,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_08_tp_sl_selected_cells
         else "# Stage 09 TP/SL full-grid cell backend API-runner benchmark"
         if stage_09_tp_sl_full_grid
+        else "# Stage 12 compiled prefix traversal API-runner benchmark"
+        if stage_12_compiled_prefix_rows
         else "# Iteration 15 API runner clean arity-6 CPU/memory benchmark"
     )
     intent_scope = (
@@ -2775,6 +2879,8 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_08_tp_sl_selected_cells
         else "BTCUSDT / 15m / tp_sl_grid / arity 6 / full request grid"
         if stage_09_tp_sl_full_grid
+        else "BTCUSDT / 15m / none / arity 6-7 / long_only + long_short_reversal"
+        if stage_12_compiled_prefix_rows
         else "BTCUSDT / 15m / arity 6"
     )
     fixture_scope = (
@@ -2791,6 +2897,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "tp_sl_grid/arity_6/long_short_reversal / full grid / "
         "REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
         if stage_09_tp_sl_full_grid
+        else "- BTCUSDT / 15m / none/arity_6..7/long_only + "
+        "none/arity_6..7/long_short_reversal / REQUEST_TOP_N = 50 / "
+        "BENCHMARK_TOP_K = 5"
+        if stage_12_compiled_prefix_rows
         else "- BTCUSDT / 15m / arity 6 only / REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
     )
     intent_text = (
@@ -2811,6 +2921,10 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "exact parity, cell-block counters, `trade_cell_evals_per_sec`, memory "
         "cleanup и service wall против May 2 reference."
         if stage_09_tp_sl_full_grid
+        else "Проверить Stage 12 `compiled_prefix_product_traversal_v1`: "
+        "compiled prefix counters, arity-7 service wall, arity-6 no-regression, "
+        "top-N parity and canonical output identity."
+        if stage_12_compiled_prefix_rows
         else "Проверить приемочный путь API-created job -> runner -> одноразовый "
         "heavy child process с 12 Numba threads и сравнить arity 6 с May 2 reference."
     )
