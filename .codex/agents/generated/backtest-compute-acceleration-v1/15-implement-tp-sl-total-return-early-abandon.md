@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_15_tp_sl_total_return_early_abandon
 repo: roehub.com
 branch: main
-scope: "Deferred: implement exact-safe TP/SL early abandon only after Stage 14R or an equivalent TP/SL repair gate is accepted."
+scope: "Unblocked: implement exact-safe TP/SL early abandon against the current exact TP/SL baseline; removed Stage 13/14 code is not required and must not be restored."
 
 language:
   implementation: python
@@ -15,11 +15,9 @@ context_sources:
     - path: docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md
       why: "Stage 15 exact-safe bound scope"
     - path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
-      why: "Stage 14 gate"
+      why: "Stage 15 gate and removed Stage 13/14 guardrails"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "avoid confirm_prefilter and non-service-wall wins"
-    - path: docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md
-      why: "Stage 13 rejection and Stage 14R replacement path"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py
       why: "TP/SL scoring loop"
@@ -59,9 +57,10 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no canonical artifact writes."
 
 hard_requirements:
-  previous_stage_required: "14R accepted, or an explicitly accepted equivalent exact-safe TP/SL repair gate; original Stage 14 is superseded and does not unblock this stage"
-  baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
-  production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage15_baseline"
+  previous_stage_required: "Stage 05+12 production default accepted/deployed and the failed Stage 13/14 TP/SL branch removed from the active tree; no TP/SL repair gate is a prerequisite."
+  baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default for no-risk rows, and current exact TP/SL scoring for TP/SL rows. Do not restore or benchmark against removed Stage 13/13S/13R/14/14R runtime, prompts or harnesses."
+  production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage15_preflight"
+  stage_15_benchmark_command: "Run Mac Studio A/B through scripts/backtest/run_api_runner_benchmark_parity.py using current exact TP/SL control vs Stage 15 default-on candidate on the same TP/SL heavy rows. If the harness has no dedicated Stage 15 row selector, add one in the scoped implementation diff rather than reusing removed Stage 13/14 harnesses."
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
   implementation_allowed: true
   benchmark_required: true
@@ -78,7 +77,7 @@ non_goals:
   - "Do not apply early abandon to profit_factor, sharpe, return_over_max_drawdown or unsupported rankings."
   - "Do not use an approximate score bound."
   - "Do not remove candidates unless exact-safe proof applies."
-  - "Do not use this stage to bypass Stage 13R diagnostics or Stage 14R reversal repair."
+  - "Do not use this stage to revive or bypass the removed Stage 13/14 TP/SL branch."
 
 task:
   summary: "Use an exact-safe optimistic remaining-return bound to abandon candidate/cell scoring only for ranking=total_return_pct desc and supported sizing."
@@ -99,7 +98,7 @@ acceptance:
     - "Top-N identity/order and metrics match the baseline within accepted tolerance."
     - "A test proves the bound cannot prune a later top candidate for the supported mode."
   performance:
-    - "Mac Studio API-runner service wall improves materially versus the accepted Stage 14R/equivalent TP/SL repair baseline on both TP/SL Stage 15 rows."
+    - "Mac Studio API-runner service wall improves materially versus the current exact TP/SL baseline on both TP/SL Stage 15 rows."
     - "service_total_without_warmup and memory cleanup do not regress."
   decision:
     - "If the proof is incomplete or speedup is only local, keep disabled and mark rejected/accepted_for_learning as appropriate."

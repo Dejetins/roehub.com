@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_19_thread_scaling_benchmark
 repo: roehub.com
 branch: main
-scope: "Benchmark NUMBA_NUM_THREADS by workload, including TP/SL reversal diagnostics if Stage 13R points to thread scaling."
+scope: "Benchmark NUMBA_NUM_THREADS by workload and update worker policy only if service-wall evidence supports it."
 
 language:
   implementation: python
@@ -18,8 +18,6 @@ context_sources:
       why: "Stage 18 gate"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "fixed-overhead pattern from failed stages"
-    - path: docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md
-      why: "recommended TP/SL reversal thread-scaling matrix"
   task_entrypoints:
     - path: scripts/backtest/run_api_runner_benchmark_parity.py
       why: "API-runner benchmark"
@@ -61,7 +59,7 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; do not write canonical artifacts."
 
 hard_requirements:
-  previous_stage_required: "18 accepted/accepted_for_learning for general thread scaling, or 13R accepted_for_learning if running the TP/SL reversal diagnostic thread matrix only"
+  previous_stage_required: "18 accepted, or accepted_for_learning with assembly-not-hot decision and no runtime merge"
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage19_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
@@ -95,11 +93,6 @@ task:
     - "tp_sl_grid/arity_6/long_only"
     - "tp_sl_grid/arity_6/long_short_reversal"
     - "none/arity_7 through accepted Stage 12 opt-in backend"
-  stage_13r_tp_sl_diagnostic_rows:
-    - "current exact / tp_sl_grid/arity_6/long_short_reversal"
-    - "matrix 64x64 / tp_sl_grid/arity_6/long_short_reversal"
-    - "matrix 64x128 / tp_sl_grid/arity_6/long_short_reversal"
-    - "matrix 64x128 / tp_sl_grid/arity_6/long_only"
   required_metrics:
     - "service wall"
     - "exact_scoring"
@@ -116,8 +109,7 @@ acceptance:
     - "Select a best thread count table by workload only when variance is controlled."
     - "Worker config update is allowed only if service wall improves without memory/oversubscription regression."
   decision:
-    - "If best thread count is workload-specific, record evidence only unless a safe selector and rollback are explicitly accepted."
-    - "If this is run as a Stage 13R follow-up, do not change worker defaults; write diagnostic evidence and ledger notes only."
+    - "If best thread count is workload-specific, implement a safe selector or record evidence only."
 
 quality_gates:
   - cmd: "python -m tools.docs.generate_docs_index --check"
@@ -142,7 +134,5 @@ final_report_format:
 
 # Task
 
-Run Stage 19 thread scaling benchmarks. When invoked as a Stage 13R follow-up,
-focus on TP/SL reversal/current exact/matrix 64x64/matrix 64x128 and do not
-change worker defaults. For general Stage 19, do not change worker defaults
-unless the service-wall evidence is clear and the ledger accepts the policy.
+Run Stage 19 thread scaling benchmarks. Do not change worker defaults unless the
+service-wall evidence is clear and the ledger accepts the policy.

@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_17_dynamic_backend_selector
 repo: roehub.com
 branch: main
-scope: "Later global backend selector only; do not use Stage 17 to bypass the Stage 13S narrow TP/SL selector gate."
+scope: "Later global backend selector only; do not use Stage 17 to revive or bypass the removed Stage 13/14 TP/SL branch."
 
 language:
   implementation: python
@@ -18,8 +18,6 @@ context_sources:
       why: "prior accepted/rejected modes"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "arity 2/3 and sidecar/cache stop-list"
-    - path: docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md
-      why: "Stage 13S owns the narrow TP/SL selector policy"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/
       why: "backend selection and scoring orchestration"
@@ -59,7 +57,7 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no canonical artifact writes."
 
 hard_requirements:
-  previous_stage_required: "Stage 13S decision complete for TP/SL selector policy, Stage 13R/14R decisions complete for reversal if TP/SL is in scope, and any Stage 16 reuse follow-up explicitly accepted if used"
+  previous_stage_required: "No-risk-only scope explicitly approved, or a new TP/SL production path accepted after the removed Stage 13/14 branch; any Stage 16 reuse follow-up explicitly accepted if used"
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage17_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
@@ -75,8 +73,8 @@ delivery_requirements:
 
 non_goals:
   - "Do not enable matrix_bitset_no_risk_v1 default for arity 2/3."
-  - "Do not implement the Stage 13S TP/SL long-only selector here."
-  - "Do not enable TP/SL backend default unless Stage 13S or a later TP/SL repair gate accepted that exact path."
+  - "Do not implement the removed Stage 13S TP/SL long-only selector here."
+  - "Do not enable TP/SL backend default unless a later TP/SL repair gate accepted that exact path."
   - "Do not use sidecar load as a default speedup."
   - "Do not change request hash or result semantics based on backend choice."
 
@@ -96,7 +94,7 @@ task:
     - "none/arity_6/long_only"
     - "none/arity_6/long_short_reversal"
     - "none/arity_7/long_only and long_short_reversal when Stage 12 remains eligible"
-    - "TP/SL rows only if a TP/SL backend is eligible from Stage 13S, Stage 14R, or a later accepted TP/SL stage"
+    - "TP/SL rows only if a TP/SL backend is eligible from a later accepted TP/SL stage"
 
 acceptance:
   correctness:
@@ -136,7 +134,7 @@ final_report_format:
 
 # Task
 
-Implement Stage 17 only as a later global selector. The narrow TP/SL long-only
-selector belongs to Stage 13S and must not be reimplemented or weakened here.
-The selector must protect small workloads, preserve accepted Stage 12 no-risk
-behavior where eligible, and keep Stage 05 as rollback/default comparison.
+Implement Stage 17 only as a later global selector. The removed Stage 13/14 TP/SL
+branch must not be reimplemented or weakened here. The selector must protect
+small workloads, preserve accepted Stage 12 no-risk behavior where eligible, and
+keep Stage 05 as rollback/default comparison.

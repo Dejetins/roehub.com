@@ -267,14 +267,12 @@ tested only under these constraints:
 | Compiled prefix product traversal | Stage 12; must be compiled/iterative hot path, not Python recursion/traversal |
 | Exact-safe prefix pruning inside traversal | Stage 12; may use eligibility upper bounds such as active bars, possible closed trades and exposure, not score/ranking upper bounds unless separately proven |
 | Selectivity-based indicator dimension order | Stage 12; compute order may change, but public variant order, `variant_hash`, result assembly and tie-break must remain canonical |
-| TP/SL full-grid `64 x 64` production candidate and block autotune | Stage 13; rejected after comparing `64 x 64`, `128 x 32`, `32 x 128`, `128 x 64`, `64 x 128` against Stage 09 accepted opt-in baseline |
-| TP/SL selective production gate | Stage 13S; new narrow selector gate: `tp_sl_grid/arity_6/long_only` with sufficiently large grid (`tp_count >= 64`, `sl_count >= 32`) may route to `matrix_cell_tp_sl_v1` shape `64 x 128`, while `long_short_reversal` and smaller grids must fall back to current exact unless separately repaired |
-| TP/SL reversal diagnostics | Stage 13R; telemetry-only accepted-for-learning stage before any reversal kernel repair |
-| TP/SL reversal kernel repair | Stage 14R; replaces the original Stage 14 monotonic-kernel dependency and may implement split-by-side or signal-exit shortcut only if Stage 13R identifies the dominant cost |
-| TP/SL monotonic cell kernel | Original Stage 14 is superseded/blocked; do not execute it as written against the rejected Stage 13 winner |
-| TP/SL total-return early abandon | Stage 15; deferred until Stage 14R or a separate exact-safe TP/SL repair gate is accepted; exact-safe only for `ranking=total_return_pct desc` and safe sizing/log-return bounds |
-| TP/SL reusable trade-window telemetry | Covered first by Stage 13R; any later Stage 16 grouped/cache work requires high reuse telemetry and must not use a Python dict runtime cache |
-| Dynamic backend selector by estimated work | Stage 17; protects arity 1/2/3 and small workloads from matrix fixed overhead |
+| TP/SL full-grid `64 x 64` production candidate and block autotune | Stage 13 rejected and removed from active tree; summary retained only in the negative-results stop-list |
+| TP/SL selective production selector and reversal repair | Stage 13S/13S2/13R/14R rejected or learning-only, then removed from active tree; do not continue this branch |
+| TP/SL monotonic cell kernel | Original Stage 14 superseded by failed Stage 13/14 branch; no executable prompt remains |
+| TP/SL total-return early abandon | Stage 15 is unblocked after Stage 13/14 cleanup; it must use the current exact TP/SL baseline on a Stage 05+12 production-default checkout and must not restore removed Stage 13/14 code |
+| TP/SL reusable trade-window telemetry | Stage 16 remains blocked; no grouped/cache work without a fresh compiled grouping plan |
+| Dynamic backend selector by estimated work | Stage 17 may be reopened only for accepted no-risk backends, or after a new accepted TP/SL production path exists |
 | Top-N/result assembly batch reduction | Stage 18; first measures assembly timers, then optional stable block top-M merge if assembly is hot |
 | Numba thread scaling by workload | Stage 19; benchmark matrix first, config update only after service-wall evidence |
 | Allocation reuse / per-child scratch buffers | Stage 20; starts with allocation telemetry, then per-child scratch only; no global cross-job cache |
@@ -405,38 +403,13 @@ Every stage record must include:
   `prefix_nodes_reused`, `prefix_pruned_subtrees`, `prefix_pruned_candidate_upper_bound`,
   `selectivity_order`, `combo_iteration_candidates_per_sec` and compiled-loop
   entry/exit timing;
-- Stage 13S TP/SL selector counters: `tp_sl_backend_selected`,
-  `tp_sl_backend_reason`, `tp_sl_backend_mode`, `tp_block_size`,
-  `sl_block_size`, and fallback reason;
-- Stage 13R/14R TP/SL reversal counters: `tp_sl_candidates_total`,
-  `tp_sl_candidates_scored`, `tp_sl_combo_count_planned`,
-  `tp_sl_candidates_after_proxy`, `tp_sl_total_trades`,
-  `tp_sl_long_trades`, `tp_sl_short_trades`, `tp_sl_reversal_transitions`,
-  `tp_sl_signal_exit_trades`, `tp_sl_close_on_end_trades`,
-  `tp_sl_avg_trades_per_candidate`, `tp_sl_p50_trades_per_candidate`,
-  `tp_sl_p95_trades_per_candidate`, `tp_sl_max_trades_per_candidate`,
-  `tp_sl_tp_count`, `tp_sl_sl_count`, `tp_sl_total_cells`,
-  `tp_sl_total_trade_cell_evals`, `tp_sl_trade_cell_evals_per_sec`,
-  `tp_sl_cell_blocks_total`, `tp_sl_cell_blocks_long`,
-  `tp_sl_cell_blocks_short`, `tp_sl_cell_blocks_mixed`,
-  `tp_sl_cell_block_shape`, `tp_sl_exit_reason_tp_count`,
-  `tp_sl_exit_reason_sl_count`, `tp_sl_exit_reason_signal_count`,
-  `tp_sl_exit_reason_end_count`, `tp_sl_exit_reason_tie_sl_wins_count`,
-  `tp_sl_signal_exit_before_any_hit_count`,
-  `tp_sl_signal_exit_before_any_hit_cell_count`,
-  `tp_sl_signal_exit_dominant_cell_pct`, `tp_sl_prepare_ms`,
-  `tp_sl_combo_iteration_ms`, `tp_sl_consensus_build_ms`,
-  `tp_sl_trade_tape_extract_ms`, `tp_sl_cell_scoring_ms`,
-  `tp_sl_best_cell_reduce_ms`, `tp_sl_heap_update_ms`,
-  `tp_sl_top_result_assembly_ms`, `tp_sl_payload_build_ms`,
-  `tp_sl_long_hit_time_reads`, `tp_sl_short_hit_time_reads`,
-  `tp_sl_no_hit_sentinel_reads`, `tp_sl_unique_entry_indices`,
-  `tp_sl_total_trade_windows`,
-  `tp_sl_unique_trade_windows`, `tp_sl_trade_window_reuse_ratio`,
+- Blocked TP/SL experimental counters remain non-active unless a new accepted
+  TP/SL plan reopens them: `early_abandon_cells`, `early_abandon_candidates`,
+  `tp_sl_total_trade_windows`, `tp_sl_unique_trade_windows`,
+  `tp_sl_trade_window_reuse_ratio`,
   `tp_sl_weighted_reuse_by_cell_count`,
-  `tp_sl_cache_candidate_savings_estimate`,
-  `tp_sl_cell_metric_buffer_bytes`, `tp_sl_trade_tape_buffer_bytes`,
-  `tp_sl_temp_alloc_count`, `tp_sl_temp_alloc_bytes`;
+  `tp_sl_top_reused_window_count`,
+  `tp_sl_cache_candidate_savings_estimate`;
 - Stage 17-20 overhead counters: backend selector decision/reason, estimated bit
   ops, estimated trade-cell ops, `heap_update_ms`, `top_result_proxy_fill_ms`,
   `variant_hash_ms`, `canonical_params_build_ms`, `payload_json_ms`,
@@ -560,14 +533,13 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 10 | Exact-safe high-arity pruning | Only monotonic/exact-safe pruning in default path; approximate beam remains explicit non-default mode |
 | 11 | Lazy detail reuse of sparse trade tape | Selected variant materialization latency benchmark; separate UX/perceived-latency gate |
 | 12 | Compiled prefix product traversal | Accepted 2026-06-13 and productionized through composite default: Stage 05 remains default for `none/arity_6`, `compiled_prefix_product_traversal_v1` becomes default for `none/arity_7`; explicit Stage 12 mode still supports arity `6`/`7`; stable top-50 `variant_hash`/rank/metrics matched baseline |
-| 13 | TP/SL `64 x 64` production gate and block autotune | Rejected 2026-06-13: shape matrix preserved parity and memory, but no block shape improved both TP/SL heavy rows by `>=15%` versus Stage 09 `64 x 64`; backend remains opt-in/internal |
-| 13S | Selective TP/SL production gate | Next executable stage. Candidate selector may route only `tp_sl_grid/arity_6/long_only` with `tp_count >= 64` and `sl_count >= 32` to `matrix_cell_tp_sl_v1` shape `64 x 128`; `long_short_reversal` and smaller grids must route to current exact. Accept only if long-only improves `>=25%` vs current exact and `>=15%` vs Stage 09, reversal service wall regresses by no more than `2%`, combined mandatory TP/SL service wall improves `>=20%` vs current exact, parity and selector telemetry pass, and rollback `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=off` is present |
-| 13R | TP/SL reversal diagnostic telemetry | Accepted_for_learning only. Add current-exact and matrix-cell counters for reversal cost attribution with no behavior change, same top-N/metrics, and service-wall overhead `<=3%`; record whether side-branching, signal-exit dominance, trade-window reuse, thread scaling or allocation pressure is the likely next cost center |
-| 14 | Original TP/SL monotonic cell kernel | Superseded/blocked. Do not execute the old Stage 14 prompt against the rejected Stage 13 winner |
-| 14R | TP/SL reversal kernel repair | Blocked until Stage 13R is accepted_for_learning. Candidate direction is split-by-side reversal kernel; optional signal-exit dominated shortcut only if Stage 13R shows enough signal-exit-dominant cells. Accept only with exact top-N/best TP/best SL/metric parity, SL-wins tie preservation, reversal service wall `>=10-15%` better than current exact, and long-only no regression |
-| 15 | TP/SL total-return early abandon | Deferred until Stage 14R or a separate exact-safe TP/SL repair gate is accepted; exact-safe bound proof for `total_return_pct desc`; same output, lower scored cells/candidates and service wall no regression |
-| 16 | TP/SL trade-window reuse telemetry/grouping decision | Superseded by Stage 13R for first telemetry. Reopen only if Stage 13R records high reuse; no runtime cache or grouped implementation without compiled sort/group design and fresh gate |
-| 17 | Dynamic backend selector | Later global selector only. Do not use it to bypass Stage 13S. No regression on arity 1/2/3, accepted no-risk speed retained on arity 6/7, selector decision telemetry recorded |
+| 13 | TP/SL block-shape production gate | Rejected and removed from active tree; not executable |
+| 13S/13S2 | TP/SL selective selector | Rejected and removed from active tree; not executable |
+| 13R | TP/SL reversal diagnostics | Learning-only result retained in negative-results; runtime diagnostics removed from active tree |
+| 14/14R | TP/SL monotonic/split-by-side repair | Superseded/rejected and removed from active tree; not executable |
+| 15 | TP/SL total-return early abandon | Unblocked; exact-safe upper-bound proof and Mac Studio A/B versus current exact TP/SL baseline required |
+| 16 | TP/SL trade-window reuse telemetry | Blocked until a new TP/SL telemetry/repair plan is accepted; no cache/grouped work |
+| 17 | Dynamic backend selector | Blocked for TP/SL; may be reopened only for accepted no-risk backends with a new scoped prompt |
 | 18 | Top-N/result assembly batch reduction | Assembly timers measured first; optional stable block top-M merge only if assembly is hot and top-N identity/order is unchanged |
 | 19 | Thread scaling benchmark | `NUMBA_NUM_THREADS=1,2,4,6,8,12` matrix; worker config change only after service-wall evidence |
 | 20 | Allocation reuse and scratch buffers | Allocation telemetry first; per-child scratch buffers only if service wall or RSS improves without cleanup regression |
@@ -588,14 +560,10 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 10 | exact-safe pruning planner | arity 7/10 bounded-search evidence |
 | 11 | lazy materialization backend adapter | lazy trades benchmark evidence |
 | 12 | `prefix_traversal.py` registered as `compiled_prefix_product_traversal_v1`; no Python recursion in hot path; production composite default mode `stage_05_and_12_no_risk` | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/` |
-| 13 | TP/SL block-shape autotune harness and selector guard; no production runtime accepted | `benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/` |
-| 13S | narrow TP/SL selector and rollback env `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=off\|stage_13s_selector\|matrix_cell_force`; selector guards on `risk_mode`, arity, direction and TP/SL grid size; telemetry records backend/reason/block shape/fallback | `benchmark_iterations/<date>_matrix_bitset_stage_13s_tp_sl_selective_selector/` |
-| 13R | reversal diagnostic counters in current exact and matrix-cell paths; no scoring/default behavior change | `benchmark_iterations/<date>_matrix_bitset_stage_13r_tp_sl_reversal_diagnostics/` |
-| 14 | none; original prompt superseded | none |
-| 14R | split-by-side reversal kernel and optional signal-exit shortcut behind env override if Stage 13R supports it | `benchmark_iterations/<date>_matrix_bitset_stage_14r_tp_sl_reversal_repair/` |
-| 15 | exact-safe total-return early-abandon implementation behind env override, only after 14R or equivalent repair gate | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |
-| 16 | optional compiled trade-window grouping study only if Stage 13R telemetry proves high reuse; no Python dict cache | `benchmark_iterations/<date>_matrix_bitset_stage_16_trade_window_grouping/` |
-| 17 | global dynamic backend selector and decision telemetry, excluding the Stage 13S narrow selector already owned by Stage 13S | `benchmark_iterations/<date>_matrix_bitset_stage_17_dynamic_selector/` |
+| 13/13S/13S2/13R/14R | none; rejected branch removed from active tree | no raw evidence retained in active tree; compact stop-list in `backtest-compute-acceleration-negative-results-v1.md` |
+| 15 | exact-safe early-abandon implementation in the current exact TP/SL scorer plus a dedicated benchmark selector if missing; no Stage 13/14 runtime, prompt or harness restore | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |
+| 16 | blocked; no telemetry/grouping/cache work until a new TP/SL plan is accepted | none |
+| 17 | blocked for TP/SL; optional future no-risk selector requires a new scoped prompt | none |
 | 18 | top-N/result assembly timers and optional stable block top-M merge | `benchmark_iterations/<date>_matrix_bitset_stage_18_topn_batch_reduction/` |
 | 19 | thread-scaling benchmark harness/report; config update only if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_19_thread_scaling/` |
 | 20 | allocation counters and per-child scratch buffers if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_20_allocation_reuse/` |
@@ -611,7 +579,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Persisted schema | `none` initially | Bitset artifacts are file artifacts, not DB schema |
 | Canonical artifact file/manifest schema | `none` initially | Stage 07 sidecar files do not change canonical `manifest.yaml`, `current.yaml` or active-slot artifacts |
 | Test sidecar artifact metadata | `compatible-change` | New benchmark/test-only `matrix_sidecar_manifest.json` records source hashes, shapes, dtypes and schema version |
-| Config schema | `compatible-change` | Optional matrix backend modes/env overrides, Stage 13S `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=off\|stage_13s_selector\|matrix_cell_force`, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
+| Config schema | `compatible-change` | Optional matrix backend modes/env overrides, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
 | Worker/thread config | `compatible-change` | Stage 19 may add workload-specific thread policy only after benchmark evidence; fixed current behavior remains rollback |
 | Request hash / cache identity | `none` | Result-affecting backend must not enter public request hash unless semantics change, which is out of scope |
 | Service-call semantics | `none` | Same API/runner/child process topology |
@@ -679,16 +647,6 @@ Each row must record:
   service path.
 - TP/SL monotonic and early-abandon stages can only apply to exact-safe surfaces;
   unsupported rankings must fall back to current exact scoring.
-- Stage 13 TP/SL block-shape autotune is rejected as a global production gate.
-  Do not enable `64 x 128` globally: it improved `long_only` but did not improve
-  `long_short_reversal`. Any production use of `64 x 128` must go through Stage
-  13S selective routing with explicit reversal exact fallback and rollback.
-- Stage 13R diagnostic telemetry is allowed to unlock a repair direction, but it
-  is not production acceleration by itself. It must not change result semantics,
-  request hash/cache identity, or default backend behavior.
-- Original Stage 14 monotonic-cell work is superseded until Stage 13R identifies
-  the reversal dominant cost. Stage 14R is the replacement gate for exact-safe
-  reversal kernel repair.
 - Dynamic selector mistakes can silently erase Stage 12 no-risk wins, Stage 05
   rollback/default behavior, or re-enable arity 2/3 regressions, so selector
   telemetry and rollback override are mandatory.

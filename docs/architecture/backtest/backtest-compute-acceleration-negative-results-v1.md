@@ -4,7 +4,7 @@
 или были явно отклонены и не должны повторно попадать в production-план как
 доказанное ускорение без нового benchmark-gated плана.
 
-Актуально на 2026-06-10. Канонический журнал выполнения:
+Актуально на 2026-06-14. Канонический журнал выполнения:
 `docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md`.
 Каноническая evidence-папка:
 `docs/architecture/backtest/benchmark_iterations/`.
@@ -38,7 +38,10 @@
 | TP/SL full-grid block shape `16 x 16` | diagnostic fail | parity прошла, но speed gate failed; accepted shape была `64 x 64` |
 | High-arity min-trade pruning Python traversal | accepted_for_learning only | exact-safe rule полезен, но traversal cost съел потенциальный выигрыш |
 | Lazy detail sparse trade tape reuse | rejected | latency delta меньше 1%, недостаточно для runtime change |
-| TP/SL block-shape autotune after Stage 09 | rejected | long-only rows improved, but no global shape improved both TP/SL heavy rows by >=15%; reversal was no-op/regression |
+| TP/SL block-shape production gate | rejected and removed | ни одна форма block scoring не дала accepted service-wall win на обеих TP/SL heavy rows |
+| TP/SL selective production selector | rejected and removed | исходный threshold не выбрал mandatory fixture, а `47 x 32` retest регрессировал |
+| TP/SL reversal diagnostics | learning only, removed from runtime | counters полезны, но current-exact diagnostics дали `+99.5%` overhead |
+| TP/SL split-by-side reversal repair | rejected and removed | parity прошла, но service wall и exact scoring регрессировали |
 | Full pair cache / dense tensor | not accepted | memory/cost risk dominates; dense tensor explicitly rejected |
 
 ## Подробности По Методам
@@ -241,44 +244,6 @@ Evidence:
 Stage 09 shape - `64 x 64` из
 `2026-06-10_matrix_bitset_stage_09_tp_sl_full_grid_64x64_rerun/`.
 
-### Stage 13 TP/SL Block-Shape Autotune
-
-Evidence:
-`docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/`.
-
-Scope: compare Stage 09 accepted `64 x 64` against `128 x 32`, `32 x 128`,
-`128 x 64`, and `64 x 128` on the same TP/SL full-grid arity-6 rows.
-
-Result:
-
-| Shape | Long-only wall delta vs Stage 09 | Reversal wall delta vs Stage 09 | Decision |
-|---|---:|---:|---|
-| `128 x 32` | `+24.615%` | `+0.011%` | rejected |
-| `32 x 128` | `+24.969%` | `-0.340%` | rejected |
-| `128 x 64` | `+26.124%` | `-1.882%` | rejected |
-| `64 x 128` | `+27.558%` | `-0.086%` | rejected |
-
-Top sample identity/order, `best_tp`, `best_sl` and metrics matched current exact
-and Stage 09 controls for accepted-input runs, and memory stayed inside the
-`>10%` regression limit. The stage is still rejected because the gate required a
-single global shape to improve both required TP/SL rows by at least `15%`.
-
-Запрет на повтор: не делать TP/SL backend default только на основании long-only
-ускорения. Любой возврат block autotune должен быть новым gate с отдельным
-решением для reversal cost center или selector policy; текущий Stage 13 не
-разблокирует Stage 14.
-
-Разрешенный следующий путь после этого rejection:
-
-- Stage 13S может проверить narrow selector policy, где только
-  `tp_sl_grid/arity_6/long_only` с достаточно большой сеткой (`tp_count >= 64`,
-  `sl_count >= 32`) получает `matrix_cell_tp_sl_v1` shape `64 x 128`, а
-  `long_short_reversal` и меньшие сетки явно остаются на current exact path.
-- Stage 13R может добавить telemetry-only counters для диагностики reversal, но
-  это `accepted_for_learning`, не production speedup.
-- Старый Stage 14 monotonic-cell prompt нельзя исполнять против rejected Stage
-  13 winner; replacement должен опираться на Stage 13R evidence.
-
 ### Stage 10 High-Arity Min-Trade Pruning
 
 Evidence:
@@ -338,6 +303,43 @@ materialization, без bulk top-N scoring change.
 Вывод: parity прошла и регрессии нет, но delta меньше `1%` на miss path. Это не
 material speedup и не оправдывает production runtime complexity.
 
+### Stage 13/14 TP/SL Production Candidate Branch
+
+Cleanup note: raw Stage 13/13S/13S2/13R/14R evidence directories, dedicated
+benchmark harnesses and executed prompt files were removed from the active tree
+on 2026-06-14 to avoid keeping a rejected branch as executable code/docs. This
+section is the durable stop-list summary.
+
+Rejected attempts:
+
+- Stage 13 TP/SL block-shape production gate kept parity, but no tested shape
+  (`64 x 64`, `128 x 32`, `32 x 128`, `128 x 64`, `64 x 128`) improved both
+  mandatory TP/SL heavy rows by the required `>=15%` service-wall threshold.
+- Stage 13S selective selector with `tp_count >= 64`, `sl_count >= 32` did not
+  select the mandatory full-grid fixture because the real fixture was
+  `tp_count=47`, `sl_count=47`.
+- Stage 13S2 changed the threshold to `tp_count >= 47`, `sl_count >= 32`; the
+  selector chose `matrix_cell_tp_sl_v1`, but long-only regressed
+  `17.901s -> 19.573s` (`-9.342%`) and combined mandatory rows regressed
+  `33.419s -> 35.265s` (`-5.524%`).
+- Stage 13R diagnostics were useful only as learning: current-exact reversal
+  diagnostics changed `15.528s -> 30.980s` (`+99.5%` overhead), so diagnostic
+  counters are not accepted runtime behavior.
+- Stage 14R split-by-side reversal repair preserved parity but regressed
+  reversal service wall `15.578s -> 16.574s` (`-6.393%`) and exact scoring
+  `15.182s -> 16.133s` (`-6.261%`), with higher sampled RSS.
+
+Запрет на повтор:
+
+- не возвращать Stage 13 block autotune как production gate without a new cost
+  model and Mac Studio A/B evidence;
+- не включать `ROEHUB_BACKTEST_TP_SL_BACKEND_MODE=stage_13s_selector` or an
+  equivalent narrow TP/SL selector;
+- не добавлять current-exact reversal diagnostic counters to the default scoring
+  hot path;
+- не продолжать split-by-side / entry-major reversal kernel repair as the next
+  implementation direction.
+
 ### Full Pair Cache And Dense Tensor Designs
 
 Source:
@@ -365,12 +367,9 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не включать `matrix_bitset_no_risk_v1` default для arity 2/3.
 - Не включать TP/SL selected-cell shadow как production backend.
 - Не использовать TP/SL block shape `16 x 16` как accepted shape.
-- Не принимать Stage 13 TP/SL block autotune как production gate: long-only
-  выигрывает, но reversal не проходит `>=15%` service-wall threshold.
-- Не включать `64 x 128` глобально. Его можно рассматривать только в Stage 13S
-  narrow selector с reversal exact fallback и rollback env.
-- Не запускать старый Stage 14 monotonic-cell kernel без Stage 13R reversal
-  diagnostics и нового replacement gate.
+- Не возвращать Stage 13 block-shape production gate, Stage 13S/13S2 selector,
+  Stage 13R current-exact diagnostics or Stage 14R split-by-side repair without
+  a new benchmark-gated architecture decision.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.
@@ -393,6 +392,5 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
   `64 x 64`, opt-in через internal env mode;
 - Stage 01/02/03/07/08/10 learning/telemetry/shadow artifacts только как
   диагностическая база, не как доказанное production speedup.
-
-Stage 13 TP/SL block autotune не accepted: он сохраняет полезную evidence
-matrix, но не меняет production/default policy.
+- Stage 12 `compiled_prefix_product_traversal_v1` production composite default
+  для no-risk arity `7`, while Stage 05 remains default for no-risk arity `6`.

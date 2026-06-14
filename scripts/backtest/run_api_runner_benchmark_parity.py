@@ -81,7 +81,6 @@ STAGE_08_TP_SL_SELECTED_STEP_PCT = 0.5
 STAGE_09_TP_SL_FULL_GRID_ARITY = 6
 STAGE_09_TP_SL_FULL_GRID_DIRECTIONS = ("long_only", "long_short_reversal")
 STAGE_09_MATRIX_BACKEND_MODE = "stage_09_tp_sl_full_grid"
-STAGE_13_TP_SL_CURRENT_EXACT_BACKEND_MODE = "current_exact"
 STAGE_12_COMPILED_PREFIX_ARITIES = (6, 7)
 STAGE_12_COMPILED_PREFIX_DIRECTIONS = ("long_only", "long_short_reversal")
 STAGE_12_MATRIX_BACKEND_MODE = "stage_12_compiled_prefix_traversal"
@@ -147,17 +146,6 @@ def main(argv: list[str] | None = None) -> int:
         os.environ[TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY] = str(
             args.tp_sl_cell_block_sl_count
         )
-    if args.stage_13_tp_sl_current_exact_rows:
-        matrix_backend_mode = os.environ.get(MATRIX_BACKEND_MODE_ENV_KEY, "").strip()
-        if matrix_backend_mode in {
-            STAGE_09_MATRIX_BACKEND_MODE,
-            "matrix_cell_tp_sl_v1",
-        }:
-            raise RuntimeError(
-                "--stage-13-tp-sl-current-exact-rows must run with "
-                f"{MATRIX_BACKEND_MODE_ENV_KEY} unset, off, or a no-risk-only "
-                f"default; got {matrix_backend_mode!r}"
-            )
     if args.stage_12_compiled_prefix_rows and not os.environ.get(
         MATRIX_BACKEND_MODE_ENV_KEY
     ):
@@ -194,10 +182,6 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.stage_09_tp_sl_full_grid:
         reference_runs, excluded = _stage_09_tp_sl_full_grid_reference_runs(
-            reference=reference
-        )
-    if args.stage_13_tp_sl_current_exact_rows:
-        reference_runs, excluded = _stage_13_tp_sl_current_exact_reference_runs(
             reference=reference
         )
     if args.stage_12_compiled_prefix_rows:
@@ -245,9 +229,6 @@ def main(argv: list[str] | None = None) -> int:
             "stage_05_no_risk_heavy_rows": args.stage_05_no_risk_heavy_rows,
             "stage_08_tp_sl_selected_cells": args.stage_08_tp_sl_selected_cells,
             "stage_09_tp_sl_full_grid": args.stage_09_tp_sl_full_grid,
-            "stage_13_tp_sl_current_exact_rows": (
-                args.stage_13_tp_sl_current_exact_rows
-            ),
             "stage_12_compiled_prefix_rows": args.stage_12_compiled_prefix_rows,
             "stage_05_12_production_default_rows": (
                 args.stage_05_12_production_default_rows
@@ -425,15 +406,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Run TP/SL arity-6 full-grid rows with matrix_cell_tp_sl_v1 "
             "enabled through ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
-        ),
-    )
-    parser.add_argument(
-        "--stage-13-tp-sl-current-exact-rows",
-        action="store_true",
-        help=(
-            "Run TP/SL arity-6 full-grid rows through the current exact backend "
-            "without forcing matrix_cell_tp_sl_v1; used as Stage 13 current "
-            "exact control evidence."
         ),
     )
     parser.add_argument(
@@ -1534,21 +1506,6 @@ def _stage_09_tp_sl_full_grid_reference_runs(
         "reason": (
             "stage_09_tp_sl_full_grid: run TP/SL arity 6 full request grids "
             "for matrix_cell_tp_sl_v1 evidence"
-        ),
-    }
-
-
-def _stage_13_tp_sl_current_exact_reference_runs(
-    *,
-    reference: Mapping[str, Any],
-) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
-    runs, excluded = _stage_09_tp_sl_full_grid_reference_runs(reference=reference)
-    return runs, {
-        **excluded,
-        "matrix_backend_mode": STAGE_13_TP_SL_CURRENT_EXACT_BACKEND_MODE,
-        "reason": (
-            "stage_13_tp_sl_current_exact_rows: run TP/SL arity 6 full request "
-            "grids through the current exact backend as the Stage 13 control"
         ),
     }
 
@@ -2986,9 +2943,6 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
     stage_05_no_risk_heavy_rows = bool(request.get("stage_05_no_risk_heavy_rows"))
     stage_08_tp_sl_selected_cells = bool(request.get("stage_08_tp_sl_selected_cells"))
     stage_09_tp_sl_full_grid = bool(request.get("stage_09_tp_sl_full_grid"))
-    stage_13_tp_sl_current_exact_rows = bool(
-        request.get("stage_13_tp_sl_current_exact_rows")
-    )
     stage_12_compiled_prefix_rows = bool(request.get("stage_12_compiled_prefix_rows"))
     stage_05_12_production_default_rows = bool(
         request.get("stage_05_12_production_default_rows")
@@ -3002,8 +2956,6 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_08_tp_sl_selected_cells
         else "# Stage 09 TP/SL full-grid cell backend API-runner benchmark"
         if stage_09_tp_sl_full_grid
-        else "# Stage 13 TP/SL current-exact API-runner control benchmark"
-        if stage_13_tp_sl_current_exact_rows
         else "# Stage 12 compiled prefix traversal API-runner benchmark"
         if stage_12_compiled_prefix_rows
         else "# Stage 05+12 no-risk production default API-runner benchmark"
@@ -3019,8 +2971,6 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         if stage_08_tp_sl_selected_cells
         else "BTCUSDT / 15m / tp_sl_grid / arity 6 / full request grid"
         if stage_09_tp_sl_full_grid
-        else "BTCUSDT / 15m / tp_sl_grid / arity 6 / current exact full request grid"
-        if stage_13_tp_sl_current_exact_rows
         else "BTCUSDT / 15m / none / arity 6-7 / long_only + long_short_reversal"
         if stage_12_compiled_prefix_rows
         else "BTCUSDT / 15m / none / production default arity 6-7 / long_only + long_short_reversal"
@@ -3041,10 +2991,6 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "tp_sl_grid/arity_6/long_short_reversal / full grid / "
         "REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
         if stage_09_tp_sl_full_grid
-        else "- BTCUSDT / 15m / tp_sl_grid/arity_6/long_only + "
-        "tp_sl_grid/arity_6/long_short_reversal / current exact full grid / "
-        "REQUEST_TOP_N = 50 / BENCHMARK_TOP_K = 5"
-        if stage_13_tp_sl_current_exact_rows
         else "- BTCUSDT / 15m / none/arity_6..7/long_only + "
         "none/arity_6..7/long_short_reversal / REQUEST_TOP_N = 50 / "
         "BENCHMARK_TOP_K = 5"
@@ -3073,10 +3019,6 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "exact parity, cell-block counters, `trade_cell_evals_per_sec`, memory "
         "cleanup и service wall против May 2 reference."
         if stage_09_tp_sl_full_grid
-        else "Проверить Stage 13 current-exact control для TP/SL full-grid rows: "
-        "generic exact backend, parity, memory cleanup и service wall как базу "
-        "для block autotune production gate."
-        if stage_13_tp_sl_current_exact_rows
         else "Проверить Stage 12 `compiled_prefix_product_traversal_v1`: "
         "compiled prefix counters, arity-7 service wall, arity-6 no-regression, "
         "top-N parity and canonical output identity."

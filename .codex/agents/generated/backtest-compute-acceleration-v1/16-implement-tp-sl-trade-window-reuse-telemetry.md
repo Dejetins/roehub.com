@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_16_tp_sl_trade_window_reuse_telemetry
 repo: roehub.com
 branch: main
-scope: "Deferred/superseded: Stage 13R owns first TP/SL trade-window reuse telemetry; reopen only for compiled grouping after high reuse evidence."
+scope: "Deferred/blocked: removed Stage 13R was learning-only diagnostics; reopen only after a fresh TP/SL plan proves high weighted reuse evidence."
 
 language:
   implementation: python
@@ -18,8 +18,6 @@ context_sources:
       why: "Stage 15 gate"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "avoid Stage 06 cache pattern"
-    - path: docs/architecture/backtest/benchmark_iterations/2026-06-13_matrix_bitset_stage_13_tp_sl_block_autotune/model_handoff_report.md
-      why: "Stage 13R pulls trade-window reuse counters into reversal diagnostics"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/tp_sl_cells.py
       why: "TP/SL trade windows are produced/scored here"
@@ -59,7 +57,7 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no source artifact writes."
 
 hard_requirements:
-  previous_stage_required: "13R accepted_for_learning with high weighted trade-window reuse, or a later explicit decision to reopen compiled grouping; Stage 16 is not the first telemetry stage anymore"
+  previous_stage_required: "A later explicit decision to reopen compiled TP/SL grouping after the removed Stage 13/14 branch; Stage 16 is not the first telemetry stage anymore"
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage16_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
@@ -79,10 +77,10 @@ non_goals:
   - "Do not use Python dict cache in hot path."
   - "Do not group or reorder scoring results."
   - "Do not change top-N, metrics, request hash, cache identity or payload shape."
-  - "Do not duplicate Stage 13R counters unless Stage 13R evidence shows a specific reuse-focused follow-up is needed."
+  - "Do not duplicate the removed Stage 13R diagnostic branch."
 
 task:
-  summary: "Only reopen this prompt after Stage 13R proves high weighted reuse; otherwise treat it as superseded by Stage 13R telemetry."
+  summary: "Only reopen this prompt after a fresh TP/SL plan proves high weighted reuse; otherwise keep it superseded/blocked."
   required_counters:
     - "tp_sl_total_trade_windows"
     - "tp_sl_unique_trade_windows"
@@ -129,6 +127,6 @@ final_report_format:
 
 # Task
 
-Do not execute Stage 16 as the first trade-window telemetry pass. Stage 13R now
-owns those counters. Reopen this prompt only if Stage 13R proves high weighted
-reuse and the next task is a focused compiled grouping decision.
+Do not execute Stage 16 as the first trade-window telemetry pass. Reopen this
+prompt only if a fresh TP/SL plan proves high weighted reuse and the next task is
+a focused compiled grouping decision.
