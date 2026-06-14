@@ -4,7 +4,10 @@ from typing import Callable, Literal, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from apps.api.dto.ui_backtests import BacktestWorkstationResponse
+from apps.api.dto.ui_backtests import (
+    BacktestArtifactDateBoundsResponse,
+    BacktestWorkstationResponse,
+)
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.platform.errors import RoehubError
 
@@ -28,6 +31,16 @@ class BacktestWorkstationService(Protocol):
         launched_to: str | None,
         refresh: Literal["initial", "auto", "manual"],
     ) -> BacktestWorkstationResponse:
+        ...
+
+    def get_artifact_date_bounds(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+    ) -> BacktestArtifactDateBoundsResponse:
         ...
 
 
@@ -97,6 +110,23 @@ def build_ui_backtests_router(
             launched_from=normalized_launched_from or None,
             launched_to=normalized_launched_to or None,
             refresh=refresh,
+        )
+
+    @router.get(
+        "/ui/backtests/artifact-date-bounds",
+        response_model=BacktestArtifactDateBoundsResponse,
+    )
+    def get_backtest_artifact_date_bounds(
+        exchange: str = Query(default="binance"),
+        market_type: str = Query(default="spot"),
+        symbol: str = Query(default="BTCUSDT"),
+        principal: CurrentUserPrincipal = Depends(require_backtest_workstation_user),
+    ) -> BacktestArtifactDateBoundsResponse:
+        return workstation_service.get_artifact_date_bounds(
+            principal=principal,
+            exchange=exchange.strip().casefold(),
+            market_type=market_type.strip().casefold(),
+            symbol=symbol.strip().upper(),
         )
 
     return router

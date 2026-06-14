@@ -60,6 +60,11 @@ R12 implementation-facing code surface near this runbook:
   - `artifact_slot_generation`
   - `artifact_manifest_hash`
   - `artifact_asof_date`
+- Web UI configurator читает `artifact_asof_date` из active artifact pointer как
+  верхнюю границу `end date` для выбранного symbol root. Если дата в UI выглядит
+  устаревшей, сначала проверяйте `current.yaml` и успешность последнего publish
+  для конкретных `{exchange, market_type, symbol}`; не исправляйте это ручным
+  редактированием date input или partial overwrite `current.yaml`.
 
 ## Artifact Config Source Of Truth
 

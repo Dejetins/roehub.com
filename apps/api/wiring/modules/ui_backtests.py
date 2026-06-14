@@ -8,6 +8,7 @@ from typing import Any, Literal, Mapping, Protocol
 from fastapi import APIRouter
 
 from apps.api.dto.ui_backtests import (
+    BacktestArtifactDateBoundsResponse,
     BacktestConfigDraftResponse,
     BacktestFooterStatusResponse,
     BacktestIndicatorCatalogResponse,
@@ -45,6 +46,11 @@ from trading.contexts.backtest.adapters.outbound import (
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
+from trading.contexts.backtest.application.dto import (
+    BacktestArtifactMetadata,
+    BacktestCoordinates,
+)
+from trading.contexts.backtest.application.ports import BacktestArtifactContextUnavailable
 from trading.contexts.backtest.application.services.v2 import (
     BacktestPreflightService,
     BacktestRuntimeConfig,
@@ -83,6 +89,8 @@ class _RefreshDecision:
 class _InstrumentUniverseReadModel:
     universe: BacktestInstrumentUniverseResponse
     source: BacktestWorkstationSourceResponse
+    selected_exchange: str
+    selected_market_type: str
 
 
 class _ListEnabledMarketsService(Protocol):
@@ -98,6 +106,11 @@ class _SearchEnabledTradableInstrumentsService(Protocol):
         q: str | None = None,
         limit: int | None = None,
     ) -> tuple[InstrumentId, ...]:
+        ...
+
+
+class _BacktestArtifactContextResolver(Protocol):
+    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
         ...
 
 
@@ -150,6 +163,7 @@ class BacktestWorkstationQueryService:
         search_enabled_tradable_instruments_use_case: (
             _SearchEnabledTradableInstrumentsService | None
         ) = None,
+        artifact_context_resolver: _BacktestArtifactContextResolver | None = None,
         refresh_limiter: BacktestWorkstationManualRefreshLimiter | None = None,
     ) -> None:
         self._runtime_defaults_service = runtime_defaults_service
@@ -159,6 +173,7 @@ class BacktestWorkstationQueryService:
         self._search_enabled_tradable_instruments_use_case = (
             search_enabled_tradable_instruments_use_case
         )
+        self._artifact_context_resolver = artifact_context_resolver
         self._refresh_limiter = refresh_limiter or BacktestWorkstationManualRefreshLimiter()
 
     def get_workstation(
@@ -189,6 +204,15 @@ class BacktestWorkstationQueryService:
             exchange=instrument_exchange,
             market_type=instrument_market_type,
             generated_at=generated_at,
+        )
+        draft_symbol = _first(
+            tuple(instrument_universe.universe.selected_symbols),
+            default=_first(self._instrument_symbols, default="BTCUSDT"),
+        )
+        date_bounds = self._resolve_artifact_date_bounds(
+            exchange=instrument_universe.selected_exchange,
+            market_type=instrument_universe.selected_market_type,
+            symbol=draft_symbol,
         )
         job_table = self._build_job_table(
             principal=principal,
@@ -235,7 +259,15 @@ class BacktestWorkstationQueryService:
             retry_after_seconds=refresh_decision.retry_after_seconds,
             sources=sources,
             runtime_defaults=runtime_defaults,
-            config_draft=_build_config_draft(runtime_defaults=runtime_defaults),
+            config_draft=_build_config_draft(
+                runtime_defaults=runtime_defaults,
+                coordinates={
+                    "exchange": instrument_universe.selected_exchange,
+                    "market_type": instrument_universe.selected_market_type,
+                    "symbol": draft_symbol,
+                },
+                date_bounds=date_bounds,
+            ),
             instrument_universe=instrument_universe.universe,
             indicator_catalog=_build_indicator_catalog(runtime_defaults=runtime_defaults),
             optimization_overview=optimization,
@@ -257,6 +289,71 @@ class BacktestWorkstationQueryService:
                 next_allowed_refresh_at=_iso_or_none(refresh_decision.next_allowed_refresh_at),
                 retry_after_seconds=refresh_decision.retry_after_seconds,
             ),
+        )
+
+    def get_artifact_date_bounds(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+    ) -> BacktestArtifactDateBoundsResponse:
+        del principal
+        return self._resolve_artifact_date_bounds(
+            exchange=exchange,
+            market_type=market_type,
+            symbol=symbol,
+        )
+
+    def _resolve_artifact_date_bounds(
+        self,
+        *,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+    ) -> BacktestArtifactDateBoundsResponse:
+        coordinates = {
+            "exchange": exchange.strip().casefold() or "binance",
+            "market_type": market_type.strip().casefold() or "spot",
+            "symbol": symbol.strip().upper() or "BTCUSDT",
+        }
+        if self._artifact_context_resolver is None:
+            return BacktestArtifactDateBoundsResponse(
+                source="artifact_current_pointer",
+                state="unavailable",
+                coordinates=coordinates,
+                default_end=None,
+                max_end=None,
+                artifact_metadata=None,
+                degradation_reason="backtest artifact context resolver is not configured",
+            )
+        try:
+            metadata = self._artifact_context_resolver.resolve_context(
+                coordinates=BacktestCoordinates(
+                    exchange=coordinates["exchange"],
+                    market_type=coordinates["market_type"],
+                    symbol=coordinates["symbol"],
+                )
+            )
+        except (BacktestArtifactContextUnavailable, FileNotFoundError, ValueError) as error:
+            return BacktestArtifactDateBoundsResponse(
+                source="artifact_current_pointer",
+                state="unavailable",
+                coordinates=coordinates,
+                default_end=None,
+                max_end=None,
+                artifact_metadata=None,
+                degradation_reason=str(error),
+            )
+        return BacktestArtifactDateBoundsResponse(
+            source="artifact_current_pointer",
+            state="ready",
+            coordinates=coordinates,
+            default_end=metadata.artifact_asof_date,
+            max_end=metadata.artifact_asof_date,
+            artifact_metadata=metadata.as_mapping(),
+            degradation_reason=None,
         )
 
     def _build_instrument_universe(
@@ -334,6 +431,8 @@ class BacktestWorkstationQueryService:
                     else "selected market returned no enabled tradable instruments",
                 ),
                 source=_source(_MARKET_REFERENCE_SOURCE, "available", generated_at),
+                selected_exchange=selected_market.exchange_name.casefold(),
+                selected_market_type=selected_market.market_type.casefold(),
             )
         except Exception as error:
             return _build_fallback_instrument_universe(
@@ -474,6 +573,7 @@ def build_ui_backtests_router(
             search_enabled_tradable_instruments_use_case=(
                 market_data_reference_use_cases.search_enabled_tradable_instruments
             ),
+            artifact_context_resolver=artifact_context_resolver,
         ),
         current_user_dependency=current_user_dependency,
     )
@@ -494,19 +594,32 @@ def _source(
     )
 
 
-def _build_config_draft(*, runtime_defaults: Mapping[str, Any]) -> BacktestConfigDraftResponse:
+def _build_config_draft(
+    *,
+    runtime_defaults: Mapping[str, Any],
+    coordinates: Mapping[str, str] | None = None,
+    date_bounds: BacktestArtifactDateBoundsResponse | None = None,
+) -> BacktestConfigDraftResponse:
     indicator_ids = list(runtime_defaults.get("supported_indicator_ids") or [])
     indicator_sources = dict(runtime_defaults.get("indicator_sources") or {})
     indicator_param_specs = dict(runtime_defaults.get("indicator_param_specs") or {})
     ranking_default = dict(runtime_defaults.get("ranking_default") or {})
     execution_defaults = dict(runtime_defaults.get("execution_defaults") or {})
-    default_end = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    default_end = (
+        date_bounds.default_end
+        if date_bounds is not None and date_bounds.default_end
+        else (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    )
     supported_timeframes = runtime_defaults.get("supported_timeframes")
     direction_modes = runtime_defaults.get("direction_modes")
     return BacktestConfigDraftResponse(
-        coordinates={"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"},
+        coordinates=dict(
+            coordinates
+            or {"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"}
+        ),
         timeframe=_preferred(supported_timeframes, preferred="1h", default="15m"),
         time_range={"start": "2023-01-01T00:00:00Z", "end": f"{default_end}T00:00:00Z"},
+        date_bounds=date_bounds,
         indicators=_default_indicator_grid(
             indicator_ids=indicator_ids,
             indicator_sources=indicator_sources,
@@ -563,6 +676,8 @@ def _build_fallback_instrument_universe(
             degradation_reason=detail,
         ),
         source=_source(_MARKET_REFERENCE_SOURCE, "degraded", generated_at, detail=detail),
+        selected_exchange="binance",
+        selected_market_type="spot",
     )
 
 

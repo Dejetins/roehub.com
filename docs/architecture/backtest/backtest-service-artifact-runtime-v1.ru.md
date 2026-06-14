@@ -137,6 +137,15 @@ Job все равно сохраняет metadata для artifact identity/water
 - диагностики, каким published state пользовался job;
 - защиты от неявного drift в benchmark/reporting.
 
+UI configurator использует тот же active artifact state как source of truth для
+доступного `time_range.end`. Для выбранных `{exchange, market_type, symbol}` web
+read-model получает `max_end` из `current.yaml.asof_date` и выставляет его как
+browser-visible верхнюю границу date input. Это не должно читать или mmap-ить
+`.npy` arrays в UI path: наличие массивов подтверждается publish-time validation
+и active slot manifest. `POST /backtests/preflight` остается финальным
+server-side guard и отклоняет `time_range.end` позже выбранного
+`artifact_asof_date`, чтобы прямые API consumers не обходили UI clamp.
+
 Риск:
 
 - если publisher когда-либо перепишет historical prefix, старые jobs и lazy trades могут стать невоспроизводимыми.

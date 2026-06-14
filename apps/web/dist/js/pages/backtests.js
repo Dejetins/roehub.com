@@ -5,6 +5,7 @@ import { createPoller } from "../core/poller.js";
 import { renderBacktestSeries } from "../charts/backtest_series.js";
 
 const DEFAULT_ENDPOINT = "/api/ui/backtests/workstation";
+const DEFAULT_ARTIFACT_DATE_BOUNDS_ENDPOINT = "/api/ui/backtests/artifact-date-bounds";
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 10;
@@ -50,6 +51,7 @@ const state = {
   query: "",
   symbolQuery: "",
   runtimeDefaults: null,
+  dateBounds: null,
   selectedSymbols: new Set(["BTCUSDT"]),
   selectedIndicators: [],
   indicatorCatalog: new Map(),
@@ -362,6 +364,23 @@ function formatDate(value) {
   return value ? String(value).slice(0, 10) : "--";
 }
 
+function isoDateOnly(value) {
+  return value ? String(value).slice(0, 10) : "";
+}
+
+function currentArtifactDateBounds() {
+  return state.dateBounds?.state === "ready" ? state.dateBounds : null;
+}
+
+function clampEndDate(value) {
+  const date = isoDateOnly(value);
+  const maxEnd = currentArtifactDateBounds()?.max_end || "";
+  if (date && maxEnd && date > maxEnd) {
+    return maxEnd;
+  }
+  return date || maxEnd || "2024-01-01";
+}
+
 function formatDateTimeMinute(value) {
   if (!value) {
     return "--";
@@ -629,7 +648,7 @@ function shortHash(value) {
 
 function buildRequestPayload(root) {
   const start = qs("[data-config-field='start']", root)?.value || "2023-01-01";
-  const end = qs("[data-config-field='end']", root)?.value || "2024-01-01";
+  const end = clampEndDate(qs("[data-config-field='end']", root)?.value);
   const capital = Number(qs("[data-config-field='capital']", root)?.value || 10000);
   const feePercent = Number(qs("[data-config-field='fee']", root)?.value || 0.075);
   const slippagePercent = Number(qs("[data-config-field='slippage']", root)?.value || 0.01);
@@ -900,13 +919,34 @@ function renderRuntimeControls(root, data) {
   if (!state.configSeeded) {
     seedConfigDraft(root, data?.config_draft || {});
     state.configSeeded = true;
+  } else {
+    applyDateBounds(root, data?.config_draft?.date_bounds || state.dateBounds);
   }
   updateRiskPanel(root);
   updateSizingPanel(root);
   renderConfigSummary(root);
 }
 
+function applyDateBounds(root, bounds) {
+  if (bounds) {
+    state.dateBounds = bounds;
+  }
+  const activeBounds = currentArtifactDateBounds();
+  const endField = qs("[data-config-field='end']", root);
+  if (!(endField instanceof HTMLInputElement)) {
+    return;
+  }
+  const maxEnd = activeBounds?.max_end || "";
+  if (maxEnd) {
+    endField.max = maxEnd;
+    endField.value = clampEndDate(endField.value);
+    return;
+  }
+  endField.removeAttribute("max");
+}
+
 function seedConfigDraft(root, draft, { validateOptions = false, includeIndicators = false } = {}) {
+  state.dateBounds = draft?.date_bounds || state.dateBounds;
   const sizing = draft?.execution?.sizing || {};
   const fieldValues = {
     symbol: draft?.coordinates?.symbol,
@@ -980,6 +1020,7 @@ function seedConfigDraft(root, draft, { validateOptions = false, includeIndicato
       .filter(Boolean);
     renderIndicators(root, { items: Array.from(state.indicatorCatalog.values()) });
   }
+  applyDateBounds(root, draft?.date_bounds || state.dateBounds);
   renderSelectedSymbols(root);
   updateRiskPanel(root);
   updateSizingPanel(root);
@@ -2543,6 +2584,18 @@ async function refreshWorkstation(root, reason = "manual", { append = false } = 
   return activeRequest;
 }
 
+async function refreshArtifactDateBounds(root) {
+  const endpoint = root.dataset.artifactDateBoundsEndpoint || DEFAULT_ARTIFACT_DATE_BOUNDS_ENDPOINT;
+  const params = new URLSearchParams();
+  params.set("exchange", state.market || "binance");
+  params.set("market_type", state.market_type || "spot");
+  params.set("symbol", selectedSymbols(root)[0] || state.symbol || "BTCUSDT");
+  const bounds = await apiFetch(`${endpoint}?${params.toString()}`);
+  applyDateBounds(root, bounds);
+  renderConfigSummary(root);
+  return bounds;
+}
+
 async function preflight(root) {
   ensureStrategyName(root);
   const payload = buildRequestPayload(root);
@@ -3021,6 +3074,9 @@ function bind(root) {
         state.symbol = symbol;
         state.selectedSymbols = new Set([symbol]);
         renderSymbols(root, state.runtimeDefaults?.instrument_universe);
+        refreshArtifactDateBounds(root).catch((error) => {
+          setText("[data-create-status]", describeApiError(error), root);
+        });
       }
       return;
     }
@@ -3175,6 +3231,9 @@ function bind(root) {
         state.symbol = symbol;
         state.selectedSymbols = symbol ? new Set([symbol]) : new Set();
       }
+      if (configInput.dataset.configField === "end") {
+        configInput.value = clampEndDate(configInput.value);
+      }
       renderConfigSummary(root);
     }
     const riskInput = event.target.closest("[data-risk-field]");
@@ -3213,6 +3272,19 @@ function bind(root) {
       normalizeRiskControls(root);
       updateCombinationsCount(root);
       renderConfigSummary(root);
+      return;
+    }
+    const configInput = event.target.closest("[data-config-field]");
+    if (configInput instanceof HTMLInputElement) {
+      if (configInput.dataset.configField === "symbol") {
+        refreshArtifactDateBounds(root).catch((error) => {
+          setText("[data-create-status]", describeApiError(error), root);
+        });
+      }
+      if (configInput.dataset.configField === "end") {
+        configInput.value = clampEndDate(configInput.value);
+        renderConfigSummary(root);
+      }
       return;
     }
     const checkbox = event.target.closest("[data-symbol-checkbox]");

@@ -25,6 +25,7 @@ class BacktestConfigDraftResponse(BaseModel):
     coordinates: dict[str, Any]
     timeframe: str
     time_range: dict[str, str]
+    date_bounds: "BacktestArtifactDateBoundsResponse | None" = None
     indicators: list[dict[str, Any]]
     risk: dict[str, Any]
     execution: dict[str, Any]
@@ -38,6 +39,18 @@ class BacktestOptionResponse(BaseModel):
     value: str
     label: str
     status: Literal["available", "disabled"] = "available"
+
+
+class BacktestArtifactDateBoundsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["artifact_current_pointer"]
+    state: Literal["ready", "unavailable"]
+    coordinates: dict[str, str]
+    default_end: str | None
+    max_end: str | None
+    artifact_metadata: dict[str, Any] | None = None
+    degradation_reason: str | None = None
 
 
 class BacktestInstrumentUniverseResponse(BaseModel):
@@ -208,6 +221,7 @@ class BacktestWorkstationResponse(BaseModel):
 
 __all__ = [
     "BacktestConfigDraftResponse",
+    "BacktestArtifactDateBoundsResponse",
     "BacktestFooterStatusResponse",
     "BacktestIndicatorCatalogResponse",
     "BacktestIndicatorCatalogRowResponse",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import FastAPI
@@ -20,6 +19,10 @@ from tests.unit.apps.api.test_backtests_routes import (
     _valid_request,
 )
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
+from trading.contexts.backtest.application.dto import (
+    BacktestArtifactMetadata,
+    BacktestCoordinates,
+)
 from trading.contexts.backtest.application.services.v2 import (
     SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestRuntimeConfig,
@@ -70,9 +73,12 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
         {"value": "futures", "label": "Futures", "status": "available"},
     ]
     assert payload["instrument_universe"]["selected_symbols"] == ["BTCUSDT"]
-    assert payload["config_draft"]["time_range"]["end"].startswith(
-        (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
-    )
+    assert payload["config_draft"]["time_range"]["end"].startswith("2026-03-25")
+    assert payload["config_draft"]["date_bounds"]["state"] == "ready"
+    assert payload["config_draft"]["date_bounds"]["max_end"] == "2026-03-25"
+    assert payload["config_draft"]["date_bounds"]["artifact_metadata"][
+        "artifact_manifest_hash"
+    ] == "a" * 64
     assert payload["config_draft"]["indicators"] == [
         {
             "indicator_id": "ma.dema",
@@ -171,6 +177,30 @@ def test_get_backtest_workstation_filters_instruments_by_reference_market() -> N
     ]
 
 
+def test_get_backtest_artifact_date_bounds_returns_selected_symbol_current_pointer() -> None:
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()))
+
+    response = client.get(
+        (
+            "/ui/backtests/artifact-date-bounds"
+            "?exchange=binance&market_type=spot&symbol=ethusdt"
+        ),
+        headers={"x-user-id": str(_USER_ID)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "artifact_current_pointer"
+    assert payload["state"] == "ready"
+    assert payload["coordinates"] == {
+        "exchange": "binance",
+        "market_type": "spot",
+        "symbol": "ETHUSDT",
+    }
+    assert payload["default_end"] == "2026-03-25"
+    assert payload["max_end"] == "2026-03-25"
+
+
 def test_get_backtest_workstation_manual_refresh_rate_limit() -> None:
     client = _build_client(
         jobs_use_case=_build_jobs_use_case(repository=_FakeJobRepository()),
@@ -221,6 +251,7 @@ def _build_client(
                 search_enabled_tradable_instruments_use_case=(
                     _FakeSearchEnabledTradableInstrumentsUseCase()
                 ),
+                artifact_context_resolver=_FakeArtifactResolver(),
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
         )
@@ -268,6 +299,18 @@ class _FakeSearchEnabledTradableInstrumentsUseCase:
         return tuple(
             InstrumentId(market_id=market_id, symbol=Symbol(symbol))
             for symbol in symbols_by_market.get(int(market_id.value), ())
+        )
+
+
+class _FakeArtifactResolver:
+    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
+        return BacktestArtifactMetadata(
+            artifact_slot="slot_a",
+            artifact_slot_generation=4,
+            artifact_manifest_hash="a" * 64,
+            artifact_asof_date="2026-03-25",
+            hit_times_manifest_hash="b" * 64,
+            published_at_utc="2026-03-25T02:00:00Z",
         )
 
 

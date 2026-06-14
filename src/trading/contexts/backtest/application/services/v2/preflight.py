@@ -274,6 +274,10 @@ class BacktestPreflightService:
         request_hash = _canonical_json_sha256(normalized_request)
         result_config_hash = self._result_config_hash()
         artifact_metadata = self._resolve_artifact_metadata(coordinates=coordinates)
+        self._validate_time_range_against_artifacts(
+            time_range=time_range,
+            artifact_metadata=artifact_metadata,
+        )
         cost_estimate = BacktestCostEstimate(
             indicator_rows=indicator_rows,
             candidate_combinations=candidate_combinations,
@@ -908,6 +912,25 @@ class BacktestPreflightService:
                 ),
                 retryable=True,
             ) from error
+
+    def _validate_time_range_against_artifacts(
+        self,
+        *,
+        time_range: Mapping[str, str],
+        artifact_metadata: BacktestArtifactMetadata,
+    ) -> None:
+        requested_end_date = str(time_range["end"])[:10]
+        max_end_date = artifact_metadata.artifact_asof_date
+        if requested_end_date <= max_end_date:
+            return
+        raise _invalid_request(
+            path="time_range.end",
+            code="after_artifact_asof_date",
+            message=(
+                "time_range.end must be on or before the selected artifact "
+                f"as-of date {max_end_date}"
+            ),
+        )
 
 
 def _invalid_request(*, path: str, code: str, message: str) -> BacktestPreflightRejected:

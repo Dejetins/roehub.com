@@ -378,9 +378,24 @@ def test_preflight_does_not_pass_request_paths_to_artifact_resolver() -> None:
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),)
 
 
+def test_preflight_rejects_end_date_after_artifact_asof_date() -> None:
+    request = _valid_request()
+    request["time_range"]["end"] = "2026-03-26T00:00:00Z"
+
+    with pytest.raises(BacktestPreflightRejected) as exc_info:
+        _service(resolver=_FakeArtifactResolver(artifact_asof_date="2026-03-25")).execute(
+            request
+        )
+
+    assert exc_info.value.error_code == BACKTEST_ERROR_INVALID_REQUEST
+    assert exc_info.value.issues[0].path == "time_range.end"
+    assert exc_info.value.issues[0].code == "after_artifact_asof_date"
+
+
 @dataclass
 class _FakeArtifactResolver:
     coordinates: tuple[BacktestCoordinates, ...] = ()
+    artifact_asof_date: str = "2026-04-11"
 
     def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
         self.coordinates = (*self.coordinates, coordinates)
@@ -388,7 +403,7 @@ class _FakeArtifactResolver:
             artifact_slot="slot_a",
             artifact_slot_generation=4,
             artifact_manifest_hash="a" * 64,
-            artifact_asof_date="2026-03-25",
+            artifact_asof_date=self.artifact_asof_date,
             hit_times_manifest_hash="b" * 64,
             published_at_utc="2026-03-25T02:00:00Z",
         )

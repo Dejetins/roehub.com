@@ -2178,7 +2178,7 @@ def _valid_request() -> dict[str, Any]:
         "timeframe": "15m",
         "time_range": {
             "start": "2020-01-11T20:08:00Z",
-            "end": "2026-04-11T20:08:00Z",
+            "end": "2026-03-25T20:08:00Z",
         },
         "indicators": [
             {
