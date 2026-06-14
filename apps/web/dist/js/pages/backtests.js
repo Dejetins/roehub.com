@@ -82,6 +82,9 @@ let poller = null;
 let manualRefreshRetrySeconds = 0;
 let delayedVariantOpen = null;
 let variantAnimationFrame = null;
+let variantOpeningJobId = null;
+let variantOpeningHeight = 0;
+let delayedVariantRender = null;
 let selectedVariantRetryTimer = null;
 
 function escapeHtml(value) {
@@ -232,15 +235,26 @@ function resultStatusText(payload, fallback = "pending") {
   if (isMaterializationPayload(payload)) {
     const status = materializationStatus(payload) || "materializing";
     const retryAfter = Number(payload.materialization?.retry_after_seconds || 0);
-    return retryAfter > 0 ? `${status}; retry ${retryAfter}s` : status;
+    if (retryAfter > 0) {
+      return t("backtests.result_detail.compute_retry", { seconds: retryAfter });
+    }
+    if (["queued", "pending"].includes(status)) {
+      return t("backtests.result_detail.queued");
+    }
+    if (["failed", "cancelled"].includes(status)) {
+      return t("backtests.result_detail.failed");
+    }
+    return t("backtests.result_detail.compute_loading");
   }
   if (payload.cache?.warning) {
-    return `degraded: ${payload.cache.warning}`;
+    return t("backtests.result_detail.degraded");
   }
   if (payload.cache?.status) {
-    return `cache ${payload.cache.status}`;
+    return payload.cache.status === "hit"
+      ? t("backtests.result_detail.ready_short")
+      : t("backtests.result_detail.compute_loading");
   }
-  return "available";
+  return t("backtests.result_detail.ready_short");
 }
 
 function labelForId(value) {
@@ -1355,6 +1369,7 @@ function renderJobs(root, table) {
   if (!target) {
     return;
   }
+  const scrollState = captureResultTableScroll(root);
   const rows = table?.items || [];
   state.jobRows = rows;
   state.nextCursor = state.loadedAllJobs ? null : table?.next_cursor || null;
@@ -1362,6 +1377,7 @@ function renderJobs(root, table) {
   renderJobPagination(root);
   if (!rows.length) {
     target.innerHTML = `<tr><td colspan="9">${escapeHtml(table?.degradation_reason || t("backtests.results.empty"))}</td></tr>`;
+    restoreResultTableScroll(root, scrollState);
     return;
   }
   target.innerHTML = rows
@@ -1369,6 +1385,32 @@ function renderJobs(root, table) {
     .join("");
   renderResultCanvases(root);
   queueVariantPanelAnimation(root);
+  restoreResultTableScroll(root, scrollState);
+}
+
+function captureResultTableScroll(root) {
+  const tableWrap = qs(".backtests-table-wrap--results", root);
+  if (!(tableWrap instanceof HTMLElement)) {
+    return null;
+  }
+  return {
+    top: tableWrap.scrollTop,
+    left: tableWrap.scrollLeft,
+  };
+}
+
+function restoreResultTableScroll(root, scrollState) {
+  if (!scrollState) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    const tableWrap = qs(".backtests-table-wrap--results", root);
+    if (!(tableWrap instanceof HTMLElement)) {
+      return;
+    }
+    tableWrap.scrollTop = scrollState.top;
+    tableWrap.scrollLeft = scrollState.left;
+  });
 }
 
 function renderJobRow(root, row, index) {
@@ -1417,18 +1459,24 @@ function renderVariantExpansion(root, row, { closing = false } = {}) {
   const variants = (summary?.top_variants?.items || []).slice(0, variantPreviewLimit(root));
   const title = t("backtests.variants.title", { job: compactId(row.job_id) });
   const shouldAnimate = state.animateVariantJobId === row.job_id;
+  const isOpening = variantOpeningJobId === row.job_id;
   const frameClass = closing
     ? "backtests-variant-frame is-open"
-    : shouldAnimate
+    : shouldAnimate && !isOpening
       ? "backtests-variant-frame"
-      : "backtests-variant-frame backtests-variant-frame--static";
+      : isOpening
+        ? "backtests-variant-frame is-open"
+        : "backtests-variant-frame backtests-variant-frame--static";
+  const frameStyle = isOpening && variantOpeningHeight > 0
+    ? `style="--backtests-variant-open-duration: ${variantOpenDurationMs(root)}ms; --backtests-variant-height: ${variantOpeningHeight}px"`
+    : "";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
     : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : variantEmptyText(row, summary))}</td></tr>`;
   return `
     <tr class="backtests-variant-expansion">
       <td class="backtests-variant-cell" colspan="9">
-        <div class="${frameClass}" data-variant-frame ${shouldAnimate ? 'data-variant-animate="true"' : ""} ${closing ? 'data-variant-closing="true"' : ""}>
+        <div class="${frameClass}" data-variant-frame ${shouldAnimate && !isOpening ? 'data-variant-animate="true"' : ""} ${closing ? 'data-variant-closing="true"' : ""} ${frameStyle}>
           <section class="backtests-variant-panel" aria-label="${escapeHtml(title)}">
             <header class="backtests-variant-panel__heading">
               <strong>${escapeHtml(title)}</strong>
@@ -1490,6 +1538,8 @@ function queueVariantPanelAnimation(root) {
   }
   const closingFrame = qs("[data-variant-frame][data-variant-closing='true']", root);
   if (closingFrame) {
+    variantOpeningJobId = null;
+    variantOpeningHeight = 0;
     closingFrame.style.setProperty("--backtests-variant-open-duration", `${variantOpenDurationMs(root)}ms`);
     closingFrame.style.setProperty("--backtests-variant-height", `${closingFrame.scrollHeight}px`);
     const close = () => {
@@ -1511,18 +1561,57 @@ function queueVariantPanelAnimation(root) {
   const frame = qs("[data-variant-frame][data-variant-animate='true']", root);
   if (!frame) {
     variantAnimationFrame = null;
-    state.animateVariantJobId = null;
+    if (!variantOpeningJobId) {
+      state.animateVariantJobId = null;
+    }
     return;
   }
-  frame.style.setProperty("--backtests-variant-open-duration", `${variantOpenDurationMs(root)}ms`);
+  const openingJobId = state.animateVariantJobId;
+  const duration = variantOpenDurationMs(root);
+  const openingHeight = frame.scrollHeight;
+  variantOpeningJobId = openingJobId;
+  variantOpeningHeight = openingHeight;
+  frame.style.setProperty("--backtests-variant-open-duration", `${duration}ms`);
+  const finishOpening = () => {
+    if (variantOpeningJobId === openingJobId) {
+      variantOpeningJobId = null;
+      variantOpeningHeight = 0;
+    }
+    if (state.animateVariantJobId === openingJobId) {
+      state.animateVariantJobId = null;
+    }
+    window.clearTimeout(fallbackTimer);
+  };
+  const fallbackTimer = window.setTimeout(finishOpening, duration + 120);
+  frame.addEventListener("transitionend", finishOpening, { once: true });
   variantAnimationFrame = window.requestAnimationFrame(() => {
-    frame.style.setProperty("--backtests-variant-height", `${frame.scrollHeight}px`);
+    frame.style.setProperty("--backtests-variant-height", `${openingHeight}px`);
     frame.classList.add("is-open");
     renderResultCanvases(root);
     frame.removeAttribute("data-variant-animate");
-    state.animateVariantJobId = null;
     variantAnimationFrame = null;
   });
+}
+
+function clearDelayedVariantRender() {
+  if (delayedVariantRender) {
+    window.clearTimeout(delayedVariantRender);
+    delayedVariantRender = null;
+  }
+}
+
+function renderJobsAfterVariantOpening(root, jobId) {
+  if (!jobId || variantOpeningJobId !== jobId) {
+    renderJobs(root, { items: state.jobRows });
+    return;
+  }
+  clearDelayedVariantRender();
+  delayedVariantRender = window.setTimeout(() => {
+    delayedVariantRender = null;
+    if (state.selectedJobId === jobId) {
+      renderJobs(root, { items: state.jobRows });
+    }
+  }, variantOpenDurationMs(root) + 40);
 }
 
 function renderJobPagination(root) {
@@ -1583,6 +1672,8 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
       : null;
   const stateName = details?.state || "pending";
   const csvHref = variantEndpoint(root, "csv", jobId, variantKey);
+  const readiness = compatibilityMetric(details?.compatibility);
+  const feed = marketDataMetric(details?.compatibility);
   return `
     <section class="backtests-result-detail" data-result-state="${escapeHtml(stateName)}" data-selected-result-variant="${escapeHtml(variantKey)}">
       <header class="backtests-result-detail__heading">
@@ -1601,9 +1692,10 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
         ${renderResultMetric(t("backtests.results.sharpe"), numberOrDash(variant?.summary_metrics?.sharpe), financialClass(variant?.summary_metrics?.sharpe))}
         ${renderResultMetric(t("backtests.results.drawdown"), signedDrawdownPercent(variant?.summary_metrics?.max_drawdown_pct ?? variant?.summary_metrics?.avg_drawdown_pct), "rh-financial--negative")}
         ${renderResultMetric(t("backtests.results.trades"), integerOrDash(variant?.summary_metrics?.trade_count ?? variant?.summary_metrics?.trades_count), "")}
-        ${renderResultMetric(t("backtests.strategy_create.readiness"), compatibilityStatus(details?.compatibility), readinessClass(details?.compatibility))}
-        ${renderResultMetric(t("backtests.strategy_create.feed"), marketDataStatus(details?.compatibility), readinessClass(details?.compatibility))}
+        ${renderResultMetric(t("backtests.strategy_create.readiness"), readiness.label, readiness.className, readiness.detail)}
+        ${renderResultMetric(t("backtests.strategy_create.feed"), feed.label, feed.className, feed.detail)}
       </div>
+      ${renderResultLoadingOverlay(details)}
       <div class="backtests-result-body">
         <div class="backtests-result-charts">
           ${renderChartShell("equity", t("backtests.result_detail.equity"), details?.equity)}
@@ -1618,32 +1710,78 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
   `;
 }
 
-function renderResultMetric(label, value, className) {
+function renderResultMetric(label, value, className, detail = "") {
   return `
     <div>
       <span>${escapeHtml(label)}</span>
-      <strong class="${escapeHtml(className)}">${escapeHtml(value)}</strong>
+      <strong class="${escapeHtml(className)}" title="${escapeHtml(detail)}">${escapeHtml(value)}</strong>
     </div>
   `;
 }
 
-function compatibilityStatus(compatibility) {
-  const stateName = compatibility?.compatibility_state || "pending";
-  const reason = (compatibility?.compatibility_reason_codes || [compatibility?.launch_blocked_reason || "--"])[0];
-  return `${stateName}: ${reason}`;
-}
-
-function marketDataStatus(compatibility) {
-  const stateName = compatibility?.market_data_state || "pending";
-  const reason = (compatibility?.market_data_reason_codes || [compatibility?.launch_blocked_reason || "--"])[0];
-  return `${stateName}: ${reason}`;
-}
-
-function readinessClass(compatibility) {
-  if (!compatibility) {
-    return "rh-financial--neutral";
+function renderResultLoadingOverlay(details) {
+  if (!resultDetailNeedsRetry(details)) {
+    return "";
   }
-  return compatibility.launch_blocked ? "rh-financial--negative" : "rh-financial--positive";
+  const retrySeconds = details && resultDetailPayloads(details).length ? resultDetailRetrySeconds(details) : 0;
+  const status = retrySeconds > 0
+    ? t("backtests.result_detail.compute_retry", { seconds: retrySeconds })
+    : t("backtests.result_detail.compute_loading");
+  return `
+    <div class="backtests-result-loading-overlay" role="status" aria-live="polite">
+      <span class="backtests-result-spinner" aria-hidden="true"></span>
+      <strong>${escapeHtml(t("backtests.result_detail.compute_loading"))}</strong>
+      <span>${escapeHtml(status)}</span>
+    </div>
+  `;
+}
+
+function compatibilityMetric(compatibility) {
+  if (!compatibility) {
+    return {
+      label: t("backtests.strategy_create.checking"),
+      className: "rh-financial--neutral",
+      detail: "",
+    };
+  }
+  const stateName = compatibility.compatibility_state || "pending";
+  const reasons = compatibility.compatibility_reason_codes || [compatibility.launch_blocked_reason].filter(Boolean);
+  if (stateName === "launchable" && !compatibility.launch_blocked) {
+    return {
+      label: t("backtests.strategy_create.ready"),
+      className: "rh-financial--positive",
+      detail: reasons.join("; "),
+    };
+  }
+  return {
+    label: t("backtests.strategy_create.not_ready"),
+    className: "rh-financial--neutral",
+    detail: reasons.join("; "),
+  };
+}
+
+function marketDataMetric(compatibility) {
+  if (!compatibility) {
+    return {
+      label: t("backtests.strategy_create.checking"),
+      className: "rh-financial--neutral",
+      detail: "",
+    };
+  }
+  const stateName = compatibility.market_data_state || "pending";
+  const reasons = compatibility.market_data_reason_codes || [compatibility.launch_blocked_reason].filter(Boolean);
+  if (stateName === "ready") {
+    return {
+      label: t("backtests.strategy_create.feed_ready"),
+      className: "rh-financial--positive",
+      detail: reasons.join("; "),
+    };
+  }
+  return {
+    label: t("backtests.strategy_create.feed_not_ready"),
+    className: "rh-financial--neutral",
+    detail: reasons.join("; "),
+  };
 }
 
 function resultDetailStatus(details) {
@@ -2229,20 +2367,26 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1, 
     state.resultDetails = cached;
     state.tradesPage = page;
     clearSelectedVariantRetry();
-    renderJobs(root, { items: state.jobRows });
+    renderJobsAfterVariantOpening(root, jobId);
     return cached;
   }
   if (activeVariantResultRequest && activeVariantResultKey === requestKey) {
     return activeVariantResultRequest;
   }
   abortActiveVariantRequest(requestKey);
-  state.resultDetails = {
-    jobId,
-    variantKey,
-    state: "pending",
-    message: t("backtests.result_detail.pending"),
-  };
-  renderJobs(root, { items: state.jobRows });
+  const currentPending =
+    state.resultDetails?.jobId === jobId &&
+    state.resultDetails?.variantKey === variantKey &&
+    ["pending", "materializing"].includes(state.resultDetails?.state);
+  if (!currentPending) {
+    state.resultDetails = {
+      jobId,
+      variantKey,
+      state: "pending",
+      message: t("backtests.result_detail.pending"),
+    };
+    renderJobs(root, { items: state.jobRows });
+  }
   const requestEntry = variantDetailRequest(root, jobId, variantKey, page);
   const request = requestEntry.promise
     .then((detail) => {
@@ -2254,7 +2398,7 @@ async function loadSelectedVariantDetails(root, { page = state.tradesPage || 1, 
       }
       state.resultDetails = detail;
       state.tradesPage = page;
-      renderJobs(root, { items: state.jobRows });
+      renderJobsAfterVariantOpening(root, jobId);
       scheduleSelectedVariantRetry(root, detail, page);
       return state.resultDetails;
     })
@@ -2476,6 +2620,9 @@ function variantPreviewLimit(root) {
 
 async function openSelectedJob(root, jobId) {
   if (!jobId) {
+    clearDelayedVariantRender();
+    variantOpeningJobId = null;
+    variantOpeningHeight = 0;
     state.closingVariantJobId = state.selectedJobId;
     state.selectedJobId = null;
     state.selectedVariantKey = null;
@@ -2487,6 +2634,9 @@ async function openSelectedJob(root, jobId) {
     return;
   }
   state.closingVariantJobId = null;
+  clearDelayedVariantRender();
+  variantOpeningJobId = null;
+  variantOpeningHeight = 0;
   setWorkspaceView(root, "results");
   state.selectedVariantKey = null;
   clearSelectedVariantRetry();
@@ -2495,7 +2645,14 @@ async function openSelectedJob(root, jobId) {
     activeResultRequest = loadResultSummary(root, jobId, { render: false });
     const summary = await activeResultRequest;
     state.selectedJobId = summary.job?.job_id || jobId;
-    state.selectedVariantKey = summary.selected_variant_key;
+    state.selectedVariantKey = summary.selected_variant_key || summary.top_variants?.items?.[0]?.variant_key || null;
+    state.resultDetails = {
+      jobId: state.selectedJobId,
+      variantKey: state.selectedVariantKey,
+      state: "pending",
+      message: t("backtests.result_detail.pending"),
+    };
+    state.tradesPage = 1;
     state.animateVariantJobId = state.selectedJobId;
     renderResultSummary(root, summary);
     await loadSelectedVariantDetails(root, { page: 1 });

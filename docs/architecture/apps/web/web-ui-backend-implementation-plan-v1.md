@@ -19,6 +19,14 @@
   `/monthly-stats`, `/symbol-stats`, `GET /trades?page=...`). Эти endpoints уже
   существуют как backend contract, но перед расширением UI должны быть hardened под
   async lazy trades materialization из `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`.
+- обновление 2026-06-15: selected result detail внутри `/backtests` уже вызывает
+  bounded `/variant`, `/equity`, `/drawdown`, `/monthly-stats`,
+  `/compatibility-readiness` и paginated `GET /trades?page=&page_size=50`.
+  Browser contract для этого состояния: opening/closing expansion анимируется
+  плавно, selected job scroll не сбрасывается при refresh/autorefresh, cache miss
+  или materialization показываются как overlay `Подготавливаем данные расчета`, а
+  технические readiness/feed reason codes не выводятся как переполняющий primary
+  metric text.
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
 
 ## Фактический checkpoint реализации на 2026-05-08
@@ -1908,15 +1916,17 @@ Backend/API:
 
 ## Этап 9 - backtest result API/state внутри workstation
 
-Статус 2026-05-11: частично реализовано. Backend endpoints для result/statistics
+Статус 2026-06-15: частично реализовано. Backend endpoints для result/statistics
 уже присутствуют в `apps/api/routes/backtests.py`, `apps/api/dto/backtests.py`,
 `src/trading/contexts/backtest/application/services/v2/result_series.py` и
-`BacktestJobsUseCase`. Текущий Web UI ожидает только selected summary flow:
+`BacktestJobsUseCase`. Текущий Web UI использует selected summary flow:
 `pages/backtests.html` содержит `data-job-summary-endpoint-template`, а
 `backtests.js` вызывает `GET /api/backtests/jobs/{job_id}/summary` для variant
-expansion и строит CSV links. UI не вызывает `/equity`, `/drawdown`,
-`/monthly-stats`, `/symbol-stats` или `GET /trades?page=...`; это намеренно
-зафиксировано тестами как текущая модель.
+expansion и строит CSV links. Selected variant detail дополнительно вызывает
+bounded `/variant`, `/equity`, `/drawdown`, `/monthly-stats`,
+`/compatibility-readiness` и `GET /trades?page=...&page_size=50`; cache miss или
+async materialization отображаются как loading/materialization state без
+блокирующего recompute в API process.
 
 Цель следующего pass: не повторно реализовывать существующие endpoints, а привести
 все result/statistics методы к production-safe contract под current Web UI и будущие
@@ -1973,10 +1983,12 @@ Frontend integration:
   `pages/backtests.html` и `apps/web/dist/js/pages/backtests.js`;
 - не меняет canonical visual reference `/backtests`: `stategy_backtest.png`;
 - full trades и тяжелые series не загружаются на first paint workstation;
-- текущий Web UI использует `summary` для раскрытия top variants и CSV links, но не
-  использует chart/stat/trades-table endpoints;
-- будущие selected variant/job panels должны использовать bounded endpoints и
-  degraded/loading/materialization states внутри существующей backtest workstation.
+- текущий Web UI использует `summary` для раскрытия top variants и CSV links, а
+  selected variant detail использует только bounded chart/stat/trades endpoints с
+  page-size bound и materialization/loading state;
+- selected variant/job panels должны сохранять высоту result surface, не сбрасывать
+  scroll выбранной job при refresh/autorefresh и не выводить технические reason
+  codes как основной текст метрик.
 - result/progress refresh использует same-page `/backtests` state, no-overlap polling/autorefresh и не запускает повторный compute.
 
 Файлы:
@@ -2024,13 +2036,13 @@ Frontend integration:
 | Browser-visible method/path | Current backend status | Current Web UI expectation | Gap / next action |
 |---|---|---|---|
 | `GET /api/backtests/jobs/{job_id}/summary` | Реализован и тестируется; bounded, не вызывает lazy trades service. | Используется `backtests.js` через `data-job-summary-endpoint-template` для раскрытия variants. | Сохранить как primary selected-job summary contract. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | Реализован и owner/public-key scoped. | Endpoint template есть в DOM, но текущий UI не делает отдельный detail fetch. | Оставить stable handoff для будущего detail panel. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}` | Реализован и owner/public-key scoped. | Используется selected variant detail для bounded metadata/readiness context. | Сохранять stable handoff и не запускать full recompute. |
 | `POST /api/backtests/jobs/{job_id}/variants/{variant_key}/trades` | Реализован как lazy trades detail: cache hit читает bounded bundle, cache miss создает/replays materialization task. | Текущий UI не вызывает POST напрямую. | Сохранять как status/materialization entrypoint; full-detail cache-hit load запрещен. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | Реализован и тестируется на point bounds/raw hash rejection; cache hit читает bounded series reader. | Текущий UI не вызывает; `renderBacktestSeries` отсутствует намеренно. | Не запускать sync lazy recompute на cache miss; вернуть status/degraded или materialized data. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | Реализован аналогично equity. | Текущий UI не вызывает. | Те же materialization/cache-status требования. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Текущий UI не вызывает. | Те же materialization/cache-status требования; DTO остается bounded. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/equity?points=` | Реализован и тестируется на point bounds/raw hash rejection; cache hit читает bounded series reader. | Используется selected variant detail через `renderBacktestSeries` с bounded points. | Не запускать sync lazy recompute на cache miss; вернуть status/degraded или materialized data. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | Реализован аналогично equity. | Используется selected variant detail через `renderBacktestSeries` с bounded points. | Те же materialization/cache-status требования. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Используется selected variant detail monthly table. | Те же materialization/cache-status требования; DTO остается bounded. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Текущий UI не вызывает. | Те же materialization/cache-status требования; source symbol берется из job request. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination; cache hit читает только requested page plus metadata. | Текущий UI не вызывает; `/trades?page=` отсутствует в JS. | Перед UI table сохранять server pagination и materialization status. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination; cache hit читает только requested page plus metadata. | Используется selected variant detail trades table с `page_size=50`. | Сохранять server pagination и materialization status. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Реализован, owner-scoped, текущий UI рендерит CSV links; export читает cache chunked до bounded max rows. | Используется как link в variant expansion. | Для очень больших payloads рассмотреть async export; full-detail cache load запрещен. |
 
 Playwright CLI:
