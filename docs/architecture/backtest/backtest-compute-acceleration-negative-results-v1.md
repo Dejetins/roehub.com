@@ -42,6 +42,7 @@
 | TP/SL selective production selector | rejected and removed | исходный threshold не выбрал mandatory fixture, а `47 x 32` retest регрессировал |
 | TP/SL reversal diagnostics | learning only, removed from runtime | counters полезны, но current-exact diagnostics дали `+99.5%` overhead |
 | TP/SL split-by-side reversal repair | rejected and removed | parity прошла, но service wall и exact scoring регрессировали |
+| TP/SL total-return early abandon | runtime rejected; learning retained | exact-safe bound сохранил parity, но не отрезал кандидатов и добавил service-wall overhead |
 | Full pair cache / dense tensor | not accepted | memory/cost risk dominates; dense tensor explicitly rejected |
 
 ## Подробности По Методам
@@ -340,6 +341,48 @@ Rejected attempts:
 - не продолжать split-by-side / entry-major reversal kernel repair as the next
   implementation direction.
 
+### Stage 15 TP/SL Total-Return Early Abandon
+
+Evidence:
+
+- preflight:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-14_matrix_bitset_stage_05_12_production_default_stage15_preflight/`;
+- control:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_control/`;
+- candidate:
+  `docs/architecture/backtest/benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_candidate/`.
+
+Идея: для `ranking=total_return_pct desc` и all-in sizing посчитать
+optimistic log-return upper bound по кандидату и не запускать точный TP/SL
+scoring, если bound строго ниже текущего top-N порога.
+
+Результат:
+
+| Job | Control wall s | Candidate wall s | Wall delta | Pruned candidates | Bound ms |
+|---|---:|---:|---:|---:|---:|
+| `tp_sl_grid/arity_6/long_only` | `17.728` | `31.298` | `-76.541%` | `0` | `13751.296` |
+| `tp_sl_grid/arity_6/long_short_reversal` | `15.474` | `15.502` | `-0.180%` | `0` | `0.000` |
+
+Почему не ускорило:
+
+- на mandatory TP/SL fixture bound оказался слишком широким и не отрезал ни
+  одного кандидата;
+- long-only row получил дополнительный `13751.296ms` bound overhead до exact
+  scoring;
+- parity и memory cleanup прошли, но service-wall gate failed against current
+  exact control.
+
+Learning handoff: Stage 16 trade-window reuse telemetry is unblocked as the
+next measurement-only TP/SL step. It may add counters for total/unique trade
+windows, weighted reuse and savings estimate, but must not add cache/grouped
+scoring implementation before telemetry proves reuse is high enough.
+
+Запрет на повтор: не возвращать Python/Numba candidate-level total-return bound
+как production hot path без предварительного дешевого reject-rate proof на той
+же TP/SL fixture. Если идея будет переоткрыта, новый план должен сначала
+доказать, что bound отрезает существенную долю candidates при overhead ниже
+экономии exact scoring.
+
 ### Full Pair Cache And Dense Tensor Designs
 
 Source:
@@ -370,6 +413,9 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не возвращать Stage 13 block-shape production gate, Stage 13S/13S2 selector,
   Stage 13R current-exact diagnostics or Stage 14R split-by-side repair without
   a new benchmark-gated architecture decision.
+- Не возвращать Stage 15 total-return early-abandon candidate без дешевого
+  reject-rate proof; Mac Studio A/B на mandatory TP/SL rows дал `0` pruned
+  candidates и service-wall regression.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.

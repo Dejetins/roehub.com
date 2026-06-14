@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_16_tp_sl_trade_window_reuse_telemetry
 repo: roehub.com
 branch: main
-scope: "Deferred/blocked: removed Stage 13R was learning-only diagnostics; reopen only after a fresh TP/SL plan proves high weighted reuse evidence."
+scope: "Unblocked: implement TP/SL trade-window reuse telemetry only after Stage 15 learning handoff; do not implement cache or grouped scoring."
 
 language:
   implementation: python
@@ -15,7 +15,7 @@ context_sources:
     - path: docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md
       why: "Stage 16 telemetry scope"
     - path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
-      why: "Stage 15 gate"
+      why: "Stage 15 learning handoff and Stage 16 unblocked gate"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
       why: "avoid Stage 06 cache pattern"
   task_entrypoints:
@@ -57,7 +57,7 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no source artifact writes."
 
 hard_requirements:
-  previous_stage_required: "A later explicit decision to reopen compiled TP/SL grouping after the removed Stage 13/14 branch; Stage 16 is not the first telemetry stage anymore"
+  previous_stage_required: "Stage 15 total-return early abandon closed as accepted_for_learning with runtime rejection; Stage 16 is now unblocked for telemetry only."
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage16_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
@@ -69,7 +69,7 @@ hard_requirements:
 delivery_requirements:
   - "Work from branch main; stop and report a blocker if the checkout is not main."
   - "After accepted or accepted_for_learning, update ledger/evidence/docs, stage only scoped files, and commit to main with a stage-specific message."
-  - "For blocked or rejected, do not commit production runtime changes; commit only docs/evidence needed to preserve the decision."
+  - "For blocked or rejected runtime candidates, do not commit production runtime changes; commit only docs/evidence needed to preserve the decision."
   - "Do not push or deploy unless the user explicitly asks."
 
 non_goals:
@@ -80,7 +80,7 @@ non_goals:
   - "Do not duplicate the removed Stage 13R diagnostic branch."
 
 task:
-  summary: "Only reopen this prompt after a fresh TP/SL plan proves high weighted reuse; otherwise keep it superseded/blocked."
+  summary: "Add telemetry counters that measure TP/SL trade-window reuse and estimate whether a future compiled grouping stage is worth implementing."
   required_counters:
     - "tp_sl_total_trade_windows"
     - "tp_sl_unique_trade_windows"
@@ -127,6 +127,7 @@ final_report_format:
 
 # Task
 
-Do not execute Stage 16 as the first trade-window telemetry pass. Reopen this
-prompt only if a fresh TP/SL plan proves high weighted reuse and the next task is
-a focused compiled grouping decision.
+Implement Stage 16 as a telemetry-only TP/SL trade-window reuse measurement.
+Add counters/reporting for total trade windows, unique trade windows, weighted
+reuse and estimated savings. Do not implement cache, grouped scoring, result
+reordering or any production TP/SL backend change in this stage.

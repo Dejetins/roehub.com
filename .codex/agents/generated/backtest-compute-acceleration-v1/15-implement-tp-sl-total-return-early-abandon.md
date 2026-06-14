@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_15_tp_sl_total_return_early_abandon
 repo: roehub.com
 branch: main
-scope: "Unblocked: implement exact-safe TP/SL early abandon against the current exact TP/SL baseline; removed Stage 13/14 code is not required and must not be restored."
+scope: "Closed: Stage 15 runtime candidate was rejected and accepted for learning only; do not execute this implementation prompt."
 
 language:
   implementation: python
@@ -57,13 +57,13 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no canonical artifact writes."
 
 hard_requirements:
-  previous_stage_required: "Stage 05+12 production default accepted/deployed and the failed Stage 13/14 TP/SL branch removed from the active tree; no TP/SL repair gate is a prerequisite."
+  previous_stage_required: "Stage 15 has already been benchmarked and closed as accepted_for_learning; Stage 16 telemetry is the next executable prompt."
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default for no-risk rows, and current exact TP/SL scoring for TP/SL rows. Do not restore or benchmark against removed Stage 13/13S/13R/14/14R runtime, prompts or harnesses."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage15_preflight"
   stage_15_benchmark_command: "Run Mac Studio A/B through scripts/backtest/run_api_runner_benchmark_parity.py using current exact TP/SL control vs Stage 15 default-on candidate on the same TP/SL heavy rows. If the harness has no dedicated Stage 15 row selector, add one in the scoped implementation diff rather than reusing removed Stage 13/14 harnesses."
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
-  implementation_allowed: true
-  benchmark_required: true
+  implementation_allowed: false
+  benchmark_required: false
   docs_update_required: true
 
 delivery_requirements:
@@ -80,7 +80,7 @@ non_goals:
   - "Do not use this stage to revive or bypass the removed Stage 13/14 TP/SL branch."
 
 task:
-  summary: "Use an exact-safe optimistic remaining-return bound to abandon candidate/cell scoring only for ranking=total_return_pct desc and supported sizing."
+  summary: "Do not implement this prompt. Stage 15 evidence is recorded in the ledger and benchmark_iterations; continue with Stage 16 telemetry."
   required_design:
     - "Represent the bound in log-return or another proven upper-bound domain."
     - "Include fees/slippage in the maximum possible trade gain bound."
@@ -129,5 +129,7 @@ final_report_format:
 
 # Task
 
-Implement Stage 15 TP/SL total-return early abandon only for proven exact-safe
-surfaces. Unsupported rankings must stay on the current exact path.
+Do not execute Stage 15. The runtime candidate was rejected after Mac Studio A/B
+evidence showed `0` pruned candidates and service-wall regression. Treat this
+prompt as closed/superseded and continue with Stage 16 trade-window reuse
+telemetry.
