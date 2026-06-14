@@ -270,7 +270,7 @@ tested only under these constraints:
 | TP/SL full-grid `64 x 64` production candidate and block autotune | Stage 13 rejected and removed from active tree; summary retained only in the negative-results stop-list |
 | TP/SL selective production selector and reversal repair | Stage 13S/13S2/13R/14R rejected or learning-only, then removed from active tree; do not continue this branch |
 | TP/SL monotonic cell kernel | Original Stage 14 superseded by failed Stage 13/14 branch; no executable prompt remains |
-| TP/SL total-return early abandon | Stage 15 is unblocked after Stage 13/14 cleanup; it must use the current exact TP/SL baseline on a Stage 05+12 production-default checkout and must not restore removed Stage 13/14 code |
+| TP/SL total-return early abandon | Stage 15 rejected on 2026-06-14: exact-safe bound preserved parity but pruned `0` candidates and regressed service wall; do not keep the runtime candidate |
 | TP/SL reusable trade-window telemetry | Stage 16 remains blocked; no grouped/cache work without a fresh compiled grouping plan |
 | Dynamic backend selector by estimated work | Stage 17 may be reopened only for accepted no-risk backends, or after a new accepted TP/SL production path exists |
 | Top-N/result assembly batch reduction | Stage 18; first measures assembly timers, then optional stable block top-M merge if assembly is hot |
@@ -508,7 +508,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Fused prefix traversal | compiled/iterative traversal only; same candidate identity, canonical variant order, stable `variant_hash`, top-N identity/order and no Python object allocation in hot path | 12 |
 | Selectivity order | compute-order reordering is internal only; output order and tie-break use canonical order | 12 |
 | TP/SL autotune and monotonic kernel | same top-N, `best_tp`, `best_sl`, metric tolerance, full-grid exact semantics and SL-wins tie rule | 13-14 |
-| TP/SL early abandon | exact-safe upper bound proof for `total_return_pct desc`; disabled for unsupported rankings/sizing modes | 15 |
+| TP/SL early abandon | Stage 15 rejected; if reopened, exact-safe upper-bound proof for `total_return_pct desc` and fallback for unsupported rankings/sizing modes are still mandatory | 15 |
 | Trade-window reuse telemetry | counters only unless a later plan accepts compiled grouping; no Python dict cache in production hot path | 16 |
 | Dynamic selector | selector decisions are logged, deterministic and do not change public result identity; arity 1/2/3 no-regression is mandatory | 17 |
 | Top-N/result assembly | stable tie-break by ranking metric, `variant_hash` and combo ordinal; persisted top-N shape unchanged | 18 |
@@ -537,7 +537,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 13S/13S2 | TP/SL selective selector | Rejected and removed from active tree; not executable |
 | 13R | TP/SL reversal diagnostics | Learning-only result retained in negative-results; runtime diagnostics removed from active tree |
 | 14/14R | TP/SL monotonic/split-by-side repair | Superseded/rejected and removed from active tree; not executable |
-| 15 | TP/SL total-return early abandon | Unblocked; exact-safe upper-bound proof and Mac Studio A/B versus current exact TP/SL baseline required |
+| 15 | TP/SL total-return early abandon | Rejected 2026-06-14; exact-safe upper-bound candidate pruned `0` candidates and regressed service wall versus current exact TP/SL control |
 | 16 | TP/SL trade-window reuse telemetry | Blocked until a new TP/SL telemetry/repair plan is accepted; no cache/grouped work |
 | 17 | Dynamic backend selector | Blocked for TP/SL; may be reopened only for accepted no-risk backends with a new scoped prompt |
 | 18 | Top-N/result assembly batch reduction | Assembly timers measured first; optional stable block top-M merge only if assembly is hot and top-N identity/order is unchanged |
@@ -561,7 +561,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 11 | lazy materialization backend adapter | lazy trades benchmark evidence |
 | 12 | `prefix_traversal.py` registered as `compiled_prefix_product_traversal_v1`; no Python recursion in hot path; production composite default mode `stage_05_and_12_no_risk` | `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_baseline_off/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_12_compiled_prefix_traversal_candidate_rerun2/`, `benchmark_iterations/2026-06-13_matrix_bitset_stage_05_12_production_default_live/` |
 | 13/13S/13S2/13R/14R | none; rejected branch removed from active tree | no raw evidence retained in active tree; compact stop-list in `backtest-compute-acceleration-negative-results-v1.md` |
-| 15 | exact-safe early-abandon implementation in the current exact TP/SL scorer plus a dedicated benchmark selector if missing; no Stage 13/14 runtime, prompt or harness restore | `benchmark_iterations/<date>_matrix_bitset_stage_15_tp_sl_early_abandon/` |
+| 15 | no accepted runtime files; exact-safe early-abandon candidate removed from active tree; no Stage 13/14 runtime, prompt or harness restore | `benchmark_iterations/2026-06-14_matrix_bitset_stage_05_12_production_default_stage15_preflight/`, `benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_control/`, `benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_candidate/` |
 | 16 | blocked; no telemetry/grouping/cache work until a new TP/SL plan is accepted | none |
 | 17 | blocked for TP/SL; optional future no-risk selector requires a new scoped prompt | none |
 | 18 | top-N/result assembly timers and optional stable block top-M merge | `benchmark_iterations/<date>_matrix_bitset_stage_18_topn_batch_reduction/` |
@@ -645,8 +645,9 @@ Each row must record:
   the composite mode. Arity `6` remains Stage 05 by default unless a later
   selector/default gate proves Stage 12 is also better for the end-to-end arity-6
   service path.
-- TP/SL monotonic and early-abandon stages can only apply to exact-safe surfaces;
-  unsupported rankings must fall back to current exact scoring.
+- TP/SL monotonic stages, and any reopened early-abandon stage, can only apply
+  to exact-safe surfaces; unsupported rankings must fall back to current exact
+  scoring.
 - Dynamic selector mistakes can silently erase Stage 12 no-risk wins, Stage 05
   rollback/default behavior, or re-enable arity 2/3 regressions, so selector
   telemetry and rollback override are mandatory.
