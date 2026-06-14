@@ -24,7 +24,6 @@ from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 from .combo_planning import (
     COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
-    MATRIX_CELL_TP_SL_V1_BACKEND,
 )
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
@@ -53,7 +52,6 @@ MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP = "stage_04_no_risk_mvp"
 MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6 = (
     "stage_05_no_risk_reversal_arity6"
 )
-MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID = "stage_09_tp_sl_full_grid"
 MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL = (
     "stage_12_compiled_prefix_traversal"
 )
@@ -360,10 +358,8 @@ def _matrix_backend_override(
         return None
     if mode not in {
         MATRIX_BITSET_NO_RISK_V1_BACKEND,
-        MATRIX_CELL_TP_SL_V1_BACKEND,
         MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
         MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
-        MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
         MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
         MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
         COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
@@ -372,12 +368,10 @@ def _matrix_backend_override(
             MATRIX_BACKEND_MODE_OFF,
             MATRIX_BACKEND_MODE_STAGE_04_NO_RISK_MVP,
             MATRIX_BACKEND_MODE_STAGE_05_NO_RISK_REVERSAL_ARITY6,
-            MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
             MATRIX_BACKEND_MODE_STAGE_12_COMPILED_PREFIX_TRAVERSAL,
             MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
             MATRIX_BITSET_NO_RISK_V1_BACKEND,
             COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
-            MATRIX_CELL_TP_SL_V1_BACKEND,
         )
         raise ValueError(
             f"{MATRIX_BACKEND_MODE_ENV_KEY} must be one of "
@@ -433,17 +427,6 @@ def _matrix_backend_override(
         )
     ):
         return COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
-    if (
-        mode
-        in {
-            MATRIX_BACKEND_MODE_STAGE_09_TP_SL_FULL_GRID,
-            MATRIX_CELL_TP_SL_V1_BACKEND,
-        }
-        and risk_mode == "tp_sl_grid"
-        and direction_mode in {"long_only", "long_short_reversal"}
-        and 1 <= arity <= 10
-    ):
-        return MATRIX_CELL_TP_SL_V1_BACKEND
     return None
 
 

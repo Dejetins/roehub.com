@@ -8,6 +8,10 @@ negative-results stop-list, but no executable TP/SL continuation stage remains.
 
 ## Статус
 
+Active prompt pack is closed as of the 2026-06-14 cleanup. No executable
+continuation stage is currently unblocked in this plan; future backtest compute
+work requires a separate approved plan/prompt pack.
+
 План внедрения и последующих continuation stages. Никакой новый backend не
 считается разрешенным к production path, пока для него не записано сопоставимое
 benchmark evidence на Mac Studio и в журнале stages не выставлено
@@ -56,10 +60,11 @@ Continuation update от 2026-06-13 добавляет Stage 12+ после nega
 candidate. Stage 12+ нельзя делать зависимыми от Stage 06 cache, Stage 07
 sidecar load, Stage 10 Python traversal или Stage 11 lazy reuse.
 
-Historical TP/SL note: Stage 09 `matrix_cell_tp_sl_v1` remains recorded as an
-accepted internal/opt-in full-grid experiment with shape `64 x 64`, but it is
-not an active production/default roadmap item and no later TP/SL continuation
-stage is planned in this document. Executable TP/SL prompt files for Stage
+Historical TP/SL note: Stage 09 `matrix_cell_tp_sl_v1` remains recorded as
+historical full-grid evidence with shape `64 x 64`, but it is no longer
+selectable through `ROEHUB_BACKTEST_MATRIX_BACKEND_MODE` and is not an active
+production/default roadmap item. No later TP/SL continuation stage is planned
+in this document. Executable TP/SL prompt files for Stage
 08/09/15/16/21 were removed from `.codex/agents/generated/`; the durable records
 are the stage ledger, benchmark evidence and negative-results stop-list.
 
@@ -137,23 +142,18 @@ Planned backend ids:
 |---|---|---|---|
 | `matrix_bitset_no_risk_v1` | `none` | accepted default only for arity 6 long-only/reversal | blockwise bitset consensus plus sparse no-risk scoring |
 | `compiled_prefix_product_traversal_v1` | `none` | accepted production composite default for arity 7 and explicit opt-in for arity 6/7 product-form pools | fused compiled prefix traversal, selectivity ordering, exact-safe prefix pruning and scoring handoff |
-| `dynamic_backtest_backend_selector_v1` | `none` | exact accepted no-risk modes only | choose current vs accepted no-risk matrix/prefix backend by estimated work and measured overhead, not arity alone |
 
-Backend selector is additive:
+Backend mode policy is additive:
 
 ```yaml
 backtest_compute:
   matrix_backend:
-    mode: stage_05_and_12_no_risk  # off | stage_05_and_12_no_risk | stage_05_no_risk_reversal_arity6 | stage_12_compiled_prefix_traversal | shadow/on aliases where supported
+    mode: stage_05_and_12_no_risk  # off | stage_05_and_12_no_risk | stage_05_no_risk_reversal_arity6 | stage_12_compiled_prefix_traversal
     candidate_block_size: 4096
     dedup_signatures: true
     hit_times_layout: by_entry
     sidecar_artifact_dir: null  # benchmark/test only; canonical publisher is unchanged
     max_pair_cache_rows: 0  # disabled by default; research/shadow only
-    dynamic_selector:
-      enabled: false
-      min_estimated_bit_ops: null
-      thread_policy: fixed
 ```
 
 `shadow` mode computes bounded samples and parity/hash evidence but does not feed
@@ -272,10 +272,10 @@ tested only under these constraints:
 | TP/SL monotonic cell kernel | Original Stage 14 superseded by failed Stage 13/14 branch; no executable prompt remains |
 | TP/SL total-return early abandon | Stage 15 closed as `accepted_for_learning` on 2026-06-14: exact-safe bound preserved parity but pruned `0` candidates and regressed service wall; do not keep the runtime candidate |
 | TP/SL reusable trade-window telemetry | Removed from active plan on 2026-06-14; no Stage 16 prompt remains |
-| Dynamic backend selector by estimated work | Stage 17 is no-risk-only and may use only accepted Stage 05/12 backends |
-| Top-N/result assembly batch reduction | Stage 18; first measures assembly timers, then optional stable block top-M merge if assembly is hot |
-| Numba thread scaling by workload | Stage 19; benchmark matrix first, config update only after service-wall evidence |
-| Allocation reuse / per-child scratch buffers | Stage 20; starts with allocation telemetry, then per-child scratch only; no global cross-job cache |
+| Dynamic backend selector by estimated work | Stage 17 executed but removed by closure cleanup; no runtime selector remains |
+| Top-N/result assembly batch reduction | Stage 18 executed as learning only and removed; assembly was not hot |
+| Numba thread scaling by workload | Stage 19 executed as learning only and removed; existing 12-thread policy remains |
+| Allocation reuse / per-child scratch buffers | Stage 20 executed as learning only and removed; no scratch-buffer runtime candidate was accepted |
 | Exact/coarse TP/SL product modes | Removed from active plan on 2026-06-14; requires a separate product/architecture plan if reopened |
 
 ## Benchmark Model
@@ -373,15 +373,15 @@ Additional MVP rows are required when the stage targets no-risk matrix backend:
 | `none/arity_3/long_only` | first generic bitset consensus target |
 | `none/arity_3/long_short_reversal` | reversal transition parity |
 
-Additional continuation rows are required for Stage 12+ when the stage targets
-the corresponding cost center:
+Additional continuation rows were required for Stage 12+ while those branches
+were active:
 
 | Job | Required when | Purpose |
 |---|---|---|
 | `none/arity_7/long_only` | Stage 12 | prove `combo_iteration` is materially lower on the high-arity product fixture |
 | `none/arity_7/long_short_reversal` | Stage 12 if fixture/request is available | prove reversal semantics under fused traversal |
-| `none/arity_1..3` | Stage 17 | prove dynamic selector avoids small-workload regressions |
-| Stage-specific thread matrix | Stage 19 | compare `NUMBA_NUM_THREADS=1,2,4,6,8,12` with same request and artifact set |
+| `none/arity_1..3` | Stage 17 historical only | proved selector tradeoffs before the selector was removed |
+| Stage-specific thread matrix | Stage 19 historical only | compared `NUMBA_NUM_THREADS=1,2,4,6,8,12`; no runtime config change was accepted |
 
 ### Metrics
 
@@ -400,11 +400,12 @@ Every stage record must include:
   `prefix_nodes_reused`, `prefix_pruned_subtrees`, `prefix_pruned_candidate_upper_bound`,
   `selectivity_order`, `combo_iteration_candidates_per_sec` and compiled-loop
   entry/exit timing;
-- Stage 17-20 overhead counters: backend selector decision/reason, estimated bit
-  ops, `heap_update_ms`, `top_result_proxy_fill_ms`,
-  `variant_hash_ms`, `canonical_params_build_ms`, `payload_json_ms`,
-  `db_persist_ms`, `matrix_buffers_allocated`, `matrix_buffer_bytes`,
-  `trade_tape_buffer_bytes`, `temporary_array_count`,
+- Historical Stage 17-20 overhead counters were retained only as compact
+  learning notes: backend selector decision/reason, estimated bit ops,
+  `heap_update_ms`, `top_result_proxy_fill_ms`, `variant_hash_ms`,
+  `canonical_params_build_ms`, `payload_json_ms`, `db_persist_ms`,
+  `matrix_buffers_allocated`, `matrix_buffer_bytes`,
+  `trade_tape_buffer_bytes`, `temporary_array_count`, and
   `scratch_buffer_reuse_count`;
 - child CPU samples, Numba threads, warmup policy, artifact manifest hashes and
   request hashes.
@@ -499,7 +500,7 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Dynamic selector | selector decisions are logged, deterministic and do not change public result identity; arity 1/2/3 no-regression is mandatory; active scope is no-risk only | 17 |
 | Top-N/result assembly | stable tie-break by ranking metric, `variant_hash` and combo ordinal; persisted top-N shape unchanged | 18 |
 | Thread scaling | no oversubscription, same request/artifacts per run, best thread count does not regress service wall or memory | 19 |
-| Allocation reuse | per-child scratch buffers only, no global cross-job cache, cleanup and RSS peak do not regress | 20 |
+| Allocation reuse | Stage 20 learning retained only as compact stop-list; telemetry/runtime path removed by closure cleanup | 20 |
 | Product TP/SL coarse mode | Removed from active plan; exact mode remains default unless a separate approved product plan reopens this topic | none |
 
 ## План Внедрения
@@ -525,10 +526,10 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 14/14R | TP/SL monotonic/split-by-side repair | Superseded/rejected and removed from active tree; not executable |
 | 15 | TP/SL total-return early abandon | Accepted for learning 2026-06-14; runtime rejected after exact-safe upper-bound candidate pruned `0` candidates and regressed service wall versus current exact TP/SL control |
 | 16 | TP/SL trade-window reuse telemetry | Closed without execution on 2026-06-14 by scope cleanup; no active prompt remains |
-| 17 | No-risk dynamic backend selector | May proceed only for accepted no-risk Stage 05/12 backends; TP/SL selector/default logic is out of scope |
-| 18 | Top-N/result assembly batch reduction | Assembly timers measured first; optional stable block top-M merge only if assembly is hot and top-N identity/order is unchanged |
-| 19 | Thread scaling benchmark | `NUMBA_NUM_THREADS=1,2,4,6,8,12` matrix; worker config change only after service-wall evidence |
-| 20 | Allocation reuse and scratch buffers | Allocation telemetry first; per-child scratch buffers only if service wall or RSS improves without cleanup regression |
+| 17 | No-risk dynamic backend selector | Executed, then removed by 2026-06-14 closure cleanup; no `stage_17_dynamic_no_risk_selector` mode remains in active runtime |
+| 18 | Top-N/result assembly batch reduction | Executed as learning only, then removed by closure cleanup; no batch merge or telemetry path remains |
+| 19 | Thread scaling benchmark | Executed as learning only, then removed by closure cleanup; existing 12-thread policy remains |
+| 20 | Allocation reuse and scratch buffers | Executed as learning only, then removed by closure cleanup; no scratch-buffer runtime path remains |
 | 21 | TP/SL exact/coarse mode architecture decision | Removed from active plan on 2026-06-14; requires a separate product/architecture plan if reopened |
 
 ## Планируемые Файлы И Артефакты По Stages
@@ -549,10 +550,10 @@ merge must prove the relevant rows below before it can be `accepted`.
 | 13/13S/13S2/13R/14R | none; rejected branch removed from active tree | no raw evidence retained in active tree; compact stop-list in `backtest-compute-acceleration-negative-results-v1.md` |
 | 15 | no accepted runtime files; exact-safe early-abandon candidate removed from active tree; no Stage 13/14 runtime, prompt or harness restore | `benchmark_iterations/2026-06-14_matrix_bitset_stage_05_12_production_default_stage15_preflight/`, `benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_control/`, `benchmark_iterations/2026-06-14_matrix_bitset_stage_15_tp_sl_early_abandon_candidate/` |
 | 16 | none; closed without execution by 2026-06-14 scope cleanup | none |
-| 17 | no-risk selector only for accepted Stage 05/12 backends | `benchmark_iterations/<date>_matrix_bitset_stage_17_dynamic_selector/` |
-| 18 | top-N/result assembly timers and optional stable block top-M merge | `benchmark_iterations/<date>_matrix_bitset_stage_18_topn_batch_reduction/` |
-| 19 | thread-scaling benchmark harness/report; config update only if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_19_thread_scaling/` |
-| 20 | allocation counters and per-child scratch buffers if accepted | `benchmark_iterations/<date>_matrix_bitset_stage_20_allocation_reuse/` |
+| 17 | none; dynamic selector runtime/config/telemetry removed by closure cleanup | raw evidence removed from active tree; compact result retained in ledger |
+| 18 | none; top-N/result assembly telemetry removed by closure cleanup | raw evidence removed from active tree; compact result retained in negative-results |
+| 19 | none; thread-scaling harness additions removed by closure cleanup | raw evidence removed from active tree; compact result retained in ledger |
+| 20 | none; allocation telemetry/scratch-buffer prompt scope removed by closure cleanup | raw evidence removed from active tree; compact result retained in negative-results |
 | 21 | none; removed from active plan by 2026-06-14 scope cleanup | none |
 
 ## Контракты И Влияние
@@ -560,13 +561,13 @@ merge must prove the relevant rows below before it can be `accepted`.
 | Dimension | Classification | Notes |
 |---|---|---|
 | Public API contract | `none` | Existing routes and payload meanings stay unchanged |
-| Port contract | `compatible-change` | New backend selector/config and telemetry may add optional fields |
+| Port contract | `compatible-change` | Accepted no-risk backend policy remains internal and additive |
 | DTO schema | `compatible-change` | Telemetry/counter fields are additive |
 | Persisted schema | `none` initially | Bitset artifacts are file artifacts, not DB schema |
 | Canonical artifact file/manifest schema | `none` initially | Stage 07 sidecar files do not change canonical `manifest.yaml`, `current.yaml` or active-slot artifacts |
 | Test sidecar artifact metadata | `compatible-change` | New benchmark/test-only `matrix_sidecar_manifest.json` records source hashes, shapes, dtypes and schema version |
-| Config schema | `compatible-change` | Optional matrix backend modes/env overrides, explicit sidecar path for benchmark/test runs and disabled-by-default pair-cache controls |
-| Worker/thread config | `compatible-change` | Stage 19 may add workload-specific thread policy only after benchmark evidence; fixed current behavior remains rollback |
+| Config schema | `breaking-change` for retired internal experimental values only | `stage_17_dynamic_no_risk_selector`, `stage_09_tp_sl_full_grid` and direct `matrix_cell_tp_sl_v1` env selection are removed; production default and accepted no-risk rollback modes remain |
+| Worker/thread config | `none` | Stage 19 did not change runtime worker config/defaults; existing fixed 12-thread Mac Studio policy remains |
 | Request hash / cache identity | `none` | Result-affecting backend must not enter public request hash unless semantics change, which is out of scope |
 | Service-call semantics | `none` | Same API/runner/child process topology |
 | Logs/metrics/report semantics | `compatible-change` | Additive benchmark and telemetry counters |
@@ -628,17 +629,19 @@ Each row must record:
   evidence. Approximate beam search requires explicit product approval and a
   separate contract.
 - Compiled prefix traversal is production default only for no-risk arity `7` in
-  the composite mode. Arity `6` remains Stage 05 by default unless a later
-  selector/default gate proves Stage 12 is also better for the end-to-end arity-6
-  service path.
+  the composite mode. Stage 17 selector evidence is retained as learning only;
+  the selector code and env mode were removed by closure cleanup.
 - TP/SL monotonic stages, and any reopened early-abandon stage, can only apply
   to exact-safe surfaces; unsupported rankings must fall back to current exact
   scoring.
-- Dynamic selector mistakes can silently erase Stage 12 no-risk wins, Stage 05
-  rollback/default behavior, or re-enable arity 2/3 regressions, so selector
-  telemetry and rollback override are mandatory.
-- Thread scaling may be hardware-specific; accepted Mac Studio thread policy must
-  not be generalized to different hardware without fresh evidence.
+- Dynamic selector work is closed. Do not reintroduce a selector without a new
+  plan that proves small-row fallback, Stage 05/12 ownership and telemetry.
+- Stage 18 showed `top_result_assembly` and DB persist are not material cost
+  centers on accepted no-risk production-default rows; do not add block top-M
+  merge without a new measured hot-path case.
+- Thread scaling is hardware-specific. Stage 19 retained the existing Mac Studio
+  12-thread policy, but that decision must not be generalized to different
+  hardware without fresh evidence.
 - Full pair cache can regress memory and wall-clock even when isolated pair lookup
   gets faster; it is excluded from default production path until bounded evidence
   proves otherwise.

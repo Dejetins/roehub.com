@@ -363,6 +363,30 @@ def test_matrix_backend_default_does_not_cover_stage04_or_tp_sl(
     )
 
 
+@pytest.mark.parametrize(
+    "mode",
+    ("stage_09_tp_sl_full_grid", "matrix_cell_tp_sl_v1"),
+)
+def test_stage_09_tp_sl_env_selection_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+) -> None:
+    monkeypatch.setenv(MATRIX_BACKEND_MODE_ENV_KEY, mode)
+
+    with pytest.raises(ValueError, match=MATRIX_BACKEND_MODE_ENV_KEY):
+        _matrix_backend_override(
+            normalized_request=_preflight(
+                top_n=50,
+                risk_mode="tp_sl_grid",
+                direction_mode="long_short_reversal",
+            ).normalized_request,
+            prepared_result=_prepared_result(
+                rows=3,
+                indicators=tuple(f"indicator_{index}" for index in range(6)),
+            ),
+        )
+
+
 @dataclass(slots=True)
 class _PreparePools:
     prepared: BacktestPreparePoolsResult

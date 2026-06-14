@@ -139,12 +139,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.stage_08_tp_sl_selected_cells:
         os.environ[TP_SL_SELECTED_CELL_SHADOW_ENV_KEY] = "1"
     if args.stage_09_tp_sl_full_grid:
-        os.environ[MATRIX_BACKEND_MODE_ENV_KEY] = STAGE_09_MATRIX_BACKEND_MODE
-        os.environ[TP_SL_CELL_BLOCK_TP_COUNT_ENV_KEY] = str(
-            args.tp_sl_cell_block_tp_count
-        )
-        os.environ[TP_SL_CELL_BLOCK_SL_COUNT_ENV_KEY] = str(
-            args.tp_sl_cell_block_sl_count
+        raise RuntimeError(
+            "--stage-09-tp-sl-full-grid is retired: Stage 09 remains historical "
+            "evidence only and is no longer selectable through "
+            f"{MATRIX_BACKEND_MODE_ENV_KEY}."
         )
     if args.stage_12_compiled_prefix_rows and not os.environ.get(
         MATRIX_BACKEND_MODE_ENV_KEY
@@ -404,8 +402,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stage-09-tp-sl-full-grid",
         action="store_true",
         help=(
-            "Run TP/SL arity-6 full-grid rows with matrix_cell_tp_sl_v1 "
-            "enabled through ROEHUB_BACKTEST_MATRIX_BACKEND_MODE."
+            "Retired Stage 09 selector. Kept only to fail old commands with a "
+            "clear message; no env backend mode is set."
         ),
     )
     parser.add_argument(
@@ -431,13 +429,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tp-sl-cell-block-tp-count",
         type=int,
         default=STAGE_09_DEFAULT_CELL_BLOCK_TP_COUNT,
-        help="TP dimension block size for Stage 09 matrix_cell_tp_sl_v1.",
+        help="Retired Stage 09 TP block size; ignored because Stage 09 is disabled.",
     )
     parser.add_argument(
         "--tp-sl-cell-block-sl-count",
         type=int,
         default=STAGE_09_DEFAULT_CELL_BLOCK_SL_COUNT,
-        help="SL dimension block size for Stage 09 matrix_cell_tp_sl_v1.",
+        help="Retired Stage 09 SL block size; ignored because Stage 09 is disabled.",
     )
     parser.add_argument("--allow-backlog", action="store_true")
     parser.add_argument("--no-fail-on-threshold", action="store_true")

@@ -43,7 +43,9 @@
 | TP/SL reversal diagnostics | learning only, removed from runtime | counters полезны, но current-exact diagnostics дали `+99.5%` overhead |
 | TP/SL split-by-side reversal repair | rejected and removed | parity прошла, но service wall и exact scoring регрессировали |
 | TP/SL total-return early abandon | runtime rejected; learning retained | exact-safe bound сохранил parity, но не отрезал кандидатов и добавил service-wall overhead |
+| Top-N/result assembly batch merge | learning retained; runtime/evidence removed | Stage 18 показал `top_result_assembly` только `0.000..0.728%` service wall и DB persist `0.096..1.906%`, поэтому batch merge не является доказанным hot-path ускорением |
 | Full pair cache / dense tensor | not accepted | memory/cost risk dominates; dense tensor explicitly rejected |
+| Allocation scratch buffers | learning retained; runtime/evidence removed | Stage 20 telemetry showed bounded `3.65MB` arity-6 and `31.0..51.7MB` arity-7 matrix-buffer churn, RSS cleanup passed, and no scratch-buffer runtime candidate was justified |
 
 ## Подробности По Методам
 
@@ -383,6 +385,36 @@ is no longer an executable prompt or active roadmap item.
 доказать, что bound отрезает существенную долю candidates при overhead ниже
 экономии exact scoring.
 
+### Stage 18 Top-N/Result Assembly Batch Merge
+
+Evidence: raw Stage 18 directory was removed from the active tree during
+2026-06-14 closure cleanup; compact values are retained below.
+
+Идея: сначала измерить `heap_update`, `top_result_proxy_fill`,
+`variant_hash`, `canonical_params_build`, `payload_json` и `db_persist`, затем
+реализовать stable block top-M merge только если top-N/result assembly является
+материальным cost center.
+
+Результат telemetry-only run:
+
+| Job | Service wall s | Assembly ms | Assembly % wall | DB persist ms | DB persist % wall |
+|---|---:|---:|---:|---:|---:|
+| `none/arity_6/long_only` | 1.655 | 12.044 | 0.728% | 31.555 | 1.906% |
+| `none/arity_6/long_short_reversal` | 3.328 | 0.003 | 0.000% | 15.523 | 0.466% |
+| `none/arity_7/long_only` | 6.225 | 13.152 | 0.211% | 37.320 | 0.599% |
+| `none/arity_7/long_short_reversal` | 19.122 | 0.004 | 0.000% | 18.396 | 0.096% |
+
+Вывод: Stage 18 принят как learning-only result, но runtime batch merge и
+telemetry code удалены из активного дерева. На accepted no-risk production-default rows сборка
+top-N и DB persist не являются доминирующей стоимостью, а изменение stable
+top-N merge/tie-break несет контрактный риск без измеримого service-wall
+основания.
+
+Запрет: не возвращать block top-M merge как production optimization без нового
+evidence, где assembly или persistence становится материальным cost center и
+где сохраняются stable top-N identity/order, `variant_hash` и persisted payload
+shape.
+
 ### Full Pair Cache And Dense Tensor Designs
 
 Source:
@@ -419,6 +451,8 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не запускать Stage 16 trade-window reuse telemetry или Stage 21 exact/coarse
   product-mode work from this prompt pack; both were closed without execution
   and require a separate approved plan if reopened.
+- Не возвращать Stage 18 block top-M merge без нового evidence, где
+  top-N/result assembly или persistence является материальным cost center.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.
@@ -438,7 +472,7 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 Отдельно accepted, но не default production:
 
 - Stage 09 `matrix_cell_tp_sl_v1` full-grid TP/SL backend с accepted shape
-  `64 x 64`, opt-in через internal env mode;
+  `64 x 64` как historical evidence only; env selection retired;
 - Stage 01/02/03/07/08/10 learning/telemetry/shadow artifacts только как
   диагностическая база, не как доказанное production speedup.
 - Stage 12 `compiled_prefix_product_traversal_v1` production composite default
