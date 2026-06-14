@@ -2,7 +2,7 @@
 prompt_name: backtest_compute_acceleration_stage_20_allocation_reuse_scratch_buffers
 repo: roehub.com
 branch: main
-scope: "Measure allocation churn and add per-child scratch buffers only if they reduce service wall or RSS without cleanup regression."
+scope: "Measure no-risk allocation churn and add per-child scratch buffers only if they reduce service wall or RSS without cleanup regression."
 
 language:
   implementation: python
@@ -20,7 +20,7 @@ context_sources:
       why: "fixed overhead pattern"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/
-      why: "matrix/cell buffers"
+      why: "accepted no-risk matrix/prefix buffers"
     - path: src/trading/contexts/backtest/application/services/v2/
       why: "child job lifecycle and cleanup"
 
@@ -81,7 +81,6 @@ task:
   required_counters:
     - "matrix_buffers_allocated"
     - "matrix_buffer_bytes"
-    - "cell_metric_buffer_bytes"
     - "trade_tape_buffer_bytes"
     - "temporary_array_count"
     - "scratch_buffer_reuse_count"
@@ -89,7 +88,6 @@ task:
     - "long_bits_buffer"
     - "short_bits_buffer"
     - "trade_tape_buffer"
-    - "tp_sl_cell_metrics_buffer"
     - "candidate_best_buffer"
     - "block_top_buffer"
 

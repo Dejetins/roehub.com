@@ -79,7 +79,7 @@ non_goals:
   - "Do not ignore oversubscription or memory pressure."
 
 task:
-  summary: "Run a thread-scaling matrix for accepted no-risk, TP/SL and high-arity workloads."
+  summary: "Run a thread-scaling matrix for accepted no-risk and high-arity workloads."
   thread_counts:
     - 1
     - 2
@@ -90,8 +90,6 @@ task:
   required_rows:
     - "none/arity_6/long_only"
     - "none/arity_6/long_short_reversal"
-    - "tp_sl_grid/arity_6/long_only"
-    - "tp_sl_grid/arity_6/long_short_reversal"
     - "none/arity_7 through accepted Stage 12 opt-in backend"
   required_metrics:
     - "service wall"
@@ -100,7 +98,6 @@ task:
     - "RSS peak"
     - "CPU utilization"
     - "candidate/sec"
-    - "trade-cell/sec"
 
 acceptance:
   correctness:
@@ -134,5 +131,5 @@ final_report_format:
 
 # Task
 
-Run Stage 19 thread scaling benchmarks. Do not change worker defaults unless the
-service-wall evidence is clear and the ledger accepts the policy.
+Run Stage 19 no-risk thread scaling benchmarks. Do not change worker defaults
+unless the service-wall evidence is clear and the ledger accepts the policy.

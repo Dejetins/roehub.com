@@ -372,10 +372,10 @@ scoring, если bound строго ниже текущего top-N порог�
 - parity и memory cleanup прошли, но service-wall gate failed against current
   exact control.
 
-Learning handoff: Stage 16 trade-window reuse telemetry is unblocked as the
-next measurement-only TP/SL step. It may add counters for total/unique trade
-windows, weighted reuse and savings estimate, but must not add cache/grouped
-scoring implementation before telemetry proves reuse is high enough.
+Learning handoff: the exact-safe total-return bound shape is not viable on the
+mandatory TP/SL fixture. The previously planned Stage 16 trade-window reuse
+telemetry was closed without execution during the 2026-06-14 scope cleanup; it
+is no longer an executable prompt or active roadmap item.
 
 Запрет на повтор: не возвращать Python/Numba candidate-level total-return bound
 как production hot path без предварительного дешевого reject-rate proof на той
@@ -416,6 +416,9 @@ Dense tensor `all_combos x all_bars x all_tp x all_sl`:
 - Не возвращать Stage 15 total-return early-abandon candidate без дешевого
   reject-rate proof; Mac Studio A/B на mandatory TP/SL rows дал `0` pruned
   candidates и service-wall regression.
+- Не запускать Stage 16 trade-window reuse telemetry или Stage 21 exact/coarse
+  product-mode work from this prompt pack; both were closed without execution
+  and require a separate approved plan if reopened.
 - Не возвращать Python high-arity branch traversal без более дешевого exact-safe
   bound и comparable baseline-off run.
 - Не принимать sub-1% lazy detail delta как production optimization.

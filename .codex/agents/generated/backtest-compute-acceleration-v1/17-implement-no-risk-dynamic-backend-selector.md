@@ -1,8 +1,8 @@
 ---
-prompt_name: backtest_compute_acceleration_stage_17_dynamic_backend_selector
+prompt_name: backtest_compute_acceleration_stage_17_no_risk_dynamic_backend_selector
 repo: roehub.com
 branch: main
-scope: "Later global backend selector only; do not use Stage 17 to revive or bypass the removed Stage 13/14 TP/SL branch."
+scope: "No-risk backend selector only; do not add TP/SL selector/default logic."
 
 language:
   implementation: python
@@ -13,16 +13,16 @@ context_sources:
     - path: .codex/AGENTS.md
       why: "repo contract"
     - path: docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md
-      why: "Stage 17 selector policy"
+      why: "Stage 17 no-risk selector policy"
     - path: docs/architecture/backtest/backtest-compute-acceleration-v1-stage-ledger.md
       why: "prior accepted/rejected modes"
     - path: docs/architecture/backtest/backtest-compute-acceleration-negative-results-v1.md
-      why: "arity 2/3 and sidecar/cache stop-list"
+      why: "arity 2/3, sidecar/cache and TP/SL stop-list"
   task_entrypoints:
     - path: src/trading/contexts/backtest/application/services/v2/
       why: "backend selection and scoring orchestration"
     - path: src/trading/contexts/backtest/application/services/v2/matrix_backend/
-      why: "matrix/cell backend ids and telemetry"
+      why: "accepted no-risk backend ids and telemetry"
 
 skill_routing:
   - skill: contract-impact-analysis
@@ -57,7 +57,7 @@ mac_studio_test_execution:
   write_policy: "Evidence only under evidence_output_dir; no canonical artifact writes."
 
 hard_requirements:
-  previous_stage_required: "No-risk-only scope explicitly approved, or a new TP/SL production path accepted after the removed Stage 13/14 branch; any Stage 16 reuse follow-up explicitly accepted if used"
+  previous_stage_required: "Stage 05+12 production default accepted; TP/SL continuation scope closed on 2026-06-14"
   baseline_code_required: "Benchmark control and candidate must run from a checkout/runtime containing the Stage 05+12 production default: Stage 05 for no-risk arity 6 and Stage 12 for no-risk arity 7. If live production runtime is used or claimed, verify /opt/roehub/app code state and ROEHUB_BACKTEST_MATRIX_BACKEND_MODE env state before benchmarking."
   production_default_benchmark_command: "uv run python scripts/backtest/run_api_runner_benchmark_parity.py --env-file /Users/daniildegtyarev/.config/roehub/roehub.env --stage-05-12-production-default-rows --out-dir docs/architecture/backtest/benchmark_iterations/<date>_matrix_bitset_stage_05_12_production_default_stage17_baseline"
   benchmark_claim_rule: "Acceptance benchmark evidence is valid only if measured heavy jobs are claimed by the benchmark harness process; if the live launchd backtest-job-runner claims a benchmark job, record the run as diagnostic and rerun with isolation or explicit claim verification."
@@ -73,13 +73,12 @@ delivery_requirements:
 
 non_goals:
   - "Do not enable matrix_bitset_no_risk_v1 default for arity 2/3."
-  - "Do not implement the removed Stage 13S TP/SL long-only selector here."
-  - "Do not enable TP/SL backend default unless a later TP/SL repair gate accepted that exact path."
+  - "Do not implement any TP/SL backend selector, TP/SL default, Stage 13S selector, Stage 16 telemetry, or Stage 21 coarse/exact policy here."
   - "Do not use sidecar load as a default speedup."
   - "Do not change request hash or result semantics based on backend choice."
 
 task:
-  summary: "Implement a deterministic backend selector based on estimated work and fixed overhead, with explicit telemetry and env override."
+  summary: "Implement a deterministic no-risk backend selector based on estimated work and fixed overhead, with explicit telemetry and env override."
   selector_inputs:
     - "risk_mode"
     - "arity"
@@ -87,14 +86,12 @@ task:
     - "candidate_count"
     - "word_count"
     - "estimated_bit_ops"
-    - "estimated_trade_cell_ops"
     - "estimated_fixed_overhead"
   required_rows:
     - "none/arity_1..3"
     - "none/arity_6/long_only"
     - "none/arity_6/long_short_reversal"
     - "none/arity_7/long_only and long_short_reversal when Stage 12 remains eligible"
-    - "TP/SL rows only if a TP/SL backend is eligible from a later accepted TP/SL stage"
 
 acceptance:
   correctness:
@@ -104,7 +101,6 @@ acceptance:
     - "arity 1/2/3 service wall does not regress."
     - "arity 6/7 keeps accepted Stage 12 speed where the selector chooses compiled prefix traversal."
     - "Stage 05 remains available as rollback/default comparison for arity 6."
-    - "Any TP/SL selector path must compare against its accepted baseline."
   decision:
     - "If selector cannot avoid known losing rows, reject or keep default-off."
 
@@ -134,7 +130,8 @@ final_report_format:
 
 # Task
 
-Implement Stage 17 only as a later global selector. The removed Stage 13/14 TP/SL
-branch must not be reimplemented or weakened here. The selector must protect
-small workloads, preserve accepted Stage 12 no-risk behavior where eligible, and
-keep Stage 05 as rollback/default comparison.
+Implement Stage 17 only as a no-risk selector. The removed Stage 13/14 TP/SL
+branch, closed Stage 15 learning candidate, canceled Stage 16 telemetry, and
+removed Stage 21 product-mode work must not be reimplemented or weakened here.
+The selector must protect small workloads, preserve accepted Stage 12 no-risk
+behavior where eligible, and keep Stage 05 as rollback/default comparison.
