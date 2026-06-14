@@ -280,6 +280,7 @@
   "backtests.result_detail.symbol": "Symbol stats",
   "backtests.result_detail.title": "Result detail {variant}",
   "backtests.result_detail.trades": "Trades",
+  "backtests.result_detail.trades_loaded": "{count}/{total} loaded",
   "backtests.result_detail.unavailable": "Result data unavailable",
   "backtests.results.unavailable": "Result data unavailable",
   "backtests.risk.sl_from": "SL from",

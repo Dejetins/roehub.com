@@ -21,12 +21,13 @@
   async lazy trades materialization из `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`.
 - обновление 2026-06-15: selected result detail внутри `/backtests` уже вызывает
   bounded `/variant`, `/equity`, `/drawdown`, `/monthly-stats`,
-  `/compatibility-readiness` и paginated `GET /trades?page=&page_size=50`.
+  `/compatibility-readiness` и paginated `GET /trades?page=&page_size=100`.
   Browser contract для этого состояния: opening/closing expansion анимируется
   плавно, selected job scroll не сбрасывается при refresh/autorefresh, cache miss
   или materialization показываются как overlay `Подготавливаем данные расчета`, а
   технические readiness/feed reason codes не выводятся как переполняющий primary
-  metric text.
+  metric text. Selected variant trades UI дозагружает все страницы paginated
+  endpoint в один scrollable list и не показывает ручные Previous/Next controls.
 - актуальная canonical map Web UI v1 содержит ровно 5 визуальных страниц: `/`, `/dashboard`, `/settings`, `/strategies`, `/backtests`.
 
 ## Фактический checkpoint реализации на 2026-05-08
@@ -45,7 +46,7 @@
 | 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. `/strategies` и `/dashboard` используют bounded polling/read-models, но не полноценный strategy live SSE bridge. | Выполнять как backend/live bridge для текущего UI, не переписывая текущие `/strategies` и `/dashboard`. |
 | 08 | `08-implement-backtests-history-configurator.md` | Реализовано как current baseline: `/backtests`, `/backtests/new`, `/backtests/{job_id}` рендерят `pages/backtests.html`; есть reference-shaped workstation, branded dropdowns, config/preflight/create/history/job filters, delete/cancel markers, `GET /api/ui/backtests/workstation`, route/API/web tests, old `backtest_ui.js` не подключается. | Дальше только bugfix/read-model hardening; не возвращать generic history cards или native selects. |
 | 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Частично реализовано на уровне API boundary: create path возвращает queued/background semantics и использует execution trigger/worker use-case seam. Production `backtest-job-runner` service на Mac Studio и lazy trades materialization queue еще не реализованы; это вынесено в `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. | Выполнить отдельный runner prompt pack до публичной нагрузки `/backtests` create/results и до UI, который активно вызывает heavy result/stat endpoints. |
-| 09 | `09-implement-backtests-results.md` | Частично реализовано: backend endpoints `summary`, `equity`, `drawdown`, `monthly-stats`, `symbol-stats`, paginated `GET /trades` и `trades.csv` уже есть и покрыты API tests. Текущий Web UI потребляет только `summary` для variant expansion и CSV links; chart helpers, paginated trades table и stat panels не подключены и тестом зафиксированы как отсутствующие. | Следующий шаг - не повторная реализация endpoints, а hardening этих методов под async materialization/cache-status и затем UI-интеграция только после runner readiness. |
+| 09 | `09-implement-backtests-results.md` | Частично реализовано: backend endpoints `summary`, `equity`, `drawdown`, `monthly-stats`, `symbol-stats`, paginated `GET /trades` и `trades.csv` уже есть и покрыты API tests. Текущий Web UI подключает selected variant detail: charts, monthly stats, compatibility readiness и trades list через bounded endpoints; trades list собирает все paginated pages выбранного variant в один scrollable список. | Следующий шаг - не повторная реализация endpoints, а hardening этих методов под async materialization/cache-status и runner readiness для public/high-load сценариев. |
 | 10 | `10-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 10. | Выполнять после завершения всех browser-visible страниц. |
 | 11 | `11-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 10 или перед публичным запуском live/autorefresh-heavy surfaces. |
 
@@ -1924,9 +1925,11 @@ Backend/API:
 `backtests.js` вызывает `GET /api/backtests/jobs/{job_id}/summary` для variant
 expansion и строит CSV links. Selected variant detail дополнительно вызывает
 bounded `/variant`, `/equity`, `/drawdown`, `/monthly-stats`,
-`/compatibility-readiness` и `GET /trades?page=...&page_size=50`; cache miss или
-async materialization отображаются как loading/materialization state без
-блокирующего recompute в API process.
+`/compatibility-readiness` и `GET /trades?page=...&page_size=100`; browser
+последовательно дозагружает все доступные pages выбранного variant в один trades
+list без manual pagination controls. Cache miss или async materialization
+отображаются как loading/materialization state без блокирующего recompute в API
+process.
 
 Цель следующего pass: не повторно реализовывать существующие endpoints, а привести
 все result/statistics методы к production-safe contract под current Web UI и будущие
@@ -1952,7 +1955,7 @@ runner readiness. `strategy_statistic.png` закреплен за `/strategies`
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=1200`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats`;
-- `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=50`;
+- `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=1&page_size=100`;
 - `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv`.
 
 Backend/API-добавления:
@@ -1985,7 +1988,9 @@ Frontend integration:
 - full trades и тяжелые series не загружаются на first paint workstation;
 - текущий Web UI использует `summary` для раскрытия top variants и CSV links, а
   selected variant detail использует только bounded chart/stat/trades endpoints с
-  page-size bound и materialization/loading state;
+  backend page-size bound; browser объединяет selected variant trades pages в один
+  scrollable list, не сохраняет full trades в top rows и сохраняет
+  materialization/loading state;
 - selected variant/job panels должны сохранять высоту result surface, не сбрасывать
   scroll выбранной job при refresh/autorefresh и не выводить технические reason
   codes как основной текст метрик.
@@ -2042,7 +2047,7 @@ Frontend integration:
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown?points=` | Реализован аналогично equity. | Используется selected variant detail через `renderBacktestSeries` с bounded points. | Те же materialization/cache-status требования. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Используется selected variant detail monthly table. | Те же materialization/cache-status требования; DTO остается bounded. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/symbol-stats` | Реализован и тестируется; cache hit читает chunked stats reader. | Текущий UI не вызывает. | Те же materialization/cache-status требования; source symbol берется из job request. |
-| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination; cache hit читает только requested page plus metadata. | Используется selected variant detail trades table с `page_size=50`. | Сохранять server pagination и materialization status. |
+| `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades?page=&page_size=` | Реализован и тестируется на pagination; cache hit читает только requested page plus metadata. | Используется selected variant detail trades list с `page_size=100`; browser последовательно дозагружает pages и объединяет их без ручных Previous/Next controls. | Сохранять server pagination и materialization status. |
 | `GET /api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv` | Реализован, owner-scoped, текущий UI рендерит CSV links; export читает cache chunked до bounded max rows. | Используется как link в variant expansion. | Для очень больших payloads рассмотреть async export; full-detail cache load запрещен. |
 
 Playwright CLI:

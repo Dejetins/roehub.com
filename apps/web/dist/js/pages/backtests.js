@@ -9,10 +9,11 @@ const DEFAULT_ARTIFACT_DATE_BOUNDS_ENDPOINT = "/api/ui/backtests/artifact-date-b
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 10;
-const DEFAULT_RESULT_DETAIL_PREFETCH_LIMIT = 3;
+const DEFAULT_RESULT_DETAIL_PREFETCH_LIMIT = 0;
 const MAX_RESULT_DETAIL_CACHE_ENTRIES = 50;
 const DEFAULT_RESULT_POINTS = 600;
-const DEFAULT_TRADES_PAGE_SIZE = 50;
+const DEFAULT_TRADES_PAGE_SIZE = 100;
+const MAX_TRADES_DETAIL_PAGES = 100;
 const DEFAULT_TP_START_PCT = 5;
 const DEFAULT_TP_STOP_PCT = 30;
 const DEFAULT_SL_START_PCT = 5;
@@ -1364,12 +1365,12 @@ function renderOptimization(root, overview) {
   setText("[data-progress-units]", `${overview?.processed_units || 0}/${overview?.total_units || 0}`, root);
 }
 
-function renderJobs(root, table) {
+function renderJobs(root, table, { anchorJobId = state.selectedJobId } = {}) {
   const target = qs("[data-job-rows]", root);
   if (!target) {
     return;
   }
-  const scrollState = captureResultTableScroll(root);
+  const scrollState = captureResultTableScroll(root, anchorJobId);
   const rows = table?.items || [];
   state.jobRows = rows;
   state.nextCursor = state.loadedAllJobs ? null : table?.next_cursor || null;
@@ -1388,14 +1389,28 @@ function renderJobs(root, table) {
   restoreResultTableScroll(root, scrollState);
 }
 
-function captureResultTableScroll(root) {
+function resultTableRowForJob(tableWrap, jobId) {
+  if (!jobId) {
+    return null;
+  }
+  return qsa("[data-job-id]", tableWrap).find((row) => row.dataset.jobId === jobId) || null;
+}
+
+function captureResultTableScroll(root, anchorJobId = null) {
   const tableWrap = qs(".backtests-table-wrap--results", root);
   if (!(tableWrap instanceof HTMLElement)) {
     return null;
   }
+  const anchorRow = resultTableRowForJob(tableWrap, anchorJobId);
+  const wrapRect = tableWrap.getBoundingClientRect();
+  const anchorOffset = anchorRow instanceof HTMLElement
+    ? anchorRow.getBoundingClientRect().top - wrapRect.top
+    : null;
   return {
     top: tableWrap.scrollTop,
     left: tableWrap.scrollLeft,
+    anchorJobId,
+    anchorOffset,
   };
 }
 
@@ -1410,6 +1425,13 @@ function restoreResultTableScroll(root, scrollState) {
     }
     tableWrap.scrollTop = scrollState.top;
     tableWrap.scrollLeft = scrollState.left;
+    const anchorRow = resultTableRowForJob(tableWrap, scrollState.anchorJobId);
+    if (!(anchorRow instanceof HTMLElement) || scrollState.anchorOffset === null) {
+      return;
+    }
+    const wrapRect = tableWrap.getBoundingClientRect();
+    const nextOffset = anchorRow.getBoundingClientRect().top - wrapRect.top;
+    tableWrap.scrollTop += nextOffset - scrollState.anchorOffset;
   });
 }
 
@@ -1889,8 +1911,11 @@ function renderTradesPanel(details) {
   const payload = details?.trades;
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const pagination = payload?.pagination || {};
-  const page = Number(pagination.page || state.tradesPage || 1);
-  const totalPages = Number(pagination.total_pages || 1);
+  const total = Number(pagination.total || items.length || 0);
+  const loaded = Number(pagination.loaded || items.length || 0);
+  const status = items.length
+    ? t("backtests.result_detail.trades_loaded", { count: loaded, total: total || loaded })
+    : resultStatusText(payload, t("backtests.results.unavailable"));
   const body = items.length
     ? items.map((item) => renderTradeRow(item)).join("")
     : `<tr><td colspan="6">${escapeHtml(resultStatusText(payload, t("backtests.results.unavailable")))}</td></tr>`;
@@ -1898,7 +1923,7 @@ function renderTradesPanel(details) {
     <section class="backtests-result-trades" data-result-trades data-result-state="${escapeHtml(resultPayloadState(payload))}">
       <header>
         <strong>${escapeHtml(t("backtests.result_detail.trades"))}</strong>
-        <span>${escapeHtml(t("backtests.result_detail.page", { page, total: totalPages }))}</span>
+        <span>${escapeHtml(status)}</span>
       </header>
       <div class="backtests-table-wrap backtests-result-trades-wrap">
         <table class="backtests-table backtests-table--result-trades">
@@ -1915,10 +1940,6 @@ function renderTradesPanel(details) {
           <tbody data-trades-rows>${body}</tbody>
         </table>
       </div>
-      <footer class="backtests-result-pagination">
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-page="prev" ${page <= 1 ? "disabled" : ""}>${escapeHtml(t("pagination.previous"))}</button>
-        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-trades-page="next" ${page >= totalPages ? "disabled" : ""}>${escapeHtml(t("pagination.next"))}</button>
-      </footer>
     </section>
   `;
 }
@@ -2288,6 +2309,62 @@ function abortActiveVariantRequest(nextRequestKey) {
   }
 }
 
+function nextTradesPage(pagination, fallbackPage) {
+  const nextPage = Number(pagination?.next_page);
+  if (Number.isFinite(nextPage) && nextPage > fallbackPage) {
+    return Math.floor(nextPage);
+  }
+  if (pagination?.has_next) {
+    return fallbackPage + 1;
+  }
+  return null;
+}
+
+function combineTradesPages(pages) {
+  const first = pages[0] || {};
+  const last = pages[pages.length - 1] || first;
+  const items = pages.flatMap((payload) => (
+    Array.isArray(payload?.items) ? payload.items : []
+  ));
+  const firstPagination = first.pagination || {};
+  const lastPagination = last.pagination || {};
+  const total = Number(firstPagination.total || lastPagination.total || items.length || 0);
+  const loaded = items.length;
+  return {
+    ...first,
+    items,
+    pagination: {
+      ...firstPagination,
+      mode: "all",
+      page: 1,
+      page_size: DEFAULT_TRADES_PAGE_SIZE,
+      loaded,
+      total: total || loaded,
+      has_next: Boolean(lastPagination.has_next),
+      has_previous: false,
+      next_page: lastPagination.next_page || null,
+      previous_page: null,
+    },
+  };
+}
+
+async function fetchVariantTrades(root, jobId, variantKey, signal) {
+  const pages = [];
+  let page = 1;
+  while (page && pages.length < MAX_TRADES_DETAIL_PAGES) {
+    const payload = await apiFetch(variantEndpoint(root, "trades", jobId, variantKey, {
+      page,
+      page_size: DEFAULT_TRADES_PAGE_SIZE,
+    }), { signal });
+    if (isMaterializationPayload(payload) || !Array.isArray(payload?.items)) {
+      return payload;
+    }
+    pages.push(payload);
+    page = nextTradesPage(payload.pagination || {}, page);
+  }
+  return combineTradesPages(pages);
+}
+
 function variantDetailRequest(root, jobId, variantKey, page) {
   const requestKey = resultDetailRequestKey(jobId, variantKey, page);
   const existing = resultDetailRequests.get(requestKey);
@@ -2295,10 +2372,6 @@ function variantDetailRequest(root, jobId, variantKey, page) {
     return existing;
   }
   const controller = new AbortController();
-  const tradesPath = variantEndpoint(root, "trades", jobId, variantKey, {
-    page,
-    page_size: DEFAULT_TRADES_PAGE_SIZE,
-  });
   const requests = {
     variant: apiFetch(variantEndpoint(root, "variant", jobId, variantKey), {
       signal: controller.signal,
@@ -2315,9 +2388,7 @@ function variantDetailRequest(root, jobId, variantKey, page) {
     compatibility: apiFetch(variantEndpoint(root, "compatibility", jobId, variantKey), {
       signal: controller.signal,
     }),
-    trades: apiFetch(tradesPath, {
-      signal: controller.signal,
-    }),
+    trades: fetchVariantTrades(root, jobId, variantKey, controller.signal),
   };
   const promise = Promise.allSettled(Object.values(requests))
     .then((results) => {
@@ -3333,21 +3404,6 @@ function bind(root) {
         return;
       }
       loadSelectedVariantDetails(root, { page: state.tradesPage || 1, force: true }).catch(() => {});
-      return;
-    }
-    const tradesPage = event.target.closest("[data-trades-page]");
-    if (tradesPage instanceof HTMLElement) {
-      event.preventDefault();
-      event.stopPropagation();
-      const pagination = state.resultDetails?.trades?.pagination || {};
-      const current = Number(pagination.page || state.tradesPage || 1);
-      const total = Number(pagination.total_pages || 1);
-      const nextPage = tradesPage.dataset.tradesPage === "next"
-        ? Math.min(total, current + 1)
-        : Math.max(1, current - 1);
-      if (nextPage !== current) {
-        loadSelectedVariantDetails(root, { page: nextPage }).catch(() => {});
-      }
       return;
     }
     const preset = event.target.closest("[data-backtests-refresh-preset]");

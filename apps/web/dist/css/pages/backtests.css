@@ -223,16 +223,25 @@
 
 .backtests-field-pair--dates {
   gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .backtests-field-pair--dates .backtests-field {
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 4px;
+  grid-template-columns: minmax(86px, 0.48fr) minmax(0, 1fr);
+  gap: 6px;
 }
 
 .backtests-field-pair--dates .backtests-input {
-  padding: 3px 4px;
-  font-size: 9px;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+.backtests-field-pair[data-sizing-bounds-row] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.backtests-field-pair[data-sizing-bounds-row] .backtests-field {
+  grid-template-columns: minmax(86px, 0.48fr) minmax(0, 1fr);
 }
 
 .backtests-input,
@@ -1059,6 +1068,7 @@
 }
 
 .backtests-result-body {
+  --backtests-result-panel-height: 408px;
   display: grid;
   grid-template-columns: minmax(360px, 0.78fr) minmax(380px, 0.9fr) minmax(420px, 1fr);
   align-items: stretch;
@@ -1090,7 +1100,8 @@
 
 .backtests-result-stat-tables > .backtests-result-stats,
 .backtests-result-trades {
-  height: 100%;
+  height: var(--backtests-result-panel-height);
+  max-height: var(--backtests-result-panel-height);
   align-content: stretch;
 }
 
@@ -1099,31 +1110,31 @@
 }
 
 .backtests-result-trades {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .backtests-result-chart {
   display: block;
   width: 100%;
-  height: 148px;
-  min-height: 148px;
-  border: 1px solid var(--rh-line-muted);
+  height: 172px;
+  min-height: 172px;
+  border: 0;
   background: var(--rh-bg);
 }
 
 .backtests-result-stats-wrap {
-  height: 88px;
+  height: 100%;
   min-height: 0;
   overflow: auto;
 }
 
 .backtests-result-stats[data-result-stats="monthly"] .backtests-result-stats-wrap {
-  height: 214px;
+  height: 100%;
   min-height: 0;
 }
 
 .backtests-result-trades-wrap {
-  height: 214px;
+  height: 100%;
   min-height: 0;
   overflow: auto;
 }
@@ -1135,10 +1146,6 @@
 
 .backtests-table--result-trades {
   min-width: 620px;
-}
-
-.backtests-result-pagination {
-  justify-content: flex-end;
 }
 
 .backtests-download-button {

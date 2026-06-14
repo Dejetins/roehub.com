@@ -280,6 +280,7 @@
   "backtests.result_detail.symbol": "Symbol stats",
   "backtests.result_detail.title": "Result detail {variant}",
   "backtests.result_detail.trades": "Сделки",
+  "backtests.result_detail.trades_loaded": "Загружено {count}/{total}",
   "backtests.result_detail.unavailable": "Данные результатов недоступны",
   "backtests.results.unavailable": "Данные результатов недоступны",
   "backtests.risk.sl_from": "SL от",
