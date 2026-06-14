@@ -16,7 +16,8 @@
 
 ## Paths and files
 
-- app checkout/runtime: `/opt/roehub/app`
+- git checkout: `/Users/daniildegtyarev/Projects/roehub.com`
+- app runtime tree: `/opt/roehub/app`
 - keycloak runtime: `/opt/roehub/keycloak/current`
 - host config root: `/opt/roehub/config`
 - backtest artifact root: `/opt/roehub/state/backtest_artifacts/v2`
@@ -30,6 +31,12 @@
 Совместимый env-path для legacy loaders:
 
 - `/etc/roehub/roehub.env` -> symlink на `/Users/daniildegtyarev/.config/roehub/roehub.env`
+
+Deployment path rule:
+
+- `/Users/daniildegtyarev/Projects/roehub.com` is the Mac Studio git checkout. Use it for `git status`, `git fetch`, branch checks, and revision inspection.
+- `/opt/roehub/app` is synced runtime state. It may intentionally have no `.git`; do not run `git pull` or other branch-changing git commands there.
+- Runtime source is delivered to `/opt/roehub/app` by the GitHub Actions deploy workflow or by an explicit rsync/tar bundle from the verified checkout.
 
 Ключевые файлы конфигурации:
 
@@ -585,7 +592,7 @@ Schema bootstrap падает с `Missing Alembic config file: /opt/roehub/app/a
 
 - проверьте статус launchd: `launchctl print gui/$(id -u)/com.roehub.clickhouse-exporter`;
 - проверьте ошибки: `tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log`;
-- если есть `TypeError: unhashable type: 'ClickHouseExporterCollector'`, обновите код (`git pull`) и перезапустите сервис;
+- если есть `TypeError: unhashable type: 'ClickHouseExporterCollector'`, обновите код в git checkout `/Users/daniildegtyarev/Projects/roehub.com`, доставьте runtime bundle в `/opt/roehub/app` через deploy workflow или rsync/tar bundle, затем перезапустите сервис;
 - проверьте модуль вручную: `/opt/roehub/app/.venv/bin/python -m apps.monitoring.clickhouse_exporter --host 127.0.0.1 --port 9116 --scrape-uri http://127.0.0.1:8123/ --database market_data --user ${CLICKHOUSE_USER:-roe} --password ${CLICKHOUSE_PASSWORD:-}`;
 - после исправления перезапустите: `bash scripts/macos/reload_launchd_services.sh prod`.
 

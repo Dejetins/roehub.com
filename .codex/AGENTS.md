@@ -146,6 +146,14 @@ When the user asks to apply, publish, ship, or carry repository changes through 
 
 `pre-ship-gate` remains the review-only gate for readiness assessment when the user wants analysis or ship confidence without performing publish, merge, deploy, or verification actions.
 
+Mac Studio path contract:
+- SSH host alias is `macstudio`.
+- The Mac Studio git checkout for this repository is `/Users/daniildegtyarev/Projects/roehub.com`.
+- The production runtime tree is `/opt/roehub/app`.
+- `/opt/roehub/app` is synced runtime state, not the authoritative git checkout; it may intentionally have no `.git`.
+- Agents MUST run remote git commands with `git -C /Users/daniildegtyarev/Projects/roehub.com ...` and MUST NOT run `git pull`, `git status`, `git reset`, or branch commands inside `/opt/roehub/app`.
+- Runtime deployment updates `/opt/roehub/app` via the deploy workflow or explicit rsync/tar bundle semantics from the verified checkout, then runs bootstrap/reload/smoke from the runtime tree.
+
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
 
 When generating executor prompts, the agent SHOULD use `prompt-manager` and SHOULD encode task-specific skill routing inside the generated prompt: which exact skill to use, when in the workflow to use it, and what boundary it owns. Generated prompts MUST NOT instruct executors to preload all available skills.
