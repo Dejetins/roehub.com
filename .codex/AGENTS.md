@@ -552,6 +552,13 @@ Preferred surfaces depend on the current environment and prompt:
 - Playwright MCP when it is the configured browser automation surface,
 - global `playwright` skill / Playwright CLI when CLI-driven browser verification is the available path.
 
+Roehub authenticated browser QA default:
+- use the smoke Keycloak test account `smoke_e2e_keycloak` when a normal authenticated test user is needed and the user did not request another account;
+- password source of truth on `macstudio`: `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`;
+- when the browser automation runs outside `macstudio`, use a securely exported local `ROEHUB_SMOKE_E2E_PASSWORD` copied from that host-local source, or a password explicitly provided by the user in the current turn;
+- never write the password into repo files, prompt artifacts, screenshots, traces, logs, stage ledgers, or final reports;
+- if no password source is available, report browser auth as blocked instead of guessing credentials.
+
 ### 7.2 When runtime verification SHOULD be used
 The agent SHOULD use runtime browser verification when the task involves one or more of:
 
