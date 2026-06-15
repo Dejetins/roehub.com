@@ -14,6 +14,7 @@ const MAX_RESULT_DETAIL_CACHE_ENTRIES = 50;
 const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 100;
 const MAX_TRADES_DETAIL_PAGES = 100;
+const RESULT_SPINNER_DOT_COUNT = 16;
 const DEFAULT_TP_START_PCT = 5;
 const DEFAULT_TP_STOP_PCT = 30;
 const DEFAULT_SL_START_PCT = 5;
@@ -1751,11 +1752,17 @@ function renderResultLoadingOverlay(details) {
     : t("backtests.result_detail.compute_loading");
   return `
     <div class="backtests-result-loading-overlay" role="status" aria-live="polite">
-      <span class="backtests-result-spinner" aria-hidden="true"></span>
+      <span class="backtests-result-spinner" aria-hidden="true">${renderResultSpinnerDots()}</span>
       <strong>${escapeHtml(t("backtests.result_detail.compute_loading"))}</strong>
       <span>${escapeHtml(status)}</span>
     </div>
   `;
+}
+
+function renderResultSpinnerDots() {
+  return Array.from({ length: RESULT_SPINNER_DOT_COUNT }, () => (
+    '<span class="backtests-result-spinner__dot"></span>'
+  )).join("");
 }
 
 function compatibilityMetric(compatibility) {

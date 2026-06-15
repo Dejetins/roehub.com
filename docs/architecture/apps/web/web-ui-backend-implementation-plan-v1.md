@@ -670,7 +670,7 @@ sequenceDiagram
 | Authorization | чужой ресурс | 403/404 без утечки деталей | owner scope до read/stream |
 | Dashboard | один источник недоступен | degraded panel, остальные panels работают | partial DTO или typed degraded source |
 | Strategy live SSE | network drop | reconnect 2s/5s/15s, затем polling fallback | read-only stream, bounded connections |
-| Backtest results | lazy detail cache miss | CLI-style loading state, bounded materialization | no full payload in top rows |
+| Backtest results | lazy detail cache miss | 4x4 CLI dot-snake loading state with CSS-variable speed, bounded materialization | no full payload in top rows |
 | CSV export | large export | отдельный download flow | streaming/file route, rate limit |
 | AI | provider timeout | draft not applied, deterministic error | cancellation, redaction, rate limit |
 
