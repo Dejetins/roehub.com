@@ -113,6 +113,35 @@ class StrategyDashboardExchangeAccountReadinessResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyDashboardMarketReadinessItemResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exchange_name: str
+    market_type: str
+    instrument_key: str
+    readiness_state: Literal["ready", "missing", "stale", "pending", "blocked"]
+    reason_codes: list[str]
+    reference_state: Literal["ready", "missing", "disabled", "incomplete"]
+    price_step: float | None
+    qty_step: float | None
+    min_notional: float | None
+    stream_state: Literal["ready", "missing", "stale", "pending"]
+    stream_name: str
+    stream_age_seconds: int | None
+
+
+class StrategyDashboardMarketReadinessResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    symbol: str
+    freshness_threshold_seconds: int
+    items: list[StrategyDashboardMarketReadinessItemResponse]
+    checked_at: datetime | None
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardSelectorFiltersResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -430,6 +459,7 @@ class StrategyDashboardResponse(BaseModel):
     selected_strategy: StrategyDashboardSelectedStrategyResponse
     live_profile: StrategyDashboardLiveProfileResponse
     compatibility_readiness: StrategyDashboardCompatibilityReadinessResponse
+    market_readiness: StrategyDashboardMarketReadinessResponse
     exchange_account_readiness: StrategyDashboardExchangeAccountReadinessResponse
     strategy_selector: StrategyDashboardSelectorResponse
     chart: StrategyChartResponse

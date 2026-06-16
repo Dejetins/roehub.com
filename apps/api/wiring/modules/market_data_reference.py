@@ -18,13 +18,24 @@ from apps.api.routes import (
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
+    ClickHouseBTCUSDTMarketReadinessReader,
     ClickHouseEnabledMarketReader,
     ClickHouseEnabledTradableInstrumentSearchReader,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.application.dto.reference_api import (
+    BTCUSDTStreamReadinessSnapshot,
+)
 from trading.contexts.market_data.application.use_cases import (
+    BTCUSDTMarketReadinessUseCase,
     ListEnabledMarketsUseCase,
     SearchEnabledTradableInstrumentsUseCase,
+)
+from trading.contexts.strategy.adapters.outbound import (
+    RedisMarketDataReadinessReader,
+    RedisStrategyLiveCandleStreamConfig,
+    load_strategy_runtime_config,
+    resolve_strategy_config_path,
 )
 
 
@@ -32,6 +43,7 @@ from trading.contexts.market_data.application.use_cases import (
 class MarketDataReferenceUseCases:
     list_enabled_markets: ListEnabledMarketsUseCase
     search_enabled_tradable_instruments: SearchEnabledTradableInstrumentsUseCase
+    btcusdt_market_readiness: BTCUSDTMarketReadinessUseCase
 
 
 def build_market_data_reference_use_cases(
@@ -54,6 +66,13 @@ def build_market_data_reference_use_cases(
                 gateway=clickhouse_gateway,
                 database=clickhouse_settings.database,
             )
+        ),
+        btcusdt_market_readiness=BTCUSDTMarketReadinessUseCase(
+            reference_reader=ClickHouseBTCUSDTMarketReadinessReader(
+                gateway=clickhouse_gateway,
+                database=clickhouse_settings.database,
+            ),
+            stream_reader=_build_btcusdt_stream_readiness_reader(environ=environ),
         ),
     )
 
@@ -93,8 +112,88 @@ def build_market_data_reference_router(
     return build_market_data_reference_api_router(
         list_enabled_markets_use_case=use_cases.list_enabled_markets,
         search_enabled_tradable_instruments_use_case=use_cases.search_enabled_tradable_instruments,
+        btcusdt_market_readiness_use_case=use_cases.btcusdt_market_readiness,
         current_user_dependency=current_user_dependency,
     )
+
+
+class _UnavailableBTCUSDTStreamReadinessReader:
+    def check(
+        self,
+        *,
+        instrument_key: str,
+        timeframe: str,
+        observed_at,
+    ) -> BTCUSDTStreamReadinessSnapshot:
+        _ = timeframe
+        _ = observed_at
+        return BTCUSDTStreamReadinessSnapshot(
+            state="pending",
+            reason_code="market_data_readiness_reader_unavailable",
+            stream_name=f"md.candles.1m.{instrument_key}",
+            stream_length=None,
+            last_message_id=None,
+            last_observed_at=None,
+            age_seconds=None,
+        )
+
+
+class _StrategyRedisBTCUSDTStreamReadinessReader:
+    def __init__(self, *, reader: RedisMarketDataReadinessReader) -> None:
+        self._reader = reader
+
+    def check(
+        self,
+        *,
+        instrument_key: str,
+        timeframe: str,
+        observed_at,
+    ) -> BTCUSDTStreamReadinessSnapshot:
+        snapshot = self._reader.check(
+            instrument_key=instrument_key,
+            timeframe=timeframe,
+            observed_at=observed_at,
+        )
+        return BTCUSDTStreamReadinessSnapshot(
+            state=snapshot.state,
+            reason_code=snapshot.reason_code,
+            stream_name=snapshot.stream_name,
+            stream_length=snapshot.stream_length,
+            last_message_id=snapshot.last_message_id,
+            last_observed_at=snapshot.last_observed_at,
+            age_seconds=snapshot.age_seconds,
+        )
+
+
+def _build_btcusdt_stream_readiness_reader(*, environ: Mapping[str, str]):
+    try:
+        runtime_config = load_strategy_runtime_config(
+            resolve_strategy_config_path(environ=environ),
+            environ=environ,
+        )
+        redis_config = runtime_config.live_worker.redis_streams
+        if not redis_config.enabled:
+            return _UnavailableBTCUSDTStreamReadinessReader()
+        return _StrategyRedisBTCUSDTStreamReadinessReader(
+            reader=RedisMarketDataReadinessReader(
+                config=RedisStrategyLiveCandleStreamConfig(
+                    host=redis_config.host,
+                    port=redis_config.port,
+                    db=redis_config.db,
+                    password_env=redis_config.password_env,
+                    socket_timeout_s=redis_config.socket_timeout_s,
+                    connect_timeout_s=redis_config.connect_timeout_s,
+                    stream_prefix=redis_config.stream_prefix,
+                    consumer_group=redis_config.consumer_group,
+                    consumer_name="api-btcusdt-readiness",
+                    read_count=1,
+                    block_ms=0,
+                ),
+                environ=environ,
+            )
+        )
+    except Exception:
+        return _UnavailableBTCUSDTStreamReadinessReader()
 
 
 __all__ = [

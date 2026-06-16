@@ -20,6 +20,8 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyDashboardExchangeAccountReadinessResponse,
     StrategyDashboardFooterStatusResponse,
     StrategyDashboardLiveProfileResponse,
+    StrategyDashboardMarketReadinessItemResponse,
+    StrategyDashboardMarketReadinessResponse,
     StrategyDashboardPaperAccountingResponse,
     StrategyDashboardRefreshControlResponse,
     StrategyDashboardResponse,
@@ -48,6 +50,7 @@ from apps.api.monitoring import (
 from apps.api.routes.ui_strategies_dashboard import (
     build_ui_strategies_dashboard_router as build_ui_strategies_dashboard_api_router,
 )
+from apps.api.wiring.modules.market_data_reference import build_market_data_reference_use_cases
 from apps.api.wiring.modules.strategy import (
     _build_compatibility_readiness_service,
     _build_live_profile_repository,
@@ -74,6 +77,8 @@ from trading.contexts.live_execution.domain import (
     ExpectedInstrumentConfig,
     StrategyPaperAccountingSnapshot,
 )
+from trading.contexts.market_data.application.dto.reference_api import BTCUSDTMarketReadinessRow
+from trading.contexts.market_data.application.use_cases import BTCUSDTMarketReadinessUseCase
 from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
 from trading.contexts.strategy.application import (
     CurrentUser,
@@ -107,6 +112,7 @@ _EVENTS_SOURCE = "strategy_events"
 _RUNTIME_METADATA_SOURCE = "strategy_run_metadata"
 _LIVE_PROFILE_SOURCE = "strategy_live_profiles"
 _COMPATIBILITY_SOURCE = "strategy_compatibility_readiness"
+_MARKET_READINESS_SOURCE = "btcusdt_market_readiness"
 _EXCHANGE_ACCOUNT_SOURCE = "exchange_account_projection"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
 _PAPER_ACCOUNTING_SOURCE = "strategy_paper_accounting"
@@ -193,6 +199,7 @@ class StrategyDashboardQueryService:
         profile_repository: LiveStrategyProfileRepository | None = None,
         signal_repository: StrategySignalRepository | None = None,
         compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+        btcusdt_market_readiness_service: BTCUSDTMarketReadinessUseCase | None = None,
         account_projection_service: AccountProjectionReadinessService | None = None,
         paper_accounting_service: PaperAccountingReadService | None = None,
         execution_outcome_service: ExecutionOutcomeReadService | None = None,
@@ -203,6 +210,7 @@ class StrategyDashboardQueryService:
         self._profile_repository = profile_repository
         self._signal_repository = signal_repository
         self._compatibility_readiness_service = compatibility_readiness_service
+        self._btcusdt_market_readiness_service = btcusdt_market_readiness_service
         self._account_projection_service = account_projection_service
         self._paper_accounting_service = paper_accounting_service
         self._execution_outcome_service = execution_outcome_service
@@ -258,6 +266,9 @@ class StrategyDashboardQueryService:
             strategy=selected_strategy,
             generated_at=generated_at,
         )
+        market_readiness, market_readiness_source = self._load_market_readiness(
+            generated_at=generated_at,
+        )
         account_readiness, account_source = self._load_exchange_account_readiness(
             principal=principal,
             strategy=selected_strategy,
@@ -268,6 +279,7 @@ class StrategyDashboardQueryService:
             *dynamic_sources,
             live_profile_source,
             compatibility_source,
+            market_readiness_source,
             account_source,
             signal_journal_source,
             paper_accounting_source,
@@ -321,6 +333,7 @@ class StrategyDashboardQueryService:
             ),
             live_profile=_build_live_profile(profile=live_profile, strategy=selected_strategy),
             compatibility_readiness=compatibility_readiness,
+            market_readiness=market_readiness,
             exchange_account_readiness=account_readiness,
             strategy_selector=_build_strategy_selector(
                 strategies=strategies,
@@ -359,6 +372,63 @@ class StrategyDashboardQueryService:
                 retry_after_seconds=refresh_decision.retry_after_seconds,
                 last_refresh_reason=refresh,
                 refresh_status=effective_refresh_status,
+            ),
+        )
+
+    def _load_market_readiness(
+        self,
+        *,
+        generated_at: datetime,
+    ) -> tuple[StrategyDashboardMarketReadinessResponse, StrategyDashboardSourceResponse]:
+        if self._btcusdt_market_readiness_service is None:
+            return (
+                _build_empty_market_readiness(reason="btcusdt_market_readiness_not_configured"),
+                _source(
+                    name=_MARKET_READINESS_SOURCE,
+                    status="unavailable",
+                    generated_at=generated_at,
+                    detail="BTCUSDT market readiness service is not configured",
+                ),
+            )
+        try:
+            report = self._btcusdt_market_readiness_service.execute(observed_at=generated_at)
+        except Exception as error:  # noqa: BLE001
+            reason = str(error)
+            return (
+                _build_empty_market_readiness(reason=reason),
+                _source(
+                    name=_MARKET_READINESS_SOURCE,
+                    status="degraded",
+                    generated_at=generated_at,
+                    detail=reason,
+                ),
+            )
+        blocked_rows = [row for row in report.rows if row.readiness_state != "ready"]
+        state = "ready" if not blocked_rows else "degraded"
+        primary_reason = blocked_rows[0].reason_codes[0] if blocked_rows else None
+        return (
+            StrategyDashboardMarketReadinessResponse(
+                source=_MARKET_READINESS_SOURCE,
+                state=state,
+                symbol=report.symbol,
+                freshness_threshold_seconds=report.freshness_threshold_seconds,
+                items=[_build_market_readiness_item(row=row) for row in report.rows],
+                checked_at=report.checked_at,
+                degradation_reason=primary_reason,
+            ),
+            _source(
+                name=_MARKET_READINESS_SOURCE,
+                status="available" if not blocked_rows else "degraded",
+                generated_at=generated_at,
+                age_seconds=_age_seconds(
+                    generated_at=generated_at,
+                    observed_at=report.checked_at,
+                ),
+                detail=(
+                    "all BTCUSDT markets ready"
+                    if not blocked_rows
+                    else f"{len(blocked_rows)} BTCUSDT market rows not ready"
+                ),
             ),
         )
 
@@ -992,6 +1062,7 @@ def build_strategy_dashboard_service(
             profile_repository=None,
             signal_repository=None,
             compatibility_readiness_service=None,
+            btcusdt_market_readiness_service=None,
             account_projection_service=None,
             paper_accounting_service=None,
             execution_outcome_service=None,
@@ -1007,12 +1078,14 @@ def build_strategy_dashboard_service(
         event_repository=None,
         clock=SystemStrategyClock(),
     )
+    market_data_use_cases = build_market_data_reference_use_cases(environ=environ)
     return StrategyDashboardQueryService(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
         profile_repository=profile_repository,
         signal_repository=signal_repository,
         compatibility_readiness_service=compatibility_readiness_service,
+        btcusdt_market_readiness_service=market_data_use_cases.btcusdt_market_readiness,
         account_projection_service=_build_account_projection_service(settings=settings),
         paper_accounting_service=_build_paper_accounting_service(settings=settings),
         execution_outcome_service=_build_execution_outcome_service(settings=settings),
@@ -1316,6 +1389,37 @@ def _build_empty_compatibility(
         launch_blocked_reason=reason,
         checked_at=None,
         degradation_reason=reason,
+    )
+
+
+def _build_empty_market_readiness(*, reason: str) -> StrategyDashboardMarketReadinessResponse:
+    return StrategyDashboardMarketReadinessResponse(
+        source=_MARKET_READINESS_SOURCE,
+        state="unavailable",
+        symbol="BTCUSDT",
+        freshness_threshold_seconds=180,
+        items=[],
+        checked_at=None,
+        degradation_reason=reason,
+    )
+
+
+def _build_market_readiness_item(
+    *, row: BTCUSDTMarketReadinessRow
+) -> StrategyDashboardMarketReadinessItemResponse:
+    return StrategyDashboardMarketReadinessItemResponse(
+        exchange_name=row.exchange_name,
+        market_type=row.market_type,
+        instrument_key=row.instrument_key,
+        readiness_state=row.readiness_state,
+        reason_codes=list(row.reason_codes),
+        reference_state=row.reference_state,
+        price_step=row.price_step,
+        qty_step=row.qty_step,
+        min_notional=row.min_notional,
+        stream_state=row.stream_state,
+        stream_name=row.stream_name,
+        stream_age_seconds=row.stream_age_seconds,
     )
 
 

@@ -1,3 +1,4 @@
+from .btcusdt_market_readiness_reader import ClickHouseBTCUSDTMarketReadinessReader
 from .canonical_candle_index_reader import ClickHouseCanonicalCandleIndexReader
 from .canonical_candle_reader import ClickHouseCanonicalCandleReader
 from .enabled_instrument_reader import ClickHouseEnabledInstrumentReader
@@ -16,6 +17,7 @@ from .ref_market_writer import ClickHouseMarketRefWriter
 
 __all__ = [
     "ClickHouseCanonicalCandleReader",
+    "ClickHouseBTCUSDTMarketReadinessReader",
     "ClickHouseCanonicalCandleIndexReader",
     "ClickHouseEnabledInstrumentReader",
     "ClickHouseEnabledMarketReader",

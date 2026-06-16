@@ -880,7 +880,11 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "/api/strategies/clone" in strategies_js
     assert "source_strategy_id" in strategies_js
     assert "summary.live_profile" in strategies_js
+    assert "summary.market_readiness" in strategies_js
     assert "data-profile-readiness" in (
+        _WEB_ROOT / "templates/pages/strategies.html"
+    ).read_text(encoding="utf-8")
+    assert "data-market-readiness" in (
         _WEB_ROOT / "templates/pages/strategies.html"
     ).read_text(encoding="utf-8")
     assert "createPoller" in strategies_js

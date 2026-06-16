@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
@@ -6,7 +7,11 @@ from fastapi.testclient import TestClient
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_market_data_reference_router
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
-from trading.contexts.market_data.application.dto.reference_api import EnabledMarketReference
+from trading.contexts.market_data.application.dto.reference_api import (
+    BTCUSDTMarketReadinessReport,
+    BTCUSDTMarketReadinessRow,
+    EnabledMarketReference,
+)
 from trading.shared_kernel.primitives import InstrumentId, MarketId, PaidLevel, Symbol, UserId
 
 # WEB-EPIC-07 mapping:
@@ -165,6 +170,16 @@ class _FakeSearchEnabledTradableInstrumentsUseCase:
         """
         self.calls.append((market_id.value, q, limit))
         return self._rows_by_market.get(market_id.value, ())
+
+
+class _FakeBTCUSDTMarketReadinessUseCase:
+    def __init__(self, *, report: BTCUSDTMarketReadinessReport) -> None:
+        self._report = report
+        self.calls = 0
+
+    def execute(self) -> BTCUSDTMarketReadinessReport:
+        self.calls += 1
+        return self._report
 
 
 def test_get_market_data_markets_returns_enabled_items() -> None:
@@ -399,6 +414,48 @@ def test_get_market_data_instruments_rejects_limit_above_max_with_422() -> None:
     }
 
 
+def test_get_btcusdt_market_readiness_returns_reference_and_stream_matrix() -> None:
+    readiness_use_case = _FakeBTCUSDTMarketReadinessUseCase(
+        report=_readiness_report(
+            row=_readiness_row(
+                market_id=1,
+                exchange_name="binance",
+                market_type="spot",
+                market_code="binance:spot",
+                readiness_state="ready",
+                reason_codes=("btcusdt_market_ready",),
+                reference_state="ready",
+                reference_reason_codes=("reference_ready",),
+                stream_state="ready",
+                stream_reason_code="market_data_stream_ready",
+            )
+        )
+    )
+    client, _ = _build_client(
+        list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
+        search_use_case=_FakeSearchEnabledTradableInstrumentsUseCase(rows_by_market={}),
+        btcusdt_readiness_use_case=readiness_use_case,
+    )
+
+    response = client.get(
+        "/market-data/btcusdt-readiness",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000106"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert readiness_use_case.calls == 1
+    assert payload["symbol"] == "BTCUSDT"
+    assert payload["freshness_threshold_seconds"] == 180
+    assert payload["items"][0]["instrument_key"] == "binance:spot:BTCUSDT"
+    assert payload["items"][0]["readiness_state"] == "ready"
+    assert payload["items"][0]["reason_codes"] == ["btcusdt_market_ready"]
+    assert payload["items"][0]["price_step"] == 0.01
+    assert payload["items"][0]["qty_step"] == 0.00001
+    assert payload["items"][0]["min_notional"] == 10.0
+    assert payload["items"][0]["stream_name"] == "md.candles.1m.binance:spot:BTCUSDT"
+
+
 def test_market_data_reference_routes_require_authentication() -> None:
     """
     Verify both reference endpoints are auth-protected and return deterministic 401.
@@ -428,9 +485,11 @@ def test_market_data_reference_routes_require_authentication() -> None:
         "/market-data/instruments",
         params={"market_id": 1},
     )
+    readiness_response = client.get("/market-data/btcusdt-readiness")
 
     assert markets_response.status_code == 401
     assert instruments_response.status_code == 401
+    assert readiness_response.status_code == 401
     assert markets_response.json() == {
         "detail": {
             "error": "unauthorized",
@@ -443,12 +502,19 @@ def test_market_data_reference_routes_require_authentication() -> None:
             "message": "Authentication required",
         }
     }
+    assert readiness_response.json() == {
+        "detail": {
+            "error": "unauthorized",
+            "message": "Authentication required",
+        }
+    }
 
 
 def _build_client(
     *,
     list_use_case: _FakeListEnabledMarketsUseCase,
     search_use_case: _FakeSearchEnabledTradableInstrumentsUseCase,
+    btcusdt_readiness_use_case: _FakeBTCUSDTMarketReadinessUseCase | None = None,
 ) -> tuple[TestClient, _FakeSearchEnabledTradableInstrumentsUseCase]:
     """
     Build FastAPI test client with market-data reference router and shared error handlers.
@@ -475,10 +541,85 @@ def _build_client(
         build_market_data_reference_router(
             list_enabled_markets_use_case=list_use_case,  # type: ignore[arg-type]
             search_enabled_tradable_instruments_use_case=search_use_case,  # type: ignore[arg-type]
+            btcusdt_market_readiness_use_case=(
+                btcusdt_readiness_use_case or _FakeBTCUSDTMarketReadinessUseCase(
+                    report=_readiness_report(
+                        row=_readiness_row(
+                            market_id=None,
+                            exchange_name="binance",
+                            market_type="spot",
+                            market_code="binance:spot",
+                            readiness_state="blocked",
+                            reason_codes=("reference_market_missing",),
+                            reference_state="missing",
+                            reference_reason_codes=("reference_market_missing",),
+                            stream_state="pending",
+                            stream_reason_code="market_data_readiness_reader_unavailable",
+                        )
+                    )
+                )
+            ),  # type: ignore[arg-type]
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
         )
     )
     return TestClient(app), search_use_case
+
+
+def _readiness_report(
+    *,
+    row: BTCUSDTMarketReadinessRow,
+) -> BTCUSDTMarketReadinessReport:
+    checked_at = datetime(2027, 1, 15, 8, 0, tzinfo=UTC)
+    return BTCUSDTMarketReadinessReport(
+        symbol="BTCUSDT",
+        freshness_threshold_seconds=180,
+        rows=(row,),
+        checked_at=checked_at,
+    )
+
+
+def _readiness_row(
+    *,
+    market_id: int | None,
+    exchange_name: str,
+    market_type: str,
+    market_code: str,
+    readiness_state: str,
+    reason_codes: tuple[str, ...],
+    reference_state: str,
+    reference_reason_codes: tuple[str, ...],
+    stream_state: str,
+    stream_reason_code: str,
+) -> BTCUSDTMarketReadinessRow:
+    checked_at = datetime(2027, 1, 15, 8, 0, tzinfo=UTC)
+    return BTCUSDTMarketReadinessRow(
+        market_id=MarketId(market_id) if market_id is not None else None,
+        exchange_name=exchange_name,
+        market_type=market_type,
+        market_code=market_code,
+        symbol="BTCUSDT",
+        instrument_key=f"{exchange_name}:{market_type}:BTCUSDT",
+        readiness_state=readiness_state,  # type: ignore[arg-type]
+        reason_codes=reason_codes,
+        reference_state=reference_state,  # type: ignore[arg-type]
+        reference_reason_codes=reference_reason_codes,
+        market_enabled=market_id is not None,
+        status="ENABLED" if market_id is not None else None,
+        is_tradable=1 if market_id is not None else None,
+        base_asset="BTC" if market_id is not None else None,
+        quote_asset="USDT" if market_id is not None else None,
+        price_step=0.01 if market_id is not None else None,
+        qty_step=0.00001 if market_id is not None else None,
+        min_notional=10.0 if market_id is not None else None,
+        stream_state=stream_state,  # type: ignore[arg-type]
+        stream_reason_code=stream_reason_code,
+        stream_name=f"md.candles.1m.{exchange_name}:{market_type}:BTCUSDT",
+        stream_length=12 if stream_state == "ready" else None,
+        stream_last_message_id="1800000000000-0" if stream_state == "ready" else None,
+        stream_last_observed_at=checked_at if stream_state == "ready" else None,
+        stream_age_seconds=30 if stream_state == "ready" else None,
+        checked_at=checked_at,
+    )
 
 
 def _market(

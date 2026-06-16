@@ -255,6 +255,34 @@ function renderCompatibilityReadiness(root, readiness) {
   setText("[data-profile-market-data]", `${marketDataState}: ${marketDataReason}`, root);
 }
 
+function renderMarketReadiness(root, readiness) {
+  const items = Array.isArray(readiness?.items) ? readiness.items : [];
+  const firstBlocked = items.find((item) => item?.readiness_state !== "ready");
+  const summaryState = firstBlocked?.readiness_state || (items.length ? "ready" : "pending");
+  const summaryReason = firstBlocked?.reason_codes?.[0] || readiness?.degradation_reason || "btcusdt_market_ready";
+  setText("[data-market-readiness]", `${summaryState}: ${summaryReason}`, root);
+  setText("[data-market-symbol]", readiness?.symbol || "BTCUSDT", root);
+  setText(
+    "[data-market-threshold]",
+    readiness?.freshness_threshold_seconds === null || readiness?.freshness_threshold_seconds === undefined
+      ? "--"
+      : `${readiness.freshness_threshold_seconds}s`,
+    root,
+  );
+  setText("[data-market-checked]", localTime(readiness?.checked_at), root);
+  ["binance:spot", "binance:futures", "bybit:spot", "bybit:futures"].forEach((marketKey) => {
+    const row = items.find((item) => `${item.exchange_name}:${item.market_type}` === marketKey);
+    const detail = row
+      ? `${row.readiness_state}: ${row.reason_codes?.[0] || "--"} / ${row.stream_state} / min ${valueOrUnavailable(row.min_notional)}`
+      : "missing: reference_market_missing";
+    setText(`[data-market-row="${marketKey}"]`, detail, root);
+  });
+  const panel = qs(".strategies-market-readiness", root);
+  if (panel instanceof HTMLElement) {
+    panel.dataset.readiness = summaryState;
+  }
+}
+
 function renderExchangeAccountReadiness(root, readiness) {
   const status = readiness?.status || "degraded";
   const reason = (readiness?.reason_codes || [readiness?.degradation_reason || "--"])[0];
@@ -671,6 +699,7 @@ function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
   renderLiveProfile(root, summary.live_profile);
   renderCompatibilityReadiness(root, summary.compatibility_readiness);
+  renderMarketReadiness(root, summary.market_readiness);
   renderExchangeAccountReadiness(root, summary.exchange_account_readiness);
   renderPaperAccounting(root, summary.paper_accounting);
   renderSelector(root, summary.strategy_selector, state.savedQuery);

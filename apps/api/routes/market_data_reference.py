@@ -12,8 +12,10 @@ from typing import Callable
 from fastapi import APIRouter, Depends, Query, Request
 
 from apps.api.dto import (
+    BTCUSDTMarketReadinessResponse,
     MarketDataInstrumentsResponse,
     MarketDataMarketsResponse,
+    build_btcusdt_market_readiness_response,
     build_market_data_instruments_response,
     build_market_data_markets_response,
 )
@@ -21,6 +23,7 @@ from trading.contexts.identity.application.ports.current_user import CurrentUser
 from trading.contexts.market_data.application.use_cases import (
     DEFAULT_INSTRUMENT_SEARCH_LIMIT,
     MAX_INSTRUMENT_SEARCH_LIMIT,
+    BTCUSDTMarketReadinessUseCase,
     ListEnabledMarketsUseCase,
     SearchEnabledTradableInstrumentsUseCase,
 )
@@ -33,6 +36,7 @@ def build_market_data_reference_router(
     *,
     list_enabled_markets_use_case: ListEnabledMarketsUseCase,
     search_enabled_tradable_instruments_use_case: SearchEnabledTradableInstrumentsUseCase,
+    btcusdt_market_readiness_use_case: BTCUSDTMarketReadinessUseCase | None = None,
     current_user_dependency: CurrentUserDependency,
 ) -> APIRouter:
     """
@@ -128,6 +132,21 @@ def build_market_data_reference_router(
             limit=limit,
         )
         return build_market_data_instruments_response(instruments=instruments)
+
+    @router.get(
+        "/market-data/btcusdt-readiness",
+        response_model=BTCUSDTMarketReadinessResponse,
+    )
+    def get_btcusdt_market_readiness(
+        _principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> BTCUSDTMarketReadinessResponse:
+        """
+        Return BTCUSDT market-data readiness matrix for strategy producer launch gates.
+        """
+        if btcusdt_market_readiness_use_case is None:
+            raise ValueError("BTCUSDT market readiness use-case is not configured")
+        report = btcusdt_market_readiness_use_case.execute()
+        return build_btcusdt_market_readiness_response(report=report)
 
     return router
 

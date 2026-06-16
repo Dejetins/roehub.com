@@ -127,6 +127,39 @@ def test_metadata_source_parses_binance_exchange_info(tmp_path: Path) -> None:
     assert rows[0].min_notional == 10.0
 
 
+def test_metadata_source_parses_binance_futures_notional_filter(tmp_path: Path) -> None:
+    """Ensure Binance futures MIN_NOTIONAL.notional is accepted as min_notional."""
+    cfg = load_market_data_runtime_config(_config(tmp_path))
+    source = RestInstrumentMetadataSource(
+        cfg=cfg,
+        http=_FakeHttp(
+            [
+                {
+                    "symbols": [
+                        {
+                            "symbol": "BTCUSDT",
+                            "baseAsset": "BTC",
+                            "quoteAsset": "USDT",
+                            "filters": [
+                                {"filterType": "PRICE_FILTER", "tickSize": "0.10"},
+                                {"filterType": "LOT_SIZE", "stepSize": "0.001"},
+                                {"filterType": "MIN_NOTIONAL", "notional": "50"},
+                            ],
+                        }
+                    ]
+                }
+            ]
+        ),
+    )
+
+    rows = source.list_for_market(MarketId(1))
+
+    assert len(rows) == 1
+    assert rows[0].price_step == 0.10
+    assert rows[0].qty_step == 0.001
+    assert rows[0].min_notional == 50.0
+
+
 def test_metadata_source_parses_bybit_paginated_payload(tmp_path: Path) -> None:
     """Ensure Bybit pagination is handled and all pages are flattened into metadata rows."""
     cfg = load_market_data_runtime_config(_config(tmp_path))
@@ -177,3 +210,42 @@ def test_metadata_source_parses_bybit_paginated_payload(tmp_path: Path) -> None:
     rows = source.list_for_market(MarketId(3))
 
     assert {str(row.instrument_id.symbol) for row in rows} == {"ETHUSDT", "ADAUSDT"}
+
+
+def test_metadata_source_parses_bybit_spot_base_precision_as_qty_step(
+    tmp_path: Path,
+) -> None:
+    """Ensure Bybit spot basePrecision fills qty_step when qtyStep is absent."""
+    cfg = load_market_data_runtime_config(_config(tmp_path))
+    source = RestInstrumentMetadataSource(
+        cfg=cfg,
+        http=_FakeHttp(
+            [
+                {
+                    "retCode": 0,
+                    "result": {
+                        "list": [
+                            {
+                                "symbol": "BTCUSDT",
+                                "baseCoin": "BTC",
+                                "quoteCoin": "USDT",
+                                "priceFilter": {"tickSize": "0.1"},
+                                "lotSizeFilter": {
+                                    "basePrecision": "0.000001",
+                                    "minOrderAmt": "5",
+                                },
+                            }
+                        ],
+                        "nextPageCursor": "",
+                    },
+                }
+            ]
+        ),
+    )
+
+    rows = source.list_for_market(MarketId(3))
+
+    assert len(rows) == 1
+    assert rows[0].price_step == 0.1
+    assert rows[0].qty_step == 0.000001
+    assert rows[0].min_notional == 5.0

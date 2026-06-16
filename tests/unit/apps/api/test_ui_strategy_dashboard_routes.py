@@ -15,6 +15,10 @@ from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_strategies_dashboard_router
 from apps.api.wiring.modules.ui_strategies_dashboard import StrategyDashboardQueryService
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.market_data.application.dto.reference_api import (
+    BTCUSDTMarketReadinessReport,
+    BTCUSDTMarketReadinessRow,
+)
 from trading.contexts.strategy.domain.entities import Strategy, StrategyRun, StrategySignal
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -71,6 +75,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
         signal_repository=_FakeSignalRepository(signals=(_signal(strategy=strategy, run=run),)),
+        btcusdt_market_readiness_service=_FakeBTCUSDTMarketReadinessService(),  # type: ignore[arg-type]
     )
     client = _build_client(service=service)
 
@@ -118,6 +123,14 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         "account_projection_not_configured"
     ]
     assert payload["exchange_account_readiness"]["ready_for_risk"] is False
+    assert payload["market_readiness"]["symbol"] == "BTCUSDT"
+    assert payload["market_readiness"]["state"] == "degraded"
+    assert payload["market_readiness"]["items"][0]["instrument_key"] == "binance:spot:BTCUSDT"
+    assert payload["market_readiness"]["items"][0]["readiness_state"] == "ready"
+    assert payload["market_readiness"]["items"][1]["instrument_key"] == "bybit:spot:BTCUSDT"
+    assert payload["market_readiness"]["items"][1]["reason_codes"] == [
+        "reference_market_missing"
+    ]
     assert "summary" not in payload["monthly_stats"]
     assert "symbol_results" not in payload
     assert payload["refresh_control"]["interval_seconds"] == 15
@@ -128,6 +141,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert source_statuses["strategy_live_profiles"] == "unavailable"
     assert source_statuses["strategy_signals"] == "available"
     assert source_statuses["exchange_account_projection"] == "unavailable"
+    assert source_statuses["btcusdt_market_readiness"] == "degraded"
     assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"
@@ -304,6 +318,81 @@ class _FakeSignalRepository:
             for signal in self._signals
             if signal.owner_user_id == owner_user_id and signal.strategy_id == strategy_id
         )
+
+
+class _FakeBTCUSDTMarketReadinessService:
+    def execute(self, *, observed_at: datetime | None = None) -> BTCUSDTMarketReadinessReport:
+        checked_at = observed_at or datetime(2027, 1, 15, 8, 0, tzinfo=UTC)
+        return BTCUSDTMarketReadinessReport(
+            symbol="BTCUSDT",
+            freshness_threshold_seconds=180,
+            rows=(
+                _market_readiness_row(
+                    exchange_name="binance",
+                    market_type="spot",
+                    readiness_state="ready",
+                    reason_codes=("btcusdt_market_ready",),
+                    reference_state="ready",
+                    stream_state="ready",
+                    checked_at=checked_at,
+                ),
+                _market_readiness_row(
+                    exchange_name="bybit",
+                    market_type="spot",
+                    readiness_state="blocked",
+                    reason_codes=("reference_market_missing",),
+                    reference_state="missing",
+                    stream_state="pending",
+                    checked_at=checked_at,
+                ),
+            ),
+            checked_at=checked_at,
+        )
+
+
+def _market_readiness_row(
+    *,
+    exchange_name: str,
+    market_type: str,
+    readiness_state: str,
+    reason_codes: tuple[str, ...],
+    reference_state: str,
+    stream_state: str,
+    checked_at: datetime,
+) -> BTCUSDTMarketReadinessRow:
+    reference_ready = reference_state == "ready"
+    return BTCUSDTMarketReadinessRow(
+        market_id=None,
+        exchange_name=exchange_name,
+        market_type=market_type,
+        market_code=f"{exchange_name}:{market_type}",
+        symbol="BTCUSDT",
+        instrument_key=f"{exchange_name}:{market_type}:BTCUSDT",
+        readiness_state=readiness_state,  # type: ignore[arg-type]
+        reason_codes=reason_codes,
+        reference_state=reference_state,  # type: ignore[arg-type]
+        reference_reason_codes=("reference_ready",) if reference_ready else reason_codes,
+        market_enabled=reference_ready,
+        status="ENABLED" if reference_ready else None,
+        is_tradable=1 if reference_ready else None,
+        base_asset="BTC" if reference_ready else None,
+        quote_asset="USDT" if reference_ready else None,
+        price_step=0.01 if reference_ready else None,
+        qty_step=0.00001 if reference_ready else None,
+        min_notional=10.0 if reference_ready else None,
+        stream_state=stream_state,  # type: ignore[arg-type]
+        stream_reason_code=(
+            "market_data_stream_ready"
+            if stream_state == "ready"
+            else "market_data_readiness_reader_unavailable"
+        ),
+        stream_name=f"md.candles.1m.{exchange_name}:{market_type}:BTCUSDT",
+        stream_length=12 if stream_state == "ready" else None,
+        stream_last_message_id="1800000000000-0" if stream_state == "ready" else None,
+        stream_last_observed_at=checked_at if stream_state == "ready" else None,
+        stream_age_seconds=30 if stream_state == "ready" else None,
+        checked_at=checked_at,
+    )
 
 
 def _build_client(*, service: StrategyDashboardQueryService) -> TestClient:

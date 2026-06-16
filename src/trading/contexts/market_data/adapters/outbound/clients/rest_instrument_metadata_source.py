@@ -141,7 +141,9 @@ class RestInstrumentMetadataSource(InstrumentMetadataSource):
             qty_step = _as_positive_float(_binance_filter_value(filters, "LOT_SIZE", "stepSize"))
             min_notional = _as_positive_float(
                 _binance_filter_value(filters, "MIN_NOTIONAL", "minNotional")
+                or _binance_filter_value(filters, "MIN_NOTIONAL", "notional")
                 or _binance_filter_value(filters, "NOTIONAL", "minNotional")
+                or _binance_filter_value(filters, "NOTIONAL", "notional")
             )
 
             out.append(
@@ -234,7 +236,9 @@ class RestInstrumentMetadataSource(InstrumentMetadataSource):
                         base_asset=_as_non_empty_string(item.get("baseCoin")),
                         quote_asset=_as_non_empty_string(item.get("quoteCoin")),
                         price_step=_as_positive_float(price_filter.get("tickSize")),
-                        qty_step=_as_positive_float(lot_filter.get("qtyStep")),
+                        qty_step=_as_positive_float(
+                            lot_filter.get("qtyStep") or lot_filter.get("basePrecision")
+                        ),
                         min_notional=min_notional,
                     )
                 )
