@@ -38,7 +38,7 @@
 
 | Stage | Статус | Prompt / task | Stage report | Validation depth | Ключевой результат | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|---|
-| `01` Baseline and handoff freeze | blocked | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/01-baseline-handoff-freeze.md` | `01-baseline-handoff-freeze.md` | target_runtime + browser_runtime | Runtime baseline reconciled with accepted gateway Stage `17`: API, Postgres, Redis, Monit, Prometheus and browser evidence collected; mainnet submit remains blocked. | `delivery_pending_main_host_sync`: docs stage is not delivered to `origin/main`, so prompt forbids `accepted`. | no |
+| `01` Baseline and handoff freeze | accepted | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/01-baseline-handoff-freeze.md` | `01-baseline-handoff-freeze.md` | target_runtime + browser_runtime | Runtime baseline reconciled with accepted gateway Stage `17`: API, Postgres, Redis, Monit, Prometheus and browser evidence collected; mainnet submit remains blocked; temporary branch delivery was resolved through `main`. | none | yes |
 | `02` Backtest-to-strategy launch UI | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/02-backtest-launch-ui.md` | `02-backtest-launch-ui.md` | browser_runtime + API/DB | TBD | TBD | no |
 | `03` Scenario matrix and compatibility | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/03-scenario-matrix-compatibility.md` | `03-scenario-matrix-compatibility.md` | API/DB + runtime readiness | TBD | TBD | no |
 | `04` BTCUSDT market readiness | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/04-btcusdt-market-readiness.md` | `04-btcusdt-market-readiness.md` | Redis/ClickHouse/API/browser | TBD | TBD | no |
@@ -95,7 +95,7 @@
 
 | Stage | Local gates | Real-boundary / e2e evidence | Result | Evidence path / note | Tests-only exception | Residual risk |
 |---|---|---|---|---|---|---|
-| `01` | `python -m tools.docs.generate_docs_index --check` passed after docs index regeneration | SSH/API/SQL/Redis/Monit/Prometheus/browser inventory collected on Mac Studio/public Roehub | blocked by delivery only | `01-baseline-handoff-freeze.md` | none | Stage cannot be accepted until main-branch delivery evidence exists. |
+| `01` | `python -m tools.docs.generate_docs_index --check` passed after docs index regeneration | SSH/API/SQL/Redis/Monit/Prometheus/browser inventory collected on Mac Studio/public Roehub | accepted | `01-baseline-handoff-freeze.md` | none | Docs-only runtime sync is `N/A`; Mac Studio git checkout sync is required after main push. |
 | `02` | focused UI/API tests, lint, type check | Playwright launch flow, API/DB proof | TBD | Stage report | none | TBD |
 | `03` | focused domain/API tests | API/top variants + SQL matrix + readiness calls | TBD | Stage report | none | TBD |
 | `04` | focused readiness tests | Redis/ClickHouse/API/browser readiness for BTCUSDT | TBD | Stage report | none | TBD |
@@ -114,7 +114,7 @@
 
 | Stage | Branch | Commit | PR | Checks before push | Deploy/runtime status | Notes |
 |---|---|---|---|---|---|---|
-| `01` | `codex/stage01-baseline-handoff-freeze` | PR head | `https://github.com/Dejetins/roehub.com/pull/28` draft | docs index passed; inventory collected; GitHub publish handoff completed as draft PR | `delivery_pending_main_host_sync`; runtime sync `N/A` only after docs-only main delivery | No code/runtime changes. Stage remains blocked because draft PR is not `origin/main`. |
+| `01` | temporary `codex/stage01-baseline-handoff-freeze`, then `main` | branch content fast-forwarded into `main`; final pushed main SHA in executor final report | `https://github.com/Dejetins/roehub.com/pull/28` superseded by direct main delivery | docs index passed; inventory collected; branch cleanup required after push | runtime sync `N/A` docs-only; Mac Studio git checkout sync required | No code/runtime changes. Stage accepted only after branch cleanup evidence is reported. |
 | `02` | TBD | TBD | TBD | local gates + Playwright + `github:yeet` preflight | TBD | Stage accepted only after main delivery evidence and UI/runtime sync as applicable. |
 | `03` | TBD | TBD | TBD | local gates + API/SQL + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
 | `04` | TBD | TBD | TBD | local gates + readiness probes + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
@@ -133,7 +133,7 @@
 
 | Stage | Blocker | Severity | Owner / next action | Resolved evidence | Next stage allowed |
 |---|---|---|---|---|---|
-| `01` | `delivery_pending_main_host_sync`: Stage `01` docs/evidence are in draft PR `https://github.com/Dejetins/roehub.com/pull/28`, not delivered to `origin/main`; accepted status is forbidden by the plan delivery contract. | blocker | Merge/deliver docs-only PR, record main SHA and docs-only runtime sync `N/A` reason. | Draft PR opened from `codex/stage01-baseline-handoff-freeze`. | no |
+| TBD | No active blockers recorded after Stage `01` main delivery path. | TBD | TBD | TBD | yes |
 
 ## Change Log
 
@@ -144,3 +144,4 @@
 | 2026-06-16 | `01` | Added Stage `01` baseline handoff report and marked the stage `blocked` on main delivery, not on runtime evidence. | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/01-baseline-handoff-freeze.md` |
 | 2026-06-16 | `01` | Regenerated architecture docs index for the new Stage `01` report. | `docs/architecture/README.md` |
 | 2026-06-16 | `01` | Opened draft PR `https://github.com/Dejetins/roehub.com/pull/28`; stage remains blocked until main delivery evidence exists. | `codex/stage01-baseline-handoff-freeze` |
+| 2026-06-16 | `01` | Updated delivery contract so temporary branches/PRs must be delivered to `main` and deleted before acceptance; fast-forwarded Stage `01` branch content into `main` and marked Stage `01` accepted pending final push/cleanup evidence in the executor report. | `01-baseline-handoff-freeze.md`; prompt pack `01`-`14` |

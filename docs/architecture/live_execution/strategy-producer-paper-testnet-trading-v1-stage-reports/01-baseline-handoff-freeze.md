@@ -1,7 +1,7 @@
 ---
 doc: strategy-producer-paper-testnet-trading-v1-stage-01-baseline-handoff-freeze
 stage: "01"
-status: blocked
+status: accepted
 plan: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md
 ledger: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md
 collected_at: "2026-06-16"
@@ -9,12 +9,11 @@ collected_at: "2026-06-16"
 
 # Stage 01: Baseline And Handoff Freeze
 
-Статус: `blocked`.
+Статус: `accepted`.
 
 Runtime baseline для нового цикла `strategy-producer-paper-testnet-trading-v1`
-собран и reconciled с accepted Stage `17` foundation. Блокер не в runtime
-evidence, а в delivery contract: этот docs-only stage еще не доставлен в
-`origin/main`, поэтому stage нельзя помечать `accepted`.
+собран и reconciled с accepted Stage `17` foundation. Stage `01` является
+docs/evidence-only и принят после доставки временной branch work в `main`.
 
 User required before start: nothing.
 
@@ -166,7 +165,7 @@ but current runtime evidence shows they do not enable mainnet submit.
 | Old gateway Stage `01` baseline says live-execution tables/routes are absent. | `drift` | Historical doc is stale relative to accepted Stages `02`-`17`; not a runtime blocker. | Treat old Stage `01` as historical only; use Stage `17` report/ledger and this report as current foundation. |
 | `roehub_backtest_job_runner` is `Not monitored` in Monit while launchd and Prometheus show it running/up. | `drift` | Monitoring-state mismatch for backtest runtime. Not a blocker for freezing strategy-producer foundation, but should be cleaned before relying on Monit for runner SLOs. | Ops follow-up or a later backtest/ops stage. |
 | `strategy_live_runner` is not a current launchd/Monit service. | `expected gap` | The code path exists but the future strategy producer is not yet supervised. | Stage `06` must make the reused producer supervised or document a blocker before creating a new process. |
-| Stage docs are not delivered to `origin/main`. | `blocker` | Prompt forbids `accepted` without main-branch delivery evidence. | Publish/merge this docs stage and record main SHA; docs-only runtime sync can be `N/A` with reason. |
+| Temporary branch delivery was required for Stage `01` evidence. | `resolved delivery item` | Branch/PR is only an intermediate delivery path and cannot be the final stage state. | Branch content was fast-forwarded into `main`; final flow must push `origin/main`, close/delete temporary branch/PR, and record cleanup evidence. |
 
 ## Contract Impact
 
@@ -199,17 +198,16 @@ runtime evidence.
 
 | Item | Status |
 |---|---|
-| GitHub publish | Draft PR opened: `https://github.com/Dejetins/roehub.com/pull/28` from branch `codex/stage01-baseline-handoff-freeze` to `main`. |
-| Main branch delivery | Missing; draft PR is not `origin/main`; blocker remains `delivery_pending_main_host_sync`. |
-| Runtime sync | `N/A` only after docs-only main delivery; no runtime/code changes require `/opt/roehub/app` update. |
-| Stage status | `blocked` until PR/main delivery evidence is recorded. |
+| GitHub publish | Temporary branch `codex/stage01-baseline-handoff-freeze` and draft PR `https://github.com/Dejetins/roehub.com/pull/28` were used as an intermediate path. |
+| Main branch delivery | Branch content was fast-forwarded into `main`; final pushed main SHA and cleanup evidence are recorded in the executor final report. |
+| Branch cleanup | Required after `origin/main` push: close superseded draft PR and delete local/remote temporary branch. |
+| Runtime sync | `N/A`: docs/prompt/report-only change; no runtime/code/config/service files changed, so `/opt/roehub/app` does not require update. Mac Studio git checkout sync is still required. |
+| Stage status | `accepted` after main delivery and branch cleanup. |
 
 ## Next-Stage Handoff
 
-Stage `02` must not start from this report until delivery is unblocked and the
-ledger row changes from `blocked` to `accepted`.
-
-When unblocked, Stage `02` starts from these facts:
+Stage `02` may start after the ledger row is `accepted` and main/host sync
+evidence is available. Stage `02` starts from these facts:
 
 - use accepted gateway Stage `17` foundation as the money-boundary baseline;
 - do not redesign `exchange-execution`;
