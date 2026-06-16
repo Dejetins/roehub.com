@@ -24,6 +24,17 @@ from .list_my_strategies import ListMyStrategiesUseCase
 from .live_strategy_profiles import LiveStrategyProfileConfig, LiveStrategyProfileService
 from .restart_strategy import RestartStrategyUseCase
 from .run_strategy import RunStrategyUseCase
+from .scenario_matrix import (
+    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+    SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1,
+    SCENARIO_MATRIX_MODES_V1,
+    SCENARIO_MATRIX_SCHEMA_V1,
+    SCENARIO_MATRIX_SYMBOL_SCOPE_V1,
+    StrategyVariantScenarioMatrixReport,
+    StrategyVariantScenarioMatrixRow,
+    StrategyVariantScenarioMatrixService,
+    scenario_matrix_row_to_json,
+)
 from .stop_strategy import StopStrategyUseCase
 
 __all__ = [
@@ -44,6 +55,15 @@ __all__ = [
     "LiveStrategyProfileConfig",
     "LiveStrategyProfileService",
     "RestartStrategyUseCase",
+    "SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1",
+    "SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1",
+    "SCENARIO_MATRIX_MODES_V1",
+    "SCENARIO_MATRIX_SCHEMA_V1",
+    "SCENARIO_MATRIX_SYMBOL_SCOPE_V1",
+    "StrategyVariantScenarioMatrixReport",
+    "StrategyVariantScenarioMatrixRow",
+    "StrategyVariantScenarioMatrixService",
+    "scenario_matrix_row_to_json",
     "map_strategy_exception",
     "position_ownership_conflict_error",
     "strategy_conflict",

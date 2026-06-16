@@ -18,6 +18,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyEventRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
+    InMemoryStrategyVariantScenarioMatrixRepository,
 )
 from trading.contexts.strategy.application import (
     BacktestVariantLaunchSnapshot,
@@ -30,6 +31,7 @@ from trading.contexts.strategy.application import (
     RunStrategyUseCase,
     StopStrategyUseCase,
     StrategyCompatibilityReadinessService,
+    StrategyVariantScenarioMatrixService,
     estimate_strategy_warmup_bars,
 )
 from trading.contexts.strategy.application.ports.market_data_readiness import (
@@ -601,6 +603,127 @@ def test_compatibility_readiness_reports_degraded_and_ready_feed_for_rollup() ->
     assert report.launch_blocked is False
 
 
+def test_scenario_matrix_derives_spot_rows_and_blocks_testnet_spot_short() -> None:
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408")
+    )
+    compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
+    matrix_repository = InMemoryStrategyVariantScenarioMatrixRepository()
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 6, 17, 10, 0, tzinfo=timezone.utc),
+            datetime(2026, 6, 17, 10, 1, tzinfo=timezone.utc),
+            datetime(2026, 6, 17, 10, 2, tzinfo=timezone.utc),
+        )
+    )
+    compatibility_service = StrategyCompatibilityReadinessService(
+        strategy_repository=None,
+        compatibility_repository=compatibility_repository,
+        market_data_reader=_StaticMarketDataReader(state="ready"),
+        clock=clock,
+    )
+    matrix_service = StrategyVariantScenarioMatrixService(
+        compatibility_readiness_service=compatibility_service,
+        repository=matrix_repository,
+        clock=clock,
+    )
+
+    report = matrix_service.build_for_backtest_variant(
+        current_user=current_user,
+        snapshot=_launch_snapshot(
+            current_user,
+            market_type="spot",
+            timeframe="1m",
+            direction_mode="long_short_reversal",
+            live_compatible=True,
+        ),
+    )
+
+    assert len(report.rows) == 8
+    assert matrix_repository.reports == [report]
+    paper_long = _find_matrix_row(
+        report=report,
+        mode="paper",
+        market_type="spot",
+        entry_sizing="fixed_quote",
+        direction="long",
+    )
+    assert paper_long.scenario_state == "launchable"
+    assert paper_long.scenario_reason_codes == ("paper_no_exchange_submit",)
+
+    paper_short = _find_matrix_row(
+        report=report,
+        mode="paper",
+        market_type="spot",
+        entry_sizing="fixed_quote",
+        direction="short",
+    )
+    assert paper_short.scenario_state == "launchable"
+    assert paper_short.order_capability == "paper_only"
+    assert paper_short.order_capability_reason_codes == (
+        "spot_short_not_real_order_capable",
+    )
+
+    testnet_short = _find_matrix_row(
+        report=report,
+        mode="testnet",
+        market_type="spot",
+        entry_sizing="fixed_quote",
+        direction="short",
+    )
+    assert testnet_short.scenario_state == "blocked"
+    assert testnet_short.launch_blocked_reason == "spot_short_not_supported"
+    assert testnet_short.order_capability == "unsupported"
+
+
+def test_scenario_matrix_marks_futures_short_real_order_capable_but_not_bound() -> None:
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000409")
+    )
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 6, 17, 11, 0, tzinfo=timezone.utc),
+            datetime(2026, 6, 17, 11, 1, tzinfo=timezone.utc),
+            datetime(2026, 6, 17, 11, 2, tzinfo=timezone.utc),
+        )
+    )
+    compatibility_service = StrategyCompatibilityReadinessService(
+        strategy_repository=None,
+        compatibility_repository=InMemoryStrategyCompatibilityReadinessRepository(),
+        market_data_reader=_StaticMarketDataReader(state="ready"),
+        clock=clock,
+    )
+    matrix_service = StrategyVariantScenarioMatrixService(
+        compatibility_readiness_service=compatibility_service,
+        clock=clock,
+    )
+
+    report = matrix_service.build_for_backtest_variant(
+        current_user=current_user,
+        snapshot=_launch_snapshot(
+            current_user,
+            market_type="futures",
+            timeframe="1m",
+            direction_mode="long_short_reversal",
+            live_compatible=True,
+        ),
+    )
+
+    testnet_short = _find_matrix_row(
+        report=report,
+        mode="testnet",
+        market_type="futures",
+        entry_sizing="fixed_quote",
+        direction="short",
+    )
+    assert testnet_short.scenario_state == "blocked"
+    assert testnet_short.launch_blocked_reason == "exchange_connection_required"
+    assert testnet_short.order_capability == "real_order_capable"
+    assert testnet_short.order_capability_reason_codes == (
+        "futures_short_requires_isolated_1x_guard",
+    )
+
+
 def test_restart_use_case_records_durable_pending_operation() -> None:
     strategy_repository = InMemoryStrategyRepository()
     run_repository = InMemoryStrategyRunRepository()
@@ -732,7 +855,26 @@ def _launch_snapshot(
     current_user: CurrentUser,
     *,
     job_state: str = "succeeded",
+    market_type: str = "spot",
+    timeframe: str = "15m",
+    direction_mode: str = "long_short_reversal",
+    live_compatible: bool = False,
 ) -> BacktestVariantLaunchSnapshot:
+    indicator_payload = (
+        {
+            "indicator_id": "MA",
+            "row_id": 7,
+            "fast": 20,
+            "slow": 50,
+        }
+        if live_compatible
+        else {
+            "indicator_id": "ma.dema",
+            "row_id": 7,
+            "source": "close",
+            "window": 5,
+        }
+    )
     return BacktestVariantLaunchSnapshot(
         job_id=UUID("00000000-0000-0000-0000-00000000b001"),
         owner_user_id=current_user.user_id,
@@ -741,9 +883,9 @@ def _launch_snapshot(
         result_config_hash="e" * 64,
         market_id=1,
         exchange="binance",
-        market_type="spot",
+        market_type=market_type,
         symbol="BTCUSDT",
-        timeframe="15m",
+        timeframe=timeframe,
         variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
         variant_hash="a" * 64,
         indicator_variant_hash="b" * 64,
@@ -751,19 +893,31 @@ def _launch_snapshot(
         summary_metrics={"total_return_pct": 12.5, "trade_count": 2},
         canonical_variant_params={
             "schema_version": 1,
-            "indicators": [
-                {
-                    "indicator_id": "ma.dema",
-                    "row_id": 7,
-                    "source": "close",
-                    "window": 5,
-                }
-            ],
+            "indicators": [indicator_payload],
             "risk": {"mode": "none"},
-            "execution": {"direction_mode": "long_short_reversal"},
+            "execution": {"direction_mode": direction_mode},
             "ranking": {"primary_metric": "total_return_pct"},
+            **({"signal_template": "MA(20,50)"} if live_compatible else {}),
         },
         readable_params={"slug": "dema_close_w5"},
+    )
+
+
+def _find_matrix_row(
+    *,
+    report,
+    mode: str,
+    market_type: str,
+    entry_sizing: str,
+    direction: str,
+):
+    return next(
+        row
+        for row in report.rows
+        if row.mode == mode
+        and row.market_type == market_type
+        and row.entry_sizing == entry_sizing
+        and row.direction == direction
     )
 
 

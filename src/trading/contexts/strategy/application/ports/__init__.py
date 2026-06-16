@@ -44,6 +44,7 @@ from .repositories import (
     StrategyRepository,
     StrategyRunRepository,
     StrategySignalRepository,
+    StrategyVariantScenarioMatrixRepository,
 )
 from .sleeper import StrategyRunnerSleeper
 from .telegram_notifier import (
@@ -74,6 +75,7 @@ __all__ = [
     "StrategyCompatibilityReadinessRepository",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
+    "StrategyVariantScenarioMatrixRepository",
     "LiveStrategyProfileRepository",
     "ExchangeConnectionReadiness",
     "ExchangeConnectionReadinessChecker",

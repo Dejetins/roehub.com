@@ -1,4 +1,5 @@
 import inspect
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -44,9 +45,18 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryStrategyCompatibilityReadinessRepository,
+)
 from trading.contexts.strategy.application import (
+    BacktestVariantLaunchSnapshot,
     CreateStrategyFromBacktestVariantResult,
     CurrentUser,
+    StrategyCompatibilityReadinessService,
+    StrategyVariantScenarioMatrixService,
+)
+from trading.contexts.strategy.application.ports.market_data_readiness import (
+    MarketDataReadinessSnapshot,
 )
 from trading.contexts.strategy.domain.entities import (
     Strategy,
@@ -280,6 +290,80 @@ def test_post_backtest_variant_strategy_sanitizes_unexpected_metric_reason(
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "unexpected_error"
     assert captured == [("rejected", "unexpected_error")]
+
+
+def test_get_backtest_variant_scenario_matrix_uses_public_top_variant_key() -> None:
+    repository = _FakeJobRepository()
+    jobs_use_case = _build_jobs_use_case(repository=repository)
+    request = _valid_request()
+    clock = _SequenceClock(
+        values=(
+            datetime(2026, 6, 17, 12, 0, tzinfo=UTC),
+            datetime(2026, 6, 17, 12, 1, tzinfo=UTC),
+            datetime(2026, 6, 17, 12, 2, tzinfo=UTC),
+        )
+    )
+    compatibility_service = StrategyCompatibilityReadinessService(
+        strategy_repository=None,
+        compatibility_repository=InMemoryStrategyCompatibilityReadinessRepository(),
+        market_data_reader=_StaticMarketDataReader(state="ready"),
+        clock=clock,
+    )
+    matrix_service = StrategyVariantScenarioMatrixService(
+        compatibility_readiness_service=compatibility_service,
+        clock=clock,
+    )
+    client = _build_client(
+        jobs_use_case=jobs_use_case,
+        compatibility_readiness_service=compatibility_service,
+        scenario_matrix_service=matrix_service,
+        backtest_variant_launch_reader=_RepoVariantLaunchReader(repository=repository),
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+        json=request,
+    )
+    _complete_job(repository=repository, job_id=UUID(created.json()["job_id"]))
+    top = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+    ).json()["items"][0]
+
+    response = client.get(
+        (
+            f"/backtests/jobs/{created.json()['job_id']}/variants/"
+            f"{top['variant_key']}/scenario-matrix"
+        ),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_variant_key"] == top["variant_key"]
+    assert payload["backtest_risk_mode"] == "none"
+    assert payload["backtest_direction_mode"] == "long_short_reversal"
+    assert len(payload["rows"]) == 8
+    paper_long = _find_api_matrix_row(
+        payload=payload,
+        mode="paper",
+        market_type="spot",
+        entry_sizing="fixed_quote",
+        direction="long",
+    )
+    assert paper_long["scenario_state"] == "blocked"
+    assert paper_long["launch_blocked"] is True
+    assert paper_long["launch_blocked_reason"] == "unsupported_live_evaluator"
+    testnet_spot_short = _find_api_matrix_row(
+        payload=payload,
+        mode="testnet",
+        market_type="spot",
+        entry_sizing="fixed_quote",
+        direction="short",
+    )
+    assert testnet_spot_short["scenario_state"] == "blocked"
+    assert testnet_spot_short["launch_blocked_reason"] == "spot_short_not_supported"
+    assert testnet_spot_short["order_capability"] == "unsupported"
 
 
 def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
@@ -1294,6 +1378,115 @@ class _HeaderCurrentUserDependency:
         )
 
 
+class _SequenceClock:
+    def __init__(self, *, values: tuple[datetime, ...]) -> None:
+        self._values = list(values)
+
+    def now(self) -> datetime:
+        if not self._values:
+            raise ValueError("_SequenceClock exhausted")
+        return self._values.pop(0)
+
+
+class _StaticMarketDataReader:
+    def __init__(self, *, state: str) -> None:
+        self._state = state
+
+    def check(self, *, instrument_key: str, timeframe: str, observed_at: datetime):
+        return MarketDataReadinessSnapshot(
+            state=self._state,  # type: ignore[arg-type]
+            reason_code=f"market_data_stream_{self._state}",
+            stream_name=f"md.candles.1m.{instrument_key}",
+            stream_length=1 if self._state == "ready" else 0,
+            last_message_id="1790000000000-0" if self._state == "ready" else None,
+            last_observed_at=observed_at if self._state == "ready" else None,
+            age_seconds=0 if self._state == "ready" else None,
+        )
+
+
+class _RepoVariantLaunchReader:
+    def __init__(self, *, repository: "_FakeJobRepository") -> None:
+        self._repository = repository
+
+    def get(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestVariantLaunchSnapshot:
+        job = self._repository.get(job_id=job_id)
+        if job is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest job was not found",
+                details={"reason": "not_found"},
+            )
+        if job.user_id != user_id:
+            raise RoehubError(
+                code="strategy_variant_launch.forbidden",
+                message="Backtest job does not belong to current user",
+                details={"reason": "forbidden"},
+            )
+        row = self._repository.get_top_variant_by_public_key(
+            job_id=job_id,
+            public_variant_key=variant_key,
+        )
+        if row is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest variant was not found",
+                details={"reason": "not_found"},
+            )
+        coordinates = _mapping(job.request_json.get("coordinates"))
+        payload = _mapping(row.payload_json)
+        return BacktestVariantLaunchSnapshot(
+            job_id=job.job_id,
+            owner_user_id=job.user_id,
+            job_state=job.state,
+            request_hash=job.request_hash,
+            result_config_hash=job.engine_params_hash,
+            market_id=int(job.market_id or 1),
+            exchange=str(coordinates.get("exchange", "binance")),
+            market_type=str(coordinates.get("market_type", "spot")),
+            symbol=str(coordinates.get("symbol", job.symbol)),
+            timeframe=str(job.timeframe),
+            variant_key=str(payload.get("public_variant_key") or variant_key),
+            variant_hash=str(payload.get("variant_hash") or row.variant_key),
+            indicator_variant_hash=(
+                str(payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                if (payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                else None
+            ),
+            rank=row.rank,
+            summary_metrics=dict(row.summary_metrics_json),
+            canonical_variant_params=_mapping(payload.get("canonical_variant_params")),
+            readable_params=_mapping(payload.get("readable_params")),
+        )
+
+
+def _find_api_matrix_row(
+    *,
+    payload: dict[str, Any],
+    mode: str,
+    market_type: str,
+    entry_sizing: str,
+    direction: str,
+) -> dict[str, Any]:
+    return next(
+        row
+        for row in payload["rows"]
+        if row["mode"] == mode
+        and row["market_type"] == market_type
+        and row["entry_sizing"] == entry_sizing
+        and row["direction"] == direction
+    )
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
 @dataclass
 class _FakeArtifactResolver:
     coordinates: tuple[BacktestCoordinates, ...] = ()
@@ -1320,6 +1513,9 @@ def _build_client(
     resolver: _FakeArtifactResolver | _UnavailableArtifactResolver | None = None,
     jobs_use_case: BacktestJobsUseCase | None = None,
     create_strategy_from_variant_use_case: Any | None = None,
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+    scenario_matrix_service: StrategyVariantScenarioMatrixService | None = None,
+    backtest_variant_launch_reader: Any | None = None,
 ) -> TestClient:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -1345,6 +1541,9 @@ def _build_client(
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
             jobs_use_case=jobs_use_case,
             create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
+            compatibility_readiness_service=compatibility_readiness_service,
+            scenario_matrix_service=scenario_matrix_service,
+            backtest_variant_launch_reader=backtest_variant_launch_reader,
         )
     )
     return TestClient(app)

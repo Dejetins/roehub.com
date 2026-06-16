@@ -48,6 +48,7 @@ from trading.contexts.strategy.adapters.outbound import (
     PostgresStrategyCompatibilityReadinessRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
+    PostgresStrategyVariantScenarioMatrixRepository,
     PsycopgStrategyPostgresGateway,
     RedisMarketDataReadinessReader,
     RedisStrategyLiveCandleStreamConfig,
@@ -60,6 +61,7 @@ from trading.contexts.strategy.application import (
     BacktestVariantLaunchSnapshot,
     CreateStrategyFromBacktestVariantUseCase,
     StrategyCompatibilityReadinessService,
+    StrategyVariantScenarioMatrixService,
 )
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
@@ -130,6 +132,10 @@ def build_backtests_router(
     compatibility_readiness_service = _build_compatibility_readiness_service(
         environ=effective_environ,
     )
+    scenario_matrix_service = _build_scenario_matrix_service(
+        environ=effective_environ,
+        compatibility_readiness_service=compatibility_readiness_service,
+    )
     return build_backtests_api_router(
         runtime_defaults_service=runtime_defaults_service,
         preflight_service=preflight_service,
@@ -137,6 +143,7 @@ def build_backtests_router(
         jobs_use_case=jobs_use_case,
         create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
         compatibility_readiness_service=compatibility_readiness_service,
+        scenario_matrix_service=scenario_matrix_service,
         backtest_variant_launch_reader=variant_launch_reader,
     )
 
@@ -273,6 +280,26 @@ def _build_compatibility_readiness_service(
             gateway=strategy_gateway,
         ),
         market_data_reader=redis_reader,
+        clock=SystemStrategyClock(),
+    )
+
+
+def _build_scenario_matrix_service(
+    *,
+    environ: Mapping[str, str],
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None,
+) -> StrategyVariantScenarioMatrixService | None:
+    if compatibility_readiness_service is None:
+        return None
+    postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    repository = None
+    if postgres_dsn:
+        repository = PostgresStrategyVariantScenarioMatrixRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=postgres_dsn)
+        )
+    return StrategyVariantScenarioMatrixService(
+        compatibility_readiness_service=compatibility_readiness_service,
+        repository=repository,
         clock=SystemStrategyClock(),
     )
 

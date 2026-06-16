@@ -58,6 +58,8 @@ from trading.contexts.strategy.application import (
     CreateStrategyFromBacktestVariantUseCase,
     CurrentUser,
     StrategyCompatibilityReadinessService,
+    StrategyVariantScenarioMatrixService,
+    scenario_matrix_row_to_json,
 )
 from trading.contexts.strategy.domain.entities import Strategy
 from trading.platform.errors import RoehubError
@@ -126,6 +128,45 @@ class BacktestVariantCompatibilityReadinessResponse(BaseModel):
     checked_at: Any
 
 
+class BacktestVariantScenarioMatrixRowResponse(BaseModel):
+    scenario_matrix_row_id: UUID
+    scenario_key: str
+    mode: str
+    market_type: str
+    symbol: str
+    entry_sizing: str
+    risk_mode: str
+    direction: str
+    backtest_risk_mode: str
+    backtest_direction_mode: str
+    scenario_state: str
+    scenario_reason_codes: list[str]
+    order_capability: str
+    order_capability_reason_codes: list[str]
+    compatibility_check_id: UUID
+    market_data_requirement_id: UUID
+    compatibility_state: str
+    compatibility_reason_codes: list[str]
+    market_data_state: str
+    market_data_reason_codes: list[str]
+    launch_blocked: bool
+    launch_blocked_reason: str
+    checked_at: Any
+
+
+class BacktestVariantScenarioMatrixResponse(BaseModel):
+    source_job_id: UUID
+    source_variant_key: str
+    variant_hash: str
+    source_market_type: str
+    symbol: str
+    strategy_spec_hash: str
+    backtest_risk_mode: str
+    backtest_direction_mode: str
+    checked_at: Any
+    rows: list[BacktestVariantScenarioMatrixRowResponse]
+
+
 def build_backtests_router(
     *,
     runtime_defaults_service: BacktestRuntimeDefaultsService,
@@ -134,6 +175,7 @@ def build_backtests_router(
     jobs_use_case: BacktestJobsUseCase | None = None,
     create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
     compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+    scenario_matrix_service: StrategyVariantScenarioMatrixService | None = None,
     backtest_variant_launch_reader: BacktestVariantLaunchReader | None = None,
 ) -> APIRouter:
     """
@@ -186,6 +228,15 @@ def build_backtests_router(
                 details={"reason": "strategy_compatibility_unavailable"},
             )
         return compatibility_readiness_service
+
+    def require_scenario_matrix_service() -> StrategyVariantScenarioMatrixService:
+        if scenario_matrix_service is None:
+            raise RoehubError(
+                code="strategy_scenario_matrix.unavailable",
+                message="Strategy scenario matrix service is not configured",
+                details={"reason": "strategy_scenario_matrix_unavailable"},
+            )
+        return scenario_matrix_service
 
     def require_backtest_variant_launch_reader() -> BacktestVariantLaunchReader:
         if backtest_variant_launch_reader is None:
@@ -372,6 +423,30 @@ def build_backtests_router(
             reason=report.market_data_reason_codes[0],
         )
         return _to_compatibility_readiness_response(report=report)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/scenario-matrix",
+        response_model=BacktestVariantScenarioMatrixResponse,
+    )
+    def get_backtest_job_variant_scenario_matrix(
+        job_id: UUID,
+        variant_key: str,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        reader: BacktestVariantLaunchReader = Depends(require_backtest_variant_launch_reader),
+        service: StrategyVariantScenarioMatrixService = Depends(
+            require_scenario_matrix_service
+        ),
+    ) -> BacktestVariantScenarioMatrixResponse:
+        snapshot = reader.get(
+            user_id=principal.user_id,
+            job_id=job_id,
+            variant_key=variant_key,
+        )
+        report = service.build_for_backtest_variant(
+            current_user=CurrentUser(user_id=principal.user_id),
+            snapshot=snapshot,
+        )
+        return _to_scenario_matrix_response(report=report)
 
     @router.post(
         "/backtests/jobs/{job_id}/variants/{variant_key}/strategies",
@@ -661,6 +736,26 @@ def _to_compatibility_readiness_response(
         launch_blocked=report.launch_blocked,
         launch_blocked_reason=report.launch_blocked_reason,
         checked_at=report.checked_at,
+    )
+
+
+def _to_scenario_matrix_response(*, report: Any) -> BacktestVariantScenarioMatrixResponse:
+    return BacktestVariantScenarioMatrixResponse(
+        source_job_id=report.source_job_id,
+        source_variant_key=report.source_variant_key,
+        variant_hash=report.variant_hash,
+        source_market_type=report.source_market_type,
+        symbol=report.symbol,
+        strategy_spec_hash=report.strategy_spec_hash,
+        backtest_risk_mode=report.backtest_risk_mode,
+        backtest_direction_mode=report.backtest_direction_mode,
+        checked_at=report.checked_at,
+        rows=[
+            BacktestVariantScenarioMatrixRowResponse(
+                **scenario_matrix_row_to_json(row=row)
+            )
+            for row in report.rows
+        ],
     )
 
 

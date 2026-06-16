@@ -25,6 +25,10 @@ from apps.api.monitoring import (
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
 from trading.contexts.strategy.application.use_cases import (
+    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+    SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1,
+    SCENARIO_MATRIX_MODES_V1,
+    SCENARIO_MATRIX_SYMBOL_SCOPE_V1,
     CloneStrategyUseCase,
     CreateStrategyFromBacktestVariantUseCase,
     CreateStrategyUseCase,
@@ -45,11 +49,11 @@ CurrentUserProviderDependency = Callable[[Request], CurrentUserProvider]
 CurrentUserPrincipalDependency = Callable[[Request], CurrentUserPrincipal]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
 _DEFAULT_LAUNCH_CAPITAL_USD = Decimal("50")
-_MIN_BTCUSDT_NOTIONAL_USD = Decimal("10")
-_ALLOWED_LAUNCH_MODES = frozenset({"paper", "testnet"})
+_MIN_BTCUSDT_NOTIONAL_USD = SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1
+_ALLOWED_LAUNCH_MODES = frozenset(SCENARIO_MATRIX_MODES_V1)
 _ALLOWED_LAUNCH_MARKET_TYPES = frozenset({"spot", "futures"})
 _ALLOWED_LAUNCH_ENTRY_SIZING = frozenset({"fixed_quote", "fixed_equity_pct"})
-_ALLOWED_LAUNCH_RISK_MODES = frozenset({"single_position_cap"})
+_ALLOWED_LAUNCH_RISK_MODES = frozenset(SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1)
 _ALLOWED_LAUNCH_DIRECTIONS = frozenset({"long", "short"})
 
 
@@ -904,7 +908,7 @@ def _validated_backtest_variant_launch_config(
     direction = payload.direction.strip().casefold()
     if mode not in _ALLOWED_LAUNCH_MODES:
         raise _strategy_launch_validation_error(reason="invalid_mode", field="mode")
-    if symbol != "BTCUSDT":
+    if symbol != SCENARIO_MATRIX_SYMBOL_SCOPE_V1:
         raise _strategy_launch_validation_error(reason="unsupported_symbol", field="symbol")
     if market_type not in _ALLOWED_LAUNCH_MARKET_TYPES:
         raise _strategy_launch_validation_error(

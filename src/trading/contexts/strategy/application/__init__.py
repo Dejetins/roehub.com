@@ -36,6 +36,7 @@ from .ports import (
     StrategySignalRepository,
     StrategyTelegramNotificationEventV1,
     StrategyTelegramNotificationV1,
+    StrategyVariantScenarioMatrixRepository,
     TelegramNotifier,
     serialize_realtime_event_payload_json,
 )
@@ -52,6 +53,11 @@ from .services import (
     evaluate_strategy_signal,
 )
 from .use_cases import (
+    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+    SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1,
+    SCENARIO_MATRIX_MODES_V1,
+    SCENARIO_MATRIX_SCHEMA_V1,
+    SCENARIO_MATRIX_SYMBOL_SCOPE_V1,
     CloneStrategyUseCase,
     CreateStrategyFromBacktestVariantResult,
     CreateStrategyFromBacktestVariantUseCase,
@@ -68,6 +74,10 @@ from .use_cases import (
     StrategyCompatibilityReadinessService,
     StrategyExchangeBindingService,
     StrategyExchangeBindingView,
+    StrategyVariantScenarioMatrixReport,
+    StrategyVariantScenarioMatrixRow,
+    StrategyVariantScenarioMatrixService,
+    scenario_matrix_row_to_json,
 )
 
 __all__ = [
@@ -124,6 +134,7 @@ __all__ = [
     "StrategyPaperAccountingRecorder",
     "StrategyEventRepository",
     "StrategyExchangeBindingRepository",
+    "StrategyVariantScenarioMatrixRepository",
     "LiveStrategyProfileRepository",
     "StrategyRepository",
     "StrategyRunnerSleeper",
@@ -131,6 +142,15 @@ __all__ = [
     "StrategySignalRepository",
     "StrategyCompatibilityReadinessReport",
     "StrategyCompatibilityReadinessService",
+    "SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1",
+    "SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1",
+    "SCENARIO_MATRIX_MODES_V1",
+    "SCENARIO_MATRIX_SCHEMA_V1",
+    "SCENARIO_MATRIX_SYMBOL_SCOPE_V1",
+    "StrategyVariantScenarioMatrixReport",
+    "StrategyVariantScenarioMatrixRow",
+    "StrategyVariantScenarioMatrixService",
+    "scenario_matrix_row_to_json",
     "TelegramNotificationPolicy",
     "TimeframeRollupPolicy",
     "TimeframeRollupProgress",

@@ -236,18 +236,20 @@ def strategy_spec_from_backtest_variant_snapshot(
     exchange = snapshot.exchange.strip().lower()
     market_type = snapshot.market_type.strip().lower()
     symbol = snapshot.symbol.strip().upper()
-    return StrategySpecV1.from_json(
-        payload={
-            "instrument_id": {
-                "market_id": int(snapshot.market_id),
-                "symbol": symbol,
-            },
-            "instrument_key": f"{exchange}:{market_type}:{symbol}",
-            "market_type": market_type,
-            "timeframe": snapshot.timeframe,
-            "indicators": strategy_indicators,
-        }
-    )
+    spec_payload: dict[str, Any] = {
+        "instrument_id": {
+            "market_id": int(snapshot.market_id),
+            "symbol": symbol,
+        },
+        "instrument_key": f"{exchange}:{market_type}:{symbol}",
+        "market_type": market_type,
+        "timeframe": snapshot.timeframe,
+        "indicators": strategy_indicators,
+    }
+    signal_template = canonical.get("signal_template")
+    if isinstance(signal_template, str) and signal_template.strip():
+        spec_payload["signal_template"] = signal_template.strip()
+    return StrategySpecV1.from_json(payload=spec_payload)
 
 
 def _strategy_indicator(*, item: Any) -> dict[str, Any]:
@@ -272,6 +274,8 @@ def _strategy_indicator(*, item: Any) -> dict[str, Any]:
             "source": item.get("source"),
             "window": item.get("window"),
             "row_id": item.get("row_id"),
+            "fast": item.get("fast"),
+            "slow": item.get("slow"),
         }.items()
         if value is not None
     }

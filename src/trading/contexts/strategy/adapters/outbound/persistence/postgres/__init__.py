@@ -4,6 +4,7 @@ from .compatibility_readiness_repository import (
 from .exchange_binding_repository import PostgresStrategyExchangeBindingRepository
 from .gateway import PsycopgStrategyPostgresGateway, StrategyPostgresGateway
 from .live_strategy_profile_repository import PostgresLiveStrategyProfileRepository
+from .scenario_matrix_repository import PostgresStrategyVariantScenarioMatrixRepository
 from .strategy_backtest_variant_provenance_repository import (
     PostgresStrategyBacktestVariantProvenanceRepository,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "PostgresStrategyExchangeBindingRepository",
     "PostgresLiveStrategyProfileRepository",
     "PostgresStrategyCompatibilityReadinessRepository",
+    "PostgresStrategyVariantScenarioMatrixRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PostgresStrategySignalRepository",
