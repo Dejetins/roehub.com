@@ -199,10 +199,10 @@ runtime evidence.
 
 | Item | Status |
 |---|---|
-| GitHub publish | Not completed in this report yet. |
-| Main branch delivery | Missing; `delivery_pending_main_host_sync`. |
-| Runtime sync | `N/A` for docs-only stage after main delivery; no runtime/code changes require `/opt/roehub/app` update. |
-| Stage status | `blocked` until main delivery evidence is recorded. |
+| GitHub publish | Draft PR opened: `https://github.com/Dejetins/roehub.com/pull/28` from branch `codex/stage01-baseline-handoff-freeze` to `main`. |
+| Main branch delivery | Missing; draft PR is not `origin/main`; blocker remains `delivery_pending_main_host_sync`. |
+| Runtime sync | `N/A` only after docs-only main delivery; no runtime/code changes require `/opt/roehub/app` update. |
+| Stage status | `blocked` until PR/main delivery evidence is recorded. |
 
 ## Next-Stage Handoff
 

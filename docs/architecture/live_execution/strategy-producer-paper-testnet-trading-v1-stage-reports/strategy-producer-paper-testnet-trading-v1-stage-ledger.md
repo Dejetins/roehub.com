@@ -113,7 +113,7 @@
 
 | Stage | Branch | Commit | PR | Checks before push | Deploy/runtime status | Notes |
 |---|---|---|---|---|---|---|
-| `01` | local `main` during evidence; publish branch TBD | TBD | TBD | docs index passed; inventory collected; `github:yeet` not completed yet | `delivery_pending_main_host_sync`; runtime sync `N/A` only after docs-only main delivery | No code/runtime changes. Stage remains blocked until docs are delivered to `origin/main` and ledger/report record delivery evidence. |
+| `01` | `codex/stage01-baseline-handoff-freeze` | PR head | `https://github.com/Dejetins/roehub.com/pull/28` draft | docs index passed; inventory collected; GitHub publish handoff completed as draft PR | `delivery_pending_main_host_sync`; runtime sync `N/A` only after docs-only main delivery | No code/runtime changes. Stage remains blocked because draft PR is not `origin/main`. |
 | `02` | TBD | TBD | TBD | local gates + Playwright + `github:yeet` preflight | TBD | Stage accepted only after main delivery evidence and UI/runtime sync as applicable. |
 | `03` | TBD | TBD | TBD | local gates + API/SQL + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
 | `04` | TBD | TBD | TBD | local gates + readiness probes + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
@@ -132,7 +132,7 @@
 
 | Stage | Blocker | Severity | Owner / next action | Resolved evidence | Next stage allowed |
 |---|---|---|---|---|---|
-| `01` | `delivery_pending_main_host_sync`: Stage `01` docs/evidence are not delivered to `origin/main`; accepted status is forbidden by the plan delivery contract. | blocker | Publish/merge docs-only stage, record main SHA and docs-only runtime sync `N/A` reason. | TBD | no |
+| `01` | `delivery_pending_main_host_sync`: Stage `01` docs/evidence are in draft PR `https://github.com/Dejetins/roehub.com/pull/28`, not delivered to `origin/main`; accepted status is forbidden by the plan delivery contract. | blocker | Merge/deliver docs-only PR, record main SHA and docs-only runtime sync `N/A` reason. | Draft PR opened from `codex/stage01-baseline-handoff-freeze`. | no |
 
 ## Change Log
 
@@ -142,3 +142,4 @@
 | 2026-06-16 | plan | Added mandatory pre-start user requirement disclosure and delivery contract: `github:yeet` publish, main-branch evidence, and Mac Studio host-sync evidence before `accepted`. | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md` |
 | 2026-06-16 | `01` | Added Stage `01` baseline handoff report and marked the stage `blocked` on main delivery, not on runtime evidence. | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/01-baseline-handoff-freeze.md` |
 | 2026-06-16 | `01` | Regenerated architecture docs index for the new Stage `01` report. | `docs/architecture/README.md` |
+| 2026-06-16 | `01` | Opened draft PR `https://github.com/Dejetins/roehub.com/pull/28`; stage remains blocked until main delivery evidence exists. | `codex/stage01-baseline-handoff-freeze` |
