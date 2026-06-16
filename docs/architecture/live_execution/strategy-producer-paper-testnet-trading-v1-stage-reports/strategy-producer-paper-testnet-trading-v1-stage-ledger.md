@@ -25,9 +25,10 @@
 | Следующий stage | Заполнять handoff так, чтобы следующий executor не перечитывал весь чат. |
 | Blocked state | Если stage не принят, следующий зависимый stage не стартует, кроме repair/unblock/supersede prompt. |
 | Pre-start user requirements | Каждый stage до implementation явно фиксирует `User required before start: ...`; если нужны ключи/артефакты/доступы, executor останавливается и не просит secrets в чате. |
-| GitHub publish | После successful validation и перед финальным статусом executor использует `github:yeet`: `gh --version`, `gh auth status`, scope diff, safe stage/commit/push/draft PR. |
-| Main delivery | Draft PR от `github:yeet` не равен delivery в `main`; stage `accepted` только после evidence, что изменения доставлены в `origin/main` или утвержденный main-branch delivery path. |
-| Publish/deploy | Если stage публикуется или деплоится, фиксировать branch/commit/PR/checks/main SHA/deploy/smoke/host sync. |
+| GitHub publish | После successful validation и перед финальным статусом executor использует `github:yeet`/`publish-ci-deploy` discipline: `gh --version`, `gh auth status`, scope diff, safe stage/commit/push. |
+| Branch lifecycle | Ветка допустима только как временная delivery branch. Не создавать per-stage ветку без причины; если branch/PR созданы, они должны быть доставлены в `main`, затем local/remote branch должны быть удалены после доказательства, что `main` содержит изменения. |
+| Main delivery | Draft PR, pushed branch или local branch не равны delivery в `main`; stage `accepted` только после evidence, что изменения доставлены в `origin/main` или утвержденный main-branch delivery path. |
+| Publish/deploy | Если stage публикуется или деплоится, фиксировать branch/commit/PR/checks/main SHA/branch cleanup/deploy/smoke/host sync. |
 | Mac Studio | Git-команды на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks допускаются в `/opt/roehub/app`. |
 | Host sync | Для runtime/code stages accepted требует Mac Studio checkout sync evidence и runtime smoke; для docs-only stages нужно явно записать `runtime sync N/A` с причиной. |
 | 24h gate | Stage `12` accepted только после фактических 24 часов логируемого наблюдения. |
@@ -63,7 +64,7 @@
 | plan | Strategy producer v1 переиспользует `apps/worker/strategy_live_runner`; новый app/process требует доказанного blocker и отдельного architecture update. | Stage `06` не должен молча создать второй producer runtime с другим lifecycle/metrics/ownership. | `strategy-producer-paper-testnet-trading-v1.md` |
 | plan | 24h acceptance gate обязателен. | Stage `12` нельзя заменить коротким smoke. | `strategy-producer-paper-testnet-trading-v1.md` |
 | plan | Каждый stage до implementation должен явно сказать, требуется ли что-то от пользователя: ключи через UI, market artifacts, SSH/env доступы или `nothing`. | Следующий executor не должен начинать работу с неявным ожиданием пользовательских секретов или внешних артефактов. | `strategy-producer-paper-testnet-trading-v1.md` |
-| plan | `github:yeet` используется для GitHub publish, но draft PR сам по себе не является `main`/production delivery. | Stage нельзя принимать как fully delivered, если нет main SHA/CI/deploy/host-sync evidence или явного docs-only `N/A`. | `strategy-producer-paper-testnet-trading-v1.md` |
+| plan | `github:yeet`/branch/PR используются только как временный delivery path. Draft PR, pushed branch или local branch сами по себе не являются `main`/production delivery. | Stage нельзя принимать как fully delivered, если нет main SHA/CI/deploy/host-sync evidence, branch cleanup evidence если branch использовалась, или явного docs-only `N/A`. | `strategy-producer-paper-testnet-trading-v1.md` |
 | `01` | `User required before start: nothing`. | Stage `01` не ждет пользовательских ключей, секретов или артефактов; все evidence собрано через existing SSH/runtime/browser access. | `01-baseline-handoff-freeze.md` |
 | `01` | Current Mac Studio checkout `/Users/daniildegtyarev/Projects/roehub.com` is on `main` and matches `origin/main` at `3117fae9` during inventory. | Следующий executor должен отличать runtime baseline от local docs changes until delivery is unblocked. | `01-baseline-handoff-freeze.md` |
 | `01` | Old gateway Stage `01` baseline is historical drift: current runtime now has accepted Stage `02`-`17` routes/tables/streams. | Do not use the old "absent live-execution" baseline as current fact; use accepted Stage `17` plus this report. | `01-baseline-handoff-freeze.md`; `live-execution-universal-order-gateway-v1-iteration-ledger.md` |

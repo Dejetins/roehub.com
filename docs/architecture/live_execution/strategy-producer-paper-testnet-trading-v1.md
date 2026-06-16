@@ -317,12 +317,13 @@ docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stag
 | Шаг | Обязательное правило |
 |---|---|
 | Pre-start user requirements | До реализации executor явно пишет `User required before start: ...`. Если ничего не нужно, пишет `User required before start: nothing`. Если нужны ключи/доступы/артефакты, executor останавливается до implementation и указывает точное действие; secrets не передаются в чат и добавляются только через штатный UI/env. |
-| GitHub publish | После successful validation и до финального статуса stage executor использует `github:yeet` для GitHub publish flow: `gh --version`, `gh auth status`, `git status -sb`, diff scope, безопасный stage/commit/push/draft PR. |
-| Ограничение `github:yeet` | `github:yeet` сам по себе не доказывает production delivery: draft PR не равен `main`, CI/deploy и Mac Studio sync. Это ограничение должно быть явно зафиксировано, если stage остановился на PR. |
-| Main branch evidence | Stage нельзя помечать `accepted`, пока не записано доказательство, что изменения доставлены в `origin/main` или другой утвержденный main-branch delivery path для этого цикла. Минимум: commit SHA, branch/PR, CI/checks status, `git rev-parse origin/main` или эквивалентный delivery evidence. |
+| GitHub publish | После successful validation и до финального статуса stage executor использует `github:yeet`/`publish-ci-deploy` discipline для `gh --version`, `gh auth status`, `git status -sb`, diff scope, безопасного stage/commit/push. |
+| Branch lifecycle | Ветка допустима только как временная delivery branch, когда direct-main delivery небезопасен или неудобен. Не создавать отдельную per-stage ветку без причины. Если ветка/PR созданы, successful stage обязан быть доставлен в `main`, а временная local/remote branch должна быть удалена после доказательства, что `main` содержит изменения. |
+| Ограничение branch/PR | Draft PR, pushed branch или local branch не доказывают production delivery: это только промежуточное состояние. Если stage остановился на branch/PR, он остается `blocked`, а следующий зависимый stage не стартует. |
+| Main branch evidence | Stage нельзя помечать `accepted`, пока не записано доказательство, что изменения доставлены в `origin/main` или другой утвержденный main-branch delivery path для этого цикла. Минимум: main commit SHA, branch/PR path или `N/A direct-main`, CI/checks status, `git rev-parse origin/main` или эквивалентный delivery evidence, плюс branch cleanup evidence если branch использовалась. |
 | Mac Studio host sync | Для runtime/code stages нужен evidence, что `macstudio` checkout `/Users/daniildegtyarev/Projects/roehub.com` синхронизирован с доставленным SHA, а runtime `/opt/roehub/app` обновлен через deploy workflow или явно описанный sync path и прошел smoke. Git-команды в `/opt/roehub/app` запрещены. |
 | Docs-only stages | Если stage меняет только docs/prompt artifacts, runtime sync может быть `N/A`, но причина `N/A` и main/docs delivery evidence обязательны. |
-| Delivery blocker | Если validation пройдена, но `github:yeet`, merge/main delivery, CI/deploy или host sync заблокированы, stage report и ledger фиксируют blocker `delivery_pending_main_host_sync`; следующий зависимый stage не стартует без явного unblock/supersede решения. |
+| Delivery blocker | Если validation пройдена, но branch/PR не доставлены в `main`, temporary branch не удалена, CI/deploy или host sync заблокированы, stage report и ledger фиксируют blocker `delivery_pending_main_host_sync`; следующий зависимый stage не стартует без явного unblock/supersede решения. |
 
 ## Prompt Pack
 
@@ -340,8 +341,8 @@ Prompt pack для реализации этого плана должен жи�
 | Обновлять ledger | Handoff фиксируется после validation и до финального отчета. |
 | Явно назвать требования к пользователю до старта | Executor пишет `User required before start: ...`; при необходимости ключей/артефактов/доступов останавливается до implementation. |
 | Требовать реальные evidence | API/DB/Redis/browser/Monit/Prometheus/testnet calls по surface stage. |
-| Использовать `github:yeet` для publish | После successful validation publish идет через `github:yeet`; ограничение draft PR фиксируется отдельно. |
-| Доставлять successful stage в `main` и синхронизировать host | Stage `accepted` только после main-branch delivery evidence и, где применимо, Mac Studio runtime sync/smoke. |
+| Использовать disciplined publish | После successful validation publish идет через `github:yeet`/`publish-ci-deploy` discipline; ветка/PR допустимы только как временный путь доставки. |
+| Доставлять successful stage в `main` и синхронизировать host | Stage `accepted` только после main-branch delivery evidence, cleanup временных веток/PR если они использовались, и, где применимо, Mac Studio runtime sync/smoke. |
 | Не переходить в mainnet | Mainnet submit blocked до отдельного плана. |
 
 ## Риски И Открытые Вопросы
