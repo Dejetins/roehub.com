@@ -1,6 +1,6 @@
 # Stage 04: BTCUSDT Market Readiness
 
-Статус: `in_progress`
+Статус: `accepted`
 
 ## Pre-Start
 
@@ -108,16 +108,57 @@ Root-cause hypothesis confirmed:
 
 ### Delivery / post-deploy
 
-TBD after main push, CI/deploy, Mac Studio sync, sync/enrich/live-feed proof, API proof, and browser/API dashboard proof.
+| Surface | Evidence | Result |
+|---|---|---|
+| Main delivery | Direct `main` commit `39ff9f8d` (`Add BTCUSDT market readiness`) pushed to `origin/main`; `git ls-remote origin refs/heads/main` returned `39ff9f8d89cedb6b08e1482c18a62ed9d595b66d`. | pass |
+| CI | GitHub Actions CI run `27655281690` for `39ff9f8d` completed successfully. | pass |
+| Deploy Backend | Run `27655488294` completed successfully; backend deploy smoke step passed. | pass |
+| Deploy Web | Run `27655488312` completed successfully. | pass |
+| Publish App Image | Run `27655488320` completed successfully; Docker cache reservation warning was non-fatal. | pass |
+| Mac Studio host sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `39ff9f8d`; `## main...origin/main`. | pass |
+| Mac Studio smoke | `/opt/roehub/app/scripts/macos/smoke_prod.sh` exited `0`: API, Redis `PONG`, launchd services and Tailscale backend were healthy. | pass |
+| Runtime sync/enrich | One-shot scheduler sync/enrich on `/opt/roehub/app` completed: `sync_and_enrich_ok`; then `com.roehub.market-data-scheduler` and `com.roehub.market-data-ws-worker` were restarted and running. | pass |
+| Active smoke sessions | Temporary browser/API smoke sessions revoked; active smoke-session count `0`. | pass |
+
+Post-deploy ClickHouse latest BTCUSDT reference rows:
+
+| Market | Status | Tradable | Base/quote | price_step | qty_step | min_notional | updated_at |
+|---|---:|---:|---|---:|---:|---:|---|
+| Binance spot (`1`) | `ENABLED` | `1` | `BTC/USDT` | `0.01` | `0.00001` | `5.0` | `2026-03-17 22:19:33.328000` |
+| Binance futures (`2`) | `ENABLED` | `1` | `BTC/USDT` | `0.1` | `0.001` | `50.0` | `2026-06-16 23:41:52.706000` |
+| Bybit spot (`3`) | `ENABLED` | `1` | `BTC/USDT` | `0.1` | `0.000001` | `5.0` | `2026-06-16 23:41:52.706000` |
+| Bybit futures (`4`) | `ENABLED` | `1` | `BTC/USDT` | `0.1` | `0.001` | `5.0` | `2026-06-16 23:41:52.706000` |
+
+Post-deploy Redis stream proof after worker restart:
+
+| Stream | Length | Last id | Last observed candle |
+|---|---:|---|---|
+| `md.candles.1m.binance:spot:BTCUSDT` | `10082` | `1781653440000-0` | `2026-06-16T23:44:00Z` / ingested `2026-06-16T23:45:00.130Z` |
+| `md.candles.1m.binance:futures:BTCUSDT` | `10083` | `1781653440000-0` | `2026-06-16T23:44:00Z` / ingested `2026-06-16T23:45:00.282Z` |
+| `md.candles.1m.bybit:spot:BTCUSDT` | `10083` | `1781653440000-0` | `2026-06-16T23:44:00Z` / ingested `2026-06-16T23:45:00.649Z` |
+| `md.candles.1m.bybit:futures:BTCUSDT` | `2` | `1781653440000-0` | `2026-06-16T23:44:00Z` / ingested `2026-06-16T23:45:00.839Z` |
+
+Authenticated production API proof:
+
+- `GET https://roehub.com/api/market-data/btcusdt-readiness` with temporary smoke session returned four `items`, all with `readiness_state=ready`, `reference_state=ready`, and `stream_state=ready`.
+- Artifact: `output/playwright/stage04-btcusdt-api-readiness.json`.
+
+Authenticated browser proof:
+
+- Playwright against `https://roehub.com/strategies` with a temporary smoke session rendered `.strategies-market-readiness` with `data-readiness="ready"`, visible `BTCUSDT`, `Binance`, `Bybit`, and `ready` text.
+- Network log included `GET https://roehub.com/api/ui/strategies/dashboard?refresh=initial&state=all => 200` and refresh `200`.
+- Screenshot: `output/playwright/stage04-btcusdt-market-readiness.png`.
+- DOM/network artifact: `output/playwright/stage04-btcusdt-market-readiness.json`, `output/playwright/stage04-btcusdt-market-readiness.network.txt`.
 
 ## Blockers
 
-Open until post-deploy runtime proof:
-
-- Need deploy of parser/API/UI/whitelist changes to Mac Studio.
-- Need run/observe sync/enrich so ClickHouse latest `BTCUSDT` rows include Binance futures `min_notional`, Bybit spot `qty_step`, and Bybit futures instrument row.
-- Need observe or start market-data WS live feed so `md.candles.1m.bybit:futures:BTCUSDT` exists and is fresh.
+None. The Stage `04` blocker was resolved by production sync/enrich, market-data worker restart, fresh Bybit futures BTCUSDT stream proof, authenticated API readiness proof, and authenticated browser proof.
 
 ## Handoff
 
-Do not start Stage `05` until Stage `04` is marked `accepted` with post-deploy API/browser and Redis/ClickHouse evidence.
+Stage `05` can rely on accepted BTCUSDT readiness for Binance/Bybit spot/futures:
+
+- All four required BTCUSDT streams are present and fresh under `md.candles.1m.*`.
+- ClickHouse reference rows have enabled/tradable status plus positive `price_step`, `qty_step`, and `min_notional`.
+- Authenticated API/UI surfaces expose the readiness matrix and fail closed through explicit readiness states if a dependency degrades.
+- Non-BTCUSDT market readiness remains out of scope for this stage.
