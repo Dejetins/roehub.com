@@ -1,6 +1,6 @@
 ---
 doc: agents
-version: "1.9"
+version: "1.10"
 status: active
 language: en
 applies_to:
@@ -116,6 +116,7 @@ Expected global skill pack:
 - `backend-performance-evidence`
 - `numba`
 - `browser-qa-evidence`
+- `ui-ux-pro-max`
 - `pre-ship-gate`
 - `publish-ci-deploy`
 - `playwright` when browser automation is needed
@@ -131,12 +132,15 @@ Current intended routing:
 - backend tests, lint, type checks, failing gate triage → `backend-quality-gates`
 - backend performance claims, profiling, benchmarks, hot-path work → `backend-performance-evidence`
 - Numba/JIT-specific optimization details, including `@njit`, `prange`, `fastmath`, ufunc/gufunc, typing, and threading diagnostics → `numba`
+- UI/UX design-system choices, visual hierarchy, layout polish, color/typography pairing, component interaction quality, accessibility heuristics, chart presentation guidance, or design-quality review of browser/mobile interfaces → `ui-ux-pro-max`
 - browser-visible QA, screenshots, console/network checks, form/navigation testing, responsive checks, or QA reports → `browser-qa-evidence` plus an available runtime browser surface such as the Browser plugin, Playwright MCP, or the global `playwright` skill
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks → `pre-ship-gate`
 - full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
 - prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
 
 Architecture documents created or materially rewritten by `architecture-design` MUST default to Russian narrative, clear explanations, and a business-readable layer in addition to engineering detail. Prompt artifacts produced by `prompt-manager` MUST keep their own language contract and remain English unless a higher-priority user instruction explicitly says otherwise.
+
+`ui-ux-pro-max` is advisory design intelligence, not repository policy. It MAY inform UI design-system proposals, visual QA checklists, accessibility heuristics, and chart/display choices, but it MUST NOT override existing Roehub UI contracts, product copy/localization contracts, security rules, API/DTO contracts, performance gates, or browser verification requirements. Do not persist generated `design-system/` artifacts into the repository unless the user explicitly requests that durable artifact and the scope is documented.
 
 Non-trivial architecture plans MUST conditionally cover the risk surfaces they introduce. When a plan touches service or context calls, external providers, exchange execution, secrets, runtime operations, alerts, runbooks, staged delivery, or side-effecting retry paths, it MUST name the applicable service-call contracts, auth model, timeout/retry/error behavior, planned code/config/infra/docs artifacts by stage, affected documentation, idempotency and unknown-state rules, redaction boundaries, and operational alerts/runbook actions. These sections SHOULD be omitted or marked `N/A` for small internal plans where the surface is genuinely unaffected.
 
