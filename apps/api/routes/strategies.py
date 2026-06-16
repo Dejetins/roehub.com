@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any, Callable, Literal, Mapping
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Header, Response
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.requests import Request
 
@@ -26,6 +26,7 @@ from trading.contexts.identity.application.ports.current_user import CurrentUser
 from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
 from trading.contexts.strategy.application.use_cases import (
     CloneStrategyUseCase,
+    CreateStrategyFromBacktestVariantUseCase,
     CreateStrategyUseCase,
     DeleteStrategyUseCase,
     GetMyStrategyUseCase,
@@ -43,6 +44,13 @@ from trading.platform.errors import RoehubError
 CurrentUserProviderDependency = Callable[[Request], CurrentUserProvider]
 CurrentUserPrincipalDependency = Callable[[Request], CurrentUserPrincipal]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
+_DEFAULT_LAUNCH_CAPITAL_USD = Decimal("50")
+_MIN_BTCUSDT_NOTIONAL_USD = Decimal("10")
+_ALLOWED_LAUNCH_MODES = frozenset({"paper", "testnet"})
+_ALLOWED_LAUNCH_MARKET_TYPES = frozenset({"spot", "futures"})
+_ALLOWED_LAUNCH_ENTRY_SIZING = frozenset({"fixed_quote", "fixed_equity_pct"})
+_ALLOWED_LAUNCH_RISK_MODES = frozenset({"single_position_cap"})
+_ALLOWED_LAUNCH_DIRECTIONS = frozenset({"long", "short"})
 
 
 class StrategyInstrumentIdRequest(BaseModel):
@@ -219,7 +227,7 @@ class StrategyRunResponse(BaseModel):
 class LiveStrategyProfileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["monitor_only", "paper", "live"] = "monitor_only"
+    mode: Literal["monitor_only", "paper", "live", "testnet"] = "monitor_only"
     exchange_connection_id: UUID | None = None
     sizing_method: Literal["fixed_quote", "fixed_equity_pct"] = "fixed_quote"
     sizing_value: Decimal = Field(default=Decimal("0"), ge=0)
@@ -232,7 +240,7 @@ class LiveStrategyProfileResponse(BaseModel):
     profile_id: UUID
     owner_user_id: UUID
     strategy_id: UUID
-    mode: Literal["monitor_only", "paper", "live"]
+    mode: Literal["monitor_only", "paper", "live", "testnet"]
     exchange_connection_id: UUID | None
     sizing_method: Literal["fixed_quote", "fixed_equity_pct"]
     sizing_value: Decimal
@@ -269,6 +277,41 @@ class StrategyCompatibilityReadinessResponse(BaseModel):
     checked_at: datetime
 
 
+class BacktestVariantLaunchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: UUID
+    variant_key: str
+    mode: str = "paper"
+    exchange_connection_id: UUID | None = None
+    market_type: str = "spot"
+    symbol: str = "BTCUSDT"
+    capital_allocation_usd: Decimal = Field(default=_DEFAULT_LAUNCH_CAPITAL_USD, ge=0)
+    entry_sizing: str = "fixed_quote"
+    risk_mode: str = "single_position_cap"
+    direction: str = "long"
+
+
+class BacktestVariantLaunchProvenanceResponse(BaseModel):
+    source_job_id: UUID
+    source_variant_key: str
+    source_variant_hash: str
+    source_indicator_variant_hash: str | None
+    strategy_spec_hash: str
+    launch_request_hash: str
+
+
+class BacktestVariantLaunchResponse(BaseModel):
+    status: Literal["started"]
+    duplicate_strategy: bool
+    duplicate_reason: str | None
+    strategy: StrategyResponse
+    profile: LiveStrategyProfileResponse
+    run: StrategyRunResponse
+    provenance: BacktestVariantLaunchProvenanceResponse
+    launch_config: dict[str, Any]
+
+
 
 def build_strategies_router(
     *,
@@ -284,6 +327,7 @@ def build_strategies_router(
     live_profile_service: LiveStrategyProfileService | None = None,
     current_user_principal_dependency: CurrentUserPrincipalDependency | None = None,
     compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
+    create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
 ) -> APIRouter:
     """
     Build Strategy API router with immutable CRUD, clone, and run-control endpoints.
@@ -406,6 +450,94 @@ def build_strategies_router(
         current_user = current_user_provider.require_current_user()
         strategies = list_use_case.execute(current_user=current_user)
         return [_to_strategy_response(strategy=item) for item in strategies]
+
+    @router.post(
+        "/strategies/launch-from-backtest-variant",
+        response_model=BacktestVariantLaunchResponse,
+        status_code=201,
+    )
+    def post_strategy_launch_from_backtest_variant(
+        payload: BacktestVariantLaunchRequest,
+        request: Request,
+        response: Response,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> BacktestVariantLaunchResponse:
+        launch_config = _validated_backtest_variant_launch_config(payload=payload)
+        create_from_variant = _require_create_strategy_from_variant_use_case(
+            use_case=create_strategy_from_variant_use_case,
+        )
+        profile_service = _require_live_profile_service(service=live_profile_service)
+        current_user = current_user_provider.require_current_user()
+        create_result = create_from_variant.execute(
+            current_user=current_user,
+            job_id=payload.job_id,
+            variant_key=payload.variant_key,
+            idempotency_key=idempotency_key,
+            launch_config=launch_config,
+        )
+        if create_result.duplicate:
+            response.status_code = 200
+        profile = profile_service.update_profile(
+            strategy_id=create_result.strategy.strategy_id,
+            current_user=current_user,
+            config=LiveStrategyProfileConfig(
+                mode=launch_config["mode"],  # type: ignore[arg-type]
+                exchange_connection_id=payload.exchange_connection_id,
+                sizing_method=launch_config["entry_sizing"],  # type: ignore[arg-type]
+                sizing_value=payload.capital_allocation_usd,
+                max_position_notional=payload.capital_allocation_usd,
+                max_orders_per_run=1,
+                max_notional_per_run=payload.capital_allocation_usd,
+            ),
+            recent_auth_confirmed=_recent_auth_confirmed(
+                request=request,
+                principal_dependency=current_user_principal_dependency,
+            ),
+        )
+        if profile.readiness_status != "ready":
+            raise RoehubError(
+                code="strategy_launch.readiness_blocked",
+                message="Strategy launch is blocked by readiness",
+                details={
+                    "reason": profile.readiness_reason,
+                    "profile_id": str(profile.profile_id),
+                    "strategy_id": str(create_result.strategy.strategy_id),
+                },
+            )
+        run = run_use_case.execute(
+            strategy_id=create_result.strategy.strategy_id,
+            current_user=current_user,
+            metadata_json={
+                "schema": "strategy_backtest_variant_launch_run_v1",
+                "launch_config": launch_config,
+                "provenance": {
+                    "source_job_id": str(create_result.provenance.source_job_id),
+                    "source_variant_key": create_result.provenance.source_variant_key,
+                    "strategy_spec_hash": create_result.provenance.strategy_spec_hash,
+                    "launch_request_hash": create_result.provenance.launch_request_hash,
+                },
+            },
+        )
+        return BacktestVariantLaunchResponse(
+            status="started",
+            duplicate_strategy=create_result.duplicate,
+            duplicate_reason=create_result.duplicate_reason,
+            strategy=_to_strategy_response(strategy=create_result.strategy),
+            profile=_to_live_strategy_profile_response(profile=profile),
+            run=_to_strategy_run_response(run=run),
+            provenance=BacktestVariantLaunchProvenanceResponse(
+                source_job_id=create_result.provenance.source_job_id,
+                source_variant_key=create_result.provenance.source_variant_key,
+                source_variant_hash=create_result.provenance.source_variant_hash,
+                source_indicator_variant_hash=(
+                    create_result.provenance.source_indicator_variant_hash
+                ),
+                strategy_spec_hash=create_result.provenance.strategy_spec_hash,
+                launch_request_hash=create_result.provenance.launch_request_hash,
+            ),
+            launch_config=launch_config,
+        )
 
     @router.get("/strategies/{strategy_id}", response_model=StrategyResponse)
     def get_strategy_by_id(
@@ -746,6 +878,86 @@ def _require_compatibility_readiness_service(
             details={"reason": "strategy_compatibility_unavailable"},
         )
     return service
+
+
+def _require_create_strategy_from_variant_use_case(
+    *,
+    use_case: CreateStrategyFromBacktestVariantUseCase | None,
+) -> CreateStrategyFromBacktestVariantUseCase:
+    if use_case is None:
+        raise RoehubError(
+            code="strategy_launch.unavailable",
+            message="Backtest variant launch service is not configured",
+            details={"reason": "strategy_launch_unavailable"},
+        )
+    return use_case
+
+
+def _validated_backtest_variant_launch_config(
+    *, payload: BacktestVariantLaunchRequest
+) -> dict[str, Any]:
+    mode = payload.mode.strip().casefold()
+    market_type = payload.market_type.strip().casefold()
+    symbol = payload.symbol.strip().upper()
+    entry_sizing = payload.entry_sizing.strip().casefold()
+    risk_mode = payload.risk_mode.strip().casefold()
+    direction = payload.direction.strip().casefold()
+    if mode not in _ALLOWED_LAUNCH_MODES:
+        raise _strategy_launch_validation_error(reason="invalid_mode", field="mode")
+    if symbol != "BTCUSDT":
+        raise _strategy_launch_validation_error(reason="unsupported_symbol", field="symbol")
+    if market_type not in _ALLOWED_LAUNCH_MARKET_TYPES:
+        raise _strategy_launch_validation_error(
+            reason="invalid_market_type", field="market_type"
+        )
+    if entry_sizing not in _ALLOWED_LAUNCH_ENTRY_SIZING:
+        raise _strategy_launch_validation_error(
+            reason="invalid_entry_sizing", field="entry_sizing"
+        )
+    if risk_mode not in _ALLOWED_LAUNCH_RISK_MODES:
+        raise _strategy_launch_validation_error(reason="invalid_risk_mode", field="risk_mode")
+    if direction not in _ALLOWED_LAUNCH_DIRECTIONS:
+        raise _strategy_launch_validation_error(reason="invalid_direction", field="direction")
+    if mode == "testnet" and payload.exchange_connection_id is None:
+        raise _strategy_launch_validation_error(
+            reason="exchange_connection_required",
+            field="exchange_connection_id",
+        )
+    if mode == "testnet" and market_type == "spot" and direction == "short":
+        raise _strategy_launch_validation_error(
+            reason="spot_short_not_supported",
+            field="direction",
+        )
+    if payload.capital_allocation_usd < _MIN_BTCUSDT_NOTIONAL_USD:
+        raise _strategy_launch_validation_error(
+            reason="insufficient_allocation_min_notional",
+            field="capital_allocation_usd",
+        )
+    return {
+        "schema": "strategy_backtest_variant_launch_config_v1",
+        "mode": mode,
+        "exchange_connection_id": (
+            str(payload.exchange_connection_id)
+            if payload.exchange_connection_id is not None
+            else None
+        ),
+        "market_type": market_type,
+        "symbol": symbol,
+        "capital_allocation_usd": str(payload.capital_allocation_usd),
+        "entry_sizing": entry_sizing,
+        "risk_mode": risk_mode,
+        "direction": direction,
+        "allowlist_scope": "paper_testnet_btcusdt_v1",
+        "mainnet": False,
+    }
+
+
+def _strategy_launch_validation_error(*, reason: str, field: str) -> RoehubError:
+    return RoehubError(
+        code="strategy_launch.invalid_config",
+        message="Strategy launch config is invalid",
+        details={"reason": reason, "field": field},
+    )
 
 
 def _recent_auth_confirmed(

@@ -2988,6 +2988,7 @@ function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
     t("backtests.strategy_create.body", { variant: compactId(variantKey) }),
     dialog
   );
+  resetStrategyLaunchForm(dialog);
   setText("[data-strategy-create-status]", "", dialog);
   const confirm = qs("[data-strategy-create-confirm]", dialog);
   if (confirm instanceof HTMLButtonElement) {
@@ -2997,6 +2998,55 @@ function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
   dialog.hidden = false;
   dialog.setAttribute("aria-hidden", "false");
   confirm?.focus();
+}
+
+function resetStrategyLaunchForm(dialog) {
+  setLaunchFieldValue(dialog, "mode", "paper");
+  setLaunchFieldValue(dialog, "exchange_connection_id", "");
+  setLaunchFieldValue(dialog, "market_type", "spot");
+  setLaunchFieldValue(dialog, "symbol", "BTCUSDT");
+  setLaunchFieldValue(dialog, "capital_allocation_usd", "50");
+  setLaunchFieldValue(dialog, "entry_sizing", "fixed_quote");
+  setLaunchFieldValue(dialog, "risk_mode", "single_position_cap");
+  setLaunchFieldValue(dialog, "direction", "long");
+  updateStrategyLaunchForm(dialog);
+}
+
+function setLaunchFieldValue(dialog, field, value) {
+  const input = qs(`[data-strategy-launch-field='${field}']`, dialog);
+  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+    input.value = value;
+  }
+  updateLaunchChoiceButtons(dialog, field, value);
+}
+
+function launchFieldValue(dialog, field) {
+  const input = qs(`[data-strategy-launch-field='${field}']`, dialog);
+  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+    return input.value.trim();
+  }
+  return "";
+}
+
+function updateStrategyLaunchForm(dialog) {
+  const mode = launchFieldValue(dialog, "mode") || "paper";
+  const exchangeRow = qs("[data-strategy-launch-exchange-row]", dialog);
+  if (exchangeRow instanceof HTMLElement) {
+    exchangeRow.hidden = mode !== "testnet";
+  }
+}
+
+function updateLaunchChoiceButtons(dialog, field, value) {
+  qsa(`[data-strategy-launch-choice='${field}']`, dialog).forEach((button) => {
+    const active = button.dataset.value === value;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function setLaunchChoice(dialog, field, value) {
+  setLaunchFieldValue(dialog, field, value);
+  updateStrategyLaunchForm(dialog);
 }
 
 function closeCreateStrategyDialog(root, { restoreFocus = true } = {}) {
@@ -3036,6 +3086,7 @@ async function confirmCreateStrategyDialog(root) {
     root
   );
   closeCreateStrategyDialog(root, { restoreFocus: false });
+  window.location.href = "/strategies";
 }
 
 async function createStrategyFromVariant(root) {
@@ -3043,16 +3094,30 @@ async function createStrategyFromVariant(root) {
   if (!pending) {
     throw new Error("No pending strategy creation");
   }
-  const endpoint = endpointFromTemplate(
-    root.dataset.createStrategyEndpointTemplate
-      || "/api/backtests/jobs/{job_id}/variants/{variant_key}/strategies",
-    { job_id: pending.jobId, variant_key: pending.variantKey }
-  );
+  const dialog = qs("[data-strategy-create-dialog]", root);
+  const endpoint = root.dataset.launchStrategyEndpoint || "/api/strategies/launch-from-backtest-variant";
+  const payload = {
+    job_id: pending.jobId,
+    variant_key: pending.variantKey,
+    mode: dialog ? launchFieldValue(dialog, "mode") || "paper" : "paper",
+    market_type: dialog ? launchFieldValue(dialog, "market_type") || "spot" : "spot",
+    symbol: dialog ? launchFieldValue(dialog, "symbol") || "BTCUSDT" : "BTCUSDT",
+    capital_allocation_usd: dialog ? launchFieldValue(dialog, "capital_allocation_usd") || "50" : "50",
+    entry_sizing: dialog ? launchFieldValue(dialog, "entry_sizing") || "fixed_quote" : "fixed_quote",
+    risk_mode: dialog ? launchFieldValue(dialog, "risk_mode") || "single_position_cap" : "single_position_cap",
+    direction: dialog ? launchFieldValue(dialog, "direction") || "long" : "long",
+  };
+  const exchangeConnectionId = dialog ? launchFieldValue(dialog, "exchange_connection_id") : "";
+  if (exchangeConnectionId) {
+    payload.exchange_connection_id = exchangeConnectionId;
+  }
   return apiFetch(endpoint, {
     method: "POST",
     headers: {
+      "Content-Type": "application/json",
       "Idempotency-Key": pending.idempotencyKey,
     },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -3274,6 +3339,20 @@ function bind(root) {
       });
       return;
     }
+    const strategyLaunchChoice = event.target.closest("[data-strategy-launch-choice]");
+    if (strategyLaunchChoice instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dialog = qs("[data-strategy-create-dialog]", root);
+      if (dialog) {
+        setLaunchChoice(
+          dialog,
+          strategyLaunchChoice.dataset.strategyLaunchChoice || "",
+          strategyLaunchChoice.dataset.value || "",
+        );
+      }
+      return;
+    }
     const strategyCreateDismiss = event.target.closest("[data-strategy-create-dismiss]");
     if (strategyCreateDismiss instanceof HTMLElement) {
       event.preventDefault();
@@ -3417,6 +3496,18 @@ function bind(root) {
     if (preset instanceof HTMLElement) {
       setAutorefresh(root, preset.dataset.backtestsRefreshPreset || "off");
       return;
+    }
+  });
+  root.addEventListener("change", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    const launchField = event.target.closest("[data-strategy-launch-field]");
+    if (launchField instanceof HTMLElement) {
+      const dialog = qs("[data-strategy-create-dialog]", root);
+      if (dialog) {
+        updateStrategyLaunchForm(dialog);
+      }
     }
   });
 

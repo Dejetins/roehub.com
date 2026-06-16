@@ -17,6 +17,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
 )
 from trading.contexts.strategy.application import (
     CloneStrategyUseCase,
+    CreateStrategyFromBacktestVariantResult,
     CreateStrategyUseCase,
     CurrentUser,
     CurrentUserProvider,
@@ -28,6 +29,11 @@ from trading.contexts.strategy.application import (
     RestartStrategyUseCase,
     RunStrategyUseCase,
     StopStrategyUseCase,
+)
+from trading.contexts.strategy.domain.entities import (
+    Strategy,
+    StrategyBacktestVariantProvenance,
+    StrategySpecV1,
 )
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
@@ -267,8 +273,14 @@ def _build_live_profile_client(
     *,
     session_created_at: datetime | None,
     exchange_eligible: bool = True,
+    create_strategy_from_variant_use_case: Any | None = None,
 ) -> TestClient:
     strategy_repository = InMemoryStrategyRepository()
+    if create_strategy_from_variant_use_case is not None and hasattr(
+        create_strategy_from_variant_use_case,
+        "bind_strategy_repository",
+    ):
+        create_strategy_from_variant_use_case.bind_strategy_repository(strategy_repository)
     event_repository = InMemoryStrategyEventRepository()
     clock = _SequenceClock(
         start=datetime(2026, 5, 30, 12, 0, tzinfo=timezone.utc),
@@ -331,6 +343,7 @@ def _build_live_profile_client(
             current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
                 session_created_at=session_created_at,
             ),
+            create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
         )
     )
     return TestClient(app)
@@ -456,6 +469,110 @@ def test_live_strategy_profile_allows_paper_and_recent_auth_live_with_ready_conn
     assert live.json()["readiness_reason"] == "live_ready_recent_auth_and_connection"
 
 
+def test_launch_from_backtest_variant_creates_profile_and_run_config() -> None:
+    use_case = _FakeCreateStrategyFromVariantUseCase()
+    client = _build_live_profile_client(
+        session_created_at=datetime.now(timezone.utc),
+        create_strategy_from_variant_use_case=use_case,
+    )
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000205"}
+
+    launched = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={**headers, "Idempotency-Key": "launch-paper-1"},
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "paper",
+            "market_type": "spot",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "long",
+        },
+    )
+
+    assert launched.status_code == 201
+    payload = launched.json()
+    assert payload["status"] == "started"
+    assert payload["strategy"]["spec"]["instrument_key"] == "binance:spot:BTCUSDT"
+    assert payload["profile"]["mode"] == "paper"
+    assert payload["profile"]["sizing_value"] == "50"
+    assert payload["profile"]["max_notional_per_run"] == "50"
+    assert payload["profile"]["readiness_reason"] == "paper_no_exchange_submit"
+    assert payload["run"]["state"] == "starting"
+    assert payload["run"]["metadata"]["launch_config"]["symbol"] == "BTCUSDT"
+    assert payload["run"]["metadata"]["launch_config"]["capital_allocation_usd"] == "50"
+    assert payload["run"]["metadata"]["launch_config"]["direction"] == "long"
+    assert payload["provenance"]["source_variant_key"] == "job_demo"
+    assert use_case.calls == (("job_demo", "launch-paper-1", "paper"),)
+
+
+def test_launch_from_backtest_variant_blocks_testnet_without_exchange() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    response = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-testnet-1",
+        },
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "testnet",
+            "market_type": "spot",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "long",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
+    assert response.json()["error"]["details"]["reason"] == "exchange_connection_required"
+
+
+def test_launch_from_backtest_variant_blocks_invalid_sizing_and_min_notional() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000000205",
+        "Idempotency-Key": "launch-invalid-1",
+    }
+    payload = {
+        "job_id": "00000000-0000-0000-0000-00000000b001",
+        "variant_key": "job_demo",
+        "mode": "paper",
+        "market_type": "spot",
+        "symbol": "BTCUSDT",
+        "capital_allocation_usd": "50",
+        "entry_sizing": "all_in",
+        "risk_mode": "single_position_cap",
+        "direction": "long",
+    }
+
+    invalid_sizing = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers=headers,
+        json=payload,
+    )
+    low_notional = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={**headers, "Idempotency-Key": "launch-invalid-2"},
+        json={**payload, "entry_sizing": "fixed_quote", "capital_allocation_usd": "5"},
+    )
+
+    assert invalid_sizing.status_code == 422
+    assert invalid_sizing.json()["error"]["details"]["reason"] == "invalid_entry_sizing"
+    assert low_notional.status_code == 422
+    assert (
+        low_notional.json()["error"]["details"]["reason"]
+        == "insufficient_allocation_min_notional"
+    )
+
+
 
 def test_strategy_get_endpoint_enforces_owner_only_visibility() -> None:
     """
@@ -571,6 +688,59 @@ def test_strategy_restart_endpoint_persists_pending_restart_and_rejects_duplicat
     duplicate_restart = client.post(f"/strategies/{strategy_id}/restart", headers=headers)
     assert duplicate_restart.status_code == 409
     assert duplicate_restart.json()["error"]["message"] == "Strategy restart is already pending"
+
+
+class _FakeCreateStrategyFromVariantUseCase:
+    def __init__(self) -> None:
+        self.calls: tuple[tuple[str, str | None, str], ...] = ()
+        self._strategy_repository: InMemoryStrategyRepository | None = None
+
+    def bind_strategy_repository(
+        self, repository: InMemoryStrategyRepository
+    ) -> None:
+        self._strategy_repository = repository
+
+    def execute(
+        self,
+        *,
+        current_user: CurrentUser,
+        job_id: UUID,
+        variant_key: str,
+        idempotency_key: str | None,
+        launch_config: dict[str, Any] | None = None,
+    ) -> CreateStrategyFromBacktestVariantResult:
+        self.calls = (
+            *self.calls,
+            (variant_key, idempotency_key, str((launch_config or {}).get("mode"))),
+        )
+        strategy = Strategy.create(
+            user_id=current_user.user_id,
+            spec=StrategySpecV1.from_json(payload=_build_create_payload(symbol="BTCUSDT")),
+            created_at=datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
+            strategy_id=UUID("00000000-0000-0000-0000-00000000c001"),
+        )
+        if self._strategy_repository is not None:
+            self._strategy_repository.create(strategy=strategy)
+        provenance = StrategyBacktestVariantProvenance(
+            strategy_id=strategy.strategy_id,
+            user_id=current_user.user_id,
+            source_job_id=job_id,
+            source_variant_key=variant_key,
+            source_variant_hash="a" * 64,
+            source_indicator_variant_hash="b" * 64,
+            backtest_request_hash="d" * 64,
+            backtest_result_config_hash="e" * 64,
+            strategy_spec_hash="f" * 64,
+            launch_request_hash="1" * 64,
+            idempotency_key_hash="2" * 64,
+            created_at=datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
+            metadata_json={"launch_config": dict(launch_config or {})},
+        )
+        return CreateStrategyFromBacktestVariantResult(
+            strategy=strategy,
+            provenance=provenance,
+            duplicate=False,
+        )
 
 
 

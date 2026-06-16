@@ -7,7 +7,7 @@ Docs:
 """
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Any, Mapping
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -24,6 +24,11 @@ from apps.api.monitoring import (
     record_strategy_position_ownership,
 )
 from apps.api.routes import build_strategies_router
+from trading.contexts.backtest.adapters.outbound import (
+    PostgresBacktestJobRepository,
+    PsycopgBacktestPostgresGateway,
+)
+from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
@@ -45,6 +50,7 @@ from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyRunRepository,
     InMemoryStrategySignalRepository,
     PostgresLiveStrategyProfileRepository,
+    PostgresStrategyBacktestVariantProvenanceRepository,
     PostgresStrategyCompatibilityReadinessRepository,
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
@@ -58,7 +64,10 @@ from trading.contexts.strategy.adapters.outbound import (
     resolve_strategy_config_path,
 )
 from trading.contexts.strategy.application import (
+    BacktestVariantLaunchReader,
+    BacktestVariantLaunchSnapshot,
     CloneStrategyUseCase,
+    CreateStrategyFromBacktestVariantUseCase,
     CreateStrategyUseCase,
     CurrentUser,
     CurrentUserProvider,
@@ -79,6 +88,7 @@ from trading.contexts.strategy.application import (
     StrategyRunRepository,
     StrategySignalRepository,
 )
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
@@ -401,6 +411,10 @@ def build_strategy_router(
         ),
         compatibility_readiness_checker=compatibility_readiness_service,
     )
+    create_strategy_from_variant_use_case = _build_create_strategy_from_variant_use_case(
+        settings=settings,
+        job_repository=_build_backtest_job_repository(settings=settings),
+    )
 
     current_user_provider_dependency = StrategyCurrentUserProviderDependency(
         current_user_dependency=current_user_dependency,
@@ -419,6 +433,7 @@ def build_strategy_router(
         live_profile_service=live_profile_service,
         current_user_principal_dependency=current_user_dependency,
         compatibility_readiness_service=compatibility_readiness_service,
+        create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
     )
 
 
@@ -475,6 +490,36 @@ def _build_live_profile_repository(
             f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
         )
     return InMemoryLiveStrategyProfileRepository()
+
+
+def _build_backtest_job_repository(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> BacktestJobRepository | None:
+    if not settings.postgres_dsn:
+        return None
+    return PostgresBacktestJobRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=settings.postgres_dsn)
+    )
+
+
+def _build_create_strategy_from_variant_use_case(
+    *,
+    settings: StrategyRuntimeSettings,
+    job_repository: BacktestJobRepository | None,
+) -> CreateStrategyFromBacktestVariantUseCase | None:
+    if not settings.postgres_dsn or job_repository is None:
+        return None
+    strategy_gateway = PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+    return CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_BacktestJobRepositoryVariantLaunchReader(repository=job_repository),
+        strategy_repository=PostgresStrategyRepository(gateway=strategy_gateway),
+        provenance_repository=PostgresStrategyBacktestVariantProvenanceRepository(
+            gateway=strategy_gateway,
+        ),
+        event_repository=PostgresStrategyEventRepository(gateway=strategy_gateway),
+        clock=SystemStrategyClock(),
+    )
 
 
 def _build_position_ownership_coordinator(
@@ -597,6 +642,82 @@ def _build_signal_repository(
             f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
         )
     return InMemoryStrategySignalRepository()
+
+
+class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
+    def __init__(self, *, repository: BacktestJobRepository) -> None:
+        self._repository = repository
+
+    def get(
+        self,
+        *,
+        user_id: UserId,
+        job_id: UUID,
+        variant_key: str,
+    ) -> BacktestVariantLaunchSnapshot:
+        job = self._repository.get(job_id=job_id)
+        if job is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest job was not found",
+                details={"reason": "not_found", "job_id": str(job_id)},
+            )
+        if job.user_id != user_id:
+            raise RoehubError(
+                code="strategy_variant_launch.forbidden",
+                message="Backtest job does not belong to current user",
+                details={"reason": "forbidden", "job_id": str(job_id)},
+            )
+        row = self._repository.get_top_variant_by_public_key(
+            job_id=job_id,
+            public_variant_key=variant_key,
+        )
+        if row is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_found",
+                message="Backtest variant was not found",
+                details={
+                    "reason": "not_found",
+                    "job_id": str(job_id),
+                    "variant_key": variant_key,
+                },
+            )
+        request = dict(job.request_json)
+        coordinates = _mapping(request.get("coordinates"))
+        payload = dict(row.payload_json)
+        if job.market_id is None:
+            raise RoehubError(
+                code="strategy_variant_launch.not_launchable",
+                message="Backtest job has no launchable market id",
+                details={"reason": "not_launchable", "job_id": str(job_id)},
+            )
+        return BacktestVariantLaunchSnapshot(
+            job_id=job.job_id,
+            owner_user_id=job.user_id,
+            job_state=job.state,
+            request_hash=job.request_hash,
+            result_config_hash=job.engine_params_hash,
+            market_id=int(job.market_id),
+            exchange=str(coordinates.get("exchange", "binance")),
+            market_type=str(coordinates.get("market_type", "spot")),
+            symbol=str(coordinates.get("symbol", job.symbol)),
+            timeframe=str(job.timeframe),
+            variant_key=str(payload.get("public_variant_key") or variant_key),
+            variant_hash=str(payload.get("variant_hash") or row.variant_key),
+            indicator_variant_hash=(
+                str(payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                if (payload.get("indicator_variant_hash") or row.indicator_variant_key)
+                else None
+            ),
+            rank=row.rank,
+            summary_metrics=dict(row.summary_metrics_json),
+            canonical_variant_params=_mapping(payload.get("canonical_variant_params")),
+            readable_params=_mapping(payload.get("readable_params")),
+        )
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 

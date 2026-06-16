@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from trading.contexts.strategy.application.ports.capital_reservation import (
@@ -91,7 +92,13 @@ class RunStrategyUseCase:
         self._position_ownership_coordinator = position_ownership_coordinator
         self._capital_reservation_coordinator = capital_reservation_coordinator
 
-    def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
+    def execute(
+        self,
+        *,
+        strategy_id: UUID,
+        current_user: CurrentUser,
+        metadata_json: Mapping[str, Any] | None = None,
+    ) -> StrategyRun:
         """
         Start strategy run by creating one immutable snapshot in `starting` state.
 
@@ -165,7 +172,7 @@ class RunStrategyUseCase:
                 self._capital_reservation_coordinator is not None
                 and profile is not None
                 and profile.exchange_connection_id is not None
-                and profile.mode in {"paper", "live"}
+                and profile.mode in {"paper", "live", "testnet"}
             ):
                 try:
                     self._capital_reservation_coordinator.reserve_for_strategy_run(
@@ -225,7 +232,7 @@ class RunStrategyUseCase:
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
                 started_at=run_started_at,
-                metadata_json={},
+                metadata_json=dict(metadata_json or {}),
             )
             try:
                 persisted_started = self._run_repository.create(run=started)

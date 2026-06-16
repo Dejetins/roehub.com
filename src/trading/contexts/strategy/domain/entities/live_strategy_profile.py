@@ -8,11 +8,11 @@ from uuid import UUID
 
 from trading.shared_kernel.primitives import UserId
 
-LiveStrategyProfileMode = Literal["monitor_only", "paper", "live"]
+LiveStrategyProfileMode = Literal["monitor_only", "paper", "live", "testnet"]
 LiveStrategyProfileSizingMethod = Literal["fixed_quote", "fixed_equity_pct"]
 LiveStrategyProfileReadinessStatus = Literal["ready", "blocked"]
 
-_ALLOWED_MODES = {"monitor_only", "paper", "live"}
+_ALLOWED_MODES = {"monitor_only", "paper", "live", "testnet"}
 _ALLOWED_SIZING_METHODS = {"fixed_quote", "fixed_equity_pct"}
 _ALLOWED_READINESS_STATUSES = {"ready", "blocked"}
 

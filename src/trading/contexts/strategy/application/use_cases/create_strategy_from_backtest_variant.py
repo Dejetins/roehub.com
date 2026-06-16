@@ -77,6 +77,7 @@ class CreateStrategyFromBacktestVariantUseCase:
         job_id: UUID,
         variant_key: str,
         idempotency_key: str | None,
+        launch_config: Mapping[str, Any] | None = None,
     ) -> CreateStrategyFromBacktestVariantResult:
         key_hash = _require_idempotency_key_hash(idempotency_key=idempotency_key)
         try:
@@ -95,6 +96,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                     "source_variant_key": snapshot.variant_key,
                     "source_variant_hash": snapshot.variant_hash,
                     "strategy_spec_hash": strategy_spec_hash,
+                    "launch_config": _normalized_launch_config(launch_config),
                 }
             )
             idempotent = self._provenance_repository.find_by_idempotency_key(
@@ -154,6 +156,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                     "rank": snapshot.rank,
                     "summary_metrics": dict(snapshot.summary_metrics),
                     "readable_params": dict(snapshot.readable_params),
+                    "launch_config": _normalized_launch_config(launch_config),
                 },
             )
             persisted_provenance = self._provenance_repository.create_with_strategy(
@@ -297,6 +300,22 @@ def _require_idempotency_key_hash(*, idempotency_key: str | None) -> str:
 def _sha256_json(payload: Mapping[str, Any]) -> str:
     rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+
+def _normalized_launch_config(
+    launch_config: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if launch_config is None:
+        return {}
+    return json.loads(
+        json.dumps(
+            dict(launch_config),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            default=str,
+        )
+    )
 
 
 def _variant_launch_error(

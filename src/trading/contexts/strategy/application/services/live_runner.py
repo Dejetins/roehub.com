@@ -906,7 +906,7 @@ class StrategyLiveRunner:
         if (
             profile is None
             or profile.exchange_connection_id is None
-            or profile.mode not in {"paper", "live"}
+            or profile.mode not in {"paper", "live", "testnet"}
         ):
             return
         self._capital_reservation_coordinator.reserve_for_strategy_run(
@@ -1711,6 +1711,8 @@ def _mode_reason_code(*, mode: str, reason_code: str) -> str:
         return f"{reason_code}_paper_no_order_stage05"
     if mode == "live" and reason_code.startswith("ma_fast_crossed_"):
         return f"{reason_code}_live_no_order_stage05"
+    if mode == "testnet" and reason_code.startswith("ma_fast_crossed_"):
+        return f"{reason_code}_testnet_no_order_stage05"
     return reason_code
 
 

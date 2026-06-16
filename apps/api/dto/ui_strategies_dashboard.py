@@ -65,7 +65,7 @@ class StrategyDashboardLiveProfileResponse(BaseModel):
 
     source: str
     state: PanelState
-    mode: Literal["monitor_only", "paper", "live"]
+    mode: Literal["monitor_only", "paper", "live", "testnet"]
     exchange_connection_id: str | None
     sizing_method: Literal["fixed_quote", "fixed_equity_pct"]
     sizing_value: Decimal
@@ -317,7 +317,7 @@ class StrategySignalJournalRowResponse(BaseModel):
     signal_id: str
     strategy_run_id: str
     live_profile_id: str | None
-    mode: Literal["monitor_only", "paper", "live"]
+    mode: Literal["monitor_only", "paper", "live", "testnet"]
     outcome: Literal["warmup", "no_signal", "signal", "blocked"]
     signal_action: Literal["none", "open", "close", "reduce", "reverse"]
     side: Literal["buy", "sell"] | None

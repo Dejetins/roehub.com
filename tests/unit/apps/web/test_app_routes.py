@@ -581,6 +581,16 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
         '/variants/{variant_key}/trades.csv"'
         in response.text
     )
+    assert 'data-launch-strategy-endpoint="/api/strategies/launch-from-backtest-variant"' in (
+        response.text
+    )
+    assert 'data-strategy-launch-field="mode"' in response.text
+    assert 'data-strategy-launch-field="exchange_connection_id"' in response.text
+    assert 'data-strategy-launch-field="capital_allocation_usd"' in response.text
+    assert 'data-strategy-launch-field="entry_sizing"' in response.text
+    assert 'data-strategy-launch-field="risk_mode"' in response.text
+    assert 'data-strategy-launch-field="direction"' in response.text
+    assert "api_secret" not in response.text
     assert 'data-variant-open-delay-ms="180"' in response.text
     assert 'data-variant-open-duration-ms="650"' in response.text
     assert 'data-variant-preview-limit="10"' in response.text

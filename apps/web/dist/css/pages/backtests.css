@@ -539,7 +539,7 @@
   z-index: 1;
   display: grid;
   gap: 10px;
-  width: min(420px, 100%);
+  width: min(520px, 100%);
   border: 1px solid var(--rh-accent);
   background: var(--rh-workstation-panel-bg);
   padding: 12px;
@@ -570,6 +570,41 @@
   color: var(--rh-muted);
   font-size: 10px;
   line-height: 1.45;
+}
+
+.backtests-launch-form {
+  display: grid;
+  gap: 8px;
+}
+
+.backtests-launch-form .backtests-field {
+  grid-template-columns: minmax(118px, 0.46fr) minmax(0, 1fr);
+}
+
+.backtests-launch-form .backtests-field-pair {
+  gap: 8px;
+}
+
+.backtests-launch-form .backtests-input[readonly] {
+  border-color: var(--rh-line-muted);
+  color: var(--rh-muted);
+  opacity: 0.78;
+}
+
+.backtests-launch-choice-group {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.backtests-launch-choice-group .rh-button {
+  min-height: 30px;
+}
+
+.backtests-launch-choice-group .rh-button.is-active {
+  border-color: var(--rh-accent);
+  color: var(--rh-accent-2);
 }
 
 .backtests-cancel-dialog__actions {

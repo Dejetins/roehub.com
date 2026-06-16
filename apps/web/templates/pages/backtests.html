@@ -26,6 +26,7 @@
     data-variant-trades-csv-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/trades.csv"
     data-variant-compatibility-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/compatibility-readiness"
     data-create-strategy-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/strategies"
+    data-launch-strategy-endpoint="/api/strategies/launch-from-backtest-variant"
     data-variant-open-delay-ms="180"
     data-variant-open-duration-ms="650"
     data-variant-preview-limit="10"
@@ -454,6 +455,65 @@
           <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-create-dismiss>{{ t("backtests.strategy_create.dismiss") }}</button>
         </header>
         <p id="backtests-strategy-create-body" data-strategy-create-body>{{ t("backtests.strategy_create.body_static") }}</p>
+        <div class="backtests-launch-form" data-strategy-launch-form>
+          <label class="backtests-field">
+            <span>{{ t("backtests.strategy_create.mode") }}</span>
+            <span class="backtests-launch-choice-group" role="radiogroup">
+              <input type="hidden" value="paper" data-strategy-launch-field="mode">
+              <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="mode" data-value="paper" aria-pressed="true">{{ t("backtests.strategy_create.mode_paper") }}</button>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="mode" data-value="testnet" aria-pressed="false">{{ t("backtests.strategy_create.mode_testnet") }}</button>
+            </span>
+          </label>
+          <label class="backtests-field" data-strategy-launch-exchange-row hidden>
+            <span>{{ t("backtests.strategy_create.exchange_connection") }}</span>
+            <input class="backtests-input" type="text" autocomplete="off" data-strategy-launch-field="exchange_connection_id" placeholder="00000000-0000-0000-0000-000000000000">
+          </label>
+          <div class="backtests-field-pair">
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.symbol") }}</span>
+              <input class="backtests-input" type="text" value="BTCUSDT" readonly data-strategy-launch-field="symbol">
+            </label>
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.market_type") }}</span>
+              <span class="backtests-launch-choice-group" role="radiogroup">
+                <input type="hidden" value="spot" data-strategy-launch-field="market_type">
+                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="market_type" data-value="spot" aria-pressed="true">{{ t("backtests.strategy_create.market_spot") }}</button>
+                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="market_type" data-value="futures" aria-pressed="false">{{ t("backtests.strategy_create.market_futures") }}</button>
+              </span>
+            </label>
+          </div>
+          <div class="backtests-field-pair">
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.allocation") }}</span>
+              <input class="backtests-input" type="number" min="10" step="1" value="50" data-strategy-launch-field="capital_allocation_usd">
+            </label>
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.entry_sizing") }}</span>
+              <span class="backtests-launch-choice-group" role="radiogroup">
+                <input type="hidden" value="fixed_quote" data-strategy-launch-field="entry_sizing">
+                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="entry_sizing" data-value="fixed_quote" aria-pressed="true">{{ t("backtests.strategy_create.sizing_fixed_quote") }}</button>
+                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="entry_sizing" data-value="fixed_equity_pct" aria-pressed="false">{{ t("backtests.strategy_create.sizing_fixed_equity_pct") }}</button>
+              </span>
+            </label>
+          </div>
+          <div class="backtests-field-pair">
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.risk_mode") }}</span>
+              <span class="backtests-launch-choice-group" role="radiogroup">
+                <input type="hidden" value="single_position_cap" data-strategy-launch-field="risk_mode">
+                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="risk_mode" data-value="single_position_cap" aria-pressed="true">{{ t("backtests.strategy_create.risk_single_position_cap") }}</button>
+              </span>
+            </label>
+            <label class="backtests-field">
+              <span>{{ t("backtests.strategy_create.direction") }}</span>
+              <span class="backtests-launch-choice-group" role="radiogroup">
+                <input type="hidden" value="long" data-strategy-launch-field="direction">
+                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="direction" data-value="long" aria-pressed="true">{{ t("backtests.strategy_create.direction_long") }}</button>
+                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="direction" data-value="short" aria-pressed="false">{{ t("backtests.strategy_create.direction_short") }}</button>
+              </span>
+            </label>
+          </div>
+        </div>
         <div class="backtests-cancel-dialog__actions">
           <output data-strategy-create-status aria-live="polite"></output>
           <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-create-dismiss>{{ t("backtests.strategy_create.keep") }}</button>

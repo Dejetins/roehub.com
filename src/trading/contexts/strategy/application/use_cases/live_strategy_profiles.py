@@ -246,7 +246,11 @@ class LiveStrategyProfileService:
             )
         return profile.with_readiness(
             readiness_status="ready",
-            readiness_reason="live_ready_recent_auth_and_connection",
+            readiness_reason=(
+                "testnet_ready_recent_auth_and_connection"
+                if profile.mode == "testnet"
+                else "live_ready_recent_auth_and_connection"
+            ),
             updated_at=now,
         )
 
