@@ -9,7 +9,7 @@
 | `plan_doc` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md` |
 | `prompt_pack` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/` |
 | `ledger_status` | `active` |
-| `current_stage` | `02` |
+| `current_stage` | `03` |
 | `updated_at` | `2026-06-17` |
 | `owner` | `Roehub agents / implementation executors` |
 
@@ -39,7 +39,7 @@
 | Stage | Статус | Prompt / task | Stage report | Validation depth | Ключевой результат | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|---|
 | `01` Baseline and handoff freeze | accepted | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/01-baseline-handoff-freeze.md` | `01-baseline-handoff-freeze.md` | target_runtime + browser_runtime | Runtime baseline reconciled with accepted gateway Stage `17`: API, Postgres, Redis, Monit, Prometheus and browser evidence collected; mainnet submit remains blocked; temporary branch delivery was resolved through `main`. | none | yes |
-| `02` Backtest-to-strategy launch UI | blocked | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/02-backtest-launch-ui.md` | `02-backtest-launch-ui.md` | browser_runtime + API/DB | Local implementation, gates, Playwright success flow, and blocked-case UI proof are complete. | Delivery prerequisite blocked: `gh auth status` timed out on the active `Dejetins` keyring account; main delivery, Mac Studio sync, and runtime SQL proof are pending. | no |
+| `02` Backtest-to-strategy launch UI | accepted | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/02-backtest-launch-ui.md` | `02-backtest-launch-ui.md` | browser_runtime + API/DB + CI/deploy/runtime SQL | Backtest variants can launch `paper`/`testnet` strategy profiles through the UI/API with sanitized `$50` BTCUSDT config, provenance/run metadata, fail-closed blocked reasons, main delivery, CI/deploy, Mac Studio sync, smoke, and runtime SQL proof. | none | yes |
 | `03` Scenario matrix and compatibility | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/03-scenario-matrix-compatibility.md` | `03-scenario-matrix-compatibility.md` | API/DB + runtime readiness | TBD | TBD | no |
 | `04` BTCUSDT market readiness | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/04-btcusdt-market-readiness.md` | `04-btcusdt-market-readiness.md` | Redis/ClickHouse/API/browser | TBD | TBD | no |
 | `05` Safe testnet exchange binding | pending | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/05-safe-testnet-exchange-binding.md` | `05-safe-testnet-exchange-binding.md` | exchange testnet account reads + DB/API | TBD | TBD | no |
@@ -71,6 +71,8 @@
 | `01` | `strategy_live_runner` code/config exists, but no current Mac Studio launchd/Monit process was observed. | Stage `06` owns supervision of the reused producer or must document a blocker before a new process. | `01-baseline-handoff-freeze.md` |
 | `01` | Monit reports `roehub_backtest_job_runner` as `Not monitored`, while launchd and Prometheus show it running/up. `backtest-artifact-publisher` remains Prometheus `up=0`. | Treat as current ops inventory/drift, not proof that strategy-producer Stage `01` failed. | `01-baseline-handoff-freeze.md` |
 | `01` | Browser/API baseline: `/settings`, `/backtests`, and `/strategies` render authenticated; relevant UI APIs return `200`; disposable smoke session was revoked to active count `0`. | Stage `02` can rely on route availability only after delivery unblock; empty/degraded dashboard states for users without strategies are valid read-model states. | `01-baseline-handoff-freeze.md` |
+| `02` | Launch endpoint is intentionally allowlisted to `paper`/`testnet`, `BTCUSDT`, `spot`/`futures`, `fixed_quote`/`fixed_equity_pct`, `single_position_cap`, `long`/`short`; `mainnet` and API secret fields are not accepted by this flow. | Stage `03` should extend compatibility/readiness by preserving these fail-closed defaults instead of broadening the UI/API silently. | `02-backtest-launch-ui.md`; `apps/api/routes/strategies.py` |
+| `02` | Testnet launch requires an existing `exchange_connection_id`; spot short is blocked; allocation below `$10` is blocked. | Stage `03`/`05` should treat these as expected branch outcomes until explicit exchange/account readiness work changes them. | `02-backtest-launch-ui.md`; `tests/unit/apps/api/test_strategies_routes.py` |
 
 ## Контракты, Миграции И Совместимость
 
@@ -96,7 +98,7 @@
 | Stage | Local gates | Real-boundary / e2e evidence | Result | Evidence path / note | Tests-only exception | Residual risk |
 |---|---|---|---|---|---|---|
 | `01` | `python -m tools.docs.generate_docs_index --check` passed after docs index regeneration | SSH/API/SQL/Redis/Monit/Prometheus/browser inventory collected on Mac Studio/public Roehub | accepted | `01-baseline-handoff-freeze.md` | none | Docs-only runtime sync is `N/A`; Mac Studio git checkout sync is required after main push. |
-| `02` | `uv run ruff check apps/api apps/web src/trading/contexts/strategy tests`; `uv run pyright apps/api src/trading/contexts/strategy tests`; `uv run pytest -q tests/unit/apps/api tests/unit/apps/web tests/unit/contexts/strategy`; docs index check all passed | Playwright success flow passed locally with launch POST `200`, redirect `/strategies`, dashboard `200`, console `0`; blocked testnet/no-exchange modal displayed `exchange_connection_required`; SQL migration text guarded locally; runtime DB proof pending main delivery | blocked on delivery | `02-backtest-launch-ui.md`; screenshots under `output/playwright/backtest-launch-ui-*.png` | none | Main delivery, Mac Studio sync/deploy smoke, and runtime SQL proof still required before accepted. |
+| `02` | `uv run ruff check apps/api apps/web src/trading/contexts/strategy tests`; `uv run pyright apps/api src/trading/contexts/strategy tests`; `uv run pytest -q tests/unit/apps/api tests/unit/apps/web tests/unit/contexts/strategy`; docs index check all passed | Playwright success flow passed locally with launch POST `200`, redirect `/strategies`, dashboard `200`, console `0`; blocked testnet/no-exchange modal displayed `exchange_connection_required`; CI, Deploy Backend, Publish App Image, and Deploy Web succeeded; Mac Studio checkout fast-forwarded to `762ef6cb`; `scripts/macos/smoke_prod.sh` exited `0`; runtime DB has Alembic `20260617_0031` and `testnet` in both strategy mode constraints | accepted | `02-backtest-launch-ui.md`; screenshots under `output/playwright/backtest-launch-ui-*.png`; CI run `27649915820`; deploy runs `27650024744`, `27650024742`, `27650101271` | none | Stage `03` must still prove scenario compatibility and exchange readiness separately; this stage only launches sanitized paper/testnet configs. |
 | `03` | focused domain/API tests | API/top variants + SQL matrix + readiness calls | TBD | Stage report | none | TBD |
 | `04` | focused readiness tests | Redis/ClickHouse/API/browser readiness for BTCUSDT | TBD | Stage report | none | TBD |
 | `05` | focused exchange guard tests | Binance/Bybit testnet account/config reads + block proof | TBD | Stage report | none | TBD |
@@ -115,7 +117,7 @@
 | Stage | Branch | Commit | PR | Checks before push | Deploy/runtime status | Notes |
 |---|---|---|---|---|---|---|
 | `01` | temporary `codex/stage01-baseline-handoff-freeze`, then `main` | branch content fast-forwarded into `main`; final pushed main SHA in executor final report | `https://github.com/Dejetins/roehub.com/pull/28` superseded by direct main delivery | docs index passed; inventory collected; branch cleanup required after push | runtime sync `N/A` docs-only; Mac Studio git checkout sync required | No code/runtime changes. Stage accepted only after branch cleanup evidence is reported. |
-| `02` | local `main` only | local only, uncommitted | none | local gates and Playwright passed; `gh --version` ok; `gh auth status` blocked on keyring timeout | not deployed; runtime SQL proof pending | Do not start Stage `03` until GitHub auth is unblocked, changes are delivered to `origin/main`, Mac Studio is synced/deployed, and runtime SQL/browser smoke are recorded. |
+| `02` | `main` | `762ef6cbdc95b8f0b969cdb20cef5e7dfb6300a0` (`Implement backtest launch UI`) | none | local gates, Playwright browser proof, `gh auth status`, CI run `27649915820` | Deploy Backend `27650024744`, Publish App Image `27650024742`, final Deploy Web `27650101271`, Mac Studio checkout sync to `762ef6cb`, prod smoke `0`, runtime SQL Alembic `20260617_0031` | Direct main delivery after local validation. Stage accepted. |
 | `03` | TBD | TBD | TBD | local gates + API/SQL + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
 | `04` | TBD | TBD | TBD | local gates + readiness probes + `github:yeet` preflight | TBD | Main delivery evidence required before accepted. |
 | `05` | TBD | TBD | TBD | local gates + testnet account reads + `github:yeet` preflight | TBD | User supplies keys through UI, not prompt/docs; main delivery evidence required before accepted. |
@@ -133,7 +135,7 @@
 
 | Stage | Blocker | Severity | Owner / next action | Resolved evidence | Next stage allowed |
 |---|---|---|---|---|---|
-| TBD | No active blockers recorded after Stage `01` main delivery path. | TBD | TBD | TBD | yes |
+| none | No active blockers recorded after Stage `02` delivery. | none | Stage `03` executor | Stage `02` accepted with main delivery, CI/deploy, Mac Studio sync, smoke, and runtime SQL proof. | yes |
 
 ## Change Log
 
@@ -147,3 +149,4 @@
 | 2026-06-16 | `01` | Updated delivery contract so temporary branches/PRs must be delivered to `main` and deleted before acceptance; fast-forwarded Stage `01` branch content into `main` and marked Stage `01` accepted pending final push/cleanup evidence in the executor report. | `01-baseline-handoff-freeze.md`; prompt pack `01`-`14` |
 | 2026-06-17 | `02` | Started Stage `02`; recorded `User required before start: nothing` and narrowed the concrete planned file list before implementation edits. | `02-backtest-launch-ui.md` |
 | 2026-06-17 | `02` | Implemented local backtest-to-strategy launch UI/API path and collected local gates + Playwright success/blocked evidence; marked stage blocked on GitHub delivery prerequisite because `gh auth status` timed out on keyring. | `02-backtest-launch-ui.md`; `gh auth status` |
+| 2026-06-17 | `02` | Unblocked GitHub auth, committed and pushed `762ef6cb` to `main`; CI, backend deploy, app image publish, and web deploy succeeded; Mac Studio checkout/runtime smoke and production SQL constraint proof collected; marked Stage `02` accepted and opened Stage `03`. | `02-backtest-launch-ui.md`; CI `27649915820`; Deploy Backend `27650024744`; Publish App Image `27650024742`; Deploy Web `27650101271` |

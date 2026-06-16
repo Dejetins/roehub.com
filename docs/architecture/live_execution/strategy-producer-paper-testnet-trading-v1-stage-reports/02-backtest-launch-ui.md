@@ -101,7 +101,7 @@ Runtime target: local SSR app with real `/backtests` and `/strategies` templates
 | API success | `test_launch_from_backtest_variant_creates_profile_and_run_config` asserts created strategy/profile/run, `paper` mode, `BTCUSDT`, `$50`, `spot`, `fixed_quote`, `single_position_cap`, `long`, provenance, and run `metadata_json.launch_config`; no secret fields are accepted or persisted. |
 | API blocked cases | `test_launch_from_backtest_variant_blocks_testnet_without_exchange` returns `strategy_launch.invalid_config` with reason `exchange_connection_required`; `test_launch_from_backtest_variant_blocks_invalid_sizing_and_min_notional` returns stable reasons for `invalid_entry_sizing` and `insufficient_allocation_min_notional`. |
 | SQL migration contract | `tests/unit/apps/migrations/test_strategy_testnet_mode_sql.py` asserts the Alembic migration expands both `strategy_live_profiles_mode_chk` and `strategy_signals_mode_chk` to `mode IN ('monitor_only', 'paper', 'live', 'testnet')`. |
-| Runtime SQL | Local `STRATEGY_PG_DSN` is empty and local `pg_isready` is unavailable. Mac Studio SSH works, but target runtime cannot prove this unshipped local diff until after main delivery/deploy. |
+| Runtime SQL | Mac Studio production Postgres reports `alembic_version=20260617_0031`; both `strategy_live_profiles_mode_chk` and `strategy_signals_mode_chk` allow `monitor_only`, `paper`, `live`, `testnet`. |
 
 ## Delivery Status
 
@@ -110,13 +110,19 @@ Runtime target: local SSR app with real `/backtests` and `/strategies` templates
 | Local implementation | complete |
 | Local gates | complete |
 | Browser success and blocked evidence | complete |
-| GitHub publish prerequisite | blocked: `gh auth status` timed out trying to log in to github.com account `Dejetins` via keyring |
-| Main delivery / origin main | pending |
-| Mac Studio host sync / deploy smoke / runtime SQL | pending until main delivery |
+| GitHub publish prerequisite | complete: `gh auth status` authenticated as `Dejetins` with `repo` and `workflow` scopes |
+| Main delivery / origin main | complete: pushed `main` commit `762ef6cbdc95b8f0b969cdb20cef5e7dfb6300a0` (`Implement backtest launch UI`) |
+| CI | complete: [CI run `27649915820`](https://github.com/Dejetins/roehub.com/actions/runs/27649915820) succeeded |
+| Deploy Backend | complete: [Deploy Backend run `27650024744`](https://github.com/Dejetins/roehub.com/actions/runs/27650024744) succeeded |
+| Publish App Image | complete: [Publish App Image run `27650024742`](https://github.com/Dejetins/roehub.com/actions/runs/27650024742) succeeded |
+| Deploy Web | complete: [Deploy Web run `27650101271`](https://github.com/Dejetins/roehub.com/actions/runs/27650101271) succeeded |
+| Mac Studio checkout sync | complete: `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded from `a7fb40f0` to `762ef6cbdc95b8f0b969cdb20cef5e7dfb6300a0`; `git status -sb` reports `## main...origin/main` |
+| Mac Studio deploy smoke | complete: `scripts/macos/smoke_prod.sh` exited `0`; launchd services include `com.roehub.api`, `com.roehub.backtest-job-runner`, `com.roehub.exchange-execution`; app redirects unauthenticated `/` to `/login`; API unauthenticated call returns expected `401 missing_session_id`; Redis `PONG`; Tailscale backend state `Running` |
+| Runtime SQL | complete: production DB has Alembic `20260617_0031` and `testnet` in both strategy mode constraints |
 
-Stage cannot be marked `accepted` until delivery and Mac Studio runtime SQL/browser smoke are recorded, per ledger rule.
+Stage `02` is accepted. `mainnet` remains unavailable through this launch path.
 
 ## Next Handoff
 
-- Stage `03` must not start from this local checkout unless Stage `02` is delivered to `main` and the ledger is updated to `accepted`.
+- Stage `03` may start from `main` commit `762ef6cbdc95b8f0b969cdb20cef5e7dfb6300a0` or later.
 - Existing fail-closed branches to preserve: no mainnet, no secret prompt, testnet requires exchange connection id, spot short on testnet is rejected, allocation below `$10` is rejected.
