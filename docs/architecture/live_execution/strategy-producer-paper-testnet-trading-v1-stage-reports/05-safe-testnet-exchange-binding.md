@@ -1,6 +1,6 @@
 # Stage 05: Safe Testnet Exchange Binding
 
-Статус: `blocked`
+Статус: `accepted`
 
 ## Pre-Start
 
@@ -40,6 +40,7 @@ Stage `05` ограничен безопасной привязкой страт
 | none | `src/trading/contexts/strategy/application/ports/exchange_connection_readiness.py`; `src/trading/contexts/strategy/application/ports/__init__.py`; `src/trading/contexts/strategy/application/__init__.py`; `src/trading/contexts/strategy/application/use_cases/live_strategy_profiles.py`; `apps/api/routes/strategies.py`; `apps/api/wiring/modules/strategy.py`; `tests/unit/apps/api/test_strategies_routes.py`; `tests/unit/apps/api/test_strategy_wiring_module.py` | none | Pass non-secret launch context into exchange readiness, bind testnet launches to owned testnet connection metadata, and call account projection/config guard for testnet futures short. | compatible-change: stricter fail-closed readiness semantics for unsafe testnet launches; DTO shape unchanged. |
 | none | `src/trading/contexts/exchange_control/application/connections.py`; `tests/unit/contexts/exchange_control/test_exchange_control_runtime.py` | none | Convert legacy/non-Transit ciphertext decrypt failures into bounded validation/account-state unavailable errors after runtime proof exposed active Binance futures credentials that exchange-control cannot decrypt. | compatible-change: fail-closed error reason becomes more specific; no secret exposure and no endpoint shape change. |
 | none | `src/trading/contexts/exchange_control/adapters/outbound/exchange_validation.py`; `tests/unit/contexts/exchange_control/test_exchange_validation.py` | none | Validate Binance futures testnet credentials against the Binance Futures Testnet API instead of the Spot Testnet account-restrictions endpoint. | compatible-change: fixes false invalid-credentials classification for Binance futures testnet keys; no endpoint shape or secret-handling change. |
+| none | this report; `strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | none | Record final operator-side Binance Futures Testnet funding/config proof and Stage `05` acceptance. | none: docs/evidence update only. |
 
 Files outside prompt expected paths: `src/trading/contexts/strategy/application/*` and `tests/unit/apps/api/test_strategy_wiring_module.py` are touched because the existing strategy launch readiness port and API wiring are the narrowest place to pass non-secret launch context and enforce exchange binding before starting a run. `src/trading/contexts/exchange_control/application/connections.py` and its runtime test were added after Mac Studio proof showed the active Binance futures testnet credentials fail before provider I/O because the stored ciphertexts are not Transit ciphertexts; the fix keeps the custody failure bounded and secret-safe.
 
@@ -149,6 +150,21 @@ Repeat proof after Binance futures validator repair and operator key re-add:
 | Latest guard result, notional `50` | `mismatch`, reasons `insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`. |
 | Latest guard result, notional `1` | `mismatch`, reasons `min_notional_issue`, `insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`. |
 
+Repeat proof after operator funding/config update:
+
+| Evidence | Runtime result |
+|---|---|
+| Runtime boundary | Mac Studio `/opt/roehub/app`, in-process `ExchangeConnectionService` + `HttpExchangeAccountStateReader` using stored Transit credentials; no chat-provided secrets. |
+| Binance requests used | Validator uses Binance Futures Testnet `/fapi/v2/account`; account-state reader uses `/fapi/v2/account`, `/fapi/v2/positionRisk`, `/fapi/v1/openOrders`, and `/fapi/v1/exchangeInfo`. |
+| Stored connection | Binance futures testnet connection `0b8c536b`, key last4 `RcSh`, status `active`, credential status `active`, ciphertext scheme `exchange_control_transit_v1`. |
+| Runtime validator probe | `valid_trade_enabled`, reason `trade_permission_detected`, `effective_capability=trading`, readiness `ready_for_trading`, reason `trading_policy_ok`, IP status `not_restricted_testnet`. |
+| Account-state read | `fresh/account_state_read_ok`; balances `8`, positions `1`, open orders `0`, filters `716` for BTCUSDT-only Stage `05` proof. |
+| USDT balance | free `4999.95403601`, total `4999.95403601`. |
+| BTCUSDT position/config | position quantity `0`, position mode `one_way`, margin mode `isolated`, leverage `1`. |
+| BTCUSDT filters | min notional `50`, min qty `0.0001`, step size `0.0001`, tick size `0.10`. |
+| Futures-short readiness, notional `50` | `ready_for_risk=true`, status `fresh`, reason `account_projection_fresh`; latest persisted guard remains the `$50` accepted path. |
+| Futures-short fail-closed check, notional `1` | `mismatch`, reason `min_notional_issue`, proving below-min-notional submit remains blocked. |
+
 Metrics after final probe included bounded account-state labels:
 
 | Metric | Value |
@@ -158,12 +174,14 @@ Metrics after final probe included bounded account-state labels:
 
 ## Blockers
 
-Stage `05` is `blocked`, not accepted.
+Stage `05` is `accepted`.
 
 Resolved blocker: the new Binance futures testnet connection is stored with Transit ciphertext, validates through the Futures Testnet API, and account-state reads are now `fresh/account_state_read_ok`.
 
-Current blocking reason: the Binance futures testnet account itself is not ready for the Stage `05` futures-short guard. BTCUSDT is configured as `cross` margin with leverage `20`, while the stage requires isolated margin and leverage `1x`; the USDT futures balance is also `0`, so the `$50` notional path fails with `insufficient_balance`. Because isolated `1x` futures-short readiness is not proven, Stage `05` cannot open Stage `06`.
+Resolved blocker: after operator-side Binance Futures Testnet setup, BTCUSDT is configured as isolated margin with leverage `1x`, USDT free balance is above the required `$50` notional, and the Stage `05` guard reports `ready_for_risk=true`.
+
+No active Stage `05` blocker remains.
 
 ## Handoff
 
-Next action is operator account setup, not code repair and not Stage `06`: in Binance Futures Testnet, fund the futures USDT wallet and set BTCUSDT to isolated margin with leverage `1x`, then rerun Stage `05` account-state/readiness proof. Do not paste keys into chat or docs, and do not auto-configure exchange leverage/margin/position mode from Roehub.
+Stage `06` may start. The next executor must keep the same safety boundary: no keys in chat/docs, no mainnet, no exchange auto-config, and no real order submit outside later stages that explicitly require testnet order proof.
