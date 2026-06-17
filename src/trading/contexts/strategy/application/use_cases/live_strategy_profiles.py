@@ -11,6 +11,7 @@ from trading.contexts.strategy.application.ports.compatibility_readiness import 
 from trading.contexts.strategy.application.ports.current_user import CurrentUser
 from trading.contexts.strategy.application.ports.exchange_connection_readiness import (
     ExchangeConnectionReadinessChecker,
+    ExchangeConnectionReadinessContext,
 )
 from trading.contexts.strategy.application.ports.repositories import (
     LiveStrategyProfileRepository,
@@ -40,6 +41,7 @@ class LiveStrategyProfileConfig:
     max_position_notional: Decimal | None = None
     max_orders_per_run: int = 0
     max_notional_per_run: Decimal = Decimal("0")
+    readiness_context: ExchangeConnectionReadinessContext | None = None
 
 
 class LiveStrategyProfileService:
@@ -147,6 +149,7 @@ class LiveStrategyProfileService:
             profile=configured,
             recent_auth_confirmed=recent_auth_confirmed,
             now=now,
+            context=config.readiness_context,
         )
         persisted = self._profile_repository.update(profile=evaluated)
         append_strategy_event(
@@ -175,6 +178,7 @@ class LiveStrategyProfileService:
             profile=existing,
             recent_auth_confirmed=recent_auth_confirmed,
             now=now,
+            context=None,
         )
         if (
             evaluated.readiness_status == existing.readiness_status
@@ -189,6 +193,7 @@ class LiveStrategyProfileService:
         profile: LiveStrategyProfile,
         recent_auth_confirmed: bool,
         now,
+        context: ExchangeConnectionReadinessContext | None = None,
     ) -> LiveStrategyProfile:
         if self._compatibility_readiness_checker is not None:
             readiness = self._compatibility_readiness_checker.check_strategy(
@@ -235,6 +240,7 @@ class LiveStrategyProfileService:
             readiness = self._exchange_connection_checker.check_trading_ready(
                 owner_user_id=profile.owner_user_id,
                 exchange_connection_id=profile.exchange_connection_id,
+                context=context,
             )
         except Exception as error:  # noqa: BLE001
             raise map_strategy_exception(error=error) from error
@@ -246,11 +252,7 @@ class LiveStrategyProfileService:
             )
         return profile.with_readiness(
             readiness_status="ready",
-            readiness_reason=(
-                "testnet_ready_recent_auth_and_connection"
-                if profile.mode == "testnet"
-                else "live_ready_recent_auth_and_connection"
-            ),
+            readiness_reason=_ready_connection_reason(mode=profile.mode, reason=readiness.reason),
             updated_at=now,
         )
 
@@ -287,3 +289,11 @@ def _event_payload(*, profile: LiveStrategyProfile) -> dict[str, object]:
         "readiness_status": profile.readiness_status,
         "readiness_reason": profile.readiness_reason,
     }
+
+
+def _ready_connection_reason(*, mode: str, reason: str) -> str:
+    if mode == "testnet" and reason != "ready_for_trading":
+        return reason
+    if mode == "testnet":
+        return "testnet_ready_recent_auth_and_connection"
+    return "live_ready_recent_auth_and_connection"

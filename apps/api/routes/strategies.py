@@ -24,6 +24,9 @@ from apps.api.monitoring import (
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
+from trading.contexts.strategy.application.ports.exchange_connection_readiness import (
+    ExchangeConnectionReadinessContext,
+)
 from trading.contexts.strategy.application.use_cases import (
     SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
     SCENARIO_MATRIX_MIN_NOTIONAL_USD_V1,
@@ -493,6 +496,13 @@ def build_strategies_router(
                 max_position_notional=payload.capital_allocation_usd,
                 max_orders_per_run=1,
                 max_notional_per_run=payload.capital_allocation_usd,
+                readiness_context=ExchangeConnectionReadinessContext(
+                    mode=str(launch_config["mode"]),
+                    market_type=str(launch_config["market_type"]),
+                    symbol=str(launch_config["symbol"]),
+                    direction=str(launch_config["direction"]),
+                    notional=payload.capital_allocation_usd,
+                ),
             ),
             recent_auth_confirmed=_recent_auth_confirmed(
                 request=request,

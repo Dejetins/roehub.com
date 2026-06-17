@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 from uuid import UUID
 
 from trading.contexts.live_execution.application.ports import (
@@ -435,9 +435,12 @@ def _requirement_to_json(requirement: ExpectedInstrumentConfig) -> dict[str, str
     return {
         "instrument_key": requirement.instrument_key,
         "market_type": requirement.market_type,
+        "side": requirement.side,
         "expected_margin_mode": requirement.expected_margin_mode,
         "expected_position_mode": requirement.expected_position_mode,
         "required_leverage": _decimal_to_str(requirement.required_leverage),
+        "order_notional": _decimal_to_str(requirement.order_notional),
+        "required_balance_asset": requirement.required_balance_asset,
         "min_notional": _decimal_to_str(requirement.min_notional),
         "tick_size": _decimal_to_str(requirement.tick_size),
         "step_size": _decimal_to_str(requirement.step_size),
@@ -448,9 +451,12 @@ def _requirement_from_json(payload: Mapping[str, Any]) -> ExpectedInstrumentConf
     return ExpectedInstrumentConfig(
         instrument_key=str(payload.get("instrument_key") or ""),
         market_type=str(payload.get("market_type") or ""),
+        side=_side_or_none(payload.get("side")),
         expected_margin_mode=_str_or_none(payload.get("expected_margin_mode")),
         expected_position_mode=_str_or_none(payload.get("expected_position_mode")),
         required_leverage=_decimal_or_none(payload.get("required_leverage")),
+        order_notional=_decimal_or_none(payload.get("order_notional")),
+        required_balance_asset=_str_or_none(payload.get("required_balance_asset")),
         min_notional=_decimal_or_none(payload.get("min_notional")),
         tick_size=_decimal_or_none(payload.get("tick_size")),
         step_size=_decimal_or_none(payload.get("step_size")),
@@ -480,4 +486,14 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
 def _str_or_none(value: Any) -> str | None:
     if value is None:
         return None
-    return str(value)
+    raw = str(value).strip()
+    return raw or None
+
+
+def _side_or_none(value: Any) -> Literal["long", "short"] | None:
+    raw = _str_or_none(value)
+    if raw == "long":
+        return "long"
+    if raw == "short":
+        return "short"
+    return None

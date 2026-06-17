@@ -1,10 +1,67 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
-from apps.api.wiring.modules.strategy import is_strategy_api_enabled
+from apps.api.exchange_control_client import (
+    ExchangeConnectionCommandResult,
+    ExchangeControlAccountStateSnapshot,
+    ExchangeControlBalanceSnapshot,
+    ExchangeControlInstrumentFilterSnapshot,
+    ExchangeControlOpenOrderSnapshot,
+    ExchangeControlPositionSnapshot,
+    InMemoryExchangeControlClient,
+)
+from apps.api.wiring.modules.strategy import (
+    ExchangeControlReadinessChecker,
+    is_strategy_api_enabled,
+)
+from trading.contexts.live_execution.adapters.outbound import (
+    InMemoryExchangeAccountProjectionRepository,
+)
+from trading.contexts.live_execution.application import ExchangeAccountProjectionService
+from trading.contexts.strategy.application import ExchangeConnectionReadinessContext
+from trading.shared_kernel.primitives import UserId
+
+
+class _StaticClock:
+    def __init__(self, value: datetime) -> None:
+        self._value = value
+
+    def now(self) -> datetime:
+        return self._value
+
+
+class _FuturesExchangeControlClient(InMemoryExchangeControlClient):
+    def __init__(
+        self,
+        *,
+        connection: ExchangeConnectionCommandResult,
+        snapshot: ExchangeControlAccountStateSnapshot,
+    ) -> None:
+        self._connection = connection
+        self._snapshot = snapshot
+
+    def list_connections(
+        self, *, owner_user_id: str, request_id: str | None = None
+    ) -> tuple[ExchangeConnectionCommandResult, ...]:
+        _ = owner_user_id, request_id
+        return (self._connection,)
+
+    def read_account_state(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_keys: tuple[str, ...] = (),
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountStateSnapshot:
+        _ = owner_user_id, connection_id, instrument_keys, request_id
+        return self._snapshot
 
 
 def _write_strategy_config(tmp_path: Path, *, api_enabled: bool) -> Path:
@@ -153,3 +210,150 @@ def test_is_strategy_api_enabled_rejects_invalid_override_literal(tmp_path: Path
                 "ROEHUB_STRATEGY_API_ENABLED": "enabled",
             },
         )
+
+
+def test_exchange_control_readiness_checker_accepts_safe_testnet_futures_short() -> None:
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000205")
+    connection_id = UUID("00000000-0000-0000-0000-00000000e102")
+    repository = InMemoryExchangeAccountProjectionRepository()
+    checker = ExchangeControlReadinessChecker(
+        client=_FuturesExchangeControlClient(
+            connection=_connection(connection_id=connection_id),
+            snapshot=_safe_futures_snapshot(),
+        ),
+        account_projection_service=ExchangeAccountProjectionService(
+            repository=repository,
+            clock=_StaticClock(datetime(2026, 6, 17, 12, 1, tzinfo=UTC)),
+        ),
+    )
+
+    readiness = checker.check_trading_ready(
+        owner_user_id=owner_user_id,
+        exchange_connection_id=connection_id,
+        context=ExchangeConnectionReadinessContext(
+            mode="testnet",
+            market_type="futures",
+            symbol="BTCUSDT",
+            direction="short",
+            notional=Decimal("50"),
+        ),
+    )
+
+    assert readiness.eligible is True
+    assert readiness.reason == "safe_testnet_futures_short_1x_isolated_verified"
+    assert repository.projections
+    assert repository.config_results[-1].reason_codes == ("verify_only_config_ok",)
+
+
+def test_exchange_control_readiness_checker_blocks_without_projection_store() -> None:
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000205")
+    connection_id = UUID("00000000-0000-0000-0000-00000000e102")
+    checker = ExchangeControlReadinessChecker(
+        client=_FuturesExchangeControlClient(
+            connection=_connection(connection_id=connection_id),
+            snapshot=_safe_futures_snapshot(),
+        ),
+        account_projection_service=None,
+    )
+
+    readiness = checker.check_trading_ready(
+        owner_user_id=owner_user_id,
+        exchange_connection_id=connection_id,
+        context=ExchangeConnectionReadinessContext(
+            mode="testnet",
+            market_type="futures",
+            symbol="BTCUSDT",
+            direction="short",
+            notional=Decimal("50"),
+        ),
+    )
+
+    assert readiness.eligible is False
+    assert readiness.reason == "account_projection_repository_unavailable"
+
+
+def _connection(*, connection_id: UUID) -> ExchangeConnectionCommandResult:
+    now = datetime(2026, 6, 17, 12, 0, tzinfo=UTC)
+    return ExchangeConnectionCommandResult(
+        connection_id=str(connection_id),
+        credential_version_id="00000000-0000-0000-0000-00000000f102",
+        exchange_name="binance",
+        market_type="futures",
+        environment="testnet",
+        label="Binance futures testnet",
+        permissions="trade",
+        requested_permissions="trade",
+        exchange_permissions="trade",
+        effective_permissions="trade",
+        permission_warnings=(),
+        api_key="****1234",
+        status="active",
+        status_reason=None,
+        validation_status="valid_trade_enabled",
+        validation_reason="trade_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        last_validated_at=now,
+        created_at=now,
+        updated_at=now,
+        disabled_at=None,
+        archived_at=None,
+        requested_capability="trading",
+        effective_capability="trading",
+        connection_readiness="ready_for_trading",
+        connection_readiness_reason="trading_policy_ok",
+        permissions_deprecated=True,
+    )
+
+
+def _safe_futures_snapshot() -> ExchangeControlAccountStateSnapshot:
+    observed_at = datetime(2026, 6, 17, 12, 0, tzinfo=UTC)
+    return ExchangeControlAccountStateSnapshot(
+        exchange_name="binance",
+        market_type="futures",
+        environment="testnet",
+        account_mode="futures",
+        sync_status="fresh",
+        sync_reason="account_state_read_ok",
+        source_hash="c" * 64,
+        observed_at=observed_at,
+        balances=(
+            ExchangeControlBalanceSnapshot(
+                asset="USDT",
+                free=Decimal("100"),
+                locked=Decimal("0"),
+                total=Decimal("100"),
+            ),
+        ),
+        positions=(
+            ExchangeControlPositionSnapshot(
+                instrument_key="binance:futures:BTCUSDT",
+                side="net",
+                quantity=Decimal("0"),
+                entry_price=Decimal("0"),
+                leverage=Decimal("1"),
+                margin_mode="isolated",
+                position_mode="one_way",
+            ),
+        ),
+        open_orders=(
+            ExchangeControlOpenOrderSnapshot(
+                instrument_key="binance:futures:BTCUSDT",
+                exchange_order_ref="order-1",
+                side="buy",
+                order_type="limit",
+                quantity=Decimal("0.001"),
+                price=Decimal("50000"),
+                status="new",
+            ),
+        ),
+        instrument_filters=(
+            ExchangeControlInstrumentFilterSnapshot(
+                instrument_key="binance:futures:BTCUSDT",
+                tick_size=Decimal("0.1"),
+                step_size=Decimal("0.001"),
+                min_qty=Decimal("0.001"),
+                min_notional=Decimal("50"),
+                max_leverage=Decimal("125"),
+            ),
+        ),
+    )

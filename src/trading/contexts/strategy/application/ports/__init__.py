@@ -12,6 +12,7 @@ from .current_user import CurrentUser, CurrentUserProvider
 from .exchange_connection_readiness import (
     ExchangeConnectionReadiness,
     ExchangeConnectionReadinessChecker,
+    ExchangeConnectionReadinessContext,
 )
 from .execution_producer import NoOpStrategyExecutionProducer, StrategyExecutionProducer
 from .live_candle_stream import StrategyLiveCandleMessage, StrategyLiveCandleStream
@@ -79,6 +80,7 @@ __all__ = [
     "LiveStrategyProfileRepository",
     "ExchangeConnectionReadiness",
     "ExchangeConnectionReadinessChecker",
+    "ExchangeConnectionReadinessContext",
     "StrategyExecutionProducer",
     "NoOpStrategyExecutionProducer",
     "StrategyRepository",

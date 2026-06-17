@@ -82,9 +82,12 @@ class ExchangeAccountProjection:
 class ExpectedInstrumentConfig:
     instrument_key: str
     market_type: str
+    side: Literal["long", "short"] | None = None
     expected_margin_mode: str | None = None
     expected_position_mode: str | None = None
     required_leverage: Decimal | None = None
+    order_notional: Decimal | None = None
+    required_balance_asset: str | None = None
     min_notional: Decimal | None = None
     tick_size: Decimal | None = None
     step_size: Decimal | None = None

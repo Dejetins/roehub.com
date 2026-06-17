@@ -23,6 +23,7 @@ from trading.contexts.strategy.application import (
     CurrentUserProvider,
     DeleteStrategyUseCase,
     ExchangeConnectionReadiness,
+    ExchangeConnectionReadinessContext,
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
     LiveStrategyProfileService,
@@ -174,18 +175,33 @@ class _HeaderCurrentUserPrincipalDependency:
 
 
 class _StaticExchangeReadinessChecker:
-    def __init__(self, *, eligible: bool, reason: str = "ready_for_trading") -> None:
+    def __init__(
+        self,
+        *,
+        eligible: bool,
+        reason: str = "ready_for_trading",
+        exchange_name: str = "binance",
+        market_type: str = "spot",
+    ) -> None:
         self._eligible = eligible
         self._reason = reason
+        self._exchange_name = exchange_name
+        self._market_type = market_type
+        self.contexts: list[ExchangeConnectionReadinessContext | None] = []
 
     def check_trading_ready(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        context: ExchangeConnectionReadinessContext | None = None,
     ) -> ExchangeConnectionReadiness:
+        self.contexts.append(context)
         return ExchangeConnectionReadiness(
             eligible=self._eligible,
             reason=self._reason,
-            exchange_name="binance",
-            market_type="spot",
+            exchange_name=self._exchange_name,
+            market_type=self._market_type,
         )
 
 
@@ -274,6 +290,7 @@ def _build_live_profile_client(
     session_created_at: datetime | None,
     exchange_eligible: bool = True,
     create_strategy_from_variant_use_case: Any | None = None,
+    exchange_connection_checker: _StaticExchangeReadinessChecker | None = None,
 ) -> TestClient:
     strategy_repository = InMemoryStrategyRepository()
     if create_strategy_from_variant_use_case is not None and hasattr(
@@ -331,13 +348,16 @@ def _build_live_profile_client(
                 profile_repository=InMemoryLiveStrategyProfileRepository(),
                 event_repository=event_repository,
                 clock=clock,
-                exchange_connection_checker=_StaticExchangeReadinessChecker(
-                    eligible=exchange_eligible,
-                    reason=(
-                        "ready_for_trading"
-                        if exchange_eligible
-                        else "exchange_connection_not_ready_for_trading"
-                    ),
+                exchange_connection_checker=(
+                    exchange_connection_checker
+                    or _StaticExchangeReadinessChecker(
+                        eligible=exchange_eligible,
+                        reason=(
+                            "ready_for_trading"
+                            if exchange_eligible
+                            else "exchange_connection_not_ready_for_trading"
+                        ),
+                    )
                 ),
             ),
             current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
@@ -533,6 +553,94 @@ def test_launch_from_backtest_variant_blocks_testnet_without_exchange() -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
     assert response.json()["error"]["details"]["reason"] == "exchange_connection_required"
+
+
+def test_launch_from_backtest_variant_blocks_unsafe_testnet_futures_short() -> None:
+    use_case = _FakeCreateStrategyFromVariantUseCase()
+    checker = _StaticExchangeReadinessChecker(
+        eligible=False,
+        reason="unsafe_futures_short",
+        market_type="futures",
+    )
+    client = _build_live_profile_client(
+        session_created_at=datetime.now(timezone.utc),
+        create_strategy_from_variant_use_case=use_case,
+        exchange_connection_checker=checker,
+    )
+    response = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-testnet-short-unsafe",
+        },
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "testnet",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e101",
+            "market_type": "futures",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "short",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "strategy_launch.readiness_blocked"
+    assert response.json()["error"]["details"]["reason"] == "unsafe_futures_short"
+    assert checker.contexts
+    context = checker.contexts[-1]
+    assert context is not None
+    assert context.mode == "testnet"
+    assert context.market_type == "futures"
+    assert context.symbol == "BTCUSDT"
+    assert context.direction == "short"
+    assert str(context.notional) == "50"
+
+
+def test_launch_from_backtest_variant_accepts_verified_testnet_futures_short() -> None:
+    use_case = _FakeCreateStrategyFromVariantUseCase()
+    checker = _StaticExchangeReadinessChecker(
+        eligible=True,
+        reason="safe_testnet_futures_short_1x_isolated_verified",
+        market_type="futures",
+    )
+    client = _build_live_profile_client(
+        session_created_at=datetime.now(timezone.utc),
+        create_strategy_from_variant_use_case=use_case,
+        exchange_connection_checker=checker,
+    )
+    response = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-testnet-short-safe",
+        },
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "testnet",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e102",
+            "market_type": "futures",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "short",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["profile"]["mode"] == "testnet"
+    assert (
+        payload["profile"]["readiness_reason"]
+        == "safe_testnet_futures_short_1x_isolated_verified"
+    )
+    assert payload["run"]["metadata"]["launch_config"]["direction"] == "short"
+    assert checker.contexts[-1] is not None
 
 
 def test_launch_from_backtest_variant_blocks_invalid_sizing_and_min_notional() -> None:

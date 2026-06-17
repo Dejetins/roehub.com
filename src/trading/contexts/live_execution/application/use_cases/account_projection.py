@@ -233,6 +233,8 @@ def _config_mismatch_reasons(
     )
     if filters is None:
         reasons.append("instrument_filters_missing")
+        if requirement.order_notional is not None:
+            reasons.append("min_notional_issue")
     else:
         if requirement.min_notional is not None and _lt(
             filters.min_notional,
@@ -243,18 +245,48 @@ def _config_mismatch_reasons(
             reasons.append("tick_size_mismatch")
         if requirement.step_size is not None and filters.step_size != requirement.step_size:
             reasons.append("step_size_mismatch")
-    for position in projection.positions:
-        if position.instrument_key != requirement.instrument_key:
-            continue
-        if (
-            requirement.expected_margin_mode
-            and position.margin_mode != requirement.expected_margin_mode
-        ):
+        if requirement.order_notional is not None:
+            if filters.min_notional is None or requirement.order_notional < filters.min_notional:
+                reasons.append("min_notional_issue")
+    if requirement.required_balance_asset is not None:
+        balance = next(
+            (
+                item
+                for item in projection.balances
+                if item.asset == requirement.required_balance_asset.upper()
+            ),
+            None,
+        )
+        if balance is None:
+            reasons.append("missing_balance")
+        elif requirement.order_notional is not None and balance.free < requirement.order_notional:
+            reasons.append("insufficient_balance")
+    position = next(
+        (
+            item
+            for item in projection.positions
+            if item.instrument_key == requirement.instrument_key
+        ),
+        None,
+    )
+    if (
+        requirement.market_type == "futures"
+        and requirement.side == "short"
+        and (
+            requirement.expected_margin_mode is not None
+            or requirement.required_leverage is not None
+        )
+        and position is None
+    ):
+        reasons.append("unsafe_futures_short")
+    if position is not None:
+        if requirement.expected_margin_mode and _normalize_margin_mode(
+            position.margin_mode
+        ) != _normalize_margin_mode(requirement.expected_margin_mode):
             reasons.append("margin_mode_mismatch")
-        if (
-            requirement.expected_position_mode
-            and position.position_mode != requirement.expected_position_mode
-        ):
+        if requirement.expected_position_mode and _normalize_position_mode(
+            position.position_mode
+        ) != _normalize_position_mode(requirement.expected_position_mode):
             reasons.append("position_mode_mismatch")
         if (
             requirement.required_leverage is not None
@@ -266,6 +298,28 @@ def _config_mismatch_reasons(
 
 def _lt(left: Decimal | None, right: Decimal) -> bool:
     return left is None or left < right
+
+
+def _normalize_margin_mode(value: str | None) -> str | None:
+    if value is None:
+        return None
+    raw = value.strip().casefold()
+    if raw in {"isolated", "isolate", "1"}:
+        return "isolated"
+    if raw in {"cross", "crossed", "0"}:
+        return "cross"
+    return raw or None
+
+
+def _normalize_position_mode(value: str | None) -> str | None:
+    if value is None:
+        return None
+    raw = value.strip().casefold()
+    if raw in {"one_way", "one-way", "merged_single", "0"}:
+        return "one_way"
+    if raw in {"hedge", "both_sides", "1", "2"}:
+        return "hedge"
+    return raw or None
 
 
 def _readiness(

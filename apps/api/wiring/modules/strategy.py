@@ -7,13 +7,16 @@ Docs:
 """
 
 from dataclasses import dataclass
-from typing import Any, Mapping
-from uuid import UUID
+from datetime import UTC
+from decimal import Decimal
+from typing import Any, Literal, Mapping
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter
 from starlette.requests import Request
 
 from apps.api.exchange_control_client import (
+    ExchangeControlAccountStateSnapshot,
     ExchangeControlClient,
     ExchangeControlClientError,
     build_exchange_control_client_from_environ,
@@ -41,7 +44,16 @@ from trading.contexts.live_execution.adapters.outbound import (
 )
 from trading.contexts.live_execution.application import (
     CapitalReservationPaperAccountingService,
+    ExchangeAccountProjectionService,
     StrategyPositionOwnershipService,
+)
+from trading.contexts.live_execution.domain import (
+    ExchangeAccountProjection,
+    ExchangeBalanceSnapshot,
+    ExchangeInstrumentFilterSnapshot,
+    ExchangeOpenOrderSnapshot,
+    ExchangePositionSnapshot,
+    ExpectedInstrumentConfig,
 )
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryLiveStrategyProfileRepository,
@@ -74,6 +86,7 @@ from trading.contexts.strategy.application import (
     DeleteStrategyUseCase,
     ExchangeConnectionReadiness,
     ExchangeConnectionReadinessChecker,
+    ExchangeConnectionReadinessContext,
     GetMyStrategyUseCase,
     ListMyStrategiesUseCase,
     LiveStrategyProfileRepository,
@@ -241,9 +254,14 @@ class StrategyCurrentUserProviderDependency:
 @dataclass(frozen=True, slots=True)
 class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
     client: ExchangeControlClient
+    account_projection_service: ExchangeAccountProjectionService | None = None
 
     def check_trading_ready(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        context: ExchangeConnectionReadinessContext | None = None,
     ) -> ExchangeConnectionReadiness:
         try:
             rows = self.client.list_connections(
@@ -271,6 +289,20 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
                 exchange_name=connection.exchange_name,
                 market_type=connection.market_type,
             )
+        if context is not None and context.mode == "testnet":
+            binding_blocker = _testnet_binding_blocker(
+                connection_exchange=connection.exchange_name,
+                connection_market_type=connection.market_type,
+                connection_environment=connection.environment,
+                context=context,
+            )
+            if binding_blocker is not None:
+                return ExchangeConnectionReadiness(
+                    eligible=False,
+                    reason=binding_blocker,
+                    exchange_name=connection.exchange_name,
+                    market_type=connection.market_type,
+                )
         if (
             connection.effective_capability != "trading"
             or connection.connection_readiness != "ready_for_trading"
@@ -282,12 +314,225 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
                 exchange_name=connection.exchange_name,
                 market_type=connection.market_type,
             )
+        if _requires_safe_futures_short_guard(context=context):
+            return self._check_safe_futures_short(
+                owner_user_id=owner_user_id,
+                exchange_connection_id=exchange_connection_id,
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                context=context,
+            )
         return ExchangeConnectionReadiness(
             eligible=True,
             reason="ready_for_trading",
             exchange_name=connection.exchange_name,
             market_type=connection.market_type,
         )
+
+    def _check_safe_futures_short(
+        self,
+        *,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        exchange_name: str,
+        market_type: str,
+        context: ExchangeConnectionReadinessContext | None,
+    ) -> ExchangeConnectionReadiness:
+        if context is None:
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason="unsafe_futures_short",
+                exchange_name=exchange_name,
+                market_type=market_type,
+            )
+        if self.account_projection_service is None:
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason="account_projection_repository_unavailable",
+                exchange_name=exchange_name,
+                market_type=market_type,
+            )
+        instrument_key = f"{exchange_name}:{market_type}:{context.symbol}"
+        requirement = ExpectedInstrumentConfig(
+            instrument_key=instrument_key,
+            market_type=market_type,
+            side="short",
+            expected_margin_mode="isolated",
+            required_leverage=Decimal("1"),
+            order_notional=context.notional,
+            required_balance_asset="USDT",
+        )
+        try:
+            self.account_projection_service.sync_connection(
+                owner_user_id=owner_user_id,
+                exchange_connection_id=exchange_connection_id,
+                reader=_ExchangeControlAccountProjectionReader(
+                    client=self.client,
+                    instrument_keys=(instrument_key,),
+                ),
+                requirements=(requirement,),
+            )
+            readiness = self.account_projection_service.get_readiness(
+                owner_user_id=owner_user_id,
+                exchange_connection_id=exchange_connection_id,
+                requirement=requirement,
+            )
+        except ExchangeControlClientError as error:
+            return ExchangeConnectionReadiness(
+                eligible=False,
+                reason=str(error) or "exchange_account_state_read_failed",
+                exchange_name=exchange_name,
+                market_type=market_type,
+            )
+        if readiness.ready_for_risk:
+            return ExchangeConnectionReadiness(
+                eligible=True,
+                reason="safe_testnet_futures_short_1x_isolated_verified",
+                exchange_name=exchange_name,
+                market_type=market_type,
+            )
+        return ExchangeConnectionReadiness(
+            eligible=False,
+            reason=readiness.reason_codes[0] if readiness.reason_codes else readiness.status,
+            exchange_name=exchange_name,
+            market_type=market_type,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _ExchangeControlAccountProjectionReader:
+    client: ExchangeControlClient
+    instrument_keys: tuple[str, ...]
+
+    def read_account_projection(
+        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+    ) -> ExchangeAccountProjection:
+        snapshot = self.client.read_account_state(
+            owner_user_id=str(owner_user_id),
+            connection_id=str(exchange_connection_id),
+            instrument_keys=self.instrument_keys,
+            request_id="apps-api-safe-testnet-binding-account-read",
+        )
+        return _projection_from_exchange_control_snapshot(
+            owner_user_id=owner_user_id,
+            exchange_connection_id=exchange_connection_id,
+            snapshot=snapshot,
+        )
+
+
+def _testnet_binding_blocker(
+    *,
+    connection_exchange: str,
+    connection_market_type: str,
+    connection_environment: str,
+    context: ExchangeConnectionReadinessContext,
+) -> str | None:
+    if connection_exchange not in {"binance", "bybit"}:
+        return "unsupported_exchange_connection"
+    if connection_environment != "testnet":
+        return "testnet_connection_required"
+    if connection_market_type != context.market_type:
+        return "exchange_connection_market_type_mismatch"
+    return None
+
+
+def _requires_safe_futures_short_guard(
+    *, context: ExchangeConnectionReadinessContext | None
+) -> bool:
+    return (
+        context is not None
+        and context.mode == "testnet"
+        and context.market_type == "futures"
+        and context.direction == "short"
+    )
+
+
+def _projection_from_exchange_control_snapshot(
+    *,
+    owner_user_id: UserId,
+    exchange_connection_id: UUID,
+    snapshot: ExchangeControlAccountStateSnapshot,
+) -> ExchangeAccountProjection:
+    observed_at = snapshot.observed_at
+    if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+        observed_at = observed_at.replace(tzinfo=UTC)
+    else:
+        observed_at = observed_at.astimezone(UTC)
+    return ExchangeAccountProjection(
+        account_snapshot_id=uuid4(),
+        owner_user_id=owner_user_id,
+        exchange_connection_id=exchange_connection_id,
+        exchange_name=snapshot.exchange_name,
+        market_type=snapshot.market_type,
+        environment=snapshot.environment,
+        account_mode=snapshot.account_mode,
+        balances=tuple(
+            ExchangeBalanceSnapshot(
+                asset=item.asset,
+                free=item.free,
+                locked=item.locked,
+                total=item.total,
+            )
+            for item in snapshot.balances
+        ),
+        positions=tuple(
+            ExchangePositionSnapshot(
+                instrument_key=item.instrument_key,
+                side=_position_side(item.side),
+                quantity=item.quantity,
+                entry_price=item.entry_price,
+                leverage=item.leverage,
+                margin_mode=item.margin_mode,
+                position_mode=item.position_mode,
+            )
+            for item in snapshot.positions
+        ),
+        open_orders=tuple(
+            ExchangeOpenOrderSnapshot(
+                instrument_key=item.instrument_key,
+                exchange_order_ref=item.exchange_order_ref,
+                side=_order_side(item.side),
+                order_type=item.order_type,
+                quantity=item.quantity,
+                price=item.price,
+                status=item.status,
+            )
+            for item in snapshot.open_orders
+        ),
+        instrument_filters=tuple(
+            ExchangeInstrumentFilterSnapshot(
+                instrument_key=item.instrument_key,
+                tick_size=item.tick_size,
+                step_size=item.step_size,
+                min_qty=item.min_qty,
+                min_notional=item.min_notional,
+                max_leverage=item.max_leverage,
+            )
+            for item in snapshot.instrument_filters
+        ),
+        source_hash=snapshot.source_hash,
+        observed_at=observed_at,
+        synced_at=observed_at,
+        sync_status="fresh" if snapshot.sync_status == "fresh" else "degraded",
+        sync_reason=snapshot.sync_reason,
+        metadata={"source": "exchange_control_account_state"},
+    )
+
+
+def _position_side(value: str) -> Literal["long", "short", "net"]:
+    normalized = value.strip().casefold()
+    if normalized == "long":
+        return "long"
+    if normalized == "short":
+        return "short"
+    return "net"
+
+
+def _order_side(value: str) -> Literal["buy", "sell"]:
+    normalized = value.strip().casefold()
+    if normalized == "sell":
+        return "sell"
+    return "buy"
 
 
 
@@ -356,6 +601,7 @@ def build_strategy_router(
         event_repository=event_repository,
         clock=clock,
     )
+    account_projection_service = _build_account_projection_service(settings=settings)
 
     create_use_case = CreateStrategyUseCase(
         repository=strategy_repository,
@@ -405,7 +651,10 @@ def build_strategy_router(
         clock=clock,
         event_repository=event_repository,
         exchange_connection_checker=(
-            ExchangeControlReadinessChecker(client=exchange_client)
+            ExchangeControlReadinessChecker(
+                client=exchange_client,
+                account_projection_service=account_projection_service,
+            )
             if exchange_client is not None
             else None
         ),
@@ -578,6 +827,20 @@ def _build_paper_accounting_service(
             result=result,
             reason=reason,
         ),
+    )
+
+
+def _build_account_projection_service(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> ExchangeAccountProjectionService | None:
+    if not settings.postgres_dsn:
+        return None
+    return ExchangeAccountProjectionService(
+        repository=PostgresExchangeAccountProjectionRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        ),
+        clock=SystemLiveExecutionClock(),
     )
 
 
