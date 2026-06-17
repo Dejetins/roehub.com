@@ -1,6 +1,6 @@
 # Stage 08: Manual entry and manual exit
 
-Статус: `in_progress`
+Статус: `accepted`
 
 ## Pre-Start
 
@@ -59,7 +59,7 @@ Stage `08` добавляет отдельные manual entry и manual stop/exi
 
 ## Evidence
 
-Local implementation and gates are complete. Stage remains `in_progress` until main delivery, CI/deploy, Mac Studio sync/smoke, browser clicks, DB/Redis/metrics proof, and testnet-safe proof/blocker are recorded.
+Stage accepted on `2026-06-18` after direct `main` delivery, CI/deploy success, Mac Studio sync/smoke, browser manual entry/exit proof, DB/Redis/metrics proof, testnet-safe fail-closed proof, and cleanup.
 
 ### Implementation Summary
 
@@ -69,6 +69,7 @@ Local implementation and gates are complete. Stage remains `in_progress` until m
 - Added a shared live-execution service builder so `/ui/execution/*` and strategy manual endpoints use the same repository/dispatch wiring in the API process.
 - Added `/strategies` manual entry and manual exit buttons with generated idempotency keys and visible `pending`/`accepted`/`rejected`/`unknown` response text.
 - Added additive `paper_orders.source_event_id` linkage for manual paper proof without changing existing strategy-signal paper rows.
+- Repaired runtime-found HTTP error mapping so `strategy_manual_execution.*` errors return stable client statuses instead of leaking as `500`.
 
 ### Local Gates
 
@@ -80,8 +81,9 @@ Local implementation and gates are complete. Stage remains `in_progress` until m
 | `python -m tools.docs.generate_docs_index --check` | passed after docs index update |
 | `uv run ruff check .` | passed |
 | `uv run pyright` | passed, `0 errors` |
-| `uv run pytest -q -ra` | passed, `1193 passed, 3 warnings` |
+| `uv run pytest -q -ra` | passed before runtime bugfix, `1193 passed, 3 warnings`; passed after bugfix, `1195 passed, 3 warnings` |
 | `uv run python -m tools.docs.generate_docs_index --check` | passed |
+| `uv run pytest -q tests/unit/apps/api/test_api_error_handlers.py::test_roehub_error_handler_maps_manual_execution_errors tests/unit/apps/api/test_strategies_routes.py::test_manual_entry_without_active_run_returns_conflict tests/unit/apps/api/test_strategies_routes.py::test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order` | passed after runtime bugfix, `3 passed` |
 
 ### Focused Local Proof
 
@@ -92,22 +94,58 @@ Local implementation and gates are complete. Stage remains `in_progress` until m
 | Paper accounting idempotency | `test_manual_paper_execution_records_idempotent_order_fill_and_accounting`: same manual `source_event_id` does not duplicate paper money rows. |
 | Additive migration | `test_manual_paper_orders_source_event_migration_is_additive`: migration adds nullable `source_event_id` and does not drop `paper_orders`. |
 
-### Pending Runtime Evidence
+### Main Delivery, CI, Deploy
 
-| Surface | Status |
+| Surface | Evidence |
 |---|---|
-| Main delivery / CI / deploy | pending |
-| Mac Studio checkout sync and `/opt/roehub/app` smoke | pending |
-| Playwright manual entry click in paper mode | pending |
-| Playwright manual exit click in paper mode | pending |
-| DB proof for source event, intent, risk audit, paper order/fill/accounting, outbox | pending |
-| Redis/metrics proof of expected dispatch or no-dispatch behavior | pending |
-| Testnet-safe representative manual action or exact Stage `05` blocker | pending |
+| Main implementation delivery | `ea239c9f9e428359c8ca791b4d2b694fc75e59b3` (`Add manual strategy execution controls`) delivered to `origin/main`. |
+| Runtime-found bugfix delivery | `9ae17321b5952ba0ff18ac6fe88f517e07a31715` (`Map manual execution errors`) delivered to `origin/main`. |
+| Current main during acceptance proof | `1a6be0ae77c8ea1755cbdc35e4ff48937b762761`; Stage `08` commits are ancestors. This commit also contains unrelated RL docs changes and is not Stage `08` implementation scope. |
+| CI for implementation commit | CI `27722721031` succeeded; Deploy Backend `27722798318` succeeded; Publish App Image `27722798352` succeeded; Deploy Web `27722798348` and follow-up `27722865764` succeeded. |
+| CI for bugfix commit | CI `27723350993` succeeded; Deploy Backend `27723436097` succeeded; Publish App Image `27723436035` succeeded; Deploy Web `27723436079` and follow-up `27723444241` succeeded. |
+| CI for current main proof SHA | CI `27723455674` succeeded; Deploy Backend `27723481220` succeeded; Publish App Image `27723481247` succeeded; Deploy Web `27723481275` and follow-up `27723487907` succeeded. |
+
+### Mac Studio Runtime Proof
+
+| Surface | Evidence |
+|---|---|
+| Checkout sync | Mac Studio checkout fast-forwarded through Stage `08` implementation and then to current main `1a6be0ae77c8ea1755cbdc35e4ff48937b762761`. |
+| Runtime file proof | `/opt/roehub/app` contains migration `20260618_0036`, strategy `manual-entry`/`manual-exit` routes, `/strategies` JS manual controls, and `strategy_manual_execution.*` HTTP error mapping. |
+| Smoke | `bash scripts/macos/smoke_prod.sh` exited `0`: core services loaded, expected API `401`, Redis `PONG`, Tailscale `Running`. |
+
+### Browser, API, DB, Redis, Metrics
+
+Runtime proof used synthetic subject `codex:stage08-manual-entry-exit-final:20260617T222334-4b31756b`, paper strategy `52cab273-7c88-4549-865a-b853b1bffa28`, and run `7b0af690-335b-4e44-9c24-e3f3fad94e37`.
+
+| Surface | Evidence |
+|---|---|
+| Browser manual entry/exit | Playwright opened `https://roehub.com/strategies?strategy_id=52cab273-7c88-4549-865a-b853b1bffa28`, clicked manual entry and manual exit, and observed both POSTs return `200`. Dashboard refreshes returned `200`; console had `0` errors/warnings. |
+| Browser visible result | DOM contained `manual:entry`, `manual:exit`, no-dispatch text, and action status `accepted: filled`. Screenshot: `output/playwright/stage08-manual-entry-exit-final-strategies.png`. |
+| DB counts | `source_events=2`, `intents=2`, `risk_audits=2`, `paper_orders=2`, `paper_fills=2`, `accounting_rows=2`, `notifications=2`, `dispatched_rows=0`. |
+| Entry ledger row | `source_event_ref=manual:entry:7b0af690-335b-4e44-9c24-e3f3fad94e37`; intent/risk rejected with `paper_no_exchange_submit`; dispatch fields `NULL`; paper order filled with `paper_market_fill_from_manual_request`; accounting completeness `paper_fee_fixed_bps_funding_not_applicable`; notification `producer_rejected/paper_no_exchange_submit`. |
+| Exit ledger row | `source_event_ref=manual:exit:7b0af690-335b-4e44-9c24-e3f3fad94e37`; same no-dispatch risk/outbox shape; accounting completeness `paper_spot_short_borrow_not_modeled`. |
+| Redis dispatch proof | Redis execution streams were unchanged before/after manual actions: `execution.requests.v1=15`, `execution.requests.retry.v1=1`, `execution.requests.dlq.v1=2`. |
+| Metrics proof | Metrics exposed manual request rows: `execution_source_event_total{result="recorded",source_type="manual_request"} 2.0`; rejected intent/risk totals with `paper_no_exchange_submit` each `2.0`; warning notification total `2.0`; paper accounting totals for the entry/exit completeness reasons each `1.0`. |
+
+### Testnet-Safe Proof
+
+| Surface | Evidence |
+|---|---|
+| Testnet profile/readiness | Testnet strategy `2fc641c6-da50-465f-b9b6-2319d5962429` profile update returned `200`; readiness was `blocked/exchange_connection_not_found`. |
+| Inactive run block | Testnet run attempt returned `409` with code `strategy_run.capital_reservation_blocked`, reason `capital_projection_missing`. |
+| Manual fail-closed | Manual entry returned `409` with code `strategy_manual_execution.blocked`, reason `strategy_run_inactive`; no source/intent/dispatch rows were written and Redis stream lengths stayed unchanged. |
+
+### Cleanup
+
+| Surface | Evidence |
+|---|---|
+| Synthetic state cleanup | Final cleanup showed `active_runs=0`, `active_sessions=0`; Playwright smoke session `stage08-manual-final` was closed. |
 
 ## File Manifest
 
 | Action | File | Reason | Contract impact |
 |---|---|---|---|
+| Modified | `apps/api/common/errors.py` | Map `strategy_manual_execution.*` domain errors to stable HTTP statuses after runtime proof found a `500` leak. | `compatible-change` API error status correction |
 | Modified | `apps/api/main/app.py` | Build shared live-execution services once for API routers. | `compatible-change` service wiring |
 | Modified | `apps/api/routes/strategies.py` | Add manual entry/exit DTOs, endpoints, idempotency, risk/dispatch/paper response mapping. | `compatible-change` API/DTO |
 | Modified | `apps/api/wiring/modules/__init__.py` | Export shared live-execution builder/service container. | `none` runtime behavior |
@@ -124,7 +162,8 @@ Local implementation and gates are complete. Stage remains `in_progress` until m
 | Modified | `src/trading/contexts/live_execution/domain/paper_accounting.py` | Add optional `source_event_id` to paper order domain record. | `compatible-change` additive domain field |
 | Modified | `src/trading/contexts/live_execution/domain/risk_gate.py` | Add manual paper no-exchange-submit risk branch. | `compatible-change` risk semantics |
 | Modified | `tests/unit/apps/api/test_app_strategy_router_toggle.py` | Update app-router test double for shared live-execution argument. | `none` production runtime |
-| Modified | `tests/unit/apps/api/test_strategies_routes.py` | Cover manual paper API idempotency and DB-row creation via in-memory adapters. | `none` production runtime |
+| Modified | `tests/unit/apps/api/test_api_error_handlers.py` | Cover manual execution domain error HTTP status mapping. | `none` production runtime |
+| Modified | `tests/unit/apps/api/test_strategies_routes.py` | Cover manual paper API idempotency, DB-row creation via in-memory adapters, and inactive-run conflict mapping. | `none` production runtime |
 | Created | `tests/unit/apps/migrations/test_manual_paper_orders_source_event_sql.py` | Guard additive migration contract. | `none` production runtime |
 | Modified | `tests/unit/contexts/live_execution/test_execution_ingress_service.py` | Cover manual paper no-dispatch risk branch. | `none` production runtime |
 | Modified | `tests/unit/contexts/live_execution/test_paper_accounting_service.py` | Cover manual paper accounting idempotency. | `none` production runtime |
@@ -135,8 +174,10 @@ Local implementation and gates are complete. Stage remains `in_progress` until m
 
 ## Blockers
 
-Pending main delivery, CI/deploy, Mac Studio sync/smoke, browser/API/DB/Redis/metrics runtime proof, and testnet-safe representative proof or exact blocker. Stage is not accepted yet.
+None. Stage `08` is accepted.
 
 ## Handoff
 
-Continue with scoped main delivery. Do not stage unrelated RL prompt/docs work currently present in the worktree. When staging `docs/architecture/README.md`, include only the Stage `08` index hunk and leave the pre-existing RL Stage `02A` hunk untouched unless the owner explicitly includes that scope.
+Stage `09` may start. Stage `08` proves manual entry/exit controls, idempotent paper no-dispatch accounting, and fail-closed testnet manual behavior when the run/readiness boundary is not active. It does not authorize real testnet submit; Stage `09` still owns representative real testnet orders, exchange submit/fill/reconciliation proof, and must preserve the no-mainnet/no-auto-config/no-chat-secrets boundary.
+
+The current `main` proof SHA `1a6be0ae` includes unrelated RL docs work in addition to Stage `08` commits; do not conflate those RL changes with Stage `08` implementation scope.
