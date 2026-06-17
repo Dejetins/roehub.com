@@ -1,6 +1,6 @@
 # Stage 06: Supervised Strategy Producer
 
-Статус: `in_progress`
+Статус: `accepted`
 
 ## Pre-Start
 
@@ -94,18 +94,43 @@ Initial classification before implementation:
 | Live/mainnet-like mode | `test_guarded_strategy_execution_producer_blocks_live_mode_even_when_allow_all`; config rejection tests | No source-event call; `strategy.producer.allowed_modes` rejects anything outside `paper`/`testnet`. |
 | Metrics label cardinality | `test_strategy_producer_metrics_do_not_use_user_or_strategy_labels` | Producer metrics expose bounded `mode`, `outcome`, `reason`, `scope` labels; no user/strategy UUID labels. |
 
+### Main delivery and deploy
+
+| Boundary | Evidence | Result |
+|---|---|---|
+| Direct main delivery | Commit `d5bac7ec6958d695d095dd3d5365a6822c47bc70` pushed to `origin/main`. | passed |
+| CI | GitHub Actions CI run `27716058678` for `d5bac7ec6958d695d095dd3d5365a6822c47bc70`. | completed `success` |
+| Deploy Backend | GitHub Actions run `27716344212` for `d5bac7ec6958d695d095dd3d5365a6822c47bc70`. | completed `success` |
+| Deploy Web | GitHub Actions run `27716343982` for `d5bac7ec6958d695d095dd3d5365a6822c47bc70`. | completed `success` |
+| Publish App Image | GitHub Actions run `27716343745` for `d5bac7ec6958d695d095dd3d5365a6822c47bc70`. | completed `success` |
+| Mac Studio checkout sync | `git -C /Users/daniildegtyarev/Projects/roehub.com fetch origin main && git -C /Users/daniildegtyarev/Projects/roehub.com merge --ff-only origin/main && git -C /Users/daniildegtyarev/Projects/roehub.com rev-parse HEAD` | fast-forwarded to `d5bac7ec6958d695d095dd3d5365a6822c47bc70` |
+
+### Mac Studio runtime proof
+
+| Boundary | Evidence | Result |
+|---|---|---|
+| Runtime files | `grep -R "strategy_producer_admin_enabled\\|GuardedStrategyExecutionProducer\\|9207" /opt/roehub/app/...` | `/opt/roehub/app` contains Stage `06` producer guard and port `9207` runtime files. |
+| launchd loaded | `launchctl print gui/$(id -u)/com.roehub.strategy-live-runner` | `state = running`; launchd command uses `/opt/roehub/app/configs/prod/strategy.yaml` and `--metrics-port 9207`. |
+| Health live/ready | `curl -fsS http://127.0.0.1:9207/health/live`; `curl -fsS http://127.0.0.1:9207/health/ready` | Both returned JSON; producer defaults are `enabled=false`, `allow_all=false`, `allowed_modes=["paper","testnet"]`, empty allowlists, and `ready=true`. |
+| Metrics | `curl -fsS http://127.0.0.1:9207/metrics` | Exposed `strategy_producer_admin_enabled 0.0`, `strategy_producer_allowed_mode{mode="paper"} 1.0`, `strategy_producer_allowed_mode{mode="testnet"} 1.0`, `strategy_producer_ready 1.0`, and runner iteration/error counters. |
+| Monit | `/opt/homebrew/bin/monit -c /opt/homebrew/etc/monitrc summary \| grep -E "roehub_strategy_live_runner|Process"` | `roehub_strategy_live_runner OK Process`. |
+| Prometheus | `curl -fsS "http://127.0.0.1:9090/api/v1/query?query=up%7Bjob%3D%22strategy-producer%22%7D"` | `up{job="strategy-producer",instance="127.0.0.1:9207"} = 1`. |
+| Production smoke | `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh` | exited `0`; service inventory includes `com.roehub.strategy-live-runner`. |
+| Stop/start drill | `/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop/start com.roehub.strategy-live-runner ...` plus readiness curl | After stop, `/health/ready` was down; after start, `/health/ready` returned `ready=true`; final launchd state `running`, pid `23087`. |
+
+### Controlled runtime source-event proof
+
+| Scenario | Evidence | Result |
+|---|---|---|
+| Disabled admin switch | Mac Studio `/opt/roehub/app/.venv/bin/python -` probe using `GuardedStrategyExecutionProducer` with `enabled=False`. | `blocked_reasons=producer_disabled`; `blocked_delegate_calls=0`; `disabled_rows=0`. |
+| Enabled producer without allowlist | Same probe with `enabled=True`, empty user/strategy allowlists. | `blocked_reasons=producer_allowlist_missing`; `blocked_delegate_calls=0`; `missing_allowlist_rows=0`. |
+| Allowlisted paper source event | Same probe with user allowlist and real `LiveExecutionStrategySignalProducer` + `PostgresExecutionIntentRepository`. | One `execution_source_events` row created for synthetic signal `00000000-0000-0000-0000-000006000913`: `source_type=strategy_signal`, `outcome=recorded`, `outcome_reason=source_event_recorded`, `mode=paper`, `action=open`. |
+| No exchange/order side effect | Read-only SQL check on the synthetic source event. | `allowed_source_event_intent_id=None`; `allowed_source_event_intent_rows=0`. |
+
 ## Blockers
 
-Pending before acceptance:
-
-- direct main delivery / `origin/main` evidence;
-- deploy/backend workflow or equivalent Mac Studio host sync;
-- target-runtime launchd loaded/control proof for `com.roehub.strategy-live-runner`;
-- Monit proof for `roehub_strategy_live_runner`;
-- Prometheus scrape proof for `job="strategy-producer"`;
-- target-runtime `/health/live`, `/health/ready`, `/metrics` evidence;
-- controlled runtime disabled-switch, missing-allowlist and allowlisted paper/testnet source-event proof.
+None for Stage `06`.
 
 ## Handoff
 
-Do not start Stage `07` until Stage `06` is accepted with main delivery and Mac Studio runtime proof. Keep producer defaults fail-closed: admin switch disabled, `paper`/`testnet` modes only, empty allowlists until a scoped runtime smoke explicitly sets user/strategy UUIDs.
+Stage `07` may start. Keep producer defaults fail-closed: admin switch disabled, `paper`/`testnet` modes only, empty allowlists until a scoped runtime smoke explicitly sets user/strategy UUIDs. Stage `06` created one synthetic source-event-only runtime probe row with signal id `00000000-0000-0000-0000-000006000913`; it has no linked execution intent or order side effect.
