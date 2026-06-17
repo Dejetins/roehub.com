@@ -190,7 +190,7 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
 
 ## Requirements (Must)
 

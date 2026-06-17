@@ -14,6 +14,10 @@ context_sources:
       why: "RL plan"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04c-dataset-refresh-manifest.md
+      why: "accepted Stage 04C refresh manifest and source universe"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/05-roehub-dataset-builder-v1.md
+      why: "accepted Stage 05 feature slabs, manifests, and golden parity fixtures"
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "optional compact state; ignore if unrelated"
   task_entrypoints:
@@ -147,12 +151,12 @@ safety_notes:
 
 # Task
 
-Implement Stage 06 dataset QA and high-volatility session extractor. Emit accepted sessionized train/val/test/backtest datasets with gap, lifecycle, overlap, embargo, and leakage evidence.
+Implement Stage 06 dataset QA and Binance Futures high-volatility session extractor. Emit accepted `binance:futures` sessionized train/val/test/backtest datasets with gap, lifecycle, overlap, embargo, and leakage evidence.
 
 Done means:
 
-- Session extraction policy is implemented and documented.
-- Accepted sessionized datasets have hashes, counts, split manifest, and leakage/gap reports.
+- Session extraction policy is implemented and documented for `binance:futures` only.
+- Accepted Binance Futures sessionized datasets have hashes, counts, split manifest, and leakage/gap reports.
 - Overlap is allowed only within a split; split boundaries have time embargo and lifecycle-aware proof.
 
 ## Context / Current State
@@ -188,7 +192,8 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage 04C defines accepted refresh manifests for HF-compatible and post-HF Binance Futures datasets. Do not choose a different universe or fallback to the old six-symbol Roehub futures reference set unless Stage 04C explicitly marks that as the only accepted dataset version.
 
 ## Requirements (Must)
 
@@ -203,7 +208,9 @@ Additional context:
 - Preserve dependency direction: RL/ML code may produce decisions and source events, but exchange submission and secret custody stay in existing execution/exchange contexts.
 - Keep all large runtime artifacts outside git under `/opt/roehub/state/rl_trading/`; commit only sanitized summaries, manifests, hashes, and tests.
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
-- Define high-volatility window selection, stride/overlap, pre-signal/post-signal context, ticker universe, and split policy.
+- Define high-volatility window selection, stride/overlap, `pre_signal_len=90`, `post_signal_len=60`, Binance Futures ticker universe, and split policy.
+- Use the accepted Stage 04C refresh manifest, including its source windows, symbol universe, residual-gap policy and latest post-HF endpoint. Do not recompute a different universe inside Stage 06.
+- Do not include Binance spot, Bybit spot, or Bybit futures data in accepted v1 training/evaluation datasets.
 - Prove no look-ahead, no survivorship leakage, and no overlap leakage across train/val/test/backtest boundaries.
 - Handle listing/delisting and missing windows explicitly.
 - Produce machine-readable QA reports plus sanitized summary.
@@ -286,9 +293,9 @@ Skill routing for this task:
 
 # Acceptance criteria (Definition of Done)
 
-- Sessionized dataset manifests and hashes exist under the local artifact store.
+- Binance Futures sessionized dataset manifests and hashes are derived from the accepted Stage 04C refresh manifest and exist under the local artifact store.
 - Leakage/embargo/gap/lifecycle reports are machine-readable and summarized in the stage report.
-- Stage 07 is allowed only for accepted dataset branches.
+- Stage 07 is allowed only for accepted `binance:futures` dataset branches.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

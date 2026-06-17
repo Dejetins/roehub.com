@@ -188,7 +188,8 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage 02A amendment after full HF NPZ inspection: HF is a Binance Futures external baseline, not a Binance/Bybit/spot training universe. Train split has `24,086` observed sessions and `309` unique symbols; all splits together have `478` symbols and `32,049` observed sessions.
 
 ## Requirements (Must)
 
@@ -205,6 +206,8 @@ Additional context:
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
 - Do not blindly vendor external code; if any code is ported, keep attribution/license note and adapt to Roehub style.
 - Pin dataset version, ticker list, sample window, random seeds, package versions, and run config hash.
+- Pin the HF dataset as Binance Futures data. Record the observed NPZ format (`fetcher_N` arrays plus `_keys_map_`), actual channel order `open, high, volume_weighted_average, low, close, volume, num_trades`, per-split hashes/counts, and the 18-session train count mismatch versus the public card.
+- Do not substitute Binance spot, Bybit spot, or Bybit futures data into the HF reproducibility baseline.
 - Record metrics and limitations without treating HF result as production approval.
 - Keep downloaded data/checkpoints outside git under /opt/roehub/state/rl_trading/.
 
@@ -287,7 +290,7 @@ Skill routing for this task:
 
 - Reproducibility report includes dataset hash, config hash, metrics, runtime resource evidence, and attribution.
 - Focused smoke proves the external concept can execute in Roehub ML env.
-- Stage 05 can start with clear separation between HF baseline and Roehub-native data.
+- Stage 04A can start with clear separation between the HF Binance Futures baseline and the Roehub-native Binance Futures universe-refresh path.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04-hf-reproducibility.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

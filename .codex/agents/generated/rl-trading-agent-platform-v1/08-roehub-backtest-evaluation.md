@@ -195,7 +195,8 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage 07 training output must come from accepted Stage 06 `binance:futures` datasets only. Do not evaluate a candidate trained on Binance spot, Bybit spot, or Bybit futures as v1 research evidence.
 
 ## Requirements (Must)
 
@@ -214,7 +215,7 @@ Additional context:
 - PnL must be after fees, slippage, and funding/contract assumptions when applicable.
 - Positive research PnL does not grant promotion-grade status; Stage 10A owns numeric promotion thresholds.
 - Record out-of-sample period and overfit indicators.
-- Block futures evaluation branches without accepted funding/metadata policy.
+- Block Binance Futures evaluation without accepted funding/metadata policy or an explicitly recorded research-only approximation.
 
 ## Requirements (Should)
 

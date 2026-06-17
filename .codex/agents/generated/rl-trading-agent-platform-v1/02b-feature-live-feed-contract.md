@@ -150,13 +150,14 @@ safety_notes:
 
 # Task
 
-Implement and document the Stage 02B feature/live-feed contract. Freeze article-compatible features versus feature-mask branches, channel order, missing-field behavior, futures metadata gate, and the Redis/live feature hot-path decision.
+Implement and document the Stage 02B feature/live-feed contract. Freeze the `binance:futures` article-compatible training feature contract, channel order, missing-field behavior, Binance Futures metadata gate, and the Redis/live feature hot-path decision. Record Binance spot, Bybit spot, and Bybit futures as non-training branches for v1 instead of designing feature-mask training branches.
 
 Done means:
 
 - A versioned feature contract and tests exist or the stage is blocked with precise missing data.
-- Activation matrix covers Binance/Bybit x spot/futures with trainable, blocked, feature-mask, or research_only_approximation statuses.
-- Live-feed trades_count/enrich/feature-mask/block decision avoids full ClickHouse scans on the hot path.
+- Training-source matrix records `binance:futures` as the only v1 training branch, with status `trainable`, `blocked`, or `research_only_approximation`.
+- Binance spot, Bybit spot, and Bybit futures are recorded as `blocked_not_training_source_v1`; no Bybit `trades_count` enrich or feature-mask training branch is opened in this stage.
+- Binance Futures live-feed `trades_count`/block decision avoids full ClickHouse scans on the hot path.
 
 ## Context / Current State
 
@@ -191,7 +192,8 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage 02A amendment after full HF NPZ inspection: HF train split has `24,086` observed sessions and `309` unique symbols; `30/33` is only Roehub reference overlap, not training-pair count. V1 training is `binance:futures` only.
 
 ## Requirements (Must)
 
@@ -208,8 +210,8 @@ Additional context:
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
 - Create the first `src/trading/contexts/rl_trading` bounded context only if needed, following Roehub DDD/ports-adapters style.
 - Define feature order, dtype, normalization inputs, missing-field policy, vwap derivation, and feature-contract hash.
-- Explicitly decide how Bybit missing `trades_count` is handled: enrich, feature-mask/model branch, research_only_approximation, or blocked.
-- Define futures metadata gate: funding, mark/index, filters, leverage tiers, fee/slippage/liquidation assumptions.
+- Explicitly record Bybit spot/futures and Binance spot as `blocked_not_training_source_v1`. Do not design a Bybit `trades_count` enrich, feature-mask/model branch, or research-only Bybit training branch in this stage unless the user creates a separate accepted plan.
+- Define Binance Futures metadata gate: funding, mark/index, filters, leverage tiers, fee/slippage/liquidation assumptions.
 - No hot-path full ClickHouse scan is allowed for live inference; repair is gap/degraded path only.
 
 ## Requirements (Should)
@@ -289,8 +291,8 @@ Skill routing for this task:
 # Acceptance criteria (Definition of Done)
 
 - Feature contract hash is deterministic and test-covered.
-- Binance/Bybit x spot/futures activation matrix is recorded in the report and ledger.
-- Live publisher/consumer contract either carries required fields or blocks/feature-masks branches explicitly.
+- Training-source matrix is recorded in the report and ledger: `binance:futures` is the only v1 training branch, while Binance spot, Bybit spot, and Bybit futures are `blocked_not_training_source_v1`.
+- Live publisher/consumer contract either carries required Binance Futures fields or blocks the `binance:futures` training/runtime branch explicitly.
 - Stage 05 dataset builder has a clear feature contract to implement.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/02b-feature-live-feed-contract.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.

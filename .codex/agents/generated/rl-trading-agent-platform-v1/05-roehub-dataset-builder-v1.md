@@ -2,7 +2,7 @@
 prompt_name: 05-roehub-dataset-builder-v1
 repo: roehub.com
 branch: main
-scope: "Build Roehub raw feature slabs, manifests, and golden feature parity fixtures without accepted sessionized datasets."
+scope: "Build Roehub raw feature slabs, manifests, and golden feature parity fixtures from the accepted Stage 04C refresh manifest without accepted sessionized datasets."
 language:
   implementation: python
   agent_report: ru
@@ -14,6 +14,8 @@ context_sources:
       why: "RL plan"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04c-dataset-refresh-manifest.md
+      why: "accepted Stage 04C refresh manifest and dataset version contract"
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "optional compact state; ignore if unrelated"
   task_entrypoints:
@@ -151,12 +153,12 @@ safety_notes:
 
 # Task
 
-Implement Stage 05 Roehub dataset builder v1. Build raw feature slabs, manifests, deterministic rebuild hashes, feature stats, and offline/live golden fixtures from branches allowed by Stage 02B. Do not emit final accepted sessionized training datasets in this stage.
+Implement Stage 05 Roehub dataset builder v1. Build raw `binance:futures` feature slabs, manifests, deterministic rebuild hashes, feature stats, and offline/live golden fixtures from the accepted Stage 04C dataset refresh manifest. Do not emit final accepted sessionized training datasets in this stage.
 
 Done means:
 
-- Raw feature slabs and manifests are produced for allowed branches only.
-- Blocked/incomplete branches fail closed with explicit reasons.
+- Raw feature slabs and manifests are produced for `binance:futures` only from the accepted Stage 04C refresh manifest.
+- Binance spot, Bybit spot, and Bybit futures fail closed as `blocked_not_training_source_v1`.
 - Golden fixtures prove the shared feature builder produces identical vectors from offline and live-equivalent candle windows.
 
 ## Context / Current State
@@ -168,7 +170,7 @@ Context ledger from the previous iteration:
   - This prompt pack is the execution handoff for the current stage.
   - No code for this stage is assumed implemented before the executor runs it.
 - open_items:
-  - Create deterministic raw feature artifacts for Stage 06 session extraction and Stage 13 live parity.
+  - Create deterministic raw feature artifacts from the accepted Stage 04C refresh manifest for Stage 06 session extraction and Stage 13 live parity.
   - Stage report, ledger status, prompt path/hash, and evidence still need executor updates.
   - Delivery state must be recorded explicitly.
 - contract_changes:
@@ -192,12 +194,13 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage 02A/02B training-source contract: v1 training is `binance:futures` only. The `30/33` overlap is not the training universe; HF train has `309` unique symbols, while Stage 04A/04B/04C own current-trading Binance Futures universe resolution, backfill coverage and dataset refresh manifests.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 04. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 04C. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/05-roehub-dataset-builder-v1.md` and record the prompt path and hash in the stage report.
 - Before editing, narrow broad expected directories to a concrete file list or planned new files and record that list in the stage report.
 - Keep the change bounded to Stage `05`. Do not start later stages or silently repair unrelated legacy issues.
@@ -207,11 +210,12 @@ Additional context:
 - Preserve dependency direction: RL/ML code may produce decisions and source events, but exchange submission and secret custody stay in existing execution/exchange contexts.
 - Keep all large runtime artifacts outside git under `/opt/roehub/state/rl_trading/`; commit only sanitized summaries, manifests, hashes, and tests.
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
-- Use the Stage 02B feature contract exactly; do not invent new channel order or missing-field policy.
+- Use the Stage 02B feature contract and Stage 04C accepted refresh manifest exactly; do not invent new channel order, universe, source windows or missing-field policy.
+- Build v1 training raw slabs only for `binance:futures` symbols and windows present in the accepted Stage 04C refresh manifest. Do not read Binance spot, Bybit spot, or Bybit futures as training inputs unless a later accepted plan changes training-source scope.
 - Emit raw slabs/manifests/golden fixtures only; Stage 06 owns accepted sessionized train/val/test/backtest datasets.
 - Store generated arrays under /opt/roehub/state/rl_trading/datasets/ or another accepted local path, not git.
 - Record deterministic rebuild hash and manifest schema.
-- Block branches missing required features or futures metadata unless Stage 02B explicitly allowed feature-mask/research approximation.
+- Block non-`binance:futures` branches as `blocked_not_training_source_v1`; block `binance:futures` if required features or futures metadata policy are missing and Stage 02B did not explicitly allow a research approximation.
 
 ## Requirements (Should)
 
@@ -290,7 +294,7 @@ Skill routing for this task:
 # Acceptance criteria (Definition of Done)
 
 - Builder tests cover deterministic manifest/hash generation and feature vector shape/dtype/order.
-- A small Mac Studio dataset build produces sanitized manifests and feature stats in the stage report.
+- A small Mac Studio dataset build from the accepted Stage 04C manifest produces sanitized manifests and feature stats in the stage report.
 - Golden parity fixture is ready for Stage 13 reuse.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/05-roehub-dataset-builder-v1.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.

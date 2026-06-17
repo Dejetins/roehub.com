@@ -204,7 +204,8 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is blocked on Binance futures testnet credential custody; RL paper/testnet execution remains gated.
+- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Training-source v1 is `binance:futures` only. Do not train on Binance spot, Bybit spot, or Bybit futures datasets in this stage.
 
 ## Requirements (Must)
 
@@ -220,7 +221,7 @@ Additional context:
 - Keep all large runtime artifacts outside git under `/opt/roehub/state/rl_trading/`; commit only sanitized summaries, manifests, hashes, and tests.
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
 - Keep PyTorch code isolated from API runtime.
-- Use accepted Stage 06 datasets only.
+- Use accepted Stage 06 `binance:futures` datasets only.
 - Record seeds, config hash, dataset hash, model architecture hash, and run status.
 - Bound CPU threads/RSS/MPS usage and do not starve inference/backtest workers.
 - Do not promote a model or activate runtime inference in this stage.
