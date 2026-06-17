@@ -4,6 +4,7 @@ global:
 
 rule_files:
   - /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
+  - /opt/roehub/config/prometheus.rules/strategy-producer.rules.yml
 
 scrape_configs:
   - job_name: prometheus
@@ -82,6 +83,10 @@ scrape_configs:
   - job_name: exchange-execution
     static_configs:
       - targets: ["127.0.0.1:9206"]
+
+  - job_name: strategy-producer
+    static_configs:
+      - targets: ["127.0.0.1:9207"]
 
   - job_name: openbao
     metrics_path: /v1/sys/metrics

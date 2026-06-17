@@ -19,6 +19,9 @@ def test_exchange_execution_native_service_assets_are_installed_and_reloaded() -
     assert "roehub-exchange-execution.monitrc" in prod_bootstrap
     assert "com.roehub.exchange-execution.plist" in prod_bootstrap
     assert "com.roehub.exchange-execution.plist" in reload_services
+    assert "roehub-strategy-live-runner.monitrc" in prod_bootstrap
+    assert "com.roehub.strategy-live-runner.plist" in prod_bootstrap
+    assert "com.roehub.strategy-live-runner.plist" in reload_services
     assert "com.roehub.test.exchange-execution.plist" in test_bootstrap
     assert "com.roehub.test.exchange-execution.plist" in reload_services
 

@@ -217,7 +217,7 @@ jobs:
             sleep 5
           done
           test "${status_code}" = '401'
-          for metrics_port in 9201 9202 9204; do
+          for metrics_port in 9201 9202 9204 9207; do
             ok='0'
             for attempt in 1 2 3 4 5 6; do
               if curl -fsS "http://127.0.0.1:${metrics_port}/metrics" >/tmp/backend-metrics-${metrics_port}.txt; then

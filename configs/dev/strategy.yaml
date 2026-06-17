@@ -46,4 +46,13 @@ strategy:
     debounce_failed_seconds: 600
 
   metrics:
-    port: 9203
+    port: 9207
+
+  producer:
+    enabled: false
+    allow_all: false
+    allowed_modes:
+      - "paper"
+      - "testnet"
+    allowed_user_ids: []
+    allowed_strategy_ids: []

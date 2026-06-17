@@ -118,7 +118,15 @@ def _write_strategy_config(tmp_path: Path, *, api_enabled: bool) -> Path:
             "    send_timeout_s: 2.0\n"
             "    debounce_failed_seconds: 600\n"
             "  metrics:\n"
-            "    port: 9203\n"
+            "    port: 9207\n"
+            "  producer:\n"
+            "    enabled: false\n"
+            "    allow_all: false\n"
+            "    allowed_modes:\n"
+            "      - paper\n"
+            "      - testnet\n"
+            "    allowed_user_ids: []\n"
+            "    allowed_strategy_ids: []\n"
         ),
         encoding="utf-8",
     )

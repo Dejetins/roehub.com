@@ -1,0 +1,11 @@
+# Stage 06 strategy producer supervision:
+# severity: critical for /health/ready and /metrics failures.
+# owner: strategy-producer.
+# escalation: keep producer admin switch disabled until allowlist/runtime proof is clean.
+# runbook/action: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions.
+check process roehub_strategy_live_runner matching "apps.worker.strategy_live_runner.main.main"
+  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.strategy-live-runner /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist"
+  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.strategy-live-runner /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist"
+  if failed host 127.0.0.1 port 9207 protocol http request "/health/ready" for 2 cycles then alert
+  if failed host 127.0.0.1 port 9207 protocol http request "/metrics" for 2 cycles then alert
+  if 5 restarts within 10 cycles then unmonitor

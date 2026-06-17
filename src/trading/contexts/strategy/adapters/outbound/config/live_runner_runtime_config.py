@@ -8,7 +8,11 @@ from typing import Any, Mapping
 import yaml
 
 from .scalar_env_overrides import resolve_bool_override, resolve_positive_int_override
-from .strategy_runtime_config import StrategyRuntimeConfig, load_strategy_runtime_config
+from .strategy_runtime_config import (
+    StrategyProducerRuntimeConfig,
+    StrategyRuntimeConfig,
+    load_strategy_runtime_config,
+)
 
 _STRATEGY_LIVE_WORKER_ENABLED_ENV_KEY = "ROEHUB_STRATEGY_LIVE_WORKER_ENABLED"
 _STRATEGY_REALTIME_OUTPUT_ENABLED_ENV_KEY = (
@@ -16,6 +20,15 @@ _STRATEGY_REALTIME_OUTPUT_ENABLED_ENV_KEY = (
 )
 _STRATEGY_TELEGRAM_ENABLED_ENV_KEY = "ROEHUB_STRATEGY_TELEGRAM_ENABLED"
 _STRATEGY_METRICS_PORT_ENV_KEY = "ROEHUB_STRATEGY_METRICS_PORT"
+_STRATEGY_PRODUCER_ENABLED_ENV_KEY = "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED"
+_STRATEGY_PRODUCER_ALLOW_ALL_ENV_KEY = "ROEHUB_STRATEGY_PRODUCER_ALLOW_ALL"
+_STRATEGY_PRODUCER_ALLOWED_MODES_ENV_KEY = "ROEHUB_STRATEGY_PRODUCER_ALLOWED_MODES"
+_STRATEGY_PRODUCER_ALLOWED_USER_IDS_ENV_KEY = (
+    "ROEHUB_STRATEGY_PRODUCER_ALLOWED_USER_IDS"
+)
+_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS_ENV_KEY = (
+    "ROEHUB_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,6 +286,7 @@ class StrategyLiveRunnerRuntimeConfig:
     telegram: StrategyLiveRunnerTelegramConfig
     repair: StrategyLiveRunnerRepairConfig
     metrics_port: int
+    producer: StrategyProducerRuntimeConfig
 
     def __post_init__(self) -> None:
         """
@@ -358,6 +372,7 @@ def load_strategy_live_runner_runtime_config(
     realtime_output_map = _get_mapping(runner_map, "realtime_output", required=False)
     telegram_map = _get_mapping(runner_map, "telegram", required=False)
     repair_map = _get_mapping(runner_map, "repair", required=False)
+    producer_map = _get_mapping(runner_map, "producer", required=False)
 
     realtime_output_enabled = resolve_bool_override(
         environ=effective_environ,
@@ -368,6 +383,16 @@ def load_strategy_live_runner_runtime_config(
         environ=effective_environ,
         key=_STRATEGY_TELEGRAM_ENABLED_ENV_KEY,
         default=_get_bool_with_default(telegram_map, "enabled", default=False),
+    )
+    producer_enabled = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_PRODUCER_ENABLED_ENV_KEY,
+        default=_get_bool_with_default(producer_map, "enabled", default=False),
+    )
+    producer_allow_all = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_PRODUCER_ALLOW_ALL_ENV_KEY,
+        default=_get_bool_with_default(producer_map, "allow_all", default=False),
     )
     return StrategyLiveRunnerRuntimeConfig(
         version=version,
@@ -476,7 +501,38 @@ def load_strategy_live_runner_runtime_config(
         metrics_port=resolve_positive_int_override(
             environ=effective_environ,
             key=_STRATEGY_METRICS_PORT_ENV_KEY,
-            default=9203,
+            default=9207,
+        ),
+        producer=StrategyProducerRuntimeConfig(
+            enabled=producer_enabled,
+            allow_all=producer_allow_all,
+            allowed_modes=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_MODES_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_modes",
+                    default=("paper", "testnet"),
+                ),
+            ),
+            allowed_user_ids=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_USER_IDS_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_user_ids",
+                    default=(),
+                ),
+            ),
+            allowed_strategy_ids=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_strategy_ids",
+                    default=(),
+                ),
+            ),
         ),
     )
 
@@ -542,6 +598,7 @@ def _build_live_runner_runtime_from_strategy_config(
             retry_backoff_seconds=strategy_config.live_worker.repair.retry_backoff_seconds,
         ),
         metrics_port=strategy_config.metrics.port,
+        producer=strategy_config.producer,
     )
 
 
@@ -761,3 +818,41 @@ def _get_bool_with_default(data: Mapping[str, Any], key: str, *, default: bool) 
     if not isinstance(value, bool):
         raise ValueError(f"expected bool at key '{key}', got {type(value).__name__}")
     return value
+
+
+def _get_str_tuple_with_default(
+    data: Mapping[str, Any],
+    key: str,
+    *,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    if key not in data:
+        return default
+    value = data[key]
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"expected list at key '{key}', got {type(value).__name__}")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(
+                f"expected string items at key '{key}', got {type(item).__name__}"
+            )
+        stripped = item.strip()
+        if not stripped:
+            raise ValueError(f"key '{key}' must not contain blank items")
+        normalized.append(stripped)
+    return tuple(normalized)
+
+
+def _resolve_csv_tuple_override(
+    *,
+    environ: Mapping[str, str],
+    key: str,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    raw_value = environ.get(key)
+    if raw_value is None:
+        return default
+    if not raw_value.strip():
+        return ()
+    return tuple(item.strip() for item in raw_value.split(",") if item.strip())

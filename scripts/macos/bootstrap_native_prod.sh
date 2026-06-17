@@ -20,6 +20,7 @@ rm -f \
 
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/live-execution-stage17.rules.yml" /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
+install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/strategy-producer.rules.yml" /opt/roehub/config/prometheus.rules/strategy-producer.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl" /opt/roehub/config/openbao/policies/roehub-api-transit-deny-decrypt.hcl
@@ -35,6 +36,7 @@ install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-job-runner.monit
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-control.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-control.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-execution.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-execution.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-strategy-live-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-strategy-live-runner.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-openbao.monitrc" /opt/homebrew/etc/monit.d/roehub-openbao.monitrc
 
 for plist in \
@@ -43,6 +45,7 @@ for plist in \
   com.roehub.openbao-recover.plist \
   com.roehub.exchange-control.plist \
   com.roehub.exchange-execution.plist \
+  com.roehub.strategy-live-runner.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \

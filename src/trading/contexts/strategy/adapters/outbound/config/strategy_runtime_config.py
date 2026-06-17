@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from uuid import UUID
 
 import yaml
 
@@ -20,6 +21,16 @@ _STRATEGY_REALTIME_OUTPUT_ENABLED_ENV_KEY = (
 )
 _STRATEGY_TELEGRAM_ENABLED_ENV_KEY = "ROEHUB_STRATEGY_TELEGRAM_ENABLED"
 _STRATEGY_METRICS_PORT_ENV_KEY = "ROEHUB_STRATEGY_METRICS_PORT"
+_STRATEGY_PRODUCER_ENABLED_ENV_KEY = "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED"
+_STRATEGY_PRODUCER_ALLOW_ALL_ENV_KEY = "ROEHUB_STRATEGY_PRODUCER_ALLOW_ALL"
+_STRATEGY_PRODUCER_ALLOWED_MODES_ENV_KEY = "ROEHUB_STRATEGY_PRODUCER_ALLOWED_MODES"
+_STRATEGY_PRODUCER_ALLOWED_USER_IDS_ENV_KEY = (
+    "ROEHUB_STRATEGY_PRODUCER_ALLOWED_USER_IDS"
+)
+_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS_ENV_KEY = (
+    "ROEHUB_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS"
+)
+_STRATEGY_PRODUCER_ALLOWED_MODES = {"paper", "testnet"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,6 +382,53 @@ class StrategyMetricsRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyProducerRuntimeConfig:
+    """
+    StrategyProducerRuntimeConfig — supervised strategy producer safety controls.
+
+    Docs:
+      - docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md
+    Related:
+      - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
+      - src/trading/contexts/strategy/application/services/live_runner.py
+      - configs/prod/strategy.yaml
+    """
+
+    enabled: bool
+    allow_all: bool
+    allowed_modes: tuple[str, ...]
+    allowed_user_ids: tuple[str, ...]
+    allowed_strategy_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        normalized_modes = _dedupe_str_tuple(self.allowed_modes)
+        if not normalized_modes:
+            raise ValueError("strategy.producer.allowed_modes must be non-empty")
+        invalid_modes = tuple(
+            mode for mode in normalized_modes if mode not in _STRATEGY_PRODUCER_ALLOWED_MODES
+        )
+        if invalid_modes:
+            joined = ", ".join(invalid_modes)
+            raise ValueError(
+                "strategy.producer.allowed_modes supports only paper/testnet, "
+                f"got: {joined}"
+            )
+
+        normalized_user_ids = _dedupe_uuid_str_tuple(
+            self.allowed_user_ids,
+            setting_name="strategy.producer.allowed_user_ids",
+        )
+        normalized_strategy_ids = _dedupe_uuid_str_tuple(
+            self.allowed_strategy_ids,
+            setting_name="strategy.producer.allowed_strategy_ids",
+        )
+
+        object.__setattr__(self, "allowed_modes", normalized_modes)
+        object.__setattr__(self, "allowed_user_ids", normalized_user_ids)
+        object.__setattr__(self, "allowed_strategy_ids", normalized_strategy_ids)
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyRuntimeConfig:
     """
     StrategyRuntimeConfig — source-of-truth Strategy runtime config (`strategy.yaml`).
@@ -389,6 +447,7 @@ class StrategyRuntimeConfig:
     realtime_output: StrategyRealtimeOutputRuntimeConfig
     telegram: StrategyTelegramRuntimeConfig
     metrics: StrategyMetricsRuntimeConfig
+    producer: StrategyProducerRuntimeConfig
 
     def __post_init__(self) -> None:
         """
@@ -501,6 +560,7 @@ def load_strategy_runtime_config(
     )
     telegram_map = _get_mapping(strategy_map, "telegram", required=False)
     metrics_map = _get_mapping(strategy_map, "metrics", required=False)
+    producer_map = _get_mapping(strategy_map, "producer", required=False)
 
     api_enabled = resolve_bool_override(
         environ=effective_environ,
@@ -525,7 +585,17 @@ def load_strategy_runtime_config(
     metrics_port = resolve_positive_int_override(
         environ=effective_environ,
         key=_STRATEGY_METRICS_PORT_ENV_KEY,
-        default=_get_int_with_default(metrics_map, "port", default=9203),
+        default=_get_int_with_default(metrics_map, "port", default=9207),
+    )
+    producer_enabled = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_PRODUCER_ENABLED_ENV_KEY,
+        default=_get_bool_with_default(producer_map, "enabled", default=False),
+    )
+    producer_allow_all = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_PRODUCER_ALLOW_ALL_ENV_KEY,
+        default=_get_bool_with_default(producer_map, "allow_all", default=False),
     )
 
     return StrategyRuntimeConfig(
@@ -642,6 +712,37 @@ def load_strategy_runtime_config(
             ),
         ),
         metrics=StrategyMetricsRuntimeConfig(port=metrics_port),
+        producer=StrategyProducerRuntimeConfig(
+            enabled=producer_enabled,
+            allow_all=producer_allow_all,
+            allowed_modes=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_MODES_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_modes",
+                    default=("paper", "testnet"),
+                ),
+            ),
+            allowed_user_ids=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_USER_IDS_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_user_ids",
+                    default=(),
+                ),
+            ),
+            allowed_strategy_ids=_resolve_csv_tuple_override(
+                environ=effective_environ,
+                key=_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS_ENV_KEY,
+                default=_get_str_tuple_with_default(
+                    producer_map,
+                    "allowed_strategy_ids",
+                    default=(),
+                ),
+            ),
+        ),
     )
 
 
@@ -857,10 +958,81 @@ def _get_bool_with_default(data: Mapping[str, Any], key: str, *, default: bool) 
     return value
 
 
+def _get_str_tuple_with_default(
+    data: Mapping[str, Any],
+    key: str,
+    *,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    if key not in data:
+        return default
+    value = data[key]
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"expected list at key '{key}', got {type(value).__name__}")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(
+                f"expected string items at key '{key}', got {type(item).__name__}"
+            )
+        stripped = item.strip()
+        if not stripped:
+            raise ValueError(f"key '{key}' must not contain blank items")
+        normalized.append(stripped)
+    return tuple(normalized)
+
+
+def _resolve_csv_tuple_override(
+    *,
+    environ: Mapping[str, str],
+    key: str,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    raw_value = environ.get(key)
+    if raw_value is None:
+        return default
+    if not raw_value.strip():
+        return ()
+    return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+
+def _dedupe_str_tuple(values: tuple[str, ...]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for value in values:
+        item = value.strip()
+        if not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        normalized.append(item)
+    return tuple(normalized)
+
+
+def _dedupe_uuid_str_tuple(values: tuple[str, ...], *, setting_name: str) -> tuple[str, ...]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for value in values:
+        item = value.strip()
+        if not item:
+            continue
+        try:
+            canonical = str(UUID(item))
+        except ValueError as exc:
+            raise ValueError(f"{setting_name} must contain UUID strings") from exc
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        normalized.append(canonical)
+    return tuple(normalized)
+
+
 __all__ = [
     "StrategyApiRuntimeConfig",
     "StrategyLiveWorkerRuntimeConfig",
     "StrategyMetricsRuntimeConfig",
+    "StrategyProducerRuntimeConfig",
     "StrategyRealtimeOutputRedisStreamsRuntimeConfig",
     "StrategyRealtimeOutputRuntimeConfig",
     "StrategyRedisStreamsRuntimeConfig",

@@ -18,6 +18,7 @@ prod_services=(
   com.roehub.openbao-recover.plist
   com.roehub.exchange-control.plist
   com.roehub.exchange-execution.plist
+  com.roehub.strategy-live-runner.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist
@@ -37,6 +38,7 @@ prod_post_openbao_services=(
   com.roehub.openbao-recover.plist
   com.roehub.exchange-control.plist
   com.roehub.exchange-execution.plist
+  com.roehub.strategy-live-runner.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
   com.roehub.market-data-ws-worker.plist

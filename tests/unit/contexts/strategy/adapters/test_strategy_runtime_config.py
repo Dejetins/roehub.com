@@ -91,6 +91,16 @@ strategy:
     debounce_failed_seconds: 120
   metrics:
     port: 9300
+  producer:
+    enabled: true
+    allow_all: false
+    allowed_modes:
+      - paper
+      - testnet
+    allowed_user_ids:
+      - "00000000-0000-0000-0000-000000000911"
+    allowed_strategy_ids:
+      - "00000000-0000-0000-0000-000000000912"
 """.strip(),
     )
 
@@ -110,6 +120,13 @@ strategy:
     assert config.telegram.enabled is True
     assert config.telegram.mode == "log_only"
     assert config.metrics.port == 9300
+    assert config.producer.enabled is True
+    assert config.producer.allow_all is False
+    assert config.producer.allowed_modes == ("paper", "testnet")
+    assert config.producer.allowed_user_ids == ("00000000-0000-0000-0000-000000000911",)
+    assert config.producer.allowed_strategy_ids == (
+        "00000000-0000-0000-0000-000000000912",
+    )
 
 
 def test_load_strategy_runtime_config_scalar_env_overrides_have_priority(
@@ -168,7 +185,15 @@ strategy:
     send_timeout_s: 2.0
     debounce_failed_seconds: 600
   metrics:
-    port: 9203
+    port: 9207
+  producer:
+    enabled: false
+    allow_all: false
+    allowed_modes:
+      - paper
+      - testnet
+    allowed_user_ids: []
+    allowed_strategy_ids: []
 """.strip(),
     )
     environ = {
@@ -177,6 +202,15 @@ strategy:
         "ROEHUB_STRATEGY_REALTIME_OUTPUT_REDIS_STREAMS_ENABLED": "no",
         "ROEHUB_STRATEGY_TELEGRAM_ENABLED": "off",
         "ROEHUB_STRATEGY_METRICS_PORT": "9100",
+        "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED": "true",
+        "ROEHUB_STRATEGY_PRODUCER_ALLOW_ALL": "true",
+        "ROEHUB_STRATEGY_PRODUCER_ALLOWED_MODES": "paper,testnet",
+        "ROEHUB_STRATEGY_PRODUCER_ALLOWED_USER_IDS": (
+            "00000000-0000-0000-0000-000000000913"
+        ),
+        "ROEHUB_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS": (
+            "00000000-0000-0000-0000-000000000914"
+        ),
     }
 
     config = load_strategy_runtime_config(config_path, environ=environ)
@@ -186,6 +220,47 @@ strategy:
     assert config.realtime_output.redis_streams.enabled is False
     assert config.telegram.enabled is False
     assert config.metrics.port == 9100
+    assert config.producer.enabled is True
+    assert config.producer.allow_all is True
+    assert config.producer.allowed_modes == ("paper", "testnet")
+    assert config.producer.allowed_user_ids == ("00000000-0000-0000-0000-000000000913",)
+    assert config.producer.allowed_strategy_ids == (
+        "00000000-0000-0000-0000-000000000914",
+    )
+
+
+def test_load_strategy_runtime_config_rejects_live_producer_mode(tmp_path: Path) -> None:
+    """
+    Verify producer mode allowlist is constrained to paper/testnet only.
+    """
+    config_path = _write_strategy_config(
+        tmp_path,
+        body="""
+version: 1
+strategy:
+  live_worker:
+    redis_streams:
+      enabled: true
+      host: redis
+      port: 6379
+      db: 0
+      socket_timeout_s: 2.0
+      connect_timeout_s: 2.0
+      stream_prefix: md.candles.1m
+      consumer_group: strategy.live_runner.v1
+      read_count: 100
+      block_ms: 100
+  producer:
+    enabled: true
+    allow_all: true
+    allowed_modes:
+      - paper
+      - live
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="paper/testnet"):
+        load_strategy_runtime_config(config_path, environ={})
 
 
 def test_load_strategy_runtime_config_rejects_invalid_boolean_override(

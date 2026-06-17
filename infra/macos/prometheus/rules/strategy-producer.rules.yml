@@ -1,0 +1,41 @@
+groups:
+  - name: strategy-producer-supervision
+    rules:
+      - alert: StrategyProducerDown
+        expr: up{job="strategy-producer"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer metrics endpoint is down
+          description: Prometheus cannot scrape the supervised strategy producer on port 9207.
+          escalation: Keep producer admin switch disabled and inspect launchd, Monit, logs, and runtime env before allowing strategies.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions
+          action: Check launchctl print, monit status, /health/ready, /metrics, and recent strategy-live-runner logs.
+
+      - alert: StrategyProducerIterationErrors
+        expr: increase(strategy_live_runner_iteration_errors_total{job="strategy-producer"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer iteration errors increased
+          description: The supervised producer loop observed one or more failed iterations.
+          escalation: Keep allowlists narrow, inspect Postgres/Redis/ClickHouse dependency readiness, and do not enable broader strategy production.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions
+          action: Query /health/ready and logs, then compare strategy_producer_last_success_unixtime with dependency health.
+
+      - alert: StrategyProducerModeBlocked
+        expr: increase(strategy_producer_skipped_strategies_total{job="strategy-producer",reason="producer_mode_not_allowed"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer blocked a non paper/testnet signal
+          description: A strategy signal was skipped before source-event creation because its mode is outside the Stage 06 paper/testnet allowlist.
+          escalation: Verify no mainnet/live producer path is being attempted before enabling more strategies.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions
+          action: Inspect strategy profile mode and producer allowlist configuration; do not add live mode to producer allowed_modes.

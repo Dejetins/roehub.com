@@ -1,14 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import socket
+import threading
+import time
 from dataclasses import dataclass
+from datetime import timezone
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Mapping
 
-from prometheus_client import Counter, Histogram, start_http_server
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
@@ -53,6 +67,7 @@ from trading.contexts.strategy.adapters.outbound import (
 from trading.contexts.strategy.adapters.outbound.acl.live_execution_producer import (
     LiveExecutionStrategySignalProducer,
 )
+from trading.contexts.strategy.adapters.outbound.config import StrategyProducerRuntimeConfig
 from trading.contexts.strategy.application import (
     NoOpStrategyRealtimeOutputPublisher,
     NoOpTelegramNotifier,
@@ -60,12 +75,21 @@ from trading.contexts.strategy.application import (
     StrategyLiveRunnerIterationReport,
     TelegramNotificationPolicy,
 )
+from trading.contexts.strategy.application.ports import (
+    NoOpStrategyExecutionProducer,
+    StrategyExecutionProducer,
+)
 from trading.contexts.strategy.domain.entities import StrategySignal
 
 log = logging.getLogger(__name__)
 
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
-_STRATEGY_PRODUCER_ENABLED_KEY = "ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED"
+_PRODUCER_ALLOWED_MODES = ("paper", "testnet")
+_PRODUCER_BLOCKED_REASONS = (
+    "producer_disabled",
+    "producer_mode_not_allowed",
+    "producer_allowlist_missing",
+)
 
 
 class StrategyLiveRunnerMetrics:
@@ -80,7 +104,7 @@ class StrategyLiveRunnerMetrics:
       - docs/runbooks/market-data-redis-streams.md
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, registry: CollectorRegistry | None = None) -> None:
         """
         Register Prometheus metrics used by strategy live-runner runtime.
 
@@ -95,75 +119,216 @@ class StrategyLiveRunnerMetrics:
         Side Effects:
             Registers metrics in default Prometheus registry.
         """
+        self.registry = registry or REGISTRY
+        self._lock = threading.Lock()
+        self._started_unixtime = 0.0
+        self._last_cycle_start_unixtime = 0.0
+        self._last_cycle_end_unixtime = 0.0
+        self._last_success_unixtime = 0.0
+        self._last_error_reason = "none"
+        self._producer_enabled = False
+        self._producer_allow_all = False
+        self._producer_allowed_modes: tuple[str, ...] = ()
+        self._producer_allowed_users = 0
+        self._producer_allowed_strategies = 0
+
         self.iterations_total = Counter(
             "strategy_live_runner_iterations_total",
             "Strategy live-runner successful iterations count",
+            registry=self.registry,
         )
         self.iteration_errors_total = Counter(
             "strategy_live_runner_iteration_errors_total",
             "Strategy live-runner iteration failures count",
+            registry=self.registry,
         )
         self.messages_read_total = Counter(
             "strategy_live_runner_messages_read_total",
             "Strategy live-runner read messages count",
+            registry=self.registry,
         )
         self.messages_acked_total = Counter(
             "strategy_live_runner_messages_acked_total",
             "Strategy live-runner acked messages count",
+            registry=self.registry,
         )
         self.failed_runs_total = Counter(
             "strategy_live_runner_failed_runs_total",
             "Strategy live-runner failed runs count",
+            registry=self.registry,
         )
         self.iteration_duration_seconds = Histogram(
             "strategy_live_runner_iteration_duration_seconds",
             "Strategy live-runner iteration duration in seconds",
             buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 15.0, 60.0),
+            registry=self.registry,
+        )
+        self.producer_admin_enabled = Gauge(
+            "strategy_producer_admin_enabled",
+            "Strategy producer admin switch, 1 when enabled",
+            registry=self.registry,
+        )
+        self.producer_allow_all = Gauge(
+            "strategy_producer_allow_all",
+            "Strategy producer allow-all switch, 1 when enabled",
+            registry=self.registry,
+        )
+        self.producer_allowed_mode = Gauge(
+            "strategy_producer_allowed_mode",
+            "Strategy producer allowed mode flags",
+            ("mode",),
+            registry=self.registry,
+        )
+        self.producer_allowlist_entries = Gauge(
+            "strategy_producer_allowlist_entries",
+            "Strategy producer allowlist entry counts",
+            ("scope",),
+            registry=self.registry,
+        )
+        self.producer_ready = Gauge(
+            "strategy_producer_ready",
+            "Strategy producer process readiness, 1 when loop is healthy",
+            registry=self.registry,
+        )
+        self.producer_last_cycle_start_unixtime = Gauge(
+            "strategy_producer_last_cycle_start_unixtime",
+            "Unix timestamp of the latest producer cycle start",
+            registry=self.registry,
+        )
+        self.producer_last_cycle_end_unixtime = Gauge(
+            "strategy_producer_last_cycle_end_unixtime",
+            "Unix timestamp of the latest producer cycle end",
+            registry=self.registry,
+        )
+        self.producer_last_success_unixtime = Gauge(
+            "strategy_producer_last_success_unixtime",
+            "Unix timestamp of the latest successful producer cycle",
+            registry=self.registry,
+        )
+        self.producer_polled_runs = Gauge(
+            "strategy_producer_polled_runs",
+            "Active strategy runs polled during the latest cycle",
+            registry=self.registry,
+        )
+        self.producer_active_instruments = Gauge(
+            "strategy_producer_active_instruments",
+            "Active instruments processed during the latest cycle",
+            registry=self.registry,
+        )
+        self.producer_source_events_total = Counter(
+            "strategy_producer_source_events_total",
+            "Strategy producer source event records created through live_execution",
+            ("mode", "outcome"),
+            registry=self.registry,
+        )
+        self.producer_skipped_strategies_total = Counter(
+            "strategy_producer_skipped_strategies_total",
+            "Strategy producer signals skipped before source-event creation",
+            ("reason",),
+            registry=self.registry,
+        )
+        self.producer_last_source_event_unixtime = Gauge(
+            "strategy_producer_last_source_event_unixtime",
+            "Unix timestamp of latest strategy producer source event by bounded outcome",
+            ("mode", "outcome"),
+            registry=self.registry,
+        )
+        self.producer_source_event_latency_seconds = Histogram(
+            "strategy_producer_source_event_latency_seconds",
+            "Seconds between signal candle close and source-event creation",
+            ("mode", "outcome"),
+            buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 15.0, 30.0, 60.0, 120.0, 300.0),
+            registry=self.registry,
+        )
+        self.producer_signal_lag_seconds = Gauge(
+            "strategy_producer_signal_lag_seconds",
+            "Seconds between latest signal candle close and producer observation",
+            registry=self.registry,
         )
         self.realtime_output_publish_total = Counter(
             "strategy_realtime_output_publish_total",
             "Strategy realtime output successful publish count",
+            registry=self.registry,
         )
         self.realtime_output_publish_errors_total = Counter(
             "strategy_realtime_output_publish_errors_total",
             "Strategy realtime output publish failures count",
+            registry=self.registry,
         )
         self.realtime_output_publish_duplicates_total = Counter(
             "strategy_realtime_output_publish_duplicates_total",
             "Strategy realtime output duplicate/out-of-order publish count",
+            registry=self.registry,
         )
         self.telegram_notify_total = Counter(
             "strategy_telegram_notify_total",
             "Strategy telegram notifications successfully sent count",
+            registry=self.registry,
         )
         self.telegram_notify_errors_total = Counter(
             "strategy_telegram_notify_errors_total",
             "Strategy telegram notifications failed send count",
+            registry=self.registry,
         )
         self.telegram_notify_skipped_total = Counter(
             "strategy_telegram_notify_skipped_total",
             "Strategy telegram notifications skipped due to missing confirmed chat binding",
+            registry=self.registry,
         )
         self.strategy_signal_total = Counter(
             "strategy_signal_total",
             "Strategy live evaluator journal outcomes",
             ("mode", "action", "outcome"),
+            registry=self.registry,
         )
         self.strategy_position_ownership_total = Counter(
             "strategy_position_ownership_total",
             "Strategy position ownership reserve/release/conflict outcomes.",
             ("result", "reason"),
+            registry=self.registry,
         )
         self.strategy_capital_reservation_total = Counter(
             "strategy_capital_reservation_total",
             "Strategy capital reservation outcomes.",
             ("result", "reason"),
+            registry=self.registry,
         )
         self.strategy_paper_accounting_total = Counter(
             "strategy_paper_accounting_total",
             "Strategy paper order/fill/accounting outcomes.",
             ("result", "reason"),
+            registry=self.registry,
         )
+
+    def mark_started(self, *, producer_config: StrategyProducerRuntimeConfig) -> None:
+        now = time.time()
+        with self._lock:
+            self._started_unixtime = now
+            self._last_error_reason = "none"
+            self._producer_enabled = producer_config.enabled
+            self._producer_allow_all = producer_config.allow_all
+            self._producer_allowed_modes = producer_config.allowed_modes
+            self._producer_allowed_users = len(producer_config.allowed_user_ids)
+            self._producer_allowed_strategies = len(producer_config.allowed_strategy_ids)
+        self.producer_admin_enabled.set(1 if producer_config.enabled else 0)
+        self.producer_allow_all.set(1 if producer_config.allow_all else 0)
+        for mode in _PRODUCER_ALLOWED_MODES:
+            self.producer_allowed_mode.labels(mode=mode).set(
+                1 if mode in producer_config.allowed_modes else 0
+            )
+        self.producer_allowlist_entries.labels(scope="user").set(
+            len(producer_config.allowed_user_ids)
+        )
+        self.producer_allowlist_entries.labels(scope="strategy").set(
+            len(producer_config.allowed_strategy_ids)
+        )
+        self.producer_ready.set(1)
+
+    def mark_iteration_started(self) -> None:
+        now = time.time()
+        with self._lock:
+            self._last_cycle_start_unixtime = now
+        self.producer_last_cycle_start_unixtime.set(now)
 
     def observe_iteration(
         self,
@@ -186,11 +351,80 @@ class StrategyLiveRunnerMetrics:
         Side Effects:
             Updates counters/histogram in Prometheus registry.
         """
+        now = time.time()
         self.iterations_total.inc()
         self.messages_read_total.inc(report.read_messages)
         self.messages_acked_total.inc(report.acked_messages)
         self.failed_runs_total.inc(report.failed_runs)
         self.iteration_duration_seconds.observe(max(duration_seconds, 0.0))
+        self.producer_polled_runs.set(report.polled_runs)
+        self.producer_active_instruments.set(report.active_instruments)
+        self.producer_last_cycle_end_unixtime.set(now)
+        self.producer_last_success_unixtime.set(now)
+        self.producer_ready.set(1)
+        with self._lock:
+            self._last_cycle_end_unixtime = now
+            self._last_success_unixtime = now
+            self._last_error_reason = "none"
+
+    def observe_iteration_error(self) -> None:
+        now = time.time()
+        self.iteration_errors_total.inc()
+        self.producer_last_cycle_end_unixtime.set(now)
+        self.producer_ready.set(0)
+        with self._lock:
+            self._last_cycle_end_unixtime = now
+            self._last_error_reason = "iteration_error"
+
+    def observe_source_event_created(self, signal: StrategySignal) -> None:
+        now = time.time()
+        mode = _bounded_signal_mode(signal.mode)
+        outcome = _bounded_signal_outcome(signal.outcome)
+        lag_seconds = max(0.0, now - signal.bar_ts_close.astimezone(timezone.utc).timestamp())
+        self.producer_source_events_total.labels(mode=mode, outcome=outcome).inc()
+        self.producer_last_source_event_unixtime.labels(mode=mode, outcome=outcome).set(now)
+        self.producer_source_event_latency_seconds.labels(
+            mode=mode,
+            outcome=outcome,
+        ).observe(lag_seconds)
+        self.producer_signal_lag_seconds.set(lag_seconds)
+
+    def observe_source_event_blocked(self, *, reason: str) -> None:
+        self.producer_skipped_strategies_total.labels(
+            reason=_bounded_producer_block_reason(reason)
+        ).inc()
+
+    def health_payload(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "service": "strategy_producer",
+                "status": "live" if self._started_unixtime > 0 else "starting",
+                "started_unixtime": self._started_unixtime,
+                "producer": self._producer_payload_locked(),
+            }
+
+    def readiness_payload(self) -> tuple[int, dict[str, object]]:
+        with self._lock:
+            ready = self._started_unixtime > 0 and self._last_error_reason == "none"
+            payload = {
+                "service": "strategy_producer",
+                "ready": ready,
+                "reason": "ready" if ready else self._last_error_reason,
+                "last_cycle_start_unixtime": self._last_cycle_start_unixtime,
+                "last_cycle_end_unixtime": self._last_cycle_end_unixtime,
+                "last_success_unixtime": self._last_success_unixtime,
+                "producer": self._producer_payload_locked(),
+            }
+        return (HTTPStatus.OK if ready else HTTPStatus.SERVICE_UNAVAILABLE, payload)
+
+    def _producer_payload_locked(self) -> dict[str, object]:
+        return {
+            "enabled": self._producer_enabled,
+            "allow_all": self._producer_allow_all,
+            "allowed_modes": list(self._producer_allowed_modes),
+            "allowed_user_count": self._producer_allowed_users,
+            "allowed_strategy_count": self._producer_allowed_strategies,
+        }
 
     def realtime_output_hooks(self) -> RedisStrategyRealtimeOutputPublisherHooks:
         """
@@ -277,6 +511,7 @@ class StrategyLiveRunnerApp:
     runner: StrategyLiveRunner
     metrics: StrategyLiveRunnerMetrics
     metrics_port: int
+    producer_config: StrategyProducerRuntimeConfig
 
     def __post_init__(self) -> None:
         """
@@ -313,26 +548,35 @@ class StrategyLiveRunnerApp:
         Side Effects:
             Starts Prometheus HTTP endpoint and performs storage/network IO each iteration.
         """
-        start_http_server(self.metrics_port)
-        log.info("strategy live-runner metrics server started on port %s", self.metrics_port)
-        while not stop_event.is_set():
-            loop = asyncio.get_running_loop()
-            started = loop.time()
-            try:
-                report = self.runner.run_once()
-                duration_seconds = loop.time() - started
-                self.metrics.observe_iteration(
-                    report=report,
-                    duration_seconds=duration_seconds,
-                )
-            except Exception:  # noqa: BLE001
-                self.metrics.iteration_errors_total.inc()
-                log.exception("strategy live-runner iteration failed")
+        self.metrics.mark_started(producer_config=self.producer_config)
+        http_server = StrategyLiveRunnerHttpServer(
+            metrics_port=self.metrics_port,
+            metrics=self.metrics,
+        )
+        http_server.start()
+        log.info("strategy live-runner health/metrics server started on port %s", self.metrics_port)
+        try:
+            while not stop_event.is_set():
+                loop = asyncio.get_running_loop()
+                started = loop.time()
+                self.metrics.mark_iteration_started()
+                try:
+                    report = self.runner.run_once()
+                    duration_seconds = loop.time() - started
+                    self.metrics.observe_iteration(
+                        report=report,
+                        duration_seconds=duration_seconds,
+                    )
+                except Exception:  # noqa: BLE001
+                    self.metrics.observe_iteration_error()
+                    log.exception("strategy live-runner iteration failed")
 
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=self.poll_interval_seconds)
-            except TimeoutError:
-                continue
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=self.poll_interval_seconds)
+                except TimeoutError:
+                    continue
+        finally:
+            http_server.stop()
 
 
 def build_strategy_live_runner_app(
@@ -466,16 +710,23 @@ def build_strategy_live_runner_app(
                 hooks=metrics.telegram_notifier_hooks(),
             )
 
-    execution_producer = None
-    if _parse_bool(environ.get(_STRATEGY_PRODUCER_ENABLED_KEY, "0")):
+    producer_config = runtime_config.producer
+    execution_producer_delegate: StrategyExecutionProducer = NoOpStrategyExecutionProducer()
+    if producer_config.enabled:
         execution_repository = PostgresExecutionIntentRepository(gateway=postgres_gateway)
-        execution_producer = LiveExecutionStrategySignalProducer(
+        execution_producer_delegate = LiveExecutionStrategySignalProducer(
             ingress_service=ExecutionIngressService(
                 repository=execution_repository,
                 clock=SystemLiveExecutionClock(),
             ),
             repository=execution_repository,
         )
+    execution_producer = GuardedStrategyExecutionProducer(
+        delegate=execution_producer_delegate,
+        producer_config=producer_config,
+        on_source_event_created=metrics.observe_source_event_created,
+        on_source_event_blocked=metrics.observe_source_event_blocked,
+    )
 
     runner = StrategyLiveRunner(
         strategy_repository=strategy_repository,
@@ -502,6 +753,7 @@ def build_strategy_live_runner_app(
         runner=runner,
         metrics=metrics,
         metrics_port=metrics_port,
+        producer_config=producer_config,
     )
 
 
@@ -560,6 +812,138 @@ def _require_non_empty_env_value(
     return value
 
 
-def _parse_bool(raw_value: str) -> bool:
-    normalized = raw_value.strip().lower()
-    return normalized in {"1", "true", "yes", "on"}
+@dataclass(frozen=True, slots=True)
+class StrategyProducerGateDecision:
+    allowed: bool
+    reason: str
+
+
+class GuardedStrategyExecutionProducer(StrategyExecutionProducer):
+    def __init__(
+        self,
+        *,
+        delegate: StrategyExecutionProducer,
+        producer_config: StrategyProducerRuntimeConfig,
+        on_source_event_created: object | None = None,
+        on_source_event_blocked: object | None = None,
+    ) -> None:
+        self._delegate = delegate
+        self._producer_config = producer_config
+        self._on_source_event_created = on_source_event_created
+        self._on_source_event_blocked = on_source_event_blocked
+
+    def record_signal(self, *, signal: StrategySignal) -> None:
+        decision = self.evaluate(signal=signal)
+        if not decision.allowed:
+            if callable(self._on_source_event_blocked):
+                self._on_source_event_blocked(reason=decision.reason)
+            log.info(
+                "strategy producer skipped signal reason=%s mode=%s outcome=%s",
+                decision.reason,
+                signal.mode,
+                signal.outcome,
+            )
+            return
+
+        self._delegate.record_signal(signal=signal)
+        if callable(self._on_source_event_created):
+            self._on_source_event_created(signal)
+
+    def evaluate(self, *, signal: StrategySignal) -> StrategyProducerGateDecision:
+        if not self._producer_config.enabled:
+            return StrategyProducerGateDecision(False, "producer_disabled")
+        if signal.mode not in self._producer_config.allowed_modes:
+            return StrategyProducerGateDecision(False, "producer_mode_not_allowed")
+        if self._producer_config.allow_all:
+            return StrategyProducerGateDecision(True, "allowed")
+        if str(signal.owner_user_id) in self._producer_config.allowed_user_ids:
+            return StrategyProducerGateDecision(True, "allowed_user")
+        if str(signal.strategy_id) in self._producer_config.allowed_strategy_ids:
+            return StrategyProducerGateDecision(True, "allowed_strategy")
+        return StrategyProducerGateDecision(False, "producer_allowlist_missing")
+
+
+class StrategyLiveRunnerHttpServer:
+    def __init__(self, *, metrics_port: int, metrics: StrategyLiveRunnerMetrics) -> None:
+        self._metrics_port = metrics_port
+        self._metrics = metrics
+        self._server: ThreadingHTTPServer | None = None
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        metrics = self._metrics
+
+        class _Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                if self.path == "/health/live":
+                    _write_json(self, HTTPStatus.OK, metrics.health_payload())
+                    return
+                if self.path == "/health/ready":
+                    status, payload = metrics.readiness_payload()
+                    _write_json(self, status, payload)
+                    return
+                if self.path == "/metrics":
+                    payload = generate_latest(metrics.registry)
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header("Content-Type", CONTENT_TYPE_LATEST)
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                    return
+                _write_json(
+                    self,
+                    HTTPStatus.NOT_FOUND,
+                    {"status": "not_found", "service": "strategy_producer"},
+                )
+
+            def log_message(self, format: str, *args: object) -> None:
+                log.debug("strategy producer http: " + format, *args)
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", self._metrics_port), _Handler)
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            name="strategy-producer-http",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._server is None:
+            return
+        self._server.shutdown()
+        self._server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+        self._server = None
+        self._thread = None
+
+
+def _write_json(
+    handler: BaseHTTPRequestHandler,
+    status: int | HTTPStatus,
+    payload: Mapping[str, object],
+) -> None:
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _bounded_signal_mode(mode: str) -> str:
+    if mode in {"monitor_only", "paper", "live", "testnet"}:
+        return mode
+    return "unknown"
+
+
+def _bounded_signal_outcome(outcome: str) -> str:
+    if outcome in {"warmup", "no_signal", "signal", "blocked"}:
+        return outcome
+    return "unknown"
+
+
+def _bounded_producer_block_reason(reason: str) -> str:
+    if reason in _PRODUCER_BLOCKED_REASONS:
+        return reason
+    return "unknown"
