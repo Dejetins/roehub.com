@@ -298,6 +298,38 @@ def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> Non
     assert repository.intents == []
 
 
+def test_manual_request_paper_no_exchange_submit_uses_no_dispatch_risk_branch() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="manual_request",
+            source_event_ref="manual-paper-entry",
+            source_ref_json={"manual_request_id": "manual-paper-entry"},
+            strategy_signal_id=None,
+            idempotency_key="manual-paper-source-key",
+        )
+    )
+
+    intent = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key="manual-paper-intent-key",
+            risk_context=_accepted_context(
+                exchange_config_verified=False,
+                account_state_fresh=False,
+                paper_no_exchange_submit=True,
+            ),
+        )
+    )
+
+    assert intent.intent.status == "rejected"
+    assert intent.intent.risk_reason == "paper_no_exchange_submit"
+    assert repository.source_events[0].outcome == "risk_rejected"
+    assert repository.source_events[0].outcome_reason == "paper_no_exchange_submit"
+
+
 def test_rejects_invalid_source_policy() -> None:
     service = ExecutionIngressService(
         repository=InMemoryExecutionIntentRepository(),

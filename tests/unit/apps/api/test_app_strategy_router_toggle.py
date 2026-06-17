@@ -148,7 +148,7 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     monkeypatch.setattr(
         app_module,
         "build_strategy_router",
-        lambda *, environ, current_user_dependency: strategy_router,
+        lambda *, environ, current_user_dependency, live_execution_services=None: strategy_router,
     )
     monkeypatch.setattr(
         app_module,

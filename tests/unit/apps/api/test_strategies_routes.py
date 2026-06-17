@@ -9,6 +9,14 @@ from starlette.requests import Request
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_strategies_router
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryExecutionIntentRepository,
+    InMemoryPaperAccountingRepository,
+)
+from trading.contexts.live_execution.application import (
+    CapitalReservationPaperAccountingService,
+    ExecutionIngressService,
+)
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -299,6 +307,8 @@ def _build_live_profile_client(
     ):
         create_strategy_from_variant_use_case.bind_strategy_repository(strategy_repository)
     event_repository = InMemoryStrategyEventRepository()
+    run_repository = InMemoryStrategyRunRepository()
+    profile_repository = InMemoryLiveStrategyProfileRepository()
     clock = _SequenceClock(
         start=datetime(2026, 5, 30, 12, 0, tzinfo=timezone.utc),
         steps=60,
@@ -321,19 +331,19 @@ def _build_live_profile_client(
             get_use_case=GetMyStrategyUseCase(repository=strategy_repository),
             run_use_case=RunStrategyUseCase(
                 strategy_repository=strategy_repository,
-                run_repository=InMemoryStrategyRunRepository(),
+                run_repository=run_repository,
                 event_repository=event_repository,
                 clock=clock,
             ),
             stop_use_case=StopStrategyUseCase(
                 strategy_repository=strategy_repository,
-                run_repository=InMemoryStrategyRunRepository(),
+                run_repository=run_repository,
                 event_repository=event_repository,
                 clock=clock,
             ),
             restart_use_case=RestartStrategyUseCase(
                 strategy_repository=strategy_repository,
-                run_repository=InMemoryStrategyRunRepository(),
+                run_repository=run_repository,
                 event_repository=event_repository,
                 clock=clock,
             ),
@@ -345,7 +355,7 @@ def _build_live_profile_client(
             current_user_provider_dependency=_HeaderCurrentUserDependency(),
             live_profile_service=LiveStrategyProfileService(
                 strategy_repository=strategy_repository,
-                profile_repository=InMemoryLiveStrategyProfileRepository(),
+                profile_repository=profile_repository,
                 event_repository=event_repository,
                 clock=clock,
                 exchange_connection_checker=(
@@ -364,9 +374,96 @@ def _build_live_profile_client(
                 session_created_at=session_created_at,
             ),
             create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
+            strategy_run_repository=run_repository,
+            live_profile_repository=profile_repository,
         )
     )
     return TestClient(app)
+
+
+def _build_manual_execution_client() -> tuple[
+    TestClient,
+    InMemoryExecutionIntentRepository,
+    InMemoryPaperAccountingRepository,
+]:
+    strategy_repository = InMemoryStrategyRepository()
+    event_repository = InMemoryStrategyEventRepository()
+    run_repository = InMemoryStrategyRunRepository()
+    profile_repository = InMemoryLiveStrategyProfileRepository()
+    execution_repository = InMemoryExecutionIntentRepository()
+    paper_repository = InMemoryPaperAccountingRepository()
+    clock = _SequenceClock(
+        start=datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc),
+        steps=120,
+    )
+    live_clock = _SequenceClock(
+        start=datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc),
+        steps=120,
+    )
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+    app.include_router(
+        build_strategies_router(
+            create_use_case=CreateStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            clone_use_case=CloneStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            list_use_case=ListMyStrategiesUseCase(repository=strategy_repository),
+            get_use_case=GetMyStrategyUseCase(repository=strategy_repository),
+            run_use_case=RunStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=run_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            stop_use_case=StopStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=run_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            restart_use_case=RestartStrategyUseCase(
+                strategy_repository=strategy_repository,
+                run_repository=run_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            delete_use_case=DeleteStrategyUseCase(
+                repository=strategy_repository,
+                event_repository=event_repository,
+                clock=clock,
+            ),
+            current_user_provider_dependency=_HeaderCurrentUserDependency(),
+            live_profile_service=LiveStrategyProfileService(
+                strategy_repository=strategy_repository,
+                profile_repository=profile_repository,
+                event_repository=event_repository,
+                clock=clock,
+                exchange_connection_checker=_StaticExchangeReadinessChecker(eligible=True),
+            ),
+            current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
+                session_created_at=datetime.now(timezone.utc),
+            ),
+            strategy_run_repository=run_repository,
+            live_profile_repository=profile_repository,
+            execution_ingress_service=ExecutionIngressService(
+                repository=execution_repository,
+                clock=live_clock,
+            ),
+            paper_accounting_service=CapitalReservationPaperAccountingService(
+                repository=paper_repository,
+                account_projection_repository=None,
+                clock=live_clock,
+            ),
+        )
+    )
+    return TestClient(app), execution_repository, paper_repository
 
 
 
@@ -527,6 +624,64 @@ def test_launch_from_backtest_variant_creates_profile_and_run_config() -> None:
     assert payload["run"]["metadata"]["launch_config"]["direction"] == "long"
     assert payload["provenance"]["source_variant_key"] == "job_demo"
     assert use_case.calls == (("job_demo", "launch-paper-1", "paper"),)
+
+
+def test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order() -> None:
+    client, execution_repository, paper_repository = _build_manual_execution_client()
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000805"}
+    created = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    assert created.status_code == 201
+    strategy_id = created.json()["strategy_id"]
+    profile = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "paper",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "50",
+            "max_position_notional": "50",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "50",
+        },
+        headers=headers,
+    )
+    assert profile.status_code == 200
+    run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
+    assert run.status_code == 200
+
+    request_headers = {**headers, "Idempotency-Key": "manual-paper-entry-1"}
+    payload = {"client_request_id": "manual-paper-entry-1", "reference_price": "50000"}
+    first = client.post(
+        f"/strategies/{strategy_id}/manual-entry",
+        json=payload,
+        headers=request_headers,
+    )
+    replay = client.post(
+        f"/strategies/{strategy_id}/manual-entry",
+        json=payload,
+        headers=request_headers,
+    )
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    first_payload = first.json()
+    replay_payload = replay.json()
+    assert first_payload["status"] == "accepted"
+    assert first_payload["risk_status"] == "rejected"
+    assert first_payload["risk_reason"] == "paper_no_exchange_submit"
+    assert first_payload["paper_order_state"] == "filled"
+    assert replay_payload["duplicate"] is True
+    assert replay_payload["source_event_id"] == first_payload["source_event_id"]
+    assert replay_payload["intent_id"] == first_payload["intent_id"]
+    assert len(execution_repository.source_events) == 1
+    assert len(execution_repository.intents) == 1
+    assert len(paper_repository.orders) == 1
+    assert paper_repository.orders[0].source_event_id == UUID(first_payload["source_event_id"])
+    assert len(paper_repository.fills) == 1
+    assert len(paper_repository.accounting) == 1
 
 
 def test_launch_from_backtest_variant_blocks_testnet_without_exchange() -> None:

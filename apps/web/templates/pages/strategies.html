@@ -15,6 +15,8 @@
     data-api-run-path-template="/api/strategies/{strategy_id}/run"
     data-api-stop-path-template="/api/strategies/{strategy_id}/stop"
     data-api-restart-path-template="/api/strategies/{strategy_id}/restart"
+    data-api-manual-entry-path-template="/api/strategies/{strategy_id}/manual-entry"
+    data-api-manual-exit-path-template="/api/strategies/{strategy_id}/manual-exit"
     data-initial-mode="{{ strategy_initial_mode }}"
     data-initial-strategy-id="{{ strategy_initial_id }}"
     aria-label="{{ t('strategies.aria') }}"
@@ -131,6 +133,12 @@
               </button>
               <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-restart>
                 {{ t("strategies.actions.restart") }}
+              </button>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-entry>
+                {{ t("strategies.actions.manual_entry") }}
+              </button>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-exit>
+                {{ t("strategies.actions.manual_exit") }}
               </button>
             </span>
             <span class="rh-dropdown strategies-dropdown strategies-action-menu" data-rh-dropdown data-rh-dropdown-kind="menu">

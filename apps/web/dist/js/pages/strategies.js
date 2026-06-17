@@ -185,6 +185,7 @@ function renderSelected(root, selected) {
   const actions = selected?.actions || {};
   const runState = selected?.run_state || null;
   const canRestart = ["starting", "warming_up", "running"].includes(runState);
+  const canManual = ["starting", "warming_up", "running"].includes(runState);
   setText("[data-selected-name]", selected?.name || t("common.unavailable"), root);
   setText("[data-selected-version]", selected?.version || "--", root);
   setText("[data-selected-exchange]", selected?.exchange || t("common.unavailable"), root);
@@ -202,6 +203,8 @@ function renderSelected(root, selected) {
   setButtonDisabled(root, "[data-strategy-run]", actions.can_run !== true);
   setButtonDisabled(root, "[data-strategy-stop]", actions.can_stop !== true);
   setButtonDisabled(root, "[data-strategy-restart]", !canRestart);
+  setButtonDisabled(root, "[data-strategy-manual-entry]", !canManual);
+  setButtonDisabled(root, "[data-strategy-manual-exit]", !canManual);
 }
 
 function setActionStatus(root, value) {
@@ -240,10 +243,22 @@ function renderLiveProfile(root, profile) {
   );
   setText("[data-profile-reason]", reason, root);
   setText("[data-profile-updated]", localTime(profile?.updated_at), root);
+  root.dataset.liveProfileMode = profile?.mode || "monitor_only";
   const panel = qs(".strategies-live-profile", root);
   if (panel instanceof HTMLElement) {
     panel.dataset.readiness = readiness;
   }
+}
+
+function manualIdempotencyKey(action, strategyId) {
+  const randomPart = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  return `manual-${action}-${strategyId}-${randomPart}`;
+}
+
+function manualStatusText(payload) {
+  const status = payload?.status || "unknown";
+  const reason = payload?.outcome_reason || payload?.risk_reason || "--";
+  return `${status}: ${reason}`;
 }
 
 function renderCompatibilityReadiness(root, readiness) {
@@ -1023,6 +1038,53 @@ function initStrategies(root) {
       })
       .catch((error) => setActionStatus(root, actionErrorText(error)));
   });
+
+  function executeManualAction(action) {
+    if (!state.selectedStrategyId) {
+      return;
+    }
+    const template = action === "entry"
+      ? root.dataset.apiManualEntryPathTemplate
+      : root.dataset.apiManualExitPathTemplate;
+    const path = template.replace("{strategy_id}", encodeURIComponent(state.selectedStrategyId));
+    const selector = action === "entry"
+      ? "[data-strategy-manual-entry]"
+      : "[data-strategy-manual-exit]";
+    const idempotencyKey = manualIdempotencyKey(action, state.selectedStrategyId);
+    setButtonDisabled(root, selector, true);
+    setActionStatus(
+      root,
+      action === "entry"
+        ? t("strategies.actions.manual_entry_pending")
+        : t("strategies.actions.manual_exit_pending"),
+    );
+    apiFetch(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({ client_request_id: idempotencyKey }),
+    })
+      .then((payload) => {
+        setActionStatus(root, manualStatusText(payload));
+        return loadDashboard("initial");
+      })
+      .catch((error) => setActionStatus(root, actionErrorText(error)))
+      .finally(() => {
+        if (lastSummary) {
+          renderSelected(root, lastSummary.selected_strategy);
+        }
+      });
+  }
+
+  qs("[data-strategy-manual-entry]", root)?.addEventListener("click", () => {
+    executeManualAction("entry");
+  });
+  qs("[data-strategy-manual-exit]", root)?.addEventListener("click", () => {
+    executeManualAction("exit");
+  });
+
   qs("[data-strategy-clone]", root)?.addEventListener("click", () => {
     if (!state.selectedStrategyId) {
       return;

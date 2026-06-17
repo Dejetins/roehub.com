@@ -95,6 +95,50 @@ def test_virtual_paper_capital_reservation_does_not_require_projection() -> None
     assert reservation.source_account_snapshot_id is None
 
 
+def test_manual_paper_execution_records_idempotent_order_fill_and_accounting() -> None:
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=None,
+        clock=_Clock(),
+    )
+    source_event_id = UUID("00000000-0000-0000-0000-000000009501")
+
+    first = service.record_manual_paper_execution(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        source_event_id=source_event_id,
+        instrument_key="binance:spot:BTCUSDT",
+        market_type="spot",
+        side="buy",
+        quote_notional=Decimal("50"),
+        reference_price=Decimal("50000"),
+        now=_NOW,
+    )
+    replay = service.record_manual_paper_execution(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        source_event_id=source_event_id,
+        instrument_key="binance:spot:BTCUSDT",
+        market_type="spot",
+        side="buy",
+        quote_notional=Decimal("50"),
+        reference_price=Decimal("50000"),
+        now=_NOW,
+    )
+
+    assert replay.accounting_id == first.accounting_id
+    assert len(accounting_repository.reservations) == 1
+    assert len(accounting_repository.orders) == 1
+    assert accounting_repository.orders[0].source_event_id == source_event_id
+    assert len(accounting_repository.fills) == 1
+    assert len(accounting_repository.accounting) == 1
+
+
 @pytest.mark.parametrize(
     ("free", "observed_at", "reason"),
     (

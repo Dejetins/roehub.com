@@ -45,6 +45,8 @@ from trading.contexts.live_execution.adapters.outbound import (
 from trading.contexts.live_execution.application import (
     CapitalReservationPaperAccountingService,
     ExchangeAccountProjectionService,
+    ExecutionDispatchService,
+    ExecutionIngressService,
     StrategyPositionOwnershipService,
 )
 from trading.contexts.live_execution.domain import (
@@ -569,6 +571,7 @@ def build_strategy_router(
     *,
     environ: Mapping[str, str],
     current_user_dependency: RequireCurrentUserDependency,
+    live_execution_services: object | None = None,
 ) -> APIRouter:
     """
     Build fully wired Strategy router from runtime settings and shared identity dependency.
@@ -683,6 +686,15 @@ def build_strategy_router(
         current_user_principal_dependency=current_user_dependency,
         compatibility_readiness_service=compatibility_readiness_service,
         create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
+        strategy_run_repository=run_repository,
+        live_profile_repository=profile_repository,
+        execution_ingress_service=_execution_ingress_service(
+            live_execution_services=live_execution_services,
+        ),
+        execution_dispatch_service=_execution_dispatch_service(
+            live_execution_services=live_execution_services,
+        ),
+        paper_accounting_service=paper_accounting_service,
     )
 
 
@@ -724,6 +736,20 @@ def _build_repositories(
         InMemoryStrategyRunRepository(),
         InMemoryStrategyEventRepository(),
     )
+
+
+def _execution_ingress_service(
+    *, live_execution_services: object | None
+) -> ExecutionIngressService | None:
+    service = getattr(live_execution_services, "ingress_service", None)
+    return service if isinstance(service, ExecutionIngressService) else None
+
+
+def _execution_dispatch_service(
+    *, live_execution_services: object | None
+) -> ExecutionDispatchService | None:
+    service = getattr(live_execution_services, "dispatch_service", None)
+    return service if service is None or isinstance(service, ExecutionDispatchService) else None
 
 
 def _build_live_profile_repository(

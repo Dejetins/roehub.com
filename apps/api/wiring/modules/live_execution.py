@@ -72,11 +72,28 @@ class LiveExecutionRuntimeSettings:
     backpressure_length: int
 
 
+@dataclass(frozen=True, slots=True)
+class LiveExecutionServices:
+    ingress_service: ExecutionIngressService
+    dispatch_service: ExecutionDispatchService | None
+    repository: object
+
+
 def build_ui_execution_router_module(
     *,
     environ: Mapping[str, str],
     current_user_dependency: RequireCurrentUserDependency,
+    services: LiveExecutionServices | None = None,
 ) -> APIRouter:
+    live_execution_services = services or build_live_execution_services(environ=environ)
+    return build_ui_execution_router(
+        ingress_service=live_execution_services.ingress_service,
+        dispatch_service=live_execution_services.dispatch_service,
+        current_user_dependency=current_user_dependency,
+    )
+
+
+def build_live_execution_services(*, environ: Mapping[str, str]) -> LiveExecutionServices:
     settings = _resolve_runtime_settings(environ=environ)
     if settings.postgres_dsn:
         repository = PostgresExecutionIntentRepository(
@@ -158,10 +175,10 @@ def build_ui_execution_router_module(
                 reason=reason
             ),
         )
-    return build_ui_execution_router(
+    return LiveExecutionServices(
         ingress_service=ingress_service,
         dispatch_service=dispatch_service,
-        current_user_dependency=current_user_dependency,
+        repository=repository,
     )
 
 

@@ -23,9 +23,29 @@ from apps.api.monitoring import (
     record_strategy_variant_compatibility,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
-from trading.contexts.strategy.application.ports.current_user import CurrentUserProvider
+from trading.contexts.live_execution.application import (
+    CapitalReservationPaperAccountingService,
+    CreateExecutionIntentCommand,
+    ExecutionDispatchService,
+    ExecutionIngressService,
+    RecordExecutionSourceEventCommand,
+)
+from trading.contexts.live_execution.domain import (
+    PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
+    CapitalReservationBlockedError,
+    ExecutionRiskContext,
+    ExecutionSourceValidationError,
+)
+from trading.contexts.strategy.application.ports.current_user import (
+    CurrentUser,
+    CurrentUserProvider,
+)
 from trading.contexts.strategy.application.ports.exchange_connection_readiness import (
     ExchangeConnectionReadinessContext,
+)
+from trading.contexts.strategy.application.ports.repositories import (
+    LiveStrategyProfileRepository,
+    StrategyRunRepository,
 )
 from trading.contexts.strategy.application.use_cases import (
     SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
@@ -319,6 +339,30 @@ class BacktestVariantLaunchResponse(BaseModel):
     launch_config: dict[str, Any]
 
 
+class ManualStrategyExecutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_request_id: str | None = Field(default=None, min_length=1, max_length=128)
+    quote_notional: Decimal | None = Field(default=None, gt=0)
+    reference_price: Decimal | None = Field(default=None, gt=0)
+
+
+class ManualStrategyExecutionResponse(BaseModel):
+    status: Literal["pending", "accepted", "rejected", "unknown"]
+    action: Literal["entry", "exit"]
+    duplicate: bool
+    source_event_id: UUID
+    intent_id: UUID
+    risk_status: str
+    risk_reason: str
+    intent_status: str
+    intent_status_reason: str
+    dispatch_stream_name: str | None
+    dispatch_redis_message_id: str | None
+    paper_accounting_id: UUID | None = None
+    paper_order_state: str | None = None
+    outcome_reason: str
+
 
 def build_strategies_router(
     *,
@@ -335,6 +379,11 @@ def build_strategies_router(
     current_user_principal_dependency: CurrentUserPrincipalDependency | None = None,
     compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
     create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
+    strategy_run_repository: StrategyRunRepository | None = None,
+    live_profile_repository: LiveStrategyProfileRepository | None = None,
+    execution_ingress_service: ExecutionIngressService | None = None,
+    execution_dispatch_service: ExecutionDispatchService | None = None,
+    paper_accounting_service: CapitalReservationPaperAccountingService | None = None,
 ) -> APIRouter:
     """
     Build Strategy API router with immutable CRUD, clone, and run-control endpoints.
@@ -761,6 +810,84 @@ def build_strategies_router(
         )
         return _to_strategy_run_response(run=restarting_run)
 
+    @router.post(
+        "/strategies/{strategy_id}/manual-entry",
+        response_model=ManualStrategyExecutionResponse,
+    )
+    def post_strategy_manual_entry(
+        strategy_id: UUID,
+        request: Request,
+        response: Response,
+        payload: ManualStrategyExecutionRequest | None = None,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> ManualStrategyExecutionResponse:
+        current_user = current_user_provider.require_current_user()
+        result = _execute_manual_strategy_action(
+            action="entry",
+            strategy_id=strategy_id,
+            request=request,
+            payload=payload or ManualStrategyExecutionRequest(),
+            idempotency_key=idempotency_key,
+            current_user=current_user,
+            get_use_case=get_use_case,
+            run_repository=_require_strategy_run_repository(
+                repository=strategy_run_repository,
+            ),
+            profile_repository=_require_live_profile_repository(
+                repository=live_profile_repository,
+            ),
+            compatibility_readiness_service=compatibility_readiness_service,
+            ingress_service=_require_execution_ingress_service(
+                service=execution_ingress_service,
+            ),
+            dispatch_service=execution_dispatch_service,
+            paper_accounting_service=paper_accounting_service,
+            principal_dependency=current_user_principal_dependency,
+        )
+        if result.duplicate:
+            response.status_code = 200
+        return result
+
+    @router.post(
+        "/strategies/{strategy_id}/manual-exit",
+        response_model=ManualStrategyExecutionResponse,
+    )
+    def post_strategy_manual_exit(
+        strategy_id: UUID,
+        request: Request,
+        response: Response,
+        payload: ManualStrategyExecutionRequest | None = None,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> ManualStrategyExecutionResponse:
+        current_user = current_user_provider.require_current_user()
+        result = _execute_manual_strategy_action(
+            action="exit",
+            strategy_id=strategy_id,
+            request=request,
+            payload=payload or ManualStrategyExecutionRequest(),
+            idempotency_key=idempotency_key,
+            current_user=current_user,
+            get_use_case=get_use_case,
+            run_repository=_require_strategy_run_repository(
+                repository=strategy_run_repository,
+            ),
+            profile_repository=_require_live_profile_repository(
+                repository=live_profile_repository,
+            ),
+            compatibility_readiness_service=compatibility_readiness_service,
+            ingress_service=_require_execution_ingress_service(
+                service=execution_ingress_service,
+            ),
+            dispatch_service=execution_dispatch_service,
+            paper_accounting_service=paper_accounting_service,
+            principal_dependency=current_user_principal_dependency,
+        )
+        if result.duplicate:
+            response.status_code = 200
+        return result
+
     @router.delete("/strategies/{strategy_id}", status_code=204, response_model=None)
     def delete_strategy(
         strategy_id: UUID,
@@ -905,6 +1032,329 @@ def _require_create_strategy_from_variant_use_case(
             details={"reason": "strategy_launch_unavailable"},
         )
     return use_case
+
+
+def _require_strategy_run_repository(
+    *, repository: StrategyRunRepository | None
+) -> StrategyRunRepository:
+    if repository is None:
+        raise RoehubError(
+            code="strategy_manual_execution.unavailable",
+            message="Manual execution is not configured",
+            details={"reason": "strategy_run_repository_unavailable"},
+        )
+    return repository
+
+
+def _require_live_profile_repository(
+    *, repository: LiveStrategyProfileRepository | None
+) -> LiveStrategyProfileRepository:
+    if repository is None:
+        raise RoehubError(
+            code="strategy_manual_execution.unavailable",
+            message="Manual execution is not configured",
+            details={"reason": "live_profile_repository_unavailable"},
+        )
+    return repository
+
+
+def _require_execution_ingress_service(
+    *, service: ExecutionIngressService | None
+) -> ExecutionIngressService:
+    if service is None:
+        raise RoehubError(
+            code="strategy_manual_execution.unavailable",
+            message="Manual execution is not configured",
+            details={"reason": "execution_ingress_unavailable"},
+        )
+    return service
+
+
+def _execute_manual_strategy_action(
+    *,
+    action: Literal["entry", "exit"],
+    strategy_id: UUID,
+    request: Request,
+    payload: ManualStrategyExecutionRequest,
+    idempotency_key: str | None,
+    current_user: CurrentUser,
+    get_use_case: GetMyStrategyUseCase,
+    run_repository: StrategyRunRepository,
+    profile_repository: LiveStrategyProfileRepository,
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None,
+    ingress_service: ExecutionIngressService,
+    dispatch_service: ExecutionDispatchService | None,
+    paper_accounting_service: CapitalReservationPaperAccountingService | None,
+    principal_dependency: CurrentUserPrincipalDependency | None,
+) -> ManualStrategyExecutionResponse:
+    strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
+    active_run = run_repository.find_active_for_strategy(
+        user_id=current_user.user_id,
+        strategy_id=strategy.strategy_id,
+    )
+    if active_run is None:
+        raise RoehubError(
+            code="strategy_manual_execution.blocked",
+            message="Manual execution is blocked",
+            details={"reason": "strategy_run_inactive"},
+        )
+    profile = profile_repository.get_for_strategy(
+        owner_user_id=current_user.user_id,
+        strategy_id=strategy.strategy_id,
+    )
+    if profile is None:
+        raise RoehubError(
+            code="strategy_manual_execution.blocked",
+            message="Manual execution is blocked",
+            details={"reason": "live_profile_missing"},
+        )
+    request_key = (idempotency_key or payload.client_request_id or "").strip()
+    if not request_key:
+        raise RoehubError(
+            code="strategy_manual_execution.idempotency_required",
+            message="Manual execution requires an idempotency key",
+            details={"reason": "idempotency_key_required"},
+        )
+    direction = _manual_direction_from_run_metadata(metadata=active_run.metadata_json)
+    side = _manual_side(action=action, direction=direction)
+    quote_notional = _manual_quote_notional(payload=payload, profile=profile)
+    reference_price = payload.reference_price or Decimal("1")
+    exchange_connection_id = (
+        profile.exchange_connection_id
+        if profile.exchange_connection_id is not None
+        else PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID
+    )
+    source_key = _manual_source_idempotency_key(
+        strategy_id=strategy.strategy_id,
+        run_id=active_run.run_id,
+        action=action,
+        request_key=request_key,
+    )
+    try:
+        source_result = ingress_service.record_source_event(
+            command=RecordExecutionSourceEventCommand(
+                owner_user_id=current_user.user_id,
+                source_type="manual_request",
+                source_event_ref=f"manual:{action}:{active_run.run_id}",
+                source_ref_json={
+                    "strategy_id": str(strategy.strategy_id),
+                    "strategy_run_id": str(active_run.run_id),
+                    "action": action,
+                    "mode": profile.mode,
+                    "instrument_key": strategy.spec.instrument_key,
+                },
+                strategy_signal_id=None,
+                idempotency_key=source_key,
+            )
+        )
+        intent_result = ingress_service.create_intent(
+            command=CreateExecutionIntentCommand(
+                owner_user_id=current_user.user_id,
+                source_event_id=source_result.event.source_event_id,
+                idempotency_key=f"{source_key}|intent",
+                exchange_connection_id=exchange_connection_id,
+                market_type=strategy.spec.market_type,
+                instrument_key=strategy.spec.instrument_key,
+                order_type="market",
+                side=side,
+                quantity=None,
+                quote_notional=quote_notional,
+                limit_price=None,
+                advanced_order_flags={},
+                risk_context=_manual_risk_context(
+                    mode=profile.mode,
+                    profile_ready=profile.readiness_status == "ready",
+                    recent_auth=_recent_auth_confirmed(
+                        request=request,
+                        principal_dependency=principal_dependency,
+                    ),
+                    compatibility_readiness_service=compatibility_readiness_service,
+                    strategy_id=strategy.strategy_id,
+                    current_user=current_user,
+                ),
+            )
+        )
+    except ExecutionSourceValidationError as error:
+        raise _manual_execution_request_error(reason=error.reason) from error
+
+    intent = intent_result.intent
+    if dispatch_service is not None:
+        intent = dispatch_service.dispatch_intent(intent=intent).intent
+
+    paper_accounting_id = None
+    paper_order_state = None
+    if (
+        profile.mode == "paper"
+        and intent.risk_status == "rejected"
+        and intent.risk_reason == "paper_no_exchange_submit"
+    ):
+        if paper_accounting_service is None:
+            raise RoehubError(
+                code="strategy_manual_execution.unavailable",
+                message="Manual execution is not configured",
+                details={"reason": "paper_accounting_unavailable"},
+            )
+        try:
+            accounting = paper_accounting_service.record_manual_paper_execution(
+                owner_user_id=current_user.user_id,
+                strategy_id=strategy.strategy_id,
+                live_profile_id=profile.profile_id,
+                strategy_run_id=active_run.run_id,
+                source_event_id=source_result.event.source_event_id,
+                instrument_key=strategy.spec.instrument_key,
+                market_type=strategy.spec.market_type,
+                side=side,
+                quote_notional=quote_notional,
+                reference_price=reference_price,
+                now=intent.created_at,
+            )
+        except CapitalReservationBlockedError as error:
+            raise RoehubError(
+                code="strategy_manual_execution.blocked",
+                message="Manual execution is blocked",
+                details={"reason": error.reason},
+            ) from error
+        paper_accounting_id = accounting.accounting_id
+        paper_order_state = "filled"
+
+    status = _manual_response_status(
+        intent_status=intent.status,
+        risk_status=intent.risk_status,
+        paper_order_state=paper_order_state,
+    )
+    return ManualStrategyExecutionResponse(
+        status=status,
+        action=action,
+        duplicate=source_result.duplicate or intent_result.duplicate,
+        source_event_id=source_result.event.source_event_id,
+        intent_id=intent.intent_id,
+        risk_status=intent.risk_status,
+        risk_reason=intent.risk_reason,
+        intent_status=intent.status,
+        intent_status_reason=intent.status_reason,
+        dispatch_stream_name=intent.dispatch_stream_name,
+        dispatch_redis_message_id=intent.dispatch_redis_message_id,
+        paper_accounting_id=paper_accounting_id,
+        paper_order_state=paper_order_state,
+        outcome_reason=paper_order_state or intent.risk_reason or intent.status_reason,
+    )
+
+
+def _manual_direction_from_run_metadata(*, metadata: Mapping[str, Any]) -> str:
+    launch_config = metadata.get("launch_config")
+    if isinstance(launch_config, Mapping):
+        direction = str(launch_config.get("direction", "long")).strip().casefold()
+        if direction in {"long", "short"}:
+            return direction
+    return "long"
+
+
+def _manual_side(*, action: Literal["entry", "exit"], direction: str) -> Literal["buy", "sell"]:
+    if action == "entry":
+        return "sell" if direction == "short" else "buy"
+    return "buy" if direction == "short" else "sell"
+
+
+def _manual_quote_notional(*, payload: ManualStrategyExecutionRequest, profile) -> Decimal:
+    if payload.quote_notional is not None:
+        return payload.quote_notional
+    if profile.max_position_notional is not None and profile.max_position_notional > 0:
+        return profile.max_position_notional
+    if profile.sizing_value > 0:
+        return profile.sizing_value
+    return _DEFAULT_LAUNCH_CAPITAL_USD
+
+
+def _manual_source_idempotency_key(
+    *,
+    strategy_id: UUID,
+    run_id: UUID,
+    action: str,
+    request_key: str,
+) -> str:
+    return "|".join(("manual_request", str(strategy_id), str(run_id), action, request_key))
+
+
+def _manual_risk_context(
+    *,
+    mode: str,
+    profile_ready: bool,
+    recent_auth: bool,
+    compatibility_readiness_service: StrategyCompatibilityReadinessService | None,
+    strategy_id: UUID,
+    current_user: CurrentUser,
+) -> ExecutionRiskContext:
+    market_data_state = "ready"
+    variant_compatible = True
+    if compatibility_readiness_service is not None:
+        report = compatibility_readiness_service.check_strategy(
+            strategy_id=strategy_id,
+            current_user=current_user,
+        )
+        market_data_state = report.market_data_state
+        variant_compatible = report.compatibility_state == "launchable"
+    if mode == "paper":
+        return ExecutionRiskContext(
+            exchange_connection_active=True,
+            secret_custody_ready=True,
+            source_authorized=True,
+            strategy_variant_compatible=variant_compatible,
+            market_data_state=market_data_state,
+            strategy_binding_active=True,
+            strategy_live_profile_ready=profile_ready,
+            strategy_run_active=True,
+            position_ownership_active=True,
+            capital_reservation_active=True,
+            capital_reservation_sufficient=True,
+            paper_accounting_ready=True,
+            paper_no_exchange_submit=True,
+            manual_recent_auth=recent_auth,
+            kill_switch_open=True,
+            environment_policy_allows=True,
+            max_order_size_ok=True,
+            daily_limit_ok=True,
+        )
+    allows_testnet = mode == "testnet"
+    return ExecutionRiskContext(
+        exchange_connection_active=profile_ready and allows_testnet,
+        secret_custody_ready=profile_ready and allows_testnet,
+        source_authorized=True,
+        strategy_variant_compatible=variant_compatible,
+        market_data_state=market_data_state,
+        strategy_binding_active=profile_ready and allows_testnet,
+        strategy_live_profile_ready=profile_ready and allows_testnet,
+        strategy_run_active=True,
+        exchange_config_verified=profile_ready and allows_testnet,
+        account_state_fresh=profile_ready and allows_testnet,
+        position_ownership_active=profile_ready and allows_testnet,
+        capital_reservation_active=profile_ready and allows_testnet,
+        capital_reservation_sufficient=profile_ready and allows_testnet,
+        manual_recent_auth=recent_auth,
+        kill_switch_open=True,
+        environment_policy_allows=allows_testnet,
+        max_order_size_ok=True,
+        daily_limit_ok=True,
+    )
+
+
+def _manual_response_status(
+    *, intent_status: str, risk_status: str, paper_order_state: str | None
+) -> Literal["pending", "accepted", "rejected", "unknown"]:
+    if paper_order_state == "filled":
+        return "accepted"
+    if risk_status == "rejected" or intent_status == "rejected":
+        return "rejected"
+    if intent_status in {"accepted", "dispatching", "dispatched", "retry"}:
+        return "pending"
+    return "unknown"
+
+
+def _manual_execution_request_error(*, reason: str) -> RoehubError:
+    return RoehubError(
+        code="strategy_manual_execution.invalid_request",
+        message="Manual execution request is invalid",
+        details={"reason": reason},
+    )
 
 
 def _validated_backtest_variant_launch_config(

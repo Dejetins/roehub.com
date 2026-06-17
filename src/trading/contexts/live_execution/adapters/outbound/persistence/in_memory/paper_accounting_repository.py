@@ -106,6 +106,26 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
         )
         if existing is not None:
             return existing
+        existing_order = next(
+            (
+                item
+                for item in self.orders
+                if item.source_event_id is not None
+                and item.source_event_id == order.source_event_id
+            ),
+            None,
+        )
+        if existing_order is not None:
+            existing_accounting = next(
+                (
+                    item
+                    for item in self.accounting
+                    if item.paper_fill_id == accounting.paper_fill_id
+                ),
+                None,
+            )
+            if existing_accounting is not None:
+                return existing_accounting
         self.orders.append(order)
         self.fills.append(fill)
         self.accounting.append(accounting)

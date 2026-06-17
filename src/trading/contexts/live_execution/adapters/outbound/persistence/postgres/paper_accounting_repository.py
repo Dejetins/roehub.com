@@ -140,17 +140,17 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             INSERT INTO paper_orders
             (
                 paper_order_id, owner_user_id, strategy_id, strategy_run_id,
-                reservation_id, source_signal_id, instrument_key, market_type,
-                side, order_type, quantity, quote_notional, reference_price,
-                status, reason, created_at
+                reservation_id, source_signal_id, source_event_id, instrument_key,
+                market_type, side, order_type, quantity, quote_notional,
+                reference_price, status, reason, created_at
             )
             VALUES
             (
                 %(paper_order_id)s, %(owner_user_id)s, %(strategy_id)s,
                 %(strategy_run_id)s, %(reservation_id)s, %(source_signal_id)s,
-                %(instrument_key)s, %(market_type)s, %(side)s, %(order_type)s,
-                %(quantity)s, %(quote_notional)s, %(reference_price)s,
-                %(status)s, %(reason)s, %(created_at)s
+                %(source_event_id)s, %(instrument_key)s, %(market_type)s,
+                %(side)s, %(order_type)s, %(quantity)s, %(quote_notional)s,
+                %(reference_price)s, %(status)s, %(reason)s, %(created_at)s
             )
             ON CONFLICT (source_signal_id) DO NOTHING
             """,
@@ -268,6 +268,7 @@ def _order_params(item: PaperOrder) -> dict[str, object]:
         "strategy_run_id": str(item.strategy_run_id),
         "reservation_id": str(item.reservation_id),
         "source_signal_id": str(item.source_signal_id),
+        "source_event_id": str(item.source_event_id) if item.source_event_id else None,
         "instrument_key": item.instrument_key,
         "market_type": item.market_type,
         "side": item.side,

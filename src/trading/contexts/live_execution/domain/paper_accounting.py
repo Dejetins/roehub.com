@@ -60,6 +60,7 @@ class PaperOrder:
     status: PaperOrderStatus
     reason: str
     created_at: datetime
+    source_event_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)

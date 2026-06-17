@@ -309,6 +309,127 @@ class CapitalReservationPaperAccountingService:
         self._record_paper(result="filled", reason=accounting.completeness_reason)
         return recorded
 
+    def record_manual_paper_execution(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        live_profile_id: UUID | None,
+        strategy_run_id: UUID,
+        source_event_id: UUID,
+        instrument_key: str,
+        market_type: str,
+        side: str,
+        quote_notional: Decimal,
+        reference_price: Decimal,
+        now: datetime,
+    ) -> StrategyPaperAccountingSnapshot:
+        if side not in {"buy", "sell"}:
+            raise CapitalReservationBlockedError(reason="paper_manual_invalid_side")
+        if quote_notional <= 0:
+            raise CapitalReservationBlockedError(reason="paper_manual_invalid_notional")
+        if reference_price <= 0:
+            raise CapitalReservationBlockedError(reason="paper_manual_invalid_reference_price")
+        reservation = self._repository.get_active_reservation_for_run(
+            owner_user_id=owner_user_id,
+            strategy_run_id=strategy_run_id,
+        )
+        if reservation is None:
+            reservation = self.reserve_virtual_for_strategy_run(
+                owner_user_id=owner_user_id,
+                strategy_id=strategy_id,
+                live_profile_id=live_profile_id,
+                strategy_run_id=strategy_run_id,
+                requested_amount=quote_notional,
+                now=now,
+            )
+        quote_amount = min(quote_notional, reservation.reserved_amount)
+        if quote_amount <= 0:
+            raise CapitalReservationBlockedError(reason="capital_reservation_insufficient")
+        quantity = (quote_amount / reference_price).quantize(
+            _QUANTITY_QUANT,
+            rounding=ROUND_DOWN,
+        )
+        fee_amount = (quote_amount * _FEE_BPS / Decimal("10000")).quantize(_MONEY_QUANT)
+        funding_model, pnl_complete, completeness_reason = _paper_completeness(
+            market_type=market_type,
+            side=side,
+        )
+        order = PaperOrder(
+            paper_order_id=_stable_uuid("manual-paper-order", source_event_id),
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+            strategy_run_id=strategy_run_id,
+            reservation_id=reservation.reservation_id,
+            source_signal_id=source_event_id,
+            source_event_id=source_event_id,
+            instrument_key=instrument_key,
+            market_type=market_type,
+            side=side,  # type: ignore[arg-type]
+            order_type="market",
+            quantity=quantity,
+            quote_notional=quote_amount,
+            reference_price=reference_price,
+            status="filled",
+            reason="paper_market_fill_from_manual_request",
+            created_at=now,
+        )
+        fill = PaperFill(
+            paper_fill_id=_stable_uuid("manual-paper-fill", source_event_id),
+            paper_order_id=order.paper_order_id,
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+            strategy_run_id=strategy_run_id,
+            instrument_key=instrument_key,
+            side=side,  # type: ignore[arg-type]
+            quantity=quantity,
+            fill_price=reference_price,
+            quote_notional=quote_amount,
+            fee_amount=fee_amount,
+            fee_asset=_QUOTE_ASSET,
+            funding_amount=Decimal("0"),
+            funding_asset=_QUOTE_ASSET,
+            filled_at=now,
+        )
+        position_quantity = quantity if side == "buy" else -quantity
+        cash_balance = (
+            reservation.reserved_amount - quote_amount - fee_amount
+            if side == "buy"
+            else reservation.reserved_amount - fee_amount
+        )
+        mark_to_market_value = quote_amount if side == "buy" else Decimal("0")
+        accounting = StrategyPaperAccountingSnapshot(
+            accounting_id=_stable_uuid("manual-paper-accounting", source_event_id),
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+            strategy_run_id=strategy_run_id,
+            reservation_id=reservation.reservation_id,
+            paper_fill_id=fill.paper_fill_id,
+            instrument_key=instrument_key,
+            market_type=market_type,
+            position_quantity=position_quantity,
+            average_entry_price=reference_price if position_quantity != 0 else None,
+            reserved_budget=reservation.reserved_amount,
+            cash_balance=cash_balance,
+            equity=(cash_balance + mark_to_market_value).quantize(_MONEY_QUANT),
+            realized_pnl=Decimal("0"),
+            unrealized_pnl=Decimal("0") - fee_amount,
+            fee_total=fee_amount,
+            funding_total=Decimal("0"),
+            fee_model="paper_fixed_bps_10",
+            funding_model=funding_model,
+            pnl_complete=pnl_complete,
+            completeness_reason=completeness_reason,
+            created_at=now,
+        )
+        recorded = self._repository.record_paper_execution(
+            order=order,
+            fill=fill,
+            accounting=accounting,
+        )
+        self._record_paper(result="filled", reason=recorded.completeness_reason)
+        return recorded
+
     def get_latest_accounting_for_strategy(
         self, *, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None:

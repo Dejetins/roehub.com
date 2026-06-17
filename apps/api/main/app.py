@@ -20,6 +20,7 @@ from apps.api.wiring.modules import (
     build_identity_api_module,
     build_indicators_compute,
     build_indicators_registry,
+    build_live_execution_services,
     build_market_data_reference_router,
     build_strategy_router,
     build_ui_account_router,
@@ -85,11 +86,13 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.include_router(build_operations_router())
     identity_module = build_identity_api_module(environ=effective_environ)
     app.include_router(identity_module.router)
+    live_execution_services = build_live_execution_services(environ=effective_environ)
     if is_strategy_api_enabled(environ=effective_environ):
         app.include_router(
             build_strategy_router(
                 environ=effective_environ,
                 current_user_dependency=identity_module.current_user_dependency,
+                live_execution_services=live_execution_services,
             )
         )
     else:
@@ -116,6 +119,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         build_ui_execution_router_module(
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
+            services=live_execution_services,
         )
     )
     app.include_router(
