@@ -613,7 +613,10 @@ class StrategyLiveRunner:
             confidence=decision.confidence,
             source_message_id=source_message_id,
             evaluator_version=decision.evaluator_version,
-            expected_order_json={},
+            expected_order_json=_expected_paper_order_json(
+                profile=profile,
+                outcome=decision.outcome,
+            ),
             created_at=run.updated_at,
         )
         persisted = self._signal_repository.record(signal=signal)
@@ -903,11 +906,19 @@ class StrategyLiveRunner:
         if self._capital_reservation_coordinator is None:
             return
         profile = self._load_live_profile(run=run)
-        if (
-            profile is None
-            or profile.exchange_connection_id is None
-            or profile.mode not in {"paper", "live", "testnet"}
-        ):
+        if profile is None:
+            return
+        if profile.mode == "paper":
+            self._capital_reservation_coordinator.reserve_virtual_for_strategy_run(
+                owner_user_id=run.user_id,
+                strategy_id=run.strategy_id,
+                live_profile_id=profile.profile_id,
+                strategy_run_id=run.run_id,
+                requested_amount=profile.sizing_value,
+                now=now,
+            )
+            return
+        if profile.exchange_connection_id is None or profile.mode not in {"live", "testnet"}:
             return
         self._capital_reservation_coordinator.reserve_for_strategy_run(
             owner_user_id=run.user_id,
@@ -1702,13 +1713,29 @@ def _signal_id(*, run: StrategyRun, candle: CandleWithMeta) -> UUID:
     return uuid5(NAMESPACE_URL, key)
 
 
+def _expected_paper_order_json(
+    *, profile: LiveStrategyProfile | None, outcome: str
+) -> dict[str, object]:
+    if profile is None or profile.mode != "paper" or outcome != "signal":
+        return {}
+    payload: dict[str, object] = {
+        "schema": "strategy_signal_expected_order_v1",
+        "mode": "paper",
+        "quote_notional": str(profile.sizing_value),
+        "paper_no_exchange_submit": True,
+    }
+    if profile.exchange_connection_id is not None:
+        payload["exchange_connection_id"] = str(profile.exchange_connection_id)
+    return payload
+
+
 def _mode_reason_code(*, mode: str, reason_code: str) -> str:
     if reason_code == "unsupported_live_evaluator":
         return reason_code
     if mode == "monitor_only" and reason_code.startswith("ma_fast_crossed_"):
         return f"{reason_code}_monitor_only_no_intent"
     if mode == "paper" and reason_code.startswith("ma_fast_crossed_"):
-        return f"{reason_code}_paper_no_order_stage05"
+        return f"{reason_code}_paper_no_exchange_submit"
     if mode == "live" and reason_code.startswith("ma_fast_crossed_"):
         return f"{reason_code}_live_no_order_stage05"
     if mode == "testnet" and reason_code.startswith("ma_fast_crossed_"):

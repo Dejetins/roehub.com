@@ -4,6 +4,7 @@ from .ports import (
     ExecutionIntentRepository,
     LiveExecutionClock,
     PaperAccountingRepository,
+    PaperScenarioCoverageRepository,
     StrategyPositionOwnershipRepository,
 )
 from .use_cases import (
@@ -21,6 +22,7 @@ from .use_cases import (
     ExecutionIntentResult,
     ExecutionNotificationResult,
     ExecutionSourceEventResult,
+    PaperScenarioCoverageService,
     RecordExecutionSourceEventCommand,
     StrategyPositionOwnershipService,
 )
@@ -45,6 +47,8 @@ __all__ = [
     "ExecutionSourceEventResult",
     "LiveExecutionClock",
     "PaperAccountingRepository",
+    "PaperScenarioCoverageRepository",
+    "PaperScenarioCoverageService",
     "RecordExecutionSourceEventCommand",
     "StrategyPositionOwnershipRepository",
     "StrategyPositionOwnershipService",

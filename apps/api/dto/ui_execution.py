@@ -64,6 +64,7 @@ class ExecutionRiskContextRequest(BaseModel):
     capital_reservation_active: bool = False
     capital_reservation_sufficient: bool = False
     paper_accounting_ready: bool = False
+    paper_no_exchange_submit: bool = False
     manual_recent_auth: bool = False
     ml_agent_policy_active: bool = False
     kill_switch_open: bool = False

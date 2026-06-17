@@ -171,8 +171,33 @@ class RunStrategyUseCase:
             if (
                 self._capital_reservation_coordinator is not None
                 and profile is not None
+                and profile.mode == "paper"
+            ):
+                try:
+                    self._capital_reservation_coordinator.reserve_virtual_for_strategy_run(
+                        owner_user_id=current_user.user_id,
+                        strategy_id=strategy.strategy_id,
+                        live_profile_id=profile.profile_id,
+                        strategy_run_id=run_id,
+                        requested_amount=profile.sizing_value,
+                        now=run_started_at,
+                    )
+                except Exception as error:  # noqa: BLE001
+                    reason = getattr(error, "reason", None) or "capital_reservation_blocked"
+                    raise RoehubError(
+                        code="strategy_run.capital_reservation_blocked",
+                        message="Strategy run is blocked by capital reservation",
+                        details={
+                            "reason": str(reason),
+                            "strategy_id": str(strategy.strategy_id),
+                        },
+                    ) from error
+                reserved_capital = True
+            elif (
+                self._capital_reservation_coordinator is not None
+                and profile is not None
                 and profile.exchange_connection_id is not None
-                and profile.mode in {"paper", "live", "testnet"}
+                and profile.mode in {"live", "testnet"}
             ):
                 try:
                     self._capital_reservation_coordinator.reserve_for_strategy_run(

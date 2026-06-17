@@ -19,6 +19,7 @@ from .execution_ingress import (
     RecordExecutionSourceEventCommand,
 )
 from .paper_accounting import CapitalReservationPaperAccountingService
+from .paper_coverage import PaperScenarioCoverageService
 from .position_ownership import StrategyPositionOwnershipService
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "ExecutionNotificationResult",
     "ExecutionSourceEventResult",
     "ExchangeAccountProjectionService",
+    "PaperScenarioCoverageService",
     "RecordExecutionSourceEventCommand",
     "StrategyPositionOwnershipService",
 ]

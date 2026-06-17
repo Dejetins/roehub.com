@@ -70,6 +70,7 @@ from .order_execution import (
     ExecutionReconciliationStatus,
 )
 from .paper_accounting import (
+    PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
     CapitalReservation,
     CapitalReservationBlockedError,
     CapitalReservationState,
@@ -78,6 +79,10 @@ from .paper_accounting import (
     PaperOrderStatus,
     PaperSide,
     StrategyPaperAccountingSnapshot,
+)
+from .paper_coverage import (
+    PaperScenarioCoverageResult,
+    PaperScenarioCoverageState,
 )
 from .position_ownership import (
     BLOCKING_POSITION_OWNERSHIP_STATES,
@@ -156,9 +161,12 @@ __all__ = [
     "ExchangeOpenOrderSnapshot",
     "ExchangePositionSnapshot",
     "ExpectedInstrumentConfig",
+    "PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID",
     "PaperFill",
     "PaperOrder",
     "PaperOrderStatus",
+    "PaperScenarioCoverageResult",
+    "PaperScenarioCoverageState",
     "PaperSide",
     "RiskStatus",
     "StrategyPaperAccountingSnapshot",

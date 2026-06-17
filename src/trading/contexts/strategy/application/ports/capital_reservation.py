@@ -10,6 +10,17 @@ from trading.shared_kernel.primitives import UserId
 
 
 class StrategyCapitalReservationCoordinator(Protocol):
+    def reserve_virtual_for_strategy_run(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        live_profile_id: UUID | None,
+        strategy_run_id: UUID,
+        requested_amount: Decimal,
+        now: datetime,
+    ) -> object: ...
+
     def reserve_for_strategy_run(
         self,
         *,

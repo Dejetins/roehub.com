@@ -12,6 +12,13 @@ from apps.worker.strategy_live_runner.wiring.modules.strategy_live_runner import
     StrategyLiveRunnerMetrics,
     _require_non_empty_env_value,
 )
+from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
+    InMemoryExecutionIntentRepository,
+)
+from trading.contexts.live_execution.application import ExecutionIngressService
+from trading.contexts.strategy.adapters.outbound.acl.live_execution_producer import (
+    LiveExecutionStrategySignalProducer,
+)
 from trading.contexts.strategy.adapters.outbound.config import StrategyProducerRuntimeConfig
 from trading.contexts.strategy.domain.entities import StrategySignal
 from trading.shared_kernel.primitives import UserId
@@ -23,6 +30,11 @@ class _ExecutionProducerSpy:
 
     def record_signal(self, *, signal: StrategySignal) -> None:
         self.signals.append(signal)
+
+
+class _Clock:
+    def now(self) -> datetime:
+        return datetime(2026, 6, 17, 10, 2, tzinfo=timezone.utc)
 
 
 def test_require_non_empty_env_value_returns_secret() -> None:
@@ -130,6 +142,34 @@ def test_guarded_strategy_execution_producer_allows_paper_user_allowlist() -> No
     assert created == [signal]
 
 
+def test_live_execution_producer_records_paper_no_dispatch_intent() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    signal = _signal(
+        mode="paper",
+        expected_order_json={
+            "schema": "strategy_signal_expected_order_v1",
+            "mode": "paper",
+            "quote_notional": "50",
+            "paper_no_exchange_submit": True,
+        },
+    )
+    producer = LiveExecutionStrategySignalProducer(
+        ingress_service=ExecutionIngressService(repository=repository, clock=_Clock()),
+        repository=repository,
+    )
+
+    producer.record_signal(signal=signal)
+
+    assert len(repository.source_events) == 1
+    assert len(repository.intents) == 1
+    assert repository.source_events[0].outcome == "risk_rejected"
+    assert repository.source_events[0].outcome_reason == "paper_no_exchange_submit"
+    assert repository.source_events[0].intent_id == repository.intents[0].intent_id
+    assert repository.intents[0].status == "rejected"
+    assert repository.intents[0].risk_reason == "paper_no_exchange_submit"
+    assert repository.intents[0].dispatch_stream_name is None
+
+
 def test_guarded_strategy_execution_producer_blocks_live_mode_even_when_allow_all() -> None:
     """
     Ensure Stage 06 producer has no live/mainnet mode path.
@@ -173,7 +213,9 @@ def test_strategy_producer_metrics_do_not_use_user_or_strategy_labels() -> None:
     assert str(signal.strategy_id) not in payload
 
 
-def _signal(*, mode: str) -> StrategySignal:
+def _signal(
+    *, mode: str, expected_order_json: dict[str, object] | None = None
+) -> StrategySignal:
     bar_ts_open = datetime(2026, 6, 17, 10, 0, tzinfo=timezone.utc)
     return StrategySignal(
         signal_id=UUID("00000000-0000-0000-0000-000000000903"),
@@ -190,11 +232,11 @@ def _signal(*, mode: str) -> StrategySignal:
         signal_action="open",
         side="buy",
         outcome="signal",
-        reason_code="ma_fast_crossed_above_slow_paper_no_order_stage05",
+        reason_code="ma_fast_crossed_above_slow_paper_no_exchange_submit",
         reference_price=Decimal("50000"),
         confidence=Decimal("1"),
         source_message_id="m-1",
         evaluator_version="test",
-        expected_order_json={},
+        expected_order_json=expected_order_json or {},
         created_at=bar_ts_open + timedelta(minutes=1),
     )

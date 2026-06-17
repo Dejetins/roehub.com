@@ -156,6 +156,49 @@ def test_risk_gate_rejects_missing_context_and_records_audit() -> None:
     assert repository.notifications[0].reason == "risk_state_unavailable"
 
 
+def test_paper_strategy_signal_records_no_dispatch_intent() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    signal_id = UUID("00000000-0000-0000-0000-000000010102")
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="strategy_signal",
+            source_event_ref=str(signal_id),
+            source_ref_json={
+                "strategy_id": str(UUID("00000000-0000-0000-0000-000000010301")),
+                "strategy_run_id": str(UUID("00000000-0000-0000-0000-000000010302")),
+                "signal_id": str(signal_id),
+                "mode": "paper",
+                "action": "open",
+            },
+            strategy_signal_id=signal_id,
+            idempotency_key="paper-source-key",
+        )
+    )
+
+    result = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key="paper-intent-key",
+            risk_context=_accepted_context(
+                exchange_config_verified=False,
+                account_state_fresh=False,
+                paper_no_exchange_submit=True,
+            ),
+        )
+    )
+
+    assert result.intent.status == "rejected"
+    assert result.intent.risk_status == "rejected"
+    assert result.intent.risk_reason == "paper_no_exchange_submit"
+    assert result.intent.dispatch_stream_name is None
+    assert repository.risk_audit_events[0].event_type == "risk_gate_rejected"
+    assert repository.risk_audit_events[0].metadata_json == {"dispatch": "no-dispatch"}
+    assert repository.source_events[0].outcome == "risk_rejected"
+    assert repository.source_events[0].intent_id == result.intent.intent_id
+
+
 @pytest.mark.parametrize(
     ("source_type", "context_overrides", "reason"),
     (

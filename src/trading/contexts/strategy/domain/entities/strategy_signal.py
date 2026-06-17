@@ -18,6 +18,16 @@ StrategySignalOutcome = Literal["warmup", "no_signal", "signal", "blocked"]
 _ALLOWED_ACTIONS = {"none", "open", "close", "reduce", "reverse"}
 _ALLOWED_SIDES = {"buy", "sell"}
 _ALLOWED_OUTCOMES = {"warmup", "no_signal", "signal", "blocked"}
+_EXPECTED_ORDER_SCHEMA_V1 = "strategy_signal_expected_order_v1"
+_ALLOWED_EXPECTED_ORDER_KEYS = frozenset(
+    {
+        "schema",
+        "mode",
+        "quote_notional",
+        "exchange_connection_id",
+        "paper_no_exchange_submit",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +97,7 @@ class StrategySignal:
         if self.created_at is not None:
             _ensure_utc_datetime(name="created_at", value=self.created_at)
         if self.expected_order_json:
-            raise ValueError("Stage 05 StrategySignal expected_order_json must stay empty")
+            _validate_expected_order_json(value=self.expected_order_json)
 
 
 def _ensure_utc_datetime(*, name: str, value: datetime) -> None:
@@ -96,3 +106,30 @@ def _ensure_utc_datetime(*, name: str, value: datetime) -> None:
         raise ValueError(f"{name} must be timezone-aware UTC datetime")
     if offset.total_seconds() != 0:
         raise ValueError(f"{name} must be UTC datetime")
+
+
+def _validate_expected_order_json(*, value: Mapping[str, Any]) -> None:
+    keys = frozenset(str(key) for key in value)
+    unknown = keys - _ALLOWED_EXPECTED_ORDER_KEYS
+    if unknown:
+        raise ValueError("StrategySignal expected_order_json has unsupported keys")
+    if value.get("schema") != _EXPECTED_ORDER_SCHEMA_V1:
+        raise ValueError("StrategySignal expected_order_json schema is unsupported")
+    if value.get("mode") != "paper":
+        raise ValueError("StrategySignal expected_order_json mode is unsupported")
+    if value.get("paper_no_exchange_submit") is not True:
+        raise ValueError("StrategySignal expected_order_json must be paper no-dispatch")
+    try:
+        quote_notional = Decimal(str(value.get("quote_notional", "")))
+    except Exception as error:  # noqa: BLE001
+        raise ValueError("StrategySignal expected_order_json quote_notional is invalid") from error
+    if quote_notional <= 0:
+        raise ValueError("StrategySignal expected_order_json quote_notional must be > 0")
+    exchange_connection_id = value.get("exchange_connection_id")
+    if exchange_connection_id is not None:
+        try:
+            UUID(str(exchange_connection_id))
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "StrategySignal expected_order_json exchange_connection_id is invalid"
+            ) from error

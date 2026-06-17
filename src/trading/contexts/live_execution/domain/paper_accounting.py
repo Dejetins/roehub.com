@@ -8,6 +8,8 @@ from uuid import UUID
 
 from trading.shared_kernel.primitives import UserId
 
+PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID = UUID("00000000-0000-0000-0000-00000000a007")
+
 CapitalReservationState = Literal["reserved", "released", "rejected", "stale_requires_repair"]
 PaperOrderStatus = Literal["filled", "rejected"]
 PaperSide = Literal["buy", "sell"]

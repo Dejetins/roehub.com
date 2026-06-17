@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from decimal import Decimal
+from uuid import UUID
+
 from trading.contexts.live_execution.application import (
+    CreateExecutionIntentCommand,
     ExecutionIngressService,
     ExecutionIntentRepository,
     RecordExecutionSourceEventCommand,
+)
+from trading.contexts.live_execution.domain import (
+    PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
+    ExecutionRiskContext,
 )
 from trading.contexts.strategy.application.ports import StrategyExecutionProducer
 from trading.contexts.strategy.domain.entities import StrategySignal
@@ -40,6 +48,25 @@ class LiveExecutionStrategySignalProducer(StrategyExecutionProducer):
                 idempotency_key=_signal_idempotency_key(signal=signal),
             )
         )
+        if signal.mode == "paper" and signal.outcome == "signal":
+            self._ingress_service.create_intent(
+                command=CreateExecutionIntentCommand(
+                    owner_user_id=signal.owner_user_id,
+                    source_event_id=result.event.source_event_id,
+                    idempotency_key=_signal_intent_idempotency_key(signal=signal),
+                    exchange_connection_id=_expected_exchange_connection_id(signal=signal),
+                    market_type=signal.market_type,
+                    instrument_key=signal.instrument_key,
+                    order_type="market",
+                    side=signal.side or "buy",
+                    quantity=None,
+                    quote_notional=_expected_quote_notional(signal=signal),
+                    limit_price=None,
+                    advanced_order_flags={},
+                    risk_context=_paper_no_dispatch_context(),
+                )
+            )
+            return
         if signal.mode == "monitor_only" or signal.outcome != "signal":
             self._repository.update_source_event_outcome(
                 owner_user_id=signal.owner_user_id,
@@ -48,6 +75,46 @@ class LiveExecutionStrategySignalProducer(StrategyExecutionProducer):
                 outcome_reason=signal.reason_code,
                 intent_id=None,
             )
+
+
+def _signal_intent_idempotency_key(*, signal: StrategySignal) -> str:
+    return f"{_signal_idempotency_key(signal=signal)}|paper-intent"
+
+
+def _expected_quote_notional(*, signal: StrategySignal) -> Decimal:
+    raw_value = signal.expected_order_json.get("quote_notional")
+    return Decimal(str(raw_value))
+
+
+def _expected_exchange_connection_id(*, signal: StrategySignal) -> UUID:
+    raw_value = signal.expected_order_json.get("exchange_connection_id")
+    if raw_value is None:
+        return PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID
+    return UUID(str(raw_value))
+
+
+def _paper_no_dispatch_context() -> ExecutionRiskContext:
+    return ExecutionRiskContext(
+        exchange_connection_active=True,
+        secret_custody_ready=True,
+        source_authorized=True,
+        strategy_variant_compatible=True,
+        market_data_state="ready",
+        strategy_binding_active=True,
+        strategy_live_profile_ready=True,
+        strategy_run_active=True,
+        exchange_config_verified=False,
+        account_state_fresh=False,
+        position_ownership_active=True,
+        capital_reservation_active=True,
+        capital_reservation_sufficient=True,
+        paper_accounting_ready=True,
+        paper_no_exchange_submit=True,
+        kill_switch_open=True,
+        environment_policy_allows=True,
+        max_order_size_ok=True,
+        daily_limit_ok=True,
+    )
 
 
 def _signal_idempotency_key(*, signal: StrategySignal) -> str:

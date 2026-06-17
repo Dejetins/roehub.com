@@ -22,6 +22,7 @@ from .order_execution import (
     ExchangeOrderAdapterError,
 )
 from .paper_accounting_repository import PaperAccountingRepository
+from .paper_coverage_repository import PaperScenarioCoverageRepository
 from .position_ownership_repository import StrategyPositionOwnershipRepository
 
 __all__ = [
@@ -43,5 +44,6 @@ __all__ = [
     "ExecutionDispatchUnavailableError",
     "LiveExecutionClock",
     "PaperAccountingRepository",
+    "PaperScenarioCoverageRepository",
     "StrategyPositionOwnershipRepository",
 ]

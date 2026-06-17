@@ -28,6 +28,7 @@ class ExecutionRiskContext:
     capital_reservation_active: bool = False
     capital_reservation_sufficient: bool = False
     paper_accounting_ready: bool = False
+    paper_no_exchange_submit: bool = False
     manual_recent_auth: bool = False
     ml_agent_policy_active: bool = False
     kill_switch_open: bool = False
@@ -152,6 +153,14 @@ def _evaluate_strategy_signal_context(
         return _reject(
             check_name="market_data_ready",
             reason=f"market_data_{context.market_data_state or 'missing'}",
+        )
+    if context.paper_no_exchange_submit:
+        strategy_decision = _first_rejection(checks)
+        if strategy_decision is not None:
+            return strategy_decision
+        return _reject(
+            check_name="paper_no_exchange_submit",
+            reason="paper_no_exchange_submit",
         )
     account_decision = _evaluate_account_context(context=context)
     if account_decision is not None:

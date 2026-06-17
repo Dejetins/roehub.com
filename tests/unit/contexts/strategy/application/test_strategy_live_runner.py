@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Callable, Mapping, Sequence
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from trading.contexts.market_data.application.dto import (
     CanonicalCandleBatch1m,
 )
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
+    InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
     InMemoryStrategySignalRepository,
@@ -31,7 +33,12 @@ from trading.contexts.strategy.application.services import (
     TimeframeRollupPolicy,
     TimeframeRollupProgress,
 )
-from trading.contexts.strategy.domain.entities import Strategy, StrategyRun, StrategySpecV1
+from trading.contexts.strategy.domain.entities import (
+    LiveStrategyProfile,
+    Strategy,
+    StrategyRun,
+    StrategySpecV1,
+)
 from trading.shared_kernel.primitives import (
     Candle,
     CandleMeta,
@@ -1062,6 +1069,77 @@ def test_live_runner_records_warmup_no_signal_and_signal_journal() -> None:
     assert latest.expected_order_json == {}
 
 
+def test_live_runner_attaches_expected_paper_order_payload_for_paper_signal() -> None:
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000927")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m", fast=2, slow=3)
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    signal_repository = InMemoryStrategySignalRepository()
+    profile_repository = InMemoryLiveStrategyProfileRepository()
+    strategy_repository.create(strategy=strategy)
+    profile_repository.create(
+        profile=LiveStrategyProfile(
+            profile_id=UUID("00000000-0000-0000-0000-00000000F927"),
+            owner_user_id=user_id,
+            strategy_id=strategy.strategy_id,
+            mode="paper",
+            exchange_connection_id=None,
+            sizing_method="fixed_quote",
+            sizing_value=Decimal("50"),
+            max_position_notional=Decimal("50"),
+            max_orders_per_run=1,
+            max_notional_per_run=Decimal("50"),
+            readiness_status="ready",
+            readiness_reason="paper_no_exchange_submit",
+            created_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
+        )
+    )
+    run_repository.create(
+        run=StrategyRun.start(
+            run_id=UUID("00000000-0000-0000-0000-00000000E927"),
+            user_id=user_id,
+            strategy_id=strategy.strategy_id,
+            started_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
+            metadata_json={},
+        )
+    )
+    candles = (
+        _message("m-1", _candle_at(datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc), close=3)),
+        _message("m-2", _candle_at(datetime(2026, 2, 17, 19, 1, tzinfo=timezone.utc), close=2)),
+        _message("m-3", _candle_at(datetime(2026, 2, 17, 19, 2, tzinfo=timezone.utc), close=1)),
+        _message("m-4", _candle_at(datetime(2026, 2, 17, 19, 3, tzinfo=timezone.utc), close=4)),
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=_StreamStub(messages_by_instrument={strategy.spec.instrument_key: candles}),
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        signal_repository=signal_repository,
+        live_profile_repository=profile_repository,
+        warmup_estimator=lambda **_kwargs: 1,
+    )
+
+    runner.run_once()
+    signals = signal_repository.list_latest_for_strategy(
+        owner_user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        limit=10,
+    )
+    latest = sorted(signals, key=lambda signal: signal.bar_ts_open)[-1]
+
+    assert latest.mode == "paper"
+    assert latest.outcome == "signal"
+    assert latest.reason_code == "ma_fast_crossed_above_slow_paper_no_exchange_submit"
+    assert latest.expected_order_json == {
+        "schema": "strategy_signal_expected_order_v1",
+        "mode": "paper",
+        "quote_notional": "50",
+        "paper_no_exchange_submit": True,
+    }
+
+
 def test_live_runner_blocks_unsupported_signal_template_without_order_dispatch() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000000926")
     strategy = _create_strategy(
@@ -1128,6 +1206,7 @@ def _build_runner(
     telegram_notifier_probe: _TelegramNotifierProbe | None = None,
     telegram_policy: TelegramNotificationPolicy | None = None,
     signal_repository: InMemoryStrategySignalRepository | None = None,
+    live_profile_repository: InMemoryLiveStrategyProfileRepository | None = None,
     position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
     warmup_estimator: Callable[..., int] | None = None,
     rollup_policy: TimeframeRollupPolicy | None = None,
@@ -1167,6 +1246,7 @@ def _build_runner(
         repair_retry_attempts=retry_attempts,
         repair_backoff_seconds=1.0,
         realtime_output_publisher=realtime_output_probe,
+        live_profile_repository=live_profile_repository,
         position_ownership_coordinator=position_ownership_coordinator,
         telegram_notifier=telegram_notifier_probe,
         telegram_notification_policy=telegram_policy,

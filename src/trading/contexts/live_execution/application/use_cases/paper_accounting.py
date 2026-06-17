@@ -11,6 +11,7 @@ from trading.contexts.live_execution.application.ports import (
     PaperAccountingRepository,
 )
 from trading.contexts.live_execution.domain import (
+    PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
     CapitalReservation,
     CapitalReservationBlockedError,
     PaperFill,
@@ -152,6 +153,51 @@ class CapitalReservationPaperAccountingService:
         self._record_capital(result="reserved", reason="capital_reserved")
         return recorded
 
+    def reserve_virtual_for_strategy_run(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        live_profile_id: UUID | None,
+        strategy_run_id: UUID,
+        requested_amount: Decimal,
+        now: datetime,
+    ) -> CapitalReservation:
+        if requested_amount <= 0:
+            return self._reject(
+                owner_user_id=owner_user_id,
+                exchange_connection_id=PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
+                strategy_id=strategy_id,
+                live_profile_id=live_profile_id,
+                strategy_run_id=strategy_run_id,
+                requested_amount=requested_amount,
+                now=now,
+                reason="capital_reservation_invalid_amount",
+                source_account_snapshot_id=None,
+            )
+        reservation = CapitalReservation(
+            reservation_id=uuid4(),
+            owner_user_id=owner_user_id,
+            exchange_connection_id=PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
+            strategy_id=strategy_id,
+            live_profile_id=live_profile_id,
+            strategy_run_id=strategy_run_id,
+            asset=_QUOTE_ASSET,
+            requested_amount=requested_amount,
+            reserved_amount=requested_amount,
+            state="reserved",
+            source_account_snapshot_id=None,
+            acquired_at=now,
+            released_at=None,
+            reason="paper_virtual_capital_reserved",
+            fee_model="paper_fixed_bps_10",
+            funding_model="paper_signal_dependent",
+            pnl_complete=False,
+        )
+        recorded = self._repository.record_reservation(reservation=reservation)
+        self._record_capital(result="reserved", reason=recorded.reason)
+        return recorded
+
     def release_for_strategy_run(
         self, *, owner_user_id: UserId, strategy_run_id: UUID, now: datetime, reason: str
     ) -> CapitalReservation | None:
@@ -185,12 +231,9 @@ class CapitalReservationPaperAccountingService:
             rounding=ROUND_DOWN,
         )
         fee_amount = (quote_notional * _FEE_BPS / Decimal("10000")).quantize(_MONEY_QUANT)
-        funding_model = "spot_not_applicable" if signal.market_type == "spot" else "funding_unknown"
-        pnl_complete = funding_model == "spot_not_applicable"
-        completeness_reason = (
-            "paper_fee_fixed_bps_funding_not_applicable"
-            if pnl_complete
-            else "paper_funding_unknown"
+        funding_model, pnl_complete, completeness_reason = _paper_completeness(
+            market_type=signal.market_type,
+            side=signal.side,
         )
         order = PaperOrder(
             paper_order_id=_stable_uuid("paper-order", signal.signal_id),
@@ -227,8 +270,13 @@ class CapitalReservationPaperAccountingService:
             funding_asset=_QUOTE_ASSET,
             filled_at=created_at,
         )
-        position_quantity = quantity if signal.side == "buy" else Decimal("0")
-        cash_balance = reservation.reserved_amount - quote_notional - fee_amount
+        position_quantity = quantity if signal.side == "buy" else -quantity
+        cash_balance = (
+            reservation.reserved_amount - quote_notional - fee_amount
+            if signal.side == "buy"
+            else reservation.reserved_amount - fee_amount
+        )
+        mark_to_market_value = quote_notional if signal.side == "buy" else Decimal("0")
         accounting = StrategyPaperAccountingSnapshot(
             accounting_id=_stable_uuid("paper-accounting", signal.signal_id),
             owner_user_id=signal.owner_user_id,
@@ -239,10 +287,10 @@ class CapitalReservationPaperAccountingService:
             instrument_key=signal.instrument_key,
             market_type=signal.market_type,
             position_quantity=position_quantity,
-            average_entry_price=signal.reference_price if position_quantity > 0 else None,
+            average_entry_price=signal.reference_price if position_quantity != 0 else None,
             reserved_budget=reservation.reserved_amount,
             cash_balance=cash_balance,
-            equity=(cash_balance + quote_notional - fee_amount).quantize(_MONEY_QUANT),
+            equity=(cash_balance + mark_to_market_value).quantize(_MONEY_QUANT),
             realized_pnl=Decimal("0"),
             unrealized_pnl=Decimal("0") - fee_amount,
             fee_total=fee_amount,
@@ -316,3 +364,22 @@ class CapitalReservationPaperAccountingService:
 
 def _stable_uuid(prefix: str, source_id: UUID) -> UUID:
     return uuid5(NAMESPACE_URL, f"roehub:{prefix}:{source_id}")
+
+
+def _paper_completeness(
+    *, market_type: str, side: str
+) -> tuple[str, bool, str]:
+    normalized_market = market_type.strip().casefold()
+    if normalized_market == "spot" and side == "sell":
+        return (
+            "spot_borrow_not_modeled",
+            False,
+            "paper_spot_short_borrow_not_modeled",
+        )
+    if normalized_market == "spot":
+        return (
+            "spot_not_applicable",
+            True,
+            "paper_fee_fixed_bps_funding_not_applicable",
+        )
+    return ("funding_unknown", False, "paper_funding_unknown")

@@ -72,6 +72,29 @@ def test_capital_reservation_uses_fresh_projection_and_releases() -> None:
     ) == Decimal("0")
 
 
+def test_virtual_paper_capital_reservation_does_not_require_projection() -> None:
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=None,
+        clock=_Clock(),
+    )
+
+    reservation = service.reserve_virtual_for_strategy_run(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        requested_amount=Decimal("50"),
+        now=_NOW,
+    )
+
+    assert reservation.state == "reserved"
+    assert reservation.reserved_amount == Decimal("50")
+    assert reservation.reason == "paper_virtual_capital_reserved"
+    assert reservation.source_account_snapshot_id is None
+
+
 @pytest.mark.parametrize(
     ("free", "observed_at", "reason"),
     (
@@ -145,6 +168,37 @@ def test_paper_signal_records_order_fill_accounting_idempotently() -> None:
     assert first.fee_model == "paper_fixed_bps_10"
     assert first.funding_model == "spot_not_applicable"
     assert first.pnl_complete is True
+    assert first.equity == Decimal("49.95000000")
+
+
+def test_paper_short_records_negative_position_and_incomplete_borrow_model() -> None:
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=None,
+        clock=_Clock(),
+    )
+    service.reserve_virtual_for_strategy_run(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        requested_amount=Decimal("50"),
+        now=_NOW,
+    )
+    signal = _signal(signal_id=UUID("00000000-0000-0000-0000-000000009502"), side="sell")
+
+    accounting = service.record_paper_signal(signal=signal)
+
+    assert accounting is not None
+    assert accounting.position_quantity == Decimal("-0.00500000")
+    assert accounting.average_entry_price == Decimal("10000")
+    assert accounting.cash_balance == Decimal("49.95000000")
+    assert accounting.equity == Decimal("49.95000000")
+    assert accounting.fee_model == "paper_fixed_bps_10"
+    assert accounting.funding_model == "spot_borrow_not_modeled"
+    assert accounting.pnl_complete is False
+    assert accounting.completeness_reason == "paper_spot_short_borrow_not_modeled"
 
 
 def _projection(*, free: Decimal, observed_at: datetime) -> ExchangeAccountProjection:
@@ -171,7 +225,7 @@ def _projection(*, free: Decimal, observed_at: datetime) -> ExchangeAccountProje
     )
 
 
-def _signal(*, signal_id: UUID) -> StrategySignal:
+def _signal(*, signal_id: UUID, side: str = "buy") -> StrategySignal:
     return StrategySignal(
         signal_id=signal_id,
         owner_user_id=_USER_ID,
@@ -185,9 +239,9 @@ def _signal(*, signal_id: UUID) -> StrategySignal:
         bar_ts_open=_NOW,
         bar_ts_close=_NOW + timedelta(minutes=1),
         signal_action="open",
-        side="buy",
+        side=side,  # type: ignore[arg-type]
         outcome="signal",
-        reason_code="ma_fast_crossed_above_slow_paper_no_order_stage05",
+        reason_code="ma_fast_crossed_above_slow_paper_no_exchange_submit",
         reference_price=Decimal("10000"),
         confidence=Decimal("1"),
         source_message_id="1-0",

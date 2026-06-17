@@ -4,6 +4,7 @@ from .in_memory import (
     InMemoryExchangeExecutionProcessRepository,
     InMemoryExecutionIntentRepository,
     InMemoryPaperAccountingRepository,
+    InMemoryPaperScenarioCoverageRepository,
     InMemoryStrategyPositionOwnershipRepository,
 )
 from .postgres import (
@@ -12,6 +13,7 @@ from .postgres import (
     PostgresExchangeExecutionProcessRepository,
     PostgresExecutionIntentRepository,
     PostgresPaperAccountingRepository,
+    PostgresPaperScenarioCoverageRepository,
     PostgresStrategyPositionOwnershipRepository,
 )
 
@@ -21,11 +23,13 @@ __all__ = [
     "InMemoryExchangeExecutionProcessRepository",
     "InMemoryExecutionIntentRepository",
     "InMemoryPaperAccountingRepository",
+    "InMemoryPaperScenarioCoverageRepository",
     "InMemoryStrategyPositionOwnershipRepository",
     "PostgresExchangeAccountProjectionRepository",
     "PostgresExchangeExecutionOrderRepository",
     "PostgresExchangeExecutionProcessRepository",
     "PostgresExecutionIntentRepository",
     "PostgresPaperAccountingRepository",
+    "PostgresPaperScenarioCoverageRepository",
     "PostgresStrategyPositionOwnershipRepository",
 ]
