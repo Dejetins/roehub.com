@@ -51,6 +51,7 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
         source_job_id: UUID,
         source_variant_key: str,
         strategy_spec_hash: str,
+        launch_request_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
         for provenance in self._by_strategy_id.values():
             if (
@@ -58,6 +59,7 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
                 and provenance.source_job_id == source_job_id
                 and provenance.source_variant_key == source_variant_key
                 and provenance.strategy_spec_hash == strategy_spec_hash
+                and provenance.launch_request_hash == launch_request_hash
             ):
                 return provenance
         return None
@@ -80,6 +82,7 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
             source_job_id=provenance.source_job_id,
             source_variant_key=provenance.source_variant_key,
             strategy_spec_hash=provenance.strategy_spec_hash,
+            launch_request_hash=provenance.launch_request_hash,
         ):
             raise StrategyStorageError("duplicate strategy source variant provenance")
         self._strategy_repository.create(strategy=strategy)

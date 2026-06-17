@@ -124,6 +124,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                 source_job_id=snapshot.job_id,
                 source_variant_key=snapshot.variant_key,
                 strategy_spec_hash=strategy_spec_hash,
+                launch_request_hash=launch_request_hash,
             )
             if existing is not None:
                 return self._duplicate_result(

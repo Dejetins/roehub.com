@@ -33,9 +33,10 @@ class StrategyBacktestVariantProvenanceRepository(Protocol):
         source_job_id: UUID,
         source_variant_key: str,
         strategy_spec_hash: str,
+        launch_request_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
         """
-        Load an existing strategy provenance for the same owner/source variant/spec identity.
+        Load existing provenance for the same owner/source variant/spec/launch identity.
         """
         ...
 

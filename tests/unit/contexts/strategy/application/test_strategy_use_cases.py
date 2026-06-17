@@ -221,6 +221,51 @@ def test_create_strategy_from_backtest_variant_returns_duplicate_for_same_source
     assert duplicate.strategy.strategy_id == created.strategy.strategy_id
 
 
+def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    provenance_repository = InMemoryStrategyBacktestVariantProvenanceRepository(
+        strategy_repository=strategy_repository,
+    )
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000127")
+    )
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
+        strategy_repository=strategy_repository,
+        provenance_repository=provenance_repository,
+        clock=_SequenceClock(
+            values=(
+                datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
+                datetime(2026, 5, 30, 10, 1, tzinfo=timezone.utc),
+            )
+        ),
+    )
+
+    first = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-1",
+        launch_config={"mode": "paper", "entry_sizing": "fixed_quote", "direction": "long"},
+    )
+    second = use_case.execute(
+        current_user=current_user,
+        job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+        variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+        idempotency_key="launch-2",
+        launch_config={
+            "mode": "paper",
+            "entry_sizing": "fixed_equity_pct",
+            "direction": "short",
+        },
+    )
+
+    assert first.duplicate is False
+    assert second.duplicate is False
+    assert second.strategy.strategy_id != first.strategy.strategy_id
+    assert second.provenance.launch_request_hash != first.provenance.launch_request_hash
+
+
 def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_job() -> None:
     current_user = CurrentUser(
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000125")

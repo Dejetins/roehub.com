@@ -72,6 +72,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         source_job_id: UUID,
         source_variant_key: str,
         strategy_spec_hash: str,
+        launch_request_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
         query = f"""
         SELECT
@@ -81,6 +82,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
           AND source_job_id = %(source_job_id)s
           AND source_variant_key = %(source_variant_key)s
           AND strategy_spec_hash = %(strategy_spec_hash)s
+          AND launch_request_hash = %(launch_request_hash)s
         """
         row = self._gateway.fetch_one(
             query=query,
@@ -89,6 +91,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
                 "source_job_id": str(source_job_id),
                 "source_variant_key": source_variant_key,
                 "strategy_spec_hash": strategy_spec_hash,
+                "launch_request_hash": launch_request_hash,
             },
         )
         return None if row is None else _map_provenance_row(row=row)
