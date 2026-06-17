@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -663,6 +665,59 @@ def test_internal_account_state_read_returns_secret_safe_sanitized_projection() 
     assert "trade-key" not in dumped
     assert "trade-secret" not in dumped
     assert "authorization" not in dumped
+
+
+def test_internal_account_state_read_reports_legacy_ciphertext_as_unavailable() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(_trade_ready_result())
+    )
+    object.__setattr__(config, "account_state_sync_enabled", True)
+    app = create_exchange_control_app(config=config)
+    client = TestClient(app)
+    owner_user_id = "00000000-0000-0000-0000-000000000125"
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=_internal_headers("account-state-legacy-cipher-create"),
+        json={
+            "owner_user_id": owner_user_id,
+            "exchange_name": "binance",
+            "market_type": "futures",
+            "environment": "testnet",
+            "label": "legacy-cipher",
+            "permissions": "trade",
+            "api_key": "trade-key",
+            "api_secret": "trade-secret",
+        },
+    )
+    assert created.status_code == 200
+    connection_id = UUID(created.json()["connection_id"])
+
+    repository = app.state.exchange_connection_service._repository
+    credential = repository.get_active_credential(connection_id=connection_id)
+    assert credential is not None
+    repository._credential_versions[credential.credential_version_id] = replace(
+        credential,
+        api_key_ciphertext="legacy-key-ciphertext",
+        api_secret_ciphertext="legacy-secret-ciphertext",
+    )
+
+    response = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/account-state",
+        headers=_internal_headers("account-state-legacy-cipher-sync"),
+        json={
+            "owner_user_id": owner_user_id,
+            "instrument_keys": ["binance:futures:BTCUSDT"],
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == (
+        "exchange_connection_account_state_unavailable"
+    )
+    dumped = str(response.json()).lower()
+    assert "trade-key" not in dumped
+    assert "trade-secret" not in dumped
+    assert "legacy-key-ciphertext" not in dumped
 
 
 def test_internal_exchange_connection_auto_validation_unavailable_is_not_active() -> None:

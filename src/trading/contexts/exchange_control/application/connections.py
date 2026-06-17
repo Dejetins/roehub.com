@@ -864,7 +864,7 @@ class ExchangeConnectionService:
                         else None
                     ),
                 )
-            except ExchangeSecretCipherError as exc:
+            except (ExchangeSecretCipherError, ValueError) as exc:
                 raise ExchangeConnectionError(
                     code="exchange_connection_validation_unavailable",
                     message="Exchange connection validation is unavailable.",
@@ -1038,7 +1038,7 @@ class ExchangeConnectionService:
                     else None
                 ),
             )
-        except ExchangeSecretCipherError as exc:
+        except (ExchangeSecretCipherError, ValueError) as exc:
             raise ExchangeConnectionError(
                 code="exchange_connection_account_state_unavailable",
                 message="Exchange account-state read is unavailable.",
