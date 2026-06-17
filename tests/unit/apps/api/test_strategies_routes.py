@@ -684,6 +684,43 @@ def test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order() -
     assert len(paper_repository.accounting) == 1
 
 
+def test_manual_entry_without_active_run_returns_conflict() -> None:
+    client, execution_repository, paper_repository = _build_manual_execution_client()
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000806"}
+    created = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    assert created.status_code == 201
+    strategy_id = created.json()["strategy_id"]
+    profile = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "paper",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "50",
+            "max_position_notional": "50",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "50",
+        },
+        headers=headers,
+    )
+    assert profile.status_code == 200
+
+    response = client.post(
+        f"/strategies/{strategy_id}/manual-entry",
+        json={"client_request_id": "manual-paper-entry-no-run"},
+        headers={**headers, "Idempotency-Key": "manual-paper-entry-no-run"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "strategy_manual_execution.blocked"
+    assert response.json()["error"]["details"]["reason"] == "strategy_run_inactive"
+    assert len(execution_repository.source_events) == 0
+    assert len(paper_repository.orders) == 0
+
+
 def test_launch_from_backtest_variant_blocks_testnet_without_exchange() -> None:
     client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
     response = client.post(

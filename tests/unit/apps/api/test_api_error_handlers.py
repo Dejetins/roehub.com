@@ -88,6 +88,46 @@ def test_roehub_error_handler_maps_capital_reservation_block_to_conflict() -> No
     assert response.json()["error"]["details"]["reason"] == "capital_projection_stale"
 
 
+def test_roehub_error_handler_maps_manual_execution_errors() -> None:
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+
+    @app.get("/manual-blocked")
+    def manual_blocked() -> None:
+        raise RoehubError(
+            code="strategy_manual_execution.blocked",
+            message="Manual execution is blocked",
+            details={"reason": "strategy_run_inactive"},
+        )
+
+    @app.get("/manual-idempotency")
+    def manual_idempotency() -> None:
+        raise RoehubError(
+            code="strategy_manual_execution.idempotency_required",
+            message="Manual execution requires an idempotency key",
+            details={"reason": "idempotency_key_required"},
+        )
+
+    @app.get("/manual-unavailable")
+    def manual_unavailable() -> None:
+        raise RoehubError(
+            code="strategy_manual_execution.unavailable",
+            message="Manual execution is not configured",
+            details={"reason": "execution_ingress_unavailable"},
+        )
+
+    client = TestClient(app)
+
+    blocked = client.get("/manual-blocked")
+    idempotency = client.get("/manual-idempotency")
+    unavailable = client.get("/manual-unavailable")
+
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["details"]["reason"] == "strategy_run_inactive"
+    assert idempotency.status_code == 422
+    assert unavailable.status_code == 503
+
+
 
 def test_request_validation_error_handler_returns_sorted_validation_errors() -> None:
     """
