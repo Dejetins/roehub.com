@@ -137,7 +137,6 @@ def test_redis_strategy_live_candle_stream_reads_and_parses_payload() -> None:
     assert rows[0].message_id == "1000-0"
     assert rows[0].candle.candle.ts_open.value == datetime(2026, 2, 17, 12, 0, tzinfo=timezone.utc)
     assert rows[0].candle.meta.instrument_key == instrument_key
-    assert rows[0].candle.meta.trades_count == 42
     assert redis_client.group_calls[0]["name"] == stream_name
 
     adapter.ack(instrument_key=instrument_key, message_id="1000-0")
@@ -163,27 +162,6 @@ def test_redis_strategy_live_candle_stream_drops_invalid_payload_and_acks() -> N
 
     assert rows == ()
     assert redis_client.ack_calls == [(stream_name, "strategy.live_runner.v1", "1001-0")]
-
-
-def test_redis_strategy_live_candle_stream_accepts_legacy_payload_without_trades_count() -> None:
-    """
-    Ensure additive `trades_count` remains backward compatible for existing schema-v1 messages.
-    """
-    instrument_key = "binance:spot:BTCUSDT"
-    stream_name = f"md.candles.1m.{instrument_key}"
-    payload = _build_valid_payload()
-    payload.pop("trades_count")
-    redis_client = _FakeRedis(read_batches=[[(stream_name, [("1002-0", payload)])]])
-    adapter = RedisStrategyLiveCandleStream(
-        config=_build_config(),
-        environ={},
-        redis_client=redis_client,  # type: ignore[arg-type]
-    )
-
-    rows = adapter.read_closed_1m(instrument_key=instrument_key)
-
-    assert len(rows) == 1
-    assert rows[0].candle.meta.trades_count is None
 
 
 def _build_config() -> RedisStrategyLiveCandleStreamConfig:
@@ -244,7 +222,6 @@ def _build_valid_payload() -> dict[str, str]:
         "close": "100.5",
         "volume_base": "10.0",
         "volume_quote": "1005.0",
-        "trades_count": "42",
         "source": "ws",
         "ingested_at": "2026-02-17T12:01:00.000Z",
         "ingest_id": str(UUID("00000000-0000-0000-0000-00000000ABCD")),
