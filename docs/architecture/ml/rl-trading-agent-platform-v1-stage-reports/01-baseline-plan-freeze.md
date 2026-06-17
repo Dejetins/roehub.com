@@ -15,6 +15,8 @@ Stage `01` создает source-of-truth архитектурный план и
 
 User required before start: nothing.
 
+Archival repair prompt precondition: User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat.
+
 ## Scope
 
 Входит:
@@ -41,6 +43,24 @@ User required before start: nothing.
 | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | - | Stage ledger for RL trading rollout. | `compatible-change` docs/ledger only |
 | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/01-baseline-plan-freeze.md` | - | - | Stage `01` report. | `compatible-change` docs/report only |
 | - | `docs/architecture/README.md` | - | Docs index update after adding architecture docs. | `compatible-change` docs index only |
+
+## Archival Repair Prompt Evidence
+
+Stage `01` was already `accepted` in the ledger when prompt `01-baseline-plan-freeze` was executed. This prompt is archival and repair-only; accepted plan/report content was not rewritten, and no implementation/runtime change was made.
+
+| Field | Value |
+|---|---|
+| Prompt path | `.codex/agents/generated/rl-trading-agent-platform-v1/01-baseline-plan-freeze.md` |
+| Prompt sha256 | `af0af5022fce926daed78d2a1c5390e6963931272d92c7e08c9519063d9aedc9` |
+| Ledger state observed before repair | Stage `01` accepted; `current_stage=02A`; Stage `02A` pending |
+| Planned concrete file list before edit | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/01-baseline-plan-freeze.md`; `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` |
+| Created | none |
+| Modified | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/01-baseline-plan-freeze.md`; `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` |
+| Deleted | none |
+| Outside expected paths | none |
+| Delivery state | `local-only`; no branch, PR, main delivery, deploy, runtime, schema, API, UI, service, exchange, or ML artifact change |
+| Validation after repair | `python -m tools.docs.generate_docs_index --check` passed; `docs/architecture/README.md` is up-to-date |
+| Cold self-review after repair | `Release`; local fallback used because subagent spawning requires an explicit user request; no Blocker/High findings |
 
 ## Observed State
 
