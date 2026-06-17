@@ -136,7 +136,7 @@ Current intended routing:
 - browser-visible QA, screenshots, console/network checks, form/navigation testing, responsive checks, or QA reports → `browser-qa-evidence` plus an available runtime browser surface such as the Browser plugin, Playwright MCP, or the global `playwright` skill
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks → `pre-ship-gate`
 - full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
-- prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
+- prompt creation, prompt rewrite, prompt migration, prompt audit, prompt review, prompt extension, prompt fixing, prompt finalization, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
 
 Architecture documents created or materially rewritten by `architecture-design` MUST default to Russian narrative, clear explanations, and a business-readable layer in addition to engineering detail. Prompt artifacts produced by `prompt-manager` MUST keep their own language contract and remain English unless a higher-priority user instruction explicitly says otherwise.
 
@@ -163,6 +163,19 @@ Skill routing MUST stay compact. Do not load several workflow skills preemptivel
 When generating executor prompts, the agent SHOULD use `prompt-manager` and SHOULD encode task-specific skill routing inside the generated prompt: which exact skill to use, when in the workflow to use it, and what boundary it owns. Generated prompts MUST NOT instruct executors to preload all available skills.
 
 If an expected skill or browser surface is unavailable, the agent SHOULD use the nearest task-bounded equivalent and state the limitation.
+
+### 0.5.1 Mandatory cold-head artifact review
+For architecture and prompt-management artifact work, the agent MUST run one cold-head review gate before reporting the artifact as ready.
+
+This applies when creating, reviewing, auditing, rewriting, extending, fixing, completing, or finalizing:
+- architecture documents, ADRs, design notes, service-integration designs, rollout plans, migration plans, development plans, or implementation plans;
+- prompt packs, prompt files, prompt templates, executor prompts, agent instructions, or skill-routing instructions.
+
+When subagents are available, the cold-head gate MUST be exactly one independent read-only subagent pass. The reviewer MUST NOT edit files. It reports gaps, blockers, and smallest required fixes. The main agent owns the fix loop: apply required changes, record any intentionally not-applied finding with reason and residual risk, run a local follow-up check, and do not start another independent reviewer pass unless the user explicitly requests it.
+
+If subagents are unavailable, the agent MUST run the same checklist locally and label the result `cold self-review fallback`.
+
+The cold-head gate MUST check the applicable lenses for the artifact: architecture-design quality, architecture-review evidence discipline, prompt-pack/stage execution readiness, stage ledger continuity, traceability, validation depth, conditional service-call/docs/retry/redaction/alert coverage, Mac Studio path contract, and browser auth/tooling rules when browser flows are in scope.
 
 ### 0.6 `.codex/` repository policy
 The `.codex/` directory is shared repository guidance, not a dump for local runtime state.
@@ -555,6 +568,8 @@ Preferred surfaces depend on the current environment and prompt:
 - Browser plugin / in-app browser when explicitly available or requested,
 - Playwright MCP when it is the configured browser automation surface,
 - global `playwright` skill / Playwright CLI when CLI-driven browser verification is the available path.
+
+For CLI-driven Roehub browser automation, agents SHOULD use the global `playwright` skill wrapper instead of floating `npx` commands. The current wrapper contract pins `@playwright/cli@0.1.14` and relies on the matching Playwright browser cache. Agents SHOULD NOT switch to `@latest` or a floating `npx --package @playwright/cli` form unless intentionally refreshing the matching browser revision and reporting that change.
 
 Roehub authenticated browser QA default:
 - use the smoke Keycloak test account `smoke_e2e_keycloak` when a normal authenticated test user is needed and the user did not request another account;
