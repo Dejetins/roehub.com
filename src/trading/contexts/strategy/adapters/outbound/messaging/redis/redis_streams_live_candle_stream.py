@@ -391,7 +391,10 @@ def _parse_candle_payload(*, fields: Mapping[str, Any]) -> CandleWithMeta:
         ),
         ingest_id=ingest_id,
         instrument_key=instrument_key,
-        trades_count=None,
+        trades_count=_parse_optional_int(
+            value=fields.get("trades_count", ""),
+            field_name="trades_count",
+        ),
         taker_buy_volume_base=None,
         taker_buy_volume_quote=None,
     )
@@ -470,6 +473,28 @@ def _parse_optional_float(*, value: Any, field_name: str) -> float | None:
     if not text:
         return None
     return _parse_float(value=text, field_name=field_name)
+
+
+def _parse_optional_int(*, value: Any, field_name: str) -> int | None:
+    """
+    Parse optional integer payload field where empty or missing means null.
+
+    Args:
+        value: Raw payload field value.
+        field_name: Field name for validation errors.
+    Returns:
+        int | None: Parsed value or `None`.
+    Assumptions:
+        `trades_count` is additive to schema v1, so old messages may omit it.
+    Raises:
+        ValueError: If non-empty value cannot be parsed as integer.
+    Side Effects:
+        None.
+    """
+    text = str(value).strip()
+    if not text:
+        return None
+    return _parse_int(value=text, field_name=field_name)
 
 
 def _parse_optional_uuid(*, value: Any, field_name: str) -> UUID | None:
