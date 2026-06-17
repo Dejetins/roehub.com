@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+import urllib.request
+
 from trading.contexts.exchange_control.adapters.outbound.exchange_validation import (
+    BinanceExchangeCredentialValidator,
     normalize_binance_api_restrictions,
+    normalize_binance_futures_testnet_account,
     normalize_bybit_api_key_info,
 )
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialPlaintext,
+    ExchangeCredentialValidationRequest,
     ExchangeCredentialValidationResult,
 )
 
@@ -182,6 +188,98 @@ def test_binance_permission_truth_table() -> None:
         "exchange_permissions": "withdraw_or_transfer",
         "effective_permissions": "none",
     }
+
+
+def test_binance_futures_testnet_validation_status_mapping() -> None:
+    trade = normalize_binance_futures_testnet_account(
+        payload={
+            "canTrade": True,
+            "canWithdraw": True,
+            "multiAssetsMargin": False,
+        },
+        requested_permissions="trade",
+    )
+    readonly = normalize_binance_futures_testnet_account(
+        payload={
+            "canTrade": False,
+            "canWithdraw": True,
+            "multiAssetsMargin": False,
+        },
+        requested_permissions="trade",
+    )
+
+    assert trade.status == "valid_trade_enabled"
+    assert trade.reason == "trade_permission_detected"
+    assert trade.ip_restriction_status == "not_restricted_testnet"
+    assert trade.permission_summary == {
+        **_permission_summary(trade),
+        "market_type": "futures",
+        "exchange_permissions": "trade",
+        "effective_permissions": "trade",
+        "withdraw_or_transfer": False,
+    }
+    assert readonly.status == "permission_mismatch"
+    assert readonly.reason == "requested_trade_but_exchange_readonly"
+    assert readonly.permission_summary == {
+        **_permission_summary(readonly),
+        "exchange_permissions": "read",
+        "effective_permissions": "read",
+    }
+
+
+class _JsonResponse:
+    def __init__(self, payload: object) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> "_JsonResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        _ = args
+
+    def read(self) -> bytes:
+        return json.dumps(self._payload).encode("utf-8")
+
+
+def test_binance_futures_testnet_validator_uses_fapi_account_endpoint(
+    monkeypatch: object,
+) -> None:
+    calls: list[str] = []
+
+    def fake_urlopen(
+        request: urllib.request.Request,
+        *,
+        timeout: float,
+    ) -> _JsonResponse:
+        _ = timeout
+        calls.append(request.full_url)
+        return _JsonResponse(
+            {
+                "canTrade": True,
+                "canWithdraw": True,
+                "multiAssetsMargin": False,
+            }
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)  # type: ignore[attr-defined]
+
+    result = BinanceExchangeCredentialValidator().validate(
+        request=ExchangeCredentialValidationRequest(
+            exchange_name="binance",
+            market_type="futures",
+            environment="testnet",
+            requested_permissions="trade",
+            credential=ExchangeCredentialPlaintext(
+                api_key="testnet-futures-key",
+                api_secret="testnet-futures-secret",
+            ),
+        )
+    )
+
+    assert result.status == "valid_trade_enabled"
+    assert len(calls) == 1
+    assert calls[0].startswith("https://testnet.binancefuture.com/fapi/v2/account?")
+    assert "/sapi/v1/account/apiRestrictions" not in calls[0]
 
 
 def test_bybit_validation_status_mapping() -> None:

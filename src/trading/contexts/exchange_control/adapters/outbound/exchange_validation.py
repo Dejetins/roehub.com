@@ -24,6 +24,7 @@ from trading.contexts.exchange_control.application.validation import (
 
 _BINANCE_MAINNET_URL = "https://api.binance.com"
 _BINANCE_TESTNET_URL = "https://testnet.binance.vision"
+_BINANCE_FUTURES_TESTNET_URL = "https://testnet.binancefuture.com"
 _BYBIT_MAINNET_URL = "https://api.bybit.com"
 _BYBIT_TESTNET_URL = "https://api-testnet.bybit.com"
 _RECV_WINDOW = "5000"
@@ -66,6 +67,8 @@ class BinanceExchangeCredentialValidator:
         *,
         request: ExchangeCredentialValidationRequest,
     ) -> ExchangeCredentialValidationResult:
+        if request.market_type == "futures" and request.environment == "testnet":
+            return self._validate_futures_testnet(request=request)
         base_url = (
             _BINANCE_TESTNET_URL
             if request.environment == "testnet"
@@ -110,6 +113,52 @@ class BinanceExchangeCredentialValidator:
         return normalize_binance_api_restrictions(
             payload=payload,
             environment=request.environment,
+            requested_permissions=request.requested_permissions,
+        )
+
+    def _validate_futures_testnet(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+    ) -> ExchangeCredentialValidationResult:
+        timestamp = str(int(time.time() * 1000))
+        query = urllib.parse.urlencode({"recvWindow": _RECV_WINDOW, "timestamp": timestamp})
+        signature = hmac.new(
+            request.credential.api_secret.encode("utf-8"),
+            query.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        url = (
+            f"{_BINANCE_FUTURES_TESTNET_URL}/fapi/v2/account"
+            f"?{query}&signature={signature}"
+        )
+        try:
+            payload = _get_json(
+                url=url,
+                headers={"X-MBX-APIKEY": request.credential.api_key},
+                timeout_seconds=self.timeout_seconds,
+            )
+        except urllib.error.HTTPError as exc:
+            return _invalid_credentials_from_http(
+                status_code=exc.code,
+                exchange="binance",
+                requested_permissions=request.requested_permissions,
+            )
+        except (OSError, ValueError):
+            return ExchangeCredentialValidationResult(
+                status="skipped_external_validation",
+                reason="exchange_request_failed",
+                ip_restriction_status="not_checked",
+                permission_summary=_permission_summary(
+                    base={"exchange": "binance", "market_type": "futures"},
+                    requested_permissions=request.requested_permissions,
+                    exchange_permissions="unknown",
+                    effective_permissions="none",
+                    permission_warnings=(),
+                ),
+            )
+        return normalize_binance_futures_testnet_account(
+            payload=payload,
             requested_permissions=request.requested_permissions,
         )
 
@@ -233,6 +282,48 @@ def normalize_binance_api_restrictions(
         reason="readonly_permission_detected",
         ip_restriction_status=ip_status,
         base_summary=_binance_summary(payload=payload),
+        requested_permissions=requested,
+        exchange_permissions="read",
+    )
+
+
+def normalize_binance_futures_testnet_account(
+    *,
+    payload: dict[str, Any],
+    requested_permissions: str = "read",
+) -> ExchangeCredentialValidationResult:
+    requested = _requested_permissions(value=requested_permissions)
+    exchange_permissions: ExchangePermissions = (
+        "trade" if bool(payload.get("canTrade")) else "read"
+    )
+    if exchange_permissions == "trade":
+        return _with_permission_policy(
+            status="valid_trade_enabled",
+            reason="trade_permission_detected",
+            ip_restriction_status="not_restricted_testnet",
+            base_summary={
+                "exchange": "binance",
+                "market_type": "futures",
+                "read": True,
+                "trade": True,
+                "withdraw_or_transfer": False,
+                "multi_assets_margin": bool(payload.get("multiAssetsMargin")),
+            },
+            requested_permissions=requested,
+            exchange_permissions="trade",
+        )
+    return _with_permission_policy(
+        status="valid_readonly",
+        reason="readonly_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        base_summary={
+            "exchange": "binance",
+            "market_type": "futures",
+            "read": True,
+            "trade": False,
+            "withdraw_or_transfer": False,
+            "multi_assets_margin": bool(payload.get("multiAssetsMargin")),
+        },
         requested_permissions=requested,
         exchange_permissions="read",
     )
@@ -520,5 +611,6 @@ __all__ = [
     "BybitExchangeCredentialValidator",
     "HttpExchangeCredentialValidator",
     "normalize_binance_api_restrictions",
+    "normalize_binance_futures_testnet_account",
     "normalize_bybit_api_key_info",
 ]
