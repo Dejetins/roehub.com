@@ -718,12 +718,13 @@ Rules:
 - every stage updates the ledger before final status;
 - every stage report includes `Created / Modified / Deleted / Reason / Contract impact`;
 - every implementation stage must start from or create an executor prompt under `.codex/agents/generated/rl-trading-agent-platform-v1/`, and the stage report must record prompt path/hash;
-- Stage `02A` is not startable until its executor prompt exists, names the required context/files, includes a strict file manifest and passes the same architecture-review cold-head checklist;
+- Stage `02A` is startable only from the generated executor prompt under `.codex/agents/generated/rl-trading-agent-platform-v1/`, which names required context/files, includes a strict file manifest and passed prompt-pack cold-head review after required fixes;
 - no secrets, cookies, raw provider payloads, model binaries, or large local logs in docs;
 - runtime artifacts live under `/opt/roehub/state/rl_trading/`, not git;
 - dependent execution stages cannot start until their classic producer prerequisites are accepted;
 - stage acceptance requires real-boundary evidence when API, persistence, browser, runtime, performance, exchange, or Mac Studio surfaces are touched;
-- code/runtime stage acceptance must state delivery state explicitly: `local-only`, `delivered-to-main`, and/or `deployed-on-macstudio`. Runtime/live stages cannot be accepted as complete from local gates alone when host sync or supervised service state is part of the stage;
+- code/runtime stage acceptance must state delivery state explicitly: `local-only`, `published-to-branch/draft-pr`, `delivered-to-main`, and/or `deployed-on-macstudio`. Runtime/live stages cannot be accepted as complete from local gates alone when host sync or supervised service state is part of the stage;
+- direct `git push origin main` is not the default delivery path. If a stage is published to GitHub, use `github:yeet`: inspect scope, stage only intended files, create one `codex/*` branch only when starting from `main`/default branch, open a draft PR, mark `delivered-to-main` only after PR merge plus SHA evidence on `origin/main`, and delete only the temporary `codex/*` branch created for that stage after the successful PR/test/deploy path. If a suitable task branch already exists, do not create a redundant branch;
 - mainnet stages require explicit approval after Stage `19`; earlier stages must keep mainnet submit blocked.
 
 ## Architecture Review Gate
@@ -745,7 +746,9 @@ Applied fixes:
 - reusable signal/outcome UI contract extended for `source_type=ml_agent_decision`.
 - external completeness review gaps integrated: Stage `02A/02B/02C` decomposition, live-feed feature gate, futures metadata gate, registry state machine, Stage `09B` local backup/restore, promotion-grade threshold profile, synthetic exits, simulator/accounting/paper parity, Mac Studio resource isolation, incident drills, live-outcome governance and product/legal mainnet gate.
 
-Current architecture-plan verdict after fixes: `Release for staged planning`. Execution is still gated: later prompt pack generation must run the same checklist again before prompts are treated as executable.
+Current architecture-plan verdict after fixes: `Release for staged planning`.
+
+Prompt-pack readiness on 2026-06-17: `.codex/agents/generated/rl-trading-agent-platform-v1/` was generated for Stage `01` repair plus Stage `02A`-`22` execution. Independent cold-head review initially returned `Block` on one High finding: prompts used an ambiguous combined worker topology while the plan fixes separate `apps/worker/rl_trading_trainer/` and `apps/worker/rl_trading_inference/` apps. The prompt pack was fixed to preserve the planned topology, non-browser prompt auth over-routing was trimmed, browser QA surfaces were clarified for UI-affecting prompts, and local follow-up checks passed. Execution remains gated by each stage prompt, ledger prerequisites and real-boundary evidence.
 
 ## Риски И Открытые Вопросы
 
@@ -763,7 +766,7 @@ Current architecture-plan verdict after fixes: `Release for staged planning`. Ex
 | Overlapping sessions can leak across splits | Overlap is allowed only inside a split; Stage `06` must prove time embargo and lifecycle-aware split boundaries. |
 | Local artifacts remain single-host risk | Stage `09B` must add local backup/restore drill; Stage `19`/`21` must either prove backup path is sufficient or explicitly accept residual single-host disk risk. |
 | PyTorch checkpoint loading is a trust boundary | Stage `09` requires no user upload, sha256 validation, accepted-state-only load, path canonicalization and `weights_only` evidence or documented fallback. |
-| Prompt pack is not generated yet | Stage `02A` cannot start until the relevant `.codex/agents/generated/rl-trading-agent-platform-v1/*` prompt is generated, cold-reviewed and recorded in the stage report. |
+| Prompt pack can drift from plan | Stage executors must use `.codex/agents/generated/rl-trading-agent-platform-v1/*`, record prompt path/hash in every stage report and keep the ledger as the source of truth for current stage status. |
 | Operator/admin auth primitive may be absent | Stage `10A` uses host-local command/runbook first; Stage `11` cannot enable web action controls until a server-side operator/admin guard exists. |
 | Live feed schema may not carry all article-compatible features | Stage `02B`/`05` must choose `trades_count` hot-path support, feature-mask branch, or blocked branch; Stage `13` cannot pass without Redis/live/offline golden parity. |
 | TP/SL/trailing can be confused with exchange-native order fields | RL v1 treats them as synthetic platform-side exits and must not pass advanced order fields into current execution order model. |

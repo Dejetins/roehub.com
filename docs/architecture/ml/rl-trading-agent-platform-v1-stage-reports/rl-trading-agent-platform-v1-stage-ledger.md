@@ -26,13 +26,14 @@
 | Mac Studio | Git на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks в `/opt/roehub/app`; ML artifacts в `/opt/roehub/state/rl_trading/`. |
 | Mainnet | Mainnet submit blocked до Stage `19` readiness review и отдельного explicit approval. |
 | File manifest | Каждый stage report обязан фиксировать `Created / Modified / Deleted / Reason / Contract impact`. |
+| GitHub delivery | По умолчанию не делать direct `git push origin main`. Если stage публикуется, использовать `github:yeet`: scoped staging, одна `codex/*` branch только при старте с default branch, draft PR, `delivered-to-main` только после merge/evidence, временную `codex/*` branch удалить после успешного PR/test/deploy path. |
 
 ## Stage Status
 
 | Stage | Статус | Stage report | Validation depth | Ключевой результат | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|
 | `01` Baseline and plan freeze | accepted | `01-baseline-plan-freeze.md` | docs + DB snapshot | Plan/ledger created; ClickHouse feature snapshot observed; classic producer dependency recorded; docs index passed. | none | yes |
-| `02A` Data source inventory | pending | `02a-data-source-inventory.md` | ClickHouse + HF + artifact manifest + lifecycle/gap/classic blocker inventory | TBD | executor prompt required before implementation | no until prompt generation + cold review |
+| `02A` Data source inventory | pending | `02a-data-source-inventory.md` | ClickHouse + HF + artifact manifest + lifecycle/gap/classic blocker inventory | Prompt pack generated under `.codex/agents/generated/rl-trading-agent-platform-v1/`; cold-head High finding fixed; implementation not started. | none; implementation pending | no until Stage `02A` accepted |
 | `02B` Feature and live-feed contract | pending | `02b-feature-live-feed-contract.md` | feature contract + live-feed parity decision + futures metadata gate | TBD | Stage `02A` required | no |
 | `02C` Action/state/reward contract | pending | `02c-action-state-reward-contract.md` | action/reward/state fixtures + strategy ownership semantics | TBD | Stage `02B` required | no |
 | `03` Mac Studio ML environment | pending | `03-mac-studio-ml-environment.md` | target runtime + benchmark + resource isolation | TBD | Stage `02C` required | no |
@@ -90,6 +91,7 @@
 | Training/retraining is platform-owned and offline; users only activate eligible tickers by tariff. | Prevents user-controlled model mutation and makes model promotion auditable. | User requirement, 2026-06-17; `rl-trading-agent-platform-v1.md` |
 | Futures activation requires funding/fee/slippage/contract metadata coverage or an explicit accepted approximation. | Prevents false-positive futures backtests. | `rl-trading-agent-platform-v1.md` |
 | Runtime/code stage acceptance must record prompt path/hash and delivery state. | Prevents local-only work from being mistaken for delivered Mac Studio production state. | `.codex/PLANS.md`; `.codex/AGENTS.md`; `rl-trading-agent-platform-v1.md` |
+| Executor prompt pack is generated and cold-reviewed for Stage `01` repair plus Stages `02A`-`22`. Cold-head initially blocked on ambiguous worker topology; prompts now use planned `apps/worker/rl_trading_trainer/` and `apps/worker/rl_trading_inference/` paths. | Stage `02A` can start from its prompt; later stages still depend on their ledger prerequisites and evidence gates. | `.codex/agents/generated/rl-trading-agent-platform-v1/`; cold-head review `019ed68b-d9ad-7ba1-9886-7eab1ae5337c`; local follow-up check |
 | Current identity plan codes are `base|free|pro|ultra`, while product labels requested for RL are `Free|Pro|Premium|Enterprise`. | Stage `12` must map codes to RL entitlements explicitly and keep ambiguous `base` fail-closed until product evidence says otherwise. | `src/trading/shared_kernel/primitives/paid_level.py`; `src/trading/contexts/identity/application/use_cases/account_settings.py`; `rl-trading-agent-platform-v1.md` |
 
 ## Contract Impact Summary
@@ -135,3 +137,6 @@
 | 2026-06-17 | plan | Added full lifecycle contracts: action/reward/state, train/live feature parity, session extraction, promotion scorecard, sanity baselines, artifact operations, checkpoint security, retraining triggers/cadence and staged rollback controls. | `docs/architecture/ml/rl-trading-agent-platform-v1.md`; this ledger |
 | 2026-06-17 | review | Closed cold-head review findings: classic producer status refreshed to Stage `04`, next data/feature prompt gate made blocking, Stage `05`/`06` dataset ownership split, operator authority grounded, reusable signal/outcome read model required. | `docs/architecture/ml/rl-trading-agent-platform-v1.md`; this ledger |
 | 2026-06-17 | plan hardening | Integrated external completeness review gaps: split Stage `02` into `02A/02B/02C`, recorded classic Stage `05` blocker, added live-feed feature gate, futures metadata gate, registry state machine, Stage `09B` backup/restore, promotion-grade thresholds, synthetic exits, simulator/paper parity, resource isolation, incident drills, live-outcome governance and product/legal mainnet gate. | `docs/architecture/ml/rl-trading-agent-platform-v1.md`; this ledger |
+| 2026-06-17 | prompt pack | Generated Stage `01` repair prompt and Stage `02A`-`22` implementation prompts, ran one independent cold-head review, fixed the High worker-topology mismatch, and completed local follow-up checks. | `.codex/agents/generated/rl-trading-agent-platform-v1/`; this ledger |
+| 2026-06-17 | prompt pack hardening | Added explicit GitHub delivery and branch-hygiene contract to prompts: use `github:yeet`, avoid direct main push, avoid unnecessary branches, and clean temporary `codex/*` branches after successful PR path. | `.codex/agents/generated/rl-trading-agent-platform-v1/`; this ledger |
+| 2026-06-17 | prompt pack hardening | Ran second cold-head review for GitHub delivery semantics; no blockers found, and low wording gaps were closed for `publish-ci-deploy` scope and `published-to-branch/draft-pr` delivery state. | `.codex/agents/generated/rl-trading-agent-platform-v1/`; cold-head review `019ed6eb-0f3d-7073-bf62-576ec53566cb`; this ledger |
