@@ -76,6 +76,33 @@
   color: var(--rh-financial-negative);
 }
 
+.settings-market-availability {
+  display: grid;
+  gap: 2px;
+  min-width: 170px;
+}
+
+.settings-market-availability__item {
+  display: grid;
+  grid-template-columns: 62px max-content;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.settings-market-availability__label {
+  color: var(--rh-muted);
+  text-transform: uppercase;
+}
+
+.settings-market-availability__item.is-current .settings-market-availability__label {
+  color: var(--rh-accent);
+}
+
+.settings-market-availability__item.is-current span:last-child {
+  font-weight: 700;
+}
+
 .settings-modebar {
   display: inline-flex;
   align-self: flex-start;
@@ -475,8 +502,6 @@
 
 .settings-exchange .settings-table th:nth-child(3),
 .settings-exchange .settings-table td:nth-child(3),
-.settings-exchange .settings-table th:nth-child(7),
-.settings-exchange .settings-table td:nth-child(7),
 .settings-exchange .settings-table th:nth-child(8),
 .settings-exchange .settings-table td:nth-child(8),
 .settings-exchange .settings-table th:nth-child(9),
@@ -484,6 +509,12 @@
 .settings-exchange .settings-table th:nth-child(10),
 .settings-exchange .settings-table td:nth-child(10) {
   max-width: 62px;
+}
+
+.settings-exchange .settings-table th:nth-child(7),
+.settings-exchange .settings-table td:nth-child(7) {
+  width: 174px;
+  max-width: 174px;
 }
 
 .settings-exchange .settings-table th:nth-child(11),

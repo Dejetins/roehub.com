@@ -634,6 +634,7 @@
   "settings.exchange.filters": "Статус биржевого подключения",
   "settings.exchange.market": "Рынок",
   "settings.exchange.market_futures": "Фьючерсы",
+  "settings.exchange.market_not_connected": "Не подключено",
   "settings.exchange.market_required": "Выберите хотя бы один рынок.",
   "settings.exchange.market_spot": "Спот",
   "settings.exchange.markets": "Рынки",

@@ -74,6 +74,28 @@ Stage 12 добавляет совместимый первый этап omni-ch
 | Secret artifact grep | `rg -n "SmokeE2E|password|api_secret|BROWSER_SECRET|KEYCLOAK|roehub_session|AUTH_SESSION|code=|state=" output/playwright` returned no matches. |
 | Screenshot limitation | Production headless screenshot capture timed out after fonts loaded, so the accepted production browser artifact is JSON state evidence rather than a PNG. Local browser QA did capture the add-key modal screenshot. |
 
+## Follow-up: Market Availability Display
+
+Дата проверки: `2026-06-18`.
+
+Production API evidence for `smoke_e2e_keycloak` showed active `binance_testnet`
+only as a futures-scoped connection: `exchange=binance`, `label=binance_testnet`,
+masked key `****RcSh`, `market_type=futures`, `environment=testnet`,
+`validation_status=valid_trade_enabled`, `connection_readiness=ready_for_trading`.
+`status=all` also showed no Binance testnet spot row for that same label/masked
+key; there is one active futures row and one disabled futures duplicate.
+
+The UI follow-up keeps the market-scoped execution model unchanged and changes
+only the `/settings` table display: the former single `Market` value is now a
+`Markets` availability cell with separate `Spot` and `Futures` lines for the
+same display-safe `(exchange, account/name, masked API key, environment)` group.
+The current row market is highlighted so row-level actions still target a single
+market-scoped binding. Missing market rows render as `Not connected`; ready rows
+render as compact `Ready` because the full readiness remains in the row `Status`
+column. This makes the current fact explicit:
+`binance_testnet` is ready for futures in Roehub, while spot still needs its own
+market-scoped connection row before execution/readiness can use it.
+
 ## Handoff
 
 The next credential-management stage should introduce a shared credential object

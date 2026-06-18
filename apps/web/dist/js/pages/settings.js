@@ -300,11 +300,87 @@ function readinessMessage(item) {
   return readableStatus(item?.status);
 }
 
+function compactReadinessMessage(item) {
+  if (item?.connection_readiness === "ready_for_trading") return t("settings.state.ready");
+  return readinessMessage(item);
+}
+
 function capabilityDisplay(item) {
   const effective = item?.effective_capability || "none";
   const requested = item?.requested_capability || "trading";
   if (effective === "trading") return t("settings.exchange.capability_trading");
   return `${readableStatus(requested)} / ${readableStatus(effective)} · ${readinessMessage(item)}`;
+}
+
+function marketAvailabilityKey(item) {
+  return [
+    item?.exchange_name || "",
+    item?.label || "",
+    item?.api_key || "",
+    item?.environment || "",
+  ].join("\u001f");
+}
+
+function marketAvailabilityRank(item) {
+  if (!item) return 0;
+  if (
+    item.status === "active" &&
+    item.connection_readiness === "ready_for_trading" &&
+    item.effective_capability === "trading"
+  ) {
+    return 40;
+  }
+  if (item.status === "active") return 30;
+  if (item.status === "disabled") return 20;
+  if (item.status === "archived") return 10;
+  return 1;
+}
+
+function buildMarketAvailability(items) {
+  const groups = new Map();
+  items.forEach((item) => {
+    if (!item?.market_type) return;
+    const key = marketAvailabilityKey(item);
+    const group = groups.get(key) || {};
+    const existing = group[item.market_type];
+    if (marketAvailabilityRank(item) >= marketAvailabilityRank(existing)) {
+      group[item.market_type] = item;
+    }
+    groups.set(key, group);
+  });
+  return groups;
+}
+
+function renderMarketAvailability(group = {}, currentMarketType = "") {
+  const root = document.createElement("div");
+  root.className = "settings-market-availability";
+  DEFAULT_MARKET_TYPES.forEach((marketType) => {
+    const item = group[marketType];
+    const row = document.createElement("span");
+    row.className = "settings-market-availability__item";
+    if (marketType === currentMarketType) {
+      row.classList.add("is-current");
+      row.setAttribute("aria-current", "true");
+    }
+    const label = document.createElement("span");
+    label.className = "settings-market-availability__label";
+    label.textContent = marketLabel(marketType);
+    const value = document.createElement("span");
+    value.className = item ? statusClass(item) : "is-warning";
+    value.textContent = item
+      ? compactReadinessMessage(item)
+      : t("settings.exchange.market_not_connected");
+    row.append(label, value);
+    root.append(row);
+  });
+  return root;
+}
+
+function appendTextCell(row, value, className = "") {
+  const cell = row.insertCell();
+  cell.textContent = String(value || "--");
+  if (className) cell.className = className;
+  return cell;
 }
 
 function formatPlan(value) {
@@ -483,6 +559,7 @@ function renderExchangeKeys(payload) {
   const body = qs("[data-exchange-keys-body]");
   if (!body) return;
   const items = exchangeItems(payload);
+  const marketAvailability = buildMarketAvailability(items);
   body.replaceChildren();
   if (!items?.length) {
     const row = body.insertRow();
@@ -494,24 +571,19 @@ function renderExchangeKeys(payload) {
   items.forEach((item) => {
     const row = body.insertRow();
     const rowClass = statusClass(item);
-    [
-      item.exchange_name,
-      item.label || "--",
-      item.api_key,
-      readinessMessage(item),
-      readableStatus(item.validation_status),
-      capabilityDisplay(item),
-      item.market_type,
-      item.environment || "--",
-      readableStatus(item.ip_restriction_status),
-      formatTimestampToSeconds(item.last_validated_at),
-    ].forEach((value, cellIndex) => {
-      const cell = row.insertCell();
-      cell.textContent = String(value || "--");
-      if (cellIndex === 3 || cellIndex === 4 || cellIndex === 8) {
-        cell.className = rowClass;
-      }
-    });
+    appendTextCell(row, item.exchange_name);
+    appendTextCell(row, item.label || "--");
+    appendTextCell(row, item.api_key);
+    appendTextCell(row, readinessMessage(item), rowClass);
+    appendTextCell(row, readableStatus(item.validation_status), rowClass);
+    appendTextCell(row, capabilityDisplay(item));
+    const markets = row.insertCell();
+    markets.append(
+      renderMarketAvailability(marketAvailability.get(marketAvailabilityKey(item)), item.market_type)
+    );
+    appendTextCell(row, item.environment || "--");
+    appendTextCell(row, readableStatus(item.ip_restriction_status), rowClass);
+    appendTextCell(row, formatTimestampToSeconds(item.last_validated_at));
     const action = row.insertCell();
     action.className = "settings-exchange-actions";
     const activeStrategyBindings = Number(item.active_strategy_bindings_count || 0);

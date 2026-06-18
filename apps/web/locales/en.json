@@ -634,6 +634,7 @@
   "settings.exchange.filters": "Exchange connection status",
   "settings.exchange.market": "Market",
   "settings.exchange.market_futures": "Futures",
+  "settings.exchange.market_not_connected": "Not connected",
   "settings.exchange.market_required": "Select at least one market.",
   "settings.exchange.market_spot": "Spot",
   "settings.exchange.markets": "Markets",
