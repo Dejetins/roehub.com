@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "Обновил .codex/agents/generated/example/01.md, prompt pack готов. Cold-head сделал, все нормально."
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "structured receipt block"
+  }
+}

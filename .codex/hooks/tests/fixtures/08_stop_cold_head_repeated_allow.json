@@ -2,7 +2,7 @@
   "payload": {
     "hook_event_name": "Stop",
     "stop_hook_active": true,
-    "last_assistant_message": "Подготовил architecture plan и prompt pack, все готово к реализации."
+    "last_assistant_message": "Подготовил architecture plan artifact и prompt pack, все готово к реализации."
   },
   "expect": {
     "returncode": 0,
