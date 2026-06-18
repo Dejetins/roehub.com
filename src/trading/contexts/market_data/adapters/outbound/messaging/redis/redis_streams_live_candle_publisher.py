@@ -315,6 +315,9 @@ class RedisStreamsLiveCandlePublisher(LiveCandlePublisher):
             "close": str(row.close),
             "volume_base": str(row.volume_base),
             "volume_quote": "" if row.volume_quote is None else str(row.volume_quote),
+            "trades_count": (
+                "" if candle.meta.trades_count is None else str(candle.meta.trades_count)
+            ),
             "source": "ws",
             "ingested_at": str(candle.meta.ingested_at),
             "ingest_id": self._ingest_id(candle),

@@ -1,7 +1,7 @@
 ---
 doc: rl-trading-agent-platform-v1-stage-02c-action-state-reward-contract
 stage: "02C"
-status: code_ready_pending_stage_02b_delivery
+status: accepted
 plan: docs/architecture/ml/rl-trading-agent-platform-v1.md
 ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
 collected_at: "2026-06-18"
@@ -9,11 +9,11 @@ collected_at: "2026-06-18"
 
 # Stage 02C: Action, State And Reward Contract
 
-Статус: `code_ready_pending_stage_02b_delivery`.
+Статус: `accepted`.
 
-Этот отчет публикует только standalone-контракт Stage `02C`: action ids, state extras, action-history encoding, reward v1 и strategy-owned close semantics. Он намеренно не добавляет Stage `02B` feature/live-feed файлы, Redis изменения или Stage `09` документы.
+Этот отчет публикует standalone-контракт Stage `02C`: action ids, state extras, action-history encoding, reward v1 и strategy-owned close semantics. Stage `02B` feature/live-feed contract доставлен отдельным sync repair-коммитом, поэтому Stage `02C` больше не заблокирован prerequisite gap.
 
-Stage ledger в текущем `main` остается на `current_stage=02B`, потому что acceptance Stage `02C` требует доставленного Stage `02B`. После отдельной доставки Stage `02B` этот report/code/test можно использовать как готовую основу для ledger acceptance Stage `02C`.
+Stage ledger продвинут на `current_stage=03` после delivery Stage `02B` и повторной проверки Stage `02C` focused gates.
 
 ## Scope
 
@@ -29,11 +29,10 @@ Included:
 
 Not included:
 
-- Stage `02B` feature/live-feed contract files or Redis `trades_count` changes;
 - exchange, paper, testnet, live or mainnet side effects;
 - API, UI, Redis, ClickHouse, Postgres, config or migration changes;
 - runtime ML artifacts under `/opt/roehub/state/rl_trading/`;
-- stage-ledger acceptance of Stage `02C`.
+- Stage `03` ML runtime/environment work.
 
 ## File Manifest
 
@@ -41,6 +40,7 @@ Not included:
 |---|---|---|---|---|
 | `src/trading/contexts/rl_trading/__init__.py`; `src/trading/contexts/rl_trading/domain/__init__.py`; `src/trading/contexts/rl_trading/domain/action_state_reward_contract.py`; `tests/unit/contexts/rl_trading/domain/test_action_state_reward_contract.py`; this report | - | - | Add standalone Stage `02C` action/state/reward contract and deterministic fixtures without Stage `02B` files. | `compatible-change` new internal/domain contract and docs/report |
 | - | `docs/architecture/README.md` | - | Docs index update after adding this Stage `02C` report. | `compatible-change` docs index only |
+| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md`; this report | - | Accept Stage `02C` after Stage `02B` delivery and repeated focused verification during repository sync repair. | `compatible-change` docs/ledger only |
 
 ## Action/State/Reward Contract
 
@@ -107,7 +107,7 @@ Backtest/live distinction:
 | Config schema/defaults | `none` | No env/YAML/default changed. |
 | Request hash / cache key / persistence identity | `none` | Existing runtime identities are unchanged; new RL scope identity is internal/domain-only. |
 | Logs/metrics/traces/audit/ledger/report/redaction | `compatible-change` | Adds sanitized Stage `02C` report evidence; no secrets/provider payloads. |
-| Benchmark / rollout gate | `none` | Stage ledger acceptance is intentionally not changed in this scoped commit. |
+| Benchmark / rollout gate | `compatible-change` | Stage `02C` acceptance opens Stage `03` after Stage `02B` delivery and focused domain verification. |
 | Performance hot path | `none` | No runtime path is called by API/worker/execution code in this stage. |
 | Browser-visible behavior | `none` | No UI/browser behavior changed. |
 | Docs/runbooks | `compatible-change` | Stage report and docs index updated only. |
@@ -120,6 +120,8 @@ Backtest/live distinction:
 | `uv run ruff check src/trading/contexts/rl_trading tests/unit/contexts/rl_trading` | passed |
 | `uv run pyright src/trading/contexts/rl_trading tests/unit/contexts/rl_trading` | passed; `0 errors` |
 | `python -m tools.docs.generate_docs_index --check` | passed after docs index regeneration |
+| 2026-06-18 acceptance repair focused gate: `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_feature_contract.py tests/unit/contexts/rl_trading/domain/test_action_state_reward_contract.py tests/unit/contexts/market_data/adapters/test_redis_streams_live_candle_publisher.py tests/unit/contexts/strategy/adapters/test_redis_strategy_live_candle_stream.py` | passed; `24 passed` |
+| 2026-06-18 acceptance repair publish gates: `uv run ruff check .`; `uv run pyright`; `uv run pytest -q -ra`; `python -m tools.docs.generate_docs_index --check` | passed; `1215 passed, 3 warnings`; pyright `0 errors`; docs index up to date |
 
 ## Evidence
 
@@ -136,9 +138,9 @@ Tests are the correct real-boundary evidence for this scoped commit because the 
 
 ## Next-Stage Handoff
 
-Stage `02C` acceptance in the ledger is still blocked until Stage `02B` is delivered to `main`.
+Stage `02C` is accepted in the ledger. Stage `03` can start after confirming this report and the ledger are present on `main`.
 
-After Stage `02B` delivery, the Stage `02C` executor should know:
+The Stage `03` executor should know:
 
 - Stage `02C` contract hash: `255d765b9474620671167412465fc55a058c0233d5da242a276143fb6816b557`.
 - Action ids are fixed: `0 hold`, `1 open_long`, `2 open_short`, `3 close`.

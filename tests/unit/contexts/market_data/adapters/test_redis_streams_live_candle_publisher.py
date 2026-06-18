@@ -209,6 +209,7 @@ def _row(
     ingested_at: datetime,
     meta_ingest_id: UUID | None,
     volume_quote: float | None,
+    trades_count: int | None = 7,
 ) -> CandleWithMeta:
     """
     Build deterministic closed WS candle row for publisher tests.
@@ -218,6 +219,7 @@ def _row(
     - ingested_at: candle metadata ingestion timestamp.
     - meta_ingest_id: optional ingest id stored in candle metadata.
     - volume_quote: quote volume value or `None`.
+    - trades_count: trade count metadata value or `None`.
 
     Returns:
     - CandleWithMeta instance.
@@ -239,7 +241,7 @@ def _row(
         ingested_at=UtcTimestamp(ingested_at),
         ingest_id=meta_ingest_id,
         instrument_key="binance:spot:BTCUSDT",
-        trades_count=7,
+        trades_count=trades_count,
         taker_buy_volume_base=1.1,
         taker_buy_volume_quote=110.0,
     )
@@ -286,6 +288,7 @@ def test_redis_publisher_maps_stream_payload_and_deterministic_id() -> None:
     assert fields["close"] == "100.8"
     assert fields["volume_base"] == "12.34"
     assert fields["volume_quote"] == "1234.5"
+    assert fields["trades_count"] == "7"
     assert fields["source"] == "ws"
     assert fields["ingested_at"] == "2026-02-10T12:35:00.120Z"
     assert fields["ingest_id"] == "00000000-0000-0000-0000-000000000001"
@@ -310,6 +313,7 @@ def test_redis_publisher_uses_process_ingest_id_when_meta_ingest_id_is_missing()
         ingested_at=datetime(2026, 2, 10, 12, 41, tzinfo=timezone.utc),
         meta_ingest_id=None,
         volume_quote=None,
+        trades_count=None,
     )
 
     publisher.publish_1m_closed(row)
@@ -318,6 +322,7 @@ def test_redis_publisher_uses_process_ingest_id_when_meta_ingest_id_is_missing()
     assert isinstance(fields, dict)
     assert fields["ingest_id"] == "00000000-0000-0000-0000-000000000777"
     assert fields["volume_quote"] == ""
+    assert fields["trades_count"] == ""
 
 
 def test_redis_publisher_treats_duplicate_id_error_as_noop() -> None:
