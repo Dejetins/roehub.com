@@ -127,6 +127,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 status_reason,
                                 permission_summary_json,
                                 ip_restriction_status,
+                                last_validated_at,
                                 created_at,
                                 updated_at,
                                 disabled_at,
@@ -143,7 +144,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                 %(status)s,
                                 %(status_reason)s,
                                 %(permission_summary_json)s::jsonb,
-                                'unknown',
+                                %(ip_restriction_status)s,
+                                %(last_validated_at)s,
                                 %(created_at)s,
                                 %(updated_at)s,
                                 %(disabled_at)s,
@@ -866,6 +868,8 @@ def _connection_parameters(
         "permissions": connection.permissions,
         "validation_status": connection.validation_status,
         "validation_reason": connection.validation_reason,
+        "ip_restriction_status": connection.ip_restriction_status,
+        "last_validated_at": connection.last_validated_at,
         "permission_summary_json": json.dumps(
             connection.permission_summary
             or {
