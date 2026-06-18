@@ -9,6 +9,10 @@ ThemeValue = Literal["terminal-orange", "graphite", "matrix-green", "high-contra
 LocaleValue = Literal["en", "ru"]
 DensityValue = Literal["compact", "comfortable"]
 AutorefreshPresetValue = Literal["off", "10s", "15s", "30s", "1m", "5m", "custom"]
+ExchangeNameValue = Literal["binance", "bybit"]
+ExchangeMarketTypeValue = Literal["spot", "futures"]
+ExchangeEnvironmentValue = Literal["mainnet", "testnet"]
+ExchangePermissionsValue = Literal["read", "trade"]
 
 
 class AccountProfileResponse(BaseModel):
@@ -50,11 +54,16 @@ class AccountLimitsResponse(BaseModel):
 class CreateExchangeConnectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    exchange_name: Literal["binance", "bybit"]
-    market_type: Literal["spot", "futures"]
-    environment: Literal["mainnet", "testnet"] = "mainnet"
+    exchange_name: ExchangeNameValue
+    market_type: ExchangeMarketTypeValue
+    market_types: list[ExchangeMarketTypeValue] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=2,
+    )
+    environment: ExchangeEnvironmentValue = "mainnet"
     label: str | None = Field(default=None, max_length=80)
-    permissions: Literal["read", "trade"] = "read"
+    permissions: ExchangePermissionsValue = "read"
     api_key: str = Field(min_length=1)
     api_secret: str = Field(min_length=1)
 
@@ -71,12 +80,12 @@ class ExchangeConnectionResponse(BaseModel):
 
     connection_id: str
     credential_version_id: str
-    exchange_name: Literal["binance", "bybit"]
-    market_type: Literal["spot", "futures"]
-    environment: Literal["mainnet", "testnet"]
+    exchange_name: ExchangeNameValue
+    market_type: ExchangeMarketTypeValue
+    environment: ExchangeEnvironmentValue
     label: str | None
-    permissions: Literal["read", "trade"]
-    requested_permissions: Literal["read", "trade"]
+    permissions: ExchangePermissionsValue
+    requested_permissions: ExchangePermissionsValue
     exchange_permissions: Literal["unknown", "read", "trade", "withdraw_or_transfer"]
     effective_permissions: Literal["none", "read", "trade"]
     requested_capability: Literal["trading"]
@@ -113,6 +122,23 @@ class ExchangeConnectionResponse(BaseModel):
     archived_at: datetime | None
     used_by_strategies_count: int = 0
     active_strategy_bindings_count: int = 0
+
+
+class ExchangeConnectionMarketCreateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    market_type: ExchangeMarketTypeValue
+    status: Literal["created", "failed"]
+    connection: ExchangeConnectionResponse | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class CreateExchangeConnectionResponse(ExchangeConnectionResponse):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ExchangeConnectionResponse] | None = None
+    market_results: list[ExchangeConnectionMarketCreateResult] | None = None
 
 
 class ExchangeConnectionsResponse(BaseModel):

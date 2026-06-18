@@ -344,11 +344,15 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "data-settings-refresh-option" not in settings_response.text
     assert "Custom interval seconds" not in settings_response.text
     assert 'role="listbox"' in settings_response.text
-    assert 'data-environment-current>mainnet</span>' in settings_response.text
+    assert 'data-market-type-checkbox checked' in settings_response.text
+    assert 'value="spot" data-market-type-checkbox checked' in settings_response.text
+    assert 'value="futures" data-market-type-checkbox checked' in settings_response.text
+    assert 'data-environment-option="mainnet">Mainnet</button>' in settings_response.text
+    assert 'data-environment-option="testnet">Testnet</button>' in settings_response.text
     assert "ADD API KEY" in settings_response.text
     assert "Connect and validate" in settings_response.text
-    assert "Advanced testnet" in settings_response.text
-    assert 'data-exchange-environment-advanced' in settings_response.text
+    assert "Advanced testnet" not in main_html
+    assert 'data-exchange-environment-advanced' not in settings_response.text
     assert 'data-exchange-form-modal hidden aria-hidden="true"' in main_html
     assert 'role="dialog" aria-modal="true"' in main_html
     assert "settings-exchange-field" in main_html
@@ -384,7 +388,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert 'data-security-focus' not in settings_response.text
     assert '<span aria-hidden="true">&gt;_</span>' not in settings_response.text
     settings_js = (_WEB_ROOT / "dist" / "js" / "pages" / "settings.js").read_text()
-    assert "permissions:" not in settings_js
+    assert 'permissions: "trade"' in settings_js
     assert "dataPermissions" not in settings_js
     assert "passphrase" not in settings_js
     assert 'type="password"' not in settings_js

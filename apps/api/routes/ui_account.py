@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from apps.api.dto.ui_account import (
     AccountAuditEventResponse,
@@ -20,7 +20,9 @@ from apps.api.dto.ui_account import (
     AccountSessionResponse,
     AccountSessionsResponse,
     CreateExchangeConnectionRequest,
+    CreateExchangeConnectionResponse,
     CreateStrategyExchangeBindingRequest,
+    ExchangeConnectionMarketCreateResult,
     ExchangeConnectionResponse,
     ExchangeConnectionsResponse,
     RotateExchangeConnectionRequest,
@@ -192,39 +194,82 @@ def build_ui_account_router(
 
     @router.post(
         "/ui/account/exchange-connections",
-        response_model=ExchangeConnectionResponse,
+        response_model=CreateExchangeConnectionResponse,
+        response_model_exclude_none=True,
         status_code=201,
     )
     def post_exchange_connection(
         request: Request,
+        response: Response,
         payload: CreateExchangeConnectionRequest,
         principal: CurrentUserPrincipal = Depends(require_account_user),
-    ) -> ExchangeConnectionResponse:
+    ) -> CreateExchangeConnectionResponse:
         _enforce_same_origin_mutation(request=request)
         _enforce_recent_auth(principal=principal, now=clock.now())
         client = _require_exchange_control_client(client=exchange_control_client)
-        try:
-            row = client.create_connection(
-                owner_user_id=str(principal.user_id),
-                exchange_name=payload.exchange_name,
-                market_type=payload.market_type,
-                environment=payload.environment,
-                label=payload.label,
-                permissions=payload.permissions,
-                api_key=payload.api_key,
-                api_secret=payload.api_secret,
-                request_id="apps-api-create-exchange-connection",
+        selected_market_types = _selected_create_market_types(payload=payload)
+        created_rows: list[ExchangeConnectionCommandResult] = []
+        market_results: list[ExchangeConnectionMarketCreateResult] = []
+        first_error: ExchangeControlClientError | None = None
+        for market_type in selected_market_types:
+            try:
+                row = client.create_connection(
+                    owner_user_id=str(principal.user_id),
+                    exchange_name=payload.exchange_name,
+                    market_type=market_type,
+                    environment=payload.environment,
+                    label=payload.label,
+                    permissions=payload.permissions,
+                    api_key=payload.api_key,
+                    api_secret=payload.api_secret,
+                    request_id=f"apps-api-create-exchange-connection-{market_type}",
+                )
+            except ExchangeControlClientError as error:
+                if first_error is None:
+                    first_error = error
+                if len(selected_market_types) == 1:
+                    raise _exchange_control_unavailable(error=error) from error
+                failed_error = _exchange_control_unavailable(error=error)
+                market_results.append(
+                    ExchangeConnectionMarketCreateResult(
+                        market_type=market_type,
+                        status="failed",
+                        error_code=failed_error.code,
+                        error_message=failed_error.message,
+                    )
+                )
+                continue
+            account_settings.record_exchange_connection_auto_validation(
+                owner_user_id=principal.user_id,
+                exchange_name=row.exchange_name,
+                operation="create",
+                result=row.connection_readiness,
+                reason=row.connection_readiness_reason,
             )
-        except ExchangeControlClientError as error:
-            raise _exchange_control_unavailable(error=error) from error
-        account_settings.record_exchange_connection_auto_validation(
-            owner_user_id=principal.user_id,
-            exchange_name=row.exchange_name,
-            operation="create",
-            result=row.connection_readiness,
-            reason=row.connection_readiness_reason,
+            created_rows.append(row)
+            market_results.append(
+                ExchangeConnectionMarketCreateResult(
+                    market_type=market_type,
+                    status="created",
+                    connection=_exchange_connection_response(row=row),
+                )
+            )
+        if not created_rows and first_error is not None:
+            raise _exchange_control_unavailable(error=first_error) from first_error
+        if not created_rows:
+            raise RoehubError(
+                code="exchange_connection_create_failed",
+                message="Exchange connection was not created.",
+                details={},
+            )
+        if len(created_rows) != len(selected_market_types):
+            response.status_code = 207
+        return _create_exchange_connection_response(
+            rows=tuple(created_rows),
+            market_results=tuple(market_results)
+            if len(selected_market_types) > 1
+            else None,
         )
-        return _exchange_connection_response(row=row)
 
     @router.post(
         "/ui/account/exchange-connections/{connection_id}/rotate",
@@ -788,6 +833,32 @@ def _exchange_control_client_error_code(
         return None
     code = message.rsplit(marker, maxsplit=1)[-1].strip()
     return code or None
+
+
+def _selected_create_market_types(
+    *,
+    payload: CreateExchangeConnectionRequest,
+) -> tuple[Literal["spot", "futures"], ...]:
+    raw_market_types = payload.market_types or [payload.market_type]
+    selected: list[Literal["spot", "futures"]] = []
+    for market_type in raw_market_types:
+        if market_type not in selected:
+            selected.append(market_type)
+    return tuple(selected)
+
+
+def _create_exchange_connection_response(
+    *,
+    rows: tuple[ExchangeConnectionCommandResult, ...],
+    market_results: tuple[ExchangeConnectionMarketCreateResult, ...] | None = None,
+) -> CreateExchangeConnectionResponse:
+    primary = _exchange_connection_response(row=rows[0])
+    items = [_exchange_connection_response(row=row) for row in rows]
+    return CreateExchangeConnectionResponse(
+        **primary.model_dump(),
+        items=items if market_results is not None else None,
+        market_results=list(market_results) if market_results is not None else None,
+    )
 
 
 def _exchange_connection_response(

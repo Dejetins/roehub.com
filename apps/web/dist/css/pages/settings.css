@@ -579,8 +579,72 @@
   white-space: nowrap;
 }
 
+.settings-exchange-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.settings-choice-group,
+.settings-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+
+.settings-check-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid var(--rh-line-muted);
+  background: var(--rh-surface-2);
+  color: var(--rh-text);
+  padding: 3px 7px;
+  cursor: pointer;
+}
+
+.settings-check-option input {
+  flex: 0 0 auto;
+  width: 13px;
+  min-height: 13px;
+  margin: 0;
+  border: 1px solid var(--rh-line);
+  padding: 0;
+  accent-color: var(--rh-accent);
+}
+
+.settings-check-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-segmented-control__button {
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid var(--rh-line-muted);
+  background: var(--rh-surface-2);
+  color: var(--rh-muted);
+  padding: 3px 7px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-segmented-control__button.is-active {
+  border-color: var(--rh-accent);
+  color: var(--rh-accent-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rh-accent) 28%, transparent);
+}
+
 .settings-exchange-field > .rh-dropdown,
 .settings-exchange-field > .settings-exchange-advanced,
+.settings-exchange-field > .settings-choice-group,
+.settings-exchange-field > .settings-segmented-control,
 .settings-exchange-field > input {
   min-width: 0;
   width: 100%;
@@ -590,6 +654,11 @@
 .settings-exchange-field .settings-exchange-advanced summary,
 .settings-exchange-field input {
   width: 100%;
+}
+
+.settings-exchange-field .settings-check-option input {
+  width: 13px;
+  min-height: 13px;
 }
 
 .settings-exchange-field .rh-dropdown__trigger,
@@ -605,6 +674,37 @@
   justify-content: flex-end;
   border-top: 1px solid var(--rh-divider);
   padding-top: 7px;
+}
+
+.settings-market-results {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--rh-divider);
+  padding-top: 7px;
+}
+
+.settings-market-results[hidden] {
+  display: none !important;
+}
+
+.settings-market-result {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.3fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid var(--rh-line-muted);
+  background: var(--rh-surface);
+  padding: 4px 7px;
+}
+
+.settings-market-result strong,
+.settings-market-result span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-exchange-modal__actions .settings-inline-status {
@@ -829,6 +929,9 @@ body.settings-exchange-modal-lock {
   .settings-form-grid,
   .settings-rotate-form,
   .settings-preference-grid,
+  .settings-choice-group,
+  .settings-segmented-control,
+  .settings-market-result,
   .settings-list-row,
   .settings-limit,
   .settings-limits {

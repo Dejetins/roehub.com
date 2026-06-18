@@ -4,6 +4,7 @@ import { t } from "../core/locale.js";
 import { initDropdowns } from "../components/dropdown.js";
 
 const AUTOREFRESH_STORAGE_KEY = "roehub_autorefresh_defaults";
+const DEFAULT_MARKET_TYPES = ["spot", "futures"];
 
 const state = {
   activeTab: "profile",
@@ -15,7 +16,7 @@ const state = {
     refresh_interval_seconds: 15,
   },
   exchangeName: "binance",
-  marketType: "futures",
+  marketTypes: [...DEFAULT_MARKET_TYPES],
   environment: "mainnet",
   exchangeStatusFilter: "active",
   sessionsCursor: null,
@@ -134,6 +135,9 @@ function openExchangeFormModal() {
   document.body.classList.add("settings-exchange-modal-lock");
   const status = qs("[data-exchange-form-status]", modal);
   if (status) status.textContent = "";
+  resetMarketResults();
+  syncMarketTypesFromControls(modal);
+  setEnvironmentValue(modal, state.environment);
   const firstControl = qs("[data-rh-dropdown-trigger], input, button", modal);
   if (firstControl instanceof HTMLElement) {
     firstControl.focus();
@@ -162,12 +166,89 @@ function secretInputValue(form, selector) {
   return input instanceof HTMLInputElement ? input.value : "";
 }
 
+function selectedMarketTypes(root = document) {
+  const selected = Array.from(root.querySelectorAll("[data-market-type-checkbox]"))
+    .filter((item) => item instanceof HTMLInputElement && item.checked)
+    .map((item) => item.value)
+    .filter((value) => DEFAULT_MARKET_TYPES.includes(value));
+  return [...new Set(selected)];
+}
+
+function syncMarketTypesFromControls(root = document) {
+  const selected = selectedMarketTypes(root);
+  state.marketTypes = selected.length ? selected : [];
+  return state.marketTypes;
+}
+
+function setEnvironmentValue(root, value) {
+  const nextEnvironment = ["mainnet", "testnet"].includes(value) ? value : "mainnet";
+  state.environment = nextEnvironment;
+  root.querySelectorAll("[data-environment-option]").forEach((button) => {
+    const selected = button.dataset.environmentOption === nextEnvironment;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-checked", selected ? "true" : "false");
+  });
+}
+
+function savedExchangeItems(saved) {
+  if (Array.isArray(saved?.items)) return saved.items;
+  return saved?.connection_id ? [saved] : [];
+}
+
 function isTradingReady(item) {
   return (
     item?.status === "active" &&
     item?.effective_capability === "trading" &&
     item?.connection_readiness === "ready_for_trading"
   );
+}
+
+function marketLabel(value) {
+  if (value === "spot") return t("settings.exchange.market_spot");
+  if (value === "futures") return t("settings.exchange.market_futures");
+  return readableStatus(value);
+}
+
+function resetMarketResults() {
+  const target = qs("[data-market-results]");
+  if (!target) return;
+  target.replaceChildren();
+  target.hidden = true;
+}
+
+function renderMarketResults(saved) {
+  const target = qs("[data-market-results]");
+  if (!target) return;
+  const results = Array.isArray(saved?.market_results)
+    ? saved.market_results
+    : savedExchangeItems(saved).map((connection) => ({
+        market_type: connection.market_type,
+        status: "created",
+        connection,
+      }));
+  target.replaceChildren();
+  if (!results.length) {
+    target.hidden = true;
+    return;
+  }
+  results.forEach((result) => {
+    const row = document.createElement("div");
+    const connection = result.connection;
+    const ready = isTradingReady(connection);
+    row.className = `settings-market-result${
+      result.status === "failed" ? " is-negative" : ready ? " is-positive" : " is-warning"
+    }`;
+    const label = document.createElement("strong");
+    label.textContent = marketLabel(result.market_type);
+    const message = document.createElement("span");
+    message.textContent =
+      result.status === "failed"
+        ? result.error_message || readableStatus(result.error_code)
+        : readinessMessage(connection);
+    row.append(label, message);
+    target.append(row);
+  });
+  target.hidden = false;
 }
 
 function exchangeItems(payload, status = state.exchangeStatusFilter) {
@@ -697,16 +778,14 @@ function initEvents(root) {
     setDropdownValue("[data-exchange-name-current]", state.exchangeName);
     closeDropdownForItem(item);
   });
-  on(root, "click", "[data-market-option]", (_event, item) => {
-    state.marketType = item.dataset.marketOption || "futures";
-    setDropdownValue("[data-market-current]", state.marketType);
-    closeDropdownForItem(item);
+  on(root, "change", "[data-market-type-checkbox]", (_event, item) => {
+    const form = item.closest("[data-exchange-form]") || root;
+    syncMarketTypesFromControls(form);
+    resetMarketResults();
   });
   on(root, "click", "[data-environment-option]", (_event, item) => {
-    state.environment = item.dataset.environmentOption || "mainnet";
-    setDropdownValue("[data-environment-current]", state.environment);
-    setDropdownValue("[data-environment-menu-current]", state.environment);
-    closeDropdownForItem(item);
+    setEnvironmentValue(root, item.dataset.environmentOption || "mainnet");
+    resetMarketResults();
   });
 }
 
@@ -731,15 +810,23 @@ function initForms(root) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    const marketTypes = syncMarketTypesFromControls(form);
+    const status = qs("[data-exchange-form-status]");
+    if (!marketTypes.length) {
+      resetMarketResults();
+      if (status) status.textContent = t("settings.exchange.market_required");
+      return;
+    }
     const payload = {
       exchange_name: state.exchangeName,
-      market_type: state.marketType,
+      market_type: marketTypes[0],
+      market_types: marketTypes,
       environment: state.environment,
       label: data.get("label") || null,
+      permissions: "trade",
       api_key: secretInputValue(form, "[data-exchange-api-key-input]"),
       api_secret: secretInputValue(form, "[data-exchange-api-secret-input]"),
     };
-    const status = qs("[data-exchange-form-status]");
     try {
       const saved = await apiFetch(endpoint(root, "exchangeKeysEndpoint"), {
         method: "POST",
@@ -747,15 +834,28 @@ function initForms(root) {
         body: JSON.stringify(payload),
       });
       clearSecretInputs(form);
-      form.reset();
-      const nextStatus = isTradingReady(saved) ? "active" : "history";
+      const savedItems = savedExchangeItems(saved);
+      const hasReadyItem = savedItems.some((item) => isTradingReady(item));
+      const allReady = savedItems.length > 0 && savedItems.every((item) => isTradingReady(item));
+      const nextStatus = hasReadyItem ? "active" : "history";
       setExchangeStatusFilter(root, nextStatus);
       const exchangeKeys = await loadJson(exchangeKeysPath(root, nextStatus), { items: [] });
       renderExchangeKeys(exchangeKeys);
-      if (status) status.textContent = isTradingReady(saved) ? t("settings.exchange.saved") : readinessMessage(saved);
-      closeExchangeFormModal({ clearSecrets: false });
+      renderMarketResults(saved);
+      if (status) {
+        status.textContent = allReady
+          ? t("settings.exchange.saved")
+          : t("settings.exchange.validation_complete");
+      }
+      if (marketTypes.length === 1 && allReady) {
+        form.reset();
+        syncMarketTypesFromControls(form);
+        resetMarketResults();
+        closeExchangeFormModal({ clearSecrets: false });
+      }
     } catch (error) {
       clearSecretInputs(form);
+      resetMarketResults();
       if (status) status.textContent = errorMessage(error);
     }
   });

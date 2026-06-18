@@ -3,9 +3,10 @@
 Статус: staged rollout active. Этап 8 принят как production-browser repair и
 заменяет неполное readiness-утверждение Этапа 7 для authenticated public
 `/settings` add-key flow. Этап 9 принят как lifecycle/permission hardening.
-Этап 10 запланирован как продуктовая доработка CJM: пользователь подключает
-биржевой аккаунт для торговли стратегиями, а не выбирает технический режим
-`read`/`trade`.
+Этап 10 принят как trading-only CJM. Этап 11 принят как strategy binding guard.
+Этап 12 вводит совместимый omni-market create: один plaintext API key может быть
+проверен для нескольких рынков, но durable/execution binding остается
+market-scoped.
 
 Документ фиксирует архитектуру первого production-этапа для Binance/Bybit
 API-ключей на `/settings`: добавление, безопасное хранение, валидация,
@@ -401,6 +402,13 @@ Stage 9, чтобы не создавать ложное ожидание physic
 
 - create/rotate request в account facade для текущих Binance/Bybit принимает
   `api_key` и `api_secret`, но не принимает `passphrase`;
+- `POST /api/ui/account/exchange-connections` сохраняет legacy `market_type` и
+  совместимо добавляет optional `market_types: ["spot", "futures"]`; если
+  `market_types` задан, API валидирует тот же plaintext key по каждому рынку и
+  создает отдельные durable market-scoped connections;
+- multi-market create response сохраняет поля primary connection на верхнем
+  уровне и добавляет `items[]` + `market_results[]` с per-market validation
+  итогом; single-market clients могут продолжать читать старую форму ответа;
 - без `api_secret`, `passphrase`, ciphertext, fingerprint, HMAC и raw exchange
   error body;
 - включать masked key suffix, status, permission summary, environment, последнюю
@@ -422,12 +430,17 @@ Stage 9, чтобы не создавать ложное ожидание physic
   подключения;
 - `disabled`/`archived` доступны через отдельный фильтр/history и не занимают
   визуальное место в основном списке;
-- выбор environment явный;
-- выбор permissions явный: `read` по умолчанию, `trade` только как осознанное
-  повышение capability; hardcoded `trade` запрещен;
+- выбор environment явный: `Mainnet` и `Testnet` отображаются как видимый
+  segmented control, без скрытого advanced summary;
+- выбор рынков при добавлении ключа делается чекбоксами `Spot`/`Futures`;
+- UI не предлагает пользователю выбирать `read`/`trade`; `/settings` отправляет
+  product intent `permissions="trade"` как compatibility field, а readiness
+  решает backend validation policy;
 - UI различает `requested_permissions`, `exchange_permissions` и
   `effective_permissions`; mismatch не отображается как успешное нормальное
   состояние;
+- после multi-market submit UI показывает per-market validation/readiness result,
+  чтобы пользователь видел, какой рынок действительно готов к trading;
 - IP allowlist guidance показывает Roehub outbound IP/runbook state;
 - add/rotate credentials работают через write-only forms;
 - destructive actions требуют typed confirmation;
@@ -2195,15 +2208,50 @@ DB/audit/metrics and authenticated `/settings` Playwright proof. Exchange
 execution, order placement, order simulation and physical deletes remain out of
 scope and blocked until a separate signal-to-execution architecture is accepted.
 
+### Этап 12 — Omni-Market Create Без Схлопывания Execution Boundary
+
+Stage 12 закрывает продуктовый разрыв между реальными биржевыми ключами и
+текущей Roehub-моделью `exchange_connection.market_type`.
+
+Решение:
+
+- публичный create DTO совместимо добавляет optional `market_types[]`, сохраняя
+  старый required `market_type`;
+- `/settings` показывает чекбоксы `Spot` и `Futures`, отправляет
+  `market_type=<первый выбранный>` для legacy compatibility и `market_types[]`
+  для нового fan-out path;
+- `apps/api` при multi-market create вызывает существующий
+  `exchange-control.create_connection` отдельно для каждого выбранного market,
+  используя один plaintext input только внутри текущего request;
+- `exchange-control` продолжает валидировать и сохранять обычные market-scoped
+  `exchange_connections` и `exchange_credential_versions`;
+- execution, readiness и strategy binding получают конкретный
+  `exchange_connection_id`; omni-ключ не становится универсальным execution
+  handle.
+
+Первый этап намеренно дублирует ciphertext между market-scoped credential
+versions, если один physical exchange API key используется для `spot` и
+`futures`. Это совместимый компромисс: не меняется ownership/readiness/execution
+identity. Следующий отдельный этап должен вынести секреты из
+`exchange_credential_versions.connection_id` в credential object, например:
+
+```text
+exchange_credential(id, owner_user_id, exchange_name, environment, fingerprint)
+exchange_connection(id, credential_id, market_type, active_credential_version_id?)
+```
+
+Этот будущий этап является persistence/rotation migration и не должен
+смешиваться с Stage 12 UI/API fan-out.
+
 ## Контрактное Влияние
 
 | Измерение | Классификация | Примечания |
 |---|---|---|
-| Публичное API | `compatible-change` до Stage 9; `breaking-change`/intentional product change для Stage 10 account facade; `compatible-change` + deterministic conflict для Stage 11 | Stage 9 добавляет explicit status filter и archive endpoint/alias без удаления legacy routes. Stage 10 убирает пользовательский выбор `read`/`trade` из `/settings` и делает `trading` единственным product capability; legacy fields остаются deprecated compatibility surface, но read-only key больше не считается успешным active подключением. Stage 11 добавляет usage count/read-model поля и возвращает `409 exchange_connection_in_use` при попытке disconnect/archive используемого connection. |
-| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. Stage 9 добавляет `archived_at`, lifecycle status `archived` и explicit permission fields/metadata без hard delete. Stage 10 может добавить capability/readiness metadata или хранить их в существующем JSON, но не удаляет secret/audit history. Stage 11 добавляет `strategy_exchange_bindings` или эквивалентный usage registry без хранения секретов. |
+| Публичное API | `compatible-change` до Stage 9; `breaking-change`/intentional product change для Stage 10 account facade; `compatible-change` + deterministic conflict для Stage 11; `compatible-change` для Stage 12 | Stage 9 добавляет explicit status filter и archive endpoint/alias без удаления legacy routes. Stage 10 убирает пользовательский выбор `read`/`trade` из `/settings` и делает `trading` единственным product capability; legacy fields остаются deprecated compatibility surface, но read-only key больше не считается успешным active подключением. Stage 11 добавляет usage count/read-model поля и возвращает `409 exchange_connection_in_use` при попытке disconnect/archive используемого connection. Stage 12 добавляет optional `market_types[]`, `items[]` и `market_results[]`, не удаляя `market_type` и top-level connection fields. |
+| Хранение | `compatible-change` | Добавляются таблицы/колонки; требуется backfill. Stage 9 добавляет `archived_at`, lifecycle status `archived` и explicit permission fields/metadata без hard delete. Stage 10 может добавить capability/readiness metadata или хранить их в существующем JSON, но не удаляет secret/audit history. Stage 11 добавляет `strategy_exchange_bindings` или эквивалентный usage registry без хранения секретов. Stage 12 не схлопывает существующие `connection_id`; multi-market create создает несколько обычных rows и поэтому additive/compatible, но временно дублирует ciphertext до отдельного credential-object этапа. |
 | Граница секретов | `compatible-change` | Граница усиливается; plaintext consumers намеренно запрещены. |
-| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`; Stage 9 добавляет archive/cleanup/mismatch metrics; Stage 10 добавляет auto-validation/readiness/reclassification metrics; Stage 11 добавляет usage-guard/binding metrics. |
-| Поведение в браузере | `compatible-change` до Stage 9; intentional product change в Stage 10; `compatible-change` в Stage 11 | Settings получает real status, validation, rotate/disable и warnings; Stage 9 скрывает disabled/archived из default list и добавляет history/filter. Stage 10 меняет CJM: нет permissions selector, Active/History вместо Active/Disabled/Archived, `Disconnect` вместо user-facing `Disable`, validation auto-run on create/rotate. Stage 11 показывает usage count и объясняет, почему используемое подключение нельзя отключить. |
+| Операции | `compatible-change` | Новые metrics/Prometheus/Monit targets, local-only internal command API и runbooks для `exchange-control`; Stage 9 добавляет archive/cleanup/mismatch metrics; Stage 10 добавляет auto-validation/readiness/reclassification metrics; Stage 11 добавляет usage-guard/binding metrics. Stage 12 переиспользует существующую per-market validation и audit; новых secret-bearing labels не добавляет. |
+| Поведение в браузере | `compatible-change` до Stage 9; intentional product change в Stage 10; `compatible-change` в Stage 11; workflow change в Stage 12 | Settings получает real status, validation, rotate/disable и warnings; Stage 9 скрывает disabled/archived из default list и добавляет history/filter. Stage 10 меняет CJM: нет permissions selector, Active/History вместо Active/Disabled/Archived, `Disconnect` вместо user-facing `Disable`, validation auto-run on create/rotate. Stage 11 показывает usage count и объясняет, почему используемое подключение нельзя отключить. Stage 12 заменяет single-market dropdown на market checkboxes и делает Mainnet/Testnet видимым segmented control; старые клиенты API не ломаются. |
 | Trading execution | `none` | Размещение ордеров намеренно вне scope этого документа. |
 
 ## Отклоненные Альтернативы

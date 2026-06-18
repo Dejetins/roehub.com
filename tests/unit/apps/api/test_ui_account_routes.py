@@ -147,6 +147,38 @@ class _ArchiveShouldNotRunClient:
         raise AssertionError("read_account_state must not run")
 
 
+class _FuturesCreateFailureClient(InMemoryExchangeControlClient):
+    def create_connection(
+        self,
+        *,
+        owner_user_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        label: str | None,
+        permissions: str,
+        api_key: str,
+        api_secret: str,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        if market_type == "futures":
+            raise ExchangeControlClientError(
+                "exchange-control internal request failed with status 422 code "
+                "invalid_permissions"
+            )
+        return super().create_connection(
+            owner_user_id=owner_user_id,
+            exchange_name=exchange_name,
+            market_type=market_type,
+            environment=environment,
+            label=label,
+            permissions=permissions,
+            api_key=api_key,
+            api_secret=api_secret,
+            request_id=request_id,
+        )
+
+
 class _InUseExchangeControlClient(InMemoryExchangeControlClient):
     def __init__(self, *, connection_id: str) -> None:
         super().__init__()
@@ -315,6 +347,88 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert limits_after_disable.status_code == 200
     assert limits_after_disable.json()["exchange_connections_used"] == 0
     assert limits_after_disable.json()["api_keys_used"] == 0
+
+
+def test_ui_account_exchange_connections_omni_create_returns_market_scoped_results() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "market_types": ["spot", "futures"],
+            "environment": "testnet",
+            "label": "omni-testnet",
+            "permissions": "trade",
+            "api_key": "OMNIKEY1234",
+            "api_secret": "TEST_SECRET_OMNI_READY",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 201
+    payload = created.json()
+    assert payload["market_type"] == "spot"
+    assert [item["market_type"] for item in payload["items"]] == ["spot", "futures"]
+    assert [result["status"] for result in payload["market_results"]] == [
+        "created",
+        "created",
+    ]
+    assert [
+        result["connection"]["connection_readiness"]
+        for result in payload["market_results"]
+    ] == ["ready_for_trading", "ready_for_trading"]
+    assert "TEST_SECRET_OMNI_READY" not in created.text
+
+    active_list = client.get("/ui/account/exchange-connections?status=active")
+    limits = client.get("/ui/account/limits")
+
+    assert active_list.status_code == 200
+    assert [item["market_type"] for item in active_list.json()["items"]] == [
+        "spot",
+        "futures",
+    ]
+    assert limits.status_code == 200
+    assert limits.json()["exchange_connections_used"] == 2
+    assert limits.json()["api_keys_used"] == 2
+
+
+def test_ui_account_exchange_connections_omni_create_partial_failure_is_secret_safe() -> None:
+    client, _account_repository, _session_ids = _build_test_client(
+        exchange_control_client=_FuturesCreateFailureClient(),
+    )
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "market_types": ["spot", "futures"],
+            "environment": "testnet",
+            "label": "partial-omni",
+            "permissions": "trade",
+            "api_key": "PARTIALKEY1234",
+            "api_secret": "TEST_SECRET_PARTIAL_OMNI",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 207
+    payload = created.json()
+    assert [item["market_type"] for item in payload["items"]] == ["spot"]
+    assert payload["market_results"][0]["status"] == "created"
+    assert payload["market_results"][0]["connection"]["market_type"] == "spot"
+    assert payload["market_results"][1] == {
+        "market_type": "futures",
+        "status": "failed",
+        "error_code": "invalid_permissions",
+        "error_message": "Exchange credentials did not pass auto-validation.",
+    }
+    assert "TEST_SECRET_PARTIAL_OMNI" not in created.text
+
+    active_list = client.get("/ui/account/exchange-connections?status=active")
+    assert [item["market_type"] for item in active_list.json()["items"]] == ["spot"]
 
 
 def test_ui_account_exchange_connection_readonly_create_is_not_active_or_limit_counted() -> None:
@@ -749,6 +863,23 @@ def test_ui_account_exchange_connections_reject_linear_and_inverse_market_types(
 
         assert response.status_code == 422
         assert "TEST_SECRET_STAGE4" not in response.text
+
+    response = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "market_types": ["spot", "inverse"],
+            "environment": "testnet",
+            "permissions": "read",
+            "api_key": "ACCOUNTKEY1234",
+            "api_secret": "TEST_SECRET_STAGE4",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert response.status_code == 422
+    assert "TEST_SECRET_STAGE4" not in response.text
 
 
 def test_ui_account_preferences_persist_locale_theme_autorefresh_and_write_audit() -> None:
