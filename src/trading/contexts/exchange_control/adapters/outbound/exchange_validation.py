@@ -23,8 +23,8 @@ from trading.contexts.exchange_control.application.validation import (
 )
 
 _BINANCE_MAINNET_URL = "https://api.binance.com"
-_BINANCE_TESTNET_URL = "https://testnet.binance.vision"
-_BINANCE_FUTURES_TESTNET_URL = "https://testnet.binancefuture.com"
+_BINANCE_SPOT_DEMO_URL = "https://demo-api.binance.com"
+_BINANCE_FUTURES_TESTNET_URL = "https://demo-fapi.binance.com"
 _BYBIT_MAINNET_URL = "https://api.bybit.com"
 _BYBIT_TESTNET_URL = "https://api-testnet.bybit.com"
 _RECV_WINDOW = "5000"
@@ -67,13 +67,11 @@ class BinanceExchangeCredentialValidator:
         *,
         request: ExchangeCredentialValidationRequest,
     ) -> ExchangeCredentialValidationResult:
+        if request.market_type == "spot" and request.environment == "testnet":
+            return self._validate_spot_demo(request=request)
         if request.market_type == "futures" and request.environment == "testnet":
             return self._validate_futures_testnet(request=request)
-        base_url = (
-            _BINANCE_TESTNET_URL
-            if request.environment == "testnet"
-            else _BINANCE_MAINNET_URL
-        )
+        base_url = _BINANCE_MAINNET_URL
         timestamp = str(int(time.time() * 1000))
         query = urllib.parse.urlencode({"recvWindow": _RECV_WINDOW, "timestamp": timestamp})
         signature = hmac.new(
@@ -115,6 +113,96 @@ class BinanceExchangeCredentialValidator:
             environment=request.environment,
             requested_permissions=request.requested_permissions,
         )
+
+    def _validate_spot_demo(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+    ) -> ExchangeCredentialValidationResult:
+        try:
+            account_payload = _binance_signed_request(
+                method="GET",
+                base_url=_BINANCE_SPOT_DEMO_URL,
+                path="/api/v3/account",
+                params={},
+                api_key=request.credential.api_key,
+                api_secret=request.credential.api_secret,
+                timeout_seconds=self.timeout_seconds,
+            )
+        except _ExchangeHttpError as exc:
+            return _invalid_credentials_from_http(
+                status_code=exc.status_code,
+                exchange="binance",
+                requested_permissions=request.requested_permissions,
+            )
+        except (OSError, ValueError):
+            return ExchangeCredentialValidationResult(
+                status="skipped_external_validation",
+                reason="exchange_request_failed",
+                ip_restriction_status="not_checked",
+                permission_summary=_permission_summary(
+                    base={"exchange": "binance", "market_type": "spot"},
+                    requested_permissions=request.requested_permissions,
+                    exchange_permissions="unknown",
+                    effective_permissions="none",
+                    permission_warnings=(),
+                ),
+            )
+        exchange_permissions: ExchangePermissions = "read"
+        if _requested_permissions(value=request.requested_permissions) == "trade":
+            try:
+                exchange_permissions = self._probe_spot_demo_trade_permission(
+                    request=request,
+                )
+            except (OSError, ValueError):
+                return ExchangeCredentialValidationResult(
+                    status="skipped_external_validation",
+                    reason="exchange_request_failed",
+                    ip_restriction_status="not_checked",
+                    permission_summary=_permission_summary(
+                        base={"exchange": "binance", "market_type": "spot"},
+                        requested_permissions=request.requested_permissions,
+                        exchange_permissions="unknown",
+                        effective_permissions="none",
+                        permission_warnings=(),
+                    ),
+                )
+        return normalize_binance_spot_demo_account(
+            payload=account_payload,
+            requested_permissions=request.requested_permissions,
+            exchange_permissions=exchange_permissions,
+        )
+
+    def _probe_spot_demo_trade_permission(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+    ) -> ExchangePermissions:
+        params = {
+            "symbol": "BTCUSDT",
+            "side": "BUY",
+            "type": "LIMIT",
+            "timeInForce": "GTC",
+            "quantity": "0.001",
+            "price": "10000",
+        }
+        try:
+            _binance_signed_request(
+                method="POST",
+                base_url=_BINANCE_SPOT_DEMO_URL,
+                path="/api/v3/order/test",
+                params=params,
+                api_key=request.credential.api_key,
+                api_secret=request.credential.api_secret,
+                timeout_seconds=self.timeout_seconds,
+            )
+        except _ExchangeHttpError as exc:
+            if _binance_auth_or_permission_error(error=exc):
+                return "read"
+            if exc.status_code == 400:
+                return "trade"
+            raise ValueError("spot demo trade permission probe failed") from exc
+        return "trade"
 
     def _validate_futures_testnet(
         self,
@@ -329,6 +417,56 @@ def normalize_binance_futures_testnet_account(
     )
 
 
+def normalize_binance_spot_demo_account(
+    *,
+    payload: dict[str, Any],
+    requested_permissions: str = "read",
+    exchange_permissions: ExchangePermissions = "read",
+) -> ExchangeCredentialValidationResult:
+    requested = _requested_permissions(value=requested_permissions)
+    permissions = payload.get("permissions")
+    if isinstance(permissions, list) and "SPOT" not in {
+        str(item).upper() for item in permissions
+    }:
+        return _with_permission_policy(
+            status="unsupported_account_mode",
+            reason="spot_permission_missing",
+            ip_restriction_status="not_restricted_testnet",
+            account_mode=str(payload.get("accountType") or "unknown").lower(),
+            base_summary=_binance_spot_demo_summary(
+                payload=payload,
+                exchange_permissions="unknown",
+            ),
+            requested_permissions=requested,
+            exchange_permissions="unknown",
+        )
+    if exchange_permissions == "trade":
+        return _with_permission_policy(
+            status="valid_trade_enabled",
+            reason="trade_permission_detected",
+            ip_restriction_status="not_restricted_testnet",
+            account_mode=str(payload.get("accountType") or "spot").lower(),
+            base_summary=_binance_spot_demo_summary(
+                payload=payload,
+                exchange_permissions="trade",
+            ),
+            requested_permissions=requested,
+            exchange_permissions="trade",
+        )
+    return _with_permission_policy(
+        status="valid_readonly",
+        reason="readonly_permission_detected",
+        ip_restriction_status="not_restricted_testnet",
+        account_mode=str(payload.get("accountType") or "spot").lower(),
+        base_summary=_binance_spot_demo_summary(
+            payload=payload,
+            exchange_permissions="read",
+        ),
+        requested_permissions=requested,
+        exchange_permissions="read",
+    )
+
+
 def normalize_bybit_api_key_info(
     *,
     payload: dict[str, Any],
@@ -430,6 +568,71 @@ def _get_json(
     if not isinstance(payload, dict):
         raise ValueError("exchange response must be an object")
     return payload
+
+
+@dataclass(frozen=True)
+class _ExchangeHttpError(RuntimeError):
+    status_code: int
+    payload: dict[str, Any]
+
+
+def _binance_signed_request(
+    *,
+    method: str,
+    base_url: str,
+    path: str,
+    params: dict[str, str],
+    api_key: str,
+    api_secret: str,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    signed = {
+        **params,
+        "recvWindow": _RECV_WINDOW,
+        "timestamp": str(int(time.time() * 1000)),
+    }
+    query = urllib.parse.urlencode(signed)
+    signature = hmac.new(
+        api_secret.encode("utf-8"),
+        query.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    request = urllib.request.Request(
+        url=f"{base_url}{path}?{query}&signature={signature}",
+        headers={"X-MBX-APIKEY": api_key},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        raise _ExchangeHttpError(
+            status_code=exc.code,
+            payload=_http_error_payload(error=exc),
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ValueError("exchange response must be an object")
+    return payload
+
+
+def _http_error_payload(*, error: urllib.error.HTTPError) -> dict[str, Any]:
+    try:
+        payload = json.loads(error.read().decode("utf-8") or "{}")
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _binance_auth_or_permission_error(*, error: _ExchangeHttpError) -> bool:
+    code = error.payload.get("code")
+    message = str(error.payload.get("msg") or "").lower()
+    return (
+        error.status_code in {401, 403}
+        or code in {-1022, -2014, -2015}
+        or "api-key" in message
+        or "signature" in message
+        or "permission" in message
+    )
 
 
 def _invalid_credentials_from_http(
@@ -569,6 +772,27 @@ def _binance_summary(*, payload: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def _binance_spot_demo_summary(
+    *,
+    payload: dict[str, Any],
+    exchange_permissions: ExchangePermissions,
+) -> dict[str, object]:
+    permissions = payload.get("permissions")
+    normalized_permissions = (
+        sorted({str(item) for item in permissions}) if isinstance(permissions, list) else []
+    )
+    return {
+        "exchange": "binance",
+        "market_type": "spot",
+        "read": True,
+        "trade": exchange_permissions == "trade",
+        "withdraw_or_transfer": False,
+        "account_can_trade": bool(payload.get("canTrade")),
+        "account_type": str(payload.get("accountType") or "spot").lower(),
+        "spot_permissions": normalized_permissions,
+    }
+
+
 def _bybit_ip_status(*, result: dict[str, Any], environment: str) -> str:
     ips = result.get("ips")
     has_ips = isinstance(ips, list) and len(ips) > 0
@@ -612,5 +836,6 @@ __all__ = [
     "HttpExchangeCredentialValidator",
     "normalize_binance_api_restrictions",
     "normalize_binance_futures_testnet_account",
+    "normalize_binance_spot_demo_account",
     "normalize_bybit_api_key_info",
 ]

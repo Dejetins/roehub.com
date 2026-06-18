@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
+from email.message import Message
+from io import BytesIO
 
 from trading.contexts.exchange_control.adapters.outbound.exchange_validation import (
     BinanceExchangeCredentialValidator,
     normalize_binance_api_restrictions,
     normalize_binance_futures_testnet_account,
+    normalize_binance_spot_demo_account,
     normalize_bybit_api_key_info,
 )
 from trading.contexts.exchange_control.application.validation import (
@@ -227,6 +231,50 @@ def test_binance_futures_testnet_validation_status_mapping() -> None:
     }
 
 
+def test_binance_spot_demo_validation_status_mapping() -> None:
+    account_payload = {
+        "canTrade": True,
+        "accountType": "SPOT",
+        "permissions": ["SPOT"],
+    }
+
+    trade = normalize_binance_spot_demo_account(
+        payload=account_payload,
+        requested_permissions="trade",
+        exchange_permissions="trade",
+    )
+    readonly = normalize_binance_spot_demo_account(
+        payload=account_payload,
+        requested_permissions="trade",
+        exchange_permissions="read",
+    )
+    unsupported = normalize_binance_spot_demo_account(
+        payload={**account_payload, "permissions": ["MARGIN"]},
+        requested_permissions="trade",
+        exchange_permissions="trade",
+    )
+
+    assert trade.status == "valid_trade_enabled"
+    assert trade.reason == "trade_permission_detected"
+    assert trade.ip_restriction_status == "not_restricted_testnet"
+    assert trade.permission_summary == {
+        **_permission_summary(trade),
+        "market_type": "spot",
+        "exchange_permissions": "trade",
+        "effective_permissions": "trade",
+        "withdraw_or_transfer": False,
+    }
+    assert readonly.status == "permission_mismatch"
+    assert readonly.reason == "requested_trade_but_exchange_readonly"
+    assert readonly.permission_summary == {
+        **_permission_summary(readonly),
+        "exchange_permissions": "read",
+        "effective_permissions": "read",
+    }
+    assert unsupported.status == "unsupported_account_mode"
+    assert unsupported.reason == "spot_permission_missing"
+
+
 class _JsonResponse:
     def __init__(self, payload: object) -> None:
         self._payload = payload
@@ -278,8 +326,107 @@ def test_binance_futures_testnet_validator_uses_fapi_account_endpoint(
 
     assert result.status == "valid_trade_enabled"
     assert len(calls) == 1
-    assert calls[0].startswith("https://testnet.binancefuture.com/fapi/v2/account?")
+    assert calls[0].startswith("https://demo-fapi.binance.com/fapi/v2/account?")
     assert "/sapi/v1/account/apiRestrictions" not in calls[0]
+
+
+def test_binance_spot_testnet_validator_uses_demo_account_and_order_test(
+    monkeypatch: object,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_urlopen(
+        request: urllib.request.Request,
+        *,
+        timeout: float,
+    ) -> _JsonResponse:
+        _ = timeout
+        calls.append((request.get_method(), request.full_url))
+        if request.get_method() == "GET" and "/api/v3/account" in request.full_url:
+            return _JsonResponse(
+                {
+                    "canTrade": True,
+                    "accountType": "SPOT",
+                    "permissions": ["SPOT"],
+                }
+            )
+        if request.get_method() == "POST" and "/api/v3/order/test" in request.full_url:
+            return _JsonResponse({})
+        raise AssertionError(f"unexpected Binance URL: {request.full_url}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)  # type: ignore[attr-defined]
+
+    result = BinanceExchangeCredentialValidator().validate(
+        request=ExchangeCredentialValidationRequest(
+            exchange_name="binance",
+            market_type="spot",
+            environment="testnet",
+            requested_permissions="trade",
+            credential=ExchangeCredentialPlaintext(
+                api_key="demo-spot-key",
+                api_secret="demo-spot-secret",
+            ),
+        )
+    )
+
+    assert result.status == "valid_trade_enabled"
+    assert [method for method, _url in calls] == ["GET", "POST"]
+    assert calls[0][1].startswith("https://demo-api.binance.com/api/v3/account?")
+    assert calls[1][1].startswith("https://demo-api.binance.com/api/v3/order/test?")
+    assert all("testnet.binance.vision" not in url for _method, url in calls)
+    assert all("/sapi/v1/account/apiRestrictions" not in url for _method, url in calls)
+
+
+def test_binance_spot_demo_trade_probe_permission_error_is_mismatch(
+    monkeypatch: object,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_urlopen(
+        request: urllib.request.Request,
+        *,
+        timeout: float,
+    ) -> _JsonResponse:
+        _ = timeout
+        calls.append((request.get_method(), request.full_url))
+        if request.get_method() == "GET" and "/api/v3/account" in request.full_url:
+            return _JsonResponse(
+                {
+                    "canTrade": True,
+                    "accountType": "SPOT",
+                    "permissions": ["SPOT"],
+                }
+            )
+        if request.get_method() == "POST" and "/api/v3/order/test" in request.full_url:
+            raise urllib.error.HTTPError(
+                url=request.full_url,
+                code=400,
+                msg="Bad Request",
+                hdrs=Message(),
+                fp=BytesIO(
+                    b'{"code": -2015, "msg": "Invalid API-key, IP, or permissions."}'
+                ),
+            )
+        raise AssertionError(f"unexpected Binance URL: {request.full_url}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)  # type: ignore[attr-defined]
+
+    result = BinanceExchangeCredentialValidator().validate(
+        request=ExchangeCredentialValidationRequest(
+            exchange_name="binance",
+            market_type="spot",
+            environment="testnet",
+            requested_permissions="trade",
+            credential=ExchangeCredentialPlaintext(
+                api_key="demo-spot-key",
+                api_secret="demo-spot-secret",
+            ),
+        )
+    )
+
+    assert result.status == "permission_mismatch"
+    assert result.reason == "requested_trade_but_exchange_readonly"
+    assert [method for method, _url in calls] == ["GET", "POST"]
 
 
 def test_bybit_validation_status_mapping() -> None:

@@ -32,7 +32,9 @@ amend or reconcile orders.
 
 | Exchange | Scenario | Env vars | Expected status | Observed status | Blocker |
 |---|---|---|---|---|---|
-| Binance | API key permission mapping | Native signed `GET /sapi/v1/account/apiRestrictions` | Map read-only, trade, transfer/withdrawal, IP restriction and unsupported mode to normalized statuses. | Implemented in `BinanceExchangeCredentialValidator`; unit mapping covers `valid_readonly`, `valid_trade_enabled`, `invalid_permissions`, `invalid_ip_restriction`, `unsupported_account_mode`. | None |
+| Binance mainnet | API key permission mapping | Native signed `GET /sapi/v1/account/apiRestrictions` | Map read-only, trade, transfer/withdrawal, IP restriction and unsupported mode to normalized statuses. | Implemented in `BinanceExchangeCredentialValidator`; unit mapping covers `valid_readonly`, `valid_trade_enabled`, `invalid_permissions`, `invalid_ip_restriction`, `unsupported_account_mode`. | None |
+| Binance Demo Spot | API key permission mapping | Native signed `GET https://demo-api.binance.com/api/v3/account`; for requested trade, safe `POST /api/v3/order/test` probe | Demo Spot keys from `demo.binance.com` must validate against the documented Spot Demo endpoint, not legacy `testnet.binance.vision` or SAPI `apiRestrictions`. | Implemented in `BinanceExchangeCredentialValidator`; unit mapping covers read/trade/mismatch and endpoint routing. | None |
+| Binance Demo Futures | API key permission mapping | Native signed `GET https://demo-fapi.binance.com/fapi/v2/account` | Futures demo keys must validate against the documented Futures Demo endpoint. | Implemented in `BinanceExchangeCredentialValidator`; unit routing covers `demo-fapi.binance.com`. | None |
 | Bybit | API key information mapping | Native signed `GET /v5/user/query-api` | Map `readOnly`, `permissions`, `ips` and account mode to normalized statuses. | Implemented in `BybitExchangeCredentialValidator`; unit mapping covers all required status classes. | None for host-local readonly credential smoke. |
 | Invalid credentials | Native HTTP/auth rejection | Test fake payloads | Return `invalid_credentials` without raw exchange body. | Unit mapping returns `invalid_credentials`; raw `retMsg` is not copied into reason. | None for deterministic evidence. |
 | API facade | `POST /api/ui/account/exchange-connections/{connection_id}/validate` | Roehub session, same-origin headers | Route through `ExchangeControlClient` only. | Implemented and tested with deterministic fake client; response contains no secret fields. | None |
@@ -42,8 +44,13 @@ amend or reconcile orders.
 
 Sources verified before implementation:
 
-- Binance: `GET /sapi/v1/account/apiRestrictions`, response fields
+- Binance mainnet: `GET /sapi/v1/account/apiRestrictions`, response fields
   `ipRestrict`, `enableReading`, withdrawal/transfer flags and trading flags.
+- Binance Demo Spot: REST base URL `https://demo-api.binance.com/api`, signed
+  `GET /api/v3/account` for read validation, and side-effect-free signed
+  `POST /api/v3/order/test` for trade permission probing.
+- Binance Demo Futures: REST base URL `https://demo-fapi.binance.com`, signed
+  `GET /fapi/v2/account` for read/trade capability.
 - Binance: signed request security requires timestamp plus HMAC signature.
 - Bybit: `GET /v5/user/query-api`, response fields `readOnly`, `secret=""`
   and `permissions`.

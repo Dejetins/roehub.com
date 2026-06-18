@@ -96,6 +96,31 @@ column. This makes the current fact explicit:
 `binance_testnet` is ready for futures in Roehub, while spot still needs its own
 market-scoped connection row before execution/readiness can use it.
 
+## Follow-up: Binance Demo Trading Endpoints
+
+Дата проверки: `2026-06-18`.
+
+Binance `environment=testnet` for exchange-control and exchange-execution now
+targets the documented Binance Demo Trading endpoints for credential validation,
+account-state reads and native testnet orders:
+
+- Spot Demo REST: `https://demo-api.binance.com/api`;
+- USD-M Futures Demo REST: `https://demo-fapi.binance.com`.
+
+The prior spot path used legacy `https://testnet.binance.vision`, which was not
+the endpoint shown by `demo.binance.com` API Management and could make a
+Demo-created spot-capable key appear as missing or invalid in Roehub. Spot Demo
+validation now signs `GET /api/v3/account` and, when trading permission is
+requested, probes the safe `POST /api/v3/order/test` endpoint. Execution and
+account-state readers use the same Demo bases, so a validated Demo Spot binding
+does not drift at submit/sync time.
+
+Contract impact remains bounded: public API/DTO/persistence shape is unchanged;
+the service-call semantics for Binance `testnet` are corrected to the documented
+Demo Trading provider endpoints. Existing market-scoped execution identity is
+unchanged: users still need a concrete active Spot row before strategy execution
+can use Binance Spot.
+
 ## Handoff
 
 The next credential-management stage should introduce a shared credential object

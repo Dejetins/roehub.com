@@ -100,6 +100,73 @@ def test_binance_futures_reader_uses_read_only_account_config_endpoints(
     assert all("/leverage" not in call and "/marginType" not in call for call in calls)
 
 
+def test_binance_spot_reader_uses_demo_trading_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_get_json_any(
+        *, url: str, headers: dict[str, str], timeout_seconds: float
+    ) -> Any:
+        _ = timeout_seconds
+        calls.append(url)
+        if "/api/v3/account" in url:
+            assert headers["X-MBX-APIKEY"] == "api-key"
+            assert "signature=" in url
+            return {
+                "balances": [
+                    {"asset": "USDT", "free": "100", "locked": "5"},
+                    {"asset": "BTC", "free": "0", "locked": "0"},
+                ]
+            }
+        if "/api/v3/openOrders" in url:
+            return []
+        if "/api/v3/exchangeInfo" in url:
+            return {
+                "symbols": [
+                    {
+                        "symbol": "BTCUSDT",
+                        "filters": [
+                            {"filterType": "PRICE_FILTER", "tickSize": "0.01"},
+                            {
+                                "filterType": "LOT_SIZE",
+                                "stepSize": "0.00001",
+                                "minQty": "0.00001",
+                            },
+                            {"filterType": "MIN_NOTIONAL", "minNotional": "5"},
+                        ],
+                    }
+                ]
+            }
+        raise AssertionError(f"unexpected Binance URL: {url}")
+
+    monkeypatch.setattr(exchange_account_state, "_get_json_any", fake_get_json_any)
+
+    result = HttpExchangeAccountStateReader().read_account_state(
+        request=ExchangeAccountStateReadRequest(
+            exchange_name="binance",
+            market_type="spot",
+            environment="testnet",
+            credential=ExchangeCredentialPlaintext(
+                api_key="api-key",
+                api_secret="api-secret",
+            ),
+            instrument_keys=("binance:spot:BTCUSDT",),
+        ),
+        now=datetime(2026, 6, 18, 12, 0, tzinfo=UTC),
+    )
+
+    assert result.exchange_name == "binance"
+    assert result.market_type == "spot"
+    assert result.environment == "testnet"
+    usdt_balance = next(item for item in result.balances if item.asset == "USDT")
+    assert usdt_balance.free == Decimal("100")
+    assert result.instrument_filters[0].min_notional == Decimal("5")
+    assert calls
+    assert all(call.startswith("https://demo-api.binance.com/") for call in calls)
+    assert all("testnet.binance.vision" not in call for call in calls)
+
+
 def test_bybit_futures_reader_normalizes_config_guard_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

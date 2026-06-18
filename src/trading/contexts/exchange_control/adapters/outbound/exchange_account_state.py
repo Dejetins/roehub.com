@@ -24,9 +24,9 @@ from trading.contexts.exchange_control.application.account_state import (
 _BYBIT_MAINNET_URL = "https://api.bybit.com"
 _BYBIT_TESTNET_URL = "https://api-testnet.bybit.com"
 _BINANCE_SPOT_MAINNET_URL = "https://api.binance.com"
-_BINANCE_SPOT_TESTNET_URL = "https://testnet.binance.vision"
+_BINANCE_SPOT_TESTNET_URL = "https://demo-api.binance.com"
 _BINANCE_FUTURES_MAINNET_URL = "https://fapi.binance.com"
-_BINANCE_FUTURES_TESTNET_URL = "https://testnet.binancefuture.com"
+_BINANCE_FUTURES_TESTNET_URL = "https://demo-fapi.binance.com"
 _RECV_WINDOW = "5000"
 
 

@@ -57,8 +57,12 @@ runtime-вызовами. Нельзя переходить к следующе�
 
 - Binance signed endpoints требуют типы прав API-ключа; Binance разделяет
   `TRADE`, `USER_DATA`, `USER_STREAM`, а API key по умолчанию не имеет `TRADE`.
-- Binance предоставляет `GET /sapi/v1/account/apiRestrictions` для проверки
-  прав API-ключа, IP-ограничений и опасных capabilities.
+- Binance mainnet предоставляет `GET /sapi/v1/account/apiRestrictions` для
+  проверки прав API-ключа, IP-ограничений и опасных capabilities.
+- Binance Demo Trading использует отдельные documented REST bases: Spot Demo
+  `https://demo-api.binance.com/api` и USD-M Futures Demo
+  `https://demo-fapi.binance.com`; Demo Spot проверяется через signed
+  `GET /api/v3/account` и side-effect-free `POST /api/v3/order/test`.
 - Bybit `GET /v5/user/query-api` возвращает метаданные API-ключа: `readOnly`,
   `permissions`, `ips`, expiry fields и пустой `secret`.
 - Bybit имеет отдельные IP/rate-limit правила и региональные ограничения egress.
@@ -1132,7 +1136,8 @@ Prerequisites:
 
 Работа:
 
-- добавить Binance validation adapter для `apiRestrictions`;
+- добавить Binance validation adapter для mainnet `apiRestrictions` и
+  Binance Demo Trading spot/futures endpoints;
 - добавить Bybit validation adapter для `/v5/user/query-api`;
 - нормализовать permissions/IP/account mode;
 - добавить sanitized error mapping;
