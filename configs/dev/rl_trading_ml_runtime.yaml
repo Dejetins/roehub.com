@@ -1,0 +1,27 @@
+---
+profile: dev
+artifact_root: /opt/roehub/state/rl_trading
+device_policy: mps_preferred_cpu_fallback
+trainer:
+  enabled: false
+  max_concurrent_jobs: 1
+  torch_num_threads: 2
+  torch_num_interop_threads: 1
+  max_rss_mb: 8192
+  nice: 10
+inference:
+  enabled: false
+  max_concurrent_processes: 1
+  torch_num_threads: 1
+  torch_num_interop_threads: 1
+  max_rss_mb: 2048
+backtest_jobs:
+  max_concurrent_when_training: 1
+  max_concurrent_when_inference_only: 1
+disk:
+  min_free_gb: 40
+  block_training_below_free_gb: 60
+  cleanup_may_delete_accepted_artifacts: false
+runtime_artifacts:
+  commit_to_git: false
+  allowed_root: /opt/roehub/state/rl_trading

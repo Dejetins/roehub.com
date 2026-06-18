@@ -22,6 +22,7 @@
 - host config root: `/opt/roehub/config`
 - backtest artifact root: `/opt/roehub/state/backtest_artifacts/v2`
 - lazy trades cache root: `/opt/roehub/state/backtest/trades_cache`
+- RL/ML artifact root: `/opt/roehub/state/rl_trading`
 - host binaries: `/opt/roehub/bin`, `/opt/clickhouse/clickhouse`
 - prod env: `/Users/daniildegtyarev/.config/roehub/roehub.env`
 - keycloak env: `/Users/daniildegtyarev/.config/roehub/keycloak.env`
@@ -218,6 +219,38 @@ set +a
 bash scripts/macos/smoke_prod.sh
 bash scripts/macos/smoke_test.sh
 ```
+
+## RL/ML optional environment
+
+Stage `03` of `rl-trading-agent-platform-v1` keeps PyTorch outside the default API
+runtime. The default production sync remains:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv sync --locked
+```
+
+The host-local ML smoke/training environment is opt-in:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv sync --locked --extra rl-ml
+uv run --extra rl-ml python scripts/rl_trading/smoke_torch_device.py \
+  --output-json /opt/roehub/state/rl_trading/stage03_torch_device_smoke.json
+uv sync --locked
+```
+
+Operational rules:
+
+- `torch` must not be imported by `apps/api` or required by `uv sync --locked`;
+- sanitized summaries may be written under `/opt/roehub/state/rl_trading/`, but
+  datasets, checkpoints and raw tensors are never committed to git;
+- accepted Stage `03` device policy is MPS preferred with CPU fallback when MPS is
+  unavailable or rejected by a later stage;
+- trainer and inference services stay disabled by default in
+  `configs/{dev,test,prod}/rl_trading_ml_runtime.yaml` until their later stages;
+- trainer, inference and backtest concurrency must follow the profile limits before
+  any Stage `07+` runtime job is enabled.
 
 ClickHouse partition dedup (safe full-history run):
 

@@ -56,6 +56,11 @@ dependencies = [
   "binance-historical-data>=0.1.14",
 ]
 
+[project.optional-dependencies]
+rl-ml = [
+  "torch>=2.7,<3",
+]
+
 [dependency-groups]
 dev = [
   "pytest==8.3.3",
