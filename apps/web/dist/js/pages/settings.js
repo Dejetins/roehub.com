@@ -351,6 +351,26 @@ function buildMarketAvailability(items) {
   return groups;
 }
 
+function representativeExchangeItems(items, status = state.exchangeStatusFilter) {
+  if (status !== "active") return items;
+  const representatives = new Map();
+  items.forEach((item) => {
+    const key = marketAvailabilityKey(item);
+    const existing = representatives.get(key);
+    if (marketAvailabilityRank(item) > marketAvailabilityRank(existing)) {
+      representatives.set(key, item);
+      return;
+    }
+    if (
+      marketAvailabilityRank(item) === marketAvailabilityRank(existing) &&
+      item?.market_type === "spot"
+    ) {
+      representatives.set(key, item);
+    }
+  });
+  return [...representatives.values()];
+}
+
 function renderMarketAvailability(group = {}, currentMarketType = "") {
   const root = document.createElement("div");
   root.className = "settings-market-availability";
@@ -560,15 +580,16 @@ function renderExchangeKeys(payload) {
   if (!body) return;
   const items = exchangeItems(payload);
   const marketAvailability = buildMarketAvailability(items);
+  const renderedItems = representativeExchangeItems(items);
   body.replaceChildren();
-  if (!items?.length) {
+  if (!renderedItems?.length) {
     const row = body.insertRow();
     const cell = row.insertCell();
     cell.colSpan = 11;
     cell.textContent = t("settings.exchange.empty");
     return;
   }
-  items.forEach((item) => {
+  renderedItems.forEach((item) => {
     const row = body.insertRow();
     const rowClass = statusClass(item);
     appendTextCell(row, item.exchange_name);

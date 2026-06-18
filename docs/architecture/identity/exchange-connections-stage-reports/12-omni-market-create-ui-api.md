@@ -89,10 +89,12 @@ The UI follow-up keeps the market-scoped execution model unchanged and changes
 only the `/settings` table display: the former single `Market` value is now a
 `Markets` availability cell with separate `Spot` and `Futures` lines for the
 same display-safe `(exchange, account/name, masked API key, environment)` group.
-The current row market is highlighted so row-level actions still target a single
-market-scoped binding. Missing market rows render as `Not connected`; ready rows
-render as compact `Ready` because the full readiness remains in the row `Status`
-column. This makes the current fact explicit:
+The active view renders one representative row per display-safe group instead of
+duplicating both market-scoped sibling rows. The current row market is
+highlighted so row-level actions still target a single market-scoped binding.
+Missing market rows render as `Not connected`; ready rows render as compact
+`Ready` because the full readiness remains in the row `Status` column. This
+makes the current fact explicit:
 `binance_testnet` is ready for futures in Roehub, while spot still needs its own
 market-scoped connection row before execution/readiness can use it.
 

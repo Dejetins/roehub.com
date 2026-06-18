@@ -410,6 +410,7 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "settings.exchange.disconnect_blocked" in settings_js
     assert "settings.exchange.market_not_connected" in settings_js
     assert "settings-market-availability" in settings_js
+    assert "representativeExchangeItems" in settings_js
     assert "aria-current" in settings_js
     assert "active_strategy_bindings_count" in settings_js
     assert "Cannot disconnect" in (_WEB_ROOT / "locales" / "en.json").read_text()

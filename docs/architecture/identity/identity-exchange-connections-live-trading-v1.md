@@ -437,6 +437,9 @@ Stage 9, чтобы не создавать ложное ожидание physic
 - выбор environment явный: `Mainnet` и `Testnet` отображаются как видимый
   segmented control, без скрытого advanced summary;
 - выбор рынков при добавлении ключа делается чекбоксами `Spot`/`Futures`;
+- active table группирует active market-scoped siblings в один representative
+  row на display-safe `(exchange, account/name, masked API key, environment)` и
+  показывает readiness по `Spot`/`Futures` в одной `Markets` cell;
 - UI не предлагает пользователю выбирать `read`/`trade`; `/settings` отправляет
   product intent `permissions="trade"` как compatibility field, а readiness
   решает backend validation policy;
