@@ -170,10 +170,13 @@ def test_binance_spot_reader_uses_demo_trading_endpoints(
 def test_bybit_futures_reader_normalizes_config_guard_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    calls: list[str] = []
+
     def fake_get_json(
         *, url: str, headers: dict[str, str], timeout_seconds: float
     ) -> dict[str, Any]:
         _ = headers, timeout_seconds
+        calls.append(url)
         if "/v5/account/wallet-balance" in url:
             return {
                 "retCode": 0,
@@ -193,8 +196,12 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
                 },
             }
         if "/v5/order/realtime" in url:
+            assert "category=linear" in url
+            assert "symbol=BTCUSDT" in url
             return {"retCode": 0, "result": {"list": []}}
         if "/v5/position/list" in url:
+            assert "category=linear" in url
+            assert "symbol=BTCUSDT" in url
             return {
                 "retCode": 0,
                 "result": {
@@ -220,9 +227,9 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
                             "symbol": "BTCUSDT",
                             "priceFilter": {"tickSize": "0.1"},
                             "lotSizeFilter": {
-                                "basePrecision": "0.001",
+                                "qtyStep": "0.001",
                                 "minOrderQty": "0.001",
-                                "minOrderAmt": "5",
+                                "minNotionalValue": "5",
                             },
                             "leverageFilter": {"maxLeverage": "100"},
                         }
@@ -252,3 +259,6 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
     assert result.positions[0].position_mode == "one_way"
     assert result.positions[0].leverage == Decimal("1")
     assert result.instrument_filters[0].step_size == Decimal("0.001")
+    assert result.instrument_filters[0].min_notional == Decimal("5")
+    assert any("/v5/order/realtime" in call for call in calls)
+    assert any("/v5/position/list" in call for call in calls)

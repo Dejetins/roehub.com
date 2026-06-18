@@ -309,6 +309,7 @@ def _read_bybit_account_state(
     base_url = _BYBIT_TESTNET_URL if request.environment == "testnet" else _BYBIT_MAINNET_URL
     category = "spot" if request.market_type == "spot" else "linear"
     symbols = tuple(_symbol_from_instrument_key(item) for item in request.instrument_keys)
+    symbol_scope = next((symbol for symbol in symbols if symbol), None)
 
     wallet_payload = _bybit_get_signed_json(
         base_url=base_url,
@@ -320,10 +321,14 @@ def _read_bybit_account_state(
     )
     balances = _bybit_balances(payload=wallet_payload)
 
+    scoped_params = {"symbol": symbol_scope} if symbol_scope else {"settleCoin": "USDT"}
+    orders_params = {"category": category, "openOnly": "0"}
+    if category != "spot":
+        orders_params.update(scoped_params)
     orders_payload = _bybit_get_signed_json(
         base_url=base_url,
         path="/v5/order/realtime",
-        params={"category": category, "openOnly": "0"},
+        params=orders_params,
         api_key=request.credential.api_key,
         api_secret=request.credential.api_secret,
         timeout_seconds=timeout_seconds,
@@ -336,10 +341,12 @@ def _read_bybit_account_state(
 
     positions: tuple[ExchangePositionState, ...] = ()
     if category != "spot":
+        position_params = {"category": category}
+        position_params.update(scoped_params)
         positions_payload = _bybit_get_signed_json(
             base_url=base_url,
             path="/v5/position/list",
-            params={"category": category},
+            params=position_params,
             api_key=request.credential.api_key,
             api_secret=request.credential.api_secret,
             timeout_seconds=timeout_seconds,
@@ -588,13 +595,23 @@ def _bybit_instrument_filters(
                     price_filter.get("tickSize") if isinstance(price_filter, dict) else None
                 ),
                 step_size=_decimal_or_none(
-                    lot_filter.get("basePrecision") if isinstance(lot_filter, dict) else None
+                    (
+                        lot_filter.get("qtyStep")
+                        or lot_filter.get("basePrecision")
+                    )
+                    if isinstance(lot_filter, dict)
+                    else None
                 ),
                 min_qty=_decimal_or_none(
                     lot_filter.get("minOrderQty") if isinstance(lot_filter, dict) else None
                 ),
                 min_notional=_decimal_or_none(
-                    lot_filter.get("minOrderAmt") if isinstance(lot_filter, dict) else None
+                    (
+                        lot_filter.get("minOrderAmt")
+                        or lot_filter.get("minNotionalValue")
+                    )
+                    if isinstance(lot_filter, dict)
+                    else None
                 ),
                 max_leverage=_decimal_or_none(
                     leverage_filter.get("maxLeverage")
