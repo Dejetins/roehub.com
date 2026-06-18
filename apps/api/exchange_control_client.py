@@ -145,6 +145,16 @@ class ExchangeControlClient(Protocol):
         request_id: str | None = None,
     ) -> ExchangeConnectionCommandResult: ...
 
+    def create_connection_market(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        market_type: str,
+        label: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult: ...
+
     def rotate_connection(
         self,
         *,
@@ -298,6 +308,29 @@ class HttpExchangeControlClient:
                 "api_key": api_key,
                 "api_secret": api_secret,
             },
+        )
+        return _connection_from_payload(response.json())
+
+    def create_connection_market(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        market_type: str,
+        label: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        payload: dict[str, object] = {
+            "owner_user_id": owner_user_id,
+            "market_type": market_type,
+        }
+        if label is not None:
+            payload["label"] = label
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/markets",
+            request_id=request_id,
+            json=payload,
         )
         return _connection_from_payload(response.json())
 
@@ -535,6 +568,33 @@ class InMemoryExchangeControlClient:
         self._connections_dict()[connection_id] = result
         self._owners_dict()[connection_id] = owner_user_id
         return result
+
+    def create_connection_market(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        market_type: str,
+        label: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        _ = request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.status != "active":
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        return self.create_connection(
+            owner_user_id=owner_user_id,
+            exchange_name=existing.exchange_name,
+            market_type=market_type,
+            environment=existing.environment,
+            label=label if label is not None else existing.label,
+            permissions=existing.permissions,
+            api_key=f"FAKE{existing.api_key[-4:]}",
+            api_secret="FAKE_SECRET",
+            request_id=request_id,
+        )
 
     def rotate_connection(
         self,

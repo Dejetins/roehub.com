@@ -70,7 +70,7 @@ implementation_rules:
   - "The `/settings` create payload should include `permissions=\"trade\"` as product intent while preserving the backend default for old clients."
   - "Bybit omni keys must still validate per market: Spot requires `SpotTrade`; Futures requires `ContractTrade` with `Order` + `Position`, `DerivativesTrade`, or `OptionsTrade` from `/v5/user/query-api`."
   - "Do not mark Futures Ready from a Spot-only active row; UI availability is derived from active market-scoped rows."
-  - "Production repair of a missing Bybit futures binding must use UI/API create and must not use manual SQL insert/update."
+  - "Production repair of a missing Bybit futures binding must use UI/API create or the secret-safe `/api/ui/account/exchange-connections/{connection_id}/markets` extension command; it must not use manual SQL insert/update."
 
 skill_routing:
   - skill: architecture-design

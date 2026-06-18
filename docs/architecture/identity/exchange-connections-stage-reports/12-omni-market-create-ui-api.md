@@ -140,7 +140,9 @@ The repair path is:
    follow-up;
 2. add `bybit_testnet` for `futures` through `/settings` or
    `/api/ui/account/exchange-connections`, reusing the physical key plaintext in
-   the create request;
+   the create request, or use
+   `POST /api/ui/account/exchange-connections/{connection_id}/markets` from the
+   active spot binding so plaintext never leaves `exchange-control`;
 3. allow `exchange-control` to validate the futures row through
    `/v5/user/query-api` without placing orders;
 4. accept only when production has active market-scoped rows for both `spot` and
@@ -153,9 +155,11 @@ operators use. Read-only DB evidence may select non-secret fields such as label,
 market type, status, masked suffix, validation status/reason and sanitized
 permission summary.
 
-Contract impact remains compatible: public API keeps legacy `market_type` and
-optional `market_types[]`; persistence reuses existing `permission_summary_json`;
-execution continues to receive a concrete `exchange_connection_id`.
+Contract impact remains compatible: public API keeps legacy `market_type`,
+optional `market_types[]`, and adds a market-extension command under the
+existing exchange-connections namespace; persistence reuses existing
+`permission_summary_json`; execution continues to receive a concrete
+`exchange_connection_id`.
 
 ## Handoff
 

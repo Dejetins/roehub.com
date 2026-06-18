@@ -75,6 +75,13 @@ class RotateExchangeConnectionRequest(BaseModel):
     api_secret: str = Field(min_length=1)
 
 
+class CreateExchangeConnectionMarketRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    market_type: ExchangeMarketTypeValue
+    label: str | None = Field(default=None, max_length=80)
+
+
 class ExchangeConnectionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

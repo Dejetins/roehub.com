@@ -19,6 +19,7 @@ from apps.api.dto.ui_account import (
     AccountProfileResponse,
     AccountSessionResponse,
     AccountSessionsResponse,
+    CreateExchangeConnectionMarketRequest,
     CreateExchangeConnectionRequest,
     CreateExchangeConnectionResponse,
     CreateStrategyExchangeBindingRequest,
@@ -270,6 +271,40 @@ def build_ui_account_router(
             if len(selected_market_types) > 1
             else None,
         )
+
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/markets",
+        response_model=ExchangeConnectionResponse,
+        response_model_exclude_none=True,
+        status_code=201,
+    )
+    def post_exchange_connection_market(
+        connection_id: UUID,
+        request: Request,
+        payload: CreateExchangeConnectionMarketRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            row = client.create_connection_market(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                market_type=payload.market_type,
+                label=payload.label,
+                request_id=f"apps-api-create-exchange-connection-market-{payload.market_type}",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        account_settings.record_exchange_connection_auto_validation(
+            owner_user_id=principal.user_id,
+            exchange_name=row.exchange_name,
+            operation="create_market",
+            result=row.connection_readiness,
+            reason=row.connection_readiness_reason,
+        )
+        return _exchange_connection_response(row=row)
 
     @router.post(
         "/ui/account/exchange-connections/{connection_id}/rotate",

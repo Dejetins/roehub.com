@@ -540,6 +540,70 @@ class ExchangeConnectionService:
             validator=validator,
             now=now,
         )
+        return self._create_validated_connection(
+            owner_user_id=owner_user_id,
+            normalized=normalized,
+            result=result,
+            now=now,
+        )
+
+    def create_market_connection_from_existing_with_validation(
+        self,
+        *,
+        owner_user_id: UserId,
+        source_connection_id: UUID,
+        market_type: str,
+        label: str | None,
+        validator: ExchangeCredentialValidator,
+        now: datetime,
+    ) -> ExchangeConnectionView:
+        source_connection = self._require_active_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=source_connection_id,
+        )
+        plaintext = self._decrypt_active_credential(
+            connection_id=source_connection_id,
+            unavailable_code="exchange_connection_validation_unavailable",
+            unavailable_message="Exchange connection validation is unavailable.",
+        )
+        normalized = _NormalizedConnectionInput.from_raw(
+            exchange_name=source_connection.exchange_name,
+            market_type=market_type,
+            environment=source_connection.environment,
+            label=label if label is not None else source_connection.label,
+            permissions=source_connection.permissions,
+            api_key=plaintext.api_key,
+            api_secret=plaintext.api_secret,
+            passphrase=plaintext.passphrase,
+        )
+        result = self._validate_plaintext(
+            exchange_name=normalized.exchange_name,
+            market_type=normalized.market_type,
+            environment=normalized.environment,
+            requested_permissions=normalized.permissions,
+            normalized=_NormalizedCredentialInput(
+                api_key=normalized.api_key,
+                api_secret=normalized.api_secret,
+                passphrase=normalized.passphrase,
+            ),
+            validator=validator,
+            now=now,
+        )
+        return self._create_validated_connection(
+            owner_user_id=owner_user_id,
+            normalized=normalized,
+            result=result,
+            now=now,
+        )
+
+    def _create_validated_connection(
+        self,
+        *,
+        owner_user_id: UserId,
+        normalized: "_NormalizedConnectionInput",
+        result: ExchangeCredentialValidationResult,
+        now: datetime,
+    ) -> ExchangeConnectionView:
         permission_summary = _validated_permission_summary(
             requested_permissions=normalized.permissions,
             result=result,
@@ -1015,7 +1079,11 @@ class ExchangeConnectionService:
         return max(0, int(count))
 
     def _decrypt_active_credential(
-        self, *, connection_id: UUID
+        self,
+        *,
+        connection_id: UUID,
+        unavailable_code: str = "exchange_connection_account_state_unavailable",
+        unavailable_message: str = "Exchange account-state read is unavailable.",
     ) -> ExchangeCredentialPlaintext:
         credential = self._repository.get_active_credential(connection_id=connection_id)
         if credential is None:
@@ -1040,8 +1108,8 @@ class ExchangeConnectionService:
             )
         except (ExchangeSecretCipherError, ValueError) as exc:
             raise ExchangeConnectionError(
-                code="exchange_connection_account_state_unavailable",
-                message="Exchange account-state read is unavailable.",
+                code=unavailable_code,
+                message=unavailable_message,
                 status_code=503,
             ) from exc
 

@@ -201,12 +201,15 @@ in `permission_summary_json`:
 
 If a Bybit physical key should support both Spot and Futures, create two
 market-scoped connections through `/settings` or
-`/api/ui/account/exchange-connections` with `market_types=["spot","futures"]`
-or a futures-only follow-up create. Do not insert or update
-`exchange_connections` manually: manual SQL bypasses Transit decrypt,
-validation, audit, metrics and the public operator workflow. Read-only evidence
-queries may select masked suffix, label, market type, status, validation
-status/reason and sanitized permission summary only.
+`/api/ui/account/exchange-connections` with `market_types=["spot","futures"]`.
+If the key is already stored as an active market-scoped connection, use
+`POST /api/ui/account/exchange-connections/{connection_id}/markets` with the
+target `market_type` instead of re-entering or exporting the secret. That path
+keeps decrypt and live `/v5/user/query-api` validation inside `exchange-control`.
+Do not insert or update `exchange_connections` manually: manual SQL bypasses
+Transit decrypt, validation, audit, metrics and the public operator workflow.
+Read-only evidence queries may select masked suffix, label, market type, status,
+validation status/reason and sanitized permission summary only.
 
 ## Backup And Restore
 

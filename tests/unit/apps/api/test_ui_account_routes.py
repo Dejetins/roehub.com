@@ -92,6 +92,17 @@ class _ArchiveShouldNotRunClient:
     ) -> ExchangeConnectionCommandResult:
         raise AssertionError("create_connection must not run")
 
+    def create_connection_market(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        market_type: str,
+        label: str | None,
+        request_id: str | None = None,
+    ) -> ExchangeConnectionCommandResult:
+        raise AssertionError("create_connection_market must not run")
+
     def rotate_connection(
         self,
         *,
@@ -347,6 +358,64 @@ def test_ui_account_exchange_connections_create_list_rotate_disable_are_secret_s
     assert limits_after_disable.status_code == 200
     assert limits_after_disable.json()["exchange_connections_used"] == 0
     assert limits_after_disable.json()["api_keys_used"] == 0
+
+
+def test_ui_account_exchange_connections_create_market_from_existing() -> None:
+    client, account_repository, session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "bybit_testnet",
+            "permissions": "trade",
+            "api_key": "BYBITACCOUNTKEYAUN5",
+            "api_secret": "TEST_SECRET_BYBIT",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    assert created.status_code == 201
+    source_id = created.json()["connection_id"]
+
+    futures = client.post(
+        f"/ui/account/exchange-connections/{source_id}/markets",
+        json={
+            "market_type": "futures",
+            "label": "bybit_testnet",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert futures.status_code == 201
+    futures_payload = futures.json()
+    assert futures_payload["exchange_name"] == "bybit"
+    assert futures_payload["market_type"] == "futures"
+    assert futures_payload["environment"] == "testnet"
+    assert futures_payload["connection_readiness"] == "ready_for_trading"
+    assert futures_payload["api_key"] == "****AUN5"
+    assert "TEST_SECRET_BYBIT" not in futures.text
+    assert "api_secret" not in futures.text
+
+    listed = client.get("/ui/account/exchange-connections")
+    assert listed.status_code == 200
+    assert [item["market_type"] for item in listed.json()["items"]] == [
+        "spot",
+        "futures",
+    ]
+    audit_events = account_repository.list_audit_events(
+        owner_user_id=session_ids["first_user_id"],
+        cursor=None,
+        limit=20,
+    ).items
+    create_market_events = [
+        event
+        for event in audit_events
+        if event.metadata.get("operation") == "create_market"
+    ]
+    assert len(create_market_events) == 1
+    assert create_market_events[0].metadata["result"] == "ready_for_trading"
 
 
 def test_ui_account_exchange_connections_omni_create_returns_market_scoped_results() -> None:

@@ -22,6 +22,7 @@ from trading.contexts.exchange_control.application.secret_cipher import (
     ExchangeCredentialCiphertext,
     ExchangeCredentialFingerprint,
     ExchangeCredentialSecret,
+    ExchangeSecretCipher,
     ExchangeSecretCipherError,
 )
 from trading.contexts.exchange_control.application.service_identity import (
@@ -40,13 +41,15 @@ def _build_client() -> TestClient:
 
 
 class _RuntimeConfigWithValidator(ExchangeControlRuntimeConfig):
-    _validator: _SequenceValidator | _StaticValidator
+    _validator: _SequenceValidator | _StaticValidator | _CapturingValidator
+    _secret_cipher: ExchangeSecretCipher | None = None
 
     @classmethod
     def from_validator(
         cls,
         *,
-        validator: "_SequenceValidator | _StaticValidator",
+        validator: "_SequenceValidator | _StaticValidator | _CapturingValidator",
+        secret_cipher: ExchangeSecretCipher | None = None,
     ) -> "_RuntimeConfigWithValidator":
         base = ExchangeControlRuntimeConfig.from_environ(
             environ={
@@ -56,10 +59,18 @@ class _RuntimeConfigWithValidator(ExchangeControlRuntimeConfig):
         )
         config = cls(**base.__dict__)
         object.__setattr__(config, "_validator", validator)
+        object.__setattr__(config, "_secret_cipher", secret_cipher)
         return config
 
-    def build_credential_validator(self) -> "_SequenceValidator | _StaticValidator":
+    def build_credential_validator(
+        self,
+    ) -> "_SequenceValidator | _StaticValidator | _CapturingValidator":
         return self._validator
+
+    def build_secret_cipher(self) -> ExchangeSecretCipher:
+        if self._secret_cipher is not None:
+            return self._secret_cipher
+        return super().build_secret_cipher()
 
 
 class _StaticValidator:
@@ -92,6 +103,39 @@ class _SequenceValidator:
     ) -> ExchangeCredentialValidationResult:
         _ = request, now
         return self._results.pop(0)
+
+
+class _CapturingValidator:
+    requires_plaintext = True
+
+    def __init__(self, result: ExchangeCredentialValidationResult) -> None:
+        self._result = result
+        self.requests: list[ExchangeCredentialValidationRequest] = []
+
+    def validate(
+        self,
+        *,
+        request: ExchangeCredentialValidationRequest,
+        now: datetime,
+    ) -> ExchangeCredentialValidationResult:
+        _ = now
+        self.requests.append(request)
+        return self._result
+
+
+class _RoundTripInMemoryExchangeSecretCipher:
+    _prefix = "vault:v1:test:"
+
+    def encrypt(self, secret: ExchangeCredentialSecret) -> ExchangeCredentialCiphertext:
+        return ExchangeCredentialCiphertext(value=f"{self._prefix}{secret.value}")
+
+    def decrypt(self, ciphertext: ExchangeCredentialCiphertext) -> ExchangeCredentialSecret:
+        if not ciphertext.value.startswith(self._prefix):
+            raise ExchangeSecretCipherError("test ciphertext is invalid")
+        return ExchangeCredentialSecret(value=ciphertext.value.removeprefix(self._prefix))
+
+    def fingerprint(self, secret: ExchangeCredentialSecret) -> ExchangeCredentialFingerprint:
+        return DeterministicInMemoryExchangeSecretCipher().fingerprint(secret)
 
 
 def _internal_headers(request_id: str) -> dict[str, str]:
@@ -381,6 +425,7 @@ def test_internal_capabilities_are_secret_safe() -> None:
     assert payload["contract_version"] == EXCHANGE_CONTROL_INTERNAL_CONTRACT_VERSION
     assert payload["request_id"] == "stage-3c-test"
     assert "capabilities.read" in payload["capabilities"]
+    assert "exchange_connections.create_from_existing" in payload["capabilities"]
     assert "exchange_connections.archive" in payload["capabilities"]
     assert payload["timeout_policy"]["retry_policy"] == "no_implicit_retry"
     assert "internal-token" not in response.text
@@ -526,6 +571,68 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     assert "exchange_connection_cleanup_total" in metrics.text
     assert 'result="archived",source="stage09d"' in metrics.text
     assert "connection_id" not in metrics.text
+
+
+def test_internal_exchange_connection_create_market_from_existing_is_secret_safe() -> None:
+    validator = _CapturingValidator(result=_trade_ready_result())
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=validator,
+        secret_cipher=_RoundTripInMemoryExchangeSecretCipher(),
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    headers = _internal_headers("stage-12-create-market-test")
+    owner_user_id = "00000000-0000-0000-0000-000000000412"
+
+    source = client.post(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "environment": "testnet",
+            "label": "bybit_testnet",
+            "permissions": "trade",
+            "api_key": "BYBIT_SOURCE_KEY_AUN5",
+            "api_secret": "BYBIT_SOURCE_SECRET",
+        },
+    )
+    assert source.status_code == 200
+    source_id = source.json()["connection_id"]
+
+    created = client.post(
+        f"/internal/v1/exchange-connections/{source_id}/markets",
+        headers=headers,
+        json={
+            "owner_user_id": owner_user_id,
+            "market_type": "futures",
+            "label": "bybit_testnet",
+        },
+    )
+
+    assert created.status_code == 200
+    payload = created.json()
+    assert payload["exchange_name"] == "bybit"
+    assert payload["market_type"] == "futures"
+    assert payload["environment"] == "testnet"
+    assert payload["api_key"] == "****AUN5"
+    assert payload["connection_readiness"] == "ready_for_trading"
+    assert "BYBIT_SOURCE_KEY_AUN5" not in created.text
+    assert "BYBIT_SOURCE_SECRET" not in created.text
+    assert [request.market_type for request in validator.requests] == ["spot", "futures"]
+    assert validator.requests[1].credential.api_key == "BYBIT_SOURCE_KEY_AUN5"
+    assert validator.requests[1].credential.api_secret == "BYBIT_SOURCE_SECRET"
+
+    listed = client.get(
+        "/internal/v1/exchange-connections",
+        headers=headers,
+        params={"owner_user_id": owner_user_id},
+    )
+    assert listed.status_code == 200
+    assert [item["market_type"] for item in listed.json()["items"]] == [
+        "spot",
+        "futures",
+    ]
 
 
 def test_internal_validate_reclassifies_readonly_connection_and_allows_recreate() -> None:

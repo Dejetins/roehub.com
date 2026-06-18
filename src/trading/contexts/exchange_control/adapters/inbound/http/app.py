@@ -66,6 +66,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_credentials.decrypt.exchange_control_only",
     "exchange_credentials.fingerprint",
     "exchange_connections.create",
+    "exchange_connections.create_from_existing",
     "exchange_connections.list",
     "exchange_connections.rotate",
     "exchange_connections.auto_validate",
@@ -484,6 +485,14 @@ class CreateExchangeConnectionInternalRequest(BaseModel):
     passphrase: str | None = None
 
 
+class CreateExchangeConnectionMarketInternalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_user_id: str
+    market_type: str
+    label: str | None = Field(default=None, max_length=80)
+
+
 class RotateExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -657,6 +666,49 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
                 passphrase=payload.passphrase,
                 validator=credential_validator,
                 now=_utc_now(),
+            )
+        except ExchangeConnectionError as error:
+            raise _exchange_connection_http_error(error=error) from error
+        _record_validation_observation(metrics=metrics, view=view)
+        metrics.record_auto_validation(
+            exchange=view.exchange_name,
+            result=view.connection_readiness,
+            reason=view.connection_readiness_reason,
+        )
+        return _exchange_connection_response(view=view)
+
+    @app.post(
+        "/internal/v1/exchange-connections/{connection_id}/markets",
+        include_in_schema=False,
+    )
+    def create_internal_exchange_connection_market(
+        connection_id: UUID,
+        payload: CreateExchangeConnectionMarketInternalRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_roehub_internal_service: str | None = Header(
+            default=None,
+            alias="X-Roehub-Internal-Service",
+        ),
+        x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    ) -> dict[str, object]:
+        _require_internal_request(
+            request=request,
+            authorization=authorization,
+            expected_token=config.internal_api_token,
+            internal_service=x_roehub_internal_service,
+            request_id=x_request_id,
+        )
+        try:
+            view = (
+                connection_service.create_market_connection_from_existing_with_validation(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                    source_connection_id=connection_id,
+                    market_type=payload.market_type,
+                    label=payload.label,
+                    validator=credential_validator,
+                    now=_utc_now(),
+                )
             )
         except ExchangeConnectionError as error:
             raise _exchange_connection_http_error(error=error) from error
