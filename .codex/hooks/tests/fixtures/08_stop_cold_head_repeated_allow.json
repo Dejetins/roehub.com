@@ -1,0 +1,11 @@
+{
+  "payload": {
+    "hook_event_name": "Stop",
+    "stop_hook_active": true,
+    "last_assistant_message": "Подготовил architecture plan и prompt pack, все готово к реализации."
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_contains": "suppressed repeated continuation"
+  }
+}
