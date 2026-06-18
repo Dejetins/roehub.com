@@ -75,7 +75,7 @@ Outside expected paths:
 | Prompt sha256 | `3870c5ae2e3071b82361dfb8ccb8fa1793771a38fdd4f8f4ff72f9a19a15b6ef` |
 | Ledger state before implementation | Stage `02C` accepted; `current_stage=03`; Stage `03` pending |
 | Required prerequisite | Stage `02C` accepted |
-| Delivery state | `local-ready-with-macstudio-runtime-evidence`; scoped files were copied to the clean Mac Studio checkout for runtime proof. GitHub/main delivery is still separate until a scoped branch/PR or main merge path is executed. |
+| Delivery state | `delivered-to-main`; scoped commit `4bc1ff71d95045ca706942b029b816cf052463dd` was pushed to `origin/main`, CI passed, Deploy Backend passed, Mac Studio checkout is synced to `4bc1ff71`, and production smoke passed. |
 | Large artifacts | No datasets, checkpoints, raw tensors, raw provider payloads or secrets were committed. Sanitized smoke JSON was written to `/opt/roehub/state/rl_trading/stage03_torch_device_smoke.json` on Mac Studio. |
 
 ## Observed State
@@ -138,6 +138,9 @@ Outside expected paths:
 | Mac Studio default `uv run python -c 'import importlib.util; print(importlib.util.find_spec("torch") is not None)'` | passed; `False` |
 | Mac Studio default focused pytest | passed; `3 passed` |
 | `python -m tools.docs.generate_docs_index --check` | passed after docs index regeneration |
+| GitHub Actions CI for `4bc1ff71d95045ca706942b029b816cf052463dd` | passed; run `27789501965` |
+| GitHub Actions Deploy Backend for `4bc1ff71d95045ca706942b029b816cf052463dd` | passed; run `27789750421` |
+| Mac Studio post-delivery production smoke | passed; `bash scripts/macos/smoke_prod.sh` from `/opt/roehub/app` |
 
 ## Cold Self-Review
 
@@ -159,9 +162,9 @@ Reviewed lenses:
 - artifact redaction: no datasets, checkpoints, raw tensors, provider payloads or secrets committed;
 - resource isolation: trainer/inference disabled by default with explicit CPU/RSS/disk/concurrency caps;
 - docs/index sync: docs index regenerated and check passed;
-- delivery state: not `delivered-to-main`; repository delivery remains explicitly recorded as a separate follow-up state.
+- delivery state: `delivered-to-main`; CI, Deploy Backend, Mac Studio checkout sync, optional ML smoke and production smoke are recorded.
 
-No blocker/High finding remains inside the Stage `03` implementation/evidence scope. The residual delivery caveat is intentional and prevents local/Mac Studio evidence from being mistaken for GitHub/main delivery.
+No blocker/High finding remains inside the Stage `03` implementation/evidence scope.
 
 ## Mac Studio CPU/MPS Evidence
 
@@ -216,12 +219,12 @@ Observed result:
 | Stage `03` prerequisite | No blocker | Stage `02C` accepted before implementation. |
 | MPS availability | No blocker | MPS is built and available on Mac Studio. |
 | API torch isolation | No blocker | Default sync removes torch and focused API import test passes. |
-| Delivery | Residual delivery state | Evidence is local plus Mac Studio checkout/runtime proof. GitHub/main delivery remains a separate scoped publish/merge action before treating this as delivered-to-main. |
+| Delivery | No blocker | Commit `4bc1ff71d95045ca706942b029b816cf052463dd` is on `origin/main`; CI and Deploy Backend passed; Mac Studio checkout is synced to `4bc1ff71`; production smoke passed. |
 | Performance throughput | Residual risk | Microbenchmark is not representative training evidence; Stage `07` must measure real D3QN/PER training throughput and Stage `17` must measure concurrent runtime load. |
 
 ## Next-Stage Handoff
 
-Stage `04` may start after the Stage `03` file set is delivered through the repository's accepted GitHub/main path.
+Stage `04` may start from `origin/main` after verifying the ledger still shows Stage `03` accepted and delivered.
 
 The Stage `04` executor should know:
 
