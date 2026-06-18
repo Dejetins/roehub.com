@@ -497,15 +497,15 @@ def _binance_order_params(command: ExchangeOrderCommand) -> dict[str, object]:
         "newClientOrderId": command.client_order_id,
     }
     if command.quantity is not None:
-        params["quantity"] = str(command.quantity.normalize())
+        params["quantity"] = _decimal_api_value(command.quantity)
     elif command.quote_notional is not None and command.market_type == "spot":
-        params["quoteOrderQty"] = str(command.quote_notional.normalize())
+        params["quoteOrderQty"] = _decimal_api_value(command.quote_notional)
     else:
         raise ExchangeOrderAdapterError(reason="unsupported_order_sizing")
     if command.order_type == "limit":
         if command.limit_price is None:
             raise ExchangeOrderAdapterError(reason="limit_price_required")
-        params["price"] = str(command.limit_price.normalize())
+        params["price"] = _decimal_api_value(command.limit_price)
         params["timeInForce"] = "GTC"
     return params
 
@@ -519,18 +519,25 @@ def _bybit_order_params(command: ExchangeOrderCommand) -> dict[str, object]:
         "orderLinkId": command.client_order_id,
     }
     if command.quantity is not None:
-        params["qty"] = str(command.quantity.normalize())
+        params["qty"] = _decimal_api_value(command.quantity)
     elif command.quote_notional is not None and command.market_type == "spot":
-        params["qty"] = str(command.quote_notional.normalize())
+        params["qty"] = _decimal_api_value(command.quote_notional)
         params["marketUnit"] = "quoteCoin"
     else:
         raise ExchangeOrderAdapterError(reason="unsupported_order_sizing")
     if command.order_type == "limit":
         if command.limit_price is None:
             raise ExchangeOrderAdapterError(reason="limit_price_required")
-        params["price"] = str(command.limit_price.normalize())
+        params["price"] = _decimal_api_value(command.limit_price)
         params["timeInForce"] = "GTC"
     return params
+
+
+def _decimal_api_value(value: Decimal) -> str:
+    text = format(value.normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def _bybit_category(command: ExchangeOrderCommand) -> str:

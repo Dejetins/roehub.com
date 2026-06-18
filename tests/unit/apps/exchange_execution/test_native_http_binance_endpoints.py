@@ -30,6 +30,28 @@ def test_binance_testnet_adapter_routes_spot_and_futures_to_demo_endpoints() -> 
     )
 
 
+def test_binance_order_params_use_plain_decimal_strings() -> None:
+    futures = _command(market_type="futures")
+
+    params = native_http._binance_order_params(futures)
+
+    assert params["quantity"] == "0.001"
+    assert params["price"] == "10000"
+    assert "E" not in str(params["quantity"])
+    assert "E" not in str(params["price"])
+
+
+def test_bybit_order_params_use_plain_decimal_strings() -> None:
+    futures = _command(market_type="futures")
+
+    params = native_http._bybit_order_params(futures)
+
+    assert params["qty"] == "0.001"
+    assert params["price"] == "10000"
+    assert "E" not in str(params["qty"])
+    assert "E" not in str(params["price"])
+
+
 def _command(*, market_type: str) -> ExchangeOrderCommand:
     return ExchangeOrderCommand(
         intent_id=uuid4(),
