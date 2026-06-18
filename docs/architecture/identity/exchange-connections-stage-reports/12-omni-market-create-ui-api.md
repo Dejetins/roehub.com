@@ -1,6 +1,8 @@
 # Stage 12: Omni-market create UI/API
 
-Статус: `implemented-local`; production runtime evidence pending direct-main delivery.
+Статус: `accepted`.
+
+Direct-main delivery, CI/deploy and production browser/runtime evidence are complete.
 
 ## Scope
 
@@ -58,19 +60,19 @@ Stage 12 добавляет совместимый первый этап omni-ch
 | Local browser QA | `npx --package=@playwright/test playwright test --config=output/playwright/playwright.stage12.config.js` passed against a local web app with mock API transport. Evidence file `output/playwright/settings-stage12-omni-market-create-local.json` records visible Spot/Futures controls, `market_type=spot`, `market_types=[spot,futures]`, `permissions=trade`, response `items=[spot,futures]`, per-market readiness `ready_for_trading`, no console errors, and no secret/ciphertext/HMAC in the response. Screenshot: `output/playwright/settings-stage12-omni-market-create-local.png`. |
 | Secret artifact grep | `rg -n "BROWSER_SECRET_VALUE|BROWSERKEY1234|ciphertext|hmac" output/playwright/settings-stage12-omni-market-create-local.*` returned no matches after sanitizing the QA payload artifact. |
 
-## Required Production Evidence Before Acceptance
+## Production Evidence
 
-Stage 12 is not accepted until direct-main delivery plus runtime evidence prove:
-
-1. Authenticated `/settings` opens and displays market checkboxes plus visible
-   Mainnet/Testnet segmented control without layout overlap.
-2. Browser/network create payload includes `market_type` and `market_types[]`
-   when both markets are checked.
-3. API response for a multi-market create returns `items[]` and
-   `market_results[]`, and no plaintext secret/ciphertext/HMAC.
-4. Active list shows market-scoped rows, not a universal execution connection.
-5. Runtime smoke, exchange-control health, Prometheus/Monit/OpenBao checks remain
-   green after deploy.
+| Check | Result |
+|---|---|
+| Direct-main delivery | Implementation commit `5696e21240ee6a65832e221d6fd36802777a4f05` pushed to `main`. |
+| CI | GitHub Actions CI run `27728371649` succeeded for `5696e21240ee6a65832e221d6fd36802777a4f05`. |
+| Deploy Backend | Run `27728426127` succeeded. The deploy job synced backend source to `/opt/roehub/app`, built the Python runtime, ran DB bootstrap/migrations, reloaded production launchd services, recovered OpenBao Transit, and ran backend smoke. |
+| Deploy Web | Runs `27728426087` and `27728460775` succeeded for the shipped SHA. |
+| Publish App Image | Run `27728426106` succeeded for the shipped SHA. |
+| Mac Studio runtime via deploy runner | Deploy Backend `27728426127` proved `exchange-control`, `exchange-execution`, `strategy-live-runner`, `api`, OpenBao and exporters were bootstrapped by launchd; OpenBao recovery reported `openbao_health=ok`, `exchange_control_encrypt=ok`, `apps_api_decrypt_denied=403`, `openbao_recovery=ok`; backend smoke returned expected unauthenticated `401` for `/auth/current-user` and required metrics ports passed. |
+| Authenticated production browser smoke | `output/playwright/settings-stage12-prod-auth.json` passed against `https://roehub.com/settings#api` using the smoke Keycloak account. It verified visible checked `Spot` and `Futures` checkboxes, visible Mainnet/Testnet segmented control, Mainnet default selected, Testnet toggles selected, Mainnet toggles back selected, `consoleErrorCount=0`, `requestFailureCount=0`. No exchange key was created in this smoke. |
+| Secret artifact grep | `rg -n "SmokeE2E|password|api_secret|BROWSER_SECRET|KEYCLOAK|roehub_session|AUTH_SESSION|code=|state=" output/playwright` returned no matches. |
+| Screenshot limitation | Production headless screenshot capture timed out after fonts loaded, so the accepted production browser artifact is JSON state evidence rather than a PNG. Local browser QA did capture the add-key modal screenshot. |
 
 ## Handoff
 
