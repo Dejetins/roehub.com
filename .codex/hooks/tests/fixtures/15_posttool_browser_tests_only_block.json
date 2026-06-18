@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example/03-browser.md\n+# Browser Stage\n+\n+This stage changes browser-visible behavior.\n+Validation: run pytest and pyright.\n+Ledger: update stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example/03-browser.md": "# Browser Stage\n\nThis stage changes browser-visible behavior.\nValidation: run pytest and pyright.\nLedger: update stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Validation depth appears tests-only"
+  }
+}

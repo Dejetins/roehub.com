@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "Подготовил architecture plan и prompt pack, все готово к реализации."
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Cold-head artifact gate not reported"
+  }
+}

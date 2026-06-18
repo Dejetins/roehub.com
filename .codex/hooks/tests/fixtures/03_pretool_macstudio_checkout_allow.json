@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "ssh macstudio 'git -C /Users/daniildegtyarev/Projects/roehub.com status'"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_empty": true
+  }
+}

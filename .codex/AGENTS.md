@@ -1,6 +1,6 @@
 ---
 doc: agents
-version: "1.10"
+version: "1.11"
 status: active
 language: en
 applies_to:
@@ -188,6 +188,18 @@ Commit only durable coordination artifacts:
 - `.codex/agents/*template*.md`
 - `.codex/agents/promt_temlate.md`
 - `.codex/agents/generated/**/*.md`
+- `.codex/hooks.json`
+- `.codex/hooks/**/*.py`
+- `.codex/hooks/**/*.json`
+- `.codex/hooks/**/*.md`
+- `.codex/rules/**/*.rules`
+
+Repo-local hooks and rules are durable policy artifacts:
+- `.codex/hooks.json` is the documented repo-local hook source;
+- `.codex/hooks/**` contains stdlib-only validators, fixtures, and docs;
+- `.codex/rules/**` contains the experimental execpolicy layer and MUST be tested with `codex execpolicy check` when changed.
+
+Hooks are guardrails, not a full security boundary. They MUST NOT persist raw hook payloads by default because hook inputs can contain commands, outputs, cookies, credentials, provider payloads, or transcript paths.
 
 Do not commit local state, secrets, logs, or generated session artifacts:
 - `.codex/agents/.context/`

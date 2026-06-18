@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example/01-stage.md\n+Implement the stage.\n+Run pytest.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example/01-stage.md": "Implement the stage.\nRun pytest.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Prompt-pack stage readiness anchors missing"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example/04-auth-browser.md\n+# Auth Browser Stage\n+\n+expected_primary_touches:\n+- docs/architecture/example/example-stage-ledger.md\n+\n+This stage changes authenticated browser login behavior and uses Playwright.\n+Ledger: update the stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n+Validation: run real browser smoke and screenshot evidence.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example/04-auth-browser.md": "# Auth Browser Stage\n\nexpected_primary_touches:\n- docs/architecture/example/example-stage-ledger.md\n\nThis stage changes authenticated browser login behavior and uses Playwright.\nLedger: update the stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\nValidation: run real browser smoke and screenshot evidence.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "host-local smoke password env var source"
+  }
+}

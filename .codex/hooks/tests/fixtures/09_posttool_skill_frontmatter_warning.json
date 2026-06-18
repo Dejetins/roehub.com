@@ -1,0 +1,19 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/skills/example/SKILL.md\n+No frontmatter here.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/skills/example/SKILL.md": "No frontmatter here.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_contains": "Skill frontmatter may be incomplete"
+  }
+}
