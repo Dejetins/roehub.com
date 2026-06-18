@@ -394,6 +394,35 @@ def test_ui_account_exchange_connections_omni_create_returns_market_scoped_resul
     assert limits.json()["api_keys_used"] == 2
 
 
+def test_ui_account_exchange_connections_futures_only_market_types_create() -> None:
+    client, _account_repository, _session_ids = _build_test_client()
+
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json={
+            "exchange_name": "bybit",
+            "market_type": "spot",
+            "market_types": ["futures"],
+            "environment": "testnet",
+            "label": "bybit-futures-only",
+            "permissions": "trade",
+            "api_key": "BYBITFUTURES1234",
+            "api_secret": "TEST_SECRET_BYBIT_FUTURES_ONLY",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert created.status_code == 201
+    payload = created.json()
+    assert payload["market_type"] == "futures"
+    assert payload.get("items") is None
+    assert payload.get("market_results") is None
+    assert "TEST_SECRET_BYBIT_FUTURES_ONLY" not in created.text
+
+    active_list = client.get("/ui/account/exchange-connections?status=active")
+    assert [item["market_type"] for item in active_list.json()["items"]] == ["futures"]
+
+
 def test_ui_account_exchange_connections_omni_create_partial_failure_is_secret_safe() -> None:
     client, _account_repository, _session_ids = _build_test_client(
         exchange_control_client=_FuturesCreateFailureClient(),

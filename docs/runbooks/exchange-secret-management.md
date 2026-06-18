@@ -186,6 +186,28 @@ codes such as `valid_readonly`, `valid_trade_enabled`, `invalid_credentials`,
 response bodies, API keys, secrets, passphrases, ciphertexts, fingerprints and
 HMAC values must not be returned, logged, audited or used as metric labels.
 
+Bybit validation is market-scoped even when the physical exchange key is omni.
+`exchange-control` reads `/v5/user/query-api` and stores only sanitized evidence
+in `permission_summary_json`:
+
+- `Spot` with `SpotTrade` proves Roehub `market_type=spot`;
+- `ContractTrade` with `Order` + `Position`, `Derivatives` with
+  `DerivativesTrade`, or `Options` with `OptionsTrade` proves Roehub
+  `market_type=futures`;
+- `Wallet` transfer permissions reject the key as unsafe;
+- `readOnly=1` rejects requested trading capability;
+- missing mainnet IP restriction rejects mainnet but testnet without IP remains
+  allowed and visible as `not_restricted_testnet`.
+
+If a Bybit physical key should support both Spot and Futures, create two
+market-scoped connections through `/settings` or
+`/api/ui/account/exchange-connections` with `market_types=["spot","futures"]`
+or a futures-only follow-up create. Do not insert or update
+`exchange_connections` manually: manual SQL bypasses Transit decrypt,
+validation, audit, metrics and the public operator workflow. Read-only evidence
+queries may select masked suffix, label, market type, status, validation
+status/reason and sanitized permission summary only.
+
 ## Backup And Restore
 
 | Operation | Procedure | Safety notes |

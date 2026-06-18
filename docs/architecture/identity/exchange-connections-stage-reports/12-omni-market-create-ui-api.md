@@ -123,6 +123,40 @@ Demo Trading provider endpoints. Existing market-scoped execution identity is
 unchanged: users still need a concrete active Spot row before strategy execution
 can use Binance Spot.
 
+## Follow-up: Bybit Omni-Key Futures Repair
+
+Дата проверки: `2026-06-19`.
+
+Runtime baseline for `smoke_e2e_keycloak` showed masked Bybit testnet key
+`****AuN5` with one active `bybit_testnet` row for `spot`. A previous futures row
+for the same physical key existed only as an archived probe
+(`stage14_bybit_testnet_futures_probe`). The `/settings` UI therefore correctly
+rendered `Futures: Not connected`; it must not infer futures readiness from the
+spot binding.
+
+The repair path is:
+
+1. deploy the Bybit V5 per-market validation correction from the Stage 5
+   follow-up;
+2. add `bybit_testnet` for `futures` through `/settings` or
+   `/api/ui/account/exchange-connections`, reusing the physical key plaintext in
+   the create request;
+3. allow `exchange-control` to validate the futures row through
+   `/v5/user/query-api` without placing orders;
+4. accept only when production has active market-scoped rows for both `spot` and
+   `futures`, each with `validation_status=valid_trade_enabled` and
+   `connection_readiness=ready_for_trading`.
+
+Manual SQL insert/update is not an accepted repair path because it would bypass
+Transit decrypt, validator behavior, audit, metrics and the public workflow that
+operators use. Read-only DB evidence may select non-secret fields such as label,
+market type, status, masked suffix, validation status/reason and sanitized
+permission summary.
+
+Contract impact remains compatible: public API keeps legacy `market_type` and
+optional `market_types[]`; persistence reuses existing `permission_summary_json`;
+execution continues to receive a concrete `exchange_connection_id`.
+
 ## Handoff
 
 The next credential-management stage should introduce a shared credential object

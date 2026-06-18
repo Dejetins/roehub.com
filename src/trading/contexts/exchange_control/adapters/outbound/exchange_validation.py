@@ -304,6 +304,7 @@ class BybitExchangeCredentialValidator:
         return normalize_bybit_api_key_info(
             payload=payload,
             environment=request.environment,
+            market_type=request.market_type,
             requested_permissions=request.requested_permissions,
         )
 
@@ -471,6 +472,7 @@ def normalize_bybit_api_key_info(
     *,
     payload: dict[str, Any],
     environment: str,
+    market_type: str = "spot",
     requested_permissions: str = "read",
 ) -> ExchangeCredentialValidationResult:
     requested = _requested_permissions(value=requested_permissions)
@@ -504,14 +506,21 @@ def normalize_bybit_api_key_info(
     account_mode = _bybit_account_mode(result=result)
     read_only = int(result.get("readOnly", 0)) == 1
     ip_status = _bybit_ip_status(result=result, environment=environment)
-    exchange_permissions: ExchangePermissions = "read" if read_only else "trade"
+    market_trade_enabled = _bybit_market_trade_enabled(
+        result=result,
+        market_type=market_type,
+    )
+    exchange_permissions: ExchangePermissions = (
+        "trade" if not read_only and market_trade_enabled else "read"
+    )
+    bybit_summary = _bybit_summary(result=result, market_type=market_type)
     if account_mode == "unsupported":
         return _with_permission_policy(
             status="unsupported_account_mode",
             reason="unsupported_account_mode",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            base_summary=_bybit_summary(result=result),
+            base_summary=bybit_summary,
             requested_permissions=requested,
             exchange_permissions=exchange_permissions,
         )
@@ -521,7 +530,7 @@ def normalize_bybit_api_key_info(
             reason="transfer_permission_enabled",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            base_summary=_bybit_summary(result=result),
+            base_summary=bybit_summary,
             requested_permissions=requested,
             exchange_permissions="withdraw_or_transfer",
         )
@@ -531,7 +540,7 @@ def normalize_bybit_api_key_info(
             reason="mainnet_ip_restriction_missing",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            base_summary=_bybit_summary(result=result),
+            base_summary=bybit_summary,
             requested_permissions=requested,
             exchange_permissions=exchange_permissions,
         )
@@ -541,7 +550,17 @@ def normalize_bybit_api_key_info(
             reason="readonly_permission_detected",
             ip_restriction_status=ip_status,
             account_mode=account_mode,
-            base_summary=_bybit_summary(result=result),
+            base_summary=bybit_summary,
+            requested_permissions=requested,
+            exchange_permissions="read",
+        )
+    if not market_trade_enabled:
+        return _with_permission_policy(
+            status="permission_mismatch",
+            reason=f"bybit_{market_type}_trade_permission_missing",
+            ip_restriction_status=ip_status,
+            account_mode=account_mode,
+            base_summary=bybit_summary,
             requested_permissions=requested,
             exchange_permissions="read",
         )
@@ -550,7 +569,7 @@ def normalize_bybit_api_key_info(
         reason="write_permission_detected",
         ip_restriction_status=ip_status,
         account_mode=account_mode,
-        base_summary=_bybit_summary(result=result),
+        base_summary=bybit_summary,
         requested_permissions=requested,
         exchange_permissions="trade",
     )
@@ -683,6 +702,8 @@ def _with_permission_policy(
     permission_warnings: tuple[PermissionWarning, ...] = ()
     resolved_status = status
     resolved_reason = reason
+    if status == "permission_mismatch" and exchange_permissions == "read":
+        effective_permissions = "read"
     if status in {"valid_readonly", "valid_trade_enabled"}:
         if requested_permissions == "trade" and exchange_permissions == "read":
             resolved_status = "permission_mismatch"
@@ -822,12 +843,81 @@ def _bybit_account_mode(*, result: dict[str, Any]) -> str | None:
     return "unsupported"
 
 
-def _bybit_summary(*, result: dict[str, Any]) -> dict[str, object]:
+def _bybit_summary(*, result: dict[str, Any], market_type: str) -> dict[str, object]:
+    permissions = _bybit_permissions(result=result)
+    market_support = {
+        "spot": _bybit_market_trade_enabled(result=result, market_type="spot"),
+        "futures": _bybit_market_trade_enabled(result=result, market_type="futures"),
+    }
     return {
         "exchange": "bybit",
+        "market_type": market_type,
         "readonly": int(result.get("readOnly", 0)) == 1,
         "transfer": _bybit_transfer_enabled(result=result),
+        "bybit_permissions": permissions,
+        "bybit_market_support": market_support,
     }
+
+
+def _bybit_permissions(*, result: dict[str, Any]) -> dict[str, list[str]]:
+    permissions = result.get("permissions")
+    if not isinstance(permissions, dict):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for key, value in permissions.items():
+        if not isinstance(value, list):
+            continue
+        values = sorted({str(item) for item in value if isinstance(item, str)})
+        normalized[str(key)] = values
+    return normalized
+
+
+def _bybit_market_trade_enabled(*, result: dict[str, Any], market_type: str) -> bool:
+    permissions = _bybit_permissions(result=result)
+    if market_type == "spot":
+        return _bybit_bucket_has_any(
+            permissions=permissions,
+            bucket="Spot",
+            values=("SpotTrade",),
+        )
+    if market_type == "futures":
+        contract_order_position = _bybit_bucket_has_all(
+            permissions=permissions,
+            bucket="ContractTrade",
+            values=("Order", "Position"),
+        )
+        derivatives_trade = _bybit_bucket_has_any(
+            permissions=permissions,
+            bucket="Derivatives",
+            values=("DerivativesTrade",),
+        )
+        usdc_contract_trade = _bybit_bucket_has_any(
+            permissions=permissions,
+            bucket="Options",
+            values=("OptionsTrade",),
+        )
+        return contract_order_position or derivatives_trade or usdc_contract_trade
+    return False
+
+
+def _bybit_bucket_has_all(
+    *,
+    permissions: dict[str, list[str]],
+    bucket: str,
+    values: tuple[str, ...],
+) -> bool:
+    observed = {item.lower() for item in permissions.get(bucket, [])}
+    return all(value.lower() in observed for value in values)
+
+
+def _bybit_bucket_has_any(
+    *,
+    permissions: dict[str, list[str]],
+    bucket: str,
+    values: tuple[str, ...],
+) -> bool:
+    observed = {item.lower() for item in permissions.get(bucket, [])}
+    return any(value.lower() in observed for value in values)
 
 
 __all__ = [

@@ -410,6 +410,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "settings.exchange.disconnect_blocked" in settings_js
     assert "settings.exchange.market_not_connected" in settings_js
     assert "settings-market-availability" in settings_js
+    assert "const items = exchangeItems(payload);" in settings_js
+    assert "const marketAvailability = buildMarketAvailability(items);" in settings_js
+    assert 'if (status === "active")' in settings_js
     assert "representativeExchangeItems" in settings_js
     assert "aria-current" in settings_js
     assert "active_strategy_bindings_count" in settings_js

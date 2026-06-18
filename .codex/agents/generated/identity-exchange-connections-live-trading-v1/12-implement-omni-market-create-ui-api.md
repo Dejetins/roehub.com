@@ -54,6 +54,7 @@ hard_requirements:
   no_exchange_execution: true
   no_order_placement: true
   no_persistence_collapse_in_stage_12: true
+  bybit_market_specific_validation_required: true
   browser_evidence_required: true
   runtime_evidence_required: true
   direct_main_push_after_validation_required: true
@@ -67,6 +68,9 @@ implementation_rules:
   - "Do not migrate `exchange_credential_versions.connection_id` in this stage."
   - "The `/settings` form must use checkboxes for Spot/Futures and a visible Mainnet/Testnet segmented control."
   - "The `/settings` create payload should include `permissions=\"trade\"` as product intent while preserving the backend default for old clients."
+  - "Bybit omni keys must still validate per market: Spot requires `SpotTrade`; Futures requires `ContractTrade` with `Order` + `Position`, `DerivativesTrade`, or `OptionsTrade` from `/v5/user/query-api`."
+  - "Do not mark Futures Ready from a Spot-only active row; UI availability is derived from active market-scoped rows."
+  - "Production repair of a missing Bybit futures binding must use UI/API create and must not use manual SQL insert/update."
 
 skill_routing:
   - skill: architecture-design
@@ -105,6 +109,7 @@ runtime_acceptance:
     - "network payload proving `market_type` plus `market_types[]` for multi-market create"
     - "API/body proof that response has `items[]` and `market_results[]` without plaintext secret/ciphertext/HMAC"
     - "active-list proof that created rows remain market-scoped"
+    - "Bybit repair proof, when applicable, showing active Spot and active Futures rows with `valid_trade_enabled` and `ready_for_trading` from sanitized API/DB evidence"
     - "Mac Studio smoke, exchange-control health, Prometheus/Monit/OpenBao post-deploy checks"
 
 non_goals:

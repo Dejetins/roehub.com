@@ -590,3 +590,105 @@ def test_bybit_permission_truth_table() -> None:
         "effective_permissions": "none",
     }
     assert "TEST_SECRET" not in invalid.reason
+
+
+def test_bybit_market_specific_permission_truth_table() -> None:
+    spot_only_payload = {
+        "retCode": 0,
+        "result": {
+            "readOnly": 0,
+            "permissions": {"Spot": ["SpotTrade"], "Wallet": []},
+            "ips": [],
+            "uta": 1,
+        },
+    }
+    contract_futures_payload = {
+        "retCode": 0,
+        "result": {
+            "readOnly": 0,
+            "permissions": {"ContractTrade": ["Order", "Position"], "Wallet": []},
+            "ips": [],
+            "uta": 1,
+        },
+    }
+    derivatives_futures_payload = {
+        "retCode": 0,
+        "result": {
+            "readOnly": 0,
+            "permissions": {"Derivatives": ["DerivativesTrade"], "Wallet": []},
+            "ips": [],
+            "uta": 1,
+        },
+    }
+    usdc_futures_payload = {
+        "retCode": 0,
+        "result": {
+            "readOnly": 0,
+            "permissions": {"Options": ["OptionsTrade"], "Wallet": []},
+            "ips": [],
+            "uta": 1,
+        },
+    }
+    incomplete_contract_payload = {
+        "retCode": 0,
+        "result": {
+            "readOnly": 0,
+            "permissions": {"ContractTrade": ["Order"], "Wallet": []},
+            "ips": [],
+            "uta": 1,
+        },
+    }
+
+    spot = normalize_bybit_api_key_info(
+        payload=spot_only_payload,
+        environment="testnet",
+        market_type="spot",
+        requested_permissions="trade",
+    )
+    spot_only_futures = normalize_bybit_api_key_info(
+        payload=spot_only_payload,
+        environment="testnet",
+        market_type="futures",
+        requested_permissions="trade",
+    )
+    contract_futures = normalize_bybit_api_key_info(
+        payload=contract_futures_payload,
+        environment="testnet",
+        market_type="futures",
+        requested_permissions="trade",
+    )
+    derivatives_futures = normalize_bybit_api_key_info(
+        payload=derivatives_futures_payload,
+        environment="testnet",
+        market_type="futures",
+        requested_permissions="trade",
+    )
+    usdc_futures = normalize_bybit_api_key_info(
+        payload=usdc_futures_payload,
+        environment="testnet",
+        market_type="futures",
+        requested_permissions="trade",
+    )
+    incomplete_contract_futures = normalize_bybit_api_key_info(
+        payload=incomplete_contract_payload,
+        environment="testnet",
+        market_type="futures",
+        requested_permissions="trade",
+    )
+
+    assert spot.status == "valid_trade_enabled"
+    assert _permission_summary(spot)["bybit_market_support"] == {
+        "spot": True,
+        "futures": False,
+    }
+    assert spot_only_futures.status == "permission_mismatch"
+    assert spot_only_futures.reason == "bybit_futures_trade_permission_missing"
+    assert _permission_summary(spot_only_futures)["exchange_permissions"] == "read"
+    assert contract_futures.status == "valid_trade_enabled"
+    assert derivatives_futures.status == "valid_trade_enabled"
+    assert usdc_futures.status == "valid_trade_enabled"
+    assert incomplete_contract_futures.status == "permission_mismatch"
+    assert _permission_summary(contract_futures)["bybit_permissions"] == {
+        "ContractTrade": ["Order", "Position"],
+        "Wallet": [],
+    }

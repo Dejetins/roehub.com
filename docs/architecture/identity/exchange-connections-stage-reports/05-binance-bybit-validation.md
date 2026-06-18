@@ -35,7 +35,7 @@ amend or reconcile orders.
 | Binance mainnet | API key permission mapping | Native signed `GET /sapi/v1/account/apiRestrictions` | Map read-only, trade, transfer/withdrawal, IP restriction and unsupported mode to normalized statuses. | Implemented in `BinanceExchangeCredentialValidator`; unit mapping covers `valid_readonly`, `valid_trade_enabled`, `invalid_permissions`, `invalid_ip_restriction`, `unsupported_account_mode`. | None |
 | Binance Demo Spot | API key permission mapping | Native signed `GET https://demo-api.binance.com/api/v3/account`; for requested trade, safe `POST /api/v3/order/test` probe | Demo Spot keys from `demo.binance.com` must validate against the documented Spot Demo endpoint, not legacy `testnet.binance.vision` or SAPI `apiRestrictions`. | Implemented in `BinanceExchangeCredentialValidator`; unit mapping covers read/trade/mismatch and endpoint routing. | None |
 | Binance Demo Futures | API key permission mapping | Native signed `GET https://demo-fapi.binance.com/fapi/v2/account` | Futures demo keys must validate against the documented Futures Demo endpoint. | Implemented in `BinanceExchangeCredentialValidator`; unit routing covers `demo-fapi.binance.com`. | None |
-| Bybit | API key information mapping | Native signed `GET /v5/user/query-api` | Map `readOnly`, `permissions`, `ips` and account mode to normalized statuses. | Implemented in `BybitExchangeCredentialValidator`; unit mapping covers all required status classes. | None for host-local readonly credential smoke. |
+| Bybit | API key information mapping | Native signed `GET /v5/user/query-api` | Map `readOnly`, per-market `permissions`, `ips` and account mode to normalized statuses. Spot trade requires `SpotTrade`; futures trade requires `ContractTrade` with `Order` + `Position`, `DerivativesTrade`, or `OptionsTrade` for USDC contracts. | Implemented in `BybitExchangeCredentialValidator`; unit mapping covers status classes and per-market Spot/Futures permission buckets. | None for host-local readonly credential smoke. |
 | Invalid credentials | Native HTTP/auth rejection | Test fake payloads | Return `invalid_credentials` without raw exchange body. | Unit mapping returns `invalid_credentials`; raw `retMsg` is not copied into reason. | None for deterministic evidence. |
 | API facade | `POST /api/ui/account/exchange-connections/{connection_id}/validate` | Roehub session, same-origin headers | Route through `ExchangeControlClient` only. | Implemented and tested with deterministic fake client; response contains no secret fields. | None |
 | Internal boundary | `POST /internal/v1/exchange-connections/{connection_id}/validate` | Internal token headers | `exchange-control` owns decrypt and native exchange calls. | Implemented; default dev config returns `skipped_external_validation`; post-deploy Mac Studio internal validation returned `valid_readonly` for Binance and Bybit. | None |
@@ -54,8 +54,40 @@ Sources verified before implementation:
 - Binance: signed request security requires timestamp plus HMAC signature.
 - Bybit: `GET /v5/user/query-api`, response fields `readOnly`, `secret=""`
   and `permissions`.
+- Bybit market-scoped validation: `Spot`/`SpotTrade` proves Roehub `spot`;
+  `ContractTrade` with `Order` + `Position`, `Derivatives`/`DerivativesTrade`
+  or `Options`/`OptionsTrade` proves Roehub `futures`. Native `linear` /
+  `inverse` are provider categories only and are not persisted as Roehub
+  `market_type` values.
 - Bybit: `X-BAPI-*` signed request rule uses timestamp, API key, recv window
   and query string for GET requests.
+
+## Bybit Omni-Key Correction
+
+Дата проверки: `2026-06-19`.
+
+Bybit V5 allows one physical API key to cover multiple product buckets. Roehub
+still keeps execution/readiness market-scoped by concrete `exchange_connection_id`,
+so validation must prove the selected market rather than infer futures readiness
+from an active spot row.
+
+The Bybit validator now stores additive market-level evidence in
+`permission_summary_json`:
+
+- `bybit_permissions`: sanitized permission bucket names and values from
+  `/v5/user/query-api`;
+- `bybit_market_support.spot`: true only when `SpotTrade` is present;
+- `bybit_market_support.futures`: true when the documented derivatives/contract
+  trade bucket is present;
+- `market_type`: the Roehub market row being validated.
+
+If a key is writable but lacks the selected market permission, validation returns
+`permission_mismatch` with `validation_reason=bybit_<market>_trade_permission_missing`.
+`readOnly=1` for requested trade remains `permission_mismatch` with
+`requested_trade_but_exchange_readonly`. Transfer permissions remain
+`invalid_permissions`; mainnet without IP restrictions remains
+`invalid_ip_restriction`; testnet without IP restrictions remains allowed but is
+shown as `not_restricted_testnet`.
 
 ## External Validation Evidence
 
