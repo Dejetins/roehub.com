@@ -1,6 +1,6 @@
 # Strategy Producer Paper/Testnet Trading v1
 
-Статус: architecture plan для нового цикла реализации. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает следующий самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 24h acceptance.
+Статус: architecture plan для нового цикла реализации. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает следующий самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 6h acceptance с controlled burst/load и CPU/RAM evidence.
 
 ## Цель
 
@@ -14,7 +14,7 @@
 | Testnet покрывает representative exchange matrix | Реальные testnet orders проходят для Binance/Bybit, spot/futures, long/short и sizing groups на `BTCUSDT`. |
 | Manual entry/exit использует тот же путь | Отдельные UI-кнопки manual entry и manual stop/exit создают такие же source events, intents, orders/outcomes. |
 | Runtime работает как production-сервис | Strategy producer supervised через launchd/Monit, виден в Prometheus, имеет kill switches, allowlists, logs, redaction и restart evidence. |
-| Производительность и задержки измеряются | Логируется gap от сигнала до intent, dispatch, exchange submit, ack/fill; 24h gate обязателен. |
+| Производительность и задержки измеряются | Логируется gap от сигнала до intent, dispatch, exchange submit, ack/fill; 6h gate обязателен и включает controlled burst/load + CPU/RAM impact evidence. |
 
 ## Контекст
 
@@ -50,8 +50,9 @@ Roehub должен дать пользователю простой путь: �
 | Scenario coverage | Все доступные `entry sizing`, `risk mode`, `direction` в paper; representative subset в testnet. |
 | Manual actions | Отдельные кнопки manual entry и manual stop/exit на UI, через общий source-event/execution path. |
 | Runtime | Strategy producer как supervised service через launchd/Monit, с Prometheus metrics и kill switches. |
-| Load | Десятки/сотни testnet strategies с соблюдением внутренних и биржевых rate limits. |
-| 24h acceptance | Обязательный логируемый 24h gate после end-to-end readiness. |
+| Load | Десятки/сотни testnet strategies с соблюдением внутренних и биржевых rate limits; Stage `12` повторно усиливает нагрузку controlled burst-интервалом внутри soak. |
+| Resource impact | CPU/RAM влияние измеряется существующими Mac Studio monitoring/benchmark методами: Prometheus `node-exporter`, service metrics, Monit и уже принятые resource snapshots; отсутствие таких метрик блокирует acceptance до старта soak. |
+| 6h acceptance | Обязательный логируемый 6h gate после end-to-end readiness; сокращение прежнего длительного soak окна компенсируется controlled burst/load и обязательным CPU/RAM evidence. |
 | Notification delivery | Реальная доставка Telegram/email вне scope, но outbox/event contract должен быть совместимым. |
 
 Не входит:
@@ -196,7 +197,7 @@ Service shape v1: переиспользуем существующий runtime 
 | Redis dispatch lag | pending, retry, DLQ, consumer lag | warning | operator |
 | Exchange adapter rate limit/backpressure | limiter wait, retry budget, DLQ | warning | operator |
 | Config guard mismatch | blocked scenario counters | info/warning | product/operator |
-| 24h soak failure | any unknown unreconciled order, unexpected stop, secret leak, mainnet attempt | critical | operator |
+| 6h soak/resource failure | any unknown unreconciled order, unexpected stop, secret leak, mainnet attempt, sustained CPU/RAM saturation, unbounded RSS growth, or burst impact not returning to accepted band | critical | operator |
 
 ## План Внедрения
 
@@ -213,7 +214,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `09` | Real testnet representative orders | Binance/Bybit x spot/futures x long/short branches x sizing groups on `BTCUSDT`; spot-short is blocked/unsupported unless margin product exists, futures short only isolated `1x`. | Real testnet order submit/status/fill/cancel or close for supported branches, explicit blocked proof for unsupported spot-short, DB order/fill/reconciliation rows, Redis ack, metrics, no mainnet. |
 | `10` | Strategy UI status and journal | `/strategies` shows market/exchange/environment, producer state, latest signals, execution outcome links, manual controls. | Playwright desktop/mobile, console/network clean, DOM secret scan, API dashboard proof. |
 | `11` | Rate limits and load harness | Dozens/hundreds of testnet-mode strategies while respecting internal/exchange limits and backpressure; paper may be used only as supporting baseline, not acceptance substitute. | Controlled testnet-mode load run, limiter wait metrics, queue lag, p95/p99 latency, no DLQ growth beyond accepted threshold. |
-| `12` | 24h supervised soak | Mandatory 24h logged acceptance gate on paper+testnet strategies. | 24h logs, Prometheus snapshots, SQL counts, Redis pending/DLQ, Monit uptime, final browser/API report. |
+| `12` | 6h supervised soak | Mandatory 6h logged acceptance gate on paper+testnet strategies with one controlled amplified-load interval. | 6h logs, Prometheus snapshots, SQL counts, Redis pending/DLQ, Monit uptime, Stage `11`/existing harness burst evidence, CPU/RAM baseline/during/post/final snapshots, final browser/API report. |
 | `13` | Notifications and operator runbooks | Outbox/event contract for future delivery, alert severity/owner/escalation, runbooks. | Outbox rows for rejected/fill/exit/kill/unknown, Prometheus rules, runbook drill evidence. |
 | `14` | Final readiness and docs closure | Stage reports, ledger, docs index, prompt pack closure, delivery readiness. | All stage reports accepted, docs index check, `github:yeet` publish evidence, main-branch delivery evidence, CI/deploy/host-sync evidence where applicable, final go/no-go for separate mainnet plan. |
 
@@ -232,7 +233,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `09` | testnet scenario runner, native adapter coverage, reconciliation evidence | `09-real-testnet-representative-orders.md` |
 | `10` | `/strategies` dashboard/status/journal UI and API read models | `10-strategy-ui-status-journal.md` |
 | `11` | load harness, limiter metrics, Prometheus rules, ops scripts | `11-rate-limits-load-harness.md` |
-| `12` | 24h soak runner/reporting, Mac Studio logs/evidence scripts | `12-supervised-24h-soak.md` |
+| `12` | 6h soak runner/reporting, controlled burst/load evidence, Mac Studio CPU/RAM logs/evidence scripts | `12-supervised-6h-soak.md` |
 | `13` | notification outbox compatibility, alert rules, runbooks | `13-notifications-runbooks.md` |
 | `14` | final docs, index, stage ledger closure, prompt pack audit | `14-final-readiness-docs-closure.md` |
 
@@ -275,7 +276,7 @@ Prompt/report mapping:
 | `09` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/09-real-testnet-representative-orders.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/09-real-testnet-representative-orders.md` |
 | `10` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/10-strategy-ui-status-journal.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/10-strategy-ui-status-journal.md` |
 | `11` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/11-rate-limits-load-harness.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/11-rate-limits-load-harness.md` |
-| `12` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/12-supervised-24h-soak.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-supervised-24h-soak.md` |
+| `12` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/12-supervised-6h-soak.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-supervised-6h-soak.md` |
 | `13` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/13-notifications-runbooks.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/13-notifications-runbooks.md` |
 | `14` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/14-final-readiness-docs-closure.md` | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/14-final-readiness-docs-closure.md` |
 
@@ -308,7 +309,7 @@ docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stag
 | No secrets in evidence | Нельзя писать ключи, secrets, cookies, tokens, raw signed payloads. |
 | Dependent stages blocked | Следующий зависимый stage не стартует, пока предыдущий не accepted или не superseded repair stage. |
 | Mac Studio runtime | Git на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks в `/opt/roehub/app` только для deploy/smoke. |
-| 24h gate | Stage `12` нельзя заменить коротким smoke; нужен фактический 24h логируемый acceptance. |
+| 6h gate | Stage `12` нельзя заменить коротким smoke; нужен фактический 6h логируемый acceptance с controlled burst/load, CPU/RAM snapshots и cleanup evidence. |
 
 ## Delivery, Main И Host Sync Contract
 
@@ -354,5 +355,5 @@ Prompt pack для реализации этого плана должен жи�
 | Futures short требует account config | Stage `05`/`09` блокируют short, если isolated `1x` не доказан. Оператор может исправить testnet futures config через явную account-config command; execution всё равно проверяет read-back evidence перед order. |
 | Spot short не является обычным spot order | Stage `03`/`07`/`09` должны доказать эту ветку как blocked/unsupported без margin trading, а не симулировать ее как реальный spot short. |
 | Сотни testnet strategies могут создать bursts | Stage `11` обязан доказать внутренний limiter/backpressure на testnet-mode strategies, даже если биржевые лимиты ожидаемо не достигнуты. |
-| 24h gate может выявить flaky runtime | Stage `12` фиксирует blocker, не принимает план “с оговоркой”. |
+| 6h gate может выявить flaky runtime или resource pressure | Stage `12` фиксирует blocker, не принимает план “с оговоркой”; burst impact должен вернуться в заранее заданный acceptable band. |
 | Notification delivery еще нет | Stage `13` делает delivery-neutral outbox contract, но не обещает Telegram/email доставку. |

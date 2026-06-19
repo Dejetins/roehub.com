@@ -74,7 +74,7 @@ Finalize delivery-neutral notification outbox compatibility and operator alert/r
 - Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `github:yeet`/`publish-ci-deploy` discipline for scoped publish, but do not leave the stage on a per-stage branch or draft PR. Temporary branches are allowed only when useful; before marking the stage `accepted`, deliver the changes to `main`, push `origin main`, verify main contains the changes, delete any temporary local/remote branch, and record main-branch delivery plus branch-cleanup evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
 - The stage report must include a file manifest table: `Created / Modified / Deleted / Reason / Contract impact`; justify any touched file outside expected paths.
 - Before editing, narrow any broad expected directory path to a concrete file list or planned new files and record that list in the stage report.
-- Produce outbox events for rejected signal/order, fill, manual exit, kill switch, unknown/reconciliation pending, strategy stopped/restarted, and 24h soak failure/success.
+- Produce outbox events for rejected signal/order, fill, manual exit, kill switch, unknown/reconciliation pending, strategy stopped/restarted, 6h soak failure/success, and resource-threshold breach during soak/load.
 - Keep event payloads redacted and compatible with future Telegram/email delivery.
 - Add/verify Prometheus alert rules with severity, owner, escalation, and runbook action.
 - Run at least one runbook drill or dry-run for a non-destructive alert path.
