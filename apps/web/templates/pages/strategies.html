@@ -171,6 +171,7 @@
               <div><dt>{{ t("strategies.selected.strategy") }}</dt><dd data-selected-name>--</dd></div>
               <div><dt>{{ t("strategies.selected.version") }}</dt><dd data-selected-version>--</dd></div>
               <div><dt>{{ t("strategies.selected.exchange") }}</dt><dd data-selected-exchange>--</dd></div>
+              <div><dt>{{ t("strategies.selected.market") }}</dt><dd data-selected-market>--</dd></div>
               <div><dt>{{ t("strategies.selected.symbols") }}</dt><dd data-selected-symbols>--</dd></div>
               <div><dt>{{ t("strategies.selected.capital") }}</dt><dd data-selected-capital>--</dd></div>
               <div><dt>{{ t("strategies.selected.commission") }}</dt><dd data-selected-commission>--</dd></div>
@@ -181,6 +182,25 @@
               <div><dt>{{ t("strategies.selected.runs") }}</dt><dd data-selected-run-state>--</dd></div>
               <div><dt>{{ t("strategies.selected.updated") }}</dt><dd data-selected-updated>--</dd></div>
             </dl>
+            <section class="strategies-runtime-status" aria-label="{{ t('strategies.runtime.title') }}">
+              <header>
+                <h3>{{ t("strategies.runtime.title") }}</h3>
+                <span class="strategies-pill" data-runtime-producer>--</span>
+              </header>
+              <dl class="strategies-kv strategies-kv--profile">
+                <div><dt>{{ t("strategies.runtime.environment") }}</dt><dd data-runtime-environment>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.mainnet") }}</dt><dd data-runtime-mainnet>unavailable</dd></div>
+                <div><dt>{{ t("strategies.runtime.run") }}</dt><dd data-runtime-run>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.started") }}</dt><dd data-runtime-started>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.updated") }}</dt><dd data-runtime-updated>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.checkpoint") }}</dt><dd data-runtime-checkpoint>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.warmup") }}</dt><dd data-runtime-warmup>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.latest_signal") }}</dt><dd data-runtime-latest-signal>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.latest_source") }}</dt><dd data-runtime-latest-source>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.latest_execution") }}</dt><dd data-runtime-latest-execution>--</dd></div>
+                <div><dt>{{ t("strategies.runtime.latency_gap") }}</dt><dd data-runtime-latency-gap>--</dd></div>
+              </dl>
+            </section>
             <section class="strategies-live-profile" aria-label="{{ t('strategies.profile.title') }}">
               <header>
                 <h3>{{ t("strategies.profile.title") }}</h3>
@@ -248,13 +268,16 @@
                 <span class="strategies-pill" data-execution-outcomes-state>--</span>
               </header>
               <div class="strategies-table-wrap strategies-table-wrap--compact">
-                <table class="strategies-table strategies-table--stats">
+                <table class="strategies-table strategies-table--stats strategies-table--outcomes">
                   <thead>
                     <tr>
                       <th>{{ t("strategies.execution_outcomes.signal") }}</th>
                       <th>{{ t("strategies.execution_outcomes.source") }}</th>
                       <th>{{ t("strategies.execution_outcomes.intent") }}</th>
                       <th>{{ t("strategies.execution_outcomes.execution") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.fill") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.reconciliation") }}</th>
+                      <th>{{ t("strategies.execution_outcomes.latency_gap") }}</th>
                       <th>{{ t("strategies.execution_outcomes.notification") }}</th>
                     </tr>
                   </thead>

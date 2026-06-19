@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
@@ -15,11 +15,17 @@ from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_strategies_dashboard_router
 from apps.api.wiring.modules.ui_strategies_dashboard import StrategyDashboardQueryService
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.live_execution.domain import ExecutionProducerOutcomeLink
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTMarketReadinessReport,
     BTCUSDTMarketReadinessRow,
 )
-from trading.contexts.strategy.domain.entities import Strategy, StrategyRun, StrategySignal
+from trading.contexts.strategy.domain.entities import (
+    LiveStrategyProfile,
+    Strategy,
+    StrategyRun,
+    StrategySignal,
+)
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
@@ -96,6 +102,9 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["live_profile"]["mode"] == "monitor_only"
     assert payload["live_profile"]["readiness_status"] == "ready"
     assert payload["live_profile"]["readiness_reason"] == "monitor_only_no_exchange_submit"
+    assert payload["runtime_status"]["environment"] == "monitor_only"
+    assert payload["runtime_status"]["producer_status"] == "running"
+    assert payload["runtime_status"]["mainnet_available"] is False
     assert payload["strategy_selector"]["filters"]["state"] == "active"
     assert payload["strategy_selector"]["totals"]["strategies"] == 1
     assert payload["strategy_selector"]["items"][0]["status"] == "live"
@@ -158,6 +167,83 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert risk_rows["rollup_bucket_count_1m"]["total_value"] == "2"
     compressed = gzip.compress(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     assert len(compressed) < 96 * 1024
+
+
+def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_journal() -> None:
+    strategy = _strategy(symbol="BTCUSDT")
+    run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-000000006202"),
+        user_id=strategy.user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 5, 6, 9, 0, tzinfo=UTC),
+    )
+    profile = _profile(strategy=strategy, mode="paper")
+    signal = _signal(strategy=strategy, run=run)
+    source_event_received_at = datetime(2026, 5, 6, 9, 2, 3, tzinfo=UTC)
+    execution_updated_at = source_event_received_at + timedelta(seconds=7)
+    service = StrategyDashboardQueryService(
+        strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
+        run_repository=_FakeRunRepository(runs=(run,)),
+        profile_repository=_FakeLiveProfileRepository(profile=profile),
+        signal_repository=_FakeSignalRepository(signals=(signal,)),
+        execution_outcome_service=_FakeExecutionOutcomeService(
+            links=(
+                ExecutionProducerOutcomeLink(
+                    source_event_id=UUID("00000000-0000-0000-0000-000000006401"),
+                    owner_user_id=strategy.user_id,
+                    source_type="strategy_signal",
+                    source_event_ref=str(signal.signal_id),
+                    source_event_received_at=source_event_received_at,
+                    strategy_signal_id=signal.signal_id,
+                    outcome="dispatched",
+                    outcome_reason="intent_recorded",
+                    intent_id=UUID("00000000-0000-0000-0000-000000006501"),
+                    intent_status="accepted",
+                    intent_status_reason="risk_accepted",
+                    risk_status="accepted",
+                    risk_reason="risk_passed",
+                    order_status="filled",
+                    order_status_reason="exchange_fill_recorded",
+                    fill_count=1,
+                    latest_fill_at=execution_updated_at,
+                    reconciliation_status="matched",
+                    reconciliation_reason="status_and_fills_matched",
+                    notification_event_type="producer_fill",
+                    notification_reason="order_filled",
+                    updated_at=execution_updated_at,
+                ),
+            )
+        ),
+    )
+    client = _build_client(service=service)
+
+    response = client.get(
+        f"/ui/strategies/dashboard?strategy_id={_STRATEGY_ID}",
+        headers={"x-user-id": _USER_ID},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selected_strategy"]["capital_usdt"] == 50.0
+    assert payload["live_profile"]["mode"] == "paper"
+    assert payload["runtime_status"]["environment"] == "paper"
+    assert payload["runtime_status"]["producer_status"] == "running"
+    assert payload["runtime_status"]["producer_reason"] == "starting"
+    assert payload["runtime_status"]["mainnet_available"] is False
+    assert payload["runtime_status"]["latest_signal_at"] == "2026-05-06T09:02:00Z"
+    assert payload["runtime_status"]["latest_source_event_at"] == "2026-05-06T09:02:03Z"
+    assert payload["runtime_status"]["latest_execution_update_at"] == "2026-05-06T09:02:10Z"
+    assert payload["runtime_status"]["observed_latency_gap_seconds"] == 7
+    assert payload["runtime_status"]["observed_latency_gap_status"] == "observed"
+    outcome = payload["execution_outcomes"]["items"][0]
+    assert outcome["source_event_received_at"] == "2026-05-06T09:02:03Z"
+    assert outcome["fill_count"] == 1
+    assert outcome["latest_fill_at"] == "2026-05-06T09:02:10Z"
+    assert outcome["reconciliation_status"] == "matched"
+    assert outcome["reconciliation_reason"] == "status_and_fills_matched"
+    assert outcome["latency_gap_seconds"] == 7
+    assert outcome["latency_gap_status"] == "observed"
+    assert outcome["latency_gap_reason"] == "source_event_to_latest_update"
 
 
 def test_strategy_dashboard_auth_failure_uses_auth_required_code() -> None:
@@ -320,6 +406,53 @@ class _FakeSignalRepository:
         )
 
 
+class _FakeLiveProfileRepository:
+    def __init__(self, *, profile: LiveStrategyProfile | None) -> None:
+        self._profile = profile
+
+    def get_for_strategy(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+    ) -> LiveStrategyProfile | None:
+        if (
+            self._profile is not None
+            and self._profile.owner_user_id == owner_user_id
+            and self._profile.strategy_id == strategy_id
+        ):
+            return self._profile
+        return None
+
+    def create(self, *, profile: LiveStrategyProfile) -> LiveStrategyProfile | None:
+        raise NotImplementedError
+
+    def update(self, *, profile: LiveStrategyProfile) -> LiveStrategyProfile:
+        raise NotImplementedError
+
+
+class _FakeExecutionOutcomeService:
+    def __init__(self, *, links: tuple[ExecutionProducerOutcomeLink, ...]) -> None:
+        self._links = links
+
+    def list_producer_outcome_links_for_strategy(
+        self,
+        *,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        limit: int,
+    ) -> tuple[ExecutionProducerOutcomeLink, ...]:
+        _ = limit
+        return tuple(
+            link
+            for link in self._links
+            if link.owner_user_id == owner_user_id
+            and link.source_event_ref
+            and link.strategy_signal_id is not None
+            and strategy_id == _STRATEGY_ID
+        )
+
+
 class _FakeBTCUSDTMarketReadinessService:
     def execute(self, *, observed_at: datetime | None = None) -> BTCUSDTMarketReadinessReport:
         checked_at = observed_at or datetime(2027, 1, 15, 8, 0, tzinfo=UTC)
@@ -441,6 +574,27 @@ def _signal(*, strategy: Strategy, run: StrategyRun) -> StrategySignal:
         source_message_id="1746522060000-0",
         evaluator_version="ma_cross_close_v1",
         created_at=datetime(2026, 5, 6, 9, 2, tzinfo=UTC),
+    )
+
+
+def _profile(
+    *, strategy: Strategy, mode: Literal["monitor_only", "paper", "live", "testnet"]
+) -> LiveStrategyProfile:
+    return LiveStrategyProfile(
+        profile_id=UUID("00000000-0000-0000-0000-000000006701"),
+        owner_user_id=strategy.user_id,
+        strategy_id=strategy.strategy_id,
+        mode=mode,
+        exchange_connection_id=UUID("00000000-0000-0000-0000-000000006801"),
+        sizing_method="fixed_quote",
+        sizing_value=Decimal("50"),
+        max_position_notional=Decimal("50"),
+        max_orders_per_run=3,
+        max_notional_per_run=Decimal("50"),
+        readiness_status="ready",
+        readiness_reason="ready_for_paper",
+        created_at=datetime(2026, 5, 6, 8, 50, tzinfo=UTC),
+        updated_at=datetime(2026, 5, 6, 8, 55, tzinfo=UTC),
     )
 
 

@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from apps.api.dto.ui_strategies_dashboard import (
+    PanelState,
     RefreshStatus,
     SourceStatus,
     StrategyBreakdownPanelResponse,
@@ -25,6 +26,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyDashboardPaperAccountingResponse,
     StrategyDashboardRefreshControlResponse,
     StrategyDashboardResponse,
+    StrategyDashboardRuntimeStatusResponse,
     StrategyDashboardSelectedStrategyResponse,
     StrategyDashboardSelectorFiltersResponse,
     StrategyDashboardSelectorResponse,
@@ -328,10 +330,18 @@ class StrategyDashboardQueryService:
             selected_strategy=_build_selected_strategy(
                 strategy=selected_strategy,
                 run=selected_run,
+                profile=live_profile,
                 generated_at=generated_at,
                 requested_strategy_id=strategy_id,
             ),
             live_profile=_build_live_profile(profile=live_profile, strategy=selected_strategy),
+            runtime_status=_build_runtime_status(
+                strategy=selected_strategy,
+                profile=live_profile,
+                run=selected_run,
+                signal_journal=signal_journal,
+                execution_outcomes=execution_outcomes,
+            ),
             compatibility_readiness=compatibility_readiness,
             market_readiness=market_readiness,
             exchange_account_readiness=account_readiness,
@@ -1241,6 +1251,7 @@ def _build_selected_strategy(
     *,
     strategy: Strategy | None,
     run: StrategyRun | None,
+    profile: LiveStrategyProfile | None,
     generated_at: datetime,
     requested_strategy_id: str | None,
 ) -> StrategyDashboardSelectedStrategyResponse:
@@ -1281,6 +1292,11 @@ def _build_selected_strategy(
     exchange, market_type, symbol = _parse_instrument_key(strategy.spec.instrument_key)
     is_live = run is not None and run.is_active()
     latest_update = run.updated_at if run is not None else strategy.created_at
+    capital_usdt = (
+        float(profile.max_notional_per_run)
+        if profile is not None and profile.max_notional_per_run > Decimal("0")
+        else None
+    )
     return StrategyDashboardSelectedStrategyResponse(
         source="strategy_strategies",
         state="ready",
@@ -1292,7 +1308,7 @@ def _build_selected_strategy(
         symbols=[symbol],
         timeframe=strategy.spec.timeframe.code,
         direction="long / short",
-        capital_usdt=None,
+        capital_usdt=capital_usdt,
         commission_percent=None,
         slippage_percent=None,
         created_at=strategy.created_at,
@@ -1371,6 +1387,104 @@ def _build_live_profile(
             else profile.readiness_reason
         ),
     )
+
+
+def _build_runtime_status(
+    *,
+    strategy: Strategy | None,
+    profile: LiveStrategyProfile | None,
+    run: StrategyRun | None,
+    signal_journal: StrategySignalJournalResponse,
+    execution_outcomes: StrategyExecutionOutcomeLinksResponse,
+) -> StrategyDashboardRuntimeStatusResponse:
+    environment = _runtime_environment(profile=profile)
+    latest_signal_at = _latest_signal_at(signal_journal=signal_journal)
+    latest_source_event_at = _latest_source_event_at(execution_outcomes=execution_outcomes)
+    latest_execution_update_at = _latest_execution_update_at(
+        execution_outcomes=execution_outcomes
+    )
+    observed_gap = _runtime_observed_gap_seconds(
+        latest_source_event_at=latest_source_event_at,
+        latest_execution_update_at=latest_execution_update_at,
+    )
+    if strategy is None:
+        return StrategyDashboardRuntimeStatusResponse(
+            source=_RUNTIME_METADATA_SOURCE,
+            state="empty",
+            environment="unknown",
+            producer_status="unknown",
+            producer_reason="selected_strategy_not_found",
+            mainnet_available=False,
+            run_id=None,
+            run_state=None,
+            run_started_at=None,
+            run_updated_at=None,
+            checkpoint_ts_open=None,
+            warmup_progress=None,
+            latest_signal_at=latest_signal_at,
+            latest_source_event_at=latest_source_event_at,
+            latest_execution_update_at=latest_execution_update_at,
+            observed_latency_gap_seconds=observed_gap,
+            observed_latency_gap_status=(
+                "observed" if observed_gap is not None else "unavailable"
+            ),
+            degradation_reason="selected_strategy_not_found",
+        )
+
+    producer_status: Literal["running", "stopped", "blocked", "unknown"] = "stopped"
+    producer_reason = "no_active_run"
+    panel_state: PanelState = "ready"
+    degradation_reason = None
+    if environment == "mainnet_unavailable":
+        producer_status = "blocked"
+        producer_reason = "mainnet_unavailable"
+        panel_state = "degraded"
+        degradation_reason = producer_reason
+    elif profile is not None and profile.readiness_status != "ready":
+        producer_status = "blocked"
+        producer_reason = profile.readiness_reason
+        panel_state = "degraded"
+        degradation_reason = producer_reason
+    elif run is not None and run.is_active():
+        producer_status = "running"
+        producer_reason = run.state
+    elif profile is None:
+        producer_reason = "live_profile_not_created_default_monitor_only"
+
+    return StrategyDashboardRuntimeStatusResponse(
+        source=_RUNTIME_METADATA_SOURCE,
+        state=panel_state,
+        environment=environment,
+        producer_status=producer_status,
+        producer_reason=producer_reason,
+        mainnet_available=False,
+        run_id=str(run.run_id) if run is not None else None,
+        run_state=run.state if run is not None else None,
+        run_started_at=run.started_at if run is not None else None,
+        run_updated_at=run.updated_at if run is not None else None,
+        checkpoint_ts_open=run.checkpoint_ts_open if run is not None else None,
+        warmup_progress=(
+            _format_warmup_progress(run.metadata_json) if run is not None else None
+        ),
+        latest_signal_at=latest_signal_at,
+        latest_source_event_at=latest_source_event_at,
+        latest_execution_update_at=latest_execution_update_at,
+        observed_latency_gap_seconds=observed_gap,
+        observed_latency_gap_status="observed" if observed_gap is not None else "unavailable",
+        degradation_reason=degradation_reason,
+    )
+
+
+def _runtime_environment(
+    *, profile: LiveStrategyProfile | None
+) -> Literal["monitor_only", "paper", "testnet", "mainnet_unavailable", "unknown"]:
+    if profile is None:
+        return "monitor_only"
+    if profile.mode == "live":
+        return "mainnet_unavailable"
+    if profile.mode in {"monitor_only", "paper", "testnet"}:
+        return profile.mode
+    return "unknown"
 
 
 def _build_empty_compatibility(
@@ -1465,6 +1579,45 @@ def _selected_symbol(*, strategy: Strategy | None) -> str | None:
         return None
     _exchange, _market_type, symbol = _parse_instrument_key(strategy.spec.instrument_key)
     return symbol
+
+
+def _latest_signal_at(
+    *, signal_journal: StrategySignalJournalResponse
+) -> datetime | None:
+    timestamps = [
+        item.created_at or item.bar_ts_close
+        for item in signal_journal.items
+        if item.created_at is not None or item.bar_ts_close is not None
+    ]
+    return max(timestamps) if timestamps else None
+
+
+def _latest_source_event_at(
+    *, execution_outcomes: StrategyExecutionOutcomeLinksResponse
+) -> datetime | None:
+    timestamps = [
+        item.source_event_received_at
+        for item in execution_outcomes.items
+        if item.source_event_received_at is not None
+    ]
+    return max(timestamps) if timestamps else None
+
+
+def _latest_execution_update_at(
+    *, execution_outcomes: StrategyExecutionOutcomeLinksResponse
+) -> datetime | None:
+    timestamps = [item.updated_at for item in execution_outcomes.items]
+    return max(timestamps) if timestamps else None
+
+
+def _runtime_observed_gap_seconds(
+    *,
+    latest_source_event_at: datetime | None,
+    latest_execution_update_at: datetime | None,
+) -> int | None:
+    if latest_source_event_at is None or latest_execution_update_at is None:
+        return None
+    return max(0, int((latest_execution_update_at - latest_source_event_at).total_seconds()))
 
 
 def _build_strategy_selector(
@@ -1795,10 +1948,12 @@ def _build_empty_execution_outcomes(*, reason: str) -> StrategyExecutionOutcomeL
 def _build_execution_outcome_link(
     *, link: ExecutionProducerOutcomeLink
 ) -> StrategyExecutionOutcomeLinkResponse:
+    latency_gap_seconds, latency_gap_status, latency_gap_reason = _link_latency_gap(link=link)
     return StrategyExecutionOutcomeLinkResponse(
         source_event_id=str(link.source_event_id),
         source_type=link.source_type,
         source_event_ref=link.source_event_ref,
+        source_event_received_at=link.source_event_received_at,
         strategy_signal_id=(
             str(link.strategy_signal_id) if link.strategy_signal_id is not None else None
         ),
@@ -1811,9 +1966,28 @@ def _build_execution_outcome_link(
         risk_reason=link.risk_reason,
         order_status=link.order_status,
         order_status_reason=link.order_status_reason,
+        fill_count=link.fill_count,
+        latest_fill_at=link.latest_fill_at,
+        reconciliation_status=link.reconciliation_status,
+        reconciliation_reason=link.reconciliation_reason,
         notification_event_type=link.notification_event_type,
         notification_reason=link.notification_reason,
+        latency_gap_seconds=latency_gap_seconds,
+        latency_gap_status=latency_gap_status,
+        latency_gap_reason=latency_gap_reason,
         updated_at=link.updated_at,
+    )
+
+
+def _link_latency_gap(
+    *, link: ExecutionProducerOutcomeLink
+) -> tuple[int | None, Literal["observed", "unavailable"], str | None]:
+    if link.source_event_received_at is None:
+        return None, "unavailable", "source_event_timestamp_unavailable"
+    return (
+        max(0, int((link.updated_at - link.source_event_received_at).total_seconds())),
+        "observed",
+        "source_event_to_latest_update",
     )
 
 

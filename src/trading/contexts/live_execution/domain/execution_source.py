@@ -130,6 +130,7 @@ class ExecutionProducerOutcomeLink:
     owner_user_id: UserId
     source_type: ExecutionSourceType
     source_event_ref: str
+    source_event_received_at: datetime | None
     strategy_signal_id: UUID | None
     outcome: str
     outcome_reason: str
@@ -140,6 +141,10 @@ class ExecutionProducerOutcomeLink:
     risk_reason: str | None
     order_status: str | None
     order_status_reason: str | None
+    fill_count: int | None
+    latest_fill_at: datetime | None
+    reconciliation_status: str | None
+    reconciliation_reason: str | None
     notification_event_type: str | None
     notification_reason: str | None
     updated_at: datetime

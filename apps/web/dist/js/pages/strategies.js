@@ -74,6 +74,24 @@ function valueOrUnavailable(value) {
   return value;
 }
 
+function durationText(seconds) {
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+    return "--";
+  }
+  const totalSeconds = Math.max(0, Math.round(Number(seconds)));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainderSeconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return remainderSeconds ? `${minutes}m ${remainderSeconds}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainderMinutes = minutes % 60;
+  return remainderMinutes ? `${hours}h ${remainderMinutes}m` : `${hours}h`;
+}
+
 function financialClass(direction) {
   if (direction === "positive") {
     return "rh-financial--positive";
@@ -189,6 +207,7 @@ function renderSelected(root, selected) {
   setText("[data-selected-name]", selected?.name || t("common.unavailable"), root);
   setText("[data-selected-version]", selected?.version || "--", root);
   setText("[data-selected-exchange]", selected?.exchange || t("common.unavailable"), root);
+  setText("[data-selected-market]", selected?.market_type || "--", root);
   setText("[data-selected-symbols]", (selected?.symbols || []).join(", ") || "--", root);
   setText("[data-selected-capital]", valueOrUnavailable(selected?.capital_usdt), root);
   setText("[data-selected-commission]", valueOrUnavailable(selected?.commission_percent), root);
@@ -222,6 +241,36 @@ function setButtonDisabled(root, selector, disabled) {
   const button = qs(selector, root);
   if (button instanceof HTMLButtonElement) {
     button.disabled = disabled;
+  }
+}
+
+function renderRuntimeStatus(root, runtimeStatus) {
+  const gapStatus = runtimeStatus?.observed_latency_gap_status || "unavailable";
+  const gapValue = runtimeStatus?.observed_latency_gap_seconds;
+  setText("[data-runtime-environment]", runtimeStatus?.environment || "unknown", root);
+  setText(
+    "[data-runtime-producer]",
+    `${runtimeStatus?.producer_status || "unknown"}: ${runtimeStatus?.producer_reason || "--"}`,
+    root,
+  );
+  setText("[data-runtime-run]", runtimeStatus?.run_state || "--", root);
+  setText("[data-runtime-started]", localTime(runtimeStatus?.run_started_at), root);
+  setText("[data-runtime-updated]", localTime(runtimeStatus?.run_updated_at), root);
+  setText("[data-runtime-checkpoint]", localTime(runtimeStatus?.checkpoint_ts_open), root);
+  setText("[data-runtime-warmup]", runtimeStatus?.warmup_progress || "--", root);
+  setText("[data-runtime-mainnet]", runtimeStatus?.mainnet_available ? "available" : t("common.unavailable"), root);
+  setText("[data-runtime-latest-signal]", localTime(runtimeStatus?.latest_signal_at), root);
+  setText("[data-runtime-latest-source]", localTime(runtimeStatus?.latest_source_event_at), root);
+  setText("[data-runtime-latest-execution]", localTime(runtimeStatus?.latest_execution_update_at), root);
+  setText(
+    "[data-runtime-latency-gap]",
+    gapStatus === "observed" ? durationText(gapValue) : "--",
+    root,
+  );
+  const panel = qs(".strategies-runtime-status", root);
+  if (panel instanceof HTMLElement) {
+    panel.dataset.readiness = runtimeStatus?.producer_status || "unknown";
+    panel.dataset.environment = runtimeStatus?.environment || "unknown";
   }
 }
 
@@ -661,16 +710,19 @@ function renderExecutionOutcomes(root, executionOutcomes) {
   );
   const items = executionOutcomes?.items || [];
   if (!items.length) {
-    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="5">${escapeHtml(panelStatusText(executionOutcomes?.state, executionOutcomes?.degradation_reason, executionOutcomes?.source))}</td></tr>`;
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="8">${escapeHtml(panelStatusText(executionOutcomes?.state, executionOutcomes?.degradation_reason, executionOutcomes?.source))}</td></tr>`;
     return;
   }
   target.innerHTML = items
     .map((item) => `
       <tr data-source-event-id="${escapeHtml(item.source_event_id)}">
         <td>${escapeHtml(item.strategy_signal_id || item.source_event_ref)}</td>
-        <td>${escapeHtml(`${item.source_type}: ${item.outcome} / ${item.outcome_reason}`)}</td>
+        <td>${escapeHtml(`${item.source_type}: ${item.outcome} / ${item.outcome_reason}`)}<br><span class="strategies-source-cell">${escapeHtml(localTime(item.source_event_received_at))}</span></td>
         <td>${escapeHtml(item.intent_id ? `${item.intent_status || "--"} / ${item.risk_reason || "--"}` : "--")}</td>
         <td>${escapeHtml(item.order_status ? `${item.order_status} / ${item.order_status_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.fill_count === null || item.fill_count === undefined ? "--" : `${item.fill_count} / ${localTime(item.latest_fill_at)}`)}</td>
+        <td>${escapeHtml(item.reconciliation_status ? `${item.reconciliation_status} / ${item.reconciliation_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.latency_gap_status === "observed" ? durationText(item.latency_gap_seconds) : "--")}</td>
         <td>${escapeHtml(item.notification_event_type ? `${item.notification_event_type} / ${item.notification_reason || "--"}` : "--")}</td>
       </tr>
     `)
@@ -712,6 +764,7 @@ function renderFreshness(summary) {
 
 function renderDashboard(root, summary, state = {}) {
   renderSelected(root, summary.selected_strategy);
+  renderRuntimeStatus(root, summary.runtime_status);
   renderLiveProfile(root, summary.live_profile);
   renderCompatibilityReadiness(root, summary.compatibility_readiness);
   renderMarketReadiness(root, summary.market_readiness);

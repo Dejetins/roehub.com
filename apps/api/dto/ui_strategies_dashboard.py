@@ -11,6 +11,14 @@ RefreshStatus = Literal["fresh", "degraded", "rate_limited"]
 FinancialDirection = Literal["positive", "negative", "neutral"]
 PanelState = Literal["ready", "empty", "degraded", "unavailable"]
 StrategyRunStatus = Literal["live", "stopped", "degraded", "unknown"]
+StrategyRuntimeEnvironment = Literal[
+    "monitor_only",
+    "paper",
+    "testnet",
+    "mainnet_unavailable",
+    "unknown",
+]
+StrategyProducerStatus = Literal["running", "stopped", "blocked", "unknown"]
 
 
 class StrategyDashboardSourceResponse(BaseModel):
@@ -75,6 +83,29 @@ class StrategyDashboardLiveProfileResponse(BaseModel):
     readiness_status: Literal["ready", "blocked"]
     readiness_reason: str
     updated_at: datetime | None
+    degradation_reason: str | None = None
+
+
+class StrategyDashboardRuntimeStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    environment: StrategyRuntimeEnvironment
+    producer_status: StrategyProducerStatus
+    producer_reason: str
+    mainnet_available: bool
+    run_id: str | None
+    run_state: str | None
+    run_started_at: datetime | None
+    run_updated_at: datetime | None
+    checkpoint_ts_open: datetime | None
+    warmup_progress: str | None
+    latest_signal_at: datetime | None
+    latest_source_event_at: datetime | None
+    latest_execution_update_at: datetime | None
+    observed_latency_gap_seconds: int | None
+    observed_latency_gap_status: Literal["observed", "unavailable"]
     degradation_reason: str | None = None
 
 
@@ -398,6 +429,7 @@ class StrategyExecutionOutcomeLinkResponse(BaseModel):
     source_event_id: str
     source_type: str
     source_event_ref: str
+    source_event_received_at: datetime | None
     strategy_signal_id: str | None
     outcome: str
     outcome_reason: str
@@ -408,8 +440,15 @@ class StrategyExecutionOutcomeLinkResponse(BaseModel):
     risk_reason: str | None
     order_status: str | None
     order_status_reason: str | None
+    fill_count: int | None
+    latest_fill_at: datetime | None
+    reconciliation_status: str | None
+    reconciliation_reason: str | None
     notification_event_type: str | None
     notification_reason: str | None
+    latency_gap_seconds: int | None
+    latency_gap_status: Literal["observed", "unavailable"]
+    latency_gap_reason: str | None
     updated_at: datetime
 
 
@@ -458,6 +497,7 @@ class StrategyDashboardResponse(BaseModel):
     sources: list[StrategyDashboardSourceResponse]
     selected_strategy: StrategyDashboardSelectedStrategyResponse
     live_profile: StrategyDashboardLiveProfileResponse
+    runtime_status: StrategyDashboardRuntimeStatusResponse
     compatibility_readiness: StrategyDashboardCompatibilityReadinessResponse
     market_readiness: StrategyDashboardMarketReadinessResponse
     exchange_account_readiness: StrategyDashboardExchangeAccountReadinessResponse

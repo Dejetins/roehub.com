@@ -423,6 +423,7 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
                 e.owner_user_id,
                 e.source_type,
                 e.source_event_ref,
+                e.received_at AS source_event_received_at,
                 e.strategy_signal_id,
                 e.outcome,
                 e.outcome_reason,
@@ -433,15 +434,38 @@ class PostgresExecutionIntentRepository(ExecutionIntentRepository):
                 i.risk_reason,
                 o.status AS order_status,
                 o.status_reason AS order_status_reason,
+                fill_summary.fill_count,
+                fill_summary.latest_fill_at,
+                reconciliation.status AS reconciliation_status,
+                reconciliation.reason AS reconciliation_reason,
                 n.event_type AS notification_event_type,
                 n.reason AS notification_reason,
-                COALESCE(o.updated_at, i.dispatch_updated_at, i.created_at, e.received_at)
+                COALESCE(
+                    reconciliation.completed_at,
+                    fill_summary.latest_fill_at,
+                    o.updated_at,
+                    i.dispatch_updated_at,
+                    i.created_at,
+                    e.received_at
+                )
                     AS updated_at
             FROM execution_source_events e
             LEFT JOIN execution_intents i
               ON i.intent_id = e.intent_id
             LEFT JOIN execution_orders o
               ON o.intent_id = i.intent_id
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*)::int AS fill_count, MAX(ef.filled_at) AS latest_fill_at
+                FROM execution_fills ef
+                WHERE ef.order_id = o.order_id
+            ) fill_summary ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT er.status, er.reason, er.completed_at
+                FROM execution_reconciliation_runs er
+                WHERE er.order_id = o.order_id
+                ORDER BY er.completed_at DESC NULLS LAST, er.started_at DESC
+                LIMIT 1
+            ) reconciliation ON TRUE
             LEFT JOIN LATERAL (
                 SELECT event_type, reason
                 FROM execution_notification_outbox n
@@ -643,6 +667,7 @@ def _map_producer_link(row: Mapping[str, Any]) -> ExecutionProducerOutcomeLink:
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         source_type=str(row["source_type"]),  # type: ignore[arg-type]
         source_event_ref=str(row["source_event_ref"]),
+        source_event_received_at=_datetime_or_none(row.get("source_event_received_at")),
         strategy_signal_id=_uuid_or_none(row.get("strategy_signal_id")),
         outcome=str(row["outcome"]),
         outcome_reason=str(row["outcome_reason"]),
@@ -653,6 +678,10 @@ def _map_producer_link(row: Mapping[str, Any]) -> ExecutionProducerOutcomeLink:
         risk_reason=_str_or_none(row.get("risk_reason")),
         order_status=_str_or_none(row.get("order_status")),
         order_status_reason=_str_or_none(row.get("order_status_reason")),
+        fill_count=_int_or_none(row.get("fill_count")),
+        latest_fill_at=_datetime_or_none(row.get("latest_fill_at")),
+        reconciliation_status=_str_or_none(row.get("reconciliation_status")),
+        reconciliation_reason=_str_or_none(row.get("reconciliation_reason")),
         notification_event_type=_str_or_none(row.get("notification_event_type")),
         notification_reason=_str_or_none(row.get("notification_reason")),
         updated_at=_datetime(row["updated_at"]),
@@ -681,6 +710,14 @@ def _datetime(value: object) -> datetime:
     if isinstance(value, datetime):
         return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     return datetime.fromisoformat(str(value))
+
+
+def _datetime_or_none(value: object) -> datetime | None:
+    return _datetime(value) if value is not None else None
+
+
+def _int_or_none(value: object) -> int | None:
+    return int(value) if value is not None else None
 
 
 def _str_or_none(value: object) -> str | None:

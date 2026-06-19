@@ -257,6 +257,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
                     owner_user_id=event.owner_user_id,
                     source_type=event.source_type,
                     source_event_ref=event.source_event_ref,
+                    source_event_received_at=event.received_at,
                     strategy_signal_id=event.strategy_signal_id,
                     outcome=event.outcome,
                     outcome_reason=event.outcome_reason,
@@ -267,6 +268,10 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
                     risk_reason=intent.risk_reason if intent is not None else None,
                     order_status=None,
                     order_status_reason=None,
+                    fill_count=None,
+                    latest_fill_at=None,
+                    reconciliation_status=None,
+                    reconciliation_reason=None,
                     notification_event_type=(
                         notification.event_type if notification is not None else None
                     ),

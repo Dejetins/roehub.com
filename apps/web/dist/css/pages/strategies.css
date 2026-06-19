@@ -382,6 +382,10 @@
   min-width: 980px;
 }
 
+.strategies-table--outcomes {
+  min-width: 1080px;
+}
+
 .strategies-table th,
 .strategies-table td {
   padding: 5px 7px;
@@ -431,6 +435,7 @@
   scrollbar-gutter: stable;
 }
 
+.strategies-runtime-status,
 .strategies-live-profile,
 .strategies-market-readiness,
 .strategies-account-readiness,
@@ -442,6 +447,7 @@
   border-top: 1px solid var(--rh-divider);
 }
 
+.strategies-runtime-status header,
 .strategies-live-profile header,
 .strategies-market-readiness header,
 .strategies-account-readiness header,
@@ -453,6 +459,7 @@
   min-width: 0;
 }
 
+.strategies-runtime-status h3,
 .strategies-live-profile h3,
 .strategies-market-readiness h3,
 .strategies-account-readiness h3,
@@ -471,6 +478,8 @@
   color: var(--rh-financial-negative);
 }
 
+.strategies-runtime-status[data-readiness="blocked"] .strategies-pill,
+.strategies-runtime-status[data-readiness="unknown"] .strategies-pill,
 .strategies-market-readiness[data-readiness="blocked"] .strategies-pill,
 .strategies-market-readiness[data-readiness="missing"] .strategies-pill,
 .strategies-market-readiness[data-readiness="stale"] .strategies-pill,
@@ -740,6 +749,10 @@
 
   .strategies-table--signals {
     min-width: 720px;
+  }
+
+  .strategies-table--outcomes {
+    min-width: 760px;
   }
 
   .strategies-empty-row,
