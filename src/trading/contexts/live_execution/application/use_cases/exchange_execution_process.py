@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Mapping
@@ -113,8 +114,11 @@ class ExchangeExecutionProcessService:
         on_order_submit: Callable[[str, str], None] | None = None,
         on_private_stream: Callable[[str, str], None] | None = None,
         on_order_latency: Callable[[str, float], None] | None = None,
+        on_rate_limit_wait: Callable[[str, str, float], None] | None = None,
         on_reconciliation: Callable[[str, str], None] | None = None,
         on_notification: Callable[[str, str, str], None] | None = None,
+        rate_limit_monotonic: Callable[[], float] | None = None,
+        rate_limit_sleep: Callable[[float], None] | None = None,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExchangeExecutionProcessService requires repository")
@@ -137,8 +141,20 @@ class ExchangeExecutionProcessService:
         self._on_order_submit = on_order_submit
         self._on_private_stream = on_private_stream
         self._on_order_latency = on_order_latency
+        self._on_rate_limit_wait = on_rate_limit_wait
         self._on_reconciliation = on_reconciliation
         self._on_notification = on_notification
+        self._rate_limit_monotonic = rate_limit_monotonic or time.monotonic
+        self._rate_limit_sleep = rate_limit_sleep or time.sleep
+        self._rate_limiters: dict[str, _ExchangeRateLimiter] = {
+            exchange: _ExchangeRateLimiter(
+                per_second=self._config.rate_limit_per_second,
+                burst=self._config.rate_limit_burst,
+                monotonic=self._rate_limit_monotonic,
+                sleep=self._rate_limit_sleep,
+            )
+            for exchange in self._config.enabled_exchanges
+        }
 
     def readiness(self) -> ExchangeExecutionHealthSnapshot:
         now = self._clock.now()
@@ -573,7 +589,10 @@ class ExchangeExecutionProcessService:
             exchange_name=connection.exchange_name,
             environment=connection.environment,
         )
-        clock_reason = self._exchange_clock_guard_reason(adapter=adapter)
+        clock_reason = self._exchange_clock_guard_reason(
+            adapter=adapter,
+            exchange=connection.exchange_name,
+        )
         if clock_reason is not None:
             order = self._order_repository.record_guard_rejection(
                 command=command,
@@ -602,6 +621,10 @@ class ExchangeExecutionProcessService:
             metadata={"source": "redis_dispatch"},
         )
         try:
+            self._acquire_rate_limit(
+                exchange=connection.exchange_name,
+                operation="private_stream",
+            )
             session = adapter.ensure_private_stream_session(connection=connection)
             self._order_repository.record_private_stream_session(
                 connection_id=connection.connection_id,
@@ -618,6 +641,10 @@ class ExchangeExecutionProcessService:
             self._record_private_stream(
                 exchange=connection.exchange_name,
                 reason=session.status_reason,
+            )
+            self._acquire_rate_limit(
+                exchange=connection.exchange_name,
+                operation="submit",
             )
             submitted = adapter.submit_order(
                 command=command,
@@ -649,6 +676,10 @@ class ExchangeExecutionProcessService:
                 exchange=connection.exchange_name,
                 latency_ms=submitted.latency_ms,
             )
+            self._acquire_rate_limit(
+                exchange=connection.exchange_name,
+                operation="status",
+            )
             status = adapter.get_order_status(
                 command=command,
                 exchange_order_id=submitted.exchange_order_id,
@@ -671,8 +702,12 @@ class ExchangeExecutionProcessService:
                     order=status_order,
                     status_result=status,
                     reason=_reconciliation_reason(order=status_order, status_result=status),
-                )
+            )
             if self._config.cancel_after_submit:
+                self._acquire_rate_limit(
+                    exchange=connection.exchange_name,
+                    operation="cancel",
+                )
                 cancelled = adapter.cancel_order(
                     command=command,
                     exchange_order_id=submitted.exchange_order_id,
@@ -910,8 +945,11 @@ class ExchangeExecutionProcessService:
                 recorded.severity,
             )
 
-    def _exchange_clock_guard_reason(self, *, adapter: ExchangeOrderAdapter) -> str | None:
+    def _exchange_clock_guard_reason(
+        self, *, adapter: ExchangeOrderAdapter, exchange: str
+    ) -> str | None:
         try:
+            self._acquire_rate_limit(exchange=exchange, operation="server_time")
             server_time_ms = adapter.server_time_ms()
         except ExchangeOrderAdapterError as error:
             return error.reason
@@ -945,9 +983,33 @@ class ExchangeExecutionProcessService:
         if self._on_order_latency is not None:
             self._on_order_latency(exchange, latency_ms)
 
+    def _record_rate_limit_wait(
+        self, *, exchange: str, operation: str, wait_seconds: float
+    ) -> None:
+        if self._on_rate_limit_wait is not None:
+            self._on_rate_limit_wait(exchange, operation, wait_seconds)
+
     def _record_reconciliation_metric(self, *, status: str, reason: str) -> None:
         if self._on_reconciliation is not None:
             self._on_reconciliation(status, reason)
+
+    def _acquire_rate_limit(self, *, exchange: str, operation: str) -> None:
+        limiter = self._rate_limiters.get(exchange)
+        if limiter is None:
+            limiter = _ExchangeRateLimiter(
+                per_second=self._config.rate_limit_per_second,
+                burst=self._config.rate_limit_burst,
+                monotonic=self._rate_limit_monotonic,
+                sleep=self._rate_limit_sleep,
+            )
+            self._rate_limiters[exchange] = limiter
+        wait_seconds = limiter.acquire()
+        if wait_seconds > 0:
+            self._record_rate_limit_wait(
+                exchange=exchange,
+                operation=operation,
+                wait_seconds=wait_seconds,
+            )
 
 
 def _rollup_status(
@@ -1022,6 +1084,43 @@ def _reconciliation_reason(
     if status_result.funding_events:
         return "futures_order_status_fills_funding_matched"
     return "funding_reconciliation_pending"
+
+
+class _ExchangeRateLimiter:
+    def __init__(
+        self,
+        *,
+        per_second: float,
+        burst: int,
+        monotonic: Callable[[], float],
+        sleep: Callable[[float], None],
+    ) -> None:
+        self._per_second = per_second
+        self._burst = float(burst)
+        self._monotonic = monotonic
+        self._sleep = sleep
+        self._tokens = float(burst)
+        self._updated_at = monotonic()
+
+    def acquire(self) -> float:
+        now = self._monotonic()
+        self._refill(now=now)
+        if self._tokens >= 1.0:
+            self._tokens -= 1.0
+            return 0.0
+
+        wait_seconds = (1.0 - self._tokens) / self._per_second
+        self._sleep(wait_seconds)
+        now = self._monotonic()
+        self._refill(now=now)
+        self._tokens = max(0.0, self._tokens - 1.0)
+        return wait_seconds
+
+    def _refill(self, *, now: float) -> None:
+        elapsed = max(0.0, now - self._updated_at)
+        if elapsed > 0:
+            self._tokens = min(self._burst, self._tokens + elapsed * self._per_second)
+            self._updated_at = now
 
 
 def _bounded_metadata(value: object | None) -> Mapping[str, int | float | str]:

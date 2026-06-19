@@ -40,6 +40,32 @@ groups:
           runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
           action: Check exchange_private_stream_sessions, execution_order_events, and execution_reconciliation_runs for the affected connection.
 
+      - alert: LiveExecutionLimiterWaitHigh
+        expr: histogram_quantile(0.99, sum by (le, exchange) (rate(exchange_execution_rate_limit_wait_seconds_bucket{job="exchange-execution"}[5m]))) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          owner: live-execution
+        annotations:
+          summary: Exchange-execution limiter waits are high
+          description: The p99 limiter wait before native adapter calls stayed above 250 ms for at least one exchange.
+          escalation: Keep producer allowlists narrow, inspect strategy count and exchange-execution queue lag, then lower production fan-out if waits keep rising.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Compare limiter wait histogram, XINFO/XPENDING, submit latency, and recent strategy producer source-event counts.
+
+      - alert: LiveExecutionSubmitLatencyHigh
+        expr: histogram_quantile(0.99, sum by (le, exchange) (rate(exchange_execution_submit_latency_ms_bucket{job="exchange-execution"}[5m]))) > 5000
+        for: 5m
+        labels:
+          severity: warning
+          owner: live-execution
+        annotations:
+          summary: Exchange-execution native adapter latency is high
+          description: The p99 native adapter submit/status/cancel latency stayed above 5000 ms for at least one exchange.
+          escalation: Pause new load expansion, verify provider/testnet health, Redis lag, and reconciliation state before increasing strategy count.
+          runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
+          action: Check exchange_execution_submit_latency_ms, execution_reconciliation_total, and exchange order events for pending or unknown states.
+
       - alert: LiveExecutionDispatchBackpressure
         expr: max(exchange_execution_dependency_ready{job="exchange-execution",dependency="backpressure",status="degraded",reason="dispatch_backpressure"}) == 0
         for: 2m

@@ -152,6 +152,19 @@ class ExchangeExecutionMetrics:
             ("exchange",),
             registry=self.registry,
         )
+        self.rate_limit_wait_total = Counter(
+            "exchange_execution_rate_limit_wait_total",
+            "Exchange-execution limiter waits before native adapter operations.",
+            ("exchange", "operation"),
+            registry=self.registry,
+        )
+        self.rate_limit_wait_seconds = Histogram(
+            "exchange_execution_rate_limit_wait_seconds",
+            "Exchange-execution limiter wait duration before native adapter operations.",
+            ("exchange", "operation"),
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
+            registry=self.registry,
+        )
         self.reconciliation_total = Counter(
             "execution_reconciliation_total",
             "Execution order reconciliation outcomes by status and reason.",
@@ -221,6 +234,12 @@ class ExchangeExecutionMetrics:
 
     def record_order_latency(self, exchange: str, latency_ms: float) -> None:
         self.submit_latency_ms.labels(exchange=exchange).observe(latency_ms)
+
+    def record_rate_limit_wait(self, exchange: str, operation: str, wait_seconds: float) -> None:
+        self.rate_limit_wait_total.labels(exchange=exchange, operation=operation).inc()
+        self.rate_limit_wait_seconds.labels(exchange=exchange, operation=operation).observe(
+            wait_seconds
+        )
 
     def record_reconciliation(self, status: str, reason: str) -> None:
         self.reconciliation_total.labels(status=status, reason=reason).inc()
@@ -408,6 +427,7 @@ def build_runtime(
         on_order_submit=metrics.record_order_submit,
         on_private_stream=metrics.record_private_stream,
         on_order_latency=metrics.record_order_latency,
+        on_rate_limit_wait=metrics.record_rate_limit_wait,
         on_reconciliation=metrics.record_reconciliation,
         on_notification=metrics.record_notification,
     )

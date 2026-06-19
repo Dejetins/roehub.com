@@ -94,6 +94,8 @@ def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
         "LiveExecutionDlqGrowing",
         "LiveExecutionClockDriftUnsafe",
         "LiveExecutionPrivateStreamMissingForSubmit",
+        "LiveExecutionLimiterWaitHigh",
+        "LiveExecutionSubmitLatencyHigh",
         "LiveExecutionDispatchBackpressure",
         "LiveExecutionReconciliationPending",
         "LiveExecutionPitrNotVerified",

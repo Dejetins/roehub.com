@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from prometheus_client import generate_latest
 
-from apps.exchange_execution.main.app import create_app
+from apps.exchange_execution.main.app import ExchangeExecutionMetrics, create_app
 
 
 def test_exchange_execution_health_ready_and_metrics_with_disabled_redis() -> None:
@@ -34,6 +35,22 @@ def test_exchange_execution_health_ready_and_metrics_with_disabled_redis() -> No
     }
     assert metrics.status_code == 200
     assert "exchange_execution_adapter_disabled 1.0" in metrics.text
+
+
+def test_exchange_execution_metrics_record_rate_limit_waits() -> None:
+    metrics = ExchangeExecutionMetrics()
+
+    metrics.record_rate_limit_wait("bybit", "submit", 0.125)
+
+    payload = generate_latest(metrics.registry).decode("utf-8")
+    assert (
+        'exchange_execution_rate_limit_wait_total{exchange="bybit",operation="submit"} 1.0'
+        in payload
+    )
+    assert (
+        'exchange_execution_rate_limit_wait_seconds_sum{exchange="bybit",operation="submit"} '
+        "0.125"
+    ) in payload
 
 
 def test_exchange_execution_run_once_reports_redis_unavailable() -> None:

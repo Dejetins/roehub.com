@@ -45,6 +45,19 @@ class _Clock:
         return value
 
 
+class _LimiterClock:
+    def __init__(self) -> None:
+        self._now = 0.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self._now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self._now += seconds
+
+
 class _Consumer:
     def __init__(
         self,
@@ -271,6 +284,59 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
     assert order_repository.reconciliation_runs[0].status == "matched"
     assert order_repository.reconciliation_runs[0].reason == "spot_order_status_and_fills_matched"
     assert adapter.submitted == 1
+
+
+def test_testnet_adapter_respects_rate_limit_before_adapter_calls() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    limiter_clock = _LimiterClock()
+    waits: list[tuple[str, str, float]] = []
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=False,
+            max_clock_drift_ms=10_000,
+            rate_limit_per_second=1.0,
+            rate_limit_burst=1,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(_Adapter(exchange_name="bybit"),),
+        consumer=consumer,
+        clock=_Clock(),
+        on_rate_limit_wait=lambda exchange, operation, wait: waits.append(
+            (exchange, operation, wait)
+        ),
+        rate_limit_monotonic=limiter_clock.monotonic,
+        rate_limit_sleep=limiter_clock.sleep,
+    )
+
+    result = service.run_once()
+
+    assert result.submitted_count == 1
+    assert [operation for _exchange, operation, _wait in waits] == [
+        "private_stream",
+        "submit",
+        "status",
+    ]
+    assert [round(wait, 3) for _exchange, _operation, wait in waits] == [1.0, 1.0, 1.0]
+    assert limiter_clock.sleeps == [1.0, 1.0, 1.0]
 
 
 def test_testnet_adapter_canary_can_record_fill_without_cancel() -> None:
