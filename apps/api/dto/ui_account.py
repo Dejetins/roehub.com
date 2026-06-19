@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -82,6 +83,14 @@ class CreateExchangeConnectionMarketRequest(BaseModel):
     label: str | None = Field(default=None, max_length=80)
 
 
+class ConfigureExchangeAccountRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instrument_key: str = Field(min_length=1, max_length=80)
+    margin_mode: Literal["isolated", "cross"] = "isolated"
+    leverage: Decimal = Field(default=Decimal("1"), ge=Decimal("1"), le=Decimal("125"))
+
+
 class ExchangeConnectionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -153,6 +162,24 @@ class ExchangeConnectionsResponse(BaseModel):
 
     items: list[ExchangeConnectionResponse]
     next_cursor: str | None = None
+
+
+class ConfigureExchangeAccountResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exchange_name: ExchangeNameValue
+    market_type: ExchangeMarketTypeValue
+    environment: ExchangeEnvironmentValue
+    instrument_key: str
+    target_margin_mode: Literal["isolated", "cross"]
+    target_leverage: str
+    observed_margin_mode: str | None
+    observed_leverage: str | None
+    observed_position_mode: str | None
+    account_mode: str
+    sync_status: Literal["fresh", "degraded"]
+    sync_reason: str
+    observed_at: datetime
 
 
 class CreateStrategyExchangeBindingRequest(BaseModel):

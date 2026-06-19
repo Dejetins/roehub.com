@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Literal, Protocol
 
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialPlaintext,
@@ -75,6 +75,35 @@ class ExchangeAccountStateReadResult:
     sync_reason: str = "account_state_read_ok"
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeAccountConfigWriteRequest:
+    exchange_name: str
+    market_type: str
+    environment: str
+    credential: ExchangeCredentialPlaintext
+    instrument_key: str
+    target_margin_mode: Literal["isolated", "cross"]
+    target_leverage: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class ExchangeAccountConfigWriteResult:
+    exchange_name: str
+    market_type: str
+    environment: str
+    instrument_key: str
+    target_margin_mode: str
+    target_leverage: Decimal
+    observed_margin_mode: str | None
+    observed_leverage: Decimal | None
+    observed_position_mode: str | None
+    account_mode: str
+    observed_at: datetime
+    source_hash: str
+    sync_status: Literal["fresh", "degraded"] = "fresh"
+    sync_reason: str = "account_config_write_ok"
+
+
 class ExchangeAccountStateReader(Protocol):
     requires_plaintext: bool
 
@@ -84,3 +113,14 @@ class ExchangeAccountStateReader(Protocol):
         request: ExchangeAccountStateReadRequest,
         now: datetime,
     ) -> ExchangeAccountStateReadResult: ...
+
+
+class ExchangeAccountConfigurator(Protocol):
+    requires_plaintext: bool
+
+    def configure_account(
+        self,
+        *,
+        request: ExchangeAccountConfigWriteRequest,
+        now: datetime,
+    ) -> ExchangeAccountConfigWriteResult: ...

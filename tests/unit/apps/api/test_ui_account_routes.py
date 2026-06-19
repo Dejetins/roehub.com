@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 from apps.api.common import register_api_error_handlers
 from apps.api.exchange_control_client import (
     ExchangeConnectionCommandResult,
+    ExchangeControlAccountConfigResult,
     ExchangeControlAccountStateSnapshot,
     ExchangeControlCapabilities,
     ExchangeControlClient,
@@ -156,6 +158,19 @@ class _ArchiveShouldNotRunClient:
         request_id: str | None = None,
     ) -> ExchangeControlAccountStateSnapshot:
         raise AssertionError("read_account_state must not run")
+
+    def configure_account(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_key: str,
+        margin_mode: str,
+        leverage: Decimal,
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountConfigResult:
+        _ = owner_user_id, connection_id, instrument_key, margin_mode, leverage, request_id
+        raise AssertionError("configure_account must not run")
 
 
 class _FuturesCreateFailureClient(InMemoryExchangeControlClient):
@@ -416,6 +431,65 @@ def test_ui_account_exchange_connections_create_market_from_existing() -> None:
     ]
     assert len(create_market_events) == 1
     assert create_market_events[0].metadata["result"] == "ready_for_trading"
+
+def test_ui_account_exchange_account_config_route_records_secret_safe_audit() -> None:
+    client, account_repository, session_ids = _build_test_client()
+    create_payload = {
+        "exchange_name": "bybit",
+        "market_type": "futures",
+        "environment": "testnet",
+        "label": "bybit_testnet",
+        "permissions": "trade",
+    }
+    create_payload["api_" + "key"] = "PUBLIC1234"
+    create_payload["api_" + "secret"] = "PRIVATE5678"
+    created = client.post(
+        "/ui/account/exchange-connections",
+        json=create_payload,
+        headers={"origin": "http://testserver"},
+    )
+    assert created.status_code == 201
+    connection_id = created.json()["connection_id"]
+
+    configured = client.post(
+        f"/ui/account/exchange-connections/{connection_id}/account-config",
+        json={
+            "instrument_key": "bybit:futures:BTCUSDT",
+            "margin_mode": "isolated",
+            "leverage": "1",
+        },
+        headers={"origin": "http://testserver"},
+    )
+
+    assert configured.status_code == 200
+    payload = configured.json()
+    assert payload["exchange_name"] == "bybit"
+    assert payload["market_type"] == "futures"
+    assert payload["target_margin_mode"] == "isolated"
+    assert payload["target_leverage"] == "1"
+    assert payload["observed_margin_mode"] == "isolated"
+    assert payload["observed_leverage"] == "1"
+    assert payload["sync_status"] == "fresh"
+    assert "PUBLIC1234" not in configured.text
+    assert "PRIVATE5678" not in configured.text
+
+    audit_events = account_repository.list_audit_events(
+        owner_user_id=session_ids["first_user_id"],
+        cursor=None,
+        limit=20,
+    ).items
+    config_events = [
+        event
+        for event in audit_events
+        if event.event_type == "exchange_account_configured"
+    ]
+    assert len(config_events) == 1
+    assert config_events[0].metadata["connection_id"] == connection_id
+    assert config_events[0].metadata["instrument_key"] == "bybit:futures:BTCUSDT"
+    assert config_events[0].metadata["target_margin_mode"] == "isolated"
+    assert config_events[0].metadata["observed_leverage"] == "1"
+    assert "PUBLIC1234" not in str(config_events[0].metadata)
+    assert "PRIVATE5678" not in str(config_events[0].metadata)
 
 
 def test_ui_account_exchange_connections_omni_create_returns_market_scoped_results() -> None:

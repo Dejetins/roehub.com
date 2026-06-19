@@ -11,7 +11,10 @@ from trading.contexts.exchange_control.adapters.outbound.exchange_account_state 
     HttpExchangeAccountStateReader,
 )
 from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountConfigWriteRequest,
     ExchangeAccountStateReadRequest,
+    ExchangeAccountStateReadResult,
+    ExchangePositionState,
 )
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialPlaintext,
@@ -195,6 +198,13 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
                     ]
                 },
             }
+        if "/v5/account/info" in url:
+            return {
+                "retCode": 0,
+                "result": {
+                    "marginMode": "ISOLATED_MARGIN",
+                },
+            }
         if "/v5/order/realtime" in url:
             assert "category=linear" in url
             assert "symbol=BTCUSDT" in url
@@ -212,7 +222,7 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
                             "size": "0",
                             "avgPrice": "0",
                             "leverage": "1",
-                            "tradeMode": 1,
+                            "tradeMode": 0,
                             "positionIdx": 0,
                         }
                     ]
@@ -262,3 +272,177 @@ def test_bybit_futures_reader_normalizes_config_guard_fields(
     assert result.instrument_filters[0].min_notional == Decimal("5")
     assert any("/v5/order/realtime" in call for call in calls)
     assert any("/v5/position/list" in call for call in calls)
+
+
+def test_binance_futures_configurator_sets_margin_and_leverage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reads = 0
+    posts: list[tuple[str, dict[str, str]]] = []
+
+    def fake_read_binance(
+        *,
+        request: ExchangeAccountStateReadRequest,
+        now: datetime,
+        timeout_seconds: float,
+        base_url: str,
+        symbols: tuple[str, ...],
+    ) -> ExchangeAccountStateReadResult:
+        nonlocal reads
+        _ = timeout_seconds, base_url, symbols
+        reads += 1
+        return ExchangeAccountStateReadResult(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            account_mode="futures",
+            balances=(),
+            positions=(
+                ExchangePositionState(
+                    instrument_key="binance:futures:BTCUSDT",
+                    side="net",
+                    quantity=Decimal("0"),
+                    leverage=Decimal("10") if reads == 1 else Decimal("1"),
+                    margin_mode="cross" if reads == 1 else "isolated",
+                    position_mode="one_way",
+                ),
+            ),
+            open_orders=(),
+            instrument_filters=(),
+            observed_at=now,
+            source_hash=f"read-{reads}",
+        )
+
+    def fake_post_binance(
+        *,
+        base_url: str,
+        path: str,
+        params: dict[str, str],
+        credential: ExchangeCredentialPlaintext,
+        timeout_seconds: float,
+        ok_negative_codes: frozenset[int] = frozenset(),
+    ) -> dict[str, object]:
+        _ = base_url, credential, timeout_seconds, ok_negative_codes
+        posts.append((path, params))
+        return {}
+
+    monkeypatch.setattr(
+        exchange_account_state,
+        "_read_binance_futures_account_state",
+        fake_read_binance,
+    )
+    monkeypatch.setattr(
+        exchange_account_state,
+        "_binance_post_signed_json_with_credential",
+        fake_post_binance,
+    )
+
+    result = HttpExchangeAccountStateReader().configure_account(
+        request=ExchangeAccountConfigWriteRequest(
+            exchange_name="binance",
+            market_type="futures",
+            environment="testnet",
+            credential=ExchangeCredentialPlaintext("public", "private"),
+            instrument_key="binance:futures:BTCUSDT",
+            target_margin_mode="isolated",
+            target_leverage=Decimal("1"),
+        ),
+        now=datetime(2026, 6, 19, 12, 0, tzinfo=UTC),
+    )
+
+    assert reads == 2
+    assert [path for path, _params in posts] == [
+        "/fapi/v1/marginType",
+        "/fapi/v1/leverage",
+    ]
+    assert posts[0][1] == {"symbol": "BTCUSDT", "marginType": "ISOLATED"}
+    assert posts[1][1] == {"symbol": "BTCUSDT", "leverage": "1"}
+    assert result.sync_status == "fresh"
+    assert result.observed_margin_mode == "isolated"
+    assert result.observed_leverage == Decimal("1")
+
+
+def test_bybit_futures_configurator_sets_account_mode_and_leverage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reads = 0
+    posts: list[tuple[str, dict[str, str]]] = []
+
+    def fake_read_bybit(
+        *,
+        request: ExchangeAccountStateReadRequest,
+        now: datetime,
+        timeout_seconds: float,
+    ) -> ExchangeAccountStateReadResult:
+        nonlocal reads
+        _ = timeout_seconds
+        reads += 1
+        return ExchangeAccountStateReadResult(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            account_mode="unified",
+            balances=(),
+            positions=(
+                ExchangePositionState(
+                    instrument_key="bybit:futures:BTCUSDT",
+                    side="net",
+                    quantity=Decimal("0"),
+                    leverage=Decimal("10") if reads == 1 else Decimal("1"),
+                    margin_mode="cross" if reads == 1 else "isolated",
+                    position_mode="one_way",
+                ),
+            ),
+            open_orders=(),
+            instrument_filters=(),
+            observed_at=now,
+            source_hash=f"read-{reads}",
+        )
+
+    def fake_post_bybit(
+        *,
+        base_url: str,
+        path: str,
+        body: dict[str, str],
+        credential: ExchangeCredentialPlaintext,
+        timeout_seconds: float,
+    ) -> dict[str, object]:
+        _ = base_url, credential, timeout_seconds
+        posts.append((path, body))
+        return {"retCode": 0}
+
+    monkeypatch.setattr(exchange_account_state, "_read_bybit_account_state", fake_read_bybit)
+    monkeypatch.setattr(
+        exchange_account_state,
+        "_bybit_post_signed_json_with_credential",
+        fake_post_bybit,
+    )
+
+    result = HttpExchangeAccountStateReader().configure_account(
+        request=ExchangeAccountConfigWriteRequest(
+            exchange_name="bybit",
+            market_type="futures",
+            environment="testnet",
+            credential=ExchangeCredentialPlaintext("public", "private"),
+            instrument_key="bybit:futures:BTCUSDT",
+            target_margin_mode="isolated",
+            target_leverage=Decimal("1"),
+        ),
+        now=datetime(2026, 6, 19, 12, 0, tzinfo=UTC),
+    )
+
+    assert reads == 2
+    assert [path for path, _body in posts] == [
+        "/v5/account/set-margin-mode",
+        "/v5/position/set-leverage",
+    ]
+    assert posts[0][1] == {"setMarginMode": "ISOLATED_MARGIN"}
+    assert posts[1][1] == {
+        "category": "linear",
+        "symbol": "BTCUSDT",
+        "buyLeverage": "1",
+        "sellLeverage": "1",
+    }
+    assert result.sync_status == "fresh"
+    assert result.observed_margin_mode == "isolated"
+    assert result.observed_leverage == Decimal("1")

@@ -3,10 +3,14 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Protocol
+from decimal import Decimal
+from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
 from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountConfigurator,
+    ExchangeAccountConfigWriteRequest,
+    ExchangeAccountConfigWriteResult,
     ExchangeAccountStateReader,
     ExchangeAccountStateReadRequest,
     ExchangeAccountStateReadResult,
@@ -1011,6 +1015,88 @@ class ExchangeConnectionService:
             now=now,
         )
 
+    def configure_account(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: UUID,
+        configurator: ExchangeAccountConfigurator,
+        instrument_key: str,
+        target_margin_mode: str,
+        target_leverage: Decimal,
+        now: datetime,
+    ) -> ExchangeAccountConfigWriteResult:
+        connection = self._require_active_owned_connection(
+            owner_user_id=owner_user_id,
+            connection_id=connection_id,
+        )
+        view = self._to_view(connection=connection)
+        if (
+            view.effective_capability != "trading"
+            or view.connection_readiness != "ready_for_trading"
+        ):
+            raise ExchangeConnectionError(
+                code=view.connection_readiness_reason or "exchange_connection_not_ready",
+                message="Exchange connection is not ready for account configuration.",
+                status_code=422,
+            )
+        if connection.market_type != "futures":
+            raise ExchangeConnectionError(
+                code="exchange_account_config_futures_only",
+                message="Account configuration is supported only for futures connections.",
+                status_code=422,
+            )
+        if connection.environment != "testnet":
+            raise ExchangeConnectionError(
+                code="exchange_account_config_testnet_only",
+                message="Account configuration is currently allowed only on testnet.",
+                status_code=422,
+            )
+        normalized_instrument_key = _normalize_config_instrument_key(
+            value=instrument_key,
+            exchange_name=connection.exchange_name,
+            market_type=connection.market_type,
+        )
+        normalized_margin_mode = cast(
+            Literal["isolated", "cross"],
+            _enum(
+                value=target_margin_mode,
+                allowed={"isolated", "cross"},
+                field_name="target_margin_mode",
+            ),
+        )
+        if target_leverage <= Decimal("0") or target_leverage > Decimal("125"):
+            raise ExchangeConnectionError(
+                code="exchange_account_config_invalid_leverage",
+                message="Target leverage must be between 1 and 125.",
+                status_code=422,
+            )
+        if target_leverage != target_leverage.to_integral_value():
+            raise ExchangeConnectionError(
+                code="exchange_account_config_invalid_leverage",
+                message="Target leverage must be an integer.",
+                status_code=422,
+            )
+        if bool(getattr(configurator, "requires_plaintext", True)):
+            plaintext = self._decrypt_active_credential(connection_id=connection_id)
+        else:
+            plaintext = ExchangeCredentialPlaintext(
+                "account_config_write_disabled",
+                "account_config_write_disabled",
+            )
+        return configurator.configure_account(
+            request=ExchangeAccountConfigWriteRequest(
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                environment=connection.environment,
+                credential=plaintext,
+                instrument_key=normalized_instrument_key,
+                target_margin_mode=normalized_margin_mode,
+                target_leverage=target_leverage,
+            ),
+            now=now,
+        )
+
     def _require_active_owned_connection(
         self, *, owner_user_id: UserId, connection_id: UUID
     ) -> ExchangeConnectionRecord:
@@ -1346,6 +1432,30 @@ class _NormalizedConnectionInput:
             api_secret=credential.api_secret,
             passphrase=credential.passphrase,
         )
+
+
+def _normalize_config_instrument_key(
+    *,
+    value: str,
+    exchange_name: str,
+    market_type: str,
+) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ExchangeConnectionError(
+            code="exchange_account_config_invalid_instrument",
+            message="Instrument key is required.",
+            status_code=422,
+        )
+    parts = stripped.split(":")
+    symbol = parts[-1].strip().upper()
+    if not symbol:
+        raise ExchangeConnectionError(
+            code="exchange_account_config_invalid_instrument",
+            message="Instrument symbol is required.",
+            status_code=422,
+        )
+    return f"{exchange_name}:{market_type}:{symbol}"
 
 
 def _enum(*, value: str, allowed: set[str], field_name: str) -> str:

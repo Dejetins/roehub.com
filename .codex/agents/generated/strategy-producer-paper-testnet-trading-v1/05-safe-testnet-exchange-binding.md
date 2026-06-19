@@ -2,7 +2,7 @@
 prompt_name: 05-safe-testnet-exchange-binding
 repo: roehub.com
 branch: main
-scope: "Bind strategies to owned testnet exchange connections and verify safe isolated futures 1x without auto-config."
+scope: "Bind strategies to owned testnet exchange connections and verify safe isolated futures 1x without hidden order-time account config mutation."
 language:
   implementation: python
   agent_report: ru
@@ -68,13 +68,13 @@ possible_secondary_touches:
   - docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md
   - docs/architecture/README.md
 safety_notes:
-  - "Do not auto-configure leverage, margin mode, or position mode on exchange accounts."
+  - "Do not mutate leverage, margin mode, or position mode inside strategy launch/order-submit paths."
   - "User provides testnet keys via /settings; never ask for or store secrets in repo/docs."
 ---
 
 # Task
 
-Implement and prove safe testnet exchange binding for strategy launch. Futures shorts are allowed only when read-only account/config evidence proves isolated margin and leverage `1x`; otherwise fail closed.
+Implement and prove safe testnet exchange binding for strategy launch. Futures shorts are allowed only when account/config evidence proves isolated margin and leverage `1x`; otherwise fail closed. This stage is verify-only for binding and execution paths; later repair stages may add an explicit operator account-config command outside order submit.
 
 ## Requirements (Must)
 
@@ -85,7 +85,7 @@ Implement and prove safe testnet exchange binding for strategy launch. Futures s
 - Before editing, narrow any broad expected directory path to a concrete file list or planned new files and record that list in the stage report.
 - Support owned Binance and Bybit testnet connections already added through `/settings`.
 - Verify account/config state with real testnet read calls where credentials exist.
-- Do not call exchange APIs that mutate leverage, margin mode, or position mode.
+- Do not call exchange APIs that mutate leverage, margin mode, or position mode from strategy launch/order-submit paths.
 - Record stable blocked reasons for missing key, inactive connection, readonly mismatch, stale projection, config mismatch, missing balance, min-notional issue, or unsafe futures short.
 - Preserve credential custody: only `exchange-execution` or exchange-control scope may resolve secrets as already designed.
 - If `/settings`, exchange connection readiness, trading capability, validation, or strategy-binding semantics change, update the identity exchange-connections plan/ledger docs in the same stage; if unchanged, state that explicitly in the stage report.

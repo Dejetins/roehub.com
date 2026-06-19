@@ -396,6 +396,16 @@ function renderMarketAvailability(group = {}, currentMarketType = "") {
   return root;
 }
 
+function canConfigureAccount(item) {
+  return (
+    item?.status === "active" &&
+    item?.market_type === "futures" &&
+    item?.environment === "testnet" &&
+    item?.effective_capability === "trading" &&
+    item?.connection_readiness === "ready_for_trading"
+  );
+}
+
 function appendTextCell(row, value, className = "") {
   const cell = row.insertCell();
   cell.textContent = String(value || "--");
@@ -592,6 +602,8 @@ function renderExchangeKeys(payload) {
   renderedItems.forEach((item) => {
     const row = body.insertRow();
     const rowClass = statusClass(item);
+    const availabilityGroup = marketAvailability.get(marketAvailabilityKey(item)) || {};
+    const futuresItem = availabilityGroup.futures;
     appendTextCell(row, item.exchange_name);
     appendTextCell(row, item.label || "--");
     appendTextCell(row, item.api_key);
@@ -600,7 +612,7 @@ function renderExchangeKeys(payload) {
     appendTextCell(row, capabilityDisplay(item));
     const markets = row.insertCell();
     markets.append(
-      renderMarketAvailability(marketAvailability.get(marketAvailabilityKey(item)), item.market_type)
+      renderMarketAvailability(availabilityGroup, item.market_type)
     );
     appendTextCell(row, item.environment || "--");
     appendTextCell(row, readableStatus(item.ip_restriction_status), rowClass);
@@ -622,6 +634,9 @@ function renderExchangeKeys(payload) {
         ? [
             ["validate", "settings.exchange.recheck", "settings.exchange.recheck_short"],
             ["rotate", "settings.exchange.rotate", "settings.exchange.rotate_short"],
+            ...(canConfigureAccount(futuresItem)
+              ? [["configureAccount", "settings.exchange.configure_account", "settings.exchange.configure_account_short"]]
+              : []),
             ["disable", "settings.exchange.disconnect", "settings.exchange.disconnect_short"],
           ]
         : item.status === "disabled"
@@ -632,9 +647,14 @@ function renderExchangeKeys(payload) {
       button.className = "rh-button rh-button--secondary rh-button--compact";
       button.type = "button";
       button.dataset[`exchange${actionKey.charAt(0).toUpperCase()}${actionKey.slice(1)}`] =
-        item.connection_id || item.key_id || "";
+        actionKey === "configureAccount"
+          ? futuresItem?.connection_id || futuresItem?.key_id || ""
+          : item.connection_id || item.key_id || "";
       button.setAttribute("aria-label", t(labelKey));
       button.textContent = t(shortLabelKey);
+      if (actionKey === "configureAccount") {
+        button.dataset.exchangeConfigureExchange = futuresItem?.exchange_name || item.exchange_name || "";
+      }
       if (actionKey === "disable" && activeStrategyBindings > 0) {
         button.disabled = true;
         button.title = t("settings.exchange.disconnect_blocked", {
@@ -793,6 +813,42 @@ function initEvents(root) {
     });
     const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
     renderExchangeKeys(exchangeKeys);
+  });
+  on(root, "click", "[data-exchange-configure-account]", async (_event, item) => {
+    const connectionId = item.dataset.exchangeConfigureAccount;
+    const exchangeName = item.dataset.exchangeConfigureExchange || "";
+    if (!connectionId || !exchangeName) return;
+    const symbol = window.prompt(t("settings.exchange.configure_symbol_prompt"), "BTCUSDT");
+    const normalizedSymbol = String(symbol || "").trim().toUpperCase();
+    if (!normalizedSymbol) return;
+    item.disabled = true;
+    try {
+      const result = await apiFetch(
+        `${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/account-config`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            instrument_key: `${exchangeName}:futures:${normalizedSymbol}`,
+            margin_mode: "isolated",
+            leverage: "1",
+          }),
+        }
+      );
+      setStatus(
+        t("settings.exchange.account_configured", {
+          margin: result.observed_margin_mode || result.target_margin_mode,
+          leverage: result.observed_leverage || result.target_leverage,
+        }),
+        result.sync_status === "fresh"
+      );
+      const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
+      renderExchangeKeys(exchangeKeys);
+    } catch (error) {
+      setStatus(errorMessage(error), false);
+    } finally {
+      item.disabled = false;
+    }
   });
   on(root, "click", "[data-exchange-rotate]", (_event, item) => {
     const connectionId = item.dataset.exchangeRotate;

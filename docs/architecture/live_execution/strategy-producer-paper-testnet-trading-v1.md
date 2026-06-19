@@ -59,7 +59,7 @@ Roehub должен дать пользователю простой путь: �
 | Не входит | Причина |
 |---|---|
 | Mainnet submit | Следующий отдельный план с real-money risk controls. |
-| Автоматическое изменение настроек биржи | `auto-config` leverage/margin/position mode требует отдельного approval, потому что меняет состояние account на бирже. |
+| Скрытое изменение настроек биржи во время исполнения | Execution/order submit не должен сам менять leverage/margin/position mode. Управление account config допускается только отдельной явной operator-командой для testnet futures с read-back proof. |
 | Не-`BTCUSDT` рынки | Артефакты будут добавлены пользователем отдельно. |
 | Полная ML agent реализация | Нужен только совместимый source-event/outbox contract. |
 | Telegram/email delivery | Delivery service вне scope, outbox совместимость сохраняется. |
@@ -74,12 +74,12 @@ Roehub должен дать пользователю простой путь: �
 
 Paper stage обязан пройти все `direction` branches, но не должен маскировать unsupported spot-short как production-capable real order. Testnet stage обязан выполнить реальные shorts через futures, а spot-short зафиксировать как корректно заблокированную ветку, пока margin trading не появится отдельным планом.
 
-## Термины Fail-Closed И Auto-Config
+## Термины Fail-Closed И Account Config
 
 | Термин | Простыми словами | Решение в этом плане |
 |---|---|---|
 | `fail-closed` | Если безопасное состояние не доказано, действие запрещено. Например, если futures account не подтвержден как isolated `1x`, short не отправляется. | Обязательно. Любая неопределенность блокирует запуск/order с понятной причиной. |
-| `auto-config` | Платформа сама вызывает API биржи и меняет настройки account: leverage, margin mode, position mode. | Не делаем в этом цикле. Только читаем и проверяем. |
+| Явная account-config command | Оператор в `/settings`/API отдельно меняет testnet futures account config: margin mode и leverage. | Разрешено для Binance/Bybit testnet futures как отдельная команда: preflight no open orders/positions for symbol, documented exchange API call, read-back proof. Не вызывается скрыто из order submit. |
 | Безопасный изолированный short `1x` | Futures short допускается только если account/position mode, margin mode, leverage, precision, min notional и balance projection доказаны заранее. | Verify-only guard перед запуском и перед order; mismatch блокирует сценарий. |
 
 ## Целевая Архитектура
@@ -148,7 +148,7 @@ Service shape v1: переиспользуем существующий runtime 
 | Launch config DTO | `mode=paper|testnet`, `exchange_connection_id`, `market_type=spot|futures`, `symbol=BTCUSDT`, `capital_allocation_usd=50`, `entry_sizing`, `risk_mode`, `direction`, `allowlist_scope`. |
 | Strategy producer source event | `source_type=strategy_signal|manual_request`, source refs, strategy/run/profile ids, scenario metadata, idempotency key. |
 | Scenario matrix artifact | Durable record of all discovered entry sizing/risk/direction combinations and which were paper/testnet-covered. |
-| Safe futures guard | Records verify-only account config: isolated margin, leverage `1x`, position mode, filters, min notional, precision, projection age. |
+| Safe futures guard | Records account config evidence: isolated margin, leverage `1x`, position mode, filters, min notional, precision, projection age. Evidence can come from read-only account-state or from the explicit testnet account-config command followed by read-back. |
 | Latency ledger | Stores timestamps for signal observed, source event persisted, intent persisted, risk accepted, dispatch, exchange submit, ack, fill/reconcile. |
 | Outbox contract | Internal notification rows/events are delivery-neutral and safe for future Telegram/email reuse. |
 
@@ -206,7 +206,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `02` | Backtest-to-strategy launch UI | Пользовательский launch flow из доступных UI/top variants с `$50`, paper/testnet, market, exchange, sizing/risk/direction. | Playwright: `/backtests` -> launch -> `/strategies`; API/DB proof; rejected cases visible. |
 | `03` | Scenario matrix and compatibility | Найти фактические `entry sizing`, `risk mode`, `direction` из доступных variants и создать durable coverage matrix. | API/top variants calls, SQL matrix rows, compatibility/readiness calls, docs report with no guessed combinations. |
 | `04` | BTCUSDT market readiness | Проверить/provision readiness только для `BTCUSDT` across Binance/Bybit spot/futures; non-BTC остается out of scope. | Redis market-data freshness, ClickHouse/reference rows, API readiness, browser status. |
-| `05` | Safe testnet exchange binding | Testnet exchange selection, read-only futures guard, safe isolated short `1x`, no auto-config. | Real Binance/Bybit testnet account/config reads, SQL projection, guard mismatch block, no exchange setting mutation. |
+| `05` | Safe testnet exchange binding | Testnet exchange selection, futures guard, safe isolated short `1x`, no hidden order-time config mutation. | Real Binance/Bybit testnet account/config reads, SQL projection, guard mismatch block; later repair adds explicit account-config command rather than mutating during submit. |
 | `06` | Supervised strategy producer | Отдельный launchd/Monit service for strategy producer, per-user/per-strategy allowlist, admin switch, no mainnet. | launchd/Monit/Prometheus evidence, health/readiness, stop/restart proof, kill switch, allowlist block/allow. |
 | `07` | Paper full branch coverage | Полная matrix coverage в paper: all sizing/risk/direction with `$50`, paper orders/fills/accounting. | API/DB/Redis/browser proof for every matrix row; PnL/fees/funding completeness flags; no exchange submit. |
 | `08` | Manual entry and manual exit | UI buttons for manual entry and manual stop/exit through same source-event/risk/order path. | Playwright clicks, source-event/intent/order/outbox rows, duplicate/idempotency proof, blocked state proof. |
@@ -351,7 +351,7 @@ Prompt pack для реализации этого плана должен жи�
 |---|---|
 | Не каждый UI/top variant реально launchable | Stage `03` должен доказать matrix из фактических variants; unsupported variants показываются как blocked, не маскируются. |
 | `$50` может быть меньше min notional для некоторых сценариев | Stage `03`/`05`/`07`/`09` фиксируют min-notional block; капитал не увеличивается автоматически. |
-| Futures short требует account config | Stage `05` блокирует short, если isolated `1x` не доказан. Auto-config вне scope. |
+| Futures short требует account config | Stage `05`/`09` блокируют short, если isolated `1x` не доказан. Оператор может исправить testnet futures config через явную account-config command; execution всё равно проверяет read-back evidence перед order. |
 | Spot short не является обычным spot order | Stage `03`/`07`/`09` должны доказать эту ветку как blocked/unsupported без margin trading, а не симулировать ее как реальный spot short. |
 | Сотни testnet strategies могут создать bursts | Stage `11` обязан доказать внутренний limiter/backpressure на testnet-mode strategies, даже если биржевые лимиты ожидаемо не достигнуты. |
 | 24h gate может выявить flaky runtime | Stage `12` фиксирует blocker, не принимает план “с оговоркой”. |

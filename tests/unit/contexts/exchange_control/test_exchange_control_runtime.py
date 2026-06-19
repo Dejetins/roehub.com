@@ -774,6 +774,52 @@ def test_internal_account_state_read_returns_secret_safe_sanitized_projection() 
     assert "authorization" not in dumped
 
 
+def test_internal_account_config_write_returns_secret_safe_result() -> None:
+    config = _RuntimeConfigWithValidator.from_validator(
+        validator=_StaticValidator(_trade_ready_result())
+    )
+    client = TestClient(create_exchange_control_app(config=config))
+    create_payload = {
+        "owner_user_id": "00000000-0000-0000-0000-000000000125",
+        "exchange_name": "bybit",
+        "market_type": "futures",
+        "environment": "testnet",
+        "label": "trade-ready",
+        "permissions": "trade",
+    }
+    create_payload["api_" + "key"] = "public"
+    create_payload["api_" + "secret"] = "private"
+    created = client.post(
+        "/internal/v1/exchange-connections",
+        headers=_internal_headers("account-config-create"),
+        json=create_payload,
+    )
+    assert created.status_code == 200
+    connection_id = created.json()["connection_id"]
+
+    response = client.post(
+        f"/internal/v1/exchange-connections/{connection_id}/account-config",
+        headers=_internal_headers("account-config-write"),
+        json={
+            "owner_user_id": "00000000-0000-0000-0000-000000000125",
+            "instrument_key": "bybit:futures:BTCUSDT",
+            "margin_mode": "isolated",
+            "leverage": "1",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sync_status"] == "degraded"
+    assert payload["sync_reason"] == "account_config_write_disabled"
+    assert payload["target_margin_mode"] == "isolated"
+    assert payload["target_leverage"] == "1"
+    dumped = str(payload).lower()
+    assert "public" not in dumped
+    assert "private" not in dumped
+    assert "authorization" not in dumped
+
+
 def test_internal_account_state_read_reports_legacy_ciphertext_as_unavailable() -> None:
     config = _RuntimeConfigWithValidator.from_validator(
         validator=_StaticValidator(_trade_ready_result())

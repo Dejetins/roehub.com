@@ -4,6 +4,7 @@ import hmac
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -25,6 +26,8 @@ from trading.contexts.exchange_control.adapters.outbound import (
     SkippedExchangeAccountStateReader,
 )
 from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountConfigurator,
+    ExchangeAccountConfigWriteResult,
     ExchangeAccountStateReader,
     ExchangeAccountStateReadResult,
 )
@@ -74,6 +77,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_connections.archive",
     "exchange_connections.validate",
     "exchange_account_state.read",
+    "exchange_account_config.write",
 )
 SECRET_CIPHER_IN_MEMORY_DEV = "in_memory_dev"
 SECRET_CIPHER_OPENBAO_TRANSIT_V1 = "openbao_transit_v1"
@@ -241,6 +245,11 @@ class ExchangeControlRuntimeConfig:
             return HttpExchangeAccountStateReader()
         return SkippedExchangeAccountStateReader()
 
+    def build_account_configurator(self) -> ExchangeAccountConfigurator:
+        if self.account_state_sync_enabled:
+            return HttpExchangeAccountStateReader()
+        return SkippedExchangeAccountStateReader()
+
 
 class ExchangeControlMetrics:
     def __init__(self) -> None:
@@ -322,6 +331,12 @@ class ExchangeControlMetrics:
             ("exchange", "result", "reason"),
             registry=self.registry,
         )
+        self.account_config_write_total = Counter(
+            "exchange_account_config_write_total",
+            "Exchange account-config write attempts by exchange, result, and reason.",
+            ("exchange", "result", "reason"),
+            registry=self.registry,
+        )
 
     def mark_active(self) -> None:
         self.active.set(1)
@@ -372,6 +387,11 @@ class ExchangeControlMetrics:
             exchange="none",
             result="degraded",
             reason="stage_07_no_account_state_read",
+        ).inc(0)
+        self.account_config_write_total.labels(
+            exchange="none",
+            result="degraded",
+            reason="stage_09_no_account_config_write",
         ).inc(0)
 
     def record_validation(self, *, exchange: str, result: str, reason: str) -> None:
@@ -470,6 +490,15 @@ class ExchangeControlMetrics:
             reason=reason,
         ).inc()
 
+    def record_account_config_write(
+        self, *, exchange: str, result: str, reason: str
+    ) -> None:
+        self.account_config_write_total.labels(
+            exchange=exchange,
+            result=result,
+            reason=reason,
+        ).inc()
+
 
 class CreateExchangeConnectionInternalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -530,6 +559,15 @@ class ReadExchangeAccountStateInternalRequest(BaseModel):
     instrument_keys: list[str] = Field(default_factory=list, max_length=20)
 
 
+class ConfigureExchangeAccountInternalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner_user_id: str
+    instrument_key: str = Field(min_length=1, max_length=80)
+    margin_mode: str = Field(default="isolated", pattern="^(isolated|cross)$")
+    leverage: Decimal = Field(default=Decimal("1"), ge=Decimal("1"), le=Decimal("125"))
+
+
 def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> FastAPI:
     service_identity = build_exchange_control_service_identity(name=config.service_identity_name)
     secret_cipher = config.build_secret_cipher()
@@ -553,6 +591,8 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
     app.state.exchange_credential_validator = credential_validator
     account_state_reader = config.build_account_state_reader()
     app.state.exchange_account_state_reader = account_state_reader
+    account_configurator = config.build_account_configurator()
+    app.state.exchange_account_configurator = account_configurator
 
     @app.get("/health/ready")
     def get_readiness(response: Response) -> dict[str, object]:
@@ -990,6 +1030,62 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         return _exchange_account_state_response(result=result)
 
+    @app.post(
+        "/internal/v1/exchange-connections/{connection_id}/account-config",
+        include_in_schema=False,
+    )
+    def configure_internal_exchange_account(
+        connection_id: UUID,
+        payload: ConfigureExchangeAccountInternalRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_roehub_internal_service: str | None = Header(
+            default=None,
+            alias="X-Roehub-Internal-Service",
+        ),
+        x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    ) -> dict[str, object]:
+        _require_internal_request(
+            request=request,
+            authorization=authorization,
+            expected_token=config.internal_api_token,
+            internal_service=x_roehub_internal_service,
+            request_id=x_request_id,
+        )
+        try:
+            result = connection_service.configure_account(
+                owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                connection_id=connection_id,
+                configurator=account_configurator,
+                instrument_key=payload.instrument_key,
+                target_margin_mode=payload.margin_mode,
+                target_leverage=payload.leverage,
+                now=_utc_now(),
+            )
+        except ExchangeConnectionError as error:
+            metrics.record_account_config_write(
+                exchange="unknown",
+                result="rejected",
+                reason=error.code,
+            )
+            raise _exchange_connection_http_error(error=error) from error
+        except Exception as error:
+            metrics.record_account_config_write(
+                exchange="unknown",
+                result="degraded",
+                reason="account_config_write_failed",
+            )
+            raise _internal_error(
+                status_code=503,
+                code="account_config_write_failed",
+            ) from error
+        metrics.record_account_config_write(
+            exchange=result.exchange_name,
+            result=result.sync_status,
+            reason=result.sync_reason,
+        )
+        return _exchange_account_config_response(result=result)
+
     return app
 
 
@@ -1220,6 +1316,31 @@ def _exchange_account_state_response(
             }
             for item in result.instrument_filters
         ],
+    }
+
+
+def _exchange_account_config_response(
+    *, result: ExchangeAccountConfigWriteResult
+) -> dict[str, object]:
+    return {
+        "exchange_name": result.exchange_name,
+        "market_type": result.market_type,
+        "environment": result.environment,
+        "instrument_key": result.instrument_key,
+        "target_margin_mode": result.target_margin_mode,
+        "target_leverage": str(result.target_leverage),
+        "observed_margin_mode": result.observed_margin_mode,
+        "observed_leverage": (
+            str(result.observed_leverage)
+            if result.observed_leverage is not None
+            else None
+        ),
+        "observed_position_mode": result.observed_position_mode,
+        "account_mode": result.account_mode,
+        "sync_status": result.sync_status,
+        "sync_reason": result.sync_reason,
+        "source_hash": result.source_hash,
+        "observed_at": result.observed_at.isoformat(),
     }
 
 

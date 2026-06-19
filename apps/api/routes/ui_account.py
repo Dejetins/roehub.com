@@ -19,6 +19,8 @@ from apps.api.dto.ui_account import (
     AccountProfileResponse,
     AccountSessionResponse,
     AccountSessionsResponse,
+    ConfigureExchangeAccountRequest,
+    ConfigureExchangeAccountResponse,
     CreateExchangeConnectionMarketRequest,
     CreateExchangeConnectionRequest,
     CreateExchangeConnectionResponse,
@@ -36,6 +38,7 @@ from apps.api.dto.ui_account import (
 )
 from apps.api.exchange_control_client import (
     ExchangeConnectionCommandResult,
+    ExchangeControlAccountConfigResult,
     ExchangeControlClient,
     ExchangeControlClientError,
 )
@@ -454,6 +457,51 @@ def build_ui_account_router(
         )
         return _exchange_connection_response(row=row)
 
+    @router.post(
+        "/ui/account/exchange-connections/{connection_id}/account-config",
+        response_model=ConfigureExchangeAccountResponse,
+    )
+    def post_exchange_account_config(
+        connection_id: UUID,
+        request: Request,
+        payload: ConfigureExchangeAccountRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ConfigureExchangeAccountResponse:
+        _enforce_same_origin_mutation(request=request)
+        _enforce_recent_auth(principal=principal, now=clock.now())
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            result = client.configure_account(
+                owner_user_id=str(principal.user_id),
+                connection_id=str(connection_id),
+                instrument_key=payload.instrument_key,
+                margin_mode=payload.margin_mode,
+                leverage=payload.leverage,
+                request_id="apps-api-configure-exchange-account",
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        response_payload = _exchange_account_config_response(result=result)
+        account_settings.record_exchange_account_configured(
+            owner_user_id=principal.user_id,
+            connection_id=str(connection_id),
+            exchange_name=result.exchange_name,
+            market_type=result.market_type,
+            environment=result.environment,
+            instrument_key=result.instrument_key,
+            target_margin_mode=result.target_margin_mode,
+            target_leverage=str(result.target_leverage),
+            observed_margin_mode=result.observed_margin_mode,
+            observed_leverage=(
+                str(result.observed_leverage)
+                if result.observed_leverage is not None
+                else None
+            ),
+            result=result.sync_status,
+            reason=result.sync_reason,
+        )
+        return response_payload
+
     @router.get(
         "/ui/strategies/{strategy_id}/exchange-bindings",
         response_model=StrategyExchangeBindingsResponse,
@@ -836,6 +884,18 @@ def _exchange_control_unavailable(*, error: ExchangeControlClientError) -> Roehu
                 ]
             },
         )
+    account_config_code = _exchange_control_client_error_code(error=error)
+    if account_config_code in {
+        "exchange_account_config_futures_only",
+        "exchange_account_config_testnet_only",
+        "exchange_account_config_invalid_instrument",
+        "exchange_account_config_invalid_leverage",
+    }:
+        return RoehubError(
+            code=account_config_code,
+            message="Exchange account configuration request is invalid.",
+            details={"reason": account_config_code},
+        )
     auto_validation_code = _exchange_control_client_error_code(error=error)
     if auto_validation_code in {
         "read_only_not_supported",
@@ -939,6 +999,31 @@ def _exchange_connection_response(
         archived_at=row.archived_at,
         used_by_strategies_count=row.used_by_strategies_count,
         active_strategy_bindings_count=row.active_strategy_bindings_count,
+    )
+
+
+def _exchange_account_config_response(
+    *,
+    result: ExchangeControlAccountConfigResult,
+) -> ConfigureExchangeAccountResponse:
+    return ConfigureExchangeAccountResponse(
+        exchange_name=_exchange_name_literal(value=result.exchange_name),
+        market_type=_market_type_literal(value=result.market_type),
+        environment=_environment_literal(value=result.environment),
+        instrument_key=result.instrument_key,
+        target_margin_mode=_margin_mode_literal(value=result.target_margin_mode),
+        target_leverage=str(result.target_leverage),
+        observed_margin_mode=result.observed_margin_mode,
+        observed_leverage=(
+            str(result.observed_leverage)
+            if result.observed_leverage is not None
+            else None
+        ),
+        observed_position_mode=result.observed_position_mode,
+        account_mode=result.account_mode,
+        sync_status=_sync_status_literal(value=result.sync_status),
+        sync_reason=result.sync_reason,
+        observed_at=result.observed_at,
     )
 
 
@@ -1129,6 +1214,18 @@ def _permissions_literal(*, value: str) -> Literal["read", "trade"]:
     if value == "read" or value == "trade":
         return value
     raise ValueError(f"Unsupported permissions value: {value!r}")
+
+
+def _margin_mode_literal(*, value: str) -> Literal["isolated", "cross"]:
+    if value == "isolated" or value == "cross":
+        return value
+    raise ValueError(f"Unsupported margin_mode value: {value!r}")
+
+
+def _sync_status_literal(*, value: str) -> Literal["fresh", "degraded"]:
+    if value == "fresh" or value == "degraded":
+        return value
+    raise ValueError(f"Unsupported sync_status value: {value!r}")
 
 
 def _exchange_permissions_literal(

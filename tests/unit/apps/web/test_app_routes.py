@@ -410,6 +410,11 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "settings.exchange.disconnect_blocked" in settings_js
     assert "settings.exchange.market_not_connected" in settings_js
     assert "settings-market-availability" in settings_js
+    assert "settings.exchange.configure_account" in settings_js
+    assert "data-exchange-configure-account" in settings_js
+    assert "/account-config" in settings_js
+    assert "margin_mode: \"isolated\"" in settings_js
+    assert "leverage: \"1\"" in settings_js
     assert "const items = exchangeItems(payload);" in settings_js
     assert "const marketAvailability = buildMarketAvailability(items);" in settings_js
     assert 'if (status === "active")' in settings_js
@@ -417,6 +422,9 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "aria-current" in settings_js
     assert "active_strategy_bindings_count" in settings_js
     assert "Cannot disconnect" in (_WEB_ROOT / "locales" / "en.json").read_text()
+    assert "Set futures margin to isolated 1x" in (
+        _WEB_ROOT / "locales" / "en.json"
+    ).read_text()
     assert "DELETE" not in settings_js
     assert 'data-rotate-form="${connectionId}" autocomplete="off" data-lpignore="true"' in (
         settings_js

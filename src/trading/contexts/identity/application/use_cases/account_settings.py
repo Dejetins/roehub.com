@@ -271,6 +271,42 @@ class AccountSettingsUseCase:
             created_at=self.clock.now(),
         )
 
+    def record_exchange_account_configured(
+        self,
+        *,
+        owner_user_id: UserId,
+        connection_id: str,
+        exchange_name: str,
+        market_type: str,
+        environment: str,
+        instrument_key: str,
+        target_margin_mode: str,
+        target_leverage: str,
+        observed_margin_mode: str | None,
+        observed_leverage: str | None,
+        result: str,
+        reason: str,
+    ) -> None:
+        self.repository.append_audit_event(
+            owner_user_id=owner_user_id,
+            event_type="exchange_account_configured",
+            summary="Exchange account configuration completed",
+            metadata={
+                "connection_id": connection_id,
+                "exchange_name": exchange_name,
+                "market_type": market_type,
+                "environment": environment,
+                "instrument_key": instrument_key,
+                "target_margin_mode": target_margin_mode,
+                "target_leverage": target_leverage,
+                "observed_margin_mode": observed_margin_mode or "",
+                "observed_leverage": observed_leverage or "",
+                "result": result,
+                "reason": reason,
+            },
+            created_at=self.clock.now(),
+        )
+
     def record_exchange_connection_archive(
         self,
         *,

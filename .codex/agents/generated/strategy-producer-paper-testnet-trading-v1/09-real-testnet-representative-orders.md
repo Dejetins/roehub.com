@@ -64,7 +64,7 @@ possible_secondary_touches:
   - docs/architecture/README.md
 safety_notes:
   - "Only testnet orders are allowed. Mainnet attempts are critical blockers."
-  - "Futures short requires safe isolated 1x proof. No auto-config."
+  - "Futures short requires safe isolated 1x proof. If missing, use only an explicit testnet account-config operator command with read-back proof; never mutate settings implicitly during order submit."
 ---
 
 # Task
@@ -80,7 +80,7 @@ Run representative real testnet order coverage for `BTCUSDT`: Binance/Bybit, spo
 - Before editing, narrow any broad expected directory path to a concrete file list or planned new files and record that list in the stage report.
 - Use user-added testnet keys from `/settings`; do not ask for or store secrets.
 - Keep allocation `$50` per strategy and respect min-notional/precision.
-- For futures short, require read-only proof of isolated margin and leverage `1x`.
+- For futures short, require account-state proof of isolated margin and leverage `1x`. Proof may come from read-only account-state or from an explicit testnet account-config command followed by read-back; the command must not place orders.
 - Treat spot-short as blocked/unsupported unless a real margin/borrow product is already implemented and accepted; do not submit fake spot-short orders.
 - Record latency timestamps: signal/source event, intent, risk, dispatch, submit, ack, fill/reconcile.
 - Unknown exchange state must be reconciled before any retry.

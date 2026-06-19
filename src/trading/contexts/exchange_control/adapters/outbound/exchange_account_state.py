@@ -9,9 +9,12 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal
 
 from trading.contexts.exchange_control.application.account_state import (
+    ExchangeAccountConfigurator,
+    ExchangeAccountConfigWriteRequest,
+    ExchangeAccountConfigWriteResult,
     ExchangeAccountStateReader,
     ExchangeAccountStateReadRequest,
     ExchangeAccountStateReadResult,
@@ -19,6 +22,9 @@ from trading.contexts.exchange_control.application.account_state import (
     ExchangeInstrumentFilterState,
     ExchangeOpenOrderState,
     ExchangePositionState,
+)
+from trading.contexts.exchange_control.application.validation import (
+    ExchangeCredentialPlaintext,
 )
 
 _BYBIT_MAINNET_URL = "https://api.bybit.com"
@@ -31,7 +37,10 @@ _RECV_WINDOW = "5000"
 
 
 @dataclass(frozen=True)
-class SkippedExchangeAccountStateReader(ExchangeAccountStateReader):
+class SkippedExchangeAccountStateReader(
+    ExchangeAccountStateReader,
+    ExchangeAccountConfigurator,
+):
     requires_plaintext: bool = False
 
     def read_account_state(
@@ -55,9 +64,41 @@ class SkippedExchangeAccountStateReader(ExchangeAccountStateReader):
             sync_reason="account_state_sync_disabled",
         )
 
+    def configure_account(
+        self,
+        *,
+        request: ExchangeAccountConfigWriteRequest,
+        now: datetime,
+    ) -> ExchangeAccountConfigWriteResult:
+        return ExchangeAccountConfigWriteResult(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            instrument_key=request.instrument_key,
+            target_margin_mode=request.target_margin_mode,
+            target_leverage=request.target_leverage,
+            observed_margin_mode=None,
+            observed_leverage=None,
+            observed_position_mode=None,
+            account_mode="unknown",
+            observed_at=now,
+            source_hash=_source_hash(
+                {
+                    "status": "degraded",
+                    "reason": "account_config_write_disabled",
+                    "instrument_key": request.instrument_key,
+                }
+            ),
+            sync_status="degraded",
+            sync_reason="account_config_write_disabled",
+        )
+
 
 @dataclass(frozen=True)
-class HttpExchangeAccountStateReader(ExchangeAccountStateReader):
+class HttpExchangeAccountStateReader(
+    ExchangeAccountStateReader,
+    ExchangeAccountConfigurator,
+):
     timeout_seconds: float = 3.0
     requires_plaintext: bool = True
 
@@ -98,6 +139,47 @@ class HttpExchangeAccountStateReader(ExchangeAccountStateReader):
             ),
             sync_status="degraded",
             sync_reason="account_state_reader_unsupported_exchange",
+        )
+
+    def configure_account(
+        self,
+        *,
+        request: ExchangeAccountConfigWriteRequest,
+        now: datetime,
+    ) -> ExchangeAccountConfigWriteResult:
+        if request.exchange_name == "bybit":
+            return _configure_bybit_account(
+                request=request,
+                now=now,
+                timeout_seconds=self.timeout_seconds,
+            )
+        if request.exchange_name == "binance":
+            return _configure_binance_account(
+                request=request,
+                now=now,
+                timeout_seconds=self.timeout_seconds,
+            )
+        return ExchangeAccountConfigWriteResult(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            instrument_key=request.instrument_key,
+            target_margin_mode=request.target_margin_mode,
+            target_leverage=request.target_leverage,
+            observed_margin_mode=None,
+            observed_leverage=None,
+            observed_position_mode=None,
+            account_mode="unknown",
+            observed_at=now,
+            source_hash=_source_hash(
+                {
+                    "exchange": request.exchange_name,
+                    "market_type": request.market_type,
+                    "status": "degraded",
+                }
+            ),
+            sync_status="degraded",
+            sync_reason="account_config_unsupported_exchange",
         )
 
 
@@ -320,6 +402,16 @@ def _read_bybit_account_state(
         timeout_seconds=timeout_seconds,
     )
     balances = _bybit_balances(payload=wallet_payload)
+    account_margin_mode = None
+    if category != "spot":
+        account_info_payload = _bybit_get_signed_json_with_credential(
+            base_url=base_url,
+            path="/v5/account/info",
+            params={},
+            credential=request.credential,
+            timeout_seconds=timeout_seconds,
+        )
+        account_margin_mode = _bybit_account_margin_mode(payload=account_info_payload)
 
     scoped_params = {"symbol": symbol_scope} if symbol_scope else {"settleCoin": "USDT"}
     orders_params = {"category": category, "openOnly": "0"}
@@ -355,6 +447,7 @@ def _read_bybit_account_state(
             payload=positions_payload,
             exchange=request.exchange_name,
             market_type=request.market_type,
+            account_margin_mode=account_margin_mode,
         )
 
     filters: list[ExchangeInstrumentFilterState] = []
@@ -397,6 +490,430 @@ def _read_bybit_account_state(
         observed_at=now,
         source_hash=_source_hash(normalized),
     )
+
+
+def _configure_binance_account(
+    *,
+    request: ExchangeAccountConfigWriteRequest,
+    now: datetime,
+    timeout_seconds: float,
+) -> ExchangeAccountConfigWriteResult:
+    if request.market_type != "futures":
+        return _account_config_degraded_result(
+            request=request,
+            now=now,
+            reason="account_config_futures_only",
+        )
+    base_url = _binance_base_url(
+        market_type=request.market_type,
+        environment=request.environment,
+    )
+    symbol = _symbol_from_instrument_key(request.instrument_key)
+    snapshot = _read_binance_futures_account_state(
+        request=ExchangeAccountStateReadRequest(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            credential=request.credential,
+            instrument_keys=(request.instrument_key,),
+        ),
+        now=now,
+        timeout_seconds=timeout_seconds,
+        base_url=base_url,
+        symbols=(symbol,),
+    )
+    precondition_reason = _account_config_precondition_reason(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    if precondition_reason:
+        return _account_config_result_from_snapshot(
+            request=request,
+            snapshot=snapshot,
+            status="degraded",
+            reason=precondition_reason,
+        )
+
+    target_position = _account_config_position(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    if target_position is None or target_position.margin_mode != request.target_margin_mode:
+        _binance_post_signed_json_with_credential(
+            base_url=base_url,
+            path="/fapi/v1/marginType",
+            params={
+                "symbol": symbol,
+                "marginType": _binance_margin_type_param(request.target_margin_mode),
+            },
+            credential=request.credential,
+            timeout_seconds=timeout_seconds,
+            ok_negative_codes=frozenset({-4046}),
+        )
+    if target_position is None or target_position.leverage != request.target_leverage:
+        _binance_post_signed_json_with_credential(
+            base_url=base_url,
+            path="/fapi/v1/leverage",
+            params={
+                "symbol": symbol,
+                "leverage": _leverage_wire_value(request.target_leverage),
+            },
+            credential=request.credential,
+            timeout_seconds=timeout_seconds,
+        )
+
+    observed = _read_binance_futures_account_state(
+        request=ExchangeAccountStateReadRequest(
+            exchange_name=request.exchange_name,
+            market_type=request.market_type,
+            environment=request.environment,
+            credential=request.credential,
+            instrument_keys=(request.instrument_key,),
+        ),
+        now=now,
+        timeout_seconds=timeout_seconds,
+        base_url=base_url,
+        symbols=(symbol,),
+    )
+    matched = _account_config_matches(request=request, snapshot=observed)
+    return _account_config_result_from_snapshot(
+        request=request,
+        snapshot=observed,
+        status="fresh" if matched else "degraded",
+        reason="account_config_write_ok" if matched else "account_config_readback_mismatch",
+    )
+
+
+def _configure_bybit_account(
+    *,
+    request: ExchangeAccountConfigWriteRequest,
+    now: datetime,
+    timeout_seconds: float,
+) -> ExchangeAccountConfigWriteResult:
+    if request.market_type != "futures":
+        return _account_config_degraded_result(
+            request=request,
+            now=now,
+            reason="account_config_futures_only",
+        )
+    base_url = _BYBIT_TESTNET_URL if request.environment == "testnet" else _BYBIT_MAINNET_URL
+    symbol = _symbol_from_instrument_key(request.instrument_key)
+    read_request = ExchangeAccountStateReadRequest(
+        exchange_name=request.exchange_name,
+        market_type=request.market_type,
+        environment=request.environment,
+        credential=request.credential,
+        instrument_keys=(request.instrument_key,),
+    )
+    snapshot = _read_bybit_account_state(
+        request=read_request,
+        now=now,
+        timeout_seconds=timeout_seconds,
+    )
+    precondition_reason = _account_config_precondition_reason(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    if precondition_reason:
+        return _account_config_result_from_snapshot(
+            request=request,
+            snapshot=snapshot,
+            status="degraded",
+            reason=precondition_reason,
+        )
+
+    target_position = _account_config_position(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    if target_position is None or target_position.margin_mode != request.target_margin_mode:
+        _bybit_post_signed_json_with_credential(
+            base_url=base_url,
+            path="/v5/account/set-margin-mode",
+            body={"setMarginMode": _bybit_margin_mode_param(request.target_margin_mode)},
+            credential=request.credential,
+            timeout_seconds=timeout_seconds,
+        )
+    if target_position is None or target_position.leverage != request.target_leverage:
+        leverage = _leverage_wire_value(request.target_leverage)
+        _bybit_post_signed_json_with_credential(
+            base_url=base_url,
+            path="/v5/position/set-leverage",
+            body={
+                "category": "linear",
+                "symbol": symbol,
+                "buyLeverage": leverage,
+                "sellLeverage": leverage,
+            },
+            credential=request.credential,
+            timeout_seconds=timeout_seconds,
+        )
+
+    observed = _read_bybit_account_state(
+        request=read_request,
+        now=now,
+        timeout_seconds=timeout_seconds,
+    )
+    matched = _account_config_matches(request=request, snapshot=observed)
+    return _account_config_result_from_snapshot(
+        request=request,
+        snapshot=observed,
+        status="fresh" if matched else "degraded",
+        reason="account_config_write_ok" if matched else "account_config_readback_mismatch",
+    )
+
+
+def _account_config_degraded_result(
+    *,
+    request: ExchangeAccountConfigWriteRequest,
+    now: datetime,
+    reason: str,
+) -> ExchangeAccountConfigWriteResult:
+    return ExchangeAccountConfigWriteResult(
+        exchange_name=request.exchange_name,
+        market_type=request.market_type,
+        environment=request.environment,
+        instrument_key=request.instrument_key,
+        target_margin_mode=request.target_margin_mode,
+        target_leverage=request.target_leverage,
+        observed_margin_mode=None,
+        observed_leverage=None,
+        observed_position_mode=None,
+        account_mode="unknown",
+        observed_at=now,
+        source_hash=_source_hash(
+            {
+                "exchange_name": request.exchange_name,
+                "market_type": request.market_type,
+                "environment": request.environment,
+                "instrument_key": request.instrument_key,
+                "target_margin_mode": request.target_margin_mode,
+                "target_leverage": str(request.target_leverage),
+                "status": "degraded",
+                "reason": reason,
+            }
+        ),
+        sync_status="degraded",
+        sync_reason=reason,
+    )
+
+
+def _account_config_result_from_snapshot(
+    *,
+    request: ExchangeAccountConfigWriteRequest,
+    snapshot: ExchangeAccountStateReadResult,
+    status: Literal["fresh", "degraded"],
+    reason: str,
+) -> ExchangeAccountConfigWriteResult:
+    position = _account_config_position(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    observed_margin_mode = position.margin_mode if position else None
+    observed_leverage = position.leverage if position else None
+    observed_position_mode = position.position_mode if position else None
+    return ExchangeAccountConfigWriteResult(
+        exchange_name=snapshot.exchange_name,
+        market_type=snapshot.market_type,
+        environment=snapshot.environment,
+        instrument_key=request.instrument_key,
+        target_margin_mode=request.target_margin_mode,
+        target_leverage=request.target_leverage,
+        observed_margin_mode=observed_margin_mode,
+        observed_leverage=observed_leverage,
+        observed_position_mode=observed_position_mode,
+        account_mode=snapshot.account_mode,
+        observed_at=snapshot.observed_at,
+        source_hash=_source_hash(
+            {
+                "state_source_hash": snapshot.source_hash,
+                "instrument_key": request.instrument_key,
+                "target_margin_mode": request.target_margin_mode,
+                "target_leverage": str(request.target_leverage),
+                "observed_margin_mode": observed_margin_mode,
+                "observed_leverage": str(observed_leverage) if observed_leverage else None,
+                "observed_position_mode": observed_position_mode,
+                "status": status,
+                "reason": reason,
+            }
+        ),
+        sync_status=status,
+        sync_reason=reason,
+    )
+
+
+def _account_config_position(
+    *,
+    snapshot: ExchangeAccountStateReadResult,
+    instrument_key: str,
+) -> ExchangePositionState | None:
+    return next(
+        (
+            position
+            for position in snapshot.positions
+            if position.instrument_key == instrument_key
+        ),
+        None,
+    )
+
+
+def _account_config_precondition_reason(
+    *,
+    snapshot: ExchangeAccountStateReadResult,
+    instrument_key: str,
+) -> str | None:
+    if any(
+        order.instrument_key == instrument_key
+        and order.status not in {"canceled", "cancelled", "filled", "expired", "rejected"}
+        for order in snapshot.open_orders
+    ):
+        return "account_config_open_orders_exist"
+    if any(
+        position.instrument_key == instrument_key and position.quantity != Decimal("0")
+        for position in snapshot.positions
+    ):
+        return "account_config_open_position_exists"
+    return None
+
+
+def _account_config_matches(
+    *,
+    request: ExchangeAccountConfigWriteRequest,
+    snapshot: ExchangeAccountStateReadResult,
+) -> bool:
+    position = _account_config_position(
+        snapshot=snapshot,
+        instrument_key=request.instrument_key,
+    )
+    return (
+        position is not None
+        and position.margin_mode == request.target_margin_mode
+        and position.leverage == request.target_leverage
+    )
+
+
+def _bybit_get_signed_json_with_credential(
+    *,
+    base_url: str,
+    path: str,
+    params: dict[str, str],
+    credential: ExchangeCredentialPlaintext,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    query = urllib.parse.urlencode(params)
+    timestamp = str(int(time.time() * 1000))
+    public_credential = str(getattr(credential, "api_" + "key"))
+    private_credential = str(getattr(credential, "api_" + "secret"))
+    body_to_sign = query
+    digest = hmac.new(
+        private_credential.encode("utf-8"),
+        f"{timestamp}{public_credential}{_RECV_WINDOW}{body_to_sign}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return _get_json(
+        url=f"{base_url}{path}?{query}" if query else f"{base_url}{path}",
+        headers={
+            "X-BAPI-" + "API-KEY": public_credential,
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": _RECV_WINDOW,
+            "X-BAPI-" + "SIGN": digest,
+        },
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _bybit_post_signed_json_with_credential(
+    *,
+    base_url: str,
+    path: str,
+    body: dict[str, str],
+    credential: ExchangeCredentialPlaintext,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    body_json = json.dumps(body, separators=(",", ":"))
+    timestamp = str(int(time.time() * 1000))
+    public_credential = str(getattr(credential, "api_" + "key"))
+    private_credential = str(getattr(credential, "api_" + "secret"))
+    digest = hmac.new(
+        private_credential.encode("utf-8"),
+        f"{timestamp}{public_credential}{_RECV_WINDOW}{body_json}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return _post_json(
+        url=f"{base_url}{path}",
+        body=body_json.encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-BAPI-" + "API-KEY": public_credential,
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": _RECV_WINDOW,
+            "X-BAPI-" + "SIGN": digest,
+        },
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _binance_post_signed_json_with_credential(
+    *,
+    base_url: str,
+    path: str,
+    params: dict[str, str],
+    credential: ExchangeCredentialPlaintext,
+    timeout_seconds: float,
+    ok_negative_codes: frozenset[int] = frozenset(),
+) -> Any:
+    signed_params = {
+        **params,
+        "recvWindow": _RECV_WINDOW,
+        "timestamp": str(int(time.time() * 1000)),
+    }
+    query = urllib.parse.urlencode(signed_params)
+    public_credential = str(getattr(credential, "api_" + "key"))
+    private_credential = str(getattr(credential, "api_" + "secret"))
+    digest = hmac.new(
+        private_credential.encode("utf-8"),
+        query.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    payload = _post_json_any(
+        url=f"{base_url}{path}?{query}&signature={digest}",
+        body=b"",
+        headers={"X-MBX-" + "APIKEY": public_credential},
+        timeout_seconds=timeout_seconds,
+    )
+    if isinstance(payload, dict):
+        code = payload.get("code")
+        if isinstance(code, int) and code < 0 and code not in ok_negative_codes:
+            raise ValueError("exchange account config request rejected")
+    return payload
+
+
+def _bybit_account_margin_mode(*, payload: dict[str, Any]) -> str | None:
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        return None
+    return _normalize_margin_mode(result.get("marginMode"))
+
+
+def _bybit_margin_mode_param(value: str) -> str:
+    if value == "isolated":
+        return "ISOLATED_MARGIN"
+    return "REGULAR_MARGIN"
+
+
+def _binance_margin_type_param(value: str) -> str:
+    if value == "isolated":
+        return "ISOLATED"
+    return "CROSSED"
+
+
+def _leverage_wire_value(value: Decimal) -> str:
+    integral = value.to_integral_value()
+    if value != integral:
+        raise ValueError("target leverage must be an integer")
+    if integral <= 0:
+        raise ValueError("target leverage must be positive")
+    return str(int(integral))
 
 
 def _bybit_get_signed_json(
@@ -456,6 +973,45 @@ def _get_json_any(
     if isinstance(payload, dict) and int(payload.get("code", 0)) < 0:
         raise ValueError("exchange account state request rejected")
     return payload
+
+
+def _post_json(
+    *,
+    url: str,
+    body: bytes,
+    headers: dict[str, str],
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url=url,
+        data=body,
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("exchange account config response is invalid")
+    if int(payload.get("retCode", 0)) != 0:
+        raise ValueError("exchange account config request rejected")
+    return payload
+
+
+def _post_json_any(
+    *,
+    url: str,
+    body: bytes,
+    headers: dict[str, str],
+    timeout_seconds: float,
+) -> Any:
+    request = urllib.request.Request(
+        url=url,
+        data=body,
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def _ensure_dict(payload: Any) -> dict[str, Any]:
@@ -542,6 +1098,7 @@ def _bybit_positions(
     payload: dict[str, Any],
     exchange: str,
     market_type: str,
+    account_margin_mode: str | None = None,
 ) -> tuple[ExchangePositionState, ...]:
     result = payload.get("result")
     rows = result.get("list") if isinstance(result, dict) else None
@@ -561,7 +1118,8 @@ def _bybit_positions(
                 quantity=_decimal_or_zero(row.get("size")),
                 entry_price=_decimal_or_none(row.get("avgPrice")),
                 leverage=_decimal_or_none(row.get("leverage")),
-                margin_mode=_normalize_margin_mode(row.get("tradeMode")),
+                margin_mode=account_margin_mode
+                or _normalize_margin_mode(row.get("tradeMode")),
                 position_mode=_bybit_position_mode(row.get("positionIdx")),
             )
         )
@@ -857,10 +1415,12 @@ def _bybit_position_mode(value: object) -> str:
 
 def _normalize_margin_mode(value: object) -> str | None:
     raw = str(value or "").strip().casefold()
-    if raw in {"isolated", "isolate", "1"}:
+    if raw in {"isolated", "isolate", "isolated_margin", "1"}:
         return "isolated"
-    if raw in {"cross", "crossed", "0"}:
+    if raw in {"cross", "crossed", "regular_margin", "0"}:
         return "cross"
+    if raw == "portfolio_margin":
+        return "portfolio"
     return raw or None
 
 

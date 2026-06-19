@@ -122,6 +122,24 @@ class ExchangeControlAccountStateSnapshot:
     instrument_filters: tuple[ExchangeControlInstrumentFilterSnapshot, ...]
 
 
+@dataclass(frozen=True)
+class ExchangeControlAccountConfigResult:
+    exchange_name: str
+    market_type: str
+    environment: str
+    instrument_key: str
+    target_margin_mode: str
+    target_leverage: Decimal
+    observed_margin_mode: str | None
+    observed_leverage: Decimal | None
+    observed_position_mode: str | None
+    account_mode: str
+    sync_status: str
+    sync_reason: str
+    source_hash: str
+    observed_at: datetime
+
+
 class ExchangeControlClient(Protocol):
     def get_capabilities(
         self, *, request_id: str | None = None
@@ -200,6 +218,17 @@ class ExchangeControlClient(Protocol):
         instrument_keys: tuple[str, ...] = (),
         request_id: str | None = None,
     ) -> ExchangeControlAccountStateSnapshot: ...
+
+    def configure_account(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_key: str,
+        margin_mode: str,
+        leverage: Decimal,
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountConfigResult: ...
 
 
 @dataclass(frozen=True)
@@ -430,6 +459,29 @@ class HttpExchangeControlClient:
         )
         return _account_state_from_payload(response.json())
 
+    def configure_account(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_key: str,
+        margin_mode: str,
+        leverage: Decimal,
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountConfigResult:
+        response = self._request(
+            "POST",
+            f"/internal/v1/exchange-connections/{connection_id}/account-config",
+            request_id=request_id,
+            json={
+                "owner_user_id": owner_user_id,
+                "instrument_key": instrument_key,
+                "margin_mode": margin_mode,
+                "leverage": str(leverage),
+            },
+        )
+        return _account_config_from_payload(response.json())
+
     def _request(
         self,
         method: str,
@@ -476,7 +528,7 @@ class InMemoryExchangeControlClient:
         service="exchange-control",
         service_identity="exchange-control",
         contract_version="internal-v1",
-        capabilities=("capabilities.read",),
+        capabilities=("capabilities.read", "exchange_account_config.write"),
     )
     _connections: dict[str, ExchangeConnectionCommandResult] | None = None
     _owners: dict[str, str] | None = None
@@ -846,6 +898,45 @@ class InMemoryExchangeControlClient:
             instrument_filters=filters,
         )
 
+    def configure_account(
+        self,
+        *,
+        owner_user_id: str,
+        connection_id: str,
+        instrument_key: str,
+        margin_mode: str,
+        leverage: Decimal,
+        request_id: str | None = None,
+    ) -> ExchangeControlAccountConfigResult:
+        _ = request_id
+        existing = self._connections_dict().get(connection_id)
+        if existing is None or self._owners_dict().get(connection_id) != owner_user_id:
+            raise ExchangeControlClientError("exchange_connection_not_found")
+        if existing.connection_readiness != "ready_for_trading":
+            raise ExchangeControlClientError("exchange_connection_not_ready")
+        if existing.market_type != "futures":
+            raise ExchangeControlClientError(
+                "exchange-control internal request failed with status 422 code "
+                "exchange_account_config_futures_only"
+            )
+        observed_at = datetime.fromisoformat("2026-05-24T12:05:00+00:00")
+        return ExchangeControlAccountConfigResult(
+            exchange_name=existing.exchange_name,
+            market_type=existing.market_type,
+            environment=existing.environment,
+            instrument_key=instrument_key,
+            target_margin_mode=margin_mode,
+            target_leverage=leverage,
+            observed_margin_mode=margin_mode,
+            observed_leverage=leverage,
+            observed_position_mode="one_way",
+            account_mode="unified" if existing.exchange_name == "bybit" else "futures",
+            sync_status="fresh",
+            sync_reason="account_config_write_ok",
+            source_hash="c" * 64,
+            observed_at=observed_at,
+        )
+
     def _connections_dict(self) -> dict[str, ExchangeConnectionCommandResult]:
         if self._connections is None:
             raise ExchangeControlClientError("exchange-control fake client is uninitialized")
@@ -990,6 +1081,40 @@ def _account_state_from_payload(payload: object) -> ExchangeControlAccountStateS
     except (KeyError, ValueError, TypeError) as exc:
         raise ExchangeControlClientError(
             "exchange-control account-state response is invalid"
+        ) from exc
+
+
+def _account_config_from_payload(payload: object) -> ExchangeControlAccountConfigResult:
+    if not isinstance(payload, dict):
+        raise ExchangeControlClientError("exchange-control account-config response is invalid")
+    try:
+        return ExchangeControlAccountConfigResult(
+            exchange_name=str(payload["exchange_name"]),
+            market_type=str(payload["market_type"]),
+            environment=str(payload["environment"]),
+            instrument_key=str(payload["instrument_key"]),
+            target_margin_mode=str(payload["target_margin_mode"]),
+            target_leverage=Decimal(str(payload["target_leverage"])),
+            observed_margin_mode=(
+                str(payload["observed_margin_mode"])
+                if payload.get("observed_margin_mode") is not None
+                else None
+            ),
+            observed_leverage=_decimal_or_none(payload.get("observed_leverage")),
+            observed_position_mode=(
+                str(payload["observed_position_mode"])
+                if payload.get("observed_position_mode") is not None
+                else None
+            ),
+            account_mode=str(payload["account_mode"]),
+            sync_status=str(payload["sync_status"]),
+            sync_reason=str(payload["sync_reason"]),
+            source_hash=str(payload["source_hash"]),
+            observed_at=datetime.fromisoformat(str(payload["observed_at"])),
+        )
+    except (KeyError, ValueError, TypeError) as exc:
+        raise ExchangeControlClientError(
+            "exchange-control account-config response is invalid"
         ) from exc
 
 
