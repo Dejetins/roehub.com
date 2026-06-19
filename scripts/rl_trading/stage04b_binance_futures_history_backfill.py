@@ -5,8 +5,11 @@ import hashlib
 import json
 import os
 import sys
+import threading
 import time
 import urllib.request
+from collections.abc import Callable
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -37,6 +40,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canon
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (  # noqa: E402,E501
     ClickHouseConnectGateway,
     ClickHouseGateway,
+    ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (  # noqa: E402,E501
     ClickHouseRawKlineWriter,
@@ -73,6 +77,16 @@ class SourceWindow:
     dataset_version: str
     source_start: datetime
     source_end: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkRunReport:
+    chunk_id: str
+    rows_read: int
+    rows_written: int
+    batches_written: int
+    started_at_utc: str
+    finished_at_utc: str
 
 
 def build_plan_manifest(
@@ -338,30 +352,43 @@ def execute_manifest(
     max_runtime_seconds: float | None,
     delay_s: float,
     log_jsonl: Path,
+    workers: int,
+    max_chunk_attempts: int,
+    failure_backoff_s: float,
+    skip_covered_chunks: bool,
 ) -> int:
+    if workers <= 0:
+        raise ValueError("workers must be > 0")
+    if max_chunk_attempts <= 0:
+        raise ValueError("max_chunk_attempts must be > 0")
+    if failure_backoff_s < 0:
+        raise ValueError("failure_backoff_s must be >= 0")
+
     manifest = _read_json(manifest_path)
     cfg = load_market_data_runtime_config(market_config_path)
     settings = ClickHouseSettingsLoader(os.environ).load()
-    gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-    clock = SystemClock()
+    gateway: ClickHouseGateway
+    if workers == 1:
+        gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
+    else:
+        gateway = ThreadLocalClickHouseConnectGateway(
+            client_factory=lambda: _clickhouse_client(settings),
+        )
     ingest_id = uuid4()
-    source = RestCandleIngestSource(
-        cfg=cfg,
-        clock=clock,
-        http=RequestsHttpClient(),
-        ingest_id=ingest_id,
-    )
-    use_case = RestFillRange1mUseCase(
-        source=source,
-        writer=ClickHouseRawKlineWriter(gateway=gateway, database=settings.database),
-        clock=clock,
-        max_days_per_insert=cfg.backfill.max_days_per_insert,
-        batch_size=batch_size,
-        index_reader=ClickHouseCanonicalCandleIndexReader(
-            gateway=gateway,
-            database=settings.database,
-        ),
-    )
+    thread_state = threading.local()
+
+    def use_case_factory() -> RestFillRange1mUseCase:
+        use_case = getattr(thread_state, "use_case", None)
+        if use_case is None:
+            use_case = _make_rest_fill_use_case(
+                cfg=cfg,
+                gateway=gateway,
+                database=settings.database,
+                batch_size=batch_size,
+                ingest_id=ingest_id,
+            )
+            thread_state.use_case = use_case
+        return cast(RestFillRange1mUseCase, use_case)
 
     execution = cast(dict[str, Any], manifest["execution"])
     now = _now_utc()
@@ -370,90 +397,253 @@ def execute_manifest(
     execution["status"] = "running"
     execution["updated_at_utc"] = _format_utc(now)
     execution["ingest_id"] = str(ingest_id)
+    execution["coordinator"] = "sharded_parallel" if workers > 1 else "sequential"
+    execution["workers"] = workers
+    execution["max_chunk_attempts"] = max_chunk_attempts
+    execution["skip_covered_chunks"] = bool(skip_covered_chunks)
     _atomic_write_json(manifest_path, manifest)
 
     started_monotonic = time.monotonic()
-    completed_this_run = 0
+    started_this_run = 0
+    failed_this_run = False
+    retry_after_monotonic: float | None = None
     log_jsonl.parent.mkdir(parents=True, exist_ok=True)
 
-    for chunk in cast(list[dict[str, Any]], manifest["chunks"]):
-        if chunk.get("status") == "completed":
-            continue
-        if max_chunks is not None and completed_this_run >= max_chunks:
-            break
-        if (
-            max_runtime_seconds is not None
-            and time.monotonic() - started_monotonic >= max_runtime_seconds
-        ):
-            break
+    chunks = cast(list[dict[str, Any]], manifest["chunks"])
+    _reset_retryable_failed_chunks(chunks=chunks, max_chunk_attempts=max_chunk_attempts)
+    inflight: dict[Future[ChunkRunReport], dict[str, Any]] = {}
+    active_ranges_by_symbol: dict[str, list[tuple[datetime, datetime]]] = {}
 
-        started_at = _now_utc()
-        chunk["status"] = "running"
-        chunk["started_at_utc"] = _format_utc(started_at)
-        chunk.pop("error_type", None)
-        chunk.pop("error_summary", None)
-        execution["updated_at_utc"] = _format_utc(started_at)
-        _atomic_write_json(manifest_path, manifest)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="stage04b") as executor:
+        while True:
+            if retry_after_monotonic is not None:
+                now_monotonic = time.monotonic()
+                if now_monotonic < retry_after_monotonic and not inflight:
+                    time.sleep(retry_after_monotonic - now_monotonic)
+                if time.monotonic() >= retry_after_monotonic:
+                    retry_after_monotonic = None
 
-        try:
-            result = use_case.run(_task_from_chunk(chunk))
-        except Exception as exc:  # noqa: BLE001
-            failed_at = _now_utc()
-            error_summary = _safe_error_summary(exc)
-            chunk["status"] = "failed"
-            chunk["finished_at_utc"] = _format_utc(failed_at)
-            chunk["error_type"] = type(exc).__name__
-            chunk["error_summary"] = error_summary
-            execution["status"] = "failed"
-            execution["updated_at_utc"] = _format_utc(failed_at)
-            execution["chunks_failed"] = int(execution.get("chunks_failed") or 0) + 1
-            _append_log(
-                log_jsonl,
-                {
-                    "event": "chunk_failed",
-                    "chunk_id": chunk["chunk_id"],
-                    "symbol": chunk["symbol"],
-                    "dataset_version": chunk["dataset_version"],
-                    "error_type": type(exc).__name__,
-                    "error_summary": error_summary,
-                    "finished_at_utc": _format_utc(failed_at),
-                },
-            )
-            _atomic_write_json(manifest_path, manifest)
-            return 1
+            while (
+                not failed_this_run
+                and retry_after_monotonic is None
+                and len(inflight) < workers
+                and not _runtime_limit_reached(
+                    started_monotonic=started_monotonic,
+                    max_runtime_seconds=max_runtime_seconds,
+                )
+                and (max_chunks is None or started_this_run < max_chunks)
+            ):
+                chunk = _next_schedulable_chunk(
+                    chunks=chunks,
+                    active_ranges_by_symbol=active_ranges_by_symbol,
+                )
+                if chunk is None:
+                    break
 
-        finished_at = _now_utc()
-        chunk["status"] = "completed"
-        chunk["finished_at_utc"] = _format_utc(finished_at)
-        chunk["rows_read"] = result.rows_read
-        chunk["rows_written"] = result.rows_written
-        chunk["batches_written"] = result.batches_written
-        execution["chunks_completed"] = int(execution.get("chunks_completed") or 0) + 1
-        execution["rows_read"] = int(execution.get("rows_read") or 0) + result.rows_read
-        execution["rows_written"] = int(execution.get("rows_written") or 0) + result.rows_written
-        execution["batches_written"] = (
-            int(execution.get("batches_written") or 0) + result.batches_written
+                skip_check_failed = False
+                if skip_covered_chunks:
+                    try:
+                        covered_chunk = _chunk_has_accepted_canonical_coverage(
+                            chunk=chunk,
+                            gateway=gateway,
+                            database=settings.database,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        skip_check_failed = True
+                        execution["coverage_skip_check_failures"] = (
+                            int(execution.get("coverage_skip_check_failures") or 0) + 1
+                        )
+                        _append_log(
+                            log_jsonl,
+                            {
+                                "event": "coverage_skip_check_failed",
+                                "chunk_id": chunk["chunk_id"],
+                                "symbol": chunk["symbol"],
+                                "dataset_version": chunk["dataset_version"],
+                                "start_utc": chunk["start_utc"],
+                                "end_utc": chunk["end_utc"],
+                                "error_type": type(exc).__name__,
+                                "error_summary": _safe_error_summary(exc),
+                                "finished_at_utc": _format_utc(_now_utc()),
+                                "workers": workers,
+                            },
+                        )
+                    else:
+                        skip_check_failed = not covered_chunk
+
+                if skip_covered_chunks and not skip_check_failed:
+                    finished_at = _now_utc()
+                    chunk["status"] = "completed"
+                    chunk["finished_at_utc"] = _format_utc(finished_at)
+                    chunk["rows_read"] = 0
+                    chunk["rows_written"] = 0
+                    chunk["batches_written"] = 0
+                    chunk["skip_reason"] = "accepted_canonical_coverage_exists"
+                    execution["chunks_completed"] = (
+                        int(execution.get("chunks_completed") or 0) + 1
+                    )
+                    execution["chunks_skipped_covered"] = (
+                        int(execution.get("chunks_skipped_covered") or 0) + 1
+                    )
+                    execution["updated_at_utc"] = _format_utc(finished_at)
+                    started_this_run += 1
+                    _append_log(
+                        log_jsonl,
+                        {
+                            "event": "chunk_skipped_covered",
+                            "chunk_id": chunk["chunk_id"],
+                            "symbol": chunk["symbol"],
+                            "dataset_version": chunk["dataset_version"],
+                            "start_utc": chunk["start_utc"],
+                            "end_utc": chunk["end_utc"],
+                            "finished_at_utc": _format_utc(finished_at),
+                            "workers": workers,
+                        },
+                    )
+                    _atomic_write_json(manifest_path, manifest)
+                    continue
+
+                started_at = _now_utc()
+                shard = str(chunk["symbol"])
+                chunk_range = _chunk_time_range(chunk)
+                chunk["status"] = "running"
+                chunk["started_at_utc"] = _format_utc(started_at)
+                chunk["coordinator"] = execution["coordinator"]
+                chunk["worker_count"] = workers
+                chunk["shard_key"] = shard
+                chunk["attempts"] = int(chunk.get("attempts") or 0) + 1
+                chunk.pop("finished_at_utc", None)
+                chunk.pop("error_type", None)
+                chunk.pop("error_summary", None)
+                execution["updated_at_utc"] = _format_utc(started_at)
+                _atomic_write_json(manifest_path, manifest)
+
+                future = executor.submit(
+                    _run_chunk,
+                    chunk=dict(chunk),
+                    use_case_factory=use_case_factory,
+                )
+                inflight[future] = chunk
+                active_ranges_by_symbol.setdefault(shard, []).append(chunk_range)
+                started_this_run += 1
+
+            if not inflight:
+                break
+
+            done, _pending = wait(inflight, return_when=FIRST_COMPLETED)
+            for future in done:
+                chunk = inflight.pop(future)
+                _remove_active_range(
+                    active_ranges_by_symbol=active_ranges_by_symbol,
+                    chunk=chunk,
+                )
+                try:
+                    result = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    failed_at = _now_utc()
+                    error_summary = _safe_error_summary(exc)
+                    chunk["finished_at_utc"] = _format_utc(failed_at)
+                    chunk["error_type"] = type(exc).__name__
+                    chunk["error_summary"] = error_summary
+                    execution["updated_at_utc"] = _format_utc(failed_at)
+                    attempts = int(chunk.get("attempts") or 1)
+                    if attempts < max_chunk_attempts:
+                        chunk["status"] = "pending"
+                        chunk["last_retry_at_utc"] = _format_utc(failed_at)
+                        execution["chunks_retried"] = int(execution.get("chunks_retried") or 0) + 1
+                        if failure_backoff_s > 0:
+                            retry_after_monotonic = max(
+                                retry_after_monotonic or 0.0,
+                                time.monotonic() + failure_backoff_s,
+                            )
+                        _append_log(
+                            log_jsonl,
+                            {
+                                "event": "chunk_retry_scheduled",
+                                "chunk_id": chunk["chunk_id"],
+                                "symbol": chunk["symbol"],
+                                "dataset_version": chunk["dataset_version"],
+                                "attempts": attempts,
+                                "max_chunk_attempts": max_chunk_attempts,
+                                "error_type": type(exc).__name__,
+                                "error_summary": error_summary,
+                                "finished_at_utc": _format_utc(failed_at),
+                                "failure_backoff_s": failure_backoff_s,
+                                "workers": workers,
+                            },
+                        )
+                        _atomic_write_json(manifest_path, manifest)
+                        continue
+
+                    failed_this_run = True
+                    chunk["status"] = "failed"
+                    execution["status"] = "failed"
+                    execution["chunks_failed"] = int(execution.get("chunks_failed") or 0) + 1
+                    _append_log(
+                        log_jsonl,
+                        {
+                            "event": "chunk_failed",
+                            "chunk_id": chunk["chunk_id"],
+                            "symbol": chunk["symbol"],
+                            "dataset_version": chunk["dataset_version"],
+                            "error_type": type(exc).__name__,
+                            "error_summary": error_summary,
+                            "finished_at_utc": _format_utc(failed_at),
+                            "workers": workers,
+                        },
+                    )
+                    _atomic_write_json(manifest_path, manifest)
+                    continue
+
+                chunk["status"] = "completed"
+                chunk["finished_at_utc"] = result.finished_at_utc
+                chunk["rows_read"] = result.rows_read
+                chunk["rows_written"] = result.rows_written
+                chunk["batches_written"] = result.batches_written
+                execution["chunks_completed"] = int(execution.get("chunks_completed") or 0) + 1
+                execution["rows_read"] = int(execution.get("rows_read") or 0) + result.rows_read
+                execution["rows_written"] = (
+                    int(execution.get("rows_written") or 0) + result.rows_written
+                )
+                execution["batches_written"] = (
+                    int(execution.get("batches_written") or 0) + result.batches_written
+                )
+                execution["updated_at_utc"] = result.finished_at_utc
+                _append_log(
+                    log_jsonl,
+                    {
+                        "event": "chunk_completed",
+                        "chunk_id": chunk["chunk_id"],
+                        "symbol": chunk["symbol"],
+                        "dataset_version": chunk["dataset_version"],
+                        "start_utc": chunk["start_utc"],
+                        "end_utc": chunk["end_utc"],
+                        "rows_read": result.rows_read,
+                        "rows_written": result.rows_written,
+                        "batches_written": result.batches_written,
+                        "started_at_utc": result.started_at_utc,
+                        "finished_at_utc": result.finished_at_utc,
+                        "workers": workers,
+                    },
+                )
+                _atomic_write_json(manifest_path, manifest)
+
+            if delay_s > 0 and inflight and not failed_this_run:
+                time.sleep(delay_s)
+
+    if failed_this_run:
+        failed_at = _now_utc()
+        execution["status"] = "failed"
+        execution["updated_at_utc"] = _format_utc(failed_at)
+        execution["pending_chunks"] = len(
+            [
+                chunk
+                for chunk in cast(Sequence[Mapping[str, Any]], manifest["chunks"])
+                if chunk.get("status") != "completed"
+            ]
         )
-        execution["updated_at_utc"] = _format_utc(finished_at)
-        completed_this_run += 1
-        _append_log(
-            log_jsonl,
-            {
-                "event": "chunk_completed",
-                "chunk_id": chunk["chunk_id"],
-                "symbol": chunk["symbol"],
-                "dataset_version": chunk["dataset_version"],
-                "start_utc": chunk["start_utc"],
-                "end_utc": chunk["end_utc"],
-                "rows_read": result.rows_read,
-                "rows_written": result.rows_written,
-                "batches_written": result.batches_written,
-                "finished_at_utc": _format_utc(finished_at),
-            },
-        )
         _atomic_write_json(manifest_path, manifest)
-        if delay_s > 0:
-            time.sleep(delay_s)
+        return 1
 
     remaining = [
         chunk
@@ -532,6 +722,10 @@ def _cmd_execute(args: argparse.Namespace) -> int:
         max_runtime_seconds=args.max_runtime_seconds,
         delay_s=float(args.delay_s),
         log_jsonl=args.log_jsonl,
+        workers=int(args.workers),
+        max_chunk_attempts=int(args.max_chunk_attempts),
+        failure_backoff_s=float(args.failure_backoff_s),
+        skip_covered_chunks=bool(args.skip_covered_chunks),
     )
 
 
@@ -583,6 +777,10 @@ def _build_parser() -> argparse.ArgumentParser:
     execute.add_argument("--max-chunks", type=int, default=None)
     execute.add_argument("--max-runtime-seconds", type=float, default=None)
     execute.add_argument("--delay-s", type=float, default=0.2)
+    execute.add_argument("--workers", type=int, default=1)
+    execute.add_argument("--max-chunk-attempts", type=int, default=1)
+    execute.add_argument("--failure-backoff-s", type=float, default=30.0)
+    execute.add_argument("--skip-covered-chunks", action="store_true")
     execute.add_argument("--log-jsonl", type=Path, default=DEFAULT_LOG_JSONL)
 
     coverage = sub.add_parser("coverage", help="Compute per-symbol/window coverage.")
@@ -718,6 +916,166 @@ def _task_from_chunk(chunk: Mapping[str, Any]) -> RestFillTask:
             UtcTimestamp(_parse_utc(str(chunk["end_utc"]))),
         ),
         reason="stage04b_backfill",
+    )
+
+
+def _make_rest_fill_use_case(
+    *,
+    cfg: Any,
+    gateway: ClickHouseGateway,
+    database: str,
+    batch_size: int,
+    ingest_id: Any,
+) -> RestFillRange1mUseCase:
+    clock = SystemClock()
+    source = RestCandleIngestSource(
+        cfg=cfg,
+        clock=clock,
+        http=RequestsHttpClient(),
+        ingest_id=ingest_id,
+    )
+    return RestFillRange1mUseCase(
+        source=source,
+        writer=ClickHouseRawKlineWriter(gateway=gateway, database=database),
+        clock=clock,
+        max_days_per_insert=cfg.backfill.max_days_per_insert,
+        batch_size=batch_size,
+        index_reader=ClickHouseCanonicalCandleIndexReader(
+            gateway=gateway,
+            database=database,
+        ),
+    )
+
+
+def _run_chunk(
+    *,
+    chunk: Mapping[str, Any],
+    use_case_factory: Callable[[], RestFillRange1mUseCase],
+) -> ChunkRunReport:
+    started_at = _now_utc()
+    result = use_case_factory().run(_task_from_chunk(chunk))
+    finished_at = _now_utc()
+    return ChunkRunReport(
+        chunk_id=str(chunk["chunk_id"]),
+        rows_read=result.rows_read,
+        rows_written=result.rows_written,
+        batches_written=result.batches_written,
+        started_at_utc=_format_utc(started_at),
+        finished_at_utc=_format_utc(finished_at),
+    )
+
+
+def _chunk_has_accepted_canonical_coverage(
+    *,
+    chunk: Mapping[str, Any],
+    gateway: ClickHouseGateway,
+    database: str,
+) -> bool:
+    start = _parse_utc(str(chunk["start_utc"]))
+    end = _parse_utc(str(chunk["end_utc"]))
+    entry = coverage_entry_from_row(
+        symbol=str(chunk["symbol"]),
+        dataset_version=str(chunk["dataset_version"]),
+        start=start,
+        end=end,
+        row=_query_coverage_row(
+            gateway=gateway,
+            database=database,
+            market_id=int(chunk["market_id"]),
+            symbol=str(chunk["symbol"]),
+            start=start,
+            end=end,
+        ),
+    )
+    return (
+        entry["missing_minutes"] == 0
+        and entry["duplicate_rows"] == 0
+        and entry["volume_quote_rows"] == entry["physical_rows"]
+        and entry["trades_count_rows"] == entry["physical_rows"]
+        and entry["vwap_computable_rows"] + entry["zero_volume_rows"]
+        == entry["physical_rows"]
+    )
+
+
+def _next_schedulable_chunk(
+    *,
+    chunks: Sequence[dict[str, Any]],
+    active_ranges_by_symbol: Mapping[str, Sequence[tuple[datetime, datetime]]],
+) -> dict[str, Any] | None:
+    for chunk in chunks:
+        if chunk.get("status") == "completed":
+            continue
+        if chunk.get("status") == "failed":
+            continue
+        if _overlaps_active_range(
+            chunk=chunk,
+            active_ranges_by_symbol=active_ranges_by_symbol,
+        ):
+            continue
+        return chunk
+    return None
+
+
+def _chunk_time_range(chunk: Mapping[str, Any]) -> tuple[datetime, datetime]:
+    return _parse_utc(str(chunk["start_utc"])), _parse_utc(str(chunk["end_utc"]))
+
+
+def _overlaps_active_range(
+    *,
+    chunk: Mapping[str, Any],
+    active_ranges_by_symbol: Mapping[str, Sequence[tuple[datetime, datetime]]],
+) -> bool:
+    symbol = str(chunk["symbol"])
+    active_ranges = active_ranges_by_symbol.get(symbol, ())
+    if not active_ranges:
+        return False
+    start, end = _chunk_time_range(chunk)
+    return any(
+        start < active_end and end > active_start
+        for active_start, active_end in active_ranges
+    )
+
+
+def _remove_active_range(
+    *,
+    active_ranges_by_symbol: dict[str, list[tuple[datetime, datetime]]],
+    chunk: Mapping[str, Any],
+) -> None:
+    symbol = str(chunk["symbol"])
+    active_ranges = active_ranges_by_symbol.get(symbol)
+    if not active_ranges:
+        return
+    chunk_range = _chunk_time_range(chunk)
+    try:
+        active_ranges.remove(chunk_range)
+    except ValueError:
+        return
+    if not active_ranges:
+        active_ranges_by_symbol.pop(symbol, None)
+
+
+def _reset_retryable_failed_chunks(
+    *,
+    chunks: Sequence[dict[str, Any]],
+    max_chunk_attempts: int,
+) -> None:
+    for chunk in chunks:
+        if chunk.get("status") != "failed":
+            continue
+        if int(chunk.get("attempts") or 0) >= max_chunk_attempts:
+            continue
+        chunk["status"] = "pending"
+        chunk["retry_reason"] = "retryable_previous_failure"
+
+
+def _runtime_limit_reached(
+    *,
+    started_monotonic: float,
+    max_runtime_seconds: float | None,
+) -> bool:
+    return (
+        max_runtime_seconds is not None
+        and time.monotonic() - started_monotonic >= max_runtime_seconds
     )
 
 

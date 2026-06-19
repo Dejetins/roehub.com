@@ -158,6 +158,12 @@ Mac Studio path contract:
 - Agents MUST run remote git commands with `git -C /Users/daniildegtyarev/Projects/roehub.com ...` and MUST NOT run `git pull`, `git status`, `git reset`, or branch commands inside `/opt/roehub/app`.
 - Runtime deployment updates `/opt/roehub/app` via the deploy workflow or explicit rsync/tar bundle semantics from the verified checkout, then runs bootstrap/reload/smoke from the runtime tree.
 
+Remote command quoting contract:
+- Agents MUST NOT inline nested shell quoting for SSH commands that contain SQL, JSON, here-strings, multiline shell bodies, or payloads with apostrophes/backticks/dollar signs.
+- For SSH + SQL/JSON/multiline payloads, agents MUST pass the payload through a quoted heredoc or stdin (`<<'SQL'`, `<<'JSON'`, `--queries-file /dev/stdin`, `query=@-`, or equivalent) so local shell, SSH, remote shell, and payload parsing stay separate.
+- Agents MUST NOT create temporary files solely to work around shell quoting. Use stdin/heredoc first; only use a durable runtime artifact when the task itself requires one and document why.
+- For Mac Studio ClickHouse checks, prefer `ssh macstudio 'zsh -lc "... clickhouse client --queries-file /dev/stdin"' <<'SQL' ... SQL` over `--query "SELECT ... symbol='...'"`.
+
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
 
 When generating executor prompts, the agent SHOULD use `prompt-manager` and SHOULD encode task-specific skill routing inside the generated prompt: which exact skill to use, when in the workflow to use it, and what boundary it owns. Generated prompts MUST NOT instruct executors to preload all available skills.

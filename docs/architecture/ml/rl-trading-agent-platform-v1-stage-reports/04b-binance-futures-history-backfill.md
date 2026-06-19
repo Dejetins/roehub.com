@@ -13,7 +13,7 @@ collected_at: "2026-06-19"
 
 User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat.
 
-Stage `04B` стартовал managed resumable/background backfill для accepted Stage `04A` universe. Это start-only evidence: ClickHouse ingestion доказан через новые rows/high-watermark deltas, но полный historical load и full coverage report еще не завершены. Stage `04C` остается blocked до completed coverage manifest.
+Stage `04B` стартовал managed resumable/background backfill для accepted Stage `04A` universe. Это start-only/in-progress evidence: ClickHouse ingestion доказан через rows/high-watermark deltas и продолжающийся resumable coordinator, но полный historical load и full coverage report еще не завершены. Stage `04C` остается blocked до completed coverage manifest.
 
 ## Scope
 
@@ -94,6 +94,15 @@ Selected path: `scripts/rl_trading/stage04b_binance_futures_history_backfill.py 
 - `ClickHouseCanonicalCandleIndexReader` for dedup/read-back guardrails;
 - existing ClickHouse materialization path for canonical rows.
 
+Coordinator mode:
+
+| Mode | Status | Safety model |
+|---|---|---|
+| Sequential `--workers 1` | Default / backward compatible | Preserves original one-chunk-at-a-time behavior. |
+| Sharded parallel `--workers N` | Opt-in operator mode; Stage `04B` runtime uses `--workers 4` | Uses `ThreadPoolExecutor` over the same `RestFillRange1mUseCase`; ClickHouse access uses `ThreadLocalClickHouseConnectGateway`; scheduler permits at most one active chunk per `symbol` shard, so overlapping source windows for the same symbol are not processed concurrently. |
+
+The parallel coordinator does not implement a separate candle downloader. Each worker builds the same REST source, raw writer, canonical index reader, and `RestFillRange1mUseCase` wiring used by the sequential runner.
+
 Rejected alternatives:
 
 | Alternative | Decision |
@@ -101,6 +110,24 @@ Rejected alternatives:
 | `apps/cli/commands/backfill_1m.py` | Rejected for Stage `04B`: current CLI is parquet/file oriented and requires `--parquet`; it is not the direct public REST historical bootstrap runner. |
 | `apps/cli/commands/rest_catchup_1m.py` | Rejected for initial bootstrap: it raises on missing canonical seed and is intended for seeded tail/gap maintenance. |
 | Scheduler queue only | Not used as the stage entrypoint because Stage `04B` needs a durable per-symbol resume manifest, start-proof paths, and bounded operator command. The runner still reuses the same fill use case and raw writer path. |
+
+## Parallel Coordinator Restart
+
+On `2026-06-19`, the initial sequential long run was stopped and replaced with the opt-in sharded coordinator because the observed runtime had only one active chunk at a time.
+
+| Field | Value |
+|---|---|
+| Sequential PID stopped | `4579` via `SIGTERM` |
+| Sequential baseline sample | `2026-06-19T08:15:34Z` to `2026-06-19T08:16:34Z`: `10` completed chunks/minute, `97,985` rows read/minute, `0` rows written/minute in that sample |
+| First parallel command | `execute --workers 4 --max-runtime-seconds 21600 --delay-s 0.2` |
+| First parallel PID | `18406` |
+| Launch correction | First restart attempt PID `18177` did not start because non-login `zsh -s` lacked `uv` in `PATH`; final command uses `/opt/homebrew/bin/uv`. |
+| First parallel manifest proof | `coordinator=sharded_parallel`, `workers=4`, `running=4`, active shards `AAVEUSDT`, `ACEUSDT`, `ACHUSDT`, `ADAUSDT` |
+| First parallel result | Too aggressive: after ~60s, all four active shards hit `HTTP request failed after retries url=https://fapi.binance.com/fapi/v1/klines`; process stopped fail-closed with `4` failed chunks. This is treated as a rate/backoff ceiling, not accepted speed evidence. |
+| Current parallel command | `execute --workers 2 --max-chunk-attempts 3 --failure-backoff-s 60 --max-runtime-seconds 21600 --delay-s 0.2` |
+| Current parallel PID | `18688` |
+| Current safety adjustment | Bounded retry/backoff is explicit for this run. Default CLI remains fail-fast with `--max-chunk-attempts 1`. |
+| Contract impact | `compatible-change`: opt-in operator concurrency only; public API, DB schema, DTOs, and `RestFillRange1mUseCase` contract unchanged. |
 
 ## Dry-Run Manifest
 
@@ -145,9 +172,10 @@ Managed/background command state:
 | Field | Value |
 |---|---|
 | PID file | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill.pid` |
-| Observed PID | `76736` |
-| Process state at final observation | original background PID exited; manifest status is `paused_with_pending_chunks` after one bounded retry |
-| Initial background self-stop bound | `--max-runtime-seconds 600` |
+| Initial observed PID | `76736` |
+| Current observed PID | `18688` |
+| Current process state | `running` with `coordinator=sharded_parallel`, `workers=2`, `max_chunk_attempts=3` |
+| Initial background self-stop bound | `--max-runtime-seconds 600`; current restart bound is `--max-runtime-seconds 21600` |
 | Resume manifest | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_resume_manifest.json` |
 | JSONL log | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_run.jsonl` |
 | Nohup log | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_nohup.log` |
@@ -168,6 +196,47 @@ Resume manifest after bounded observation:
 | Updated at | `2026-06-18T23:40:40Z` |
 
 One transient `RuntimeError` event occurred on chunk `6346bcfab2c11d38e852cd3b`; a bounded `--max-chunks 1` retry completed that same chunk successfully. The manifest currently has `0` chunks with `status=failed`.
+
+Current sharded run initial observation after successful restart:
+
+| Metric | Value |
+|---|---:|
+| Observed at | `2026-06-19T08:25:18Z` |
+| PID | `18688` |
+| Coordinator | `sharded_parallel` |
+| Workers | `2` |
+| Max chunk attempts | `3` |
+| Chunks completed | `1,647` |
+| Running chunks | `2` |
+| Pending chunks | `43,297` |
+| Current failed chunks | `0` |
+| Running shards | `AAVEUSDT`, `ACEUSDT` |
+
+Short runtime performance sample:
+
+| Mode | Window | Completed chunks/min | Rows read/min | Rows written/min | Failed chunks | Retries |
+|---|---|---:|---:|---:|---:|---:|
+| Sequential baseline, PID `4579` | `2026-06-19T08:15:34Z` to `2026-06-19T08:16:34Z` | `10` | `97,985` | `0` | `0` | `0` |
+| Sharded parallel, PID `18688`, `workers=2` | `2026-06-19T08:25:32Z` to `2026-06-19T08:26:33Z` | `16` | `161,280` | `0` | `0` | `0` |
+
+Interpretation: the accepted current operator setting is `workers=2`, which showed about `+60%` chunks/minute and `+65%` rows-read/minute on a short runtime sample without retries or failed chunks. The `workers=4` sample is rejected as unsafe for the current external REST/runtime environment because it produced simultaneous HTTP retry exhaustion.
+
+Latest runtime recheck:
+
+| Metric | Value |
+|---|---:|
+| Observed at | `2026-06-19T08:30:03Z` |
+| PID | `18688` |
+| Execution status | `running` |
+| Chunks completed | `1,700` |
+| Running chunks | `2` |
+| Pending chunks | `43,244` |
+| Failed chunks | `0` |
+| Retried chunks | `1` |
+| Rows read | `17,055,362` |
+| Rows written | `1,131,623` |
+
+The single transient retry recovered after the configured `60s` backoff; the process resumed with two active shards and no terminal failed chunks.
 
 Completed chunks observed in log:
 
@@ -226,12 +295,12 @@ Coverage acceptance criteria for the follow-up:
 | Persisted schema | `none` | No schema migration or table shape change. |
 | Persisted rows / identity semantics | `compatible-change` | Adds raw/canonical market-data rows for accepted `binance:futures` symbols through existing append/materialization path; chunk IDs and resume status are deterministic runtime artifacts. |
 | Config schema/defaults | `none` | No config schema/default changed. Host-local env was used only to connect to ClickHouse on Mac Studio. |
-| Service-call auth/timeout/retry/error semantics | `compatible-change` | Public Binance Futures REST calls use existing market-data config timeouts/retries; no private/account endpoint and no exchange-side effect. |
+| Service-call auth/timeout/retry/error semantics | `compatible-change` | Public Binance Futures REST calls use existing market-data config timeouts/retries; sharded operator run uses `--workers 2`; no private/account endpoint and no exchange-side effect. |
 | External side-effect idempotency/unknown-state | `compatible-change` | Unknown-state retries are guarded by resume manifest plus canonical read-back dedup. Interrupted execution resumes pending chunks only. |
 | Logs/metrics/traces/audit/ledger/report semantics | `compatible-change` | Adds sanitized runtime JSON manifest/logs and docs summaries; no raw provider payloads or secrets in docs/git. |
 | Alert/runbook semantics | `none` | No alert routing or service manager config changed. |
 | Browser-visible behavior | `none` | Browser/runtime UI verification disabled by prompt and not relevant. |
-| Performance/hot path | `none` | Operator backfill job is offline; no live inference/execution hot path changed. |
+| Performance/hot path | `none` | Operator backfill throughput changed, but the job is offline; no live inference/execution hot path changed. |
 
 ## Service-Call And Runtime Coverage
 
@@ -241,7 +310,7 @@ Coverage acceptance criteria for the follow-up:
 | Private/auth exchange call | `N/A`: no Binance private/account endpoint, no order endpoint, no signed request, no exchange credential. |
 | ClickHouse write | Covered: existing `ClickHouseRawKlineWriter` writes raw 1m rows; canonical materialization is existing market-data pipeline. No schema change. |
 | Timeout/retry/backoff | Covered by existing `configs/prod/market_data.yaml` REST settings loaded by the same market-data source; this stage did not change defaults. |
-| Rate/batch bounding | Covered: source requests remain 1,000-minute Binance windows; runner chunks source windows into seven-day chunks; raw insert batch size default is `10,000`; background run used `--max-runtime-seconds 600`. |
+| Rate/batch bounding | Covered: source requests remain 1,000-minute Binance windows; runner chunks source windows into seven-day chunks; raw insert batch size default is `10,000`; current sharded run uses `--workers 4`, one active chunk per symbol, `--delay-s 0.2`, and `--max-runtime-seconds 21600`. |
 | Idempotency / retry after unknown state | Covered: chunk resume manifest records pending/running/completed/failed state; `RestFillRange1mUseCase` reads canonical minutes and skips existing rows before writing. |
 | Redaction boundary | Covered: docs include counts, hashes, paths, PID and sanitized UUID only; secrets/env values and raw provider payloads are not copied into docs/git. |
 | Alerts / runbook | `N/A`: no Monit/launchd/systemd, alert routing, or operational paging rule changed. |
@@ -253,12 +322,15 @@ Coverage acceptance criteria for the follow-up:
 | Gate | Result |
 |---|---|
 | `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/04b-binance-futures-history-backfill.md` | passed; hash recorded above |
-| `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed: `4 passed`; Mac Studio passed: `4 passed` |
+| `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed: `7 passed`; Mac Studio passed: `7 passed` |
 | `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py tests/unit/contexts/market_data/application/use_cases/test_rest_fill_range_1m.py tests/unit/contexts/market_data/application/use_cases/test_backfill_1m_candles.py tests/unit/contexts/market_data/application/use_cases/test_rest_catchup_1m.py` | passed: `16 passed` |
 | `uv run ruff check scripts/rl_trading/stage04b_binance_futures_history_backfill.py tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed; Mac Studio passed |
+| `uv run pyright scripts/rl_trading/stage04b_binance_futures_history_backfill.py tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed: `0 errors` |
 | `uv run ruff check apps/cli src/trading/contexts/market_data scripts/rl_trading tests/unit/contexts/market_data tests/unit/apps/cli tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | passed |
 | Mac Studio dry-run manifest generation | passed; `215` active symbols, `0` stale symbols, `44,946` chunks |
 | Mac Studio bounded background start proof | passed; PID `76736` launched, final manifest `paused_with_pending_chunks`, `6` chunks completed, `60,480` rows written, ClickHouse first/high-watermark moved |
+| Mac Studio sharded restart proof | passed; PID `18688` running with `coordinator=sharded_parallel`, `workers=2`, `running=2`, `failed=0` |
+| Mac Studio short performance sample | passed; sequential `10` chunks/min and `97,985` rows_read/min vs sharded `workers=2` `16` chunks/min and `161,280` rows_read/min; `0` failures/retries in accepted sample |
 | CLI-specific pytest gate | not run; no CLI path changed |
 | `uv run pyright scripts/rl_trading/stage04b_binance_futures_history_backfill.py tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | passed: `0 errors` |
 | `python -m tools.docs.generate_docs_index && python -m tools.docs.generate_docs_index --check` | passed; generated index was unchanged and up to date |

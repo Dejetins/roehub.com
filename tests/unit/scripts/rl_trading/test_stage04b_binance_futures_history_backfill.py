@@ -6,6 +6,9 @@ from scripts.rl_trading.stage04b_binance_futures_history_backfill import (
     DATASET_HF_PERIOD_REBUILD,
     DATASET_POST_HF_EXTENSION,
     STALE_REASON,
+    _build_parser,
+    _next_schedulable_chunk,
+    _reset_retryable_failed_chunks,
     _safe_error_summary,
     build_plan_manifest,
     coverage_entry_from_row,
@@ -155,3 +158,100 @@ def test_stage04b_error_summary_does_not_keep_raw_response_body() -> None:
     )
 
     assert summary == "HTTP 418 for https://fapi.binance.com/fapi/v1/klines"
+
+
+def test_stage04b_execute_workers_default_to_sequential() -> None:
+    args = _build_parser().parse_args(["execute"])
+
+    assert args.workers == 1
+    assert args.max_chunk_attempts == 1
+    assert args.skip_covered_chunks is False
+
+
+def test_stage04b_execute_accepts_explicit_worker_count() -> None:
+    args = _build_parser().parse_args(
+        ["execute", "--workers", "4", "--max-chunk-attempts", "3", "--skip-covered-chunks"]
+    )
+
+    assert args.workers == 4
+    assert args.max_chunk_attempts == 3
+    assert args.skip_covered_chunks is True
+
+
+def test_stage04b_parallel_scheduler_allows_non_overlapping_same_symbol_chunks() -> None:
+    chunks = [
+        {
+            "chunk_id": "a",
+            "symbol": "BTCUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-08T00:00:00Z",
+            "end_utc": "2024-01-15T00:00:00Z",
+        },
+        {
+            "chunk_id": "b",
+            "symbol": "ETHUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+        },
+    ]
+
+    selected = _next_schedulable_chunk(
+        chunks=chunks,
+        active_ranges_by_symbol={
+            "BTCUSDT": [
+                (
+                    datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+                    datetime(2024, 1, 8, 0, 0, tzinfo=UTC),
+                )
+            ]
+        },
+    )
+
+    assert selected == chunks[0]
+
+
+def test_stage04b_parallel_scheduler_blocks_overlapping_same_symbol_chunks() -> None:
+    chunks = [
+        {
+            "chunk_id": "a",
+            "symbol": "BTCUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-07T00:00:00Z",
+            "end_utc": "2024-01-14T00:00:00Z",
+        },
+        {
+            "chunk_id": "b",
+            "symbol": "ETHUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+        },
+    ]
+
+    selected = _next_schedulable_chunk(
+        chunks=chunks,
+        active_ranges_by_symbol={
+            "BTCUSDT": [
+                (
+                    datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
+                    datetime(2024, 1, 8, 0, 0, tzinfo=UTC),
+                )
+            ]
+        },
+    )
+
+    assert selected == chunks[1]
+
+
+def test_stage04b_reset_retryable_failed_chunks_keeps_exhausted_failures_terminal() -> None:
+    chunks = [
+        {"chunk_id": "a", "symbol": "BTCUSDT", "status": "failed", "attempts": 1},
+        {"chunk_id": "b", "symbol": "ETHUSDT", "status": "failed", "attempts": 3},
+    ]
+
+    _reset_retryable_failed_chunks(chunks=chunks, max_chunk_attempts=3)
+
+    assert chunks[0]["status"] == "pending"
+    assert chunks[0]["retry_reason"] == "retryable_previous_failure"
+    assert chunks[1]["status"] == "failed"
