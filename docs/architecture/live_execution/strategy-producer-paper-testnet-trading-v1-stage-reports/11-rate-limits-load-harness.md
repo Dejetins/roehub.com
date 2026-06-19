@@ -1,8 +1,10 @@
 # Stage 11: Rate Limits And Load Harness
 
-Статус: `in_progress`.
+Статус: `accepted`.
 
 Дата старта: `2026-06-20`.
+
+Дата acceptance: `2026-06-20`.
 
 ## Pre-Start
 
@@ -120,6 +122,11 @@ Files outside prompt expected paths: `tests/unit/infra/test_monitoring_assets.py
 | Broad pre-publish ruff | passed | `uv run ruff check .` -> `All checks passed!`. |
 | Broad pre-publish pyright | passed | `uv run pyright` -> `0 errors`. |
 | Broad pre-publish pytest | passed after test inventory repair | First run failed only because `tests/unit/infra/test_monitoring_assets.py` intentionally enumerated Prometheus alert names and did not yet include the two new Stage `11` alerts. After updating the managed-alert inventory test and the non-testnet harness invariant, `uv run pytest -q -ra` -> `1257 passed, 3 warnings`. |
+| GitHub publish preflight | passed | `gh --version` -> `2.85.0`; `gh auth status` succeeded with output suppressed by local hook policy; staged path list matched the Stage `11` file manifest. |
+| Direct main delivery | passed | Commit `c4993cc9520965d4ec46d402f4ea0b05fb5f8907` (`Add rate limit load harness`) pushed to `origin/main`; no temporary branch/PR used. |
+| CI and deploy | passed | CI `27850016681`, Publish App Image `27850083075`, Deploy Backend `27850083079`, Deploy Web `27850083069` and `27850089185` all succeeded. |
+| Mac Studio checkout/runtime | passed | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded from `7dd72316` to `c4993cc9`; `scripts/macos/smoke_prod.sh` exited `0`. |
+| Mac Studio controlled load | passed | Host-side `uv run python -m apps.exchange_execution.load_harness --strategies 120 --read-count 25 --rate-limit-per-second 60 --rate-limit-burst 20 --pretty` -> `passed=true`, `violations=[]`, duration `9.359749s`. |
 
 ## Load Evidence
 
@@ -159,6 +166,25 @@ Controlled probes:
 | Backpressure | pass | `result=retry`, `reason=dispatch_backpressure`, `retry_count=1`, `request_count=0`, `dlq_count=0`. |
 | Retry budget | pass | `result=dlq`, `reason=retry_budget_exhausted`, `request_count=0`, `dlq_count=0`, no order side effect. |
 
+## Mac Studio Host Evidence
+
+The same controlled load command was rerun from the synced Mac Studio checkout at `c4993cc9`.
+
+| Metric | Result |
+|---|---:|
+| Run result | `passed=true`, `violations=[]`, duration `9.359749s` |
+| Requests / submitted / acked | `120 / 120 / 120` |
+| Mode mix / order environment | `testnet=120`, `paper=0`; orders by environment `testnet=120` |
+| Main guard / adapter / quarantined | `0 / 0 / 0` |
+| Main retry / DLQ | `0 / 0` |
+| Redis pending final / max pending | `0 / 25` |
+| Queue lag | p95 `8849.691ms`, p99 `9243.284ms` |
+| Signal-to-source / source-to-intent | p99 `0.044ms` / `0.075ms` |
+| Risk / dispatch | p99 `0.005ms` / `0.027ms` |
+| Limiter waits | total `6.596224s`, p99 `16.302ms`, max `16.453ms` |
+| Limiter waits by exchange | `binance=3.329253s`, `bybit=3.266971s` |
+| CPU / RSS delta | `0.303738s` / `1.46875MB` |
+
 Safety notes:
 
 - No real Binance/Bybit HTTP requests were sent by this load run.
@@ -169,14 +195,23 @@ Safety notes:
 
 ## Publish / Deploy
 
-Pending direct `main` delivery. Stage must not be marked `accepted` until CI/deploy evidence, Mac Studio checkout sync, runtime smoke, and branch cleanup evidence are recorded.
+| Item | Evidence |
+|---|---|
+| Branch | `main` |
+| Commit | `c4993cc9520965d4ec46d402f4ea0b05fb5f8907` (`Add rate limit load harness`) |
+| PR / branch cleanup | none; direct `main` delivery, so temporary branch cleanup `N/A` |
+| CI | `27850016681` passed |
+| Deploy | Publish App Image `27850083075`, Deploy Backend `27850083079`, Deploy Web `27850083069` and `27850089185` passed |
+| Mac Studio checkout | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `c4993cc9` |
+| Runtime smoke | `scripts/macos/smoke_prod.sh` exited `0` |
+| Host load proof | Mac Studio controlled 120-strategy `testnet`-mode load passed with `violations=[]` |
 
 ## Blockers
 
 | Blocker | Severity | Owner / next action | Acceptance impact |
 |---|---|---|---|
-| main delivery, CI/deploy, Mac Studio host sync/runtime smoke pending | blocker | Complete direct-main publish/deploy, sync Mac Studio checkout, run runtime smoke, and update this report/ledger before acceptance. | Stage remains `in_progress`; Stage `12` may not start. |
+| none | none | Stage `12` may start. Keep Stage `11` harness controlled/testnet-only and do not replace Stage `12` 24h observation with short smoke or local-only load evidence. | none |
 
 ## Handoff
 
-Local implementation and validation are complete. Next handoff is direct `main` delivery plus CI/deploy/Mac Studio runtime proof before acceptance.
+Stage `12` may start from accepted Stage `11`. Preserve the enforced per-exchange limiter, limiter wait metrics, dispatch/backpressure probes, no-mainnet invariant, and controlled host-side load harness as the pre-soak load gate. Stage `12` still requires the actual 24h logged observation gate before acceptance.
