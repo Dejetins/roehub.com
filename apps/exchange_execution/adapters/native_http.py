@@ -136,6 +136,26 @@ class BinanceTestnetOrderAdapter:
         *,
         connection: ExchangeExecutionConnection,
     ) -> ExchangePrivateStreamSession:
+        if connection.market_type == "spot":
+            now = datetime.now(tz=UTC)
+            return ExchangePrivateStreamSession(
+                session_id=_session_uuid(
+                    "binance",
+                    f"spot-rest-user-stream-deprecated:{connection.connection_id}",
+                ),
+                exchange_name="binance",
+                environment=connection.environment,
+                market_type=connection.market_type,
+                status="degraded",
+                status_reason="binance_spot_rest_user_stream_deprecated",
+                opened_at=now,
+                keepalive_at=None,
+                expires_at=None,
+                metadata={
+                    "provider": "binance",
+                    "private_stream": "rest_listen_key_deprecated",
+                },
+            )
         base_url, path = _binance_base_and_listen_key_path(
             market_type=connection.market_type
         )
