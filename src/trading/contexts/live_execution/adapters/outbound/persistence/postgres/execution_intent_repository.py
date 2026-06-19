@@ -717,7 +717,13 @@ def _datetime_or_none(value: object) -> datetime | None:
 
 
 def _int_or_none(value: object) -> int | None:
-    return int(value) if value is not None else None
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, Decimal | float | str | bytes | bytearray):
+        return int(value)
+    return int(str(value))
 
 
 def _str_or_none(value: object) -> str | None:
