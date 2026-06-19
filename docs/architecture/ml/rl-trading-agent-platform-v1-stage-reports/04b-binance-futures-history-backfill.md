@@ -81,7 +81,7 @@ Outside expected paths: none for Stage `04B`. The checkout already had unrelated
 | Prompt sha256 | `899a79b0664852cc576b7e343d820c9b4a8d2143fd8452e158d1c604085d3c25` |
 | Ledger state before implementation | Stage `04A` accepted; `current_stage=04B`; Stage `04B` pending |
 | Required prerequisite | Stage `04A` accepted |
-| Delivery state | Repository changes are `local-only`; no branch, PR, merge, main delivery or app deploy. Runtime start proof ran on Mac Studio from copied local script/test files. |
+| Delivery state | Report/ledger changes are `local-only`; no branch, PR, merge or app deploy was performed in this run. Local checkout is on `80327d15`; Mac Studio checkout was behind at `fe956e0a`, so the Stage `04B` runner/test files were copied there as untracked runtime tooling for proof only. |
 | Large/runtime artifacts | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/`; no raw candle dumps, raw provider payloads, secrets or credentials are committed. |
 
 ## Selected Backfill Path
@@ -146,25 +146,28 @@ Managed/background command state:
 |---|---|
 | PID file | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill.pid` |
 | Observed PID | `76736` |
-| Process state at observation | `running`, elapsed `00:44` |
-| Self-stop bound | `--max-runtime-seconds 600` |
+| Process state at final observation | original background PID exited; manifest status is `paused_with_pending_chunks` after one bounded retry |
+| Initial background self-stop bound | `--max-runtime-seconds 600` |
 | Resume manifest | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_resume_manifest.json` |
 | JSONL log | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_run.jsonl` |
 | Nohup log | `/opt/roehub/state/rl_trading/stage04b_binance_futures_history_backfill/stage04b_backfill_nohup.log` |
-| `ingest_id` | `f882a124-8ed1-403b-948c-a2e61f7aaa8e` |
+| Latest `ingest_id` | `b3847ad9-b9c5-439a-b6f5-14c5b216456e` |
 
 Resume manifest after bounded observation:
 
 | Metric | Value |
 |---|---:|
-| Execution status | `running` |
-| Chunks completed | `5` |
-| Chunks failed | `0` |
-| Rows read | `50,400` |
-| Rows written | `50,400` |
-| Batches written | `10` |
+| Execution status | `paused_with_pending_chunks` |
+| Chunks completed | `6` |
+| Current failed chunks | `0` |
+| Pending chunks | `44,940` |
+| Rows read | `60,480` |
+| Rows written | `60,480` |
+| Batches written | `12` |
 | Started at | `2026-06-18T23:36:12Z` |
-| Updated at | `2026-06-18T23:36:39Z` |
+| Updated at | `2026-06-18T23:40:40Z` |
+
+One transient `RuntimeError` event occurred on chunk `6346bcfab2c11d38e852cd3b`; a bounded `--max-chunks 1` retry completed that same chunk successfully. The manifest currently has `0` chunks with `status=failed`.
 
 Completed chunks observed in log:
 
@@ -175,19 +178,20 @@ Completed chunks observed in log:
 | `1000BONKUSDT` | `hf_period_rebuild_current_trading` | `[2023-12-06T14:00:00Z, 2023-12-13T14:00:00Z)` | `10,080` | `10,080` |
 | `1000BONKUSDT` | `hf_period_rebuild_current_trading` | `[2023-12-13T14:00:00Z, 2023-12-20T14:00:00Z)` | `10,080` | `10,080` |
 | `1000BONKUSDT` | `hf_period_rebuild_current_trading` | `[2023-12-20T14:00:00Z, 2023-12-27T14:00:00Z)` | `10,080` | `10,080` |
+| `1000BONKUSDT` | `hf_period_rebuild_current_trading` | `[2023-12-27T14:00:00Z, 2024-01-03T14:00:00Z)` | `10,080` | `10,080` |
 
 ClickHouse row/high-watermark evidence:
 
 | Symbol | Before rows | Before first | Before last | After rows | After first | After last |
 |---|---:|---|---|---:|---|---|
-| `1000BONKUSDT` | `192` | `2026-06-18 20:23:00.000` | `2026-06-18 23:34:00.000` | `50,594` | `2023-11-22 14:00:00.000` | `2026-06-18 23:36:00.000` |
+| `1000BONKUSDT` | `192` | `2026-06-18 20:23:00.000` | `2026-06-18 23:34:00.000` | `60,677` | `2023-11-22 14:00:00.000` | `2026-06-18 23:39:00.000` |
 | `BTCUSDT` | `3,564,337` | `2019-09-08 17:57:00.000` | `2026-06-18 23:34:00.000` | `3,564,339` | `2019-09-08 17:57:00.000` | `2026-06-18 23:36:00.000` |
 
 Interpretation:
 
 - Historical ingestion started for the first accepted Stage `04A` symbol.
 - The first candle for `1000BONKUSDT` moved from current-tail-only `2026-06-18T20:23:00Z` back to `2023-11-22T14:00:00Z`.
-- Stage `04B` is not accepted yet because `44,946` planned chunks are not completed and the full coverage report is not available.
+- Stage `04B` is not accepted yet because `44,940` chunks remain pending and the full coverage report is not available.
 
 ## Coverage Status
 
@@ -249,12 +253,15 @@ Coverage acceptance criteria for the follow-up:
 | Gate | Result |
 |---|---|
 | `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/04b-binance-futures-history-backfill.md` | passed; hash recorded above |
-| `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed: `3 passed`; Mac Studio passed: `3 passed` |
+| `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed: `4 passed`; Mac Studio passed: `4 passed` |
+| `uv run pytest -q tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py tests/unit/contexts/market_data/application/use_cases/test_rest_fill_range_1m.py tests/unit/contexts/market_data/application/use_cases/test_backfill_1m_candles.py tests/unit/contexts/market_data/application/use_cases/test_rest_catchup_1m.py` | passed: `16 passed` |
 | `uv run ruff check scripts/rl_trading/stage04b_binance_futures_history_backfill.py tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | local passed; Mac Studio passed |
+| `uv run ruff check apps/cli src/trading/contexts/market_data scripts/rl_trading tests/unit/contexts/market_data tests/unit/apps/cli tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | passed |
 | Mac Studio dry-run manifest generation | passed; `215` active symbols, `0` stale symbols, `44,946` chunks |
-| Mac Studio bounded background start proof | passed; PID `76736`, `5` chunks completed, `50,400` rows written, ClickHouse first/high-watermark moved |
-| Full prompt REST/backfill pytest suite | pending; only new runner tests were run because no existing use-case behavior was changed |
-| `python -m tools.docs.generate_docs_index --check` | pending after this report/ledger update |
+| Mac Studio bounded background start proof | passed; PID `76736` launched, final manifest `paused_with_pending_chunks`, `6` chunks completed, `60,480` rows written, ClickHouse first/high-watermark moved |
+| CLI-specific pytest gate | not run; no CLI path changed |
+| `uv run pyright scripts/rl_trading/stage04b_binance_futures_history_backfill.py tests/unit/scripts/rl_trading/test_stage04b_binance_futures_history_backfill.py` | passed: `0 errors` |
+| `python -m tools.docs.generate_docs_index && python -m tools.docs.generate_docs_index --check` | passed; generated index was unchanged and up to date |
 
 ## Blockers And Handoff
 
