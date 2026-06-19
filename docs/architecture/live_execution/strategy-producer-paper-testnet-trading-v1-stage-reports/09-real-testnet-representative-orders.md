@@ -175,8 +175,8 @@ Verdict: `Release`. Blockers fixed: stale `blocked` status, stale Bybit manual-o
 | `uv run pyright src/trading/contexts/exchange_control src/trading/contexts/identity apps/api tests/unit/contexts/exchange_control tests/unit/apps/api tests/unit/apps/web/test_app_routes.py` | passed (`0 errors`) |
 | Stage `09` earlier exchange-execution gates | `uv run ruff`, `uv run pyright`, and focused exchange execution/control tests passed (`133 passed`) |
 | `python -m tools.docs.generate_docs_index --check` | passed after final acceptance update. |
-| GitHub Actions | CI/deploy passed for implementation commit `e093ce2e`; final docs-only commit requires docs-index/CI check after push. |
-| Mac Studio smoke | passed after implementation deploy; final docs-only sync has no runtime service impact and is covered by the executor final report. |
+| GitHub Actions | CI/deploy passed for implementation commit `e093ce2e`; final docs-only delivery evidence is recorded in the executor final report. |
+| Mac Studio smoke | passed after implementation deploy; final docs-only checkout sync has no runtime service impact and is covered by the executor final report. |
 
 ## Acceptance Criteria Status
 
