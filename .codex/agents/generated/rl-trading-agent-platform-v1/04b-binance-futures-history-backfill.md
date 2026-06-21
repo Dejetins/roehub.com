@@ -2,7 +2,7 @@
 prompt_name: 04b-binance-futures-history-backfill
 repo: roehub.com
 branch: main
-scope: "Backfill accepted Binance Futures 1m source windows and prove coverage before dataset refresh manifests."
+scope: "Repair to the full current Binance Futures USDT perpetual universe, backfill 1m source windows, and prove coverage before dataset refresh manifests."
 language:
   implementation: python
   agent_report: ru
@@ -17,7 +17,7 @@ context_sources:
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/02a-data-source-inventory.md
       why: "HF windows, current coverage, channel and universe facts"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04a-binance-futures-universe-whitelist.md
-      why: "accepted symbol universe and exclusions from Stage 04A"
+      why: "previous 215-symbol partial universe and whitelist/ref evidence from Stage 04A"
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "optional compact state; ignore if unrelated"
   task_entrypoints:
@@ -116,7 +116,7 @@ required_literals:
   - "post_hf_extension_current_trading"
   - "/opt/roehub/state/rl_trading/"
 non_goals:
-  - "Do not add symbols outside the accepted Stage 04A universe."
+  - "Do not add non-USDT, non-perpetual, quarterly/dated, TRADIFI_PERPETUAL, BUSD/USDC/USD1, or non-current symbols to this v1 USDT-pair training universe."
   - "Do not synthesize missing candles."
   - "Do not build feature slabs or sessionized datasets."
   - "Do not use Binance private/account endpoints."
@@ -153,9 +153,11 @@ stage_execution_ledger:
   required_update: true
   template: .codex/agents/stage_execution_ledger_template.md
 expected_primary_touches:
+  - "configs/prod/whitelist.csv"
   - "scripts/rl_trading"
   - "src/trading/contexts/market_data"
   - "tests/unit/contexts/market_data"
+  - "tests/unit/scripts/rl_trading"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04b-binance-futures-history-backfill.md"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
 possible_secondary_touches:
@@ -170,15 +172,19 @@ safety_notes:
   - "Binance public kline/metadata endpoints are allowed; private/account endpoints are not needed and must not be used."
   - "Backfill writes market_data raw/canonical rows only through existing writers/use cases; no exchange trading side effects."
   - "Mac Studio git commands must use /Users/daniildegtyarev/Projects/roehub.com; /opt/roehub/app is runtime state only."
+  - "Browser/auth is N/A for this data backfill stage: do not use the smoke_e2e_keycloak account and do not read ROEHUB_SMOKE_E2E_PASSWORD from /Users/daniildegtyarev/.config/roehub/roehub.env unless a later browser-visible task explicitly requires it."
 ---
 
 # Task
 
-Implement Stage 04B Binance Futures historical backfill and coverage. Using the accepted Stage 04A universe, load or repair required 1m source candle windows for current-trading Binance Futures USDT perpetual symbols and prove coverage before any feature slabs are built.
+Implement Stage 04B Binance Futures historical backfill and coverage repair. The previous Stage 04A/04B path covered only the HF-intersection subset (`215` symbols). The corrected target is all current Binance USD-M Futures symbols where `status=TRADING`, `contractType=PERPETUAL`, and `quoteAsset=USDT` (`528` observed on 2026-06-21; use live metadata at execution). Supplement whitelist/ref/enrichment and backfill coverage to that full current USDT perpetual universe before any feature slabs are built.
 
 Done means:
 
-- Every accepted Stage 04A symbol has a source-window task plan using `max(required_source_start, exchange onboard/history start)`.
+- The executor resolves the live full-current Binance `TRADING` `USDT` `PERPETUAL` universe and records count/hash; HF membership is not a filter.
+- Existing 215-symbol Stage 04A/04B artifacts are reused as partial progress, not treated as final coverage.
+- Every accepted full-current USDT perpetual symbol has a source-window task plan using `max(required_source_start, exchange onboard/history start)`.
+- Missing symbols compared with the previous Stage 04A subset are added to `configs/prod/whitelist.csv`, synced to `market_data.ref_instruments`, and enriched before backfill.
 - The executor uses an existing safe REST/scheduler/fill path when present; if no operator-safe explicit range runner exists, it implements the narrowest wrapper around existing market-data ports/use cases or blocks with evidence.
 - Backfill runs are resumable and recorded with per-symbol status.
 - Long-running backfill is launched as a managed resumable/background job, then the agent verifies within a bounded observation window that new rows/high-watermarks started appearing in ClickHouse and stops active work; it must not sit in an active session waiting for the entire historical load to finish.
@@ -187,7 +193,7 @@ Done means:
 
 ## Context / Current State
 
-- Stage 04A owns universe and whitelist/ref/enrichment. Do not rediscover or expand the universe here.
+- Stage 04A historically accepted a 215-symbol HF-intersection subset. User correction on 2026-06-21 supersedes that as final target: Stage 04B must repair/supplement to the full current Binance USDT perpetual universe.
 - Existing `backfill-1m` CLI may be parquet-oriented; `rest-catchup` requires seed history for an instrument. Verify actual current code before choosing a path.
 - Market-data docs describe REST catch-up, scheduler bootstrap, symbol-specific history starts, and `RestInstrumentHistoryStartSource` for Binance Futures `onboardDate`.
 - This stage may write raw market data through existing market-data ingestion paths, but it must never place raw candle dumps in git/docs.
@@ -198,8 +204,10 @@ Done means:
 - Verify prerequisites before implementation. Required accepted prerequisites: Stage 04A. If Stage 04A is not accepted, write/update the Stage 04B report as blocked, update the ledger, and do not implement dependent work.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/04b-binance-futures-history-backfill.md` and record path/hash in the stage report.
 - Before editing, narrow expected paths to a concrete file list and record it in the stage report.
-- Keep the change bounded to Stage 04B. Do not update whitelist, change training-source scope, build feature slabs, sessionize windows, train models, or change live execution behavior.
-- Use only accepted Stage 04A symbols. If a symbol disappears from current Binance Futures metadata between Stage 04A and 04B, mark it excluded/stale and do not backfill it.
+- Keep the change bounded to Stage 04B. Do not change training-source scope beyond `binance:futures` USDT perpetuals, build feature slabs, sessionize windows, train models, or change live execution behavior.
+- Resolve the target universe from current public Binance Futures metadata at execution time: accept only `status=TRADING`, `contractType=PERPETUAL`, `quoteAsset=USDT`. Do not require symbols to exist in the HF train/all-split lists.
+- Treat the previous Stage 04A accepted `215` symbols as a partial subset. Compute the supplement set as `current_full_usdt_perpetual_universe - existing_stage04a_symbols`; update whitelist/ref/enrichment for the supplement before scheduling their backfill.
+- If a previously backfilled Stage 04A symbol disappears from current Binance Futures metadata, mark it stale for future versions but keep its historical evidence separate; do not use it to block supplement scheduling for still-current symbols.
 - Respect source windows from the plan and recompute the current post-HF endpoint from the latest Binance Futures candle snapshot before running extension tasks.
 - For each symbol, compute safe start as `max(required_source_window_start, onboard/listing/history start)`. Do not request pre-listing candles.
 - Use chunked/rate-limited fills with resume manifest and read-back coverage. Interrupted or unknown-state backfill must read canonical/raw coverage before retry.
@@ -218,7 +226,7 @@ Done means:
 
 # Context acquisition protocol
 
-Read `.codex/AGENTS.md`, RL plan, ledger, Stage 02A report, Stage 04A report, then current market-data backfill code. Expand into scheduler/runtime docs only if the safe path is ambiguous.
+Read `.codex/AGENTS.md`, RL plan, ledger, Stage 02A report, Stage 04A report, then current market-data backfill code. Treat Stage 04A as partial historical evidence only; the current target universe is full current Binance USDT perpetuals. Expand into scheduler/runtime docs only if the safe path is ambiguous.
 
 # Work plan (agent should follow)
 
@@ -229,20 +237,22 @@ Skill routing:
 - `data-analytics-methodology`: use for coverage/gap methodology.
 - `contract-impact-analysis`: use for market-data write/config/CLI impact.
 
-1. Verify Stage 04A acceptance and load its accepted symbol manifest.
-2. Verify the current available backfill path: explicit REST range use case, scheduler bootstrap, rest-catchup, or parquet staging. Record the selected path and why alternatives were rejected.
-3. Generate a dry-run task manifest for all accepted symbols and source windows.
-4. Execute a bounded start of the backfill plan on Mac Studio only after dry-run evidence is reviewed by the stage executor; use a managed resumable/background path, not a foreground command that requires the agent to wait for the whole history.
-5. Read back ClickHouse canonical/raw state during a short observation window and prove ingestion has started via new rows, changed high-watermarks, or completed chunk markers. If ingestion does not start, stop and record the blocker.
-6. If the full backfill has not completed, update the stage report and ledger as `in_progress`, include job/process/service state, log/resume paths, start-proof evidence, and the exact follow-up coverage-check command. Stop there.
-7. Only when the full job is already complete, read back ClickHouse canonical/raw coverage and compute gaps/duplicates/feature coverage.
-8. Update stage report and ledger with accepted/blocked/in_progress status and handoff to Stage 04C.
+1. Verify Stage 04A acceptance and load its previous 215-symbol manifest as partial progress.
+2. Fetch current Binance Futures public metadata and resolve the full `TRADING` `USDT` `PERPETUAL` symbol list. Record count/hash and compare with the 2026-06-21 observed count `528`; live count wins if it changed.
+3. Compute supplement symbols missing from the previous Stage 04A subset, update `configs/prod/whitelist.csv`, sync `market_data.ref_instruments`, and enrich exchange filters/steps/min-notional for the supplement. If this write path is unavailable, block instead of silently backfilling unregistered symbols.
+4. Verify the current available backfill path: explicit REST range use case, scheduler bootstrap, rest-catchup, or parquet staging. Record the selected path and why alternatives were rejected.
+5. Generate a dry-run task manifest for the full current USDT perpetual universe, reusing completed 215-symbol chunk state where valid and scheduling only missing/stale windows for supplement symbols.
+6. Execute a bounded start of the supplement/full backfill plan on Mac Studio only after dry-run evidence is reviewed by the stage executor; use a managed resumable/background path, not a foreground command that requires the agent to wait for the whole history.
+7. Read back ClickHouse canonical/raw state during a short observation window and prove supplement ingestion has started via new rows, changed high-watermarks, or completed chunk markers. If ingestion does not start, stop and record the blocker.
+8. If the full backfill has not completed, update the stage report and ledger as `in_progress`, include job/process/service state, log/resume paths, start-proof evidence, and the exact follow-up coverage-check command. Stop there.
+9. Only when the full job is already complete, read back ClickHouse canonical/raw coverage and compute gaps/duplicates/feature coverage for the full current USDT perpetual universe.
+10. Update stage report and ledger with accepted/blocked/in_progress status and handoff to Stage 04C.
 
 # Acceptance criteria (Definition of Done)
 
-- Stage 04B report records prompt path/hash, file manifest, selected backfill path, dry-run task manifest hash, execution/resume evidence, coverage report, residual gaps, and delivery state.
+- Stage 04B report records prompt path/hash, file manifest, live Binance metadata count/hash, previous 215-symbol subset hash, supplement symbol count/hash, whitelist/ref/enrichment evidence for the supplement, selected backfill path, dry-run task manifest hash, execution/resume evidence, coverage report, residual gaps, and delivery state.
 - If a long-running backfill was started but not completed, the report records start-proof evidence and Stage 04B remains `in_progress`; this is a valid stop point for the executor, not an accepted handoff to Stage 04C.
-- No excluded Stage 04A symbols are backfilled.
+- No non-current, non-USDT, non-perpetual, quarterly/dated, `TRADIFI_PERPETUAL`, BUSD/USDC/USD1, or unmapped symbol is backfilled in this v1 USDT-pair scope.
 - Coverage is computed per symbol and per dataset source window; summary includes first/last candle, missing minutes, duplicates, `volume_quote`, `trades_count`, zero-volume rows and `vwap` computability.
 - Backfill unknown-state retry is guarded by read-back coverage/resume manifest, not by assuming no write happened.
 - Stage ledger is updated after validation and before final response.
@@ -306,9 +316,11 @@ Skill routing:
 
 Primary touches:
 
+- `configs/prod/whitelist.csv`
 - `scripts/rl_trading`
 - `src/trading/contexts/market_data`
 - `tests/unit/contexts/market_data`
+- `tests/unit/scripts/rl_trading`
 - `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04b-binance-futures-history-backfill.md`
 - `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md`
 
@@ -323,7 +335,7 @@ Possible secondary touches:
 
 # Non-goals
 
-- Do not change whitelist/universe except to mark stale symbols as blocked in the report.
+- Do not change whitelist/universe except to add, sync, and enrich the full-current Binance USDT perpetual supplement and mark stale/non-current symbols as blocked in the report.
 - Do not build RL feature slabs or session windows.
 - Do not train models.
 - Do not use private exchange/account endpoints.

@@ -139,23 +139,24 @@ safety_notes:
   - "Never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, raw candle dumps, or raw checkpoint tensors into prompts, docs, ledgers, traces, screenshots, or logs."
   - "Runtime dataset refresh manifests may live under /opt/roehub/state/rl_trading/; docs contain sanitized summaries and hashes only."
   - "Mac Studio git commands must use /Users/daniildegtyarev/Projects/roehub.com; /opt/roehub/app is runtime state only."
+  - "Browser/auth is N/A for this manifest stage: do not use the smoke_e2e_keycloak account and do not read ROEHUB_SMOKE_E2E_PASSWORD from /Users/daniildegtyarev/.config/roehub/roehub.env unless a later browser-visible task explicitly requires it."
 ---
 
 # Task
 
-Implement Stage 04C dataset refresh manifest. Freeze the exact Binance Futures dataset refresh versions that Stage 05 will consume, based on accepted Stage 04A universe and Stage 04B coverage.
+Implement Stage 04C dataset refresh manifest. Freeze the exact Binance Futures dataset refresh versions that Stage 05 will consume, based on the corrected full-current Binance `TRADING` `USDT` `PERPETUAL` universe and accepted Stage 04B coverage.
 
 Done means:
 
-- `hf_period_rebuild_current_trading` is defined for HF-compatible train/val/test/backtest signal/source windows over the accepted current-trading Binance Futures universe.
+- `hf_period_rebuild_current_trading` is defined for HF-compatible train/val/test/backtest signal/source windows over the full current Binance USDT perpetual universe; HF membership is not a symbol filter.
 - `post_hf_extension_current_trading` is defined for post-HF data after `2025-06-01`, using the latest accepted coverage endpoint.
 - Each dataset version records symbols, source windows, excluded symbols, residual gaps, coverage thresholds, feature contract dependency, source hashes/query hashes, and acceptance status.
 - Stage 05 receives a single accepted refresh manifest path/hash and does not rediscover universe/backfill scope.
 
 ## Context / Current State
 
-- Stage 04A resolves and onboards the current Binance Futures universe.
-- Stage 04B backfills/repairs source candle windows and records coverage.
+- Stage 04A historically onboarded a 215-symbol HF-intersection subset. Stage 04B owns the 2026-06-21 repair to all current Binance USDT perpetual symbols and must provide the accepted full-universe coverage manifest.
+- Stage 04B backfills/repairs source candle windows and records coverage for the corrected full current USDT perpetual universe.
 - Stage 05 builds raw feature slabs; it must not own universe resolution or historical data loading.
 - External HF baseline is immutable reference input and must not be overwritten by Roehub refresh versions.
 
@@ -167,7 +168,7 @@ Done means:
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/04c-dataset-refresh-manifest.md` and record path/hash in the stage report.
 - Before editing, narrow expected paths to a concrete file list and record it in the stage report.
 - Keep the change bounded to Stage 04C. Do not backfill candles, build feature slabs, sessionize windows, train models, or change live execution behavior.
-- Read Stage 04A accepted/excluded universe and Stage 04B coverage/residual gaps; do not recompute a different universe.
+- Read Stage 04A accepted/excluded universe only as partial historical evidence. Read Stage 04B full-current-USDT universe, supplement, coverage and residual gaps as the source of truth; do not recompute a different universe inside Stage 04C.
 - Create deterministic refresh manifest(s) under `/opt/roehub/state/rl_trading/` or another accepted runtime path. Commit only schema/helper code and sanitized docs/hashes.
 - Define at minimum two dataset versions when coverage permits: `hf_period_rebuild_current_trading` and `post_hf_extension_current_trading`.
 - If coverage is insufficient, mark the affected dataset version `blocked` or `partial_rejected`; do not let Stage 05 consume it silently.
@@ -193,7 +194,7 @@ Skill routing:
 - `backend-quality-gates`: use for focused tests/lint/type gates when code changes.
 - `contract-impact-analysis`: use for manifest schema or metadata contract changes.
 
-1. Verify Stage 04B acceptance and load its coverage manifest; `in_progress` start-only evidence is not accepted coverage.
+1. Verify Stage 04B acceptance and load its full-current-USDT coverage manifest; `in_progress` start-only evidence or 215-symbol-only coverage is not accepted coverage.
 2. Define deterministic manifest schema and exact runtime artifact paths.
 3. Create refresh manifests for HF-period rebuild and post-HF extension, or mark versions blocked with explicit evidence.
 4. Validate hashes, schema, symbol ordering, source-window coverage and residual-gap semantics.
@@ -202,7 +203,7 @@ Skill routing:
 # Acceptance criteria (Definition of Done)
 
 - Stage 04C report records prompt path/hash, file manifest, manifest schema, dataset version statuses, runtime manifest paths/hashes, source windows, universe/exclusion hashes, coverage dependencies, and delivery state.
-- Stage 05 has one explicit accepted input manifest or is blocked; no implicit six-symbol fallback is allowed.
+- Stage 05 has one explicit accepted input manifest over the corrected full current USDT perpetual universe or is blocked; no implicit six-symbol fallback or 215-symbol HF-intersection fallback is allowed.
 - External HF baseline remains immutable and separate from Roehub-native refresh versions.
 - Stage ledger is updated after validation and before final response.
 - Delivery state is explicit: `local-only`, `published-to-branch/draft-pr`, `delivered-to-main`, and/or `deployed-on-macstudio`, with evidence appropriate to the stage.

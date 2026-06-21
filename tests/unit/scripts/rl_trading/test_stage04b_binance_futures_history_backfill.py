@@ -104,6 +104,13 @@ def test_stage04b_plan_excludes_stage04a_symbols_missing_from_current_metadata()
                     "quoteAsset": "USDT",
                 },
                 {
+                    "symbol": "SUPPLEMENTUSDT",
+                    "status": "TRADING",
+                    "contractType": "PERPETUAL",
+                    "quoteAsset": "USDT",
+                    "onboardDate": 1767225600000,
+                },
+                {
                     "symbol": "OLDUSDT",
                     "status": "BREAK",
                     "contractType": "PERPETUAL",
@@ -117,10 +124,106 @@ def test_stage04b_plan_excludes_stage04a_symbols_missing_from_current_metadata()
     )
 
     assert manifest["current_metadata"]["active_stage04a_symbol_count"] == 1
+    assert manifest["current_metadata"]["supplement_symbol_count"] == 1
+    assert manifest["summary"]["symbols_planned"] == 2
+    assert manifest["summary"]["symbols_supplement_planned"] == 1
     assert manifest["current_metadata"]["stale_symbols"] == [
         {"symbol": "OLDUSDT", "reason": STALE_REASON}
     ]
-    assert [item["symbol"] for item in manifest["symbols"]] == ["BTCUSDT"]
+    assert [item["symbol"] for item in manifest["symbols"]] == [
+        "BTCUSDT",
+        "SUPPLEMENTUSDT",
+    ]
+    supplement = next(item for item in manifest["symbols"] if item["symbol"] == "SUPPLEMENTUSDT")
+    assert supplement["source_lower_bound_utc"] == "2026-01-01T00:00:00Z"
+
+
+def test_stage04b_plan_reuses_completed_chunks_from_previous_manifest() -> None:
+    previous = build_plan_manifest(
+        stage04a_manifest={
+            "stage": "04A",
+            "market": "binance:futures",
+            "market_id": 2,
+            "accepted_symbols": ["BTCUSDT"],
+            "accepted_symbol_source_windows": [
+                {
+                    "symbol": "BTCUSDT",
+                    "source_lower_bound_utc": "2020-01-13T22:30:00Z",
+                },
+            ],
+        },
+        exchange_info={
+            "symbols": [
+                {
+                    "symbol": "BTCUSDT",
+                    "status": "TRADING",
+                    "contractType": "PERPETUAL",
+                    "quoteAsset": "USDT",
+                },
+            ]
+        },
+        latest_candle_utc=datetime(2026, 6, 19, 12, 34, tzinfo=UTC),
+        generated_at_utc=datetime(2026, 6, 19, 12, 35, tzinfo=UTC),
+        chunk_days=31,
+    )
+    previous["execution"]["status"] = "completed"
+    first_chunk = previous["chunks"][0]
+    first_chunk.update(
+        {
+            "status": "completed",
+            "rows_read": 44640,
+            "rows_written": 44640,
+            "batches_written": 5,
+            "finished_at_utc": "2026-06-20T00:00:00Z",
+        }
+    )
+
+    manifest = build_plan_manifest(
+        stage04a_manifest={
+            "stage": "04A",
+            "market": "binance:futures",
+            "market_id": 2,
+            "accepted_symbols": ["BTCUSDT"],
+            "accepted_symbol_source_windows": [
+                {
+                    "symbol": "BTCUSDT",
+                    "source_lower_bound_utc": "2020-01-13T22:30:00Z",
+                },
+            ],
+        },
+        exchange_info={
+            "symbols": [
+                {
+                    "symbol": "BTCUSDT",
+                    "status": "TRADING",
+                    "contractType": "PERPETUAL",
+                    "quoteAsset": "USDT",
+                },
+                {
+                    "symbol": "NEWUSDT",
+                    "status": "TRADING",
+                    "contractType": "PERPETUAL",
+                    "quoteAsset": "USDT",
+                    "onboardDate": 1767225600000,
+                },
+            ]
+        },
+        latest_candle_utc=datetime(2026, 6, 19, 12, 34, tzinfo=UTC),
+        generated_at_utc=datetime(2026, 6, 19, 12, 35, tzinfo=UTC),
+        chunk_days=31,
+        previous_manifest=previous,
+    )
+
+    reused = [
+        chunk
+        for chunk in manifest["chunks"]
+        if chunk.get("reuse_source") == "previous_stage04b_manifest"
+    ]
+    assert len(reused) == 1
+    assert reused[0]["chunk_id"] == first_chunk["chunk_id"]
+    assert reused[0]["rows_written"] == 44640
+    assert manifest["summary"]["chunks_reused_completed_from_previous_manifest"] == 1
+    assert manifest["execution"]["chunks_completed"] == 1
 
 
 def test_stage04b_coverage_entry_reports_missing_duplicates_and_vwap_counts() -> None:

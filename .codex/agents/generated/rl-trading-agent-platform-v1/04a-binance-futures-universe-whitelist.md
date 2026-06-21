@@ -152,21 +152,21 @@ safety_notes:
 
 # Task
 
-Implement Stage 04A Binance Futures universe and whitelist. Resolve the HF train-compatible symbol universe against current Binance Futures metadata, update only the accepted `binance:futures` whitelist/ref/enrichment path, and produce a durable exclusion/onboarding manifest for Stage 04B.
+Implement Stage 04A Binance Futures universe and whitelist. Resolve the full current Binance USD-M Futures `USDT` perpetual trading universe, update only the accepted `binance:futures` whitelist/ref/enrichment path, and produce a durable exclusion/onboarding manifest for Stage 04B.
 
 Done means:
 
-- Target universe starts from observed HF `train_data.npz` symbols (`309` unique train symbols from Stage 02A) and is filtered through current Binance Futures `exchangeInfo`.
-- Only symbols with `status=TRADING`, `contractType=PERPETUAL`, and quote `USDT` are accepted for this v1 training universe.
-- Missing/delisted/renamed/non-USDT/BUSD/USDC/quarterly symbols are recorded as `excluded_not_currently_trading_or_not_usdt_perpetual` and are not added to whitelist or scheduled for backfill.
+- Target universe starts from current Binance Futures `exchangeInfo`, not from HF train membership. HF counts remain reproducibility baseline evidence only.
+- Only symbols with `status=TRADING`, `contractType=PERPETUAL`, and `quoteAsset=USDT` are accepted for this v1 training universe.
+- Missing/delisted/renamed/non-USDT/BUSD/USDC/USD1/quarterly/dated/`TRADIFI_PERPETUAL` symbols are recorded with explicit exclusion reasons and are not added to whitelist or scheduled for backfill.
 - `configs/prod/whitelist.csv`, `market_data.ref_instruments`, and exchange metadata enrichment are aligned for accepted `binance:futures` symbols.
 - Stage 04B receives an exact symbol list and source-window lower-bound policy; no candle backfill is performed here.
 
 ## Context / Current State
 
-- Stage 02A is accepted and amended after full HF NPZ inspection.
+- Stage 02A is accepted and amended after full HF NPZ inspection, but HF symbols are no longer the ceiling for Roehub-native training.
 - Training-source v1 is `binance:futures` only.
-- Current Roehub Binance Futures reference universe has only six tradable symbols; this is not enough to represent the HF train universe.
+- Current Roehub Binance Futures reference universe originally had only six tradable symbols, and the previous Stage 04A implementation accepted a 215-symbol HF-intersection subset. That subset is partial progress, not the final target universe.
 - The last thread clarified that dataset refresh must not try to load symbols Binance no longer trades.
 - `configs/prod/whitelist.csv` currently maps market ids to symbols; executor must confirm that `binance:futures` market id is still `2` from current config before editing.
 
@@ -177,7 +177,7 @@ Done means:
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/04a-binance-futures-universe-whitelist.md` and record path/hash in the stage report.
 - Before editing, narrow expected paths to a concrete file list and record it in the stage report.
 - Keep the change bounded to Stage 04A. Do not backfill candles, build feature slabs, train models, or change non-`binance:futures` training scope.
-- Build a deterministic universe resolver or report that records: HF candidate count, current Binance metadata count, accepted count, excluded count, accepted symbols, excluded symbols and reasons.
+- Build a deterministic universe resolver or report that records: current Binance metadata count, accepted full-current USDT perpetual count, excluded count by reason, accepted symbols, excluded symbols and reasons, and optional overlap with HF train/all-split symbols for analysis only.
 - Confirm current Binance Futures metadata from public REST or existing metadata source; do not use private/account endpoints.
 - Update only the `binance:futures` whitelist entries needed for accepted symbols, preserving unrelated whitelist rows and disabled rows.
 - Run or document the operator-safe whitelist -> `ref_instruments` sync and enrichment evidence on Mac Studio. If this write is not allowed in the current environment, mark Stage 04A blocked rather than pretending the universe is onboarded.
@@ -205,9 +205,9 @@ Skill routing:
 - `contract-impact-analysis`: use when whitelist/config/ref-data behavior changes.
 
 1. Verify ledger prerequisites and record prompt path/hash plus planned concrete file list.
-2. Resolve HF train symbols from Stage 02A/Stage 04 evidence; do not assume `478` union is the default training universe.
-3. Read current Binance Futures metadata and filter to `TRADING` USDT perpetual contracts.
-4. Compare candidates to current Roehub whitelist/ref state and write accepted/excluded manifests.
+2. Read current Binance Futures metadata and filter to `status=TRADING`, `contractType=PERPETUAL`, `quoteAsset=USDT`. Do not filter by HF membership.
+3. Compare accepted current symbols to current Roehub whitelist/ref state and write accepted/excluded manifests plus an optional HF-overlap summary.
+4. Record the live Binance metadata snapshot/hash and accepted count; if it differs from the previous observed `528`, use the live count and explain the drift.
 5. Update whitelist/ref/enrichment only for accepted `binance:futures` symbols.
 6. Run focused local checks and collect Mac Studio ref/enrichment evidence.
 7. Update stage report and ledger with accepted/blocked status and exact handoff to Stage 04B.
@@ -215,7 +215,7 @@ Skill routing:
 # Acceptance criteria (Definition of Done)
 
 - Stage 04A report records prompt path/hash, file manifest, current Binance metadata evidence, accepted symbols, excluded symbols with reasons, whitelist diff, ref sync/enrichment evidence, and delivery state.
-- No non-current, non-USDT, non-perpetual, quarterly, BUSD/USDC, or unmapped symbol is scheduled for backfill.
+- No non-current, non-USDT, non-perpetual, quarterly/dated, `TRADIFI_PERPETUAL`, BUSD/USDC/USD1, or unmapped symbol is scheduled for backfill in this USDT-pair v1 scope.
 - Binance spot, Bybit spot, and Bybit futures remain `blocked_not_training_source_v1` for training.
 - Stage ledger is updated after validation and before final response.
 - Stage 04B is allowed only if accepted symbol/ref/enrichment evidence exists.

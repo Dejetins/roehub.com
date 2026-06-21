@@ -96,22 +96,26 @@ def build_plan_manifest(
     latest_candle_utc: datetime,
     generated_at_utc: datetime,
     chunk_days: int,
+    previous_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if chunk_days <= 0 or chunk_days > 31:
         raise ValueError("chunk_days must be in [1..31]")
 
     market_id = int(stage04a_manifest["market_id"])
     accepted_windows = _source_lower_bounds_by_symbol(stage04a_manifest)
-    current_symbols = _current_trading_usdt_perpetual_symbols(exchange_info)
+    current_windows = _current_trading_usdt_perpetual_source_lower_bounds(exchange_info)
+    current_symbols = set(current_windows)
     accepted_symbols = sorted(accepted_windows)
     stale_symbols = [symbol for symbol in accepted_symbols if symbol not in current_symbols]
-    active_symbols = [symbol for symbol in accepted_symbols if symbol in current_symbols]
+    active_stage04a_symbols = [symbol for symbol in accepted_symbols if symbol in current_symbols]
+    supplement_symbols = sorted(current_symbols - set(accepted_symbols))
+    active_symbols = sorted(current_symbols)
     source_windows = _dataset_source_windows(latest_candle_utc)
 
     symbol_plans: list[dict[str, Any]] = []
     chunks: list[dict[str, Any]] = []
     for symbol in active_symbols:
-        source_lower_bound = accepted_windows[symbol]
+        source_lower_bound = accepted_windows.get(symbol, current_windows[symbol])
         window_plans: list[dict[str, Any]] = []
         for source_window in source_windows:
             safe_start = max(source_window.source_start, source_lower_bound)
@@ -178,6 +182,10 @@ def build_plan_manifest(
     )
     for chunk in chunks:
         chunk["status"] = "pending"
+    reused_completed_chunks = _merge_previous_completed_chunk_state(
+        chunks=chunks,
+        previous_manifest=previous_manifest,
+    )
 
     return {
         "schema_version": 1,
@@ -194,15 +202,20 @@ def build_plan_manifest(
             "accepted_symbols_sha256": _hash_lines(accepted_symbols),
             "source_manifest_stage": stage04a_manifest.get("stage"),
             "source_manifest_market": stage04a_manifest.get("market"),
+            "status_after_2026_06_21_correction": "reusable_partial_universe_progress",
         },
         "current_metadata": {
             "current_trading_usdt_perpetual_count": len(current_symbols),
-            "active_stage04a_symbol_count": len(active_symbols),
+            "current_trading_usdt_perpetual_symbols_sha256": _hash_lines(active_symbols),
+            "active_stage04a_symbol_count": len(active_stage04a_symbols),
             "stale_stage04a_symbol_count": len(stale_symbols),
             "stale_symbols": [
                 {"symbol": symbol, "reason": STALE_REASON} for symbol in stale_symbols
             ],
             "stale_symbols_sha256": _hash_lines(stale_symbols),
+            "supplement_symbol_count": len(supplement_symbols),
+            "supplement_symbols": supplement_symbols,
+            "supplement_symbols_sha256": _hash_lines(supplement_symbols),
         },
         "dataset_versions": [
             {
@@ -222,20 +235,30 @@ def build_plan_manifest(
         "summary": {
             "symbols_total_from_stage04a": len(accepted_symbols),
             "symbols_planned": len(active_symbols),
+            "symbols_reused_from_stage04a": len(active_stage04a_symbols),
+            "symbols_supplement_planned": len(supplement_symbols),
             "chunks_total": len(chunks),
+            "chunks_reused_completed_from_previous_manifest": reused_completed_chunks,
+            "chunks_pending_after_reuse": len(chunks) - reused_completed_chunks,
             "expected_minutes_total": sum(int(chunk["expected_minutes"]) for chunk in chunks),
             "chunks_sha256": _hash_json(chunks),
         },
+        "previous_manifest_reuse": _previous_manifest_reuse_summary(
+            previous_manifest=previous_manifest,
+            reused_completed_chunks=reused_completed_chunks,
+        ),
         "execution": {
-            "status": "planned",
+            "status": "planned_with_reused_progress"
+            if reused_completed_chunks
+            else "planned",
             "started_at_utc": None,
             "updated_at_utc": _format_utc(generated_at_utc),
             "finished_at_utc": None,
-            "chunks_completed": 0,
+            "chunks_completed": reused_completed_chunks,
             "chunks_failed": 0,
-            "rows_read": 0,
-            "rows_written": 0,
-            "batches_written": 0,
+            "rows_read": sum(int(chunk.get("rows_read") or 0) for chunk in chunks),
+            "rows_written": sum(int(chunk.get("rows_written") or 0) for chunk in chunks),
+            "batches_written": sum(int(chunk.get("batches_written") or 0) for chunk in chunks),
         },
     }
 
@@ -693,6 +716,11 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         latest_candle_utc=latest_candle_utc,
         generated_at_utc=_now_utc(),
         chunk_days=int(args.chunk_days),
+        previous_manifest=(
+            _read_json(args.previous_manifest)
+            if args.previous_manifest is not None and args.previous_manifest.exists()
+            else None
+        ),
     )
     _atomic_write_json(args.output_json, manifest)
     print(
@@ -704,6 +732,13 @@ def _cmd_plan(args: argparse.Namespace) -> int:
                 "active_stage04a_symbol_count": manifest["current_metadata"][
                     "active_stage04a_symbol_count"
                 ],
+                "supplement_symbol_count": manifest["current_metadata"][
+                    "supplement_symbol_count"
+                ],
+                "chunks_reused_completed_from_previous_manifest": manifest["summary"][
+                    "chunks_reused_completed_from_previous_manifest"
+                ],
+                "chunks_pending_after_reuse": manifest["summary"]["chunks_pending_after_reuse"],
                 "stale_stage04a_symbol_count": manifest["current_metadata"][
                     "stale_stage04a_symbol_count"
                 ],
@@ -764,6 +799,7 @@ def _build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--exchange-info-json", type=Path, default=None)
     plan.add_argument("--latest-candle-utc", type=str, default=None)
     plan.add_argument("--chunk-days", type=int, default=7)
+    plan.add_argument("--previous-manifest", type=Path, default=None)
     plan.add_argument("--output-json", type=Path, default=DEFAULT_PLAN_JSON)
 
     execute = sub.add_parser("execute", help="Execute pending chunks from a manifest.")
@@ -833,10 +869,16 @@ def _source_lower_bounds_by_symbol(stage04a_manifest: Mapping[str, Any]) -> dict
 
 
 def _current_trading_usdt_perpetual_symbols(exchange_info: Mapping[str, Any]) -> set[str]:
+    return set(_current_trading_usdt_perpetual_source_lower_bounds(exchange_info))
+
+
+def _current_trading_usdt_perpetual_source_lower_bounds(
+    exchange_info: Mapping[str, Any],
+) -> dict[str, datetime]:
     rows = exchange_info.get("symbols")
     if not isinstance(rows, list):
         raise ValueError("Binance exchangeInfo payload is missing symbols list")
-    out: set[str] = set()
+    out: dict[str, datetime] = {}
     for item in rows:
         if not isinstance(item, Mapping):
             continue
@@ -848,8 +890,111 @@ def _current_trading_usdt_perpetual_symbols(exchange_info: Mapping[str, Any]) ->
             continue
         symbol = str(item.get("symbol", "")).strip().upper()
         if symbol:
-            out.add(symbol)
+            out[symbol] = _source_lower_bound_from_exchange_symbol(item)
     return out
+
+
+def _source_lower_bound_from_exchange_symbol(item: Mapping[str, Any]) -> datetime:
+    onboard_dt = _exchange_onboard_utc(item.get("onboardDate"))
+    required_start = _parse_utc("2020-01-13T22:30:00Z")
+    if onboard_dt is None:
+        return required_start
+    return max(required_start, onboard_dt)
+
+
+def _exchange_onboard_utc(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        ms = int(value)
+    except (TypeError, ValueError):
+        return None
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).replace(second=0, microsecond=0)
+
+
+def _merge_previous_completed_chunk_state(
+    *,
+    chunks: Sequence[dict[str, Any]],
+    previous_manifest: Mapping[str, Any] | None,
+) -> int:
+    if previous_manifest is None:
+        return 0
+    previous_chunks = previous_manifest.get("chunks")
+    if not isinstance(previous_chunks, Sequence):
+        return 0
+    completed_by_id: dict[str, Mapping[str, Any]] = {}
+    for item in previous_chunks:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("status") != "completed":
+            continue
+        chunk_id = str(item.get("chunk_id", ""))
+        if chunk_id:
+            completed_by_id[chunk_id] = item
+
+    reusable_keys = (
+        "status",
+        "started_at_utc",
+        "finished_at_utc",
+        "rows_read",
+        "rows_written",
+        "batches_written",
+        "skip_reason",
+        "coordinator",
+        "worker_count",
+        "attempts",
+    )
+    reused = 0
+    for chunk in chunks:
+        previous = completed_by_id.get(str(chunk.get("chunk_id", "")))
+        if previous is None:
+            continue
+        if not _same_chunk_identity(chunk, previous):
+            continue
+        for key in reusable_keys:
+            if key in previous:
+                chunk[key] = previous[key]
+        chunk["reuse_source"] = "previous_stage04b_manifest"
+        reused += 1
+    return reused
+
+
+def _same_chunk_identity(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    keys = ("market_id", "symbol", "dataset_version", "start_utc", "end_utc")
+    return all(str(left.get(key)) == str(right.get(key)) for key in keys)
+
+
+def _previous_manifest_reuse_summary(
+    *,
+    previous_manifest: Mapping[str, Any] | None,
+    reused_completed_chunks: int,
+) -> dict[str, Any]:
+    if previous_manifest is None:
+        return {
+            "enabled": False,
+            "reused_completed_chunks": 0,
+        }
+    previous_chunks = previous_manifest.get("chunks")
+    chunks_total = len(previous_chunks) if isinstance(previous_chunks, Sequence) else 0
+    execution = previous_manifest.get("execution")
+    execution_status = (
+        execution.get("status")
+        if isinstance(execution, Mapping)
+        else None
+    )
+    return {
+        "enabled": True,
+        "source_stage": previous_manifest.get("stage"),
+        "source_market": previous_manifest.get("market"),
+        "source_generated_at_utc": previous_manifest.get("generated_at_utc"),
+        "source_execution_status": execution_status,
+        "source_chunks_total": chunks_total,
+        "reused_completed_chunks": reused_completed_chunks,
+        "reuse_rule": (
+            "copy only completed chunks with matching chunk_id and identical "
+            "market/symbol/window identity"
+        ),
+    }
 
 
 def _chunk_record(

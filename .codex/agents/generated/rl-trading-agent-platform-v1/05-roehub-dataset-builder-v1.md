@@ -149,6 +149,7 @@ safety_notes:
   - "Runtime ML artifacts live under /opt/roehub/state/rl_trading/ and are not committed to git."
   - "Mac Studio git commands must use /Users/daniildegtyarev/Projects/roehub.com; /opt/roehub/app is runtime state only."
   - "ML trainer/inference code must not call exchange SDKs or resolve exchange secrets directly."
+  - "Browser/auth is N/A for this dataset-builder stage: do not use the smoke_e2e_keycloak account and do not read ROEHUB_SMOKE_E2E_PASSWORD from /Users/daniildegtyarev/.config/roehub/roehub.env unless a later browser-visible task explicitly requires it."
 ---
 
 # Task
@@ -195,7 +196,7 @@ Additional context:
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
 - Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
-- Stage 02A/02B training-source contract: v1 training is `binance:futures` only. The `30/33` overlap is not the training universe; HF train has `309` unique symbols, while Stage 04A/04B/04C own current-trading Binance Futures universe resolution, backfill coverage and dataset refresh manifests.
+- Stage 02A/02B training-source contract: v1 training is `binance:futures` only. The `30/33` overlap is not the training universe, and the previous `215`-symbol Stage 04A HF-intersection subset is not the final training universe. Stage 04B/04C now own the corrected full current Binance `TRADING` `USDT` `PERPETUAL` universe resolution, backfill coverage and dataset refresh manifests.
 
 ## Requirements (Must)
 
@@ -211,7 +212,7 @@ Additional context:
 - Keep all large runtime artifacts outside git under `/opt/roehub/state/rl_trading/`; commit only sanitized summaries, manifests, hashes, and tests.
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
 - Use the Stage 02B feature contract and Stage 04C accepted refresh manifest exactly; do not invent new channel order, universe, source windows or missing-field policy.
-- Build v1 training raw slabs only for `binance:futures` symbols and windows present in the accepted Stage 04C refresh manifest. Do not read Binance spot, Bybit spot, or Bybit futures as training inputs unless a later accepted plan changes training-source scope.
+- Build v1 training raw slabs only for `binance:futures` symbols and windows present in the accepted Stage 04C full-current-USDT refresh manifest. Do not fallback to six symbols, the old 215-symbol subset, Binance spot, Bybit spot, or Bybit futures unless a later accepted plan changes training-source scope.
 - Emit raw slabs/manifests/golden fixtures only; Stage 06 owns accepted sessionized train/val/test/backtest datasets.
 - Store generated arrays under /opt/roehub/state/rl_trading/datasets/ or another accepted local path, not git.
 - Record deterministic rebuild hash and manifest schema.
