@@ -380,7 +380,7 @@ Review / planning task handling
 Defaults when values are missing
 - `repo`: infer from current repository.
 - `branch`: use current branch, otherwise `main`.
-- prompt-pack `branch_policy`: default to `main`; create a separate branch only if the user explicitly requested one branch for the whole prompt pack.
+- prompt-pack `branch_policy`: default to `main`; create a separate branch only if the user explicitly requested one branch for the whole prompt pack; if branch work is allowed, use one dedicated `git worktree` under `/Users/daniildegtyarev/Projects/roehub-worktrees/` and keep the primary checkout `/Users/daniildegtyarev/Projects/roehub.com` on `main`.
 - `language.implementation`: infer from the touched subsystem; default `python`.
 - `language.agent_report`: default `ru` unless the user requests another report language.
 - `context_sources.always_read`: include `.codex/AGENTS.md`, state snapshot, and latest executor report when available.
@@ -404,7 +404,7 @@ Hard requirements to encode in generated prompts
 - Skill routing must be compact and conditional, with exact skill names and workflow timing.
 - Non-trivial implementation prompts must require real-boundary or end-to-end validation in addition to local tests.
 - Prompt packs and staged-plan prompts must create or update the stage execution ledger.
-- Prompt packs must include branch policy: default `main`, no branch unless explicitly requested, at most one branch per prompt pack, and no stage-specific branch names.
+- Prompt packs must include branch policy: default `main`, no branch unless explicitly requested, at most one branch per prompt pack, one deterministic worktree path under `/Users/daniildegtyarev/Projects/roehub-worktrees/` when branch work is allowed, no primary-checkout branch switching, no stage-specific branch names, and no local worktree deletion before successful merge/delivery back to `main`.
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
 

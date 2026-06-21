@@ -42,12 +42,12 @@ as attempted shell execution.
 
 - `secret_redaction_guard.py`: blocks raw secret-like values.
 - `command_safety_guard.py`: blocks obvious destructive commands.
-- `branch_workflow_guard.py`: blocks unapproved branch creation and stage-specific prompt-pack branches.
+- `branch_workflow_guard.py`: blocks unapproved branch creation, stage-specific prompt-pack branches, direct branch creation in the primary checkout, branch worktrees outside `/Users/daniildegtyarev/Projects/roehub-worktrees/`, and switching the primary checkout away from `main`.
 - `macstudio_path_guard.py`: blocks git operations inside `/opt/roehub/app`.
 - `remote_payload_quoting_guard.py`: blocks inline SSH + ClickHouse SQL quoting and warns on inline SSH JSON payloads.
 - `playwright_wrapper_guard.py`: blocks floating Playwright CLI invocations.
 - `prompt_pack_stage_ledger_linter.py`: requires generated prompts to carry ledger and manifest anchors.
-- `prompt_pack_branch_policy_guard.py`: requires generated prompt packs that mention branch work to use one shared branch policy.
+- `prompt_pack_branch_policy_guard.py`: requires generated prompt packs that mention branch work to use one shared branch policy, one fixed worktree root/path, and cleanup only after merge or delivery back to `main`.
 - `docs_index_drift_guard.py`: reminds agents to refresh/check generated docs indexes after docs edits.
 - `architecture_doc_linter.py`: warns about missing architecture documentation anchors.
 - `validation_depth_linter.py`: flags tests-only validation for runtime/integration surfaces.
