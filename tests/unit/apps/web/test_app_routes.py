@@ -604,8 +604,14 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-launch-strategy-endpoint="/api/strategies/launch-from-backtest-variant"' in (
         response.text
     )
+    assert (
+        'data-exchange-connections-endpoint="/api/ui/account/exchange-connections?status=active"'
+        in response.text
+    )
     assert 'data-strategy-launch-field="mode"' in response.text
     assert 'data-strategy-launch-field="exchange_connection_id"' in response.text
+    assert "data-strategy-launch-connection-select" in response.text
+    assert 'placeholder="00000000-0000-0000-0000-000000000000"' not in response.text
     assert 'data-strategy-launch-field="capital_allocation_usd"' in response.text
     assert 'data-strategy-launch-field="entry_sizing"' in response.text
     assert 'data-strategy-launch-field="risk_mode"' in response.text
@@ -651,7 +657,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "/assets/css/pages/backtests.css" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text
-    assert "<select" not in response.text
+    assert response.text.count("<select") == 1
     assert 'role="listbox"' in response.text
     assert 'data-backtest-control="branded dropdown"' in response.text
     assert "Protected workspace placeholder" not in main_html
@@ -698,6 +704,18 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert detail_response.status_code == 200
     assert 'data-page="backtests"' in detail_response.text
     assert 'data-initial-mode="selected_job"' in detail_response.text
+
+    backtests_js = (_WEB_ROOT / "dist" / "js" / "pages" / "backtests.js").read_text()
+    assert "launchExchangeConnectionsEndpoint" in backtests_js
+    assert "data-strategy-launch-connection-select" in backtests_js
+    assert "exchange_connection_id" in backtests_js
+    assert "exchange_name" in backtests_js
+    assert "market_type" in backtests_js
+    assert "environment" in backtests_js
+    assert "testnet" in backtests_js
+    assert "effective_capability" in backtests_js
+    assert "connection_readiness" in backtests_js
+    assert "ready_for_trading" in backtests_js
     assert f'data-initial-job-id="{job_id}"' in detail_response.text
 
 

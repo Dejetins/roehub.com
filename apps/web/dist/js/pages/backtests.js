@@ -63,6 +63,10 @@ const state = {
   selectedJobId: null,
   selectedVariantKey: null,
   pendingStrategyCreate: null,
+  launchExchangeConnections: [],
+  launchExchangeConnectionsLoaded: false,
+  launchExchangeConnectionsLoading: false,
+  launchExchangeConnectionsError: "",
   pendingCancelJobId: null,
   pendingCancelTrigger: null,
   resultSummary: null,
@@ -2964,6 +2968,224 @@ async function confirmCancelDialog(root) {
   closeCancelDialog(root, { restoreFocus: false });
 }
 
+function launchExchangeConnectionsEndpoint(root) {
+  return (
+    root.dataset.exchangeConnectionsEndpoint ||
+    "/api/ui/account/exchange-connections?status=active"
+  );
+}
+
+function selectedLaunchJob(root) {
+  const jobId = state.pendingStrategyCreate?.jobId || state.selectedJobId;
+  const fromRows = state.jobRows.find((row) => row.job_id === jobId);
+  if (fromRows) {
+    return fromRows;
+  }
+  if (state.resultSummary?.job?.job_id === jobId) {
+    return state.resultSummary.job;
+  }
+  return null;
+}
+
+function readableConnectionPart(value) {
+  return labelForId(value || "--");
+}
+
+function launchExchangeLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "binance") {
+    return "Binance";
+  }
+  if (normalized === "bybit") {
+    return "Bybit";
+  }
+  return readableConnectionPart(normalized || value);
+}
+
+function launchMarketLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "spot") {
+    return "Spot";
+  }
+  if (normalized === "futures") {
+    return "Futures";
+  }
+  return readableConnectionPart(normalized || value);
+}
+
+function launchConnectionTail(item) {
+  const masked = String(item?.api_key || "").trim();
+  if (masked) {
+    if (masked.includes("...")) {
+      return masked;
+    }
+    return masked.length > 4 ? `...${masked.slice(-4)}` : masked;
+  }
+  return `...${compactId(item?.connection_id || "")}`;
+}
+
+function launchConnectionOptionLabel(item) {
+  const venue = [
+    launchExchangeLabel(item?.exchange_name),
+    launchMarketLabel(item?.market_type),
+    "Testnet",
+  ].join(" ");
+  return [
+    venue,
+    readableConnectionPart(item?.status || "active").toLowerCase(),
+    "trading ready",
+    launchConnectionTail(item),
+  ].join(" · ");
+}
+
+function launchConnectionFilters(dialog) {
+  const root = dialog.closest("[data-backtests-root]");
+  const job = root ? selectedLaunchJob(root) : null;
+  return {
+    exchange: String(job?.exchange || state.market || "binance").trim().toLowerCase(),
+    marketType: String(launchFieldValue(dialog, "market_type") || job?.market_type || state.market_type || "spot")
+      .trim()
+      .toLowerCase(),
+  };
+}
+
+function isReadyLaunchConnection(item, filters) {
+  return (
+    String(item?.exchange_name || "").trim().toLowerCase() === filters.exchange &&
+    String(item?.market_type || "").trim().toLowerCase() === filters.marketType &&
+    String(item?.environment || "").trim().toLowerCase() === "testnet" &&
+    String(item?.status || "").trim().toLowerCase() === "active" &&
+    String(item?.effective_capability || "").trim().toLowerCase() === "trading" &&
+    String(item?.connection_readiness || "").trim().toLowerCase() === "ready_for_trading"
+  );
+}
+
+function filteredLaunchConnections(dialog) {
+  const filters = launchConnectionFilters(dialog);
+  return state.launchExchangeConnections
+    .filter((item) => isReadyLaunchConnection(item, filters))
+    .sort((left, right) =>
+      launchConnectionOptionLabel(left).localeCompare(launchConnectionOptionLabel(right))
+    );
+}
+
+function renderLaunchConnectionSelect(dialog) {
+  const select = qs("[data-strategy-launch-connection-select]", dialog);
+  const status = qs("[data-strategy-launch-connection-status]", dialog);
+  if (!(select instanceof HTMLSelectElement)) {
+    return;
+  }
+  const mode = launchFieldValue(dialog, "mode") || "paper";
+  if (mode !== "testnet") {
+    select.replaceChildren();
+    select.disabled = true;
+    if (status) {
+      status.textContent = "";
+    }
+    return;
+  }
+
+  const filters = launchConnectionFilters(dialog);
+  const exchange = launchExchangeLabel(filters.exchange);
+  const market = launchMarketLabel(filters.marketType);
+  const previousValue = select.value;
+  select.replaceChildren();
+
+  if (state.launchExchangeConnectionsLoading) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = t("backtests.strategy_create.connection_loading");
+    select.append(option);
+    select.disabled = true;
+    if (status) {
+      status.textContent = t("backtests.strategy_create.connection_loading");
+    }
+    return;
+  }
+
+  if (state.launchExchangeConnectionsError) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = t("backtests.strategy_create.connection_load_failed");
+    select.append(option);
+    select.disabled = true;
+    if (status) {
+      status.textContent = state.launchExchangeConnectionsError;
+    }
+    return;
+  }
+
+  const connections = filteredLaunchConnections(dialog);
+  if (!connections.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = t("backtests.strategy_create.connection_none", { exchange, market });
+    select.append(option);
+    select.disabled = true;
+    if (status) {
+      status.textContent = t("backtests.strategy_create.connection_none", { exchange, market });
+    }
+    return;
+  }
+
+  connections.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.connection_id || "";
+    option.textContent = launchConnectionOptionLabel(item);
+    select.append(option);
+  });
+  select.disabled = false;
+  if (connections.some((item) => item.connection_id === previousValue)) {
+    select.value = previousValue;
+  } else {
+    select.value = connections[0].connection_id || "";
+  }
+  if (status) {
+    status.textContent = t("backtests.strategy_create.connection_ready", {
+      count: String(connections.length),
+      exchange,
+      market,
+    });
+  }
+}
+
+function updateStrategyLaunchConfirmState(dialog) {
+  const confirm = qs("[data-strategy-create-confirm]", dialog);
+  if (!(confirm instanceof HTMLButtonElement)) {
+    return;
+  }
+  const mode = launchFieldValue(dialog, "mode") || "paper";
+  const needsConnection = mode === "testnet";
+  confirm.disabled = needsConnection && !launchFieldValue(dialog, "exchange_connection_id");
+}
+
+async function ensureLaunchExchangeConnections(root, dialog) {
+  if (
+    state.launchExchangeConnectionsLoaded ||
+    state.launchExchangeConnectionsLoading
+  ) {
+    return;
+  }
+  state.launchExchangeConnectionsLoading = true;
+  state.launchExchangeConnectionsError = "";
+  renderLaunchConnectionSelect(dialog);
+  updateStrategyLaunchConfirmState(dialog);
+  try {
+    const payload = await apiFetch(launchExchangeConnectionsEndpoint(root));
+    state.launchExchangeConnections = Array.isArray(payload?.items) ? payload.items : [];
+    state.launchExchangeConnectionsLoaded = true;
+  } catch (error) {
+    state.launchExchangeConnections = [];
+    state.launchExchangeConnectionsLoaded = false;
+    state.launchExchangeConnectionsError =
+      describeApiError(error) || t("backtests.strategy_create.connection_load_failed");
+  } finally {
+    state.launchExchangeConnectionsLoading = false;
+    renderLaunchConnectionSelect(dialog);
+    updateStrategyLaunchConfirmState(dialog);
+  }
+}
+
 function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
   if (!jobId || !variantKey) {
     return;
@@ -3034,6 +3256,14 @@ function updateStrategyLaunchForm(dialog) {
   if (exchangeRow instanceof HTMLElement) {
     exchangeRow.hidden = mode !== "testnet";
   }
+  if (mode === "testnet") {
+    renderLaunchConnectionSelect(dialog);
+    const root = dialog.closest("[data-backtests-root]");
+    if (root instanceof HTMLElement) {
+      ensureLaunchExchangeConnections(root, dialog).catch(() => {});
+    }
+  }
+  updateStrategyLaunchConfirmState(dialog);
 }
 
 function updateLaunchChoiceButtons(dialog, field, value) {
@@ -3066,6 +3296,22 @@ async function confirmCreateStrategyDialog(root) {
   const dialog = qs("[data-strategy-create-dialog]", root);
   const pending = state.pendingStrategyCreate;
   if (!dialog || !pending) {
+    return;
+  }
+  if (
+    (launchFieldValue(dialog, "mode") || "paper") === "testnet" &&
+    !launchFieldValue(dialog, "exchange_connection_id")
+  ) {
+    updateStrategyLaunchForm(dialog);
+    const filters = launchConnectionFilters(dialog);
+    setText(
+      "[data-strategy-create-status]",
+      t("backtests.strategy_create.connection_none", {
+        exchange: launchExchangeLabel(filters.exchange),
+        market: launchMarketLabel(filters.marketType),
+      }),
+      dialog
+    );
     return;
   }
   const confirm = qs("[data-strategy-create-confirm]", dialog);

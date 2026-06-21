@@ -27,6 +27,7 @@
     data-variant-compatibility-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/compatibility-readiness"
     data-create-strategy-endpoint-template="/api/backtests/jobs/{job_id}/variants/{variant_key}/strategies"
     data-launch-strategy-endpoint="/api/strategies/launch-from-backtest-variant"
+    data-exchange-connections-endpoint="/api/ui/account/exchange-connections?status=active"
     data-variant-open-delay-ms="180"
     data-variant-open-duration-ms="650"
     data-variant-preview-limit="10"
@@ -444,7 +445,7 @@
         aria-label="{{ t('backtests.strategy_create.dismiss') }}"
       ></button>
       <section
-        class="backtests-cancel-dialog__panel"
+        class="backtests-cancel-dialog__panel backtests-cancel-dialog__panel--launch"
         role="dialog"
         aria-modal="true"
         aria-labelledby="backtests-strategy-create-title"
@@ -464,9 +465,19 @@
               <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="mode" data-value="testnet" aria-pressed="false">{{ t("backtests.strategy_create.mode_testnet") }}</button>
             </span>
           </label>
-          <label class="backtests-field" data-strategy-launch-exchange-row hidden>
+          <label class="backtests-field backtests-field--launch-connection" data-strategy-launch-exchange-row hidden>
             <span>{{ t("backtests.strategy_create.exchange_connection") }}</span>
-            <input class="backtests-input" type="text" autocomplete="off" data-strategy-launch-field="exchange_connection_id" placeholder="00000000-0000-0000-0000-000000000000">
+            <span class="backtests-launch-select-wrap">
+              <select
+                class="backtests-input backtests-launch-select"
+                data-strategy-launch-field="exchange_connection_id"
+                data-strategy-launch-connection-select
+                disabled
+              >
+                <option value="">{{ t("backtests.strategy_create.connection_loading") }}</option>
+              </select>
+              <output class="backtests-launch-hint" data-strategy-launch-connection-status aria-live="polite"></output>
+            </span>
           </label>
           <div class="backtests-field-pair">
             <label class="backtests-field">
