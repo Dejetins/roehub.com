@@ -86,6 +86,10 @@ class CreateStrategyFromBacktestVariantUseCase:
                 job_id=job_id,
                 variant_key=variant_key,
             )
+            _validate_launch_config_matches_snapshot(
+                launch_config=launch_config,
+                snapshot=snapshot,
+            )
             spec = strategy_spec_from_backtest_variant_snapshot(snapshot=snapshot)
             strategy_spec_hash = _sha256_json(spec.to_json())
             launch_request_hash = _sha256_json(
@@ -321,6 +325,56 @@ def _normalized_launch_config(
             default=str,
         )
     )
+
+
+def _validate_launch_config_matches_snapshot(
+    *,
+    launch_config: Mapping[str, Any] | None,
+    snapshot: BacktestVariantLaunchSnapshot,
+) -> None:
+    normalized = _normalized_launch_config(launch_config)
+    if not normalized:
+        return
+    expected = {
+        "market_type": snapshot.market_type.strip().lower(),
+        "symbol": snapshot.symbol.strip().upper(),
+        "direction": _launch_direction_from_snapshot(snapshot=snapshot),
+    }
+    actual = {
+        "market_type": str(normalized.get("market_type", "")).strip().lower(),
+        "symbol": str(normalized.get("symbol", "")).strip().upper(),
+        "direction": str(normalized.get("direction", "")).strip().lower(),
+    }
+    for field, expected_value in expected.items():
+        actual_value = actual[field]
+        if actual_value and actual_value != expected_value:
+            raise _variant_launch_error(
+                code="strategy_launch.invalid_config",
+                message="Backtest variant launch config does not match the source variant",
+                reason=f"{field}_mismatch",
+                details={
+                    "field": field,
+                    "expected": expected_value,
+                    "actual": actual_value,
+                },
+            )
+
+
+def _launch_direction_from_snapshot(*, snapshot: BacktestVariantLaunchSnapshot) -> str:
+    canonical = _mapping(snapshot.canonical_variant_params)
+    execution = _mapping(canonical.get("execution"))
+    direction_mode = str(
+        execution.get("direction_mode", "long_short_reversal")
+    ).strip().lower()
+    if direction_mode in {"long_only", "long"}:
+        return "long"
+    if direction_mode == "short":
+        return "short"
+    return "long_short_reversal"
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _variant_launch_error(

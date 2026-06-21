@@ -611,6 +611,15 @@
   text-overflow: ellipsis;
 }
 
+.backtests-launch-derived {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid var(--rh-line-muted);
+  color: var(--rh-muted);
+  padding: 4px 10px;
+}
+
 .backtests-launch-hint {
   min-height: 12px;
   color: var(--rh-muted);

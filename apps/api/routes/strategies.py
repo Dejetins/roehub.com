@@ -77,7 +77,7 @@ _ALLOWED_LAUNCH_MODES = frozenset(SCENARIO_MATRIX_MODES_V1)
 _ALLOWED_LAUNCH_MARKET_TYPES = frozenset({"spot", "futures"})
 _ALLOWED_LAUNCH_ENTRY_SIZING = frozenset({"fixed_quote", "fixed_equity_pct"})
 _ALLOWED_LAUNCH_RISK_MODES = frozenset(SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1)
-_ALLOWED_LAUNCH_DIRECTIONS = frozenset({"long", "short"})
+_ALLOWED_LAUNCH_DIRECTIONS = frozenset({"long", "short", "long_short_reversal"})
 
 
 class StrategyInstrumentIdRequest(BaseModel):
@@ -1116,6 +1116,12 @@ def _execute_manual_strategy_action(
             details={"reason": "idempotency_key_required"},
         )
     direction = _manual_direction_from_run_metadata(metadata=active_run.metadata_json)
+    if direction == "long_short_reversal":
+        raise RoehubError(
+            code="strategy_manual_execution.blocked",
+            message="Manual execution is blocked",
+            details={"reason": "manual_direction_ambiguous"},
+        )
     side = _manual_side(action=action, direction=direction)
     quote_notional = _manual_quote_notional(payload=payload, profile=profile)
     reference_price = payload.reference_price or Decimal("1")
@@ -1244,7 +1250,7 @@ def _manual_direction_from_run_metadata(*, metadata: Mapping[str, Any]) -> str:
     launch_config = metadata.get("launch_config")
     if isinstance(launch_config, Mapping):
         direction = str(launch_config.get("direction", "long")).strip().casefold()
-        if direction in {"long", "short"}:
+        if direction in {"long", "short", "long_short_reversal"}:
             return direction
     return "long"
 
@@ -1387,7 +1393,11 @@ def _validated_backtest_variant_launch_config(
             reason="exchange_connection_required",
             field="exchange_connection_id",
         )
-    if mode == "testnet" and market_type == "spot" and direction == "short":
+    if (
+        mode == "testnet" and
+        market_type == "spot" and
+        direction in {"short", "long_short_reversal"}
+    ):
         raise _strategy_launch_validation_error(
             reason="spot_short_not_supported",
             field="direction",

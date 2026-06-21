@@ -131,6 +131,7 @@
   "backtests.strategy_create.connection_load_failed": "Could not load Testnet connections",
   "backtests.strategy_create.connection_none": "No ready {exchange} {market} Testnet connection",
   "backtests.strategy_create.connection_ready": "Ready {exchange} {market} Testnet connections: {count}",
+  "backtests.strategy_create.testnet_spot_short_blocked": "Testnet Spot is blocked for Long/Short variants because spot short orders are not supported. Use Paper or launch a Futures-tested variant.",
   "backtests.strategy_create.symbol": "Symbol",
   "backtests.strategy_create.market_type": "Market",
   "backtests.strategy_create.market_spot": "Spot",

@@ -131,6 +131,7 @@
   "backtests.strategy_create.connection_load_failed": "Не удалось загрузить Testnet подключения",
   "backtests.strategy_create.connection_none": "Нет готового {exchange} {market} Testnet подключения",
   "backtests.strategy_create.connection_ready": "Готовых {exchange} {market} Testnet подключений: {count}",
+  "backtests.strategy_create.testnet_spot_short_blocked": "Testnet Spot заблокирован для Long/Short вариантов: spot short ордера не поддержаны. Используйте Paper или запускайте вариант, протестированный на Futures.",
   "backtests.strategy_create.symbol": "Символ",
   "backtests.strategy_create.market_type": "Рынок",
   "backtests.strategy_create.market_spot": "Spot",

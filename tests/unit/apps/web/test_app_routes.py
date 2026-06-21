@@ -612,6 +612,10 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-strategy-launch-field="exchange_connection_id"' in response.text
     assert "data-strategy-launch-connection-select" in response.text
     assert 'placeholder="00000000-0000-0000-0000-000000000000"' not in response.text
+    assert 'data-strategy-launch-display="market_type"' in response.text
+    assert 'data-strategy-launch-display="direction"' in response.text
+    assert 'data-strategy-launch-choice="market_type"' not in response.text
+    assert 'data-strategy-launch-choice="direction"' not in response.text
     assert 'data-strategy-launch-field="capital_allocation_usd"' in response.text
     assert 'data-strategy-launch-field="entry_sizing"' in response.text
     assert 'data-strategy-launch-field="risk_mode"' in response.text
@@ -716,6 +720,9 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "effective_capability" in backtests_js
     assert "connection_readiness" in backtests_js
     assert "ready_for_trading" in backtests_js
+    assert "launchDirectionValue" in backtests_js
+    assert "long_short_reversal" in backtests_js
+    assert "testnet_spot_short_blocked" in backtests_js
     assert f'data-initial-job-id="{job_id}"' in detail_response.text
 
 

@@ -3013,6 +3013,70 @@ function launchMarketLabel(value) {
   return readableConnectionPart(normalized || value);
 }
 
+function launchDirectionValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "long_only" || normalized === "long") {
+    return "long";
+  }
+  if (normalized === "short") {
+    return "short";
+  }
+  if (normalized === "long_short_reversal") {
+    return "long_short_reversal";
+  }
+  return "long_short_reversal";
+}
+
+function launchDirectionLabel(value) {
+  const normalized = launchDirectionValue(value);
+  if (normalized === "long_short_reversal") {
+    return t("backtests.option.long_short");
+  }
+  if (normalized === "short") {
+    return t("backtests.strategy_create.direction_short");
+  }
+  return t("backtests.strategy_create.direction_long");
+}
+
+function launchSymbolValue(job) {
+  return String(job?.symbol || state.symbol || "BTCUSDT").trim().toUpperCase();
+}
+
+function launchMarketValue(job) {
+  const value = String(job?.market_type || state.market_type || "spot").trim().toLowerCase();
+  return value === "futures" ? "futures" : "spot";
+}
+
+function syncLaunchFieldsFromVariant(dialog) {
+  const root = dialog.closest("[data-backtests-root]");
+  const job = root ? selectedLaunchJob(root) : null;
+  setLaunchFieldValue(dialog, "symbol", launchSymbolValue(job));
+  setLaunchFieldValue(dialog, "market_type", launchMarketValue(job));
+  setLaunchFieldValue(dialog, "direction", launchDirectionValue(job?.direction || state.direction));
+  renderLaunchDerivedFields(dialog);
+}
+
+function renderLaunchDerivedFields(dialog) {
+  const marketType = launchFieldValue(dialog, "market_type") || "spot";
+  const direction = launchFieldValue(dialog, "direction") || "long";
+  setText("[data-strategy-launch-display='market_type']", launchMarketLabel(marketType), dialog);
+  setText("[data-strategy-launch-display='direction']", launchDirectionLabel(direction), dialog);
+}
+
+function launchTestnetBlockReason(dialog) {
+  const mode = launchFieldValue(dialog, "mode") || "paper";
+  const marketType = launchFieldValue(dialog, "market_type") || "spot";
+  const direction = launchFieldValue(dialog, "direction") || "long";
+  if (
+    mode === "testnet" &&
+    marketType === "spot" &&
+    (direction === "short" || direction === "long_short_reversal")
+  ) {
+    return t("backtests.strategy_create.testnet_spot_short_blocked");
+  }
+  return "";
+}
+
 function launchConnectionTail(item) {
   const masked = String(item?.api_key || "").trim();
   if (masked) {
@@ -3081,6 +3145,18 @@ function renderLaunchConnectionSelect(dialog) {
     select.disabled = true;
     if (status) {
       status.textContent = "";
+    }
+    return;
+  }
+  const blockReason = launchTestnetBlockReason(dialog);
+  if (blockReason) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = blockReason;
+    select.replaceChildren(option);
+    select.disabled = true;
+    if (status) {
+      status.textContent = blockReason;
     }
     return;
   }
@@ -3156,7 +3232,8 @@ function updateStrategyLaunchConfirmState(dialog) {
   }
   const mode = launchFieldValue(dialog, "mode") || "paper";
   const needsConnection = mode === "testnet";
-  confirm.disabled = needsConnection && !launchFieldValue(dialog, "exchange_connection_id");
+  confirm.disabled = Boolean(launchTestnetBlockReason(dialog)) ||
+    (needsConnection && !launchFieldValue(dialog, "exchange_connection_id"));
 }
 
 async function ensureLaunchExchangeConnections(root, dialog) {
@@ -3225,12 +3302,10 @@ function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
 function resetStrategyLaunchForm(dialog) {
   setLaunchFieldValue(dialog, "mode", "paper");
   setLaunchFieldValue(dialog, "exchange_connection_id", "");
-  setLaunchFieldValue(dialog, "market_type", "spot");
-  setLaunchFieldValue(dialog, "symbol", "BTCUSDT");
+  syncLaunchFieldsFromVariant(dialog);
   setLaunchFieldValue(dialog, "capital_allocation_usd", "50");
   setLaunchFieldValue(dialog, "entry_sizing", "fixed_quote");
   setLaunchFieldValue(dialog, "risk_mode", "single_position_cap");
-  setLaunchFieldValue(dialog, "direction", "long");
   updateStrategyLaunchForm(dialog);
 }
 
@@ -3251,6 +3326,7 @@ function launchFieldValue(dialog, field) {
 }
 
 function updateStrategyLaunchForm(dialog) {
+  renderLaunchDerivedFields(dialog);
   const mode = launchFieldValue(dialog, "mode") || "paper";
   const exchangeRow = qs("[data-strategy-launch-exchange-row]", dialog);
   if (exchangeRow instanceof HTMLElement) {
@@ -3259,10 +3335,11 @@ function updateStrategyLaunchForm(dialog) {
   if (mode === "testnet") {
     renderLaunchConnectionSelect(dialog);
     const root = dialog.closest("[data-backtests-root]");
-    if (root instanceof HTMLElement) {
+    if (root instanceof HTMLElement && !launchTestnetBlockReason(dialog)) {
       ensureLaunchExchangeConnections(root, dialog).catch(() => {});
     }
   }
+  setText("[data-strategy-create-status]", launchTestnetBlockReason(dialog), dialog);
   updateStrategyLaunchConfirmState(dialog);
 }
 
@@ -3296,6 +3373,12 @@ async function confirmCreateStrategyDialog(root) {
   const dialog = qs("[data-strategy-create-dialog]", root);
   const pending = state.pendingStrategyCreate;
   if (!dialog || !pending) {
+    return;
+  }
+  const testnetBlockReason = launchTestnetBlockReason(dialog);
+  if (testnetBlockReason) {
+    setText("[data-strategy-create-status]", testnetBlockReason, dialog);
+    updateStrategyLaunchConfirmState(dialog);
     return;
   }
   if (

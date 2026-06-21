@@ -445,7 +445,7 @@ def _requires_safe_futures_short_guard(
         context is not None
         and context.mode == "testnet"
         and context.market_type == "futures"
-        and context.direction == "short"
+        and context.direction in {"short", "long_short_reversal"}
     )
 
 

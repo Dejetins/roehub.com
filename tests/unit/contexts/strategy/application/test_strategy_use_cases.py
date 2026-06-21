@@ -246,7 +246,11 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
         job_id=UUID("00000000-0000-0000-0000-00000000b001"),
         variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
         idempotency_key="launch-1",
-        launch_config={"mode": "paper", "entry_sizing": "fixed_quote", "direction": "long"},
+        launch_config={
+            "mode": "paper",
+            "entry_sizing": "fixed_quote",
+            "direction": "long_short_reversal",
+        },
     )
     second = use_case.execute(
         current_user=current_user,
@@ -256,7 +260,7 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
         launch_config={
             "mode": "paper",
             "entry_sizing": "fixed_equity_pct",
-            "direction": "short",
+            "direction": "long_short_reversal",
         },
     )
 
@@ -264,6 +268,41 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
     assert second.duplicate is False
     assert second.strategy.strategy_id != first.strategy.strategy_id
     assert second.provenance.launch_request_hash != first.provenance.launch_request_hash
+
+
+def test_create_strategy_from_backtest_variant_rejects_direction_override() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000128")
+    )
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
+        strategy_repository=strategy_repository,
+        provenance_repository=InMemoryStrategyBacktestVariantProvenanceRepository(
+            strategy_repository=strategy_repository,
+        ),
+        clock=_SequenceClock(values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)),
+    )
+
+    with pytest.raises(RoehubError) as exc_info:
+        use_case.execute(
+            current_user=current_user,
+            job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+            variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+            idempotency_key="launch-direction-mismatch",
+            launch_config={
+                "mode": "paper",
+                "market_type": "spot",
+                "symbol": "BTCUSDT",
+                "entry_sizing": "fixed_quote",
+                "direction": "long",
+            },
+        )
+
+    assert exc_info.value.code == "strategy_launch.invalid_config"
+    assert exc_info.value.details is not None
+    assert exc_info.value.details["reason"] == "direction_mismatch"
+    assert not strategy_repository.list_for_user(user_id=current_user.user_id)
 
 
 def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_job() -> None:

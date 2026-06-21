@@ -626,6 +626,36 @@ def test_launch_from_backtest_variant_creates_profile_and_run_config() -> None:
     assert use_case.calls == (("job_demo", "launch-paper-1", "paper"),)
 
 
+def test_launch_from_backtest_variant_preserves_long_short_direction_mode() -> None:
+    use_case = _FakeCreateStrategyFromVariantUseCase()
+    client = _build_live_profile_client(
+        session_created_at=datetime.now(timezone.utc),
+        create_strategy_from_variant_use_case=use_case,
+    )
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000205"}
+
+    launched = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={**headers, "Idempotency-Key": "launch-paper-long-short"},
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "paper",
+            "market_type": "spot",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "long_short_reversal",
+        },
+    )
+
+    assert launched.status_code == 201
+    payload = launched.json()
+    assert payload["run"]["metadata"]["launch_config"]["direction"] == "long_short_reversal"
+    assert payload["profile"]["readiness_reason"] == "paper_no_exchange_submit"
+
+
 def test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order() -> None:
     client, execution_repository, paper_repository = _build_manual_execution_client()
     headers = {"x-user-id": "00000000-0000-0000-0000-000000000805"}
@@ -745,6 +775,33 @@ def test_launch_from_backtest_variant_blocks_testnet_without_exchange() -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
     assert response.json()["error"]["details"]["reason"] == "exchange_connection_required"
+
+
+def test_launch_from_backtest_variant_blocks_testnet_spot_long_short() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    response = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-testnet-spot-long-short",
+        },
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "testnet",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e101",
+            "market_type": "spot",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "long_short_reversal",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
+    assert response.json()["error"]["details"]["reason"] == "spot_short_not_supported"
 
 
 def test_launch_from_backtest_variant_blocks_unsafe_testnet_futures_short() -> None:

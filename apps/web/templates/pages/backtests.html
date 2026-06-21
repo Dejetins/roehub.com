@@ -486,10 +486,9 @@
             </label>
             <label class="backtests-field">
               <span>{{ t("backtests.strategy_create.market_type") }}</span>
-              <span class="backtests-launch-choice-group" role="radiogroup">
+              <span class="backtests-launch-derived">
                 <input type="hidden" value="spot" data-strategy-launch-field="market_type">
-                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="market_type" data-value="spot" aria-pressed="true">{{ t("backtests.strategy_create.market_spot") }}</button>
-                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="market_type" data-value="futures" aria-pressed="false">{{ t("backtests.strategy_create.market_futures") }}</button>
+                <output data-strategy-launch-display="market_type">{{ t("backtests.strategy_create.market_spot") }}</output>
               </span>
             </label>
           </div>
@@ -517,10 +516,9 @@
             </label>
             <label class="backtests-field">
               <span>{{ t("backtests.strategy_create.direction") }}</span>
-              <span class="backtests-launch-choice-group" role="radiogroup">
+              <span class="backtests-launch-derived">
                 <input type="hidden" value="long" data-strategy-launch-field="direction">
-                <button class="rh-button rh-button--secondary rh-button--compact is-active" type="button" data-strategy-launch-choice="direction" data-value="long" aria-pressed="true">{{ t("backtests.strategy_create.direction_long") }}</button>
-                <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-launch-choice="direction" data-value="short" aria-pressed="false">{{ t("backtests.strategy_create.direction_short") }}</button>
+                <output data-strategy-launch-display="direction">{{ t("backtests.strategy_create.direction_long") }}</output>
               </span>
             </label>
           </div>
