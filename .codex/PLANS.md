@@ -187,6 +187,7 @@ This section tracks the major project streams at a strategic level.
 | Web UI / Gateway | same-origin browser control surface for backtests and strategies | active | active | keep browser flows consistent with backend/runtime contracts |
 | ML | future feature registry and inference path | planned | planned | no active checkpoint |
 | Live Execution | future order routing and execution gateway | planned | planned | no active checkpoint |
+| Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | architecture freeze | active | Stage 00 local plan on `codex/web-execution-telegram-notifications-v1` |
 | Cross-cutting Architecture / Docs | roadmap integrity, design docs, milestone coordination | always-on | active | keep architecture docs aligned with delivery |
 
 ---
@@ -265,7 +266,18 @@ High-level milestones:
   - exchange-specific adapter isolation,
   - safe operational controls
 
-### 6.8 Cross-cutting Architecture / Docs
+### 6.8 Notifications
+High-level milestones:
+- M11 active planning
+- intended direction:
+  - provider-neutral `notifications` bounded context,
+  - Telegram bot binding, commands and delivery,
+  - user modes for critical-only, signals, trades and reports,
+  - day/week/month portfolio, strategy and exchange stats,
+  - separate admin critical alerts, ops alerts and reports,
+  - synthetic type-by-type proof before real Telegram canary
+
+### 6.9 Cross-cutting Architecture / Docs
 Always-on responsibilities:
 - preserve bounded-context clarity,
 - keep roadmap docs internally consistent,
@@ -280,6 +292,7 @@ This section is operational and should stay current.
 
 ### Primary active project focus
 - Backtest runtime evolution under staged, rollout-safe architecture
+- Notifications bounded-context architecture freeze and staged Telegram delivery plan
 - Web/runtime contract consistency for browser-visible flows
 - Architecture-document iteration across active streams
 - Cross-stream planning discipline to keep milestones bounded
@@ -392,7 +405,7 @@ Keep only the most recent, still-relevant decisions here.
 2. Keep `.codex/AGENTS.md` for durable repo rules; keep `PLANS.md` for long-horizon execution state.
 3. Prefer bounded, milestone-shaped prompts over broad “read and redesign everything” prompts.
 4. Treat browser-visible verification as a first-class requirement when web/UI behavior is in scope.
-5. Keep this file strategic on top and operational below; rotate detail out instead of letting it grow indefinitely.
+5. Keep Notifications provider-neutral: producer contexts publish source facts, while delivery providers live behind the `notifications` bounded context.
 
 ---
 
@@ -404,6 +417,7 @@ Keep this list current and short.
 2. Prompt-generation workflow has been migrated away from flat broad-reading prompt structure.
 3. Browser/runtime verification is being incorporated as a first-class concern through available browser automation surfaces.
 4. A single project-level execution map is now recognized as necessary for multi-iteration design and roadmap work.
+5. Notifications Stage `00` is being captured as a local architecture/stage plan before schema, provider or Telegram bot implementation starts.
 
 ---
 
