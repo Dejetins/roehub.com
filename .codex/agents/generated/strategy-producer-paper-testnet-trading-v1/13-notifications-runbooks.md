@@ -48,6 +48,12 @@ stage_execution_ledger:
   current_stage: "13"
   required_update: true
   template: .codex/agents/stage_execution_ledger_template.md
+readiness_anchors:
+  previous_stage_ledger_gate: "Previous stage prerequisite: before implementation, read the stage ledger and verify Stage 12.5 is accepted in the ledger and Stage 12.1 through Stage 12.4 are accepted in the ledger; record evidence in the Stage 13 report."
+  file_manifest_required: true
+  smoke_keycloak_username: smoke_e2e_keycloak
+  host_local_smoke_password_env_var_source: "/Users/daniildegtyarev/.config/roehub/roehub.env:ROEHUB_SMOKE_E2E_PASSWORD"
+  credential_redaction_rule: "Do not write secrets, passwords, cookies, tokens, DSNs, exchange keys, raw credentials, or session values to reports, logs, screenshots, ledger, commits, or final output."
 expected_primary_touches:
   - src/trading/contexts/live_execution
   - apps/api/routes/ui_execution.py
@@ -70,9 +76,12 @@ Finalize delivery-neutral notification outbox compatibility and operator alert/r
 ## Requirements (Must)
 
 - Before implementation, explicitly state `User required before start: ...`; if nothing is required, state `User required before start: nothing`. If user-provided keys, artifacts, or access are needed, stop before implementation and list the exact requirement; do not ask for secrets in chat. Record this pre-start line in the stage report.
-- Before implementation, verify Stage `12` is `accepted` in the stage ledger; stop if it is blocked or pending unless this task is explicitly converted into an unblock/repair task.
+- Previous stage ledger gate: read `stage_execution_ledger.path` before implementation and verify Stage `12.5` is accepted in the ledger, and verify `12.1` through `12.4` are also accepted in the ledger; record the ledger evidence in the Stage `13` report.
+- Before implementation, verify Stage `12.5` is `accepted` in the stage ledger, and verify `12.1` through `12.4` are also accepted. Stop if any Stage `12.x` gate is blocked, pending, skipped, or superseded unless this task is explicitly converted into an unblock/repair task.
 - Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `github:yeet`/`publish-ci-deploy` discipline for scoped publish, but do not leave the stage on a per-stage branch or draft PR. Temporary branches are allowed only when useful; before marking the stage `accepted`, deliver the changes to `main`, push `origin main`, verify main contains the changes, delete any temporary local/remote branch, and record main-branch delivery plus branch-cleanup evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
 - The stage report must include a file manifest table: `Created / Modified / Deleted / Reason / Contract impact`; justify any touched file outside expected paths.
+- Credential redaction rule: never write secrets, passwords, cookies, tokens, DSNs, exchange keys, raw credentials, or session values to reports, logs, screenshots, ledger, commits, or final output.
+- If authenticated browser/API smoke is needed for notification surfaces, use Keycloak username `smoke_e2e_keycloak`. On `macstudio`, read the password only from `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; outside `macstudio`, use securely exported local `ROEHUB_SMOKE_E2E_PASSWORD`. Do not ask for or print the password.
 - Before editing, narrow any broad expected directory path to a concrete file list or planned new files and record that list in the stage report.
 - Produce outbox events for rejected signal/order, fill, manual exit, kill switch, unknown/reconciliation pending, strategy stopped/restarted, 6h soak failure/success, and resource-threshold breach during soak/load.
 - Keep event payloads redacted and compatible with future Telegram/email delivery.
