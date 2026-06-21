@@ -429,26 +429,18 @@ def execute_manifest(
     started_monotonic = time.monotonic()
     started_this_run = 0
     failed_this_run = False
-    retry_after_monotonic: float | None = None
     log_jsonl.parent.mkdir(parents=True, exist_ok=True)
 
     chunks = cast(list[dict[str, Any]], manifest["chunks"])
+    _reset_interrupted_running_chunks(chunks=chunks)
     _reset_retryable_failed_chunks(chunks=chunks, max_chunk_attempts=max_chunk_attempts)
     inflight: dict[Future[ChunkRunReport], dict[str, Any]] = {}
     active_ranges_by_symbol: dict[str, list[tuple[datetime, datetime]]] = {}
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="stage04b") as executor:
         while True:
-            if retry_after_monotonic is not None:
-                now_monotonic = time.monotonic()
-                if now_monotonic < retry_after_monotonic and not inflight:
-                    time.sleep(retry_after_monotonic - now_monotonic)
-                if time.monotonic() >= retry_after_monotonic:
-                    retry_after_monotonic = None
-
             while (
                 not failed_this_run
-                and retry_after_monotonic is None
                 and len(inflight) < workers
                 and not _runtime_limit_reached(
                     started_monotonic=started_monotonic,
@@ -459,6 +451,7 @@ def execute_manifest(
                 chunk = _next_schedulable_chunk(
                     chunks=chunks,
                     active_ranges_by_symbol=active_ranges_by_symbol,
+                    now_utc=_now_utc(),
                 )
                 if chunk is None:
                     break
@@ -535,6 +528,7 @@ def execute_manifest(
                 chunk["worker_count"] = workers
                 chunk["shard_key"] = shard
                 chunk["attempts"] = int(chunk.get("attempts") or 0) + 1
+                chunk.pop("next_retry_after_utc", None)
                 chunk.pop("finished_at_utc", None)
                 chunk.pop("error_type", None)
                 chunk.pop("error_summary", None)
@@ -551,7 +545,13 @@ def execute_manifest(
                 started_this_run += 1
 
             if not inflight:
-                break
+                next_retry_at = _next_retry_after_utc(chunks=chunks, now_utc=_now_utc())
+                if next_retry_at is None:
+                    break
+                sleep_s = max(0.0, (next_retry_at - _now_utc()).total_seconds())
+                if sleep_s > 0:
+                    time.sleep(sleep_s)
+                continue
 
             done, _pending = wait(inflight, return_when=FIRST_COMPLETED)
             for future in done:
@@ -573,12 +573,13 @@ def execute_manifest(
                     if attempts < max_chunk_attempts:
                         chunk["status"] = "pending"
                         chunk["last_retry_at_utc"] = _format_utc(failed_at)
-                        execution["chunks_retried"] = int(execution.get("chunks_retried") or 0) + 1
                         if failure_backoff_s > 0:
-                            retry_after_monotonic = max(
-                                retry_after_monotonic or 0.0,
-                                time.monotonic() + failure_backoff_s,
+                            chunk["next_retry_after_utc"] = _format_utc(
+                                failed_at + timedelta(seconds=failure_backoff_s)
                             )
+                        else:
+                            chunk.pop("next_retry_after_utc", None)
+                        execution["chunks_retried"] = int(execution.get("chunks_retried") or 0) + 1
                         _append_log(
                             log_jsonl,
                             {
@@ -600,6 +601,7 @@ def execute_manifest(
 
                     failed_this_run = True
                     chunk["status"] = "failed"
+                    chunk.pop("next_retry_after_utc", None)
                     execution["status"] = "failed"
                     execution["chunks_failed"] = int(execution.get("chunks_failed") or 0) + 1
                     _append_log(
@@ -619,6 +621,7 @@ def execute_manifest(
                     continue
 
                 chunk["status"] = "completed"
+                chunk.pop("next_retry_after_utc", None)
                 chunk["finished_at_utc"] = result.finished_at_utc
                 chunk["rows_read"] = result.rows_read
                 chunk["rows_written"] = result.rows_written
@@ -1146,11 +1149,14 @@ def _next_schedulable_chunk(
     *,
     chunks: Sequence[dict[str, Any]],
     active_ranges_by_symbol: Mapping[str, Sequence[tuple[datetime, datetime]]],
+    now_utc: datetime,
 ) -> dict[str, Any] | None:
     for chunk in chunks:
-        if chunk.get("status") == "completed":
+        if chunk.get("status") != "pending":
             continue
-        if chunk.get("status") == "failed":
+        if not _chunk_retry_ready(chunk=chunk, now_utc=now_utc):
+            continue
+        if active_ranges_by_symbol.get(str(chunk.get("symbol"))):
             continue
         if _overlaps_active_range(
             chunk=chunk,
@@ -1159,6 +1165,33 @@ def _next_schedulable_chunk(
             continue
         return chunk
     return None
+
+
+def _chunk_retry_ready(*, chunk: Mapping[str, Any], now_utc: datetime) -> bool:
+    retry_after = chunk.get("next_retry_after_utc")
+    if retry_after is None:
+        return True
+    if not isinstance(retry_after, str):
+        return True
+    return _parse_utc(retry_after) <= now_utc
+
+
+def _next_retry_after_utc(
+    *,
+    chunks: Sequence[Mapping[str, Any]],
+    now_utc: datetime,
+) -> datetime | None:
+    retry_after_values: list[datetime] = []
+    for chunk in chunks:
+        if chunk.get("status") in {"completed", "failed"}:
+            continue
+        retry_after = chunk.get("next_retry_after_utc")
+        if not isinstance(retry_after, str):
+            continue
+        retry_after_dt = _parse_utc(retry_after)
+        if retry_after_dt > now_utc:
+            retry_after_values.append(retry_after_dt)
+    return min(retry_after_values, default=None)
 
 
 def _chunk_time_range(chunk: Mapping[str, Any]) -> tuple[datetime, datetime]:
@@ -1211,6 +1244,17 @@ def _reset_retryable_failed_chunks(
             continue
         chunk["status"] = "pending"
         chunk["retry_reason"] = "retryable_previous_failure"
+
+
+def _reset_interrupted_running_chunks(*, chunks: Sequence[dict[str, Any]]) -> None:
+    for chunk in chunks:
+        if chunk.get("status") != "running":
+            continue
+        chunk["status"] = "pending"
+        chunk["retry_reason"] = "interrupted_previous_run"
+        chunk.pop("started_at_utc", None)
+        chunk.pop("shard_key", None)
+        chunk.pop("worker_count", None)
 
 
 def _runtime_limit_reached(

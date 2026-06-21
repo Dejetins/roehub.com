@@ -8,6 +8,7 @@ from scripts.rl_trading.stage04b_binance_futures_history_backfill import (
     STALE_REASON,
     _build_parser,
     _next_schedulable_chunk,
+    _reset_interrupted_running_chunks,
     _reset_retryable_failed_chunks,
     _safe_error_summary,
     build_plan_manifest,
@@ -281,7 +282,7 @@ def test_stage04b_execute_accepts_explicit_worker_count() -> None:
     assert args.skip_covered_chunks is True
 
 
-def test_stage04b_parallel_scheduler_allows_non_overlapping_same_symbol_chunks() -> None:
+def test_stage04b_parallel_scheduler_spreads_work_across_symbols() -> None:
     chunks = [
         {
             "chunk_id": "a",
@@ -309,9 +310,10 @@ def test_stage04b_parallel_scheduler_allows_non_overlapping_same_symbol_chunks()
                 )
             ]
         },
+        now_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
     )
 
-    assert selected == chunks[0]
+    assert selected == chunks[1]
 
 
 def test_stage04b_parallel_scheduler_blocks_overlapping_same_symbol_chunks() -> None:
@@ -342,9 +344,86 @@ def test_stage04b_parallel_scheduler_blocks_overlapping_same_symbol_chunks() -> 
                 )
             ]
         },
+        now_utc=datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
     )
 
     assert selected == chunks[1]
+
+
+def test_stage04b_parallel_scheduler_skips_chunks_in_retry_cooldown() -> None:
+    chunks = [
+        {
+            "chunk_id": "a",
+            "symbol": "BTCUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+            "next_retry_after_utc": "2024-01-01T00:03:00Z",
+        },
+        {
+            "chunk_id": "b",
+            "symbol": "ETHUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+        },
+    ]
+
+    selected = _next_schedulable_chunk(
+        chunks=chunks,
+        active_ranges_by_symbol={},
+        now_utc=datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+    )
+
+    assert selected == chunks[1]
+
+
+def test_stage04b_parallel_scheduler_ignores_stale_running_chunks() -> None:
+    chunks = [
+        {
+            "chunk_id": "a",
+            "symbol": "BTCUSDT",
+            "status": "running",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+        },
+        {
+            "chunk_id": "b",
+            "symbol": "ETHUSDT",
+            "status": "pending",
+            "start_utc": "2024-01-01T00:00:00Z",
+            "end_utc": "2024-01-08T00:00:00Z",
+        },
+    ]
+
+    selected = _next_schedulable_chunk(
+        chunks=chunks,
+        active_ranges_by_symbol={},
+        now_utc=datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+    )
+
+    assert selected == chunks[1]
+
+
+def test_stage04b_reset_interrupted_running_chunks_requeues_them() -> None:
+    chunks = [
+        {
+            "chunk_id": "a",
+            "symbol": "BTCUSDT",
+            "status": "running",
+            "started_at_utc": "2024-01-01T00:00:00Z",
+            "shard_key": "BTCUSDT",
+            "worker_count": 4,
+        }
+    ]
+
+    _reset_interrupted_running_chunks(chunks=chunks)
+
+    assert chunks[0]["status"] == "pending"
+    assert chunks[0]["retry_reason"] == "interrupted_previous_run"
+    assert "started_at_utc" not in chunks[0]
+    assert "shard_key" not in chunks[0]
+    assert "worker_count" not in chunks[0]
 
 
 def test_stage04b_reset_retryable_failed_chunks_keeps_exhausted_failures_terminal() -> None:
