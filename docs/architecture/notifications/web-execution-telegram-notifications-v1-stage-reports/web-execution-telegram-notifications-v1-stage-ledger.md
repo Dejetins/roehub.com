@@ -12,6 +12,8 @@
 | `updated_at` | `2026-06-22` |
 | `owner` | `Roehub agents / notifications executors` |
 | `branch` | `codex/web-execution-telegram-notifications-v1` |
+| `checkout_path` | `/Users/daniildegtyarev/Projects/roehub.com` |
+| `prompt_contract` | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md` |
 
 ## Правила Обновления
 
@@ -20,7 +22,7 @@
 | Обязательность | Каждый stage обновляет этот ledger после validation и до финального отчета. |
 | Источник фактов | Писать только проверенные факты: tests, runtime calls, DB evidence, browser QA, CI, deploy/smoke или явно помеченные blockers. |
 | Статусы | Использовать `pending`, `in_progress`, `completed-local`, `accepted`, `blocked`, `skipped`, `superseded`. |
-| Local не accepted | `completed-local` означает, что работа готова в локальной ветке/worktree. `accepted` разрешен только после согласованного delivery path, main evidence и runtime/browser evidence когда они применимы. |
+| Local не accepted | `completed-local` означает, что работа готова в обычном локальном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `codex/web-execution-telegram-notifications-v1`. `accepted` разрешен только после согласованного delivery path, main evidence и runtime/browser evidence когда они применимы. |
 | Tests не acceptance | Unit/integration/static checks обязательны как gates, но non-trivial stage accepted только после real-boundary/e2e evidence по затронутой поверхности. |
 | Секреты | Не писать secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, HMAC, API keys или credentials. Telegram token/chat ids не выводить в docs/logs. |
 | Synthetic proof | До готовности всех producer paths использовать синтетические source facts/fixtures на тестовом аккаунте и фиксировать type-by-type evidence. |
@@ -28,7 +30,9 @@
 | Provider boundary | Реальный Telegram provider включать только в canary stage. До этого использовать `log_only` или fake adapter. |
 | Unknown state | Любой provider timeout/ambiguous send фиксировать как `unknown` и не делать blind retry для trade/critical user messages. |
 | Mac Studio | Git-команды на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks допускаются в `/opt/roehub/app`. |
-| Branch lifecycle | Работа ведется в отдельной `codex/*` ветке. Branch/PR сами по себе не равны delivery в `main`. |
+| Branch lifecycle | Работа ведется только в обычном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `codex/web-execution-telegram-notifications-v1`. Не создавать per-stage branches и sibling worktrees для этого плана. Branch/PR сами по себе не равны delivery в `main`. |
+| Prompt contract | Каждый будущий executor prompt для этого плана обязан включать `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md` в required context и проверить ветку до чтения широкого контекста или edits. |
+| Unrelated dirty work | Если checkout не на notifications branch или есть unrelated dirty changes, executor обязан сохранить их явно и не смешивать с notifications commits. |
 | File manifest | Каждый stage report обязан фиксировать `Created / Modified / Deleted / Reason / Contract impact`. |
 | Docs index | При изменении markdown docs обязательно обновить или проверить `docs/architecture/README.md` через `uv run python -m tools.docs.generate_docs_index --check`. |
 
@@ -130,3 +134,4 @@ Every implementation stage that changes event routing or delivery must update th
 | Date | Stage | Change | Evidence |
 |---|---|---|---|
 | 2026-06-22 | `00` | Created Notifications v1 plan and stage ledger on branch `codex/web-execution-telegram-notifications-v1`; fixed provider-neutral architecture, Telegram bot command contract, stats/report scope and synthetic notification matrix. | `web-execution-telegram-notifications-v1.md`; this ledger |
+| 2026-06-22 | branch contract | Fixed the single-branch execution rule: all Notifications v1 prompts/stages must run from `/Users/daniildegtyarev/Projects/roehub.com` on `codex/web-execution-telegram-notifications-v1`; per-stage branches and sibling worktrees are forbidden unless the user explicitly changes this contract in repo docs. | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`; this ledger |

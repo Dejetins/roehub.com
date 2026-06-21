@@ -9,8 +9,25 @@
 | `status` | `plan-ready-local` |
 | `created_at` | `2026-06-22` |
 | `owner` | `Roehub agents / notifications` |
+| `prompt_pack` | `.codex/agents/generated/web-execution-telegram-notifications-v1/` |
 | `ledger` | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` |
 | `scope` | provider-neutral notifications, Telegram bot, user/admin alerts, day/week/month stats, weekly/monthly reports |
+
+## Branch And Prompt Execution Contract
+
+All Notifications v1 stages run in the normal repository checkout:
+
+`/Users/daniildegtyarev/Projects/roehub.com`
+
+The only working branch for this plan is:
+
+`codex/web-execution-telegram-notifications-v1`
+
+Future executor prompts must not create per-stage branches or sibling worktrees. They must include and follow:
+
+`.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`
+
+Before any edit, each executor must verify `git status --short --branch` in `/Users/daniildegtyarev/Projects/roehub.com`. If the checkout is not on `codex/web-execution-telegram-notifications-v1`, the executor must switch the same checkout to that branch. If unrelated dirty work exists, it must be preserved explicitly before switching; it must not be mixed into Notifications v1 commits.
 
 ## Цель
 

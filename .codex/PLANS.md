@@ -187,7 +187,7 @@ This section tracks the major project streams at a strategic level.
 | Web UI / Gateway | same-origin browser control surface for backtests and strategies | active | active | keep browser flows consistent with backend/runtime contracts |
 | ML | future feature registry and inference path | planned | planned | no active checkpoint |
 | Live Execution | future order routing and execution gateway | planned | planned | no active checkpoint |
-| Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | architecture freeze | active | Stage 00 local plan on `codex/web-execution-telegram-notifications-v1` |
+| Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | architecture freeze | active | Stage 00 plus single-branch prompt contract on `codex/web-execution-telegram-notifications-v1` |
 | Cross-cutting Architecture / Docs | roadmap integrity, design docs, milestone coordination | always-on | active | keep architecture docs aligned with delivery |
 
 ---
@@ -276,6 +276,11 @@ High-level milestones:
   - day/week/month portfolio, strategy and exchange stats,
   - separate admin critical alerts, ops alerts and reports,
   - synthetic type-by-type proof before real Telegram canary
+- execution contract:
+  - all stages run in `/Users/daniildegtyarev/Projects/roehub.com`,
+  - the only working branch is `codex/web-execution-telegram-notifications-v1`,
+  - future prompts must include `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`,
+  - per-stage branches and sibling worktrees are forbidden unless the user explicitly changes this repo contract
 
 ### 6.9 Cross-cutting Architecture / Docs
 Always-on responsibilities:
@@ -292,7 +297,7 @@ This section is operational and should stay current.
 
 ### Primary active project focus
 - Backtest runtime evolution under staged, rollout-safe architecture
-- Notifications bounded-context architecture freeze and staged Telegram delivery plan
+- Notifications bounded-context architecture freeze, staged Telegram delivery plan and single-branch prompt contract
 - Web/runtime contract consistency for browser-visible flows
 - Architecture-document iteration across active streams
 - Cross-stream planning discipline to keep milestones bounded
@@ -417,7 +422,7 @@ Keep this list current and short.
 2. Prompt-generation workflow has been migrated away from flat broad-reading prompt structure.
 3. Browser/runtime verification is being incorporated as a first-class concern through available browser automation surfaces.
 4. A single project-level execution map is now recognized as necessary for multi-iteration design and roadmap work.
-5. Notifications Stage `00` is being captured as a local architecture/stage plan before schema, provider or Telegram bot implementation starts.
+5. Notifications Stage `00` is captured as an architecture/stage plan with a mandatory single-branch prompt contract before schema, provider or Telegram bot implementation starts.
 
 ---
 
