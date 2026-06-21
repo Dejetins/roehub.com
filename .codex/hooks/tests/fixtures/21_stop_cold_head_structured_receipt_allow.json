@@ -2,7 +2,7 @@
   "payload": {
     "hook_event_name": "Stop",
     "stop_hook_active": false,
-    "last_assistant_message": "Обновил docs/architecture/example.md и prompt pack.\n\nCold-head review: completed\nMode: independent subagent\nVerdict: Release after fixes\nBlockers fixed: all Blocker and High findings were fixed locally.\nResidual risks: no blocking residual risk."
+    "last_assistant_message": "Обновил docs/architecture/example.md и prompt pack.\n\nCold-head review: completed\nMode: independent subagent\nReview scope: docs/architecture/example.md and .codex/agents/generated/example/*.md\nReview instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md\nVerdict: Release after fixes\nBlockers fixed: all Blocker and High findings were fixed locally.\nLocal follow-up check: completed\nResidual risks: no blocking residual risk."
   },
   "expect": {
     "returncode": 0,

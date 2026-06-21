@@ -31,7 +31,11 @@ RISK_TERMS = [
 
 
 def _is_arch_doc(path: str) -> bool:
-    return path.startswith("docs/architecture/") and path.endswith(".md")
+    return (
+        path.startswith("docs/architecture/")
+        and path.endswith(".md")
+        and path != "docs/architecture/README.md"
+    )
 
 
 def _missing_sections(text: str) -> list[str]:

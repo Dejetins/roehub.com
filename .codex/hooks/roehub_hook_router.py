@@ -32,10 +32,13 @@ VALIDATOR_MODULES = [
     "validators.secret_redaction_guard",
     "validators.command_safety_guard",
     "validators.macstudio_path_guard",
+    "validators.remote_payload_quoting_guard",
     "validators.playwright_wrapper_guard",
     "validators.prompt_pack_stage_ledger_linter",
+    "validators.docs_index_drift_guard",
     "validators.architecture_doc_linter",
     "validators.validation_depth_linter",
+    "validators.performance_evidence_guard",
     "validators.cold_head_gate",
     "validators.skill_lint_guard",
 ]
@@ -195,7 +198,15 @@ def maybe_observe(payload: dict[str, Any], findings: list[Finding]) -> None:
         "event": hook_event(payload),
         "cwd": payload.get("cwd"),
         "finding_count": len(findings),
-        "findings": [finding.line() for finding in findings],
+        "findings": [
+            {
+                "severity": finding.severity,
+                "validator": finding.validator,
+                "title": finding.title,
+                "target": finding.target,
+            }
+            for finding in findings
+        ],
     }
     path = Path(log_path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)

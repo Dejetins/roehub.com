@@ -16,6 +16,8 @@ HOOK_DIR = TEST_DIR.parent
 ROUTER = HOOK_DIR / "roehub_hook_router.py"
 FIXTURES = TEST_DIR / "fixtures"
 SYNTHETIC_SMOKE_SECRET = "Smoke" + "E2E!" + "9999"
+SYNTHETIC_SECRET_ASSIGNMENT = "service " + "password: " + "abcdefgh1234"
+SYNTHETIC_JWT = "eyJ" + ("a" * 16) + "." + "eyJ" + ("b" * 16) + "." + "eyJ" + ("c" * 16)
 
 
 def load_fixture(path: Path) -> dict[str, Any]:
@@ -29,6 +31,14 @@ def materialize_fixture(fixture: dict[str, Any], tmpdir: Path) -> dict[str, Any]
     payload_text = payload_text.replace(
         "__ROEHUB_SYNTHETIC_SMOKE_SECRET__",
         SYNTHETIC_SMOKE_SECRET,
+    )
+    payload_text = payload_text.replace(
+        "__ROEHUB_SYNTHETIC_SECRET_ASSIGNMENT__",
+        SYNTHETIC_SECRET_ASSIGNMENT,
+    )
+    payload_text = payload_text.replace(
+        "__ROEHUB_SYNTHETIC_JWT__",
+        SYNTHETIC_JWT,
     )
     rendered = json.loads(payload_text)
     rendered["cwd"] = str(tmpdir)

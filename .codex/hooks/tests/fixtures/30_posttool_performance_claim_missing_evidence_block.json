@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: docs/architecture/perf-missing.md\n+# Performance Note\n+\n+The benchmark is 50% faster after this change.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    "docs/architecture/perf-missing.md": "# Performance Note\n\nThe benchmark is 50% faster after this change.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Performance claim lacks comparable evidence"
+  }
+}

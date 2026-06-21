@@ -1,11 +1,11 @@
-"""Block obvious raw secrets in prompts, commands, reports, and tool output."""
+"""Block obvious raw secrets and warn on softer secret-looking output."""
 
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from validators.common import FATAL_BLOCK, Finding, iter_text_surfaces
+from validators.common import FATAL_BLOCK, WARN_WITH_CONTEXT, Finding, iter_text_surfaces
 
 RAW_SECRET_PATTERNS = [
     ("Roehub smoke E2E password-like literal", re.compile(r"SmokeE2E!\d{4}")),
@@ -69,9 +69,10 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
                 )
         for match in SECRET_ASSIGNMENT.finditer(text):
             if _unsafe_assignment_value(match.group(1)):
+                severity = WARN_WITH_CONTEXT if surface == "tool_response" else FATAL_BLOCK
                 findings.append(
                     Finding(
-                        severity=FATAL_BLOCK,
+                        severity=severity,
                         title="Secret-looking assignment",
                         message=assignment_message,
                         validator="secret_redaction_guard",

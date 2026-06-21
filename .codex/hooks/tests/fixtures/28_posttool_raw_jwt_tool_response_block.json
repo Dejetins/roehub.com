@@ -1,0 +1,18 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "printf 'token check'"
+    },
+    "tool_response": {
+      "stdout": "provider returned __ROEHUB_SYNTHETIC_JWT__"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "JWT"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: docs/architecture/perf-ready.md\n+# Производительность\n+\n+Бизнес объяснение: изменение снижает время ожидания оператора, но принимается только по сопоставимому benchmark evidence.\n+\n+Baseline before measurement: 100 ms on Mac Studio hardware in the same environment.\n+Candidate current measurement after change: 80 ms on Mac Studio hardware in the same environment.\n+Benchmark command: uv run python scripts/perf/check.py.\n+Evidence artifact: docs/architecture/backtest/benchmark_iterations/example/benchmark_results.json.\n+Service calls: N/A, no сервис or provider calls are changed.\n+Logging/redaction: N/A, no logs, секреты, metrics, or traces are changed.\n+Alerts/monitoring/runbook: N/A, no alert or runbook behavior is changed.\n*** Update File: docs/architecture/README.md\n@@\n+Index refreshed.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    "docs/architecture/perf-ready.md": "# Производительность\n\nБизнес объяснение: изменение снижает время ожидания оператора, но принимается только по сопоставимому benchmark evidence.\n\nBaseline before measurement: 100 ms on Mac Studio hardware in the same environment.\nCandidate current measurement after change: 80 ms on Mac Studio hardware in the same environment.\nBenchmark command: uv run python scripts/perf/check.py.\nEvidence artifact: docs/architecture/backtest/benchmark_iterations/example/benchmark_results.json.\nService calls: N/A, no сервис or provider calls are changed.\nLogging/redaction: N/A, no logs, секреты, metrics, or traces are changed.\nAlerts/monitoring/runbook: N/A, no alert or runbook behavior is changed.\n",
+    "docs/architecture/README.md": "# Index\n\nIndex refreshed.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_empty": true
+  }
+}

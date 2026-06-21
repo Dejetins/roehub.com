@@ -43,10 +43,13 @@ as attempted shell execution.
 - `secret_redaction_guard.py`: blocks raw secret-like values.
 - `command_safety_guard.py`: blocks obvious destructive commands.
 - `macstudio_path_guard.py`: blocks git operations inside `/opt/roehub/app`.
+- `remote_payload_quoting_guard.py`: blocks inline SSH + ClickHouse SQL quoting and warns on inline SSH JSON payloads.
 - `playwright_wrapper_guard.py`: blocks floating Playwright CLI invocations.
 - `prompt_pack_stage_ledger_linter.py`: requires generated prompts to carry ledger and manifest anchors.
+- `docs_index_drift_guard.py`: reminds agents to refresh/check generated docs indexes after docs edits.
 - `architecture_doc_linter.py`: warns about missing architecture documentation anchors.
 - `validation_depth_linter.py`: flags tests-only validation for runtime/integration surfaces.
+- `performance_evidence_guard.py`: requires comparable baseline/candidate evidence for performance claims.
 - `cold_head_gate.py`: requires cold-head evidence before finalizing architecture or prompt artifacts.
 - `skill_lint_guard.py`: warns about missing `SKILL.md` frontmatter.
 
@@ -70,6 +73,12 @@ credentials. Do not persist payloads by default.
 Optional diagnostic logging is disabled unless `ROEHUB_HOOK_OBSERVE_LOG` is set.
 When enabled, the router writes only event name, cwd, and finding text; it does
 not persist raw hook payloads.
+
+Summarize an observe log without reading raw payloads:
+
+```bash
+/usr/bin/python3 .codex/hooks/hook_observe_report.py "$ROEHUB_HOOK_OBSERVE_LOG"
+```
 
 ## Validation
 
@@ -100,4 +109,6 @@ After edits, review and trust hook definitions through `/hooks` in Codex.
 - Repo-local hooks run only when the project `.codex/` layer is trusted.
 - `.codex/rules/*.rules` are an experimental execpolicy layer and should be tested with `codex execpolicy check`.
 - Hooks cannot prove that a named cold-head review actually happened; they only
-  prevent finalizing relevant artifacts without reported cold-head evidence.
+  prevent finalizing relevant artifacts without a structured reported cold-head
+  receipt that names scope, instructions, verdict, fixes, local follow-up, and
+  residual risks.

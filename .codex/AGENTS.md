@@ -183,6 +183,19 @@ If subagents are unavailable, the agent MUST run the same checklist locally and 
 
 The cold-head gate MUST check the applicable lenses for the artifact: architecture-design quality, architecture-review evidence discipline, prompt-pack/stage execution readiness, stage ledger continuity, traceability, validation depth, conditional service-call/docs/retry/redaction/alert coverage, Mac Studio path contract, and browser auth/tooling rules when browser flows are in scope.
 
+Before using readiness language for architecture or prompt-management artifacts, the final response MUST include this structured receipt:
+
+```text
+Cold-head review: completed
+Mode: independent subagent | cold self-review fallback
+Review scope: ...
+Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
+Verdict: Release | Release after fixes | Block
+Blockers fixed: ...
+Local follow-up check: completed | not needed | blocked
+Residual risks: ...
+```
+
 ### 0.6 `.codex/` repository policy
 The `.codex/` directory is shared repository guidance, not a dump for local runtime state.
 

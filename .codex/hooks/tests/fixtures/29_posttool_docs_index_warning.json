@@ -1,0 +1,19 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: docs/architecture/example-docs-index.md\n+# Документ архитектуры\n+\n+Этот документ описывает внутреннее решение простыми словами для бизнеса и инженерной команды. Он не меняет runtime, провайдеров или секреты.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    "docs/architecture/example-docs-index.md": "# Документ архитектуры\n\nЭтот документ описывает внутреннее решение простыми словами для бизнеса и инженерной команды. Он не меняет runtime, провайдеров или секреты.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_contains": "Docs index may need refresh"
+  }
+}
