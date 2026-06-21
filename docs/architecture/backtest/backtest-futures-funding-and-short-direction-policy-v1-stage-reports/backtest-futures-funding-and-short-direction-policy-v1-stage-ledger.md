@@ -2,7 +2,8 @@
 
 ## Статус
 
-План подготовлен к реализации. Implementation stages еще не стартовали.
+Stage `00` выполнен локально как docs-only baseline freeze. Production
+implementation stages еще не стартовали.
 
 `User required before start: nothing`.
 
@@ -11,6 +12,9 @@ Source architecture document:
 
 Prompt pack:
 `.codex/agents/generated/backtest-futures-funding-and-short-direction-policy-v1/`.
+
+Stage `00` report:
+`docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/00-baseline-and-contract-freeze.md`.
 
 ## Правила приемки
 
@@ -36,6 +40,10 @@ Prompt pack:
   futures profitability interpretation and short-direction CJM; stages must
   preserve gross `total_return_pct`, add net-of-funding fields, and expose
   degraded funding readiness before strategy launch.
+- Stage `00` service-call coverage: N/A for runtime changes. Stage `00` only
+  rechecked official provider docs and local boundary availability; it did not
+  add provider clients, ClickHouse writes, retries, authenticated browser flows
+  or side-effecting runtime behavior.
 - Conditional service-call coverage: Stage `01` must cover provider REST,
   ClickHouse and scheduler `/metrics`; Stage `02` artifact filesystem/ClickHouse
   reads; Stage `03`, `06` and `07` local API/browser routes; Stage `08`
@@ -49,7 +57,7 @@ Prompt pack:
 
 | Stage | Prompt | Status | Required evidence | Accepted evidence | Blockers / notes |
 | --- | --- | --- | --- | --- | --- |
-| `00` | `00-review-baseline-and-freeze-contract.md` | planned | Baseline review, current code/doc manifest, external API re-check from official docs or provider smoke, contract classification, docs index check if changed. | TBD | Must stop if implementation would require missing access or secret data. |
+| `00` | `00-review-baseline-and-freeze-contract.md` | accepted-local | Baseline review, current code/doc manifest, external API re-check from official docs or provider smoke, contract classification, docs index check if changed. | 2026-06-22 Stage report created at `00-baseline-and-contract-freeze.md`; official Binance/Bybit docs rechecked; current scheduler topology, enabled-instrument scan pattern, Prometheus scrape baseline, runtime boundary availability and frozen Stage `01`-`08` file manifests recorded; `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Docs-only local acceptance; not published or deployed. Local ClickHouse/API/web/scheduler metrics boundaries were unavailable and remain future-stage real-boundary requirements. |
 | `01` | `01-implement-funding-storage-and-catchup.md` | planned | ClickHouse funding DDL, dedicated exchange-discovered futures funding universe, funding source/store/use case, CLI dispatcher, automatic `market-data-scheduler` `funding_rate_catchup` job for all tradable Binance/Bybit futures instruments, mandatory interval metadata contract, funding-interval aligned due selection, Prometheus metrics, alert rules, runbook updates, idempotent catch-up tests, Bybit `linear` mapping test, interval metadata fallback/degraded tests, ClickHouse migration/query smoke, provider REST contract smoke or explicit network-unavailable blocker, `/metrics` proof on `127.0.0.1:9202`. | TBD | No secret output in reports; do not use `symbol` as Prometheus label; do not mark all exchange futures as `ENABLED` in whitelist-driven `ref_instruments`; do not implement minute-level full-market polling; do not silently treat Binance `fundingInfo` failure as ready 8h coverage. |
 | `02` | `02-implement-funding-artifact-family-and-coverage.md` | planned | Funding artifact family, manifest hash, coverage reader, artifact publish/load tests, filesystem artifact publish/load smoke against a temp root, ClickHouse-backed coverage smoke against scheduler-maintained `canonical_funding_rates` when ClickHouse is available. | TBD | Root manifest and explicit `funding_manifest_hash` must be coherent. |
 | `03` | `03-implement-preflight-runtime-defaults-funding-readiness.md` | planned | Normalized funding request, direction compatibility, preflight readiness fields, request hash tests, local API route smoke for runtime-defaults and preflight with funding-ready/degraded fixtures. | TBD | Existing jobs must remain readable and immutable. |
@@ -63,7 +71,7 @@ Prompt pack:
 
 | Stage | Branch | Commit / SHA | PR | Local gates | Remote / runtime evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| `00` | TBD | TBD | TBD | TBD | TBD | Planning stage only until executed. |
+| `00` | `codex/backtest-futures-funding-v1-stage-00` | local uncommitted | N/A | `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Local probes unavailable: `127.0.0.1:9202`, `8123`, `8000`, `3000` refused connections. | Docs-only baseline freeze; not published/deployed. |
 | `01` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `02` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `03` | TBD | TBD | TBD | TBD | TBD | TBD |
@@ -86,6 +94,7 @@ Prompt pack:
 | 2026-06-21 | Standalone `short` must be added to runtime preflight before it is promised in UI/API. | Current runtime defaults expose only `long_only` and `long_short_reversal`. |
 | 2026-06-21 | Futures funding jobs use net-of-funding as effective default ranking while preserving gross `total_return_pct`. | Prevents misleading futures top-N after funding is included. |
 | 2026-06-21 | Spot short-like jobs are readable but not launchable; new short-like work requires futures. | Aligns backtest, strategy launch and live capability with real order semantics. |
+| 2026-06-22 | Stage `00` freezes the current docs/code baseline and future-stage file manifest before implementation. | Implementation agents need current facts, provider-doc dates, real-boundary availability and narrow file boundaries before touching production code. |
 
 ## Cold-head receipt
 
