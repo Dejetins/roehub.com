@@ -45,7 +45,13 @@ class CanonicalCandleIndexReader(Protocol):
         """
         ...
 
-    def max_ts_open_lt(self, *, instrument_id: InstrumentId, before: UtcTimestamp) -> UtcTimestamp | None:  # noqa: E501
+    def max_ts_open_lt(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
+    ) -> UtcTimestamp | None:
         ...
 
     def daily_counts(self, *, instrument_id: InstrumentId, time_range: TimeRange) -> Sequence[DailyTsOpenCount]:  # noqa: E501

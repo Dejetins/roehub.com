@@ -22,15 +22,19 @@ class ReconnectTailFillPlanner:
     - index_reader: canonical index reader used for last known minute lookup.
     - clock: UTC clock.
     - bootstrap_start_by_market: market-specific bootstrap lower bounds from runtime config.
+    - tail_lookback_minutes: bounded recent lookback for reconnect recovery.
 
     Assumptions/Invariants:
     - Tail range semantics are half-open: `[start, now_floor)`.
     - Current `now_floor` minute is considered not closed and therefore excluded.
+    - Reconnect recovery is a recent-tail concern; full historical scans belong to scheduler
+      maintenance, not websocket reconnect callbacks.
     """
 
     index_reader: CanonicalCandleIndexReader
     clock: Clock
     bootstrap_start_by_market: Mapping[int, UtcTimestamp]
+    tail_lookback_minutes: int = 720
 
     def __post_init__(self) -> None:
         """
@@ -57,6 +61,8 @@ class ReconnectTailFillPlanner:
             raise ValueError("ReconnectTailFillPlanner requires clock")
         if self.bootstrap_start_by_market is None:  # type: ignore[truthy-bool]
             raise ValueError("ReconnectTailFillPlanner requires bootstrap_start_by_market")
+        if self.tail_lookback_minutes <= 0:
+            raise ValueError("tail_lookback_minutes must be > 0")
 
     def plan(self, instruments: Iterable[InstrumentId]) -> list[RestFillTask]:
         """
@@ -104,19 +110,24 @@ class ReconnectTailFillPlanner:
         - Reads canonical index storage.
         """
         now_floor = UtcTimestamp(floor_to_minute_utc(self.clock.now().value))
+        lookback_start = UtcTimestamp(
+            now_floor.value - timedelta(minutes=self.tail_lookback_minutes)
+        )
         last = self.index_reader.max_ts_open_lt(
             instrument_id=instrument_id,
             before=now_floor,
+            after=lookback_start,
         )
 
         if last is None:
             bootstrap_start = self._bootstrap_start(instrument_id)
-            if bootstrap_start.value >= now_floor.value:
+            start = max(bootstrap_start.value, lookback_start.value)
+            if start >= now_floor.value:
                 return None
             return RestFillTask(
                 instrument_id=instrument_id,
-                time_range=TimeRange(start=bootstrap_start, end=now_floor),
-                reason="bootstrap",
+                time_range=TimeRange(start=UtcTimestamp(start), end=now_floor),
+                reason="reconnect_tail",
             )
 
         threshold = now_floor.value - timedelta(minutes=1)

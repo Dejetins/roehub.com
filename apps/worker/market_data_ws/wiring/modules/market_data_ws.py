@@ -693,6 +693,7 @@ def build_market_data_ws_app(
             int(market.market_id.value): market.rest.earliest_available_ts_utc
             for market in config.markets
         },
+        tail_lookback_minutes=config.ingestion.tail_lookback_minutes,
     )
 
     return MarketDataWsApp(

@@ -116,13 +116,20 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
             return (None, None)
         return (_minute_key_to_utc_timestamp(int(first)), _minute_key_to_utc_timestamp(int(last)))
 
-    def max_ts_open_lt(self, *, instrument_id: InstrumentId, before: UtcTimestamp) -> UtcTimestamp | None:  # noqa: E501
+    def max_ts_open_lt(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
+    ) -> UtcTimestamp | None:
         """
         Return latest canonical minute strictly before `before`.
 
         Parameters:
         - instrument_id: instrument whose latest known minute is requested.
         - before: upper bound (exclusive).
+        - after: optional lower bound (inclusive) for bounded tail lookups.
 
         Returns:
         - Latest minute in UTC or `None` when no qualifying rows exist.
@@ -137,21 +144,30 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         Side effects:
         - Executes one ClickHouse SELECT query.
         """
+        after_filter = (
+            "\n          AND ts_open >= fromUnixTimestamp64Milli(%(after_ms)s, 'UTC')"
+            if after is not None
+            else ""
+        )
         q = f"""
         SELECT
             max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
+          {after_filter}
           AND ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')
         """
+        parameters: dict[str, Any] = {
+            "market_id": int(instrument_id.market_id.value),
+            "symbol": str(instrument_id.symbol),
+            "before_ms": _dt_to_epoch_ms(before.value),
+        }
+        if after is not None:
+            parameters["after_ms"] = _dt_to_epoch_ms(after.value)
         rows = self.gateway.select(
             q,
-            {
-                "market_id": int(instrument_id.market_id.value),
-                "symbol": str(instrument_id.symbol),
-                "before_ms": _dt_to_epoch_ms(before.value),
-            },
+            parameters,
         )
         if not rows:
             return None

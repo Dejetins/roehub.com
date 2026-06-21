@@ -110,6 +110,7 @@ class _FixedCanonicalCandleIndexReader:
         *,
         instrument_id: InstrumentId,
         before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
     ) -> UtcTimestamp | None:
         """
         Reject unrelated protocol calls in these publish-use-case unit tests.
@@ -130,7 +131,7 @@ class _FixedCanonicalCandleIndexReader:
         Related:
           - canonical_candle_index_reader.py
         """
-        del instrument_id, before
+        del instrument_id, before, after
         raise AssertionError(
             "max_ts_open_lt() is not used by PublishBacktestArtifactsV2UseCase tests"
         )

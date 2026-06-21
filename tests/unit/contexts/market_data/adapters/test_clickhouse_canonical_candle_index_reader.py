@@ -88,6 +88,26 @@ def test_max_ts_open_lt():
     assert int(gw.last_params["before_ms"]) == int(before.value.timestamp() * 1000)
 
 
+def test_max_ts_open_lt_can_apply_inclusive_after_filter() -> None:
+    """Ensure latest-ts lookup can be bounded to a recent tail window."""
+    dt = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+    minute_key = int(dt.timestamp() // 60)
+    gw = FakeGateway([{"last_minute_key": minute_key}])
+    reader = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
+
+    inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    after = UtcTimestamp(datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc))
+    before = UtcTimestamp(datetime(2026, 2, 1, 13, 0, tzinfo=timezone.utc))
+    out = reader.max_ts_open_lt(instrument_id=inst, before=before, after=after)
+
+    assert out is not None
+    assert str(out) == str(UtcTimestamp(dt))
+    assert gw.last_query is not None
+    assert "ts_open >= fromUnixTimestamp64Milli(%(after_ms)s, 'UTC')" in gw.last_query
+    assert gw.last_params is not None
+    assert int(gw.last_params["after_ms"]) == int(after.value.timestamp() * 1000)
+
+
 def test_bounds_1m_applies_exclusive_before_filter() -> None:
     """
     Ensure `bounds_1m` query includes exclusive `ts_open < before` constraint.

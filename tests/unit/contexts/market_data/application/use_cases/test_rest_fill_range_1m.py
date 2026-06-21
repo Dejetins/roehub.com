@@ -108,6 +108,7 @@ class _FakeIndex:
         *,
         instrument_id: InstrumentId,
         before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
     ) -> UtcTimestamp | None:
         """
         Return latest canonical timestamp below the exclusive upper bound.
@@ -121,6 +122,7 @@ class _FakeIndex:
         """
         _ = instrument_id
         _ = before
+        _ = after
         _min_ts, max_ts = self._bounds
         return max_ts
 

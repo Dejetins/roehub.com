@@ -101,6 +101,7 @@ class FakeIndex:
         *,
         instrument_id: InstrumentId,
         before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
     ) -> UtcTimestamp | None:
         """
         Return preconfigured latest timestamp below provided bound.
@@ -123,6 +124,7 @@ class FakeIndex:
         """
         _ = instrument_id
         _ = before
+        _ = after
         return self._last
 
     def bounds_1m(

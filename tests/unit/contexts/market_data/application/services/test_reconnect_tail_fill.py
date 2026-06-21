@@ -36,11 +36,13 @@ class _FakeIndex:
     def __init__(self, last_value: UtcTimestamp | None) -> None:
         """Store latest timestamp result used by planner test."""
         self._last_value = last_value
+        self.last_after: UtcTimestamp | None = None
 
-    def max_ts_open_lt(self, *, instrument_id, before):  # noqa: ANN001
+    def max_ts_open_lt(self, *, instrument_id, before, after=None):  # noqa: ANN001
         """Return configured latest timestamp."""
         _ = instrument_id
         _ = before
+        self.last_after = after
         return self._last_value
 
     def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
@@ -117,18 +119,26 @@ class _FakeIndex:
         return ()
 
 
-def test_reconnect_tail_planner_bootstrap_when_canonical_is_empty() -> None:
-    """Ensure planner creates bootstrap task when canonical index has no rows."""
+def test_reconnect_tail_planner_uses_bounded_tail_when_recent_window_is_empty() -> None:
+    """Ensure reconnect planning does not bootstrap full history from websocket callbacks."""
+    index = _FakeIndex(last_value=None)
     planner = ReconnectTailFillPlanner(
-        index_reader=_FakeIndex(last_value=None),
+        index_reader=index,
         clock=_FixedClock(UtcTimestamp(datetime(2026, 2, 5, 12, 34, 45, tzinfo=timezone.utc))),
         bootstrap_start_by_market={
             1: UtcTimestamp(datetime(2017, 1, 1, tzinfo=timezone.utc)),
         },
+        tail_lookback_minutes=720,
     )
     task = planner.plan_for_instrument(InstrumentId(MarketId(1), Symbol("BTCUSDT")))
     assert task is not None
-    assert task.reason == "bootstrap"
+    assert task.reason == "reconnect_tail"
+    assert str(index.last_after) == str(
+        UtcTimestamp(datetime(2026, 2, 5, 0, 34, tzinfo=timezone.utc))
+    )
+    assert str(task.time_range.start) == str(
+        UtcTimestamp(datetime(2026, 2, 5, 0, 34, tzinfo=timezone.utc))
+    )
     assert str(task.time_range.end) == str(
         UtcTimestamp(datetime(2026, 2, 5, 12, 34, tzinfo=timezone.utc))
     )
@@ -144,6 +154,7 @@ def test_reconnect_tail_planner_enqueues_tail_fill_for_old_last_minute() -> None
         bootstrap_start_by_market={
             1: UtcTimestamp(datetime(2017, 1, 1, tzinfo=timezone.utc)),
         },
+        tail_lookback_minutes=720,
     )
     task = planner.plan_for_instrument(InstrumentId(MarketId(1), Symbol("BTCUSDT")))
     assert task is not None

@@ -131,6 +131,7 @@ class _BaseIndexReader:
         *,
         instrument_id: InstrumentId,
         before: UtcTimestamp,
+        after: UtcTimestamp | None = None,
     ) -> UtcTimestamp | None:
         """
         Return latest canonical minute before upper bound.
@@ -144,6 +145,7 @@ class _BaseIndexReader:
         """
         _ = instrument_id
         _ = before
+        _ = after
         return None
 
     def daily_counts(
