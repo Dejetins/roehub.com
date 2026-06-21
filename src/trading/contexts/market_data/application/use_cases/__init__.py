@@ -1,4 +1,9 @@
 from .backfill_1m_candles import Backfill1mCandlesUseCase
+from .backfill_funding_rates import (
+    BackfillFundingRatesReport,
+    BackfillFundingRatesUseCase,
+    FundingCatchupInstrumentReport,
+)
 from .btcusdt_market_readiness import (
     BTCUSDT_MARKET_READINESS_STALE_AFTER_SECONDS,
     BTCUSDTMarketReadinessStreamReader,
@@ -17,6 +22,11 @@ from .search_enabled_tradable_instruments import (
     SearchEnabledTradableInstrumentsUseCase,
 )
 from .seed_ref_market import SeedRefMarketReport, SeedRefMarketUseCase
+from .sync_futures_funding_universe import (
+    FundingUniverseMarketReport,
+    SyncFuturesFundingUniverseReport,
+    SyncFuturesFundingUniverseUseCase,
+)
 from .sync_whitelist_to_ref_instruments import (
     SyncWhitelistReport,
     SyncWhitelistToRefInstrumentsUseCase,
@@ -27,8 +37,12 @@ __all__ = [
     "BTCUSDT_MARKET_READINESS_STALE_AFTER_SECONDS",
     "BTCUSDTMarketReadinessStreamReader",
     "BTCUSDTMarketReadinessUseCase",
+    "BackfillFundingRatesReport",
+    "BackfillFundingRatesUseCase",
     "EnrichRefInstrumentsFromExchangeUseCase",
     "EnrichRefInstrumentsReport",
+    "FundingCatchupInstrumentReport",
+    "FundingUniverseMarketReport",
     "ListEnabledMarketsUseCase",
     "RestCatchUp1mUseCase",
     "RestCatchUp1mReport",
@@ -40,4 +54,6 @@ __all__ = [
     "SeedRefMarketReport",
     "SyncWhitelistToRefInstrumentsUseCase",
     "SyncWhitelistReport",
+    "SyncFuturesFundingUniverseReport",
+    "SyncFuturesFundingUniverseUseCase",
 ]

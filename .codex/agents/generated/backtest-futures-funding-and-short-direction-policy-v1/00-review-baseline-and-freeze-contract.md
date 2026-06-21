@@ -15,6 +15,8 @@ context_sources:
   - "docs/runbooks/market-data-metrics-reference-ru.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Previous-stage ledger gate: N/A for Stage 00 because this stage creates/repairs the baseline ledger; still read and update the ledger before final report."
+  - "Previous stage: N/A; there is no previous required stage for Stage 00."
   - "Do not implement production code in this stage."
   - "Freeze exact file boundaries for stages 01-08."
   - "Re-check official Binance and Bybit funding docs or perform provider smoke before relying on API details."
@@ -30,6 +32,7 @@ skill_routing:
   - "backend-quality-gates"
 target_envs:
   - "local repository"
+  - "Mac Studio target host via ssh macstudio for runtime-boundary availability notes"
 required_literals:
   - "User required before start: nothing"
   - "short_direction_requires_futures_market"
@@ -40,7 +43,7 @@ non_goals:
   - "No UI changes."
 final_report_format:
   - "Scope"
-  - "Files changed"
+  - "File manifest: created/modified/deleted"
   - "Baseline facts"
   - "Contract impact"
   - "Validation"
@@ -50,6 +53,7 @@ quality_gates:
 validation_strategy:
   - "Docs index check."
   - "Official provider docs re-check or explicit provider-smoke blocker."
+  - "When recording runtime-boundary availability, distinguish Codex local loopback from Mac Studio target-host loopback."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/00-baseline-and-contract-freeze.md"
@@ -60,11 +64,19 @@ possible_secondary_touches:
 safety_notes:
   - "Do not print secret-like environment values."
   - "If a later stage needs unavailable credentials or infrastructure, mark that future stage blocked rather than weakening acceptance."
+  - "For Roehub runtime checks, 127.0.0.1 means Mac Studio loopback only after ssh macstudio; Codex local loopback is not acceptance evidence."
 ---
 
 # Task
 
 Freeze the current implementation baseline for Backtest Futures Funding And Short Direction Policy v1 before any production code changes.
+
+## Stage Gate
+
+Previous stage: N/A. Previous-stage ledger gate: N/A for Stage `00`. This is the baseline freeze
+stage and it creates or repairs the stage execution ledger. The executor must
+still read the existing ledger if present, avoid overwriting accepted facts, and
+update it before the final report.
 
 ## Context / Current State
 
@@ -75,9 +87,11 @@ This stage is documentation and verification only. It must produce a stage repor
 ## Requirements (Must)
 
 - Start by writing down `User required before start: nothing` in the stage report.
+- Record the Stage `00` gate as `N/A - baseline stage` and update the stage ledger before final output.
+- Previous stage is N/A because Stage `00` is the baseline stage.
 - Read the context sources listed in frontmatter and only the code entrypoints needed to verify current state.
 - Verify official Binance/Bybit funding API details from primary sources or perform a provider REST smoke. Record exact date and source.
-- Verify the current `market-data-scheduler` topology, all-enabled-instruments scan pattern and Prometheus `/metrics` baseline.
+- Verify the current `market-data-scheduler` topology, all-enabled-instruments scan pattern and Prometheus `/metrics` baseline. If probing runtime availability, do it through `ssh macstudio`; local Codex loopback probes are development diagnostics only.
 - Produce a narrow file manifest for each future stage.
 - Reclassify all contract impacts if repository facts differ from the architecture document.
 - Update the stage ledger with status, evidence and blockers.
@@ -87,7 +101,7 @@ This stage is documentation and verification only. It must produce a stage repor
 
 - Identify tests likely to need updates in each implementation stage.
 - Identify any old docs that could mislead future implementation agents.
-- Record whether ClickHouse, local API and browser smoke are available in the current environment.
+- Record whether ClickHouse, API, browser and scheduler smoke are available on the Mac Studio target host. If you also probe Codex-local loopback, label it explicitly as non-acceptance diagnostic evidence.
 
 ## Requirements (Nice-to-have)
 
@@ -121,7 +135,7 @@ Minimum entrypoints:
 
 1. Confirm the current git status and list unrelated dirty files without touching them.
 2. Create `00-baseline-and-contract-freeze.md` under the stage reports folder.
-3. Record baseline facts, file manifests, contract impact and real-boundary availability.
+3. Record baseline facts, file manifests, contract impact and target-host real-boundary availability.
 4. Update the stage ledger.
 5. Run docs index generation if needed, then run the docs index check.
 6. Perform a cold-head self-review and record the receipt.
@@ -159,7 +173,7 @@ python -m tools.docs.generate_docs_index --check
 # Final output: report format (strict)
 
 - Scope
-- Files changed
+- File manifest: created/modified/deleted
 - Baseline facts
 - Contract impact
 - Validation

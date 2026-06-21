@@ -1,0 +1,46 @@
+groups:
+  - name: market-data-funding
+    rules:
+      - alert: MarketDataFundingCatchupErrors
+        expr: increase(scheduler_job_errors_total{job="funding_rate_catchup"}[30m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: Funding catch-up scheduler job is failing
+          runbook: docs/runbooks/market-data-metrics.md#funding-catch-up
+          action: Check market-data-scheduler logs, provider status and ClickHouse writes.
+
+      - alert: MarketDataFundingNoRecentSuccess
+        expr: time() - scheduler_funding_catchup_last_success_timestamp_seconds > 32400
+        for: 30m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: Funding catch-up has no recent successful write
+          runbook: docs/runbooks/market-data-metrics.md#funding-catch-up
+          action: Verify provider REST access, funding interval metadata and scheduler due selection.
+
+      - alert: MarketDataFundingLagHigh
+        expr: scheduler_funding_catchup_lag_seconds{status="ok"} > 43200
+        for: 30m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: Funding freshness lag is high
+          runbook: docs/runbooks/market-data-metrics.md#funding-catch-up
+          action: Compare lag against funding intervals and settlement lag before paging.
+
+      - alert: MarketDataFundingMissingIntervals
+        expr: scheduler_funding_catchup_universe_instruments{status="missing_interval"} > 0
+        for: 30m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: Funding universe has instruments without interval metadata
+          runbook: docs/runbooks/market-data-metrics.md#funding-catch-up
+          action: Check Bybit instruments-info fundingInterval and Binance fundingInfo fallback policy.

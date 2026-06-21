@@ -6,6 +6,7 @@ from .enabled_market_reader import ClickHouseEnabledMarketReader
 from .enabled_tradable_instrument_search_reader import (
     ClickHouseEnabledTradableInstrumentSearchReader,
 )
+from .funding_rate_store import ClickHouseFundingRateStore
 from .gateway import (
     ClickHouseConnectGateway,
     ClickHouseGateway,
@@ -22,6 +23,7 @@ __all__ = [
     "ClickHouseEnabledInstrumentReader",
     "ClickHouseEnabledMarketReader",
     "ClickHouseEnabledTradableInstrumentSearchReader",
+    "ClickHouseFundingRateStore",
     "ClickHouseGateway",
     "ClickHouseConnectGateway",
     "ThreadLocalClickHouseConnectGateway",

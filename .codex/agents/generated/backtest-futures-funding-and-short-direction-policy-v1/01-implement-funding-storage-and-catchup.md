@@ -14,6 +14,7 @@ context_sources:
   - "docs/runbooks/market-data-metrics.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Confirm previous required stage is accepted in the ledger before implementation edits."
   - "Previous-stage ledger gate: confirm Stage 00 is accepted in the stage execution ledger before implementation; if it is not accepted, stop and record Stage 01 as blocked unless the user explicitly supersedes Stage 00 in the current turn."
   - "Keep funding ingestion in market_data context, not backtest context."
   - "Use internal market_type=futures to Bybit category=linear mapping for v1."
@@ -39,8 +40,9 @@ skill_routing:
   - "backend-quality-gates"
 target_envs:
   - "local"
-  - "ClickHouse when configured; otherwise record boundary-unavailable blocker/evidence"
-  - "market-data-scheduler metrics endpoint on 127.0.0.1:9202"
+  - "Mac Studio target host via ssh macstudio for ClickHouse and scheduler runtime proof"
+  - "Mac Studio ClickHouse HTTP endpoint on 127.0.0.1:8123 from inside the SSH session"
+  - "Mac Studio market-data-scheduler metrics endpoint on 127.0.0.1:9202 from inside the SSH session"
 required_literals:
   - "User required before start: nothing"
   - "category=linear"
@@ -73,9 +75,9 @@ validation_strategy:
   - "Scheduler tests proving non-due symbols do not trigger provider funding-history calls."
   - "Tests proving Bybit missing fundingInterval degrades/skips the symbol, Binance adjusted fundingInfo rows override the standard interval, Binance symbols absent from fundingInfo use explicit binance_standard_8h_no_adjustment_row, and global Binance fundingInfo failure blocks/degrades readiness."
   - "Prometheus metrics tests proving funding metrics are registered without symbol labels."
-  - "ClickHouse DDL apply/query smoke when ClickHouse is configured; otherwise record boundary-unavailable blocker/evidence."
+  - "ClickHouse DDL apply/query smoke on Mac Studio via ssh macstudio; use ClickHouse HTTP stdin if clickhouse CLI is unavailable."
   - "Provider REST contract smoke for one Binance futures symbol and one Bybit linear symbol, or mark stage blocked if network/provider access is unavailable."
-  - "Runtime metrics proof: curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_funding_catchup_'."
+  - "Runtime metrics proof on Mac Studio: inside ssh macstudio, curl -fsS http://127.0.0.1:9202/metrics | grep -E '^scheduler_funding_catchup_'."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
@@ -110,6 +112,9 @@ safety_notes:
   - "Use env var names only in logs and reports."
   - "Do not add authenticated exchange clients for public funding history endpoints."
   - "Do not persist ROEHUB_SMOKE_E2E_PASSWORD or any derived browser credentials; browser auth smoke is N/A unless a later user request expands this stage."
+  - "Runtime 127.0.0.1 probes are Mac Studio loopback probes after SSH, not local Codex-host probes."
+  - "Run remote git commands only with git -C /Users/daniildegtyarev/Projects/roehub.com; never run git commands in /opt/roehub/app."
+  - "Use quoted heredoc/stdin for SSH SQL, JSON, or multiline payloads; do not use fragile nested inline quotes."
 ---
 
 # Task
@@ -125,7 +130,7 @@ blocked unless the user explicitly supersedes this gate in the current turn.
 
 ## Context / Current State
 
-The repository has market_data ClickHouse candle ingestion, whitelist-driven reference instrument sync and an existing `market-data-scheduler` process with `/metrics` on port `9202`. Funding rates are absent. The architecture decision is to ingest funding in market_data, keep it fresh automatically for all exchange-discovered tradable Binance and Bybit futures instruments, and let backtest consume normalized data later through artifacts. Do not confuse the existing `EnabledInstrumentReader` whitelist with the full futures funding universe.
+The repository has market_data ClickHouse candle ingestion, whitelist-driven reference instrument sync and an existing `market-data-scheduler` process with `/metrics` on port `9202`. Runtime services run on Mac Studio; local Codex loopback probes are development diagnostics only. For acceptance evidence, SSH to `macstudio` and treat `127.0.0.1` as Mac Studio loopback. Funding rates are absent. The architecture decision is to ingest funding in market_data, keep it fresh automatically for all exchange-discovered tradable Binance and Bybit futures instruments, and let backtest consume normalized data later through artifacts. Do not confuse the existing `EnabledInstrumentReader` whitelist with the full futures funding universe.
 
 ## Requirements (Must)
 
@@ -152,7 +157,7 @@ The repository has market_data ClickHouse candle ingestion, whitelist-driven ref
 - Add Prometheus alert rules for funding catch-up errors, no recent success, high lag and missing instruments.
 - Update market-data metrics runbook(s).
 - Add tests for parsing, Bybit window restrictions, mapping and idempotency.
-- Prove real boundaries: ClickHouse apply/query, provider REST smoke, and scheduler `/metrics` proof on `127.0.0.1:9202`, or mark the stage blocked if the boundary is unavailable.
+- Prove real boundaries on the correct target: ClickHouse apply/query and scheduler `/metrics` proof must run through `ssh macstudio`; `127.0.0.1:8123` and `127.0.0.1:9202` mean Mac Studio loopback. Provider REST smoke may run locally or on Mac Studio, but record where it ran. If the Stage branch is not delivered to the Mac Studio checkout/runtime, record the stage as blocked on target-runtime deployment/proof rather than as service unavailable.
 
 ## Requirements (Should)
 
@@ -195,7 +200,7 @@ Read current market_data DDL, rest catch-up command, market-data scheduler, runt
 5. Extend `market-data-scheduler` with `funding_rate_catchup`, config parsing and all-futures enumeration.
 6. Add Prometheus metrics, alert rules, monitoring tests and runbook updates.
 7. Add focused tests and fixtures.
-8. Run focused checks, then real-boundary smoke including scheduler `/metrics`.
+8. Run focused checks, then target-host real-boundary smoke through `ssh macstudio`, including ClickHouse HTTP query and scheduler `/metrics`.
 9. Update stage report and ledger.
 
 # Acceptance criteria (Definition of Done)
@@ -209,14 +214,14 @@ Read current market_data DDL, rest catch-up command, market-data scheduler, runt
 - Prometheus funding metrics are exposed without `symbol` labels.
 - Prometheus alert rule assets and runbook docs are updated.
 - Funding freshness alerts are interval-aware; they must not page between normal 8h settlement windows.
-- Real-boundary evidence is recorded for ClickHouse, provider REST and scheduler `/metrics`.
+- Real-boundary evidence is recorded for ClickHouse, provider REST and scheduler `/metrics`; ClickHouse and scheduler evidence is from Mac Studio target-host probes, not local Codex-host loopback.
 
 # Implementation constraints
 
 - Keep exchange REST code unauthenticated for these public endpoints.
 - Do not couple backtest code to provider clients.
 - Keep rows idempotent for reruns over the same window.
-- Reuse the existing `market-data-scheduler` topology on port `9202`; do not introduce a second scheduler/daemon unless the stage report records a blocker and user decision.
+- Reuse the existing `market-data-scheduler` topology on port `9202`; runtime proof must query that endpoint on Mac Studio through SSH. Do not introduce a second scheduler/daemon unless the stage report records a blocker and user decision.
 - Do not implement minute-level full-market polling.
 - Per-symbol funding diagnostics must be structured logs or ClickHouse queries, not Prometheus labels.
 
@@ -236,6 +241,20 @@ uv run ruff check src/trading/contexts/market_data apps/cli apps/scheduler tests
 uv run pyright src/trading/contexts/market_data apps/cli apps/scheduler tests
 uv run pytest -q tests/unit/contexts/market_data tests/unit/apps/cli tests/unit/apps/scheduler tests/unit/infra
 python -m tools.docs.generate_docs_index --check
+```
+
+Target-host smoke examples:
+
+```bash
+ssh macstudio 'zsh -s' <<'REMOTE'
+set -e
+git -C /Users/daniildegtyarev/Projects/roehub.com rev-parse --short HEAD
+curl -fsS --max-time 5 http://127.0.0.1:8123/ping
+printf 'SELECT 1 FORMAT TabSeparated\n' \
+  | curl -fsS --max-time 5 --data-binary @- 'http://127.0.0.1:8123/'
+curl -fsS --max-time 5 http://127.0.0.1:9202/metrics \
+  | grep -E '^scheduler_funding_catchup_'
+REMOTE
 ```
 
 # Final output: report format (strict)

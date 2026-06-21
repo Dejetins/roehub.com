@@ -5,6 +5,7 @@ import sys
 
 from apps.cli.commands.backfill_1m import Backfill1mCli
 from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishCli
+from apps.cli.commands.funding_rate_catchup import FundingRateCatchupCli
 from apps.cli.commands.rest_catchup_1m import RestCatchUp1mCli
 from apps.cli.commands.sync_instruments import SyncInstrumentsCli
 
@@ -29,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
             "  backtest-artifact-publish [args...]\n"
             "  sync-instruments [args...]\n"
             "  rest-catchup [args...]\n"
+            "  funding-rate-catchup [args...]\n"
             "\n"
             "Back-compat: if no command is provided, arguments are passed to backfill-1m."
         )
@@ -45,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
         return SyncInstrumentsCli().run(rest)
     if cmd == "rest-catchup":
         return RestCatchUp1mCli().run(rest)
+    if cmd == "funding-rate-catchup":
+        return FundingRateCatchupCli().run(rest)
 
     # back-compat
     return Backfill1mCli().run(args)

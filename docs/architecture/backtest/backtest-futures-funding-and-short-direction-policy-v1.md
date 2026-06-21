@@ -25,6 +25,48 @@ baseline остается Stage 05 + Stage 12 composite default
 использовать только публичные market-data endpoints Binance/Bybit и существующий
 prod env contract репозитория.
 
+## Mac Studio runtime evidence contract
+
+Runtime acceptance for this plan is target-host evidence, not Codex-session
+loopback evidence. Whenever a stage requires ClickHouse, API, web, scheduler
+metrics, Prometheus, browser or benchmark runtime proof, the default target is
+`ssh macstudio` unless the stage explicitly says it is local-only development
+evidence.
+
+Required host/path contract:
+
+- SSH alias: `macstudio`.
+- Remote git checkout: `/Users/daniildegtyarev/Projects/roehub.com`.
+- Runtime tree: `/opt/roehub/app`.
+- Run remote git commands only with
+  `git -C /Users/daniildegtyarev/Projects/roehub.com ...`; do not run git
+  commands in `/opt/roehub/app`.
+- `127.0.0.1` in runtime smoke commands means Mac Studio loopback after SSH,
+  not the local Codex host.
+- SSH commands with SQL, JSON or multiline payloads must use quoted heredoc or
+  stdin. Do not use fragile nested inline shell quotes.
+- Mac Studio may not have `rg` or `clickhouse` CLI. Runtime probes should use
+  portable `grep`, `python`, and ClickHouse HTTP stdin when needed.
+
+Canonical target-host probes for Stage `01`:
+
+```bash
+ssh macstudio 'zsh -s' <<'REMOTE'
+set -e
+git -C /Users/daniildegtyarev/Projects/roehub.com rev-parse --short HEAD
+curl -fsS --max-time 5 http://127.0.0.1:8123/ping
+printf 'SELECT 1 FORMAT TabSeparated\n' \
+  | curl -fsS --max-time 5 --data-binary @- 'http://127.0.0.1:8123/'
+curl -fsS --max-time 5 http://127.0.0.1:9202/metrics \
+  | grep -E '^scheduler_funding_catchup_'
+REMOTE
+```
+
+If the Stage branch is not delivered to the Mac Studio checkout/runtime yet,
+the target-host probe may prove baseline service availability, but it cannot
+prove Stage acceptance. Record that as "not deployed to target runtime yet"
+rather than "service unavailable".
+
 Главные исправления к базовому плану:
 
 - Bybit external API category для USDT perpetual futures должен быть `linear`,
@@ -396,7 +438,11 @@ Alert rules:
 Runtime proof before Stage `01` acceptance:
 
 ```bash
-curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_funding_catchup_'
+ssh macstudio 'zsh -s' <<'REMOTE'
+set -e
+curl -fsS --max-time 5 http://127.0.0.1:9202/metrics \
+  | grep -E '^scheduler_funding_catchup_'
+REMOTE
 ```
 
 The proof must show metrics names and non-secret label values only.
@@ -633,8 +679,11 @@ touching shared contracts:
 - `uv run pyright <touched targets>`;
 - `uv run pytest -q <focused tests>`;
 - `python -m tools.docs.generate_docs_index --check` when docs changed;
-- `curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_funding_catchup_'`
-  for Stage `01` runtime observability proof;
+- `ssh macstudio 'zsh -s'` target-host probes for ClickHouse, API/web,
+  scheduler metrics and Prometheus runtime evidence; `127.0.0.1` means Mac
+  Studio loopback, not local Codex loopback;
+- `curl -fsS http://127.0.0.1:9202/metrics | grep -E '^scheduler_funding_catchup_'`
+  inside the Mac Studio SSH session for Stage `01` runtime observability proof;
 - benchmark/performance evidence for stages `04` and `05`;
 - browser QA evidence for stage `07`;
 - pre-ship gate and direct delivery proof for stage `08`.

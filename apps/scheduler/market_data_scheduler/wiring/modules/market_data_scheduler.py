@@ -7,13 +7,23 @@ from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
 
-from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram, start_http_server
+from prometheus_client import (
+    REGISTRY,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    start_http_server,
+)
 
 from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
     _clickhouse_client,
 )
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
+from trading.contexts.market_data.adapters.outbound.clients.funding_rate_history_source import (
+    RestFundingRateHistorySource,
+)
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
 )
@@ -33,6 +43,7 @@ from trading.contexts.market_data.adapters.outbound.config.whitelist import (
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
     ClickHouseEnabledInstrumentReader,
+    ClickHouseFundingRateStore,
     ClickHouseInstrumentRefWriter,
     ClickHouseMarketRefWriter,
     ClickHouseRawKlineWriter,
@@ -55,14 +66,16 @@ from trading.contexts.market_data.application.services import (
 )
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
 from trading.contexts.market_data.application.use_cases import (
+    BackfillFundingRatesUseCase,
     EnrichRefInstrumentsFromExchangeUseCase,
     RestCatchUp1mUseCase,
     RestFillRange1mUseCase,
     SeedRefMarketUseCase,
+    SyncFuturesFundingUniverseUseCase,
     SyncWhitelistToRefInstrumentsUseCase,
 )
 from trading.platform.time.system_clock import SystemClock
-from trading.shared_kernel.primitives import InstrumentId, UtcTimestamp
+from trading.shared_kernel.primitives import InstrumentId, MarketId, UtcTimestamp
 
 log = logging.getLogger(__name__)
 
@@ -179,6 +192,36 @@ class MarketDataSchedulerMetrics:
             "Total historical gap rows written by periodic rest catchup",
             registry=effective_registry,
         )
+        self.scheduler_funding_catchup_instruments_total = Counter(
+            "scheduler_funding_catchup_instruments_total",
+            "Funding catchup instruments processed by exchange, market type and status",
+            labelnames=("exchange", "market_type", "status"),
+            registry=effective_registry,
+        )
+        self.scheduler_funding_catchup_rows_written_total = Counter(
+            "scheduler_funding_catchup_rows_written_total",
+            "Funding rows written by exchange and market type",
+            labelnames=("exchange", "market_type"),
+            registry=effective_registry,
+        )
+        self.scheduler_funding_catchup_lag_seconds = Gauge(
+            "scheduler_funding_catchup_lag_seconds",
+            "Latest observed funding lag in seconds by exchange, market type and status",
+            labelnames=("exchange", "market_type", "status"),
+            registry=effective_registry,
+        )
+        self.scheduler_funding_catchup_last_success_timestamp_seconds = Gauge(
+            "scheduler_funding_catchup_last_success_timestamp_seconds",
+            "Unix timestamp of the latest successful funding catchup by exchange and market type",
+            labelnames=("exchange", "market_type"),
+            registry=effective_registry,
+        )
+        self.scheduler_funding_catchup_universe_instruments = Gauge(
+            "scheduler_funding_catchup_universe_instruments",
+            "Funding universe instruments by exchange, market type and status",
+            labelnames=("exchange", "market_type", "status"),
+            registry=effective_registry,
+        )
 
 
 class MarketDataSchedulerApp:
@@ -217,6 +260,8 @@ class MarketDataSchedulerApp:
         metrics: MarketDataSchedulerMetrics,
         metrics_port: int,
         history_start_source: InstrumentHistoryStartSource | None = None,
+        funding_sync_use_case: SyncFuturesFundingUniverseUseCase | None = None,
+        funding_catchup_use_case: BackfillFundingRatesUseCase | None = None,
     ) -> None:
         """
         Validate and store scheduler runtime dependencies.
@@ -249,9 +294,12 @@ class MarketDataSchedulerApp:
         self._backfill_planner = backfill_planner
         self._history_start_source = history_start_source
         self._rest_catchup_use_case = rest_catchup_use_case
+        self._funding_sync_use_case = funding_sync_use_case
+        self._funding_catchup_use_case = funding_catchup_use_case
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._clock: Clock = SystemClock()
+        self._funding_last_universe_refresh_monotonic: float | None = None
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """
@@ -292,6 +340,16 @@ class MarketDataSchedulerApp:
                 interval_seconds=1,
             ),
         ]
+        if (
+            self._funding_job_enabled()
+            and self._config.scheduler.jobs.funding_rate_catchup.startup_bootstrap
+        ):
+            startup_jobs.append(
+                SchedulerJob(
+                    name="funding_rate_catchup",
+                    interval_seconds=1,
+                )
+            )
         for job in startup_jobs:
             await self._run_once(job)
 
@@ -309,6 +367,13 @@ class MarketDataSchedulerApp:
                 interval_seconds=self._config.scheduler.jobs.rest_insurance_catchup.interval_seconds,
             ),
         ]
+        if self._funding_job_enabled():
+            jobs.append(
+                SchedulerJob(
+                    name="funding_rate_catchup",
+                    interval_seconds=self._config.scheduler.jobs.funding_rate_catchup.interval_seconds,
+                )
+            )
 
         periodic_tasks = [
             asyncio.create_task(
@@ -379,6 +444,8 @@ class MarketDataSchedulerApp:
                 await self._run_startup_scan_job()
             elif job.name == "rest_insurance_catchup":
                 await self._run_rest_insurance_job()
+            elif job.name == "funding_rate_catchup":
+                await self._run_funding_rate_catchup_job()
             else:
                 raise RuntimeError(f"unknown scheduler job: {job.name}")
         except Exception:  # noqa: BLE001
@@ -493,6 +560,104 @@ class MarketDataSchedulerApp:
             allowed_reasons={"scheduler_bootstrap", "historical_backfill"},
         )
         await self._run_periodic_gap_catchup()
+
+    async def _run_funding_rate_catchup_job(self) -> None:
+        """
+        Run funding universe refresh and due-only funding history catchup.
+
+        Universe refresh is not tied to every scheduler wake-up. The funding
+        history use-case then skips non-due symbols without provider calls.
+        """
+        if self._funding_sync_use_case is None or self._funding_catchup_use_case is None:
+            log.info("funding_rate_catchup skipped: funding use cases are not wired")
+            return
+
+        await self._maybe_refresh_funding_universe()
+        report = await asyncio.to_thread(
+            self._funding_catchup_use_case.run_due_universe,
+            market_ids=(MarketId(2), MarketId(4)),
+            dry_run=False,
+        )
+        success_by_market: set[tuple[str, str]] = set()
+        for item in report.instrument_reports:
+            self._metrics.scheduler_funding_catchup_instruments_total.labels(
+                exchange=item.exchange,
+                market_type=item.market_type,
+                status=item.status,
+            ).inc()
+            if item.rows_written:
+                self._metrics.scheduler_funding_catchup_rows_written_total.labels(
+                    exchange=item.exchange,
+                    market_type=item.market_type,
+                ).inc(item.rows_written)
+            if item.lag_seconds is not None:
+                self._metrics.scheduler_funding_catchup_lag_seconds.labels(
+                    exchange=item.exchange,
+                    market_type=item.market_type,
+                    status=item.status,
+                ).set(item.lag_seconds)
+            if item.status == "ok":
+                success_by_market.add((item.exchange, item.market_type))
+
+        now_seconds = self._clock.now().value.timestamp()
+        for exchange, market_type in success_by_market:
+            self._metrics.scheduler_funding_catchup_last_success_timestamp_seconds.labels(
+                exchange=exchange,
+                market_type=market_type,
+            ).set(now_seconds)
+
+        log.info(
+            "funding_rate_catchup instruments_total=%s due=%s ok=%s skipped=%s failed=%s rows_written=%s",  # noqa: E501
+            report.instruments_total,
+            report.instruments_due,
+            report.instruments_ok,
+            report.instruments_skipped,
+            report.instruments_failed,
+            report.rows_written,
+        )
+
+    async def _maybe_refresh_funding_universe(self) -> None:
+        if self._funding_sync_use_case is None:
+            return
+        loop = asyncio.get_running_loop()
+        now = loop.time()
+        interval = (
+            self._config.scheduler.jobs.funding_rate_catchup.universe_refresh_interval_seconds
+        )
+        if (
+            self._funding_last_universe_refresh_monotonic is not None
+            and now - self._funding_last_universe_refresh_monotonic < interval
+        ):
+            return
+
+        report = await asyncio.to_thread(self._funding_sync_use_case.run)
+        self._funding_last_universe_refresh_monotonic = now
+        for market_report in report.market_reports:
+            market = self._config.market_by_id(market_report.market_id)
+            self._metrics.scheduler_funding_catchup_universe_instruments.labels(
+                exchange=market.exchange,
+                market_type=market.market_type,
+                status="with_interval",
+            ).set(market_report.instruments_with_interval)
+            self._metrics.scheduler_funding_catchup_universe_instruments.labels(
+                exchange=market.exchange,
+                market_type=market.market_type,
+                status="missing_interval",
+            ).set(market_report.instruments_missing_interval)
+        log.info(
+            "funding_rate_catchup universe refreshed: markets=%s instruments=%s with_interval=%s missing_interval=%s",  # noqa: E501
+            report.markets_total,
+            report.instruments_total,
+            report.instruments_with_interval,
+            report.instruments_missing_interval,
+        )
+
+    def _funding_job_enabled(self) -> bool:
+        return (
+            self._config.scheduler.jobs.funding_rate_catchup.enabled
+            and self._funding_sync_use_case is not None
+            and self._funding_catchup_use_case is not None
+        )
 
     async def _run_periodic_gap_catchup(self) -> None:
         """
@@ -912,6 +1077,36 @@ def build_market_data_scheduler_app(
         batch_size=10_000,
         ingest_id=uuid4(),
     )
+    funding_store = ClickHouseFundingRateStore(
+        gateway=gateway,
+        database=clickhouse_settings.database,
+    )
+    funding_source = RestFundingRateHistorySource(
+        cfg=config,
+        http=RequestsHttpClient(),
+        clock=SystemClock(),
+        ingest_id=uuid4(),
+        binance_standard_interval_hours=(
+            config.scheduler.jobs.funding_rate_catchup.binance_standard_interval_hours
+        ),
+        allow_binance_funding_info_failure_fallback=(
+            config.scheduler.jobs.funding_rate_catchup.allow_binance_funding_info_failure_fallback
+        ),
+    )
+    funding_sync_use_case = SyncFuturesFundingUniverseUseCase(
+        source=funding_source,
+        store=funding_store,
+        clock=SystemClock(),
+        market_ids=(MarketId(2), MarketId(4)),
+    )
+    funding_catchup_use_case = BackfillFundingRatesUseCase(
+        source=funding_source,
+        writer=funding_store,
+        universe_store=funding_store,
+        clock=SystemClock(),
+        tail_lookback_intervals=config.scheduler.jobs.funding_rate_catchup.tail_lookback_intervals,
+        settlement_lag_minutes=config.scheduler.jobs.funding_rate_catchup.settlement_lag_minutes,
+    )
     metadata_source = RestInstrumentMetadataSource(cfg=config, http=RequestsHttpClient())
     history_start_source = RestInstrumentHistoryStartSource(
         cfg=config,
@@ -944,6 +1139,8 @@ def build_market_data_scheduler_app(
         backfill_planner=backfill_planner,
         history_start_source=history_start_source,
         rest_catchup_use_case=rest_catchup_use_case,
+        funding_sync_use_case=funding_sync_use_case,
+        funding_catchup_use_case=funding_catchup_use_case,
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,
     )

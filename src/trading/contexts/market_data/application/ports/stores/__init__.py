@@ -6,6 +6,8 @@ from .enabled_market_reader import EnabledMarketReader
 from .enabled_tradable_instrument_search_reader import (
     EnabledTradableInstrumentSearchReader,
 )
+from .funding_instrument_universe_store import FundingInstrumentUniverseStore
+from .funding_rate_writer import FundingRateWriter
 from .instrument_ref_writer import InstrumentRefWriter
 from .market_ref_writer import MarketRefWriter
 from .raw_kline_writer import RawKlineWriter
@@ -18,6 +20,8 @@ __all__ = [
     "EnabledInstrumentReader",
     "EnabledMarketReader",
     "EnabledTradableInstrumentSearchReader",
+    "FundingInstrumentUniverseStore",
+    "FundingRateWriter",
     "InstrumentRefWriter",
     "MarketRefWriter",
     "RawKlineWriter",

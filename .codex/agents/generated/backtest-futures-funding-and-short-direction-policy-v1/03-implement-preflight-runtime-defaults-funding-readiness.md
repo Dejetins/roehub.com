@@ -10,6 +10,8 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Confirm previous required stage is accepted in the ledger before implementation edits."
+  - "Previous-stage ledger gate: confirm Stage 02 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 03 as blocked unless the user explicitly supersedes the gate in the current turn."
   - "Add standalone short to runtime direction compatibility only when validation and tests are updated."
   - "Spot short-like requests must be invalid for new create/preflight flows."
   - "Existing persisted jobs remain readable and immutable."
@@ -22,7 +24,8 @@ skill_routing:
   - "contract-impact-analysis"
   - "backend-quality-gates"
 target_envs:
-  - "local API"
+  - "local API for development smoke"
+  - "Mac Studio target-host API/runtime smoke via ssh macstudio when recording acceptance evidence"
 required_literals:
   - "short_direction_requires_futures_market"
   - "funding_readiness"
@@ -32,7 +35,7 @@ non_goals:
   - "No browser UI changes."
 final_report_format:
   - "Scope"
-  - "Files changed"
+  - "File manifest: created/modified/deleted"
   - "Request contract"
   - "Preflight contract"
   - "Validation"
@@ -44,10 +47,12 @@ quality_gates:
   - "uv run pytest -q tests/unit/contexts/backtest tests/unit/apps/api"
   - "python -m tools.docs.generate_docs_index --check"
 validation_strategy:
-  - "Route smoke for runtime-defaults and preflight with ready, degraded, unavailable and not_applicable fixtures."
+  - "Route smoke for runtime-defaults and preflight with ready, degraded, unavailable and not_applicable fixtures; acceptance runtime smoke runs on Mac Studio when the API is part of target runtime evidence."
   - "Request hash tests for normalized funding config."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/03-preflight-runtime-defaults-funding-readiness.md"
   - "src/trading/contexts/backtest/application/services/v2/preflight.py"
   - "apps/api/routes/backtests.py"
   - "apps/api/dto/backtests.py"
@@ -55,16 +60,23 @@ possible_secondary_touches:
   - "src/trading/contexts/backtest/application/dto/"
   - "tests/unit/contexts/backtest/"
   - "tests/unit/apps/api/"
-  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/03-preflight-runtime-defaults-funding-readiness.md"
   - "docs/architecture/README.md"
 safety_notes:
   - "Request hash change applies only to new jobs."
   - "Do not mutate old persisted jobs."
+  - "For acceptance runtime smoke, 127.0.0.1 means Mac Studio loopback after ssh macstudio, not local Codex-host loopback."
 ---
 
 # Task
 
 Add funding readiness and direction-market compatibility to backtest runtime defaults and preflight.
+
+## Stage Gate
+
+Previous-stage ledger gate: before implementation edits, read the stage
+execution ledger and verify Stage `02` is accepted. If Stage `02` is not
+accepted, do not implement Stage `03`; update the Stage `03` report/ledger as
+blocked unless the user explicitly supersedes this gate in the current turn.
 
 ## Context / Current State
 
@@ -73,13 +85,14 @@ Current preflight exposes `long_only` and `long_short_reversal`, without funding
 ## Requirements (Must)
 
 - Record `User required before start: nothing` in the stage report before edits.
+- Previous-stage gate: Stage `02` must be `accepted` in the stage ledger before Stage `03` implementation starts; otherwise stop and mark this stage blocked unless the user explicitly supersedes Stage `02`.
 - Add normalized `execution.funding.mode` and `coverage_policy`.
 - Add funding readiness to preflight responses.
 - Expose server-side `direction_market_compatibility` in runtime defaults.
 - Add standalone `short` only with complete validation and tests.
 - Reject new `spot + short` and `spot + long_short_reversal` requests with `short_direction_requires_futures_market`.
 - Preserve existing job readability.
-- Prove local API route smoke.
+- Prove API route smoke; local smoke is development evidence, while acceptance runtime smoke must run on Mac Studio when target runtime is required.
 
 ## Requirements (Should)
 
@@ -108,7 +121,7 @@ Read current preflight normalization and routes before editing DTOs.
 3. Implement request normalization and compatibility validation.
 4. Add preflight/readiness response fields.
 5. Add API route tests and request hash tests.
-6. Run route smoke and update report/ledger.
+6. Run route smoke; use Mac Studio target-host smoke for acceptance/runtime evidence when applicable; update report/ledger.
 
 # Acceptance criteria (Definition of Done)
 
@@ -116,7 +129,7 @@ Read current preflight normalization and routes before editing DTOs.
 - Preflight reports funding readiness for all relevant market/direction combinations.
 - New spot short-like preflight/create flow fails with the new reason code.
 - Existing read paths for persisted jobs are not broken.
-- Local route smoke is recorded.
+- Route smoke is recorded with the environment clearly labeled; Mac Studio target-host smoke is required for acceptance when runtime proof is in scope.
 
 # Implementation constraints
 
@@ -144,7 +157,7 @@ python -m tools.docs.generate_docs_index --check
 # Final output: report format (strict)
 
 - Scope
-- Files changed
+- File manifest: created/modified/deleted
 - Request contract
 - Preflight contract
 - Validation

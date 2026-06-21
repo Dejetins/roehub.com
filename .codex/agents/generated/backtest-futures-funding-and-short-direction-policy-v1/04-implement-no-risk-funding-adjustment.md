@@ -11,6 +11,8 @@ context_sources:
   - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Confirm previous required stage is accepted in the ledger before implementation edits."
+  - "Previous-stage ledger gate: confirm Stage 03 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 04 as blocked unless the user explicitly supersedes the gate in the current turn."
   - "Do not replace gross total_return_pct."
   - "Use total_return_pct_net_of_funding as effective default ranking for funding-enabled futures jobs."
   - "Apply funding after base scoring on a bounded candidate pool."
@@ -24,7 +26,8 @@ skill_routing:
   - "backend-quality-gates"
   - "backend-performance-evidence"
 target_envs:
-  - "local benchmark"
+  - "local benchmark for development"
+  - "Mac Studio target-host benchmark via ssh macstudio for acceptance performance evidence"
 required_literals:
   - "total_return_pct_net_of_funding"
   - "funding_adjustment_scope"
@@ -34,7 +37,7 @@ non_goals:
   - "No browser UI changes."
 final_report_format:
   - "Scope"
-  - "Files changed"
+  - "File manifest: created/modified/deleted"
   - "Funding formula"
   - "Ranking contract"
   - "Validation"
@@ -48,25 +51,34 @@ quality_gates:
 validation_strategy:
   - "Formula tests for long/short positive and negative funding."
   - "Candidate-pool tests proving gross and net metrics are both preserved."
-  - "Performance benchmark on artifact-backed runtime input; do not accept tests-only."
+  - "Performance benchmark on artifact-backed runtime input on Mac Studio for acceptance; record baseline before measurement, candidate current measurement, benchmark command, sample size, same environment and comparable results; do not accept tests-only."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/04-no-risk-funding-adjustment.md"
   - "src/trading/contexts/backtest/application/services/v2/top_result_assembly.py"
   - "src/trading/contexts/backtest/domain/entities/backtest_job_results.py"
   - "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py"
 possible_secondary_touches:
   - "src/trading/contexts/backtest/application/services/v2/"
   - "tests/unit/contexts/backtest/"
-  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/04-no-risk-funding-adjustment.md"
   - "docs/architecture/README.md"
 safety_notes:
   - "Do not store full trades in top rows."
   - "Report performance with baseline, command, sample size and environment."
+  - "For performance acceptance, run benchmark commands on Mac Studio through ssh macstudio and remote git checkout /Users/daniildegtyarev/Projects/roehub.com."
 ---
 
 # Task
 
 Implement no-risk net-of-funding summary metrics and effective ranking for futures jobs.
+
+## Stage Gate
+
+Previous-stage ledger gate: before implementation edits, read the stage
+execution ledger and verify Stage `03` is accepted. If Stage `03` is not
+accepted, do not implement Stage `04`; update the Stage `04` report/ledger as
+blocked unless the user explicitly supersedes this gate in the current turn.
 
 ## Context / Current State
 
@@ -75,13 +87,14 @@ Top result assembly currently persists summary-only top variants with gross retu
 ## Requirements (Must)
 
 - Record `User required before start: nothing` in the stage report before edits.
+- Previous-stage gate: Stage `03` must be `accepted` in the stage ledger before Stage `04` implementation starts; otherwise stop and mark this stage blocked unless the user explicitly supersedes Stage `03`.
 - Add funding PnL and net return calculation for no-risk variants.
 - Preserve gross `total_return_pct`.
 - Add `total_return_pct_net_of_funding`, `funding_return_pct`, `funding_pnl_quote`, `funding_events_count`, `funding_data_quality`, `funding_warning_codes`, `funding_included`, `funding_adjustment_scope`.
 - Use bounded candidate pool `max(top_n * 5, top_n + 100)`.
 - Persist `funding_adjustment_exact_global_ranking=false`.
 - Persist requested and effective ranking metrics.
-- Produce performance evidence on artifact-backed runtime input.
+- Produce Mac Studio performance evidence on artifact-backed runtime input with baseline before measurement and candidate current measurement.
 
 ## Requirements (Should)
 
@@ -110,7 +123,7 @@ Read top assembly, job result entity, repository serialization and Stage `02` ar
 3. Implement reusable funding calculation for no-risk open-position windows.
 4. Integrate candidate-pool adjustment and net ranking.
 5. Add correctness tests.
-6. Run performance evidence and focused gates.
+6. Run Mac Studio performance evidence and focused gates.
 7. Update report and ledger.
 
 # Acceptance criteria (Definition of Done)
@@ -119,7 +132,7 @@ Read top assembly, job result entity, repository serialization and Stage `02` ar
 - Positive funding rate makes longs pay and shorts receive.
 - Candidate-pool metadata is persisted.
 - Effective ranking for funding futures jobs uses net metric by default.
-- Performance evidence is recorded and compared against baseline.
+- Mac Studio performance evidence is recorded with baseline before measurement and candidate current measurement.
 
 # Implementation constraints
 
@@ -147,7 +160,7 @@ python -m tools.docs.generate_docs_index --check
 # Final output: report format (strict)
 
 - Scope
-- Files changed
+- File manifest: created/modified/deleted
 - Funding formula
 - Ranking contract
 - Validation

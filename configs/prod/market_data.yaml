@@ -106,6 +106,18 @@ market_data:
         interval_seconds: 43200
       rest_insurance_catchup:
         interval_seconds: 3600
+      funding_rate_catchup:
+        enabled: true
+        interval_seconds: 1800
+        due_mode: "due_only"
+        settlement_lag_minutes: 10
+        binance_standard_interval_hours: 8
+        allow_binance_funding_info_failure_fallback: false
+        startup_bootstrap: true
+        universe_refresh_interval_seconds: 21600
+        tail_lookback_intervals: 3
+        gap_audit_lookback_intervals: 21
+        batch_size: 1000
 
   backfill:
     max_days_per_insert: 7

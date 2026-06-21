@@ -2,8 +2,14 @@
 
 ## Статус
 
-Stage `00` выполнен локально как docs-only baseline freeze. Production
-implementation stages еще не стартовали.
+Stage `00` accepted как docs-only baseline freeze после remote branch delivery:
+`origin/codex/backtest-futures-funding-v1-stage-00@7dc0e726fc6babe8c101369a40a4119d5d23fd03`.
+Stage `01` implemented locally on
+`codex/backtest-futures-funding-v1-stage-01`; local gates passed, provider REST
+smoke passed, Mac Studio ClickHouse and scheduler baseline endpoints are
+reachable, but the stage is blocked until the Stage `01` branch is delivered to
+Mac Studio runtime and `canonical_funding_rates` plus
+`scheduler_funding_catchup_*` are proven there.
 
 `User required before start: nothing`.
 
@@ -45,10 +51,12 @@ Stage `00` report:
   add provider clients, ClickHouse writes, retries, authenticated browser flows
   or side-effecting runtime behavior.
 - Conditional service-call coverage: Stage `01` must cover provider REST,
-  ClickHouse and scheduler `/metrics`; Stage `02` artifact filesystem/ClickHouse
-  reads; Stage `03`, `06` and `07` local API/browser routes; Stage `08`
-  delivery/runtime evidence when delivery is in scope. Pure local unit-only
-  evidence is not enough where these boundaries are touched.
+  ClickHouse and scheduler `/metrics` on Mac Studio target runtime; Stage `02`
+  artifact filesystem/ClickHouse reads; Stage `03`, `06` and `07` API/browser
+  routes on Mac Studio target runtime when acceptance evidence is recorded;
+  Stage `08` delivery/runtime evidence when delivery is in scope. Pure local
+  unit-only or Codex-local loopback evidence is not enough where these
+  boundaries are touched.
 - Logging/redaction coverage: reports and runtime logs may include env var names,
   provider names, status codes and aggregate counts, but must not include DSNs,
   API keys, bearer tokens, ClickHouse passwords or secret-like values.
@@ -57,8 +65,8 @@ Stage `00` report:
 
 | Stage | Prompt | Status | Required evidence | Accepted evidence | Blockers / notes |
 | --- | --- | --- | --- | --- | --- |
-| `00` | `00-review-baseline-and-freeze-contract.md` | accepted-local | Baseline review, current code/doc manifest, external API re-check from official docs or provider smoke, contract classification, docs index check if changed. | 2026-06-22 Stage report created at `00-baseline-and-contract-freeze.md`; official Binance/Bybit docs rechecked; current scheduler topology, enabled-instrument scan pattern, Prometheus scrape baseline, runtime boundary availability and frozen Stage `01`-`08` file manifests recorded; `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Docs-only local acceptance; not published or deployed. Local ClickHouse/API/web/scheduler metrics boundaries were unavailable and remain future-stage real-boundary requirements. |
-| `01` | `01-implement-funding-storage-and-catchup.md` | planned | ClickHouse funding DDL, dedicated exchange-discovered futures funding universe, funding source/store/use case, CLI dispatcher, automatic `market-data-scheduler` `funding_rate_catchup` job for all tradable Binance/Bybit futures instruments, mandatory interval metadata contract, funding-interval aligned due selection, Prometheus metrics, alert rules, runbook updates, idempotent catch-up tests, Bybit `linear` mapping test, interval metadata fallback/degraded tests, ClickHouse migration/query smoke, provider REST contract smoke or explicit network-unavailable blocker, `/metrics` proof on `127.0.0.1:9202`. | TBD | No secret output in reports; do not use `symbol` as Prometheus label; do not mark all exchange futures as `ENABLED` in whitelist-driven `ref_instruments`; do not implement minute-level full-market polling; do not silently treat Binance `fundingInfo` failure as ready 8h coverage. |
+| `00` | `00-review-baseline-and-freeze-contract.md` | accepted | Baseline review, current code/doc manifest, external API re-check from official docs or provider smoke, contract classification, docs index check if changed. | 2026-06-22 Stage report created at `00-baseline-and-contract-freeze.md`; official Binance/Bybit docs rechecked; current scheduler topology, enabled-instrument scan pattern, Prometheus scrape baseline, runtime boundary availability and frozen Stage `01`-`08` file manifests recorded; branch delivered to `origin/codex/backtest-futures-funding-v1-stage-00@7dc0e726fc6babe8c101369a40a4119d5d23fd03`; `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Accepted as docs-only remote-branch delivery. Main merge, Mac Studio deploy and runtime smoke are not applicable for Stage `00`; local ClickHouse/API/web/scheduler metrics boundaries were unavailable and remain future-stage real-boundary requirements. |
+| `01` | `01-implement-funding-storage-and-catchup.md` | blocked | ClickHouse funding DDL, dedicated exchange-discovered futures funding universe, funding source/store/use case, CLI dispatcher, automatic `market-data-scheduler` `funding_rate_catchup` job for all tradable Binance/Bybit futures instruments, mandatory interval metadata contract, funding-interval aligned due selection, Prometheus metrics, alert rules, runbook updates, idempotent catch-up tests, Bybit `linear` mapping test, interval metadata fallback/degraded tests, Mac Studio ClickHouse migration/query smoke, provider REST contract smoke or explicit network-unavailable blocker, Mac Studio `/metrics` proof for `scheduler_funding_catchup_*` on `127.0.0.1:9202` inside `ssh macstudio`. | Local implementation and local gates completed in `01-funding-storage-and-catchup.md`; Binance and Bybit provider REST smokes passed; Mac Studio baseline probes show ClickHouse HTTP `ping=Ok`, `SELECT 1=1`, scheduler `/metrics` reachable with existing `scheduler_` metrics. | Not accepted: Mac Studio checkout/runtime is on `main`, not this Stage `01` branch; `scheduler_funding_catchup_*` has zero lines on the live scheduler; Stage `01` DDL/query against delivered runtime remains unproven. Earlier Codex-local refused-connection probes are superseded diagnostics, not target-runtime evidence. |
 | `02` | `02-implement-funding-artifact-family-and-coverage.md` | planned | Funding artifact family, manifest hash, coverage reader, artifact publish/load tests, filesystem artifact publish/load smoke against a temp root, ClickHouse-backed coverage smoke against scheduler-maintained `canonical_funding_rates` when ClickHouse is available. | TBD | Root manifest and explicit `funding_manifest_hash` must be coherent. |
 | `03` | `03-implement-preflight-runtime-defaults-funding-readiness.md` | planned | Normalized funding request, direction compatibility, preflight readiness fields, request hash tests, local API route smoke for runtime-defaults and preflight with funding-ready/degraded fixtures. | TBD | Existing jobs must remain readable and immutable. |
 | `04` | `04-implement-no-risk-funding-adjustment.md` | planned | No-risk funding formula, candidate-pool adjustment, net metrics, focused tests, benchmark/performance evidence on artifact-backed runtime inputs. | TBD | Must persist requested/effective ranking metadata. |
@@ -71,8 +79,8 @@ Stage `00` report:
 
 | Stage | Branch | Commit / SHA | PR | Local gates | Remote / runtime evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| `00` | `codex/backtest-futures-funding-v1-stage-00` | local uncommitted | N/A | `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Local probes unavailable: `127.0.0.1:9202`, `8123`, `8000`, `3000` refused connections. | Docs-only baseline freeze; not published/deployed. |
-| `01` | TBD | TBD | TBD | TBD | TBD | TBD |
+| `00` | `codex/backtest-futures-funding-v1-stage-00` | `7dc0e726fc6babe8c101369a40a4119d5d23fd03` | N/A | `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Remote branch `origin/codex/backtest-futures-funding-v1-stage-00` resolves to `7dc0e726fc6babe8c101369a40a4119d5d23fd03`; local probes unavailable: `127.0.0.1:9202`, `8123`, `8000`, `3000` refused connections. | Accepted docs-only branch delivery; not main/Mac runtime deployed because Stage `00` has no runtime behavior. |
+| `01` | `codex/backtest-futures-funding-v1-stage-01` | N/A - no implementation commit yet | N/A | `uv run ruff check src/trading/contexts/market_data apps/cli apps/scheduler tests`, `uv run pyright src/trading/contexts/market_data apps/cli apps/scheduler tests`, focused funding pytest set and broader market-data/CLI/scheduler/infra pytest set passed locally. | Provider REST smokes passed for Binance `/fapi/v1/fundingRate` and Bybit `/v5/market/funding/history?category=linear`; Mac Studio `ssh` probe passed for ClickHouse HTTP ping/query and scheduler `/metrics` baseline; funding metrics absent because Stage `01` is not delivered to runtime. | Local code/docs complete, blocked on Mac Studio delivery/runtime proof before acceptance. |
 | `02` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `03` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `04` | TBD | TBD | TBD | TBD | TBD | TBD |
@@ -95,6 +103,9 @@ Stage `00` report:
 | 2026-06-21 | Futures funding jobs use net-of-funding as effective default ranking while preserving gross `total_return_pct`. | Prevents misleading futures top-N after funding is included. |
 | 2026-06-21 | Spot short-like jobs are readable but not launchable; new short-like work requires futures. | Aligns backtest, strategy launch and live capability with real order semantics. |
 | 2026-06-22 | Stage `00` freezes the current docs/code baseline and future-stage file manifest before implementation. | Implementation agents need current facts, provider-doc dates, real-boundary availability and narrow file boundaries before touching production code. |
+| 2026-06-22 | Stage `00` remote branch delivery promotes Stage `00` to `accepted` and unblocks the Stage `01` previous-stage gate. | `origin/codex/backtest-futures-funding-v1-stage-00` resolves to `7dc0e726fc6babe8c101369a40a4119d5d23fd03`; Stage `00` is docs-only, so main/Mac runtime proof is not applicable to this acceptance. |
+| 2026-06-22 | Stage `01` remains blocked after local implementation because the Stage branch is not delivered to Mac Studio runtime. | Funding storage, provider adapters, scheduler job, CLI, Prometheus rules and runbooks are implemented with local gates passing; Mac Studio ClickHouse and scheduler baseline endpoints are reachable, but Stage `01` DDL/query and `scheduler_funding_catchup_*` export must be proven on target runtime before acceptance. |
+| 2026-06-22 | Runtime smoke loopback means Mac Studio loopback for this plan. | Codex-local `127.0.0.1` probes are diagnostics only; acceptance probes for ClickHouse, API/web, scheduler metrics, Prometheus and benchmarks must run through `ssh macstudio` unless a stage explicitly declares local-only evidence. |
 
 ## Cold-head receipt
 

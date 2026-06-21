@@ -4,7 +4,7 @@ Docs-only baseline freeze before funding and futures-only short policy implement
 
 Date: 2026-06-22
 
-Status: accepted-local, docs-only, not published or deployed.
+Status: accepted, docs-only, remote branch delivered.
 
 Branch: `codex/backtest-futures-funding-v1-stage-00`
 
@@ -80,6 +80,14 @@ Startup state:
 - Current branch was created from local `main` as
   `codex/backtest-futures-funding-v1-stage-00`.
 
+Delivery state:
+
+- Remote branch:
+  `origin/codex/backtest-futures-funding-v1-stage-00@7dc0e726fc6babe8c101369a40a4119d5d23fd03`.
+- Local branch and remote branch resolve to the same commit SHA.
+- Stage 00 remains docs-only: main merge, Mac Studio deploy and runtime smoke
+  are not applicable acceptance evidence for this baseline freeze.
+
 ## Baseline Facts
 
 ### Official provider facts rechecked
@@ -126,12 +134,16 @@ category.
 
 ### Runtime boundary availability in this environment
 
+Note: the probes in this Stage `00` table were Codex-local loopback diagnostics,
+not Mac Studio target-runtime acceptance probes. Future runtime acceptance for
+this plan must use `ssh macstudio`; `127.0.0.1` then means Mac Studio loopback.
+
 | Boundary | Probe | Result | Stage 00 consequence |
 | --- | --- | --- | --- |
-| Scheduler `/metrics` | `curl -fsS --max-time 2 http://127.0.0.1:9202/metrics | rg '^scheduler_' | head -n 20` | Unavailable: connection refused on port `9202`. | Not a blocker for docs-only Stage 00; Stage `01` must prove runtime metrics or block. |
-| ClickHouse | `curl -fsS --max-time 2 http://127.0.0.1:8123/ping` | Unavailable: connection refused on port `8123`. | Stage `01` ClickHouse smoke is currently unavailable locally. |
-| Local API | `curl -fsS --max-time 2 http://127.0.0.1:8000/openapi.json` | Unavailable: connection refused on port `8000`. | Stage `03`, `06`, `07` local API smokes need a running API. |
-| Local web/browser smoke | `curl -fsS --max-time 2 http://127.0.0.1:3000/backtests` | Unavailable: connection refused on port `3000`. | Stage `07` browser QA needs a running web/API environment. |
+| Scheduler `/metrics` | Codex-local `curl -fsS --max-time 2 http://127.0.0.1:9202/metrics | rg '^scheduler_' | head -n 20` | Codex-local unavailable: connection refused on port `9202`. | Not acceptance evidence. Stage `01` must prove runtime metrics on Mac Studio or block. |
+| ClickHouse | Codex-local `curl -fsS --max-time 2 http://127.0.0.1:8123/ping` | Codex-local unavailable: connection refused on port `8123`. | Not acceptance evidence. Stage `01` ClickHouse smoke must run on Mac Studio. |
+| Local API | Codex-local `curl -fsS --max-time 2 http://127.0.0.1:8000/openapi.json` | Codex-local unavailable: connection refused on port `8000`. | Not acceptance evidence. Stage `03`, `06`, `07` API smokes must use the required target runtime when acceptance evidence is recorded. |
+| Local web/browser smoke | Codex-local `curl -fsS --max-time 2 http://127.0.0.1:3000/backtests` | Codex-local unavailable: connection refused on port `3000`. | Not acceptance evidence. Stage `07` browser QA must use the required target runtime when acceptance evidence is recorded. |
 
 ## Frozen Future Stage File Manifest
 
@@ -253,16 +265,17 @@ Review instructions: architecture-review/references/cold-head-plan-prompt-pack-r
 Verdict: Release after fixes
 Blockers fixed: Initial draft risked treating local runtime unavailability as a Stage 00 blocker; report now records it as future real-boundary blocker/evidence for implementation stages. Initial manifest risked inheriting broad prompt-pack paths; report now freezes per-stage primary created/modified/test surfaces and requires explicit justification for files outside the manifest.
 Local follow-up check: completed
-Residual risks: No live provider REST smoke was run; local ClickHouse/API/web/scheduler boundaries were unavailable; future implementation stages must block or collect real-boundary evidence instead of accepting docs-only proof.
+Residual risks: No live provider REST smoke was run; Codex-local ClickHouse/API/web/scheduler loopback probes were unavailable and are non-acceptance diagnostics; future implementation stages must collect Mac Studio target-runtime real-boundary evidence instead of accepting docs-only proof.
 
 ## Residual Risks
 
 - Provider docs can drift; each provider-touching implementation stage must
   recheck official docs or run provider smoke before accepting API behavior.
-- Local real-boundary services were unavailable in this environment. Stage `01`
-  cannot be accepted without ClickHouse/provider/scheduler metrics proof or an
-  explicit blocker, and stages `03`, `06`, `07` need local API/browser runtime
-  proof.
+- Codex-local real-boundary services were unavailable in this environment, but
+  those probes are not target-runtime evidence. Stage `01` cannot be accepted
+  without Mac Studio ClickHouse/provider/scheduler metrics proof or an explicit
+  blocker, and stages `03`, `06`, `07` need Mac Studio API/browser runtime
+  proof when acceptance evidence is recorded.
 - Funding performance remains unknown until stages `04` and `05` benchmark the
   post-pool funding adjustment on artifact-backed runtime inputs.
 - `StrategySpecV1` direction storage remains a future-stage boundary: Stage
