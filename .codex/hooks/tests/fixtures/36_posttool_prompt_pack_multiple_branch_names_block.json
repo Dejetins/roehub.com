@@ -1,0 +1,22 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example-multi-branch/01.md\n+# Stage 01\n+\n+branch_policy:\n+  default_branch: main\n+  separate_branch_allowed: true\n+  single_allowed_branch: codex/example-multi-branch-a\n+  stage_specific_branches_forbidden: true\n+\n+expected_primary_touches:\n+- docs/architecture/example/example-stage-ledger.md\n+\n+Ledger: update stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n*** Add File: .codex/agents/generated/example-multi-branch/02.md\n+# Stage 02\n+\n+branch_policy:\n+  default_branch: main\n+  separate_branch_allowed: true\n+  single_allowed_branch: codex/example-multi-branch-b\n+  stage_specific_branches_forbidden: true\n+\n+expected_primary_touches:\n+- docs/architecture/example/example-stage-ledger.md\n+\n+Ledger: update stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example-multi-branch/01.md": "# Stage 01\n\nbranch_policy:\n  default_branch: main\n  separate_branch_allowed: true\n  single_allowed_branch: codex/example-multi-branch-a\n  stage_specific_branches_forbidden: true\n\nexpected_primary_touches:\n- docs/architecture/example/example-stage-ledger.md\n\nLedger: update stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\n",
+    ".codex/agents/generated/example-multi-branch/02.md": "# Stage 02\n\nbranch_policy:\n  default_branch: main\n  separate_branch_allowed: true\n  single_allowed_branch: codex/example-multi-branch-b\n  stage_specific_branches_forbidden: true\n\nexpected_primary_touches:\n- docs/architecture/example/example-stage-ledger.md\n\nLedger: update stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "use at most one codex/* branch name"
+  }
+}

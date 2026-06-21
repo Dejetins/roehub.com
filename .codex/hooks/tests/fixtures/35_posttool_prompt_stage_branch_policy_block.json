@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example-branch-policy/01-stage.md\n+# Stage 01\n+\n+branch_policy:\n+  default_branch: main\n+  separate_branch_allowed: true\n+  single_allowed_branch: codex/example-branch-policy-stage-01\n+  stage_specific_branches_forbidden: true\n+\n+expected_primary_touches:\n+- docs/architecture/example/example-stage-ledger.md\n+\n+Ledger: update stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n+Run `git switch -c codex/example-branch-policy-stage-01` before implementation.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example-branch-policy/01-stage.md": "# Stage 01\n\nbranch_policy:\n  default_branch: main\n  separate_branch_allowed: true\n  single_allowed_branch: codex/example-branch-policy-stage-01\n  stage_specific_branches_forbidden: true\n\nexpected_primary_touches:\n- docs/architecture/example/example-stage-ledger.md\n\nLedger: update stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\nRun `git switch -c codex/example-branch-policy-stage-01` before implementation.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Prompt pack branch policy is incomplete"
+  }
+}
