@@ -215,7 +215,8 @@ class RestFundingRateHistorySource(FundingRateHistorySource, FundingInstrumentUn
                 status = str(item.get("status") or "Trading")
                 if status.upper() != "TRADING":
                     continue
-                interval = _optional_int(item.get("fundingInterval"))
+                raw_interval = _optional_int(item.get("fundingInterval"))
+                interval = raw_interval if raw_interval is not None and raw_interval > 0 else None
                 interval_source = "bybit_instruments_info" if interval is not None else None
                 instrument_id = InstrumentId(market.market_id, Symbol(symbol))
                 out.append(

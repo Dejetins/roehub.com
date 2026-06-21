@@ -169,6 +169,7 @@ def test_bybit_universe_uses_linear_and_degrades_missing_interval(tmp_path) -> N
                             "fundingInterval": "480",
                         },
                         {"symbol": "ETHUSDT", "status": "Trading"},
+                        {"symbol": "SOLUSDT", "status": "Trading", "fundingInterval": "0"},
                     ],
                     "nextPageCursor": "",
                 },
@@ -187,6 +188,8 @@ def test_bybit_universe_uses_linear_and_degrades_missing_interval(tmp_path) -> N
     by_symbol = {str(row.instrument_id.symbol): row for row in rows}
     assert by_symbol["BTCUSDT"].funding_interval_minutes == 480
     assert by_symbol["ETHUSDT"].funding_interval_minutes is None
+    assert by_symbol["SOLUSDT"].funding_interval_minutes is None
+    assert by_symbol["SOLUSDT"].funding_interval_source is None
 
 
 def test_bybit_history_uses_linear_category_and_filters_half_open_window(tmp_path) -> None:

@@ -158,6 +158,14 @@ Mac Studio path contract:
 - Agents MUST run remote git commands with `git -C /Users/daniildegtyarev/Projects/roehub.com ...` and MUST NOT run `git pull`, `git status`, `git reset`, or branch commands inside `/opt/roehub/app`.
 - Runtime deployment updates `/opt/roehub/app` via the deploy workflow or explicit rsync/tar bundle semantics from the verified checkout, then runs bootstrap/reload/smoke from the runtime tree.
 
+Mac Studio proof/deploy boundary contract:
+- `target-host readiness proof` is allowed before merge to `main` only when it is read-only or uses non-production isolation. It may check SSH access, host paths, environment availability, current service health, current production smoke, launchd/brew status, or remote checkout state. It MUST be labeled as host/readiness evidence, not proof that the current branch's changed code works in production.
+- `read-only runtime smoke` may run against the existing `/opt/roehub/app` production runtime before merge only to observe current deployed behavior. It MUST NOT sync files, reload services, run migrations, mutate provider state, or claim changed-code validation.
+- `post-main production runtime proof` is the only valid proof that changed code works in `/opt/roehub/app`. It requires the target revision to be on `main`, the relevant GitHub Actions/CI state to be green, deployment or verified sync from the `main` checkout to `/opt/roehub/app`, and then the appropriate runtime smoke/browser/API/service verification.
+- Prompt-pack stages MUST NOT require "Mac Studio target-runtime proof" for changed code before `main` delivery. If a stage needs such proof but the revision is not on `main` with green CI/deploy, the stage MUST record a blocked or deferred post-main verification handoff instead of weakening the claim.
+- Generated prompts and final reports MUST distinguish these labels explicitly: `target_host_readiness_pre_main`, `read_only_existing_runtime_smoke`, and `post_main_production_runtime_proof`. Do not use ambiguous phrases such as "target-runtime proof" without stating which boundary is being validated.
+- `publish-ci-deploy` owns the production deploy and post-main verification path. Other skills or stage prompts may collect pre-main host readiness evidence, but MUST NOT perform production deploy actions or present pre-main evidence as production proof for changed code.
+
 Remote command quoting contract:
 - Agents MUST NOT inline nested shell quoting for SSH commands that contain SQL, JSON, here-strings, multiline shell bodies, or payloads with apostrophes/backticks/dollar signs.
 - For SSH + SQL/JSON/multiline payloads, agents MUST pass the payload through a quoted heredoc or stdin (`<<'SQL'`, `<<'JSON'`, `--queries-file /dev/stdin`, `query=@-`, or equivalent) so local shell, SSH, remote shell, and payload parsing stay separate.

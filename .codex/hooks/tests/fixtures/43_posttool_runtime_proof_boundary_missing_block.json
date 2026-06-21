@@ -1,0 +1,21 @@
+{
+  "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: .codex/agents/generated/example-runtime-proof/01.md\n+# Stage 01\n+\n+stage_execution_ledger: docs/architecture/example/example-stage-ledger.md\n+expected_primary_touches:\n+- docs/architecture/example/example-stage-ledger.md\n+\n+Mac Studio target-runtime proof is required before accepting this stage.\n+Run smoke against `/opt/roehub/app` to validate changed code.\n+\n+Ledger: update stage ledger.\n+File manifest: created/modified/deleted.\n+Confirm previous required stage is accepted in the ledger.\n*** End Patch\n"
+    },
+    "tool_response": {
+      "exit_code": 0
+    }
+  },
+  "setup_files": {
+    ".codex/agents/generated/example-runtime-proof/01.md": "# Stage 01\n\nstage_execution_ledger: docs/architecture/example/example-stage-ledger.md\nexpected_primary_touches:\n- docs/architecture/example/example-stage-ledger.md\n\nMac Studio target-runtime proof is required before accepting this stage.\nRun smoke against `/opt/roehub/app` to validate changed code.\n\nLedger: update stage ledger.\nFile manifest: created/modified/deleted.\nConfirm previous required stage is accepted in the ledger.\n"
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Mac Studio runtime proof boundary is ambiguous"
+  }
+}
