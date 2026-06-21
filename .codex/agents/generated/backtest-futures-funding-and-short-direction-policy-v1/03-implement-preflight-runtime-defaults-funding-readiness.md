@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 03 - Preflight Runtime Defaults Funding Readiness"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-03"
+branch: "codex/backtest-futures-funding-v1"
 scope: "Backtest request normalization, runtime defaults and preflight funding readiness"
 language: "en"
 context_sources:
@@ -10,6 +10,7 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before implementation edits."
   - "Previous-stage ledger gate: confirm Stage 02 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 03 as blocked unless the user explicitly supersedes the gate in the current turn."
   - "Add standalone short to runtime direction compatibility only when validation and tests are updated."

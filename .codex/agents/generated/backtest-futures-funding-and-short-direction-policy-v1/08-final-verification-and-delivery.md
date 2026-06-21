@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 08 - Final Verification And Delivery"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-08"
+branch: "codex/backtest-futures-funding-v1"
 scope: "Full verification, docs closure and delivery readiness for the funding/short policy line"
 language: "en"
 context_sources:
@@ -10,6 +10,7 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before final verification edits."
   - "Previous-stage ledger gate: confirm Stages 00-07 are accepted or explicitly scoped out by user decision before final verification; if any required stage is planned or blocked, stop and record Stage 08 as blocked."
   - "Do not mark the plan accepted until all prior stages are accepted or explicitly scoped out by user decision."

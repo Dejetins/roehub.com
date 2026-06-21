@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 07 - Futures-only Short Policy API And CJM"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-07"
+branch: "codex/backtest-futures-funding-v1"
 scope: "API, scenario matrix and browser CJM for short-like directions requiring futures"
 language: "en"
 context_sources:
@@ -10,6 +10,7 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before implementation edits."
   - "Previous-stage ledger gate: confirm Stage 06 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 07 as blocked unless the user explicitly supersedes the gate in the current turn."
   - "Reject spot short-like backtest and strategy launch paths with short_direction_requires_futures_market."

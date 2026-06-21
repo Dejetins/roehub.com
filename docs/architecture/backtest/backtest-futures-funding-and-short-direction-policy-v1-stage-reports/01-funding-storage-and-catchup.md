@@ -7,7 +7,7 @@ Date: 2026-06-22
 
 Status: blocked on Mac Studio target-runtime proof; local implementation complete.
 
-Branch: `codex/backtest-futures-funding-v1-stage-01`
+Branch: `codex/backtest-futures-funding-v1`
 
 `User required before start: nothing`
 
@@ -54,8 +54,9 @@ Conditional service-call coverage:
   query works, but Stage `01` DDL/query proof against the delivered runtime is
   still pending;
 - scheduler `/metrics`: applicable; Mac Studio `127.0.0.1:9202/metrics` is
-  reachable, but `scheduler_funding_catchup_*` is absent because this Stage
-  `01` branch is not delivered to the Mac Studio checkout/runtime yet;
+  reachable, but `scheduler_funding_catchup_*` is absent because the unified
+  prompt-pack branch containing Stage `01` is not delivered to the Mac Studio
+  checkout/runtime yet;
 - browser/API route evidence: N/A for this stage because no browser-visible API
   or UI contract is changed.
 
@@ -67,10 +68,13 @@ execution ledger before implementation starts.
 Observed ledger state after the acceptance repair:
 
 - Stage `00` status: `accepted`.
-- Stage `00` report status: `accepted, docs-only, remote branch delivered`.
-- Delivery ledger for Stage `00`:
-  `origin/codex/backtest-futures-funding-v1-stage-00@7dc0e726fc6babe8c101369a40a4119d5d23fd03`;
-  runtime boundaries unavailable and N/A for docs-only Stage `00`.
+- Stage `00` report status: `accepted, docs-only baseline evidence`.
+- Delivery ledger for Stage `00`: evidence commit
+  `7dc0e726fc6babe8c101369a40a4119d5d23fd03` is retained in the unified
+  prompt-pack branch history; historical
+  `origin/codex/backtest-futures-funding-v1-stage-00` is superseded and not the
+  branch model for later stages; runtime boundaries unavailable and N/A for
+  docs-only Stage `00`.
 
 Decision: previous-stage gate was satisfied before implementation. Required
 ClickHouse DDL/query, provider REST and Mac Studio scheduler `/metrics` evidence
@@ -263,7 +267,7 @@ Mac Studio target-host boundary:
 - SSH host `macstudio` is reachable; remote hostname reported
   `MacStudioDaniil`.
 - Remote checkout `/Users/daniildegtyarev/Projects/roehub.com` is currently on
-  `main`, not this Stage `01` branch.
+  `main`, not the unified prompt-pack branch containing Stage `01`.
 - ClickHouse HTTP endpoint on Mac Studio is reachable:
   `curl http://127.0.0.1:8123/ping` returned `Ok.`, and
   `SELECT 1 FORMAT TabSeparated` through HTTP stdin returned `1`.
@@ -278,9 +282,9 @@ Superseded diagnostic: earlier Codex-local probes to `127.0.0.1:8123` and
 host, not the Mac Studio target runtime, and are not acceptance evidence.
 
 Decision: Stage `01` is not accepted. It is locally implemented and locally
-tested, but blocked until this branch is delivered to Mac Studio target runtime
-and the Stage `01` DDL/query plus live `scheduler_funding_catchup_*` metrics are
-proven there.
+tested, but blocked until the unified prompt-pack branch is delivered to Mac
+Studio target runtime and the Stage `01` DDL/query plus live
+`scheduler_funding_catchup_*` metrics are proven there.
 
 ## Cold-Head Review Receipt
 

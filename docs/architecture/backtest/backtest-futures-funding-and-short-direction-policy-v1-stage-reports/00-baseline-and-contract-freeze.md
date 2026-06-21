@@ -4,9 +4,9 @@ Docs-only baseline freeze before funding and futures-only short policy implement
 
 Date: 2026-06-22
 
-Status: accepted, docs-only, remote branch delivered.
+Status: accepted, docs-only baseline evidence.
 
-Branch: `codex/backtest-futures-funding-v1-stage-00`
+Branch: `codex/backtest-futures-funding-v1`
 
 `User required before start: nothing`
 
@@ -77,14 +77,19 @@ Startup state:
 
 - `git status --short`: clean before edits.
 - No unrelated dirty files were present.
-- Current branch was created from local `main` as
-  `codex/backtest-futures-funding-v1-stage-00`.
+- Original Stage `00` work was first published on historical branch
+  `codex/backtest-futures-funding-v1-stage-00`. The active prompt-pack branch is
+  now `codex/backtest-futures-funding-v1`; later stages must continue on that
+  branch and use the stage ledger for iteration boundaries.
 
 Delivery state:
 
-- Remote branch:
-  `origin/codex/backtest-futures-funding-v1-stage-00@7dc0e726fc6babe8c101369a40a4119d5d23fd03`.
-- Local branch and remote branch resolve to the same commit SHA.
+- Evidence commit:
+  `7dc0e726fc6babe8c101369a40a4119d5d23fd03`, retained in the unified branch
+  history.
+- Historical remote branch
+  `origin/codex/backtest-futures-funding-v1-stage-00` exists as a superseded
+  artifact and must not be used as the branch model for later stages.
 - Stage 00 remains docs-only: main merge, Mac Studio deploy and runtime smoke
   are not applicable acceptance evidence for this baseline freeze.
 

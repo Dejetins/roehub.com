@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 05 - TP/SL Funding Adjustment"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-05"
+branch: "codex/backtest-futures-funding-v1"
 scope: "Funding-aware TP/SL variants using exact exit semantics"
 language: "en"
 context_sources:
@@ -11,6 +11,7 @@ context_sources:
   - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before implementation edits."
   - "Previous-stage ledger gate: confirm Stage 04 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 05 as blocked unless the user explicitly supersedes the gate in the current turn."
   - "Reuse exact TP/SL exit semantics; do not fork divergent logic."
