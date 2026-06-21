@@ -31,10 +31,12 @@ from validators.common import (  # noqa: E402
 VALIDATOR_MODULES = [
     "validators.secret_redaction_guard",
     "validators.command_safety_guard",
+    "validators.branch_workflow_guard",
     "validators.macstudio_path_guard",
     "validators.remote_payload_quoting_guard",
     "validators.playwright_wrapper_guard",
     "validators.prompt_pack_stage_ledger_linter",
+    "validators.prompt_pack_branch_policy_guard",
     "validators.docs_index_drift_guard",
     "validators.architecture_doc_linter",
     "validators.validation_depth_linter",

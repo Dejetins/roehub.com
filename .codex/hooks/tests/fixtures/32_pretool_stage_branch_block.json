@@ -1,0 +1,15 @@
+{
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git switch -c codex/backtest-futures-funding-v1-stage-02"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "hookSpecificOutput.permissionDecision",
+    "json_value": "deny",
+    "stdout_contains": "Stage-specific prompt-pack branch is forbidden"
+  }
+}
