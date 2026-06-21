@@ -326,31 +326,7 @@ class MarketDataSchedulerApp:
         log.info("scheduler metrics server started on port %s", self._metrics_port)
         await self._rest_fill_queue.start()
 
-        startup_jobs = [
-            SchedulerJob(
-                name="sync_whitelist",
-                interval_seconds=self._config.scheduler.jobs.sync_whitelist.interval_seconds,
-            ),
-            SchedulerJob(
-                name="enrich",
-                interval_seconds=self._config.scheduler.jobs.enrich.interval_seconds,
-            ),
-            SchedulerJob(
-                name="startup_scan",
-                interval_seconds=1,
-            ),
-        ]
-        if (
-            self._funding_job_enabled()
-            and self._config.scheduler.jobs.funding_rate_catchup.startup_bootstrap
-        ):
-            startup_jobs.append(
-                SchedulerJob(
-                    name="funding_rate_catchup",
-                    interval_seconds=1,
-                )
-            )
-        for job in startup_jobs:
+        for job in self._startup_jobs():
             await self._run_once(job)
 
         jobs = [
@@ -385,6 +361,35 @@ class MarketDataSchedulerApp:
         await stop_event.wait()
         await asyncio.gather(*periodic_tasks, return_exceptions=True)
         await self._rest_fill_queue.close()
+
+    def _startup_jobs(self) -> list[SchedulerJob]:
+        jobs = [
+            SchedulerJob(
+                name="sync_whitelist",
+                interval_seconds=self._config.scheduler.jobs.sync_whitelist.interval_seconds,
+            ),
+            SchedulerJob(
+                name="enrich",
+                interval_seconds=self._config.scheduler.jobs.enrich.interval_seconds,
+            ),
+        ]
+        if (
+            self._funding_job_enabled()
+            and self._config.scheduler.jobs.funding_rate_catchup.startup_bootstrap
+        ):
+            jobs.append(
+                SchedulerJob(
+                    name="funding_rate_catchup",
+                    interval_seconds=1,
+                )
+            )
+        jobs.append(
+            SchedulerJob(
+                name="startup_scan",
+                interval_seconds=1,
+            )
+        )
+        return jobs
 
     async def _run_periodic_job(self, job: SchedulerJob, stop_event: asyncio.Event) -> None:
         """

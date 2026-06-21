@@ -39,6 +39,32 @@ def test_funding_metrics_do_not_use_symbol_label() -> None:
         assert "symbol" not in metric._labelnames
 
 
+def test_funding_startup_bootstrap_runs_before_heavy_startup_scan(tmp_path: Path) -> None:
+    app = MarketDataSchedulerApp(
+        config=_config(tmp_path),
+        whitelist_path=str(tmp_path / "whitelist.csv"),
+        seed_use_case=cast(Any, object()),
+        sync_use_case=cast(Any, object()),
+        enrich_use_case=cast(Any, object()),
+        instrument_reader=cast(Any, object()),
+        index_reader=cast(Any, object()),
+        rest_fill_queue=cast(Any, object()),
+        backfill_planner=cast(Any, object()),
+        rest_catchup_use_case=cast(Any, object()),
+        metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+        metrics_port=9202,
+        funding_sync_use_case=cast(Any, object()),
+        funding_catchup_use_case=cast(Any, object()),
+    )
+
+    assert [job.name for job in app._startup_jobs()] == [
+        "sync_whitelist",
+        "enrich",
+        "funding_rate_catchup",
+        "startup_scan",
+    ]
+
+
 def test_funding_job_does_not_refresh_full_universe_every_wake(tmp_path: Path) -> None:
     class _Clock:
         def now(self):
