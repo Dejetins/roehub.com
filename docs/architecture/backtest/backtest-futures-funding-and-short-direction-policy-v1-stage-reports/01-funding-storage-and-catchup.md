@@ -395,9 +395,9 @@ Post-main production runtime proof:
 - Runtime parity checks show the funding store, provider source, scheduler
   wiring and ClickHouse funding DDL files in `/opt/roehub/app` match the
   deployed main checkout.
-- Runtime health checks passed: API auth smoke returned `401`, ClickHouse ping
-  returned `Ok.`, and the scheduler metrics endpoint on `127.0.0.1:9202` is
-  reachable through `ssh macstudio`.
+- Runtime health checks passed: API auth smoke on `/auth/current-user` returned
+  `401`, ClickHouse ping returned `Ok.`, and the scheduler metrics endpoint on
+  `127.0.0.1:9202` is reachable through `ssh macstudio`.
 - Bounded manual production CLI smoke for `market_id=2`, `BTCUSDT`,
   `2026-06-22T00:00:00Z..2026-06-22T09:00:00Z` returned
   `instruments_total=1`, `instruments_due=1`, `instruments_ok=1`,
@@ -419,10 +419,12 @@ Post-main production runtime proof:
   `raw_bybit_count=1960`; canonical market counts are market `2` = `1703` and
   market `4` = `1960`, both covering `2026-06-21 16:00:00.000` through
   `2026-06-22 10:00:00.000`.
-- Fresh scheduler logs after the final deploy contain no new
-  `scheduler job failed: funding_rate_catchup`, `ILLEGAL_AGGREGATION`,
-  `datetime must be timezone-aware`, `Traceback`, `ValueError` or
-  `DatabaseError` entries after the successful `13:31:42` summary line.
+- Fresh scheduler logs after the successful `13:31:42` summary line contain no
+  new `scheduler job failed: funding_rate_catchup`, `ILLEGAL_AGGREGATION`,
+  `datetime must be timezone-aware`, or funding catch-up `ValueError` /
+  `DatabaseError` entries. Later unrelated candle REST-fill tracebacks for
+  Bybit spot `TONUSDT` are present in the same scheduler log and remain outside
+  Stage `01` funding proof.
 
 Superseded diagnostic: earlier Codex-local probes to `127.0.0.1:8123` and
 `127.0.0.1:9202` refused connections, but those probes were against the Codex
