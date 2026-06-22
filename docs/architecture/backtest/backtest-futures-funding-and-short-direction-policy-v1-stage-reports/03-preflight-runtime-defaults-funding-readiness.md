@@ -5,13 +5,12 @@ implementation record.
 
 Date: 2026-06-22
 
-Status: local implementation complete; Mac Studio
-`target_host_readiness_pre_main` is now collected and
-`read_only_existing_runtime_smoke` observed the already deployed runtime health
-and auth boundary. Authenticated Stage `03` route smoke for the changed code is
-not claimed because the local changes have not been committed, delivered to
-`main`, deployed or synced into `/opt/roehub/app`. No
-`post_main_production_runtime_proof` is claimed.
+Status: accepted. Stage `03` changed code is committed on `main` at
+`78646c42b08bb02ed9cedae4556e2f2a6d425ce8`, GitHub CI/deploy workflows are
+green, the Mac Studio checkout is fast-forwarded to that revision, the backend
+bundle is synced into `/opt/roehub/app`, launchd services were reloaded, and
+authenticated Mac Studio route smoke passed for `/backtests/runtime-defaults`
+and `/backtests/preflight`.
 
 Execution branch policy: `main` by default; do not create branches, worktrees or
 local workflow folders unless the user explicitly requests them.
@@ -89,9 +88,10 @@ Deleted:
 
 ## Working Tree Note
 
-The checkout already contained uncommitted Stage `02` files before Stage `03`
-implementation began. Stage `03` changes are scoped to the manifest above and
-do not revert or sweep unrelated local changes.
+The checkout already contained Stage `02` artifact-family files before Stage
+`03` implementation began. Direct-main delivery commit `78646c42` intentionally
+ships that prerequisite artifact scope together with Stage `03`; unrelated
+local changes were not staged.
 
 ## Request Contract
 
@@ -201,15 +201,22 @@ Delivery gate fixes made before publish:
 
 ## Real-Boundary Evidence
 
-Proof-boundary rule for this report:
+Post-main production runtime proof:
 
-- `target_host_readiness_pre_main` can only prove host reachability or current
-  service availability before delivery.
-- `read_only_existing_runtime_smoke` can only observe the already deployed
-  runtime before delivery.
-- `post_main_production_runtime_proof` requires `main`, green
-  `CI/GitHub Actions`, deploy/sync into `/opt/roehub/app`, and then API/runtime
-  smoke from the Mac Studio runtime. This stage has not met those prerequisites.
+- `main` delivery: commit `78646c42b08bb02ed9cedae4556e2f2a6d425ce8`
+  (`Ship futures funding preflight readiness`) was pushed to `origin/main`.
+- GitHub Actions: CI run `27963611975` passed; Deploy Backend run
+  `27963927905`, Publish App Image run `27963927723`, and Deploy Web runs
+  `27963927997`/`27963946189` passed for the same head SHA.
+- Mac Studio checkout: `/Users/daniildegtyarev/Projects/roehub.com` was
+  fast-forwarded from `bf2723dc` to `78646c42` and remained clean.
+- Runtime sync/deploy: `/opt/roehub/app` was updated through the same backend
+  source-bundle path used by `.github/workflows/deploy-backend.yml`; `uv sync
+  --locked`, `bootstrap_native_prod.sh`, `apps.migrations.bootstrap_main` and
+  `reload_launchd_services.sh prod` completed.
+- Baseline runtime smoke: `bash scripts/macos/smoke_prod.sh` passed after the
+  API reload settled; API auth boundary returned expected `401`, metrics,
+  ClickHouse, Redis, Postgres and Tailscale checks passed.
 
 Local API development smoke:
 
@@ -222,7 +229,7 @@ Local API development smoke:
   `unavailable`; degraded returned `['missing_trailing_coverage']`, unavailable
   returned `['no_funding_rows']`.
 
-Target host:
+Target host pre-delivery diagnostics:
 
 - First `target_host_readiness_pre_main` attempt failed with
   `ssh: connect to host 100.74.213.43 port 22: Operation timed out`.
@@ -236,15 +243,25 @@ Target host:
   with `{"status":"ok"}`; `GET /auth/current-user` returned `401` with
   `missing_session_id`; unauthenticated `GET /backtests/runtime-defaults`
   returned `401` with Roehub error code `auth.required`.
-- No authenticated Mac Studio `/backtests/runtime-defaults` or
-  `/backtests/preflight` smoke is claimed for the local Stage `03` changes
-  because those changes have not been committed, delivered, deployed or synced
-  into `/opt/roehub/app`.
-- `post_main_production_runtime_proof` is explicitly not claimed. For this stage
-  family it would require the target revision to be on `main`, relevant GitHub
-  Actions/CI and deploy workflows to be green, the Mac Studio checkout/runtime
-  to be deployed or synced from that `main` revision into `/opt/roehub/app`,
-  and only then API/runtime smoke against Mac Studio loopback.
+Authenticated Mac Studio route smoke after deploy:
+
+- Temporary local Roehub smoke sessions were created through host-local identity
+  storage and revoked after each route check; no cookies, tokens or DSNs were
+  printed.
+- Authenticated `GET /backtests/runtime-defaults` returned `200`; response
+  contained standalone `short`, default funding mode `include_when_futures` and
+  spot `short` rejection code `short_direction_requires_futures_market`.
+- Authenticated `POST /backtests/preflight` for spot/long-only returned `200`;
+  normalized funding mode was `off`, `funding_readiness.status` was
+  `not_applicable`, and `direction_market_compatibility.compatible` was `true`.
+- Authenticated `POST /backtests/preflight` for futures/short returned `200`;
+  normalized funding mode was `include_when_futures`,
+  `direction_market_compatibility.required_market_type` was `futures`, and
+  `funding_readiness.status` was `unavailable`. This is accepted Stage `03`
+  behavior because degraded/unavailable funding readiness is warning metadata,
+  not a preflight hard blocker.
+- Authenticated spot/short negative smoke returned `422` and included
+  `short_direction_requires_futures_market`.
 
 ## Contract Impact
 
@@ -271,34 +288,31 @@ Target host:
 
 Cold-head review: completed
 Mode: cold self-review fallback
-Review scope: Stage `03` report, ledger update plan, runtime-defaults/preflight
-contract, request hash impact, `target_host_readiness_pre_main`,
-`read_only_existing_runtime_smoke`, `post_main_production_runtime_proof`
-boundary labels and validation evidence.
+Review scope: Stage `03` report, ledger update, runtime-defaults/preflight
+contract, request hash impact, delivery proof, Mac Studio `/opt/roehub/app`
+sync, authenticated route smoke and residual-risk wording.
 Review instructions:
 `architecture-review/references/cold-head-plan-prompt-pack-review.md`
 Verdict: Release after fixes
 Blockers fixed: added business-readable impact layer; added conditional
-service-call, logging/redaction and alerts/monitoring sections; separated local
-API smoke from Mac Studio `target_host_readiness_pre_main`,
-`read_only_existing_runtime_smoke` and unavailable authenticated route proof for
-the changed code; documented request hash and persisted-job compatibility.
+service-call, logging/redaction and alerts/monitoring sections; replaced stale
+local-only/blocker wording with post-main production runtime proof; documented
+request hash and persisted-job compatibility; recorded authenticated route smoke
+for runtime defaults, spot/long-only preflight, futures/short funding readiness
+and spot/short rejection.
 Local follow-up check: completed
-Residual risks: Mac Studio host access and unauthenticated runtime health/auth
-boundary are proven, but authenticated Mac Studio route smoke for the changed
-Stage `03` code is still not proven because the changes are local and not
-deployed; standalone `short` is accepted at preflight for futures, while
-funding PnL and UI/browser CJM remain later-stage work.
+Residual risks: production futures artifacts currently report funding readiness
+`unavailable` for the smoke request, which Stage `03` intentionally exposes as
+warning metadata instead of a hard blocker. Standalone `short` is accepted at
+preflight for futures, while funding PnL and UI/browser CJM remain later-stage
+work.
 
 ## Residual Risks
 
-- Mac Studio `target_host_readiness_pre_main` and unauthenticated
-  `read_only_existing_runtime_smoke` are now collected, but authenticated
-  `/backtests/runtime-defaults` and `/backtests/preflight` route smoke for the
-  changed Stage `03` code is still unavailable until the changes are delivered
-  and deployed or another safe authenticated target-smoke path is provided.
-- No `post_main_production_runtime_proof` is claimed because this local change
-  has not been committed, pushed, deployed or synced into `/opt/roehub/app`.
+- Production futures artifacts currently report
+  `funding_readiness.status=unavailable` for the authenticated futures/short
+  smoke request. Stage `03` treats that as non-blocking readiness metadata; the
+  actual funding PnL adjustment is owned by later stages.
 - `short` is now a normalized futures direction in preflight; downstream funding
   PnL, result fields, UI/browser warnings and launch CJM remain owned by later
   stages.
