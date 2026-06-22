@@ -133,8 +133,17 @@ def calculate_no_risk_funding_adjustment(
         event_start = int(np.searchsorted(funding_time_i64, entry_time_ms, side="right"))
         event_stop = int(np.searchsorted(funding_time_i64, exit_time_ms, side="right"))
         for event_idx in range(event_start, event_stop):
+            event_time_ms = int(funding_time_i64[event_idx])
             rate = float(funding_rate_f64[event_idx])
-            price = float(mark_price_f64[event_idx])
+            price, mark_price_fallback_used = _funding_event_mark_price(
+                event_time_ms=event_time_ms,
+                mark_price=float(mark_price_f64[event_idx]),
+                execution_close_1m=execution_close_1m,
+                execution_close_time_1m=execution_close_time_1m,
+                t_exec=t_exec,
+            )
+            if mark_price_fallback_used:
+                warnings.add("funding_mark_price_fallback_used")
             if not (math.isfinite(rate) and math.isfinite(price)) or price <= 0.0:
                 warnings.add("invalid_funding_event_values")
                 continue
@@ -162,7 +171,10 @@ def calculate_no_risk_funding_adjustment(
         equity = available_quote + safe_quote
 
     quality = funding_data_quality
-    if "funding_event_data_quality_degraded" in warnings:
+    if (
+        "funding_event_data_quality_degraded" in warnings
+        or "funding_mark_price_fallback_used" in warnings
+    ):
         quality = "degraded"
     return NoRiskFundingAdjustmentSummary(
         funding_pnl_quote=funding_pnl_quote,
@@ -170,6 +182,29 @@ def calculate_no_risk_funding_adjustment(
         funding_data_quality=quality,
         funding_warning_codes=tuple(sorted(warnings)),
     )
+
+
+def _funding_event_mark_price(
+    *,
+    event_time_ms: int,
+    mark_price: float,
+    execution_close_1m: np.ndarray,
+    execution_close_time_1m: np.ndarray,
+    t_exec: int,
+) -> tuple[float, bool]:
+    if math.isfinite(mark_price) and mark_price > 0.0:
+        return mark_price, False
+
+    close_time = np.asarray(execution_close_time_1m, dtype=np.int64)[:t_exec]
+    if int(close_time.size) == 0:
+        return mark_price, False
+    fallback_idx = int(np.searchsorted(close_time, event_time_ms, side="right")) - 1
+    if fallback_idx < 0:
+        return mark_price, False
+    fallback_price = float(execution_close_1m[fallback_idx])
+    if not math.isfinite(fallback_price) or fallback_price <= 0.0:
+        return mark_price, False
+    return fallback_price, True
 
 
 __all__ = [

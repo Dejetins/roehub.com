@@ -253,6 +253,46 @@ def test_no_risk_funding_formula_applies_positive_rate_against_longs_and_for_sho
     )[FUNDING_RETURN_PCT] == pytest.approx(-1.0)
 
 
+def test_no_risk_funding_formula_falls_back_to_execution_close_for_missing_mark_price() -> None:
+    request = _normalized_request(
+        market_type="futures",
+        funding_mode="include_when_futures",
+        initial_cash_quote=10_000.0,
+        sizing={"mode": "fixed_quote", "quote_amount": 10_000.0},
+    )
+    settings = execution_settings_from_normalized(
+        request,
+        expected_direction_mode="long_short_reversal",
+        config=BacktestNoRiskExactConfig(),
+        rejection_cls=BacktestNoRiskExactRejected,
+    )
+
+    summary = calculate_no_risk_funding_adjustment(
+        entry_exec_idx=np.asarray([0], dtype=np.int32),
+        dir_arr=np.asarray([1], dtype=np.int8),
+        sig_exit_exec_idx=np.asarray([3], dtype=np.int32),
+        execution_open_1m=np.asarray([100.0, 100.0, 100.0, 100.0], dtype=np.float32),
+        execution_close_1m=np.asarray([120.0, 100.0, 100.0, 100.0], dtype=np.float32),
+        execution_open_time_1m=np.asarray([0, 60_000, 120_000, 180_000], dtype=np.int64),
+        execution_close_time_1m=np.asarray(
+            [59_999, 119_999, 179_999, 239_999],
+            dtype=np.int64,
+        ),
+        funding_time=np.asarray([60_000], dtype=np.int64),
+        funding_rate=np.asarray([0.01], dtype=np.float64),
+        mark_price=np.asarray([np.nan], dtype=np.float64),
+        data_quality=np.asarray([1], dtype=np.uint8),
+        execution_settings=settings,
+        t_exec=4,
+        funding_data_quality="ready",
+    )
+
+    assert summary.funding_pnl_quote == pytest.approx(-120.0)
+    assert summary.funding_events_count == 1
+    assert summary.funding_data_quality == "degraded"
+    assert summary.funding_warning_codes == ("funding_mark_price_fallback_used",)
+
+
 def test_no_risk_funding_uses_bounded_candidate_pool_and_reranks_by_net(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
