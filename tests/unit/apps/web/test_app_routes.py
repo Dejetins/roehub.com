@@ -722,7 +722,10 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert "ready_for_trading" in backtests_js
     assert "launchDirectionValue" in backtests_js
     assert "long_short_reversal" in backtests_js
-    assert "testnet_spot_short_blocked" in backtests_js
+    assert "short_direction_requires_futures_market" in backtests_js
+    assert "launchShortPolicyBlockReason" in backtests_js
+    assert "rerunLaunchAsFutures" in backtests_js
+    assert "total_return_pct_net_of_funding" in backtests_js
     assert f'data-initial-job-id="{job_id}"' in detail_response.text
 
 

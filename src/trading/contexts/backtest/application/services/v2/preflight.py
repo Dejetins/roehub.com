@@ -39,6 +39,11 @@ from trading.contexts.indicators.domain.specifications.grid_param_spec import (
     GridParamSpec,
     GridValue,
 )
+from trading.shared_kernel.direction_policy import (
+    SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    SHORT_LIKE_DIRECTIONS,
+    short_direction_requires_futures_market,
+)
 
 SUPPORTED_BACKTEST_TIMEFRAMES_V1: tuple[str, ...] = ARTIFACT_MAPPING_TIMEFRAMES_V2
 BACKTEST_RISK_MODES_V1: tuple[str, ...] = ("none", "tp_sl_grid")
@@ -47,12 +52,10 @@ BACKTEST_DIRECTION_MODES_V1: tuple[str, ...] = (
     "short",
     "long_short_reversal",
 )
-BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1 = frozenset({"short", "long_short_reversal"})
+BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1 = SHORT_LIKE_DIRECTIONS
 BACKTEST_FUNDING_MODES_V1: tuple[str, ...] = ("include_when_futures", "off")
 BACKTEST_FUNDING_COVERAGE_POLICIES_V1: tuple[str, ...] = ("degraded_with_warning",)
-BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET = (
-    "short_direction_requires_futures_market"
-)
+BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET = SHORT_DIRECTION_REQUIRES_FUTURES_MARKET
 BACKTEST_SIZING_MODES_V1: tuple[str, ...] = (
     "all_in",
     "fixed_quote",
@@ -1082,9 +1085,9 @@ def _validate_direction_market_compatibility(
 
 
 def _is_direction_market_compatible(*, market_type: str, direction_mode: str) -> bool:
-    return not (
-        market_type != "futures"
-        and direction_mode in BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1
+    return not short_direction_requires_futures_market(
+        market_type=market_type,
+        direction=direction_mode,
     )
 
 

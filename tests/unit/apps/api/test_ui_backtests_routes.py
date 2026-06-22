@@ -61,7 +61,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert "preset" not in payload["config_draft"]
     assert payload["config_draft"]["top_n"] == 10
     assert payload["config_draft"]["timeframe"] == "1h"
-    assert payload["config_draft"]["execution"]["direction_mode"] == "long_short_reversal"
+    assert payload["config_draft"]["execution"]["direction_mode"] == "long_only"
     assert payload["config_draft"]["execution"]["sizing"] == {"mode": "all_in"}
     assert payload["instrument_universe"]["source"] == "market_data_reference"
     assert payload["instrument_universe"]["markets"] == [

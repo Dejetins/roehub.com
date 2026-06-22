@@ -28,6 +28,10 @@ from trading.contexts.strategy.domain.entities import (
     StrategySpecV1,
 )
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.direction_policy import (
+    SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    short_direction_requires_futures_market,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +90,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                 job_id=job_id,
                 variant_key=variant_key,
             )
+            _validate_snapshot_short_policy(snapshot=snapshot)
             _validate_launch_config_matches_snapshot(
                 launch_config=launch_config,
                 snapshot=snapshot,
@@ -358,6 +363,27 @@ def _validate_launch_config_matches_snapshot(
                     "actual": actual_value,
                 },
             )
+
+
+def _validate_snapshot_short_policy(*, snapshot: BacktestVariantLaunchSnapshot) -> None:
+    market_type = snapshot.market_type.strip().lower()
+    direction = _launch_direction_from_snapshot(snapshot=snapshot)
+    if not short_direction_requires_futures_market(
+        market_type=market_type,
+        direction=direction,
+    ):
+        return
+    raise _variant_launch_error(
+        code="strategy_launch.invalid_config",
+        message="Short-like backtest variants require market_type=futures before launch",
+        reason=SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+        details={
+            "field": "market_type",
+            "required_market_type": "futures",
+            "actual_market_type": market_type,
+            "direction": direction,
+        },
+    )
 
 
 def _launch_direction_from_snapshot(*, snapshot: BacktestVariantLaunchSnapshot) -> str:

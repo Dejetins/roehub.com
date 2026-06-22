@@ -15,6 +15,7 @@ const DEFAULT_RESULT_POINTS = 600;
 const DEFAULT_TRADES_PAGE_SIZE = 100;
 const MAX_TRADES_DETAIL_PAGES = 100;
 const RESULT_SPINNER_DOT_COUNT = 16;
+const SHORT_DIRECTION_REQUIRES_FUTURES_MARKET = "short_direction_requires_futures_market";
 const DEFAULT_TP_START_PCT = 5;
 const DEFAULT_TP_STOP_PCT = 30;
 const DEFAULT_SL_START_PCT = 5;
@@ -34,7 +35,7 @@ const state = {
   market_type: "spot",
   symbol: "BTCUSDT",
   timeframe: "1h",
-  direction: "long_short_reversal",
+  direction: "long_only",
   risk_mode: "none",
   risk_tp_enabled: true,
   risk_sl_enabled: true,
@@ -635,12 +636,18 @@ function strategyRiskPart(root) {
 }
 
 function directionSlug(value) {
+  if (value === "short") {
+    return "short";
+  }
   return value === "long_only" ? "long" : "long-short";
 }
 
 function directionLabel(value) {
   if (value === "long_short_reversal") {
     return t("backtests.option.long_short");
+  }
+  if (value === "short") {
+    return t("backtests.option.short");
   }
   if (value === "long_only") {
     return t("backtests.option.long_only");
@@ -801,7 +808,13 @@ function setDropdownValue(root, name, value, { label = "", validateOptions = fal
   return true;
 }
 
-function updateOptionSelection(root, name, value, label, { refresh = true } = {}) {
+function updateOptionSelection(
+  root,
+  name,
+  value,
+  label,
+  { refresh = true, enforcePolicy = true } = {},
+) {
   state[name] = value;
   qsa(`[data-backtest-option='${name}']`, root).forEach((option) => {
     option.setAttribute("aria-selected", option.dataset.value === value ? "true" : "false");
@@ -809,6 +822,9 @@ function updateOptionSelection(root, name, value, label, { refresh = true } = {}
   qsa(`[data-current-value='${name}']`, root).forEach((current) => {
     current.textContent = label || value || t("backtests.results.all");
   });
+  if (enforcePolicy && ["direction", "market_type"].includes(name)) {
+    applyDirectionMarketCompatibility(root, name);
+  }
   if (refresh && ["job_state", "job_exchange", "job_market_type"].includes(name)) {
     refreshWorkstation(root, "manual").catch(() => {});
   }
@@ -824,6 +840,74 @@ function updateOptionSelection(root, name, value, label, { refresh = true } = {}
     updateSizingPanel(root);
   }
   renderConfigSummary(root);
+}
+
+function directionMarketCompatibilityPolicy() {
+  return state.runtimeDefaults?.runtime_defaults?.direction_market_compatibility || {};
+}
+
+function directionMarketPolicyFor(marketType) {
+  return directionMarketCompatibilityPolicy()?.markets?.[marketType] || {};
+}
+
+function rejectedDirectionReason(marketType, direction) {
+  const rejected = directionMarketPolicyFor(marketType).rejected_direction_modes || {};
+  return rejected[direction] || "";
+}
+
+function requiredMarketForDirection(direction) {
+  const shortLike = directionMarketCompatibilityPolicy()?.short_like_direction_modes || [];
+  return shortLike.includes(direction) ? "futures" : "";
+}
+
+function firstAllowedDirection(marketType) {
+  const allowed = directionMarketPolicyFor(marketType).allowed_direction_modes || [];
+  return allowed[0] || "long_only";
+}
+
+function policyReasonText(reason) {
+  if (reason === SHORT_DIRECTION_REQUIRES_FUTURES_MARKET) {
+    return t("backtests.policy.short_direction_requires_futures_market");
+  }
+  return labelForId(reason || "blocked");
+}
+
+function applyDirectionMarketCompatibility(root, changedName) {
+  const reason = rejectedDirectionReason(state.market_type, state.direction);
+  if (!reason) {
+    return false;
+  }
+  const requiredMarket = requiredMarketForDirection(state.direction);
+  if (
+    changedName === "direction" &&
+    requiredMarket === "futures" &&
+    hasDropdownOption(root, "market_type", "futures")
+  ) {
+    updateOptionSelection(
+      root,
+      "market_type",
+      "futures",
+      optionLabelForValue(root, "market_type", "futures"),
+      { refresh: false, enforcePolicy: false },
+    );
+    state.symbol = "";
+    state.selectedSymbols = new Set();
+    setText("[data-create-status]", policyReasonText(reason), root);
+    refreshWorkstation(root, "auto").catch(() => {});
+    return true;
+  }
+  const fallbackDirection = firstAllowedDirection(state.market_type);
+  if (fallbackDirection && fallbackDirection !== state.direction) {
+    updateOptionSelection(
+      root,
+      "direction",
+      fallbackDirection,
+      optionLabelForValue(root, "direction", fallbackDirection),
+      { refresh: false, enforcePolicy: false },
+    );
+  }
+  setText("[data-create-status]", policyReasonText(reason), root);
+  return false;
 }
 
 function initialWorkspaceView(root) {
@@ -921,7 +1005,7 @@ function renderRuntimeControls(root, data) {
   )));
   renderDropdownOptions(root, "direction", (runtime.direction_modes || []).map((value) => ({
     value,
-    label: value === "long_only" ? t("backtests.option.long_only") : t("backtests.option.long_short"),
+    label: directionLabel(value),
   })));
   renderDropdownOptions(root, "risk_mode", (runtime.risk_modes || []).map((value) => ({
     value,
@@ -1499,7 +1583,7 @@ function renderVariantExpansion(root, row, { closing = false } = {}) {
     : "";
   const body = variants.length
     ? variants.map((variant) => renderVariantRow(root, row.job_id, variant)).join("")
-    : `<tr><td colspan="10">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : variantEmptyText(row, summary))}</td></tr>`;
+    : `<tr><td colspan="11">${escapeHtml(activeResultRequest ? t("backtests.variants.loading") : variantEmptyText(row, summary))}</td></tr>`;
   return `
     <tr class="backtests-variant-expansion">
       <td class="backtests-variant-cell" colspan="9">
@@ -1516,7 +1600,8 @@ function renderVariantExpansion(root, row, { closing = false } = {}) {
                     <th>${escapeHtml(t("backtests.variants.rank"))}</th>
                     <th>${escapeHtml(t("backtests.variants.variant"))}</th>
                     <th>${escapeHtml(t("backtests.variants.params"))}</th>
-                    <th>${escapeHtml(t("backtests.results.return"))}</th>
+                    <th>${escapeHtml(t("backtests.results.return_gross"))}</th>
+                    <th>${escapeHtml(t("backtests.results.return_net_funding"))}</th>
                     <th>${escapeHtml(t("backtests.results.sharpe"))}</th>
                     <th>${escapeHtml(t("backtests.results.drawdown"))}</th>
                     <th>${escapeHtml(t("backtests.results.profit_factor"))}</th>
@@ -1660,12 +1745,14 @@ function renderVariantRow(root, jobId, variant) {
   const href = `${variantBaseEndpoint(root, jobId, variant.variant_key)}/trades.csv`;
   const maxDrawdown = metrics.max_drawdown_pct ?? metrics.avg_drawdown_pct;
   const trades = metrics.trade_count ?? metrics.trades_count;
+  const netReturn = metrics.total_return_pct_net_of_funding;
   return `
     <tr class="${selected ? "is-selected" : ""}" data-result-variant-key="${escapeHtml(variant.variant_key)}" tabindex="0">
       <td>#${numberOrDash(variant.rank)}</td>
       <td>${escapeHtml(compactId(variant.variant_key))}</td>
       <td class="backtests-variant-params">${escapeHtml(formatVariantParams(variant))}</td>
       <td class="${financialClass(metrics.total_return_pct)}">${percent(metrics.total_return_pct)}</td>
+      <td class="${financialClass(netReturn)}">${percent(netReturn)}</td>
       <td class="${financialClass(metrics.sharpe)}">${numberOrDash(metrics.sharpe)}</td>
       <td class="rh-financial--negative">${signedDrawdownPercent(maxDrawdown)}</td>
       <td>${decimalOrDash(metrics.profit_factor, 3)}</td>
@@ -1701,6 +1788,10 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
   const csvHref = variantEndpoint(root, "csv", jobId, variantKey);
   const readiness = compatibilityMetric(details?.compatibility);
   const feed = marketDataMetric(details?.compatibility);
+  const detailVariant = details?.variant || variant;
+  const metrics = detailVariant?.summary_metrics || variant?.summary_metrics || {};
+  const funding = detailVariant?.funding || variant?.funding || {};
+  const fundingState = fundingMetric(funding, metrics);
   return `
     <section class="backtests-result-detail" data-result-state="${escapeHtml(stateName)}" data-selected-result-variant="${escapeHtml(variantKey)}">
       <header class="backtests-result-detail__heading">
@@ -1715,10 +1806,12 @@ function renderSelectedVariantDetail(root, jobId, summaryVariants) {
         </div>
       </header>
       <div class="backtests-result-metrics">
-        ${renderResultMetric(t("backtests.results.return"), percent(variant?.summary_metrics?.total_return_pct), financialClass(variant?.summary_metrics?.total_return_pct))}
-        ${renderResultMetric(t("backtests.results.sharpe"), numberOrDash(variant?.summary_metrics?.sharpe), financialClass(variant?.summary_metrics?.sharpe))}
-        ${renderResultMetric(t("backtests.results.drawdown"), signedDrawdownPercent(variant?.summary_metrics?.max_drawdown_pct ?? variant?.summary_metrics?.avg_drawdown_pct), "rh-financial--negative")}
-        ${renderResultMetric(t("backtests.results.trades"), integerOrDash(variant?.summary_metrics?.trade_count ?? variant?.summary_metrics?.trades_count), "")}
+        ${renderResultMetric(t("backtests.results.return_gross"), percent(metrics.total_return_pct), financialClass(metrics.total_return_pct))}
+        ${renderResultMetric(t("backtests.results.return_net_funding"), percent(metrics.total_return_pct_net_of_funding), financialClass(metrics.total_return_pct_net_of_funding))}
+        ${renderResultMetric(t("backtests.results.sharpe"), numberOrDash(metrics.sharpe), financialClass(metrics.sharpe))}
+        ${renderResultMetric(t("backtests.results.drawdown"), signedDrawdownPercent(metrics.max_drawdown_pct ?? metrics.avg_drawdown_pct), "rh-financial--negative")}
+        ${renderResultMetric(t("backtests.results.trades"), integerOrDash(metrics.trade_count ?? metrics.trades_count), "")}
+        ${fundingState ? renderResultMetric(t("backtests.result_detail.funding"), fundingState.label, fundingState.className, fundingState.detail) : ""}
         ${renderResultMetric(t("backtests.strategy_create.readiness"), readiness.label, readiness.className, readiness.detail)}
         ${renderResultMetric(t("backtests.strategy_create.feed"), feed.label, feed.className, feed.detail)}
       </div>
@@ -1742,6 +1835,7 @@ function renderResultMetric(label, value, className, detail = "") {
     <div>
       <span>${escapeHtml(label)}</span>
       <strong class="${escapeHtml(className)}" title="${escapeHtml(detail)}">${escapeHtml(value)}</strong>
+      ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
     </div>
   `;
 }
@@ -1814,6 +1908,40 @@ function marketDataMetric(compatibility) {
     label: t("backtests.strategy_create.feed_not_ready"),
     className: "rh-financial--neutral",
     detail: reasons.join("; "),
+  };
+}
+
+function fundingMetric(funding, metrics) {
+  const hasFundingMetrics = Number.isFinite(Number(metrics?.total_return_pct_net_of_funding));
+  if (!funding?.included && !hasFundingMetrics) {
+    return null;
+  }
+  const warnings = Array.isArray(funding?.warning_codes) ? funding.warning_codes : [];
+  const dataQuality = String(funding?.data_quality || "").trim().toLowerCase();
+  const eventStatus = String(funding?.funding_events_status || "").trim().toLowerCase();
+  const detail = [
+    dataQuality,
+    eventStatus && eventStatus !== dataQuality ? eventStatus : "",
+    ...warnings,
+  ].filter(Boolean).join("; ");
+  if (warnings.length || dataQuality === "degraded" || eventStatus === "degraded") {
+    return {
+      label: t("backtests.result_detail.funding_degraded"),
+      className: "rh-financial--neutral",
+      detail,
+    };
+  }
+  if (dataQuality === "unavailable" || eventStatus === "unavailable") {
+    return {
+      label: t("backtests.result_detail.funding_unavailable"),
+      className: "rh-financial--neutral",
+      detail,
+    };
+  }
+  return {
+    label: t("backtests.result_detail.funding_included"),
+    className: "rh-financial--positive",
+    detail,
   };
 }
 
@@ -3063,18 +3191,11 @@ function renderLaunchDerivedFields(dialog) {
   setText("[data-strategy-launch-display='direction']", launchDirectionLabel(direction), dialog);
 }
 
-function launchTestnetBlockReason(dialog) {
-  const mode = launchFieldValue(dialog, "mode") || "paper";
+function launchShortPolicyBlockReason(dialog) {
   const marketType = launchFieldValue(dialog, "market_type") || "spot";
   const direction = launchFieldValue(dialog, "direction") || "long";
-  if (
-    mode === "testnet" &&
-    marketType === "spot" &&
-    (direction === "short" || direction === "long_short_reversal")
-  ) {
-    return t("backtests.strategy_create.testnet_spot_short_blocked");
-  }
-  return "";
+  const reason = rejectedDirectionReason(marketType, direction);
+  return reason ? policyReasonText(reason) : "";
 }
 
 function launchConnectionTail(item) {
@@ -3148,7 +3269,7 @@ function renderLaunchConnectionSelect(dialog) {
     }
     return;
   }
-  const blockReason = launchTestnetBlockReason(dialog);
+  const blockReason = launchShortPolicyBlockReason(dialog);
   if (blockReason) {
     const option = document.createElement("option");
     option.value = "";
@@ -3230,10 +3351,17 @@ function updateStrategyLaunchConfirmState(dialog) {
   if (!(confirm instanceof HTMLButtonElement)) {
     return;
   }
+  const root = dialog.closest("[data-backtests-root]");
+  const shortPolicyBlockReason = launchShortPolicyBlockReason(dialog);
+  if (shortPolicyBlockReason) {
+    confirm.textContent = t("backtests.strategy_create.rerun_futures");
+    confirm.disabled = !(root instanceof HTMLElement) || !hasDropdownOption(root, "market_type", "futures");
+    return;
+  }
+  confirm.textContent = t("backtests.strategy_create.confirm");
   const mode = launchFieldValue(dialog, "mode") || "paper";
   const needsConnection = mode === "testnet";
-  confirm.disabled = Boolean(launchTestnetBlockReason(dialog)) ||
-    (needsConnection && !launchFieldValue(dialog, "exchange_connection_id"));
+  confirm.disabled = needsConnection && !launchFieldValue(dialog, "exchange_connection_id");
 }
 
 async function ensureLaunchExchangeConnections(root, dialog) {
@@ -3287,13 +3415,13 @@ function openCreateStrategyDialog(root, jobId, variantKey, trigger) {
     t("backtests.strategy_create.body", { variant: compactId(variantKey) }),
     dialog
   );
-  resetStrategyLaunchForm(dialog);
   setText("[data-strategy-create-status]", "", dialog);
   const confirm = qs("[data-strategy-create-confirm]", dialog);
   if (confirm instanceof HTMLButtonElement) {
     confirm.disabled = false;
     confirm.textContent = t("backtests.strategy_create.confirm");
   }
+  resetStrategyLaunchForm(dialog);
   dialog.hidden = false;
   dialog.setAttribute("aria-hidden", "false");
   confirm?.focus();
@@ -3335,11 +3463,11 @@ function updateStrategyLaunchForm(dialog) {
   if (mode === "testnet") {
     renderLaunchConnectionSelect(dialog);
     const root = dialog.closest("[data-backtests-root]");
-    if (root instanceof HTMLElement && !launchTestnetBlockReason(dialog)) {
+    if (root instanceof HTMLElement && !launchShortPolicyBlockReason(dialog)) {
       ensureLaunchExchangeConnections(root, dialog).catch(() => {});
     }
   }
-  setText("[data-strategy-create-status]", launchTestnetBlockReason(dialog), dialog);
+  setText("[data-strategy-create-status]", launchShortPolicyBlockReason(dialog), dialog);
   updateStrategyLaunchConfirmState(dialog);
 }
 
@@ -3375,10 +3503,9 @@ async function confirmCreateStrategyDialog(root) {
   if (!dialog || !pending) {
     return;
   }
-  const testnetBlockReason = launchTestnetBlockReason(dialog);
-  if (testnetBlockReason) {
-    setText("[data-strategy-create-status]", testnetBlockReason, dialog);
-    updateStrategyLaunchConfirmState(dialog);
+  const shortPolicyBlockReason = launchShortPolicyBlockReason(dialog);
+  if (shortPolicyBlockReason) {
+    rerunLaunchAsFutures(root, dialog);
     return;
   }
   if (
@@ -3416,6 +3543,21 @@ async function confirmCreateStrategyDialog(root) {
   );
   closeCreateStrategyDialog(root, { restoreFocus: false });
   window.location.href = "/strategies";
+}
+
+function rerunLaunchAsFutures(root, dialog) {
+  const direction = launchFieldValue(dialog, "direction") || "long_short_reversal";
+  setDropdownValue(root, "market_type", "futures", {
+    label: optionLabelForValue(root, "market_type", "futures"),
+    refresh: true,
+  });
+  setDropdownValue(root, "direction", direction, {
+    label: optionLabelForValue(root, "direction", direction),
+    refresh: false,
+  });
+  setWorkspaceView(root, "configure");
+  setText("[data-create-status]", t("backtests.strategy_create.rerun_futures_status"), root);
+  closeCreateStrategyDialog(root, { restoreFocus: false });
 }
 
 async function createStrategyFromVariant(root) {

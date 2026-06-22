@@ -612,6 +612,18 @@ def _build_config_draft(
     )
     supported_timeframes = runtime_defaults.get("supported_timeframes")
     direction_modes = runtime_defaults.get("direction_modes")
+    market_type = str(
+        (coordinates or {}).get("market_type") or "spot"
+    ).strip().casefold()
+    direction_mode = (
+        _preferred(
+            direction_modes,
+            preferred="long_short_reversal",
+            default="long_short_reversal",
+        )
+        if market_type == "futures"
+        else _preferred(direction_modes, preferred="long_only", default="long_only")
+    )
     return BacktestConfigDraftResponse(
         coordinates=dict(
             coordinates
@@ -627,11 +639,7 @@ def _build_config_draft(
         ),
         risk={"mode": _first(runtime_defaults.get("risk_modes"), default="none")},
         execution={
-            "direction_mode": _preferred(
-                direction_modes,
-                preferred="long_short_reversal",
-                default="long_short_reversal",
-            ),
+            "direction_mode": direction_mode,
             "fee_rate": execution_defaults.get("fee_rate", 0.00075),
             "slippage_rate": execution_defaults.get("slippage_rate", 0.0001),
             "initial_cash_quote": execution_defaults.get("initial_cash_quote", 10000.0),

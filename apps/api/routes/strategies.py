@@ -67,6 +67,10 @@ from trading.contexts.strategy.application.use_cases import (
 )
 from trading.contexts.strategy.domain.entities import LiveStrategyProfile, Strategy, StrategyRun
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.direction_policy import (
+    SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    short_direction_requires_futures_market,
+)
 
 CurrentUserProviderDependency = Callable[[Request], CurrentUserProvider]
 CurrentUserPrincipalDependency = Callable[[Request], CurrentUserPrincipal]
@@ -1388,19 +1392,18 @@ def _validated_backtest_variant_launch_config(
         raise _strategy_launch_validation_error(reason="invalid_risk_mode", field="risk_mode")
     if direction not in _ALLOWED_LAUNCH_DIRECTIONS:
         raise _strategy_launch_validation_error(reason="invalid_direction", field="direction")
+    if short_direction_requires_futures_market(
+        market_type=market_type,
+        direction=direction,
+    ):
+        raise _strategy_launch_validation_error(
+            reason=SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+            field="market_type",
+        )
     if mode == "testnet" and payload.exchange_connection_id is None:
         raise _strategy_launch_validation_error(
             reason="exchange_connection_required",
             field="exchange_connection_id",
-        )
-    if (
-        mode == "testnet" and
-        market_type == "spot" and
-        direction in {"short", "long_short_reversal"}
-    ):
-        raise _strategy_launch_validation_error(
-            reason="spot_short_not_supported",
-            field="direction",
         )
     if payload.capital_allocation_usd < _MIN_BTCUSDT_NOTIONAL_USD:
         raise _strategy_launch_validation_error(

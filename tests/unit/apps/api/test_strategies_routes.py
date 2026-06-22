@@ -641,7 +641,7 @@ def test_launch_from_backtest_variant_preserves_long_short_direction_mode() -> N
             "job_id": "00000000-0000-0000-0000-00000000b001",
             "variant_key": "job_demo",
             "mode": "paper",
-            "market_type": "spot",
+            "market_type": "futures",
             "symbol": "BTCUSDT",
             "capital_allocation_usd": "50",
             "entry_sizing": "fixed_quote",
@@ -654,6 +654,35 @@ def test_launch_from_backtest_variant_preserves_long_short_direction_mode() -> N
     payload = launched.json()
     assert payload["run"]["metadata"]["launch_config"]["direction"] == "long_short_reversal"
     assert payload["profile"]["readiness_reason"] == "paper_no_exchange_submit"
+
+
+def test_launch_from_backtest_variant_blocks_paper_spot_long_short() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    response = client.post(
+        "/strategies/launch-from-backtest-variant",
+        headers={
+            "x-user-id": "00000000-0000-0000-0000-000000000205",
+            "Idempotency-Key": "launch-paper-spot-long-short",
+        },
+        json={
+            "job_id": "00000000-0000-0000-0000-00000000b001",
+            "variant_key": "job_demo",
+            "mode": "paper",
+            "market_type": "spot",
+            "symbol": "BTCUSDT",
+            "capital_allocation_usd": "50",
+            "entry_sizing": "fixed_quote",
+            "risk_mode": "single_position_cap",
+            "direction": "long_short_reversal",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
+    assert (
+        response.json()["error"]["details"]["reason"]
+        == "short_direction_requires_futures_market"
+    )
 
 
 def test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order() -> None:
@@ -801,7 +830,10 @@ def test_launch_from_backtest_variant_blocks_testnet_spot_long_short() -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
-    assert response.json()["error"]["details"]["reason"] == "spot_short_not_supported"
+    assert (
+        response.json()["error"]["details"]["reason"]
+        == "short_direction_requires_futures_market"
+    )
 
 
 def test_launch_from_backtest_variant_blocks_unsafe_testnet_futures_short() -> None:

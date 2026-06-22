@@ -249,7 +249,7 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
         launch_config={
             "mode": "paper",
             "entry_sizing": "fixed_quote",
-            "direction": "long_short_reversal",
+            "direction": "long",
         },
     )
     second = use_case.execute(
@@ -260,7 +260,7 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
         launch_config={
             "mode": "paper",
             "entry_sizing": "fixed_equity_pct",
-            "direction": "long_short_reversal",
+            "direction": "long",
         },
     )
 
@@ -276,7 +276,13 @@ def test_create_strategy_from_backtest_variant_rejects_direction_override() -> N
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000128")
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
-        variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
+        variant_reader=_StaticBacktestVariantReader(
+            snapshot=_launch_snapshot(
+                current_user,
+                market_type="futures",
+                direction_mode="long_short_reversal",
+            )
+        ),
         strategy_repository=strategy_repository,
         provenance_repository=InMemoryStrategyBacktestVariantProvenanceRepository(
             strategy_repository=strategy_repository,
@@ -292,7 +298,7 @@ def test_create_strategy_from_backtest_variant_rejects_direction_override() -> N
             idempotency_key="launch-direction-mismatch",
             launch_config={
                 "mode": "paper",
-                "market_type": "spot",
+                "market_type": "futures",
                 "symbol": "BTCUSDT",
                 "entry_sizing": "fixed_quote",
                 "direction": "long",
@@ -302,6 +308,44 @@ def test_create_strategy_from_backtest_variant_rejects_direction_override() -> N
     assert exc_info.value.code == "strategy_launch.invalid_config"
     assert exc_info.value.details is not None
     assert exc_info.value.details["reason"] == "direction_mismatch"
+    assert not strategy_repository.list_for_user(user_id=current_user.user_id)
+
+
+def test_create_strategy_from_backtest_variant_rejects_spot_short_like_snapshot() -> None:
+    strategy_repository = InMemoryStrategyRepository()
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000129")
+    )
+    use_case = CreateStrategyFromBacktestVariantUseCase(
+        variant_reader=_StaticBacktestVariantReader(
+            snapshot=_launch_snapshot(
+                current_user,
+                market_type="spot",
+                direction_mode="long_short_reversal",
+            )
+        ),
+        strategy_repository=strategy_repository,
+        provenance_repository=InMemoryStrategyBacktestVariantProvenanceRepository(
+            strategy_repository=strategy_repository,
+        ),
+        clock=_SequenceClock(values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)),
+    )
+
+    with pytest.raises(RoehubError) as exc_info:
+        use_case.execute(
+            current_user=current_user,
+            job_id=UUID("00000000-0000-0000-0000-00000000b001"),
+            variant_key="job_demo__dema_close_w5__vh_aaaaaaaa",
+            idempotency_key="launch-spot-short-like",
+        )
+
+    assert exc_info.value.code == "strategy_launch.invalid_config"
+    assert exc_info.value.details is not None
+    assert (
+        exc_info.value.details["reason"]
+        == "short_direction_requires_futures_market"
+    )
+    assert exc_info.value.details["field"] == "market_type"
     assert not strategy_repository.list_for_user(user_id=current_user.user_id)
 
 
@@ -687,7 +731,7 @@ def test_compatibility_readiness_reports_degraded_and_ready_feed_for_rollup() ->
     assert report.launch_blocked is False
 
 
-def test_scenario_matrix_derives_spot_rows_and_blocks_testnet_spot_short() -> None:
+def test_scenario_matrix_derives_spot_rows_and_blocks_short_like_spot() -> None:
     current_user = CurrentUser(
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000408")
     )
@@ -742,10 +786,11 @@ def test_scenario_matrix_derives_spot_rows_and_blocks_testnet_spot_short() -> No
         entry_sizing="fixed_quote",
         direction="short",
     )
-    assert paper_short.scenario_state == "launchable"
-    assert paper_short.order_capability == "paper_only"
+    assert paper_short.scenario_state == "blocked"
+    assert paper_short.launch_blocked_reason == "short_direction_requires_futures_market"
+    assert paper_short.order_capability == "unsupported"
     assert paper_short.order_capability_reason_codes == (
-        "spot_short_not_real_order_capable",
+        "short_direction_requires_futures_market",
     )
 
     testnet_short = _find_matrix_row(
@@ -756,8 +801,11 @@ def test_scenario_matrix_derives_spot_rows_and_blocks_testnet_spot_short() -> No
         direction="short",
     )
     assert testnet_short.scenario_state == "blocked"
-    assert testnet_short.launch_blocked_reason == "spot_short_not_supported"
+    assert testnet_short.launch_blocked_reason == "short_direction_requires_futures_market"
     assert testnet_short.order_capability == "unsupported"
+    assert testnet_short.order_capability_reason_codes == (
+        "short_direction_requires_futures_market",
+    )
 
 
 def test_scenario_matrix_marks_futures_short_real_order_capable_but_not_bound() -> None:
@@ -941,7 +989,7 @@ def _launch_snapshot(
     job_state: str = "succeeded",
     market_type: str = "spot",
     timeframe: str = "15m",
-    direction_mode: str = "long_short_reversal",
+    direction_mode: str = "long_only",
     live_compatible: bool = False,
 ) -> BacktestVariantLaunchSnapshot:
     indicator_payload = (

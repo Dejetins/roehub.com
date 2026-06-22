@@ -73,6 +73,7 @@ _STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS = frozenset(
         "idempotency_key_required",
         "not_found",
         "not_launchable",
+        "short_direction_requires_futures_market",
         "strategy_variant_launch_unavailable",
         "unavailable",
         "unexpected_error",

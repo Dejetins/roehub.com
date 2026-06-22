@@ -28,6 +28,10 @@ from trading.contexts.strategy.application.use_cases.create_strategy_from_backte
 from trading.contexts.strategy.application.use_cases.errors import map_strategy_exception
 from trading.contexts.strategy.domain.entities import LiveStrategyProfileSizingMethod
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.direction_policy import (
+    SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    short_direction_requires_futures_market,
+)
 
 SCENARIO_MATRIX_SCHEMA_V1 = "strategy_variant_scenario_matrix_v1"
 SCENARIO_MATRIX_SYMBOL_SCOPE_V1 = "BTCUSDT"
@@ -263,8 +267,11 @@ def _scenario_state(
         return "blocked", ("unsupported_symbol",)
     if market_type not in {"spot", "futures"}:
         return "blocked", ("invalid_market_type",)
-    if mode == "testnet" and market_type == "spot" and direction == "short":
-        return "blocked", ("spot_short_not_supported",)
+    if short_direction_requires_futures_market(
+        market_type=market_type,
+        direction=direction,
+    ):
+        return "blocked", (SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,)
     if compatibility.launch_blocked:
         return "blocked", (compatibility.launch_blocked_reason,)
     if mode == "testnet":
@@ -277,12 +284,13 @@ def _scenario_state(
 def _order_capability(
     *, mode: str, market_type: str, direction: str
 ) -> tuple[ScenarioOrderCapability, tuple[str, ...]]:
+    if short_direction_requires_futures_market(
+        market_type=market_type,
+        direction=direction,
+    ):
+        return "unsupported", (SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,)
     if mode == "paper":
-        if market_type == "spot" and direction == "short":
-            return "paper_only", ("spot_short_not_real_order_capable",)
         return "paper_only", ("paper_no_exchange_submit",)
-    if market_type == "spot" and direction == "short":
-        return "unsupported", ("spot_short_not_supported",)
     if market_type == "futures" and direction == "short":
         return "real_order_capable", ("futures_short_requires_isolated_1x_guard",)
     return "real_order_capable", ("testnet_order_path_supported_when_exchange_ready",)
