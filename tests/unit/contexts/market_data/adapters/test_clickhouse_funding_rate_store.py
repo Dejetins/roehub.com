@@ -150,3 +150,15 @@ def test_list_tradable_funding_instruments_treats_clickhouse_naive_time_as_utc()
     rows = store.list_tradable_funding_instruments(market_ids=(MarketId(2),))
 
     assert rows[0].updated_at == _ts(1)
+
+
+def test_latest_funding_time_uses_nullable_max_for_empty_history() -> None:
+    gateway = _Gateway()
+    gateway.response_rows = [{"funding_time_ms": None}]
+    store = ClickHouseFundingRateStore(gateway=gateway, database="market_data")
+
+    latest = store.latest_funding_time(InstrumentId(MarketId(2), Symbol("BTCUSDT")))
+
+    query = gateway.select_rows[0][0]
+    assert "maxOrNull(toUnixTimestamp64Milli(funding_time))" in query
+    assert latest is None

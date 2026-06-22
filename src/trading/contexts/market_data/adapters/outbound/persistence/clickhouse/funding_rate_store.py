@@ -91,7 +91,7 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
 
     def latest_funding_time(self, instrument_id: InstrumentId) -> UtcTimestamp | None:
         q = f"""
-        SELECT max(toUnixTimestamp64Milli(funding_time)) AS funding_time_ms
+        SELECT maxOrNull(toUnixTimestamp64Milli(funding_time)) AS funding_time_ms
         FROM {self._db}.canonical_funding_rates
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
