@@ -5,7 +5,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from validators.common import FATAL_BLOCK, Finding, command_text, is_bash_pre_tool, is_codex_execpolicy_check
+from validators.common import (
+    FATAL_BLOCK,
+    Finding,
+    command_text,
+    is_bash_pre_tool,
+    is_codex_execpolicy_check,
+)
 
 BRANCH_APPROVAL_MARKER = "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1"
 WORKTREE_APPROVAL_MARKER = "ROEHUB_WORKTREE_APPROVED=1"
@@ -16,7 +22,10 @@ BRANCH_CREATE_PATTERNS = [
     re.compile(rf"{GIT}\s+switch\s+(?:--create|-c|-C)\s+(?P<branch>[^\s;&|]+)", re.IGNORECASE),
     re.compile(rf"{GIT}\s+checkout\s+(?:-b|-B)\s+(?P<branch>[^\s;&|]+)", re.IGNORECASE),
     re.compile(rf"{GIT}\s+branch\s+(?!-)(?P<branch>[^\s;&|]+)", re.IGNORECASE),
-    re.compile(rf"{GIT}\s+worktree\s+add\b[^\n;|&]*\s(?:-b|-B)\s+(?P<branch>[^\s;&|]+)", re.IGNORECASE),
+    re.compile(
+        rf"{GIT}\s+worktree\s+add\b[^\n;|&]*\s(?:-b|-B)\s+(?P<branch>[^\s;&|]+)",
+        re.IGNORECASE,
+    ),
 ]
 
 BRANCH_USE_PATTERNS = [
@@ -84,7 +93,8 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
                 title="Worktree creation requires explicit user approval marker",
                 message=(
                     "Do not create separate worktree folders unless the user explicitly requested "
-                    f"a worktree/folder workflow. Include `{WORKTREE_APPROVAL_MARKER}` only for that explicit request."
+                    f"a worktree/folder workflow. Include `{WORKTREE_APPROVAL_MARKER}` only for "
+                    "that explicit request."
                 ),
                 validator="branch_workflow_guard",
                 target="git worktree add",

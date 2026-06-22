@@ -72,6 +72,7 @@ def _load_app_module(*, monkeypatch):
     monkeypatch.setenv("ROEHUB_NUMBA_NUM_THREADS", numba_threads)
     monkeypatch.setenv("NUMBA_NUM_THREADS", numba_threads)
     monkeypatch.setenv("STRATEGY_PG_DSN", "postgresql://user:pass@localhost:5432/roehub")
+    monkeypatch.setenv("IDENTITY_FAIL_FAST", "false")
     original_read_text = Path.read_text
 
     def _safe_read_text(self: Path, *args, **kwargs) -> str:

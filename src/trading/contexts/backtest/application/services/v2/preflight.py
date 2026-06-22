@@ -42,7 +42,17 @@ from trading.contexts.indicators.domain.specifications.grid_param_spec import (
 
 SUPPORTED_BACKTEST_TIMEFRAMES_V1: tuple[str, ...] = ARTIFACT_MAPPING_TIMEFRAMES_V2
 BACKTEST_RISK_MODES_V1: tuple[str, ...] = ("none", "tp_sl_grid")
-BACKTEST_DIRECTION_MODES_V1: tuple[str, ...] = ("long_only", "long_short_reversal")
+BACKTEST_DIRECTION_MODES_V1: tuple[str, ...] = (
+    "long_only",
+    "short",
+    "long_short_reversal",
+)
+BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1 = frozenset({"short", "long_short_reversal"})
+BACKTEST_FUNDING_MODES_V1: tuple[str, ...] = ("include_when_futures", "off")
+BACKTEST_FUNDING_COVERAGE_POLICIES_V1: tuple[str, ...] = ("degraded_with_warning",)
+BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET = (
+    "short_direction_requires_futures_market"
+)
 BACKTEST_SIZING_MODES_V1: tuple[str, ...] = (
     "all_in",
     "fixed_quote",
@@ -153,6 +163,7 @@ class BacktestRuntimeDefaultsService:
                 "tp_levels_pct": self.runtime_config.hit_times_tp_levels_pct,
                 "sl_levels_pct": self.runtime_config.hit_times_sl_levels_pct,
             },
+            direction_market_compatibility=_direction_market_compatibility_policy(),
             links={
                 "preflight": "/backtests/preflight",
                 "jobs": "/backtests/jobs",
@@ -235,7 +246,7 @@ class BacktestPreflightService:
             payload=payload,
             guardrails=guardrails,
         )
-        execution = self._normalize_execution(payload=payload)
+        execution = self._normalize_execution(payload=payload, coordinates=coordinates)
         ranking = self._normalize_ranking(payload=payload)
         top_n = self._normalize_top_n(payload=payload)
         quality_constraints = self._normalize_quality_constraints(
@@ -278,6 +289,12 @@ class BacktestPreflightService:
             time_range=time_range,
             artifact_metadata=artifact_metadata,
         )
+        funding_readiness = _funding_readiness(
+            coordinates=coordinates,
+            time_range=time_range,
+            execution=execution,
+            artifact_metadata=artifact_metadata,
+        )
         cost_estimate = BacktestCostEstimate(
             indicator_rows=indicator_rows,
             candidate_combinations=candidate_combinations,
@@ -299,6 +316,7 @@ class BacktestPreflightService:
             cost_estimate=cost_estimate,
             guardrails=guardrails,
         )
+        warnings = (*warnings, *_funding_readiness_warnings(funding_readiness))
         return BacktestPreflightResult(
             normalized_request=normalized_request,
             request_hash=request_hash,
@@ -307,6 +325,11 @@ class BacktestPreflightService:
             cost_estimate=cost_estimate,
             warnings=warnings,
             errors=(),
+            funding_readiness=funding_readiness,
+            direction_market_compatibility=_selected_direction_market_compatibility(
+                market_type=coordinates.market_type,
+                direction_mode=str(execution["direction_mode"]),
+            ),
         )
 
     def _normalize_coordinates(self, *, payload: Mapping[str, Any]) -> BacktestCoordinates:
@@ -603,7 +626,12 @@ class BacktestPreflightService:
             )
         return {"start": start, "stop": stop, "step": step, "count": len(values)}
 
-    def _normalize_execution(self, *, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def _normalize_execution(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        coordinates: BacktestCoordinates,
+    ) -> dict[str, Any]:
         defaults = self.runtime_config.execution_defaults.as_mapping()
         raw_execution = payload.get("execution", {})
         if raw_execution is None:
@@ -624,14 +652,21 @@ class BacktestPreflightService:
             "sizing",
             "profit_lock",
             "close_on_end",
+            "funding",
         ):
             if key in raw_execution:
                 execution[key] = raw_execution[key]
+        if "direction_mode" not in raw_execution and coordinates.market_type != "futures":
+            execution["direction_mode"] = "long_only"
 
         direction_mode = _string_choice(
             execution["direction_mode"],
             path="execution.direction_mode",
             allowed=BACKTEST_DIRECTION_MODES_V1,
+        )
+        _validate_direction_market_compatibility(
+            market_type=coordinates.market_type,
+            direction_mode=direction_mode,
         )
         fee_rate = _non_negative_float(execution["fee_rate"], path="execution.fee_rate")
         slippage_rate = _non_negative_float(
@@ -645,6 +680,10 @@ class BacktestPreflightService:
         sizing = _normalize_sizing(execution["sizing"])
         profit_lock = _normalize_profit_lock(execution["profit_lock"])
         close_on_end = _strict_bool(execution["close_on_end"], path="execution.close_on_end")
+        funding = _normalize_funding(
+            execution.get("funding"),
+            market_type=coordinates.market_type,
+        )
         return {
             "direction_mode": direction_mode,
             "fee_rate": fee_rate,
@@ -653,6 +692,7 @@ class BacktestPreflightService:
             "sizing": sizing,
             "profit_lock": profit_lock,
             "close_on_end": close_on_end,
+            "funding": funding,
         }
 
     def _normalize_ranking(self, *, payload: Mapping[str, Any]) -> dict[str, str]:
@@ -883,6 +923,9 @@ class BacktestPreflightService:
             "guardrails": self.runtime_config.guardrails.as_mapping(),
             "ranking_default": DEFAULT_BACKTEST_RANKING_V1,
             "supported_timeframes": SUPPORTED_BACKTEST_TIMEFRAMES_V1,
+            "direction_modes": BACKTEST_DIRECTION_MODES_V1,
+            "funding_modes": BACKTEST_FUNDING_MODES_V1,
+            "direction_market_compatibility": _direction_market_compatibility_policy(),
             "top_n_default": DEFAULT_BACKTEST_TOP_N_V1,
             "quality_constraints_default": _quality_constraints_default_mapping(),
             "hit_times_grid": {
@@ -931,6 +974,204 @@ class BacktestPreflightService:
                 f"as-of date {max_end_date}"
             ),
         )
+
+
+def _direction_market_compatibility_policy() -> dict[str, Any]:
+    return {
+        "version": "funding_short_policy_v1",
+        "short_like_direction_modes": sorted(BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1),
+        "markets": {
+            "spot": {
+                "allowed_direction_modes": ["long_only"],
+                "rejected_direction_modes": {
+                    "short": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+                    "long_short_reversal": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+                },
+                "funding_default": _funding_default_for_market(market_type="spot"),
+            },
+            "futures": {
+                "allowed_direction_modes": list(BACKTEST_DIRECTION_MODES_V1),
+                "rejected_direction_modes": {},
+                "funding_default": _funding_default_for_market(market_type="futures"),
+            },
+        },
+    }
+
+
+def _selected_direction_market_compatibility(
+    *,
+    market_type: str,
+    direction_mode: str,
+) -> dict[str, Any]:
+    compatible = _is_direction_market_compatible(
+        market_type=market_type,
+        direction_mode=direction_mode,
+    )
+    reason_codes: list[str] = []
+    if not compatible:
+        reason_codes.append(BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET)
+    return {
+        "market_type": market_type,
+        "direction_mode": direction_mode,
+        "compatible": compatible,
+        "reason_codes": reason_codes,
+        "required_market_type": (
+            "futures"
+            if direction_mode in BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1
+            else None
+        ),
+        "funding_default": _funding_default_for_market(market_type=market_type),
+    }
+
+
+def _validate_direction_market_compatibility(
+    *,
+    market_type: str,
+    direction_mode: str,
+) -> None:
+    if _is_direction_market_compatible(
+        market_type=market_type,
+        direction_mode=direction_mode,
+    ):
+        return
+    raise _invalid_request(
+        path="execution.direction_mode",
+        code=BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+        message="short-like direction modes require market_type=futures",
+    )
+
+
+def _is_direction_market_compatible(*, market_type: str, direction_mode: str) -> bool:
+    return not (
+        market_type != "futures"
+        and direction_mode in BACKTEST_SHORT_LIKE_DIRECTION_MODES_V1
+    )
+
+
+def _funding_default_for_market(*, market_type: str) -> dict[str, str]:
+    return {
+        "mode": "include_when_futures" if market_type == "futures" else "off",
+        "coverage_policy": "degraded_with_warning",
+    }
+
+
+def _normalize_funding(value: Any, *, market_type: str) -> dict[str, str]:
+    if value is None:
+        raw_funding: Mapping[str, Any] = {}
+    elif isinstance(value, Mapping):
+        raw_funding = value
+    else:
+        raise _invalid_request(
+            path="execution.funding",
+            code="invalid_type",
+            message="execution.funding must be an object when provided",
+        )
+    default_funding = _funding_default_for_market(market_type=market_type)
+    mode = _string_choice(
+        raw_funding.get("mode", default_funding["mode"]),
+        path="execution.funding.mode",
+        allowed=BACKTEST_FUNDING_MODES_V1,
+    )
+    coverage_policy = _string_choice(
+        raw_funding.get("coverage_policy", default_funding["coverage_policy"]),
+        path="execution.funding.coverage_policy",
+        allowed=BACKTEST_FUNDING_COVERAGE_POLICIES_V1,
+    )
+    if market_type != "futures" and mode == "include_when_futures":
+        mode = "off"
+    return {"mode": mode, "coverage_policy": coverage_policy}
+
+
+def _funding_readiness(
+    *,
+    coordinates: BacktestCoordinates,
+    time_range: Mapping[str, str],
+    execution: Mapping[str, Any],
+    artifact_metadata: BacktestArtifactMetadata,
+) -> dict[str, Any]:
+    funding = execution.get("funding")
+    funding_mode = (
+        str(funding.get("mode"))
+        if isinstance(funding, Mapping)
+        else _funding_default_for_market(market_type=coordinates.market_type)["mode"]
+    )
+    funding_policy = (
+        str(funding.get("coverage_policy"))
+        if isinstance(funding, Mapping)
+        else "degraded_with_warning"
+    )
+    window = {"start": str(time_range["start"]), "end": str(time_range["end"])}
+    if coordinates.market_type != "futures" or funding_mode == "off":
+        return {
+            "status": "not_applicable",
+            "coverage_policy": "not_applicable",
+            "warning_codes": [],
+            "coverage_ratio": None,
+            "window": window,
+            "funding_manifest_hash": None,
+            "rows_count": 0,
+            "expected_event_count": 0,
+            "missing_event_count": 0,
+        }
+
+    status = artifact_metadata.funding_coverage_status or "unavailable"
+    reason_codes = tuple(artifact_metadata.funding_reason_codes)
+    if status == "degraded" and not reason_codes:
+        reason_codes = ("funding_coverage_degraded",)
+    if status == "unavailable" and not reason_codes:
+        reason_codes = ("funding_artifacts_unavailable",)
+    rows_count = int(artifact_metadata.funding_rows_count or 0)
+    expected_event_count = int(artifact_metadata.funding_expected_event_count or 0)
+    missing_event_count = int(artifact_metadata.funding_missing_event_count or 0)
+    return {
+        "status": status,
+        "coverage_policy": funding_policy,
+        "warning_codes": list(reason_codes if status != "ready" else ()),
+        "coverage_ratio": _funding_coverage_ratio(
+            status=status,
+            rows_count=rows_count,
+            expected_event_count=expected_event_count,
+            missing_event_count=missing_event_count,
+        ),
+        "window": window,
+        "funding_manifest_hash": artifact_metadata.funding_manifest_hash,
+        "rows_count": rows_count,
+        "expected_event_count": expected_event_count,
+        "missing_event_count": missing_event_count,
+    }
+
+
+def _funding_coverage_ratio(
+    *,
+    status: str,
+    rows_count: int,
+    expected_event_count: int,
+    missing_event_count: int,
+) -> float:
+    if expected_event_count > 0:
+        observed = max(rows_count, expected_event_count - missing_event_count)
+        return round(max(0.0, min(1.0, observed / expected_event_count)), 6)
+    if status == "ready":
+        return 1.0
+    return 0.0
+
+
+def _funding_readiness_warnings(
+    funding_readiness: Mapping[str, Any],
+) -> tuple[BacktestValidationIssue, ...]:
+    status = str(funding_readiness.get("status", ""))
+    if status not in {"degraded", "unavailable"}:
+        return ()
+    return (
+        BacktestValidationIssue(
+            path="funding_readiness",
+            code=f"funding_readiness_{status}",
+            message=(
+                "Funding readiness is "
+                f"{status}; creation proceeds under degraded_with_warning policy"
+            ),
+        ),
+    )
 
 
 def _invalid_request(*, path: str, code: str, message: str) -> BacktestPreflightRejected:
@@ -1349,6 +1590,7 @@ __all__ = [
     "BACKTEST_ERROR_INVALID_REQUEST",
     "BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE",
     "BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED",
+    "BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET",
     "BACKTEST_RANKING_METRICS_V1",
     "BACKTEST_RISK_MODES_V1",
     "BACKTEST_SIZING_MODES_V1",

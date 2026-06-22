@@ -36,7 +36,10 @@ from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.contexts.market_data.application.dto import CanonicalCandleBatch1m
-from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
+from trading.contexts.market_data.application.ports.stores import (
+    CanonicalCandleReader,
+    FundingRateCoverageReader,
+)
 from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
@@ -48,6 +51,12 @@ from trading.shared_kernel.primitives import (
 
 from .artifact_precompute_coordinator import ArtifactPrecomputeCoordinatorV2
 from .contracts import (
+    ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_EVENT_AXIS_ORDER_V2,
+    ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
     ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
     ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
     ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
@@ -81,6 +90,7 @@ from .contracts import (
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
+    ArtifactFundingManifestV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactHitTimesPathsV2,
     ArtifactHitTimesReferenceV2,
@@ -464,6 +474,7 @@ class _RootManifestScaffoldV2:
     mappings: tuple[ArtifactMappingTimeframeManifestV2, ...]
     signals: ArtifactSignalCatalogV2
     hit_times: ArtifactHitTimesReferenceV2
+    funding: ArtifactFundingManifestV2 | None
     signal_encoding: ArtifactSignalEncodingContractV2
 
 
@@ -750,6 +761,7 @@ class BacktestArtifactPrecomputeRunnerV2:
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2
     artifact_loader: BacktestArtifactLoaderV2
     canonical_candle_reader: CanonicalCandleReader
+    funding_rate_coverage_reader: FundingRateCoverageReader | None = None
     defaults_provider: BacktestGridDefaultsProvider | None = None
     signal_rules_engine: BacktestSignalRulesEngineV2 | None = None
     indicator_compute: IndicatorCompute | None = None
@@ -1166,11 +1178,20 @@ class BacktestArtifactPrecomputeRunnerV2:
                     signal_manifests=tuple(signal_manifests),
                 )
             )
+            funding_manifest = _build_funding_artifact_v2(
+                artifact_loader=self.artifact_loader,
+                funding_rate_coverage_reader=self.funding_rate_coverage_reader,
+                coordinates=request.coordinates,
+                slot=inactive_slot,
+                slot_root=slot_root,
+                request=request,
+            )
             effective_scaffold = _RootManifestScaffoldV2(
                 preserved_prices=scaffold.preserved_prices,
                 mappings=scaffold.mappings,
                 signals=root_signals,
                 hit_times=hit_times_build_result.reference,
+                funding=funding_manifest,
                 signal_encoding=scaffold.signal_encoding,
             )
             written_manifest_path = coordinator.run_stage(
@@ -1197,6 +1218,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                     mapping_manifests=tuple(mapping_manifests),
                     signal_catalog=root_signals,
                     hit_times_reference=hit_times_build_result.reference,
+                    funding_manifest=funding_manifest,
                 ),
                 build_output=lambda written_path: ArtifactPrecomputeStageOutputV2(
                     stage="root_manifest",
@@ -1606,6 +1628,7 @@ def _write_root_manifest_stage_v2(
     mapping_manifests: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_catalog: ArtifactSignalCatalogV2,
     hit_times_reference: ArtifactHitTimesReferenceV2,
+    funding_manifest: ArtifactFundingManifestV2 | None,
 ) -> Path:
     """
     Write the strict root manifest after all R12 build stages have finished.
@@ -1645,6 +1668,7 @@ def _write_root_manifest_stage_v2(
         mapping_sections=mapping_manifests,
         signal_entries=signal_catalog.manifests,
         hit_times_reference=hit_times_reference,
+        funding_manifest=funding_manifest,
     )
     root_manifest_payload = _build_root_manifest_payload_v2(
         request=request,
@@ -1655,6 +1679,7 @@ def _write_root_manifest_stage_v2(
             mappings=root_scaffold.mappings,
             signals=signal_catalog,
             hit_times=hit_times_reference,
+            funding=funding_manifest,
             signal_encoding=root_scaffold.signal_encoding,
         ),
         price_manifests=price_manifests,
@@ -6149,6 +6174,197 @@ def _write_hit_times_arrays_atomically_v2(
     _write_npy_atomically_v2(path=hit_times_paths.short_sl, array=arrays.short_sl)
 
 
+def _build_funding_artifact_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    funding_rate_coverage_reader: FundingRateCoverageReader | None,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+) -> ArtifactFundingManifestV2:
+    if coordinates.market_type != "futures":
+        return _finalize_funding_manifest_hash_v2(
+            ArtifactFundingManifestV2(
+                coverage_status="not_applicable",
+                coverage_policy="not_applicable",
+                funding_manifest_hash=ARTIFACT_PLACEHOLDER_SHA256_V2,
+                rows_count=0,
+                expected_event_count=0,
+                missing_event_count=0,
+                reason_codes=(),
+                funding_time=None,
+                funding_rate=None,
+                mark_price=None,
+                funding_interval_minutes=None,
+                data_quality=None,
+            )
+        )
+    if funding_rate_coverage_reader is None:
+        raise ValueError(
+            "futures artifact publish requires FundingRateCoverageReader "
+            "for canonical_funding_rates"
+        )
+    snapshot = funding_rate_coverage_reader.read_funding_coverage(
+        instrument_id=_instrument_id_from_coordinates_v2(coordinates),
+        time_range=request.time_range,
+    )
+    if snapshot.status == "unavailable":
+        return _finalize_funding_manifest_hash_v2(
+            ArtifactFundingManifestV2(
+                coverage_status="unavailable",
+                coverage_policy="unavailable",
+                funding_manifest_hash=ARTIFACT_PLACEHOLDER_SHA256_V2,
+                rows_count=0,
+                expected_event_count=snapshot.expected_event_count,
+                missing_event_count=snapshot.missing_event_count,
+                reason_codes=snapshot.reason_codes,
+                funding_time=None,
+                funding_rate=None,
+                mark_price=None,
+                funding_interval_minutes=None,
+                data_quality=None,
+            )
+        )
+    funding_paths = artifact_loader.resolve_funding_paths(coordinates, slot)
+    funding_time = np.asarray(
+        [int(record.funding_time.value.timestamp() * 1000) for record in snapshot.records],
+        dtype=np.int64,
+    )
+    funding_rate = np.asarray(
+        [float(record.funding_rate) for record in snapshot.records],
+        dtype=np.float64,
+    )
+    mark_price = np.asarray(
+        [
+            np.nan if record.mark_price is None else float(record.mark_price)
+            for record in snapshot.records
+        ],
+        dtype=np.float64,
+    )
+    interval_minutes = np.asarray(
+        [int(record.funding_interval_minutes) for record in snapshot.records],
+        dtype=np.uint16,
+    )
+    data_quality = np.asarray(
+        [int(record.data_quality) for record in snapshot.records],
+        dtype=np.uint8,
+    )
+    _write_npy_atomically_v2(path=funding_paths.funding_time, array=funding_time)
+    _write_npy_atomically_v2(path=funding_paths.funding_rate, array=funding_rate)
+    _write_npy_atomically_v2(path=funding_paths.mark_price, array=mark_price)
+    _write_npy_atomically_v2(
+        path=funding_paths.funding_interval_minutes,
+        array=interval_minutes,
+    )
+    _write_npy_atomically_v2(path=funding_paths.data_quality, array=data_quality)
+    return _finalize_funding_manifest_hash_v2(
+        ArtifactFundingManifestV2(
+            coverage_status=snapshot.status,
+            coverage_policy=snapshot.coverage_policy,
+            funding_manifest_hash=ARTIFACT_PLACEHOLDER_SHA256_V2,
+            rows_count=len(snapshot.records),
+            expected_event_count=snapshot.expected_event_count,
+            missing_event_count=snapshot.missing_event_count,
+            reason_codes=snapshot.reason_codes,
+            funding_time=_funding_array_metadata_v2(
+                slot_root=slot_root,
+                absolute_path=funding_paths.funding_time,
+                dtype=ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
+            ),
+            funding_rate=_funding_array_metadata_v2(
+                slot_root=slot_root,
+                absolute_path=funding_paths.funding_rate,
+                dtype=ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+            ),
+            mark_price=_funding_array_metadata_v2(
+                slot_root=slot_root,
+                absolute_path=funding_paths.mark_price,
+                dtype=ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+            ),
+            funding_interval_minutes=_funding_array_metadata_v2(
+                slot_root=slot_root,
+                absolute_path=funding_paths.funding_interval_minutes,
+                dtype=ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+            ),
+            data_quality=_funding_array_metadata_v2(
+                slot_root=slot_root,
+                absolute_path=funding_paths.data_quality,
+                dtype=ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
+            ),
+        )
+    )
+
+
+def _funding_array_metadata_v2(
+    *,
+    slot_root: Path,
+    absolute_path: Path,
+    dtype: str,
+) -> ArtifactArrayMetadataV2:
+    array = np.load(absolute_path, mmap_mode="r", allow_pickle=False)
+    return ArtifactArrayMetadataV2(
+        path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=absolute_path),
+        dtype=dtype,
+        shape=tuple(int(value) for value in array.shape),
+        axis_order=ARTIFACT_FUNDING_EVENT_AXIS_ORDER_V2,
+        sha256=_file_sha256_hex_v2(absolute_path),
+    )
+
+
+def _finalize_funding_manifest_hash_v2(
+    funding: ArtifactFundingManifestV2,
+) -> ArtifactFundingManifestV2:
+    return ArtifactFundingManifestV2(
+        coverage_status=funding.coverage_status,
+        coverage_policy=funding.coverage_policy,
+        funding_manifest_hash=_funding_manifest_hash_v2(funding=funding),
+        rows_count=funding.rows_count,
+        expected_event_count=funding.expected_event_count,
+        missing_event_count=funding.missing_event_count,
+        reason_codes=funding.reason_codes,
+        funding_time=funding.funding_time,
+        funding_rate=funding.funding_rate,
+        mark_price=funding.mark_price,
+        funding_interval_minutes=funding.funding_interval_minutes,
+        data_quality=funding.data_quality,
+    )
+
+
+def _funding_manifest_hash_v2(*, funding: ArtifactFundingManifestV2) -> str:
+    payload = {
+        "coverage_status": funding.coverage_status,
+        "coverage_policy": funding.coverage_policy,
+        "rows_count": funding.rows_count,
+        "expected_event_count": funding.expected_event_count,
+        "missing_event_count": funding.missing_event_count,
+        "reason_codes": funding.reason_codes,
+        "arrays": {
+            "funding_time": _array_metadata_identity_v2(funding.funding_time),
+            "funding_rate": _array_metadata_identity_v2(funding.funding_rate),
+            "mark_price": _array_metadata_identity_v2(funding.mark_price),
+            "funding_interval_minutes": _array_metadata_identity_v2(
+                funding.funding_interval_minutes
+            ),
+            "data_quality": _array_metadata_identity_v2(funding.data_quality),
+        },
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _array_metadata_identity_v2(metadata: ArtifactArrayMetadataV2 | None) -> dict[str, Any] | None:
+    if metadata is None:
+        return None
+    return {
+        "path": metadata.path,
+        "dtype": metadata.dtype,
+        "shape": metadata.shape,
+        "axis_order": metadata.axis_order,
+        "sha256": metadata.sha256,
+    }
+
+
 def _build_hit_times_manifest_v2(
     *,
     coordinates: ArtifactCoordinatesV2,
@@ -6912,6 +7128,7 @@ def _build_root_manifest_scaffold_v2(
             mappings=(),
             signals=_empty_signal_catalog_v2(),
             hit_times=_placeholder_hit_times_reference_v2(),
+            funding=None,
             signal_encoding=_default_signal_encoding_contract_v2(),
         )
     return _RootManifestScaffoldV2(
@@ -6927,6 +7144,7 @@ def _build_root_manifest_scaffold_v2(
         ),
         signals=existing_manifest.signals,
         hit_times=existing_manifest.hit_times,
+        funding=existing_manifest.funding,
         signal_encoding=existing_manifest.signal_encoding,
     )
 
@@ -7291,6 +7509,7 @@ def _build_root_manifest_provenance_v2(
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...] = (),
     hit_times_reference: ArtifactHitTimesReferenceV2 | None = None,
+    funding_manifest: ArtifactFundingManifestV2 | None = None,
 ) -> ArtifactManifestProvenanceV2:
     """
     Build deterministic root-manifest provenance for emitted artifact families.
@@ -7332,6 +7551,7 @@ def _build_root_manifest_provenance_v2(
             mapping_sections=mapping_sections,
             signal_entries=signal_entries,
             hit_times_reference=hit_times_reference,
+            funding_manifest=funding_manifest,
             price_lookback_bars=runtime_settings.price_tail_bars_1m,
             mapping_lookback_bars=runtime_settings.mapping_tail_bars_1m,
             signal_lookback_bars=runtime_settings.signal_tail_bars_1m,
@@ -7347,6 +7567,7 @@ def _build_inputs_sha256_v2(
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...],
     hit_times_reference: ArtifactHitTimesReferenceV2 | None,
+    funding_manifest: ArtifactFundingManifestV2 | None,
     price_lookback_bars: int,
     mapping_lookback_bars: int,
     signal_lookback_bars: int,
@@ -7412,6 +7633,12 @@ def _build_inputs_sha256_v2(
                     "manifest_sha256": hit_times_reference.manifest_sha256,
                 }
             ),
+            "funding": None
+            if funding_manifest is None
+            else {
+                "coverage_status": funding_manifest.coverage_status,
+                "funding_manifest_hash": funding_manifest.funding_manifest_hash,
+            },
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -7457,6 +7684,9 @@ def _build_inputs_sha256_v2(
         digest.update(hit_times_reference.timeframe.encode("ascii"))
         digest.update(hit_times_reference.manifest_path.encode("utf-8"))
         digest.update(hit_times_reference.manifest_sha256.encode("ascii"))
+    if funding_manifest is not None:
+        digest.update(funding_manifest.coverage_status.encode("ascii"))
+        digest.update(funding_manifest.funding_manifest_hash.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -7504,7 +7734,7 @@ def _build_root_manifest_payload_v2(
         preserved_mappings=root_scaffold.mappings,
         mapping_manifests=mapping_manifests,
     )
-    return {
+    payload = {
         "schema_version": 1,
         "manifest_kind": "slot_root",
         "slot": slot,
@@ -7522,6 +7752,9 @@ def _build_root_manifest_payload_v2(
         "signal_encoding": _serialize_signal_encoding_v2(root_scaffold.signal_encoding),
         "provenance": _serialize_provenance_v2(provenance),
     }
+    if root_scaffold.funding is not None:
+        payload["funding"] = _serialize_funding_manifest_v2(root_scaffold.funding)
+    return payload
 
 
 def _merge_price_sections_v2(
@@ -7679,6 +7912,25 @@ def _serialize_mapping_manifest_v2(
         "timeframe": section.timeframe,
         "bar_open_1m_idx": _serialize_array_metadata_v2(section.bar_open_1m_idx),
         "bar_close_1m_idx": _serialize_array_metadata_v2(section.bar_close_1m_idx),
+    }
+
+
+def _serialize_funding_manifest_v2(section: ArtifactFundingManifestV2) -> dict[str, Any]:
+    return {
+        "coverage_status": section.coverage_status,
+        "coverage_policy": section.coverage_policy,
+        "funding_manifest_hash": section.funding_manifest_hash,
+        "rows_count": section.rows_count,
+        "expected_event_count": section.expected_event_count,
+        "missing_event_count": section.missing_event_count,
+        "reason_codes": [code for code in section.reason_codes],
+        "funding_time": _serialize_optional_array_metadata_v2(section.funding_time),
+        "funding_rate": _serialize_optional_array_metadata_v2(section.funding_rate),
+        "mark_price": _serialize_optional_array_metadata_v2(section.mark_price),
+        "funding_interval_minutes": _serialize_optional_array_metadata_v2(
+            section.funding_interval_minutes
+        ),
+        "data_quality": _serialize_optional_array_metadata_v2(section.data_quality),
     }
 
 
@@ -8073,6 +8325,14 @@ def _serialize_array_metadata_v2(
         "axis_order": [axis for axis in metadata.axis_order],
         "sha256": metadata.sha256,
     }
+
+
+def _serialize_optional_array_metadata_v2(
+    metadata: ArtifactArrayMetadataV2 | None,
+) -> dict[str, Any] | None:
+    if metadata is None:
+        return None
+    return _serialize_array_metadata_v2(metadata)
 
 
 def _serialize_timeline_coverage_v2(

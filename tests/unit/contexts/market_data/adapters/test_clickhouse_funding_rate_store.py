@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.funding_rate_store import (  # noqa: E501
     ClickHouseFundingRateStore,
 )
 from trading.contexts.market_data.application.dto import FundingInstrument, FundingRateRecord
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
 
 class _Gateway:
@@ -162,3 +162,57 @@ def test_latest_funding_time_uses_nullable_max_for_empty_history() -> None:
     query = gateway.select_rows[0][0]
     assert "maxOrNull(toUnixTimestamp64Milli(funding_time))" in query
     assert latest is None
+
+
+def test_read_funding_coverage_reports_degraded_partial_window() -> None:
+    gateway = _Gateway()
+    gateway.response_rows = [
+        {
+            "market_id": 2,
+            "symbol": "BTCUSDT",
+            "instrument_key": "binance:futures:BTCUSDT",
+            "funding_time_ms": int(_ts(0).value.timestamp() * 1000),
+            "funding_rate": 0.0001,
+            "mark_price": None,
+            "funding_interval_minutes": 480,
+            "data_quality": 1,
+        },
+        {
+            "market_id": 2,
+            "symbol": "BTCUSDT",
+            "instrument_key": "binance:futures:BTCUSDT",
+            "funding_time_ms": int(_ts(16).value.timestamp() * 1000),
+            "funding_rate": -0.0002,
+            "mark_price": None,
+            "funding_interval_minutes": 480,
+            "data_quality": 1,
+        },
+    ]
+    store = ClickHouseFundingRateStore(gateway=gateway, database="market_data")
+
+    snapshot = store.read_funding_coverage(
+        instrument_id=InstrumentId(MarketId(2), Symbol("BTCUSDT")),
+        time_range=TimeRange(start=_ts(0), end=UtcTimestamp(_ts(16).value + timedelta(hours=8))),
+    )
+
+    query = gateway.select_rows[0][0]
+    assert "FROM market_data.canonical_funding_rates" in query
+    assert snapshot.status == "degraded"
+    assert snapshot.coverage_policy == "degraded_with_warning"
+    assert snapshot.missing_event_count == 1
+    assert snapshot.reason_codes == ("funding_interval_gap",)
+    assert snapshot.records[0].funding_rate == 0.0001
+
+
+def test_read_funding_coverage_reports_unavailable_without_rows() -> None:
+    gateway = _Gateway()
+    store = ClickHouseFundingRateStore(gateway=gateway, database="market_data")
+
+    snapshot = store.read_funding_coverage(
+        instrument_id=InstrumentId(MarketId(2), Symbol("BTCUSDT")),
+        time_range=TimeRange(start=_ts(0), end=_ts(8)),
+    )
+
+    assert snapshot.status == "unavailable"
+    assert snapshot.reason_codes == ("no_funding_rows",)
+    assert snapshot.records == ()

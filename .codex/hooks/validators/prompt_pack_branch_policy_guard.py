@@ -93,17 +93,21 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
         names = _branch_names(combined)
         if len(names) > 1:
             missing.append("use at most one codex/* branch name across the prompt pack")
-        if (
-            ("git switch -c" in combined or "git checkout -b" in combined or "git worktree add -b" in combined)
-            and "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1" not in combined
-        ):
+        branch_creation = (
+            "git switch -c" in combined
+            or "git checkout -b" in combined
+            or "git worktree add -b" in combined
+        )
+        if branch_creation and "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1" not in combined:
             missing.append(
                 "branch creation command must carry ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1"
             )
-        if (
-            ("git worktree add" in combined or "worktree_path" in combined or "worktree_root" in combined)
-            and "ROEHUB_WORKTREE_APPROVED=1" not in combined
-        ):
+        worktree_mention = (
+            "git worktree add" in combined
+            or "worktree_path" in combined
+            or "worktree_root" in combined
+        )
+        if worktree_mention and "ROEHUB_WORKTREE_APPROVED=1" not in combined:
             missing.append(
                 "remove worktree/folder instructions unless the user explicitly requested them"
             )

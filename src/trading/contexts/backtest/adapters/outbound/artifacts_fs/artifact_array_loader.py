@@ -17,8 +17,14 @@ from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
+    ArtifactFundingArraysV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactMappingArraysV2,
     ArtifactMappingTimeframeManifestV2,
@@ -149,6 +155,67 @@ class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
             manifest=manifest,
             bar_open_1m_idx=bar_open_1m_idx,
             bar_close_1m_idx=bar_close_1m_idx,
+        )
+
+    def load_funding_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+    ) -> ArtifactFundingArraysV2:
+        manifest = context.slot_manifest.funding
+        if manifest is None:
+            raise ValueError("slot manifest does not declare funding artifacts")
+        if manifest.coverage_status not in ("ready", "degraded"):
+            raise ValueError(
+                "funding arrays are available only for ready/degraded coverage; "
+                f"got {manifest.coverage_status!r}"
+            )
+        paths = self.artifact_loader.resolve_funding_paths(
+            context.coordinates,
+            context.artifact_slot,
+        )
+        if (
+            manifest.funding_time is None
+            or manifest.funding_rate is None
+            or manifest.mark_price is None
+            or manifest.funding_interval_minutes is None
+            or manifest.data_quality is None
+        ):
+            raise ValueError("funding manifest missing array metadata")
+        return ArtifactFundingArraysV2(
+            manifest=manifest,
+            funding_manifest_hash=manifest.funding_manifest_hash,
+            coverage_status=manifest.coverage_status,
+            funding_time=_load_npy_mmap(
+                paths.funding_time,
+                metadata=manifest.funding_time,
+                expected_dtype=np.dtype(ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2),
+                expected_ndim=1,
+            ),
+            funding_rate=_load_npy_mmap(
+                paths.funding_rate,
+                metadata=manifest.funding_rate,
+                expected_dtype=np.dtype(ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2),
+                expected_ndim=1,
+            ),
+            mark_price=_load_npy_mmap(
+                paths.mark_price,
+                metadata=manifest.mark_price,
+                expected_dtype=np.dtype(ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2),
+                expected_ndim=1,
+            ),
+            funding_interval_minutes=_load_npy_mmap(
+                paths.funding_interval_minutes,
+                metadata=manifest.funding_interval_minutes,
+                expected_dtype=np.dtype(ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2),
+                expected_ndim=1,
+            ),
+            data_quality=_load_npy_mmap(
+                paths.data_quality,
+                metadata=manifest.data_quality,
+                expected_dtype=np.dtype(ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2),
+                expected_ndim=1,
+            ),
         )
 
     def load_signal_matrix(

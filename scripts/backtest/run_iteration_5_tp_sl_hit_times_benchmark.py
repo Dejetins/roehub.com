@@ -319,6 +319,9 @@ class _FailingTableLoader:
     def load_mapping_arrays(self, **kwargs: Any) -> Any:
         return self._inner.load_mapping_arrays(**kwargs)
 
+    def load_funding_arrays(self, **kwargs: Any) -> Any:
+        return self._inner.load_funding_arrays(**kwargs)
+
     def load_signal_matrix(self, **kwargs: Any) -> Any:
         return self._inner.load_signal_matrix(**kwargs)
 

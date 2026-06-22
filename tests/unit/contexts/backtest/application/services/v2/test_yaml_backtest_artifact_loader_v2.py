@@ -387,6 +387,31 @@ def test_yaml_backtest_artifact_loader_v2_accepts_legacy_slot_without_signal_fea
     assert signal_manifest.signal_features is None
 
 
+def test_yaml_backtest_artifact_loader_v2_reads_funding_manifest(tmp_path: Path) -> None:
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+        ),
+        include_funding=True,
+    )
+
+    root_manifest = store.loader.load_slot_manifest(store.coordinates, store.active_slot)
+    funding_paths = store.loader.resolve_funding_paths(store.coordinates, store.active_slot)
+
+    assert root_manifest.funding is not None
+    assert root_manifest.funding.coverage_status == "ready"
+    assert root_manifest.funding.funding_manifest_hash != "0" * 64
+    assert root_manifest.funding.funding_rate is not None
+    assert root_manifest.funding.funding_rate.axis_order == ("funding_event",)
+    assert funding_paths.funding_rate == store.builder.funding_paths(
+        store.coordinates,
+        store.active_slot,
+    ).funding_rate
+
+
 def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
     monkeypatch: pytest.MonkeyPatch,
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,

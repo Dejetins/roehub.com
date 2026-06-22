@@ -12,6 +12,12 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     BAR_OPEN_MAPPING_FILENAME_V2,
     CLOSE_TIME_FILENAME_V2,
     CURRENT_ARTIFACT_POINTER_FILENAME_V2,
+    FUNDING_DATA_QUALITY_FILENAME_V2,
+    FUNDING_DIRECTORY_LITERAL_V2,
+    FUNDING_INTERVAL_MINUTES_FILENAME_V2,
+    FUNDING_MARK_PRICE_FILENAME_V2,
+    FUNDING_RATE_FILENAME_V2,
+    FUNDING_TIME_FILENAME_V2,
     HIT_TIMES_DIRECTORY_LITERAL_V2,
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
     LONG_SL_FILENAME_V2,
@@ -29,6 +35,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     SL_VALUES_FILENAME_V2,
     TP_VALUES_FILENAME_V2,
     ArtifactCoordinatesV2,
+    ArtifactFundingPathsV2,
     ArtifactHitTimesPathsV2,
     ArtifactMappingPathsV2,
     ArtifactPricePathsV2,
@@ -398,6 +405,22 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             long_sl=hit_times_directory / LONG_SL_FILENAME_V2,
             short_tp=hit_times_directory / SHORT_TP_FILENAME_V2,
             short_sl=hit_times_directory / SHORT_SL_FILENAME_V2,
+        )
+
+    def funding_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactFundingPathsV2:
+        funding_directory = self.slot_root(coordinates, slot) / FUNDING_DIRECTORY_LITERAL_V2
+        return ArtifactFundingPathsV2(
+            funding_time=funding_directory / FUNDING_TIME_FILENAME_V2,
+            funding_rate=funding_directory / FUNDING_RATE_FILENAME_V2,
+            mark_price=funding_directory / FUNDING_MARK_PRICE_FILENAME_V2,
+            funding_interval_minutes=(
+                funding_directory / FUNDING_INTERVAL_MINUTES_FILENAME_V2
+            ),
+            data_quality=funding_directory / FUNDING_DATA_QUALITY_FILENAME_V2,
         )
 
     def _timeframe_directory(

@@ -14,6 +14,7 @@ from .contracts import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     CURRENT_ARTIFACT_POINTER_FILENAME_V2,
     HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+    ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
     ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
     SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
     SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
@@ -21,6 +22,8 @@ from .contracts import (
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
+    ArtifactFundingManifestV2,
+    ArtifactFundingPathsV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactHitTimesPathsV2,
     ArtifactHitTimesReferenceV2,
@@ -46,6 +49,7 @@ from .contracts import (
     BacktestArtifactPathResolverV2,
     freeze_artifact_payload_mapping_v2,
     validate_artifact_slot_v2,
+    validate_funding_coverage_status_v2,
     validate_indicator_id_v2,
     validate_mapping_timeframe_v2,
     validate_price_timeframe_v2,
@@ -689,6 +693,13 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         """
         return self.path_resolver.hit_times_paths(coordinates, slot)
 
+    def resolve_funding_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactFundingPathsV2:
+        return self.path_resolver.funding_paths(coordinates, slot)
+
     def _parse_root_manifest_document(
         self,
         *,
@@ -717,9 +728,10 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        self._require_exact_yaml_keys(
+        self._require_exact_yaml_keys_with_optional(
             payload=payload,
             required_keys=ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            optional_keys=ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
             path=path,
         )
         manifest_slot = validate_artifact_slot_v2(
@@ -766,6 +778,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
                 path=path,
                 payload=self._required_mapping_field(payload=payload, key="hit_times", path=path),
             ),
+            funding=self._parse_optional_funding_manifest(path=path, payload=payload),
             signal_encoding=self._parse_signal_encoding(
                 path=path,
                 payload=self._required_mapping_field(
@@ -777,6 +790,108 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             provenance=self._parse_provenance(
                 path=path,
                 payload=self._required_mapping_field(payload=payload, key="provenance", path=path),
+            ),
+        )
+
+    def _parse_optional_funding_manifest(
+        self,
+        *,
+        path: Path,
+        payload: Mapping[str, Any],
+    ) -> ArtifactFundingManifestV2 | None:
+        if "funding" not in payload:
+            return None
+        funding_payload = self._required_mapping_field(payload=payload, key="funding", path=path)
+        self._require_exact_yaml_keys(
+            payload=funding_payload,
+            required_keys=(
+                "coverage_status",
+                "coverage_policy",
+                "funding_manifest_hash",
+                "rows_count",
+                "expected_event_count",
+                "missing_event_count",
+                "reason_codes",
+                "funding_time",
+                "funding_rate",
+                "mark_price",
+                "funding_interval_minutes",
+                "data_quality",
+            ),
+            path=path,
+        )
+        return ArtifactFundingManifestV2(
+            coverage_status=validate_funding_coverage_status_v2(
+                str(
+                    self._required_yaml_field(
+                        payload=funding_payload,
+                        key="coverage_status",
+                        path=path,
+                    )
+                )
+            ),
+            coverage_policy=str(
+                self._required_yaml_field(
+                    payload=funding_payload,
+                    key="coverage_policy",
+                    path=path,
+                )
+            ),
+            funding_manifest_hash=str(
+                self._required_yaml_field(
+                    payload=funding_payload,
+                    key="funding_manifest_hash",
+                    path=path,
+                )
+            ),
+            rows_count=self._required_yaml_field(
+                payload=funding_payload,
+                key="rows_count",
+                path=path,
+            ),
+            expected_event_count=self._required_yaml_field(
+                payload=funding_payload,
+                key="expected_event_count",
+                path=path,
+            ),
+            missing_event_count=self._required_yaml_field(
+                payload=funding_payload,
+                key="missing_event_count",
+                path=path,
+            ),
+            reason_codes=self._parse_string_tuple(
+                path=path,
+                key="funding.reason_codes",
+                values=self._required_sequence_field(
+                    payload=funding_payload,
+                    key="reason_codes",
+                    path=path,
+                ),
+            ),
+            funding_time=self._parse_optional_array_metadata(
+                path=path,
+                payload=funding_payload,
+                key="funding_time",
+            ),
+            funding_rate=self._parse_optional_array_metadata(
+                path=path,
+                payload=funding_payload,
+                key="funding_rate",
+            ),
+            mark_price=self._parse_optional_array_metadata(
+                path=path,
+                payload=funding_payload,
+                key="mark_price",
+            ),
+            funding_interval_minutes=self._parse_optional_array_metadata(
+                path=path,
+                payload=funding_payload,
+                key="funding_interval_minutes",
+            ),
+            data_quality=self._parse_optional_array_metadata(
+                path=path,
+                payload=funding_payload,
+                key="data_quality",
             ),
         )
 
@@ -1672,6 +1787,26 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
                 values=self._required_sequence_field(payload=payload, key="axis_order", path=path),
             ),
             sha256=str(self._required_yaml_field(payload=payload, key="sha256", path=path)),
+        )
+
+    def _parse_optional_array_metadata(
+        self,
+        *,
+        path: Path,
+        payload: Mapping[str, Any],
+        key: str,
+    ) -> ArtifactArrayMetadataV2 | None:
+        value = self._required_yaml_field(payload=payload, key=key, path=path)
+        if value is None:
+            return None
+        return self._parse_array_metadata(
+            path=path,
+            key=f"funding.{key}",
+            payload=self._coerce_mapping_value(
+                value=value,
+                path=path,
+                field_name=f"funding.{key}",
+            ),
         )
 
     def _parse_timeline_coverage(

@@ -40,6 +40,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseCanonicalCandleIndexReader,
     ClickHouseCanonicalCandleReader,
     ClickHouseConnectGateway,
+    ClickHouseFundingRateStore,
 )
 from trading.platform.time.system_clock import SystemClock  # noqa: F401
 
@@ -359,6 +360,10 @@ def _build_publish_use_case_v2(
             gateway=clickhouse_gateway,
             database=clickhouse_settings.database,
         ),
+        funding_rate_coverage_reader=ClickHouseFundingRateStore(
+            gateway=clickhouse_gateway,
+            database=clickhouse_settings.database,
+        ),
         defaults_provider=defaults_provider,
         signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
         indicator_compute=indicator_compute,
@@ -439,6 +444,8 @@ def _render_report_v2(
             f"hit_times={result.tail_rebuild_bars.hit_times}\n"
             f"- signal_manifest_count: {result.validation.signal_manifest_count}\n"
             f"- hit_times_manifest_present: {result.validation.hit_times_manifest_present}\n"
+            f"- funding_coverage_status: {result.validation.funding_coverage_status}\n"
+            f"- funding_manifest_hash: {result.validation.funding_manifest_hash}\n"
         )
     raise ValueError(f"unsupported report format: {report_format!r}")
 

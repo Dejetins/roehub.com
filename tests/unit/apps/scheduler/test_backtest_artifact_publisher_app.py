@@ -231,6 +231,8 @@ def _result(*, exchange: str, market_type: str, symbol: str) -> PublishBacktestA
             signal_artifacts=(("15m", "ma.ema"),),
             signal_manifest_count=1,
             hit_times_manifest_present=True,
+            funding_coverage_status=None,
+            funding_manifest_hash=None,
             diagnostics_count=0,
         ),
         stage_rebuild_stats=ArtifactStageRebuildStatsCollectionV2(

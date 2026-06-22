@@ -37,6 +37,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     indicator_sources: dict[str, list[str]]
     indicator_param_specs: dict[str, Any]
     hit_times_grid: dict[str, Any]
+    direction_market_compatibility: dict[str, Any]
     links: dict[str, Any]
 
 
@@ -52,6 +53,8 @@ class BacktestPreflightResponse(BaseModel):
     cost_estimate: dict[str, Any]
     warnings: list[dict[str, str]]
     errors: list[dict[str, str]]
+    funding_readiness: dict[str, Any]
+    direction_market_compatibility: dict[str, Any]
 
 
 class BacktestJobProgressResponse(BaseModel):

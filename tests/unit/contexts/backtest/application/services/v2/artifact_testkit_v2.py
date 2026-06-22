@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -23,6 +24,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactCoordinatesV2,
+    ArtifactFundingPathsV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotLiteralV2,
@@ -91,6 +93,10 @@ def build_synthetic_artifact_store_v2(
     active_include_signal_features: bool = True,
     inactive_include_signal_features: bool = True,
     omit_inactive_files: tuple[str, ...] = (),
+    coordinates: ArtifactCoordinatesV2 | None = None,
+    include_funding: bool = False,
+    funding_coverage_status: str = "ready",
+    funding_reason_codes: tuple[str, ...] = (),
 ) -> SyntheticArtifactStoreV2:
     """
     Build a deterministic two-slot artifact tree with strict R2-03 manifests under `tmp_path`.
@@ -130,10 +136,14 @@ def build_synthetic_artifact_store_v2(
     """
     builder = BacktestArtifactPathBuilderV2(root=tmp_path / "artifacts" / "backtest" / "v2")
     loader = YamlBacktestArtifactLoaderV2(path_resolver=builder)
-    coordinates = ArtifactCoordinatesV2(
-        exchange="binance",
-        market_type="spot",
-        symbol="BTCUSDT",
+    coordinates = (
+        ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        )
+        if coordinates is None
+        else coordinates
     )
     inactive_slot: ArtifactSlotLiteralV2 = "slot_b" if active_slot == "slot_a" else "slot_a"
     validation_spec = ArtifactSlotValidationSpecV2(
@@ -157,6 +167,9 @@ def build_synthetic_artifact_store_v2(
         short_tp=_default_short_tp(),
         short_sl=_default_short_sl(),
         include_signal_features=active_include_signal_features,
+        include_funding=include_funding,
+        funding_coverage_status=funding_coverage_status,
+        funding_reason_codes=funding_reason_codes,
         omit_files=(),
     )
     _write_slot_payloads(
@@ -189,6 +202,9 @@ def build_synthetic_artifact_store_v2(
             inactive_short_sl.copy() if inactive_short_sl is not None else _default_short_sl()
         ),
         include_signal_features=inactive_include_signal_features,
+        include_funding=include_funding,
+        funding_coverage_status=funding_coverage_status,
+        funding_reason_codes=funding_reason_codes,
         omit_files=omit_inactive_files,
     )
 
@@ -220,6 +236,7 @@ def build_synthetic_artifact_store_v2(
 def build_artifact_precompute_fixture_v2(
     *,
     tmp_path: Path,
+    coordinates: ArtifactCoordinatesV2 | None = None,
     active_slot: ArtifactSlotLiteralV2 = "slot_a",
     current_slot_generation: int = 4,
     price_tail_bars_1m: int = 2,
@@ -301,10 +318,14 @@ def build_artifact_precompute_fixture_v2(
     """
     builder = BacktestArtifactPathBuilderV2(root=tmp_path / "artifacts" / "backtest" / "v2")
     loader = YamlBacktestArtifactLoaderV2(path_resolver=builder)
-    coordinates = ArtifactCoordinatesV2(
-        exchange="binance",
-        market_type="spot",
-        symbol="BTCUSDT",
+    coordinates = (
+        ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        )
+        if coordinates is None
+        else coordinates
     )
     inactive_slot = inactive_artifact_slot_v2(active_slot)
     current_pointer_payload = {
@@ -517,6 +538,9 @@ def _write_slot_payloads(
     short_tp: np.ndarray,
     short_sl: np.ndarray,
     include_signal_features: bool,
+    include_funding: bool,
+    funding_coverage_status: str,
+    funding_reason_codes: tuple[str, ...],
     omit_files: tuple[str, ...],
 ) -> None:
     """
@@ -580,6 +604,7 @@ def _write_slot_payloads(
     signal_paths = builder.signal_paths(coordinates, slot, "15m", "ma.ema")
     signal_features_paths = builder.signal_features_paths(coordinates, slot, "15m", "ma.ema")
     hit_times_paths = builder.hit_times_paths(coordinates, slot)
+    funding_paths = builder.funding_paths(coordinates, slot)
 
     _write_npy_if_needed(
         price_1m_paths.open_time,
@@ -853,6 +878,36 @@ def _write_slot_payloads(
     if _slot_relative_path(builder, coordinates, slot, hit_times_paths.manifest) not in omit_files:
         _write_yaml(hit_times_paths.manifest, hit_times_manifest_payload)
 
+    funding_payload: dict[str, Any] | None = None
+    if include_funding:
+        funding_time = np.array([1000, 2000], dtype=np.int64)
+        funding_rate = np.array([0.001, -0.0005], dtype=np.float64)
+        mark_price = np.array([np.nan, np.nan], dtype=np.float64)
+        interval_minutes = np.array([480, 480], dtype=np.uint16)
+        data_quality = np.array([1, 1], dtype=np.uint8)
+        for path, array in (
+            (funding_paths.funding_time, funding_time),
+            (funding_paths.funding_rate, funding_rate),
+            (funding_paths.mark_price, mark_price),
+            (funding_paths.funding_interval_minutes, interval_minutes),
+            (funding_paths.data_quality, data_quality),
+        ):
+            _write_npy_if_needed(
+                path,
+                array,
+                slot_relative_path=_slot_relative_path(builder, coordinates, slot, path),
+                omit_files=omit_files,
+            )
+        funding_payload = _funding_manifest_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            coverage_status=funding_coverage_status,
+            reason_codes=funding_reason_codes,
+            rows_count=int(funding_time.shape[0]),
+            funding_paths=funding_paths,
+        )
+
     root_manifest_payload = {
         "schema_version": 1,
         "manifest_kind": "slot_root",
@@ -939,6 +994,8 @@ def _write_slot_payloads(
         },
         "provenance": _provenance_payload(),
     }
+    if funding_payload is not None:
+        root_manifest_payload["funding"] = funding_payload
     root_manifest_relative_path = _slot_relative_path(
         builder,
         coordinates,
@@ -1133,6 +1190,103 @@ def _level_array_metadata_payload(
     )
     payload["axis_order"] = ["level"]
     return payload
+
+
+def _funding_manifest_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    coverage_status: str,
+    reason_codes: tuple[str, ...],
+    rows_count: int,
+    funding_paths: ArtifactFundingPathsV2,
+) -> dict[str, Any]:
+    payload = {
+        "coverage_status": coverage_status,
+        "coverage_policy": (
+            "degraded_with_warning" if coverage_status == "degraded" else coverage_status
+        ),
+        "funding_manifest_hash": "0" * 64,
+        "rows_count": rows_count,
+        "expected_event_count": rows_count + len(reason_codes),
+        "missing_event_count": len(reason_codes),
+        "reason_codes": list(reason_codes),
+        "funding_time": _funding_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=funding_paths.funding_time,
+        ),
+        "funding_rate": _funding_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=funding_paths.funding_rate,
+        ),
+        "mark_price": _funding_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=funding_paths.mark_price,
+        ),
+        "funding_interval_minutes": _funding_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=funding_paths.funding_interval_minutes,
+        ),
+        "data_quality": _funding_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=funding_paths.data_quality,
+        ),
+    }
+    payload["funding_manifest_hash"] = _funding_manifest_hash(payload)
+    return payload
+
+
+def _funding_array_metadata_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    absolute_path: Path,
+) -> dict[str, Any]:
+    payload = _array_metadata_payload(
+        builder=builder,
+        coordinates=coordinates,
+        slot=slot,
+        absolute_path=absolute_path,
+    )
+    payload["axis_order"] = ["funding_event"]
+    return payload
+
+
+def _funding_manifest_hash(payload: Mapping[str, Any]) -> str:
+    identity_payload = {
+        "coverage_status": payload["coverage_status"],
+        "coverage_policy": payload["coverage_policy"],
+        "rows_count": payload["rows_count"],
+        "expected_event_count": payload["expected_event_count"],
+        "missing_event_count": payload["missing_event_count"],
+        "reason_codes": tuple(payload["reason_codes"]),
+        "arrays": {
+            "funding_time": payload["funding_time"],
+            "funding_rate": payload["funding_rate"],
+            "mark_price": payload["mark_price"],
+            "funding_interval_minutes": payload["funding_interval_minutes"],
+            "data_quality": payload["data_quality"],
+        },
+    }
+    encoded = json.dumps(
+        identity_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _timeline_payload(*, open_time: np.ndarray, close_time: np.ndarray) -> dict[str, Any]:

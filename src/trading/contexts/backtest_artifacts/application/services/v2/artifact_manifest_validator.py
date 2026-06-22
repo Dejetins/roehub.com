@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -10,6 +11,12 @@ from typing import Any
 import numpy as np
 
 from .contracts import (
+    ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_EVENT_AXIS_ORDER_V2,
+    ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+    ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
     ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
     ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
     ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
@@ -25,6 +32,7 @@ from .contracts import (
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
+    ArtifactFundingManifestV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactHitTimesTableManifestV2,
     ArtifactManifestDocumentV2,
@@ -154,6 +162,14 @@ class BacktestArtifactManifestValidatorV2:
                 one_minute_bar_count=one_minute_bar_count,
                 diagnostics=diagnostics,
             )
+
+        self._validate_funding_manifest(
+            coordinates=coordinates,
+            slot=slot,
+            slot_root=slot_root,
+            slot_manifest=slot_manifest,
+            diagnostics=diagnostics,
+        )
 
         signal_manifests: list[ArtifactSignalManifestDocumentV2] = []
         for signal_reference in slot_manifest.signals.manifests:
@@ -713,6 +729,120 @@ class BacktestArtifactManifestValidatorV2:
                         manifest_path=slot_manifest_path,
                     )
                 )
+
+    def _validate_funding_manifest(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: ArtifactSlotLiteralV2,
+        slot_root: Path,
+        slot_manifest: ArtifactManifestDocumentV2,
+        diagnostics: list[ArtifactValidationDiagnosticV2],
+    ) -> None:
+        funding = slot_manifest.funding
+        if coordinates.market_type != "futures":
+            if funding is not None and funding.coverage_status != "not_applicable":
+                diagnostics.append(
+                    ArtifactValidationDiagnosticV2(
+                        code="spot_funding_not_applicable_required",
+                        message="spot artifact manifests must mark funding as not_applicable",
+                        location="funding.coverage_status",
+                        manifest_path=slot_manifest.path,
+                    )
+                )
+            return
+        if funding is None:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="funding_manifest_missing_for_futures",
+                    message="futures artifact manifests must include a funding section",
+                    location="funding",
+                    manifest_path=slot_manifest.path,
+                )
+            )
+            return
+        if funding.coverage_status == "not_applicable":
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="futures_funding_not_applicable_invalid",
+                    message="futures artifact manifests cannot mark funding as not_applicable",
+                    location="funding.coverage_status",
+                    manifest_path=slot_manifest.path,
+                )
+            )
+            return
+        if funding.coverage_status == "unavailable":
+            return
+        funding_paths = self.artifact_loader.resolve_funding_paths(coordinates, slot)
+        expected_shape = (funding.rows_count,)
+        array_specs = (
+            (
+                "funding_time",
+                funding.funding_time,
+                funding_paths.funding_time,
+                ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
+            ),
+            (
+                "funding_rate",
+                funding.funding_rate,
+                funding_paths.funding_rate,
+                ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+            ),
+            (
+                "mark_price",
+                funding.mark_price,
+                funding_paths.mark_price,
+                ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+            ),
+            (
+                "funding_interval_minutes",
+                funding.funding_interval_minutes,
+                funding_paths.funding_interval_minutes,
+                ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+            ),
+            (
+                "data_quality",
+                funding.data_quality,
+                funding_paths.data_quality,
+                ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
+            ),
+        )
+        for name, metadata, path, dtype in array_specs:
+            if metadata is None:
+                diagnostics.append(
+                    ArtifactValidationDiagnosticV2(
+                        code="funding_array_metadata_missing",
+                        message=f"funding.{name} metadata is required for futures coverage",
+                        location=f"funding.{name}",
+                        manifest_path=slot_manifest.path,
+                        artifact_path=path,
+                    )
+                )
+                continue
+            self._validate_array_metadata_and_load(
+                slot_root=slot_root,
+                manifest_path=slot_manifest.path,
+                location=f"funding.{name}",
+                metadata=metadata,
+                expected_path=path,
+                expected_dtype=dtype,
+                expected_axis_order=ARTIFACT_FUNDING_EVENT_AXIS_ORDER_V2,
+                expected_shape=expected_shape,
+                diagnostics=diagnostics,
+            )
+        actual_hash = _funding_manifest_hash_v2(funding=funding)
+        if funding.funding_manifest_hash != actual_hash:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="funding_manifest_hash_mismatch",
+                    message=(
+                        "funding_manifest_hash must match funding array metadata and coverage; "
+                        f"got {funding.funding_manifest_hash!r}, expected {actual_hash!r}"
+                    ),
+                    location="funding.funding_manifest_hash",
+                    manifest_path=slot_manifest.path,
+                )
+            )
 
     def _load_signal_manifest_with_diagnostics(
         self,
@@ -1947,6 +2077,40 @@ class BacktestArtifactManifestValidatorV2:
                     manifest_path=manifest_path,
                 )
             )
+
+
+def _funding_manifest_hash_v2(*, funding: ArtifactFundingManifestV2) -> str:
+    payload = {
+        "coverage_status": funding.coverage_status,
+        "coverage_policy": funding.coverage_policy,
+        "rows_count": funding.rows_count,
+        "expected_event_count": funding.expected_event_count,
+        "missing_event_count": funding.missing_event_count,
+        "reason_codes": funding.reason_codes,
+        "arrays": {
+            "funding_time": _array_metadata_identity_v2(funding.funding_time),
+            "funding_rate": _array_metadata_identity_v2(funding.funding_rate),
+            "mark_price": _array_metadata_identity_v2(funding.mark_price),
+            "funding_interval_minutes": _array_metadata_identity_v2(
+                funding.funding_interval_minutes
+            ),
+            "data_quality": _array_metadata_identity_v2(funding.data_quality),
+        },
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _array_metadata_identity_v2(metadata: ArtifactArrayMetadataV2 | None) -> dict[str, Any] | None:
+    if metadata is None:
+        return None
+    return {
+        "path": metadata.path,
+        "dtype": metadata.dtype,
+        "shape": metadata.shape,
+        "axis_order": metadata.axis_order,
+        "sha256": metadata.sha256,
+    }
 
 
 def _file_sha256_hex_v2(path: Path) -> str:

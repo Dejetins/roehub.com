@@ -7,6 +7,12 @@ from .enabled_tradable_instrument_search_reader import (
     EnabledTradableInstrumentSearchReader,
 )
 from .funding_instrument_universe_store import FundingInstrumentUniverseStore
+from .funding_rate_coverage_reader import (
+    FundingCoverageStatus,
+    FundingRateArtifactRecord,
+    FundingRateCoverageReader,
+    FundingRateCoverageSnapshot,
+)
 from .funding_rate_writer import FundingRateWriter
 from .instrument_ref_writer import InstrumentRefWriter
 from .market_ref_writer import MarketRefWriter
@@ -21,6 +27,10 @@ __all__ = [
     "EnabledMarketReader",
     "EnabledTradableInstrumentSearchReader",
     "FundingInstrumentUniverseStore",
+    "FundingCoverageStatus",
+    "FundingRateArtifactRecord",
+    "FundingRateCoverageReader",
+    "FundingRateCoverageSnapshot",
     "FundingRateWriter",
     "InstrumentRefWriter",
     "MarketRefWriter",

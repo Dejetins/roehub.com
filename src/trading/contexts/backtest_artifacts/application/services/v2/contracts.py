@@ -22,6 +22,7 @@ SIGNALS_DIRECTORY_LITERAL_V2 = "signals"
 SIGNAL_FEATURES_DIRECTORY_LITERAL_V2 = "signal_features"
 MAPPINGS_DIRECTORY_LITERAL_V2 = "mappings"
 HIT_TIMES_DIRECTORY_LITERAL_V2 = "hit_times"
+FUNDING_DIRECTORY_LITERAL_V2 = "funding"
 ARTIFACT_SLOT_A_LITERAL_V2 = "slot_a"
 ARTIFACT_SLOT_B_LITERAL_V2 = "slot_b"
 HIT_TIMES_TIMEFRAME_LITERAL_V2 = "15m"
@@ -39,6 +40,11 @@ LONG_TP_FILENAME_V2 = "long_tp.u32.npy"
 LONG_SL_FILENAME_V2 = "long_sl.u32.npy"
 SHORT_TP_FILENAME_V2 = "short_tp.u32.npy"
 SHORT_SL_FILENAME_V2 = "short_sl.u32.npy"
+FUNDING_TIME_FILENAME_V2 = "funding_time.i64.npy"
+FUNDING_RATE_FILENAME_V2 = "funding_rate.f64.npy"
+FUNDING_MARK_PRICE_FILENAME_V2 = "mark_price.f64.npy"
+FUNDING_INTERVAL_MINUTES_FILENAME_V2 = "funding_interval_minutes.u16.npy"
+FUNDING_DATA_QUALITY_FILENAME_V2 = "data_quality.u8.npy"
 CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2 = 1
 ROOT_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
 SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
@@ -55,6 +61,11 @@ ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2 = "float32"
 ARTIFACT_MAPPING_DTYPE_LITERAL_V2 = "uint32"
 ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2 = "float32"
 ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2 = "uint32"
+ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2 = "int64"
+ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2 = "float64"
+ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2 = "float64"
+ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2 = "uint16"
+ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2 = "uint8"
 ARTIFACT_SIGNAL_VALUE_SET_V2: tuple[int, int, int] = (-1, 0, 1)
 ARTIFACT_SIGNAL_AXIS_ORDER_V2: tuple[str, str] = ("variant", "time")
 ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2: tuple[str, str] = ("variant", "feature")
@@ -62,6 +73,7 @@ ARTIFACT_TIME_AXIS_ORDER_V2: tuple[str, ...] = ("time",)
 ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2: tuple[str, str] = ("time", "field")
 ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2: tuple[str, ...] = ("level",)
 ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2: tuple[str, str] = ("level", "time")
+ARTIFACT_FUNDING_EVENT_AXIS_ORDER_V2: tuple[str, ...] = ("funding_event",)
 ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2 = "non_decreasing_by_level"
 ARTIFACT_PLACEHOLDER_SHA256_V2 = "0" * 64
 ARTIFACT_PUBLISH_BLOCKING_JOB_STATES_V2: tuple[str, ...] = ("queued", "running")
@@ -95,6 +107,7 @@ ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
     "signal_encoding",
     "provenance",
 )
+ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2: tuple[str, ...] = ("funding",)
 SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
     "schema_version",
     "manifest_kind",
@@ -233,6 +246,12 @@ type SignalSourceLiteralV2 = Literal[
     "ohlc4",
 ]
 type StageADirectionModeLiteralV2 = Literal["long-only", "short-only", "long-short"]
+type ArtifactFundingCoverageStatusLiteralV2 = Literal[
+    "ready",
+    "degraded",
+    "unavailable",
+    "not_applicable",
+]
 type StageBExitReasonLiteralV2 = Literal[
     "signal_exit",
     "tp",
@@ -906,6 +925,41 @@ def validate_hit_times_timeframe_v2(timeframe: str) -> str:
     return timeframe
 
 
+def validate_funding_coverage_status_v2(
+    status: str,
+) -> ArtifactFundingCoverageStatusLiteralV2:
+    normalized = status.strip().lower()
+    allowed = ("ready", "degraded", "unavailable", "not_applicable")
+    if normalized not in allowed:
+        raise ValueError(f"funding coverage_status must be one of {allowed}, got {status!r}")
+    return cast(ArtifactFundingCoverageStatusLiteralV2, normalized)
+
+
+def validate_funding_coverage_policy_v2(*, status: str, coverage_policy: str) -> str:
+    normalized = coverage_policy.strip().lower()
+    if not normalized:
+        raise ValueError("funding coverage_policy must be non-empty")
+    if status == "degraded" and normalized != "degraded_with_warning":
+        raise ValueError("funding coverage_policy must be degraded_with_warning when degraded")
+    return normalized
+
+
+def validate_funding_reason_codes_v2(reason_codes: tuple[str, ...]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in reason_codes:
+        code = value.strip().lower()
+        if not code:
+            raise ValueError("funding reason_codes must contain non-empty literals")
+        if not re.fullmatch(r"[a-z0-9_]+", code):
+            raise ValueError(f"funding reason code must be machine-readable, got {value!r}")
+        if code in seen:
+            raise ValueError(f"funding reason_codes contains duplicate code {code!r}")
+        seen.add(code)
+        normalized.append(code)
+    return tuple(normalized)
+
+
 def validate_artifact_precompute_stage_id_v2(value: str) -> ArtifactPrecomputeStageIdV2:
     """
     Validate one stage identifier used by the R12 precompute coordinator.
@@ -1204,6 +1258,19 @@ class ArtifactHitTimesPathsV2:
     long_sl: Path
     short_tp: Path
     short_sl: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactFundingPathsV2:
+    """
+    Explicit paths for the `funding/` artifact family.
+    """
+
+    funding_time: Path
+    funding_rate: Path
+    mark_price: Path
+    funding_interval_minutes: Path
+    data_quality: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -1627,6 +1694,84 @@ class ArtifactHitTimesReferenceV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactFundingManifestV2:
+    """
+    Root-manifest section for the additive `funding/` artifact family.
+    """
+
+    coverage_status: ArtifactFundingCoverageStatusLiteralV2
+    coverage_policy: str
+    funding_manifest_hash: str
+    rows_count: int
+    expected_event_count: int
+    missing_event_count: int
+    reason_codes: tuple[str, ...]
+    funding_time: ArtifactArrayMetadataV2 | None
+    funding_rate: ArtifactArrayMetadataV2 | None
+    mark_price: ArtifactArrayMetadataV2 | None
+    funding_interval_minutes: ArtifactArrayMetadataV2 | None
+    data_quality: ArtifactArrayMetadataV2 | None
+
+    def __post_init__(self) -> None:
+        status = validate_funding_coverage_status_v2(self.coverage_status)
+        object.__setattr__(self, "coverage_status", status)
+        object.__setattr__(
+            self,
+            "coverage_policy",
+            validate_funding_coverage_policy_v2(
+                status=status,
+                coverage_policy=self.coverage_policy,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "funding_manifest_hash",
+            validate_current_pointer_manifest_sha256_v2(self.funding_manifest_hash),
+        )
+        object.__setattr__(
+            self,
+            "rows_count",
+            validate_non_negative_manifest_int_v2(self.rows_count),
+        )
+        object.__setattr__(
+            self,
+            "expected_event_count",
+            validate_non_negative_manifest_int_v2(self.expected_event_count),
+        )
+        object.__setattr__(
+            self,
+            "missing_event_count",
+            validate_non_negative_manifest_int_v2(self.missing_event_count),
+        )
+        object.__setattr__(
+            self,
+            "reason_codes",
+            validate_funding_reason_codes_v2(self.reason_codes),
+        )
+        array_fields = (
+            self.funding_time,
+            self.funding_rate,
+            self.mark_price,
+            self.funding_interval_minutes,
+            self.data_quality,
+        )
+        if status in ("ready", "degraded"):
+            if any(item is None for item in array_fields):
+                raise ValueError("funding arrays are required for ready/degraded coverage")
+            if self.rows_count <= 0:
+                raise ValueError("funding rows_count must be positive when arrays are present")
+            if status == "ready" and self.reason_codes:
+                raise ValueError("ready funding coverage cannot carry reason_codes")
+            return
+        if any(item is not None for item in array_fields):
+            raise ValueError("funding arrays must be omitted for unavailable/not_applicable")
+        if self.rows_count != 0:
+            raise ValueError("funding rows_count must be zero when arrays are absent")
+        if status == "not_applicable" and self.reason_codes:
+            raise ValueError("not_applicable funding coverage cannot carry reason_codes")
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactSignalEncodingContractV2:
     """
     Root-manifest runtime contract for signal dtype, axis order, and allowed values.
@@ -1956,6 +2101,7 @@ class ArtifactManifestDocumentV2:
     mappings: tuple[ArtifactMappingTimeframeManifestV2, ...]
     signals: ArtifactSignalCatalogV2
     hit_times: ArtifactHitTimesReferenceV2
+    funding: ArtifactFundingManifestV2 | None
     signal_encoding: ArtifactSignalEncodingContractV2
     provenance: ArtifactManifestProvenanceV2
 
@@ -1980,9 +2126,10 @@ class ArtifactManifestDocumentV2:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
         """
-        _validate_exact_mapping_keys_v2(
+        _validate_exact_mapping_keys_with_optional_v2(
             payload=self.raw_payload,
             required_keys=ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            optional_keys=ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
             path=self.path,
         )
         object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
@@ -4037,6 +4184,22 @@ class ArtifactMappingArraysV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactFundingArraysV2:
+    """
+    Memory-mapped funding event arrays loaded from one explicit `funding/` family.
+    """
+
+    manifest: ArtifactFundingManifestV2
+    funding_manifest_hash: str
+    coverage_status: ArtifactFundingCoverageStatusLiteralV2
+    funding_time: np.ndarray
+    funding_rate: np.ndarray
+    mark_price: np.ndarray
+    funding_interval_minutes: np.ndarray
+    data_quality: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactHitTimesArraysV2:
     """
     Memory-mapped strict `hit_times/15m` arrays reused by future runtime kernels.
@@ -4954,6 +5117,14 @@ class BacktestArtifactPathResolverV2(Protocol):
         """Resolve explicit hit-times artifact paths without touching disk."""
         ...
 
+    def funding_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactFundingPathsV2:
+        """Resolve explicit funding artifact paths without touching disk."""
+        ...
+
 
 class BacktestArtifactLoaderV2(Protocol):
     """
@@ -5113,6 +5284,14 @@ class BacktestArtifactLoaderV2(Protocol):
         """Resolve hit-times artifact paths without touching disk."""
         ...
 
+    def resolve_funding_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactFundingPathsV2:
+        """Resolve funding artifact paths without touching disk."""
+        ...
+
 
 class BacktestArtifactSlotResolverV2(Protocol):
     """
@@ -5178,6 +5357,14 @@ class BacktestPriceArraysLoaderV2(Protocol):
         context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> ArtifactHitTimesArraysV2:
         """Load or reuse strict `hit_times/15m` mmap arrays via explicit manifest-driven paths."""
+        ...
+
+    def load_funding_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+    ) -> ArtifactFundingArraysV2:
+        """Load one validated `funding/` mmap family when the pinned slot declares it."""
         ...
 
 
@@ -5677,6 +5864,11 @@ def validate_artifact_dtype_literal_v2(dtype_literal: str) -> str:
         ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
         ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
         ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+        ARTIFACT_FUNDING_TIME_DTYPE_LITERAL_V2,
+        ARTIFACT_FUNDING_RATE_DTYPE_LITERAL_V2,
+        ARTIFACT_FUNDING_MARK_PRICE_DTYPE_LITERAL_V2,
+        ARTIFACT_FUNDING_INTERVAL_MINUTES_DTYPE_LITERAL_V2,
+        ARTIFACT_FUNDING_DATA_QUALITY_DTYPE_LITERAL_V2,
     )
     validate_manifest_text_literal_v2(dtype_literal, field_name="array dtype")
     _validate_allowed_literal_v2(

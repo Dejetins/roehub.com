@@ -15,6 +15,7 @@ from trading.contexts.backtest.application.services.v2 import (
     BACKTEST_ERROR_INVALID_REQUEST,
     BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE,
     BACKTEST_ERROR_TP_SL_GRID_NOT_COVERED,
+    BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
     SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestPreflightRejected,
     BacktestPreflightService,
@@ -33,7 +34,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
 
     assert response["supported_timeframes"] == list(SUPPORTED_BACKTEST_TIMEFRAMES_V1)
     assert response["risk_modes"] == ["none", "tp_sl_grid"]
-    assert response["direction_modes"] == ["long_only", "long_short_reversal"]
+    assert response["direction_modes"] == ["long_only", "short", "long_short_reversal"]
     assert response["sizing_modes"] == [
         "all_in",
         "fixed_quote",
@@ -50,6 +51,21 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
         "min_trades_per_year": 12,
         "max_trades_per_year": 365,
     }
+    assert response["execution_defaults"]["funding"] == {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning",
+    }
+    compatibility = response["direction_market_compatibility"]
+    assert compatibility["markets"]["spot"]["allowed_direction_modes"] == ["long_only"]
+    assert compatibility["markets"]["spot"]["rejected_direction_modes"] == {
+        "short": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+        "long_short_reversal": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    }
+    assert compatibility["markets"]["futures"]["allowed_direction_modes"] == [
+        "long_only",
+        "short",
+        "long_short_reversal",
+    ]
     assert "ma.dema" in response["supported_indicator_ids"]
 
 
@@ -71,6 +87,35 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
     assert first.normalized_request["execution"]["sizing"] == {
         "mode": "fixed_equity_pct",
         "equity_pct": 10.0,
+    }
+    assert first.normalized_request["execution"]["funding"] == {
+        "mode": "off",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert first.funding_readiness == {
+        "status": "not_applicable",
+        "coverage_policy": "not_applicable",
+        "warning_codes": [],
+        "coverage_ratio": None,
+        "window": {
+            "start": "2020-01-11T20:08:00Z",
+            "end": "2026-04-11T20:08:00Z",
+        },
+        "funding_manifest_hash": None,
+        "rows_count": 0,
+        "expected_event_count": 0,
+        "missing_event_count": 0,
+    }
+    assert first.direction_market_compatibility == {
+        "market_type": "spot",
+        "direction_mode": "long_only",
+        "compatible": True,
+        "reason_codes": [],
+        "required_market_type": None,
+        "funding_default": {
+            "mode": "off",
+            "coverage_policy": "degraded_with_warning",
+        },
     }
     assert first.request_hash == second.request_hash
     assert first.result_config_hash == second.result_config_hash
@@ -95,6 +140,135 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
         "scheduling_class": "heavy",
     }
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),) * 2
+
+
+def test_preflight_futures_short_defaults_to_funding_include_and_ready() -> None:
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+    request["execution"]["direction_mode"] = "short"
+    resolver = _FakeArtifactResolver(
+        funding_coverage_status="ready",
+        funding_coverage_policy="ready",
+        funding_manifest_hash="c" * 64,
+        funding_rows_count=6,
+        funding_expected_event_count=6,
+        funding_missing_event_count=0,
+    )
+
+    result = _service(resolver=resolver).execute(request)
+
+    assert result.normalized_request["execution"]["funding"] == {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert result.funding_readiness == {
+        "status": "ready",
+        "coverage_policy": "degraded_with_warning",
+        "warning_codes": [],
+        "coverage_ratio": 1.0,
+        "window": {
+            "start": "2020-01-11T20:08:00Z",
+            "end": "2026-04-11T20:08:00Z",
+        },
+        "funding_manifest_hash": "c" * 64,
+        "rows_count": 6,
+        "expected_event_count": 6,
+        "missing_event_count": 0,
+    }
+    assert result.direction_market_compatibility["compatible"] is True
+    assert result.direction_market_compatibility["required_market_type"] == "futures"
+
+
+@pytest.mark.parametrize(
+    ("status", "reason_codes", "expected_ratio", "warning_code"),
+    [
+        ("degraded", ("missing_trailing_coverage",), 0.75, "funding_readiness_degraded"),
+        ("unavailable", ("no_funding_rows",), 0.0, "funding_readiness_unavailable"),
+    ],
+)
+def test_preflight_futures_funding_readiness_warns_without_blocking(
+    status: str,
+    reason_codes: tuple[str, ...],
+    expected_ratio: float,
+    warning_code: str,
+) -> None:
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+    request["execution"]["direction_mode"] = "long_only"
+    resolver = _FakeArtifactResolver(
+        funding_coverage_status=status,
+        funding_coverage_policy=status,
+        funding_manifest_hash="c" * 64,
+        funding_rows_count=3 if status == "degraded" else 0,
+        funding_expected_event_count=4,
+        funding_missing_event_count=1 if status == "degraded" else 4,
+        funding_reason_codes=reason_codes,
+    )
+
+    result = _service(resolver=resolver).execute(request)
+
+    assert result.errors == ()
+    assert result.funding_readiness["status"] == status
+    assert result.funding_readiness["coverage_policy"] == "degraded_with_warning"
+    assert result.funding_readiness["warning_codes"] == list(reason_codes)
+    assert result.funding_readiness["coverage_ratio"] == expected_ratio
+    assert warning_code in {warning.code for warning in result.warnings}
+
+
+def test_preflight_futures_missing_funding_manifest_reports_unavailable() -> None:
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+    request["execution"]["direction_mode"] = "long_only"
+
+    result = _service(resolver=_FakeArtifactResolver()).execute(request)
+
+    assert result.funding_readiness["status"] == "unavailable"
+    assert result.funding_readiness["coverage_policy"] == "degraded_with_warning"
+    assert result.funding_readiness["warning_codes"] == ["funding_artifacts_unavailable"]
+    assert result.funding_readiness["funding_manifest_hash"] is None
+
+
+def test_preflight_rejects_new_spot_short_like_requests() -> None:
+    for direction_mode in ("short", "long_short_reversal"):
+        request = _valid_request()
+        request["execution"]["direction_mode"] = direction_mode
+
+        with pytest.raises(BacktestPreflightRejected) as exc_info:
+            _service().execute(request)
+
+        assert exc_info.value.error_code == BACKTEST_ERROR_INVALID_REQUEST
+        assert exc_info.value.issues[0].path == "execution.direction_mode"
+        assert exc_info.value.issues[0].code == (
+            BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET
+        )
+
+
+def test_preflight_request_hash_includes_normalized_funding_config() -> None:
+    default_request = _valid_request()
+    default_request["coordinates"]["market_type"] = "futures"
+    default_request["execution"]["direction_mode"] = "long_only"
+    funding_off_request = _valid_request()
+    funding_off_request["coordinates"]["market_type"] = "futures"
+    funding_off_request["execution"]["direction_mode"] = "long_only"
+    funding_off_request["execution"]["funding"] = {
+        "mode": "off",
+        "coverage_policy": "degraded_with_warning",
+    }
+
+    service = _service(
+        resolver=_FakeArtifactResolver(
+            funding_coverage_status="ready",
+            funding_coverage_policy="ready",
+            funding_manifest_hash="c" * 64,
+            funding_rows_count=6,
+            funding_expected_event_count=6,
+            funding_missing_event_count=0,
+        )
+    )
+
+    assert service.execute(default_request).request_hash != service.execute(
+        funding_off_request
+    ).request_hash
 
 
 def test_preflight_accepts_explicit_min_closed_trades_override() -> None:
@@ -396,6 +570,13 @@ def test_preflight_rejects_end_date_after_artifact_asof_date() -> None:
 class _FakeArtifactResolver:
     coordinates: tuple[BacktestCoordinates, ...] = ()
     artifact_asof_date: str = "2026-04-11"
+    funding_manifest_hash: str | None = None
+    funding_coverage_status: str | None = None
+    funding_coverage_policy: str | None = None
+    funding_rows_count: int | None = None
+    funding_expected_event_count: int | None = None
+    funding_missing_event_count: int | None = None
+    funding_reason_codes: tuple[str, ...] = ()
 
     def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
         self.coordinates = (*self.coordinates, coordinates)
@@ -406,6 +587,13 @@ class _FakeArtifactResolver:
             artifact_asof_date=self.artifact_asof_date,
             hit_times_manifest_hash="b" * 64,
             published_at_utc="2026-03-25T02:00:00Z",
+            funding_manifest_hash=self.funding_manifest_hash,
+            funding_coverage_status=self.funding_coverage_status,
+            funding_coverage_policy=self.funding_coverage_policy,
+            funding_rows_count=self.funding_rows_count,
+            funding_expected_event_count=self.funding_expected_event_count,
+            funding_missing_event_count=self.funding_missing_event_count,
+            funding_reason_codes=self.funding_reason_codes,
         )
 
 
@@ -456,7 +644,7 @@ def _valid_request() -> dict[str, Any]:
         ],
         "risk": {"mode": "none"},
         "execution": {
-            "direction_mode": "long_short_reversal",
+            "direction_mode": "long_only",
             "fee_rate": 0.00075,
             "slippage_rate": 0.0001,
             "initial_cash_quote": 10000.0,

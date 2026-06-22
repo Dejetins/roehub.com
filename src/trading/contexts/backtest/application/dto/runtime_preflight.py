@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 JsonMapping = Mapping[str, Any]
@@ -80,6 +80,7 @@ class BacktestExecutionDefaults:
     sizing: JsonMapping | None = None
     profit_lock: JsonMapping | None = None
     close_on_end: bool = True
+    funding: JsonMapping | None = None
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -90,6 +91,13 @@ class BacktestExecutionDefaults:
             "sizing": dict(self.sizing or {"mode": "all_in"}),
             "profit_lock": dict(self.profit_lock or {"enabled": False}),
             "close_on_end": self.close_on_end,
+            "funding": dict(
+                self.funding
+                or {
+                    "mode": "include_when_futures",
+                    "coverage_policy": "degraded_with_warning",
+                }
+            ),
         }
 
 
@@ -113,6 +121,7 @@ class BacktestRuntimeDefaults:
     indicator_sources: Mapping[str, tuple[str, ...]]
     indicator_param_specs: JsonMapping
     hit_times_grid: JsonMapping
+    direction_market_compatibility: JsonMapping
     links: JsonMapping
 
     def as_mapping(self) -> dict[str, Any]:
@@ -134,6 +143,7 @@ class BacktestRuntimeDefaults:
             },
             "indicator_param_specs": dict(self.indicator_param_specs),
             "hit_times_grid": dict(self.hit_times_grid),
+            "direction_market_compatibility": dict(self.direction_market_compatibility),
             "links": dict(self.links),
         }
 
@@ -218,6 +228,13 @@ class BacktestArtifactMetadata:
     artifact_asof_date: str
     hit_times_manifest_hash: str | None
     published_at_utc: str
+    funding_manifest_hash: str | None = None
+    funding_coverage_status: str | None = None
+    funding_coverage_policy: str | None = None
+    funding_rows_count: int | None = None
+    funding_expected_event_count: int | None = None
+    funding_missing_event_count: int | None = None
+    funding_reason_codes: tuple[str, ...] = ()
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -227,6 +244,13 @@ class BacktestArtifactMetadata:
             "artifact_asof_date": self.artifact_asof_date,
             "hit_times_manifest_hash": self.hit_times_manifest_hash,
             "published_at_utc": self.published_at_utc,
+            "funding_manifest_hash": self.funding_manifest_hash,
+            "funding_coverage_status": self.funding_coverage_status,
+            "funding_coverage_policy": self.funding_coverage_policy,
+            "funding_rows_count": self.funding_rows_count,
+            "funding_expected_event_count": self.funding_expected_event_count,
+            "funding_missing_event_count": self.funding_missing_event_count,
+            "funding_reason_codes": list(self.funding_reason_codes),
         }
 
 
@@ -243,6 +267,8 @@ class BacktestPreflightResult:
     cost_estimate: BacktestCostEstimate
     warnings: tuple[BacktestValidationIssue, ...] = ()
     errors: tuple[BacktestValidationIssue, ...] = ()
+    funding_readiness: JsonMapping = field(default_factory=dict)
+    direction_market_compatibility: JsonMapping = field(default_factory=dict)
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -253,6 +279,8 @@ class BacktestPreflightResult:
             "cost_estimate": self.cost_estimate.as_mapping(),
             "warnings": [warning.as_mapping() for warning in self.warnings],
             "errors": [error.as_mapping() for error in self.errors],
+            "funding_readiness": dict(self.funding_readiness),
+            "direction_market_compatibility": dict(self.direction_market_compatibility),
         }
 
 

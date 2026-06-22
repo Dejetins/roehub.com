@@ -116,6 +116,8 @@ class PublishBacktestArtifactsV2ValidationSummary:
     signal_artifacts: tuple[tuple[str, str], ...]
     signal_manifest_count: int
     hit_times_manifest_present: bool
+    funding_coverage_status: str | None
+    funding_manifest_hash: str | None
     diagnostics_count: int
 
     def as_dict(self) -> Mapping[str, object]:
@@ -151,6 +153,8 @@ class PublishBacktestArtifactsV2ValidationSummary:
             ],
             "signal_manifest_count": self.signal_manifest_count,
             "hit_times_manifest_present": self.hit_times_manifest_present,
+            "funding_coverage_status": self.funding_coverage_status,
+            "funding_manifest_hash": self.funding_manifest_hash,
             "diagnostics_count": self.diagnostics_count,
         }
 
@@ -777,6 +781,16 @@ def _build_validation_summary_v2(
         ),
         signal_manifest_count=len(publish_result.validation.signal_manifests),
         hit_times_manifest_present=publish_result.validation.hit_times_manifest is not None,
+        funding_coverage_status=(
+            None
+            if slot_manifest is None or slot_manifest.funding is None
+            else slot_manifest.funding.coverage_status
+        ),
+        funding_manifest_hash=(
+            None
+            if slot_manifest is None or slot_manifest.funding is None
+            else slot_manifest.funding.funding_manifest_hash
+        ),
         diagnostics_count=len(publish_result.validation.diagnostics),
     )
 

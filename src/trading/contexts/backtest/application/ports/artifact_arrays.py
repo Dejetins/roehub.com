@@ -11,6 +11,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestTpSlHitTimesTableArrays,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactFundingArraysV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactMappingArraysV2,
     ArtifactPriceArraysV2,
@@ -54,6 +55,16 @@ class BacktestArtifactArrayLoader(Protocol):
     ) -> ArtifactMappingArraysV2:
         """
         Load one `mappings/<tf>` family through `np.load(..., mmap_mode="r")`.
+        """
+        ...
+
+    def load_funding_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+    ) -> ArtifactFundingArraysV2:
+        """
+        Load the `funding/` family only when the selected futures job needs it.
         """
         ...
 

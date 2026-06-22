@@ -59,6 +59,7 @@ class FilesystemBacktestArtifactContextResolver:
                 current_pointer.active_slot,
             )
             hit_times_manifest_hash = root_manifest.hit_times.manifest_sha256
+            funding_manifest = root_manifest.funding
             self.artifact_loader.load_hit_times_manifest(
                 artifact_coordinates,
                 current_pointer.active_slot,
@@ -73,6 +74,25 @@ class FilesystemBacktestArtifactContextResolver:
             artifact_asof_date=current_pointer.asof_date,
             hit_times_manifest_hash=hit_times_manifest_hash,
             published_at_utc=current_pointer.published_at_utc,
+            funding_manifest_hash=(
+                None if funding_manifest is None else funding_manifest.funding_manifest_hash
+            ),
+            funding_coverage_status=(
+                None if funding_manifest is None else funding_manifest.coverage_status
+            ),
+            funding_coverage_policy=(
+                None if funding_manifest is None else funding_manifest.coverage_policy
+            ),
+            funding_rows_count=None if funding_manifest is None else funding_manifest.rows_count,
+            funding_expected_event_count=(
+                None if funding_manifest is None else funding_manifest.expected_event_count
+            ),
+            funding_missing_event_count=(
+                None if funding_manifest is None else funding_manifest.missing_event_count
+            ),
+            funding_reason_codes=(
+                () if funding_manifest is None else funding_manifest.reason_codes
+            ),
         )
 
 

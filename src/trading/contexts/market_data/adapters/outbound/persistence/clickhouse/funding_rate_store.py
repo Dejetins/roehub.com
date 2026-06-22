@@ -10,13 +10,22 @@ from trading.contexts.market_data.application.dto import FundingInstrument, Fund
 from trading.contexts.market_data.application.ports.stores.funding_instrument_universe_store import (  # noqa: E501
     FundingInstrumentUniverseStore,
 )
+from trading.contexts.market_data.application.ports.stores.funding_rate_coverage_reader import (
+    FundingRateArtifactRecord,
+    FundingRateCoverageReader,
+    FundingRateCoverageSnapshot,
+)
 from trading.contexts.market_data.application.ports.stores.funding_rate_writer import (
     FundingRateWriter,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
 
-class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseStore):
+class ClickHouseFundingRateStore(
+    FundingRateWriter,
+    FundingInstrumentUniverseStore,
+    FundingRateCoverageReader,
+):
     def __init__(self, *, gateway: ClickHouseGateway, database: str = "market_data") -> None:
         if gateway is None:  # type: ignore[truthy-bool]
             raise ValueError("ClickHouseFundingRateStore requires gateway")
@@ -110,6 +119,46 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
             return None
         return UtcTimestamp(_dt_from_epoch_ms(int(value)))
 
+    def read_funding_coverage(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> FundingRateCoverageSnapshot:
+        q = f"""
+        SELECT
+            market_id,
+            symbol,
+            argMax(instrument_key, ingested_at) AS instrument_key,
+            toUnixTimestamp64Milli(funding_time) AS funding_time_ms,
+            argMax(funding_rate, ingested_at) AS funding_rate,
+            CAST(NULL AS Nullable(Float64)) AS mark_price,
+            argMax(funding_interval_minutes, ingested_at) AS funding_interval_minutes,
+            1 AS data_quality
+        FROM {self._db}.canonical_funding_rates
+        WHERE market_id = %(market_id)s
+          AND symbol = %(symbol)s
+          AND funding_time >= %(start)s
+          AND funding_time < %(end)s
+        GROUP BY market_id, symbol, funding_time
+        ORDER BY funding_time ASC
+        """
+        rows = self._gw.select(
+            q,
+            {
+                "market_id": int(instrument_id.market_id.value),
+                "symbol": str(instrument_id.symbol),
+                "start": _ensure_utc(time_range.start.value),
+                "end": _ensure_utc(time_range.end.value),
+            },
+        )
+        records = tuple(self._artifact_record_from_row(row) for row in rows)
+        return _coverage_snapshot_from_records(
+            instrument_id=instrument_id,
+            time_range=time_range,
+            records=records,
+        )
+
     def _universe_payload(self, row: FundingInstrument) -> Mapping[str, Any]:
         return {
             "market_id": int(row.instrument_id.market_id.value),
@@ -172,6 +221,79 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
         payload = dict(self._canonical_payload(row))
         payload["category"] = row.bybit_category or "linear"
         return payload
+
+    def _artifact_record_from_row(self, row: Mapping[str, Any]) -> FundingRateArtifactRecord:
+        instrument_id = InstrumentId(
+            MarketId(int(row["market_id"])),
+            Symbol(str(row["symbol"])),
+        )
+        return FundingRateArtifactRecord(
+            instrument_id=instrument_id,
+            instrument_key=str(row["instrument_key"]),
+            funding_time=UtcTimestamp(_dt_from_epoch_ms(int(row["funding_time_ms"]))),
+            funding_rate=float(row["funding_rate"]),
+            mark_price=_optional_float(row.get("mark_price")),
+            funding_interval_minutes=int(row["funding_interval_minutes"]),
+            data_quality=int(row["data_quality"]),
+        )
+
+
+def _coverage_snapshot_from_records(
+    *,
+    instrument_id: InstrumentId,
+    time_range: TimeRange,
+    records: tuple[FundingRateArtifactRecord, ...],
+) -> FundingRateCoverageSnapshot:
+    if not records:
+        return FundingRateCoverageSnapshot(
+            status="unavailable",
+            coverage_policy="unavailable",
+            requested_range=time_range,
+            available_start=None,
+            available_end=None,
+            expected_event_count=0,
+            observed_event_count=0,
+            missing_event_count=0,
+            reason_codes=("no_funding_rows",),
+            records=(),
+        )
+    interval_ms = int(records[0].funding_interval_minutes) * 60 * 1000
+    start_ms = _epoch_ms(time_range.start.value)
+    end_ms = _epoch_ms(time_range.end.value)
+    times_ms = tuple(_epoch_ms(record.funding_time.value) for record in records)
+    missing_event_count = 0
+    reason_codes: list[str] = []
+    first_ms = times_ms[0]
+    last_ms = times_ms[-1]
+    if first_ms > start_ms + interval_ms:
+        missing_event_count += 1
+        reason_codes.append("missing_leading_coverage")
+    for previous_ms, current_ms in zip(times_ms, times_ms[1:]):
+        interval_gap_count = max(0, round((current_ms - previous_ms) / interval_ms) - 1)
+        if interval_gap_count > 0:
+            missing_event_count += interval_gap_count
+            if "funding_interval_gap" not in reason_codes:
+                reason_codes.append("funding_interval_gap")
+    if last_ms < end_ms - interval_ms:
+        missing_event_count += 1
+        reason_codes.append("missing_trailing_coverage")
+    status = "ready" if missing_event_count == 0 else "degraded"
+    return FundingRateCoverageSnapshot(
+        status=status,
+        coverage_policy="ready" if status == "ready" else "degraded_with_warning",
+        requested_range=time_range,
+        available_start=records[0].funding_time,
+        available_end=records[-1].funding_time,
+        expected_event_count=len(records) + missing_event_count,
+        observed_event_count=len(records),
+        missing_event_count=missing_event_count,
+        reason_codes=tuple(reason_codes),
+        records=records,
+    )
+
+
+def _epoch_ms(value: datetime) -> int:
+    return int(_ensure_utc(value).timestamp() * 1000)
 
 
 def _ensure_utc(value: datetime) -> datetime:

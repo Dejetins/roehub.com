@@ -27,6 +27,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.application.services.v2 import (
+    BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
     SUPPORTED_BACKTEST_TIMEFRAMES_V1,
     BacktestAdmissionConfig,
     BacktestAdmissionService,
@@ -79,11 +80,21 @@ def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
     payload = response.json()
     assert payload["supported_timeframes"] == list(SUPPORTED_BACKTEST_TIMEFRAMES_V1)
     assert payload["risk_modes"] == ["none", "tp_sl_grid"]
-    assert payload["direction_modes"] == ["long_only", "long_short_reversal"]
+    assert payload["direction_modes"] == ["long_only", "short", "long_short_reversal"]
     assert "fixed_equity_pct_max_quote" in payload["sizing_modes"]
     assert "total_return_pct" in payload["ranking_metrics"]
     assert payload["top_n_default"] == 10
     assert payload["guardrails"]["max_top_n"] == 50
+    assert payload["execution_defaults"]["funding"] == {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert payload["direction_market_compatibility"]["markets"]["spot"][
+        "rejected_direction_modes"
+    ] == {
+        "short": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+        "long_short_reversal": BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
+    }
     assert payload["indicator_param_specs"]["ma.dema"]["params"]["window"] == {
         "mode": "range",
         "start": 5,
@@ -109,8 +120,111 @@ def test_post_backtest_preflight_returns_normalized_result_without_job_creation(
     assert len(payload["request_hash"]) == 64
     assert payload["artifact_metadata"]["artifact_slot"] == "slot_a"
     assert payload["cost_estimate"]["candidate_combinations"] == 6
+    assert payload["normalized_request"]["execution"]["funding"] == {
+        "mode": "off",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert payload["funding_readiness"]["status"] == "not_applicable"
+    assert payload["direction_market_compatibility"]["compatible"] is True
     assert payload["errors"] == []
     assert resolver.coordinates == (BacktestCoordinates("binance", "spot", "BTCUSDT"),)
+
+
+def test_post_backtest_preflight_returns_futures_funding_readiness_fixtures() -> None:
+    client = _build_client(
+        resolver=_FakeArtifactResolver(
+            funding_coverage_status="degraded",
+            funding_coverage_policy="degraded_with_warning",
+            funding_manifest_hash="c" * 64,
+            funding_rows_count=3,
+            funding_expected_event_count=4,
+            funding_missing_event_count=1,
+            funding_reason_codes=("missing_trailing_coverage",),
+        )
+    )
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+    request["execution"]["direction_mode"] = "short"
+
+    response = client.post(
+        "/backtests/preflight",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000202"},
+        json=request,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["normalized_request"]["execution"]["funding"] == {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert payload["funding_readiness"]["status"] == "degraded"
+    assert payload["funding_readiness"]["warning_codes"] == ["missing_trailing_coverage"]
+    assert payload["funding_readiness"]["coverage_ratio"] == 0.75
+    assert payload["funding_readiness"]["funding_manifest_hash"] == "c" * 64
+    assert payload["direction_market_compatibility"]["required_market_type"] == "futures"
+
+
+@pytest.mark.parametrize(
+    ("status", "rows_count", "expected_event_count", "missing_event_count", "warning_codes"),
+    [
+        ("ready", 4, 4, 0, []),
+        ("degraded", 3, 4, 1, ["missing_trailing_coverage"]),
+        ("unavailable", 0, 4, 4, ["no_funding_rows"]),
+    ],
+)
+def test_post_backtest_preflight_route_smoke_for_futures_funding_statuses(
+    status: str,
+    rows_count: int,
+    expected_event_count: int,
+    missing_event_count: int,
+    warning_codes: list[str],
+) -> None:
+    client = _build_client(
+        resolver=_FakeArtifactResolver(
+            funding_coverage_status=status,
+            funding_coverage_policy=(
+                "degraded_with_warning" if status == "degraded" else status
+            ),
+            funding_manifest_hash="c" * 64,
+            funding_rows_count=rows_count,
+            funding_expected_event_count=expected_event_count,
+            funding_missing_event_count=missing_event_count,
+            funding_reason_codes=tuple(warning_codes),
+        )
+    )
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+
+    response = client.post(
+        "/backtests/preflight",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000202"},
+        json=request,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["funding_readiness"]["status"] == status
+    assert payload["funding_readiness"]["coverage_policy"] == "degraded_with_warning"
+    assert payload["funding_readiness"]["warning_codes"] == warning_codes
+
+
+def test_post_backtest_preflight_rejects_spot_short_like_direction() -> None:
+    client = _build_client()
+    request = _valid_request()
+    request["execution"]["direction_mode"] = "long_short_reversal"
+
+    response = client.post(
+        "/backtests/preflight",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000203"},
+        json=request,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.invalid_request"
+    assert response.json()["error"]["details"]["errors"][0]["code"] == (
+        BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET
+    )
 
 
 @pytest.mark.parametrize("timeframe", SUPPORTED_BACKTEST_TIMEFRAMES_V1)
@@ -229,6 +343,26 @@ def test_post_backtest_job_creates_job_and_exposes_public_top_variant_key() -> N
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
 
 
+def test_post_backtest_job_rejects_spot_short_like_direction() -> None:
+    repository = _FakeJobRepository()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
+    request = _valid_request()
+    request["execution"]["direction_mode"] = "short"
+
+    response = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
+        json=request,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "backtest.invalid_request"
+    assert response.json()["error"]["details"]["errors"][0]["code"] == (
+        BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET
+    )
+    assert repository.jobs == {}
+
+
 def test_post_backtest_variant_strategy_requires_idempotency_and_returns_provenance() -> None:
     use_case = _FakeCreateStrategyFromVariantUseCase()
     client = _build_client(create_strategy_from_variant_use_case=use_case)
@@ -319,6 +453,8 @@ def test_get_backtest_variant_scenario_matrix_uses_public_top_variant_key() -> N
         scenario_matrix_service=matrix_service,
         backtest_variant_launch_reader=_RepoVariantLaunchReader(repository=repository),
     )
+    request["coordinates"]["market_type"] = "futures"
+    request["execution"]["direction_mode"] = "long_short_reversal"
     created = client.post(
         "/backtests/jobs",
         headers={"x-user-id": "00000000-0000-0000-0000-000000000205"},
@@ -347,23 +483,23 @@ def test_get_backtest_variant_scenario_matrix_uses_public_top_variant_key() -> N
     paper_long = _find_api_matrix_row(
         payload=payload,
         mode="paper",
-        market_type="spot",
+        market_type="futures",
         entry_sizing="fixed_quote",
         direction="long",
     )
     assert paper_long["scenario_state"] == "blocked"
     assert paper_long["launch_blocked"] is True
     assert paper_long["launch_blocked_reason"] == "unsupported_live_evaluator"
-    testnet_spot_short = _find_api_matrix_row(
+    testnet_futures_short = _find_api_matrix_row(
         payload=payload,
         mode="testnet",
-        market_type="spot",
+        market_type="futures",
         entry_sizing="fixed_quote",
         direction="short",
     )
-    assert testnet_spot_short["scenario_state"] == "blocked"
-    assert testnet_spot_short["launch_blocked_reason"] == "spot_short_not_supported"
-    assert testnet_spot_short["order_capability"] == "unsupported"
+    assert testnet_futures_short["scenario_state"] == "blocked"
+    assert testnet_futures_short["launch_blocked_reason"] == "unsupported_live_evaluator"
+    assert testnet_futures_short["order_capability"] == "real_order_capable"
 
 
 def test_post_backtest_job_rejects_ultra_top_n_above_50() -> None:
@@ -1490,6 +1626,13 @@ def _mapping(value: Any) -> dict[str, Any]:
 @dataclass
 class _FakeArtifactResolver:
     coordinates: tuple[BacktestCoordinates, ...] = ()
+    funding_manifest_hash: str | None = None
+    funding_coverage_status: str | None = None
+    funding_coverage_policy: str | None = None
+    funding_rows_count: int | None = None
+    funding_expected_event_count: int | None = None
+    funding_missing_event_count: int | None = None
+    funding_reason_codes: tuple[str, ...] = ()
 
     def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
         self.coordinates = (*self.coordinates, coordinates)
@@ -1500,6 +1643,13 @@ class _FakeArtifactResolver:
             artifact_asof_date="2026-03-25",
             hit_times_manifest_hash="b" * 64,
             published_at_utc="2026-03-25T02:00:00Z",
+            funding_manifest_hash=self.funding_manifest_hash,
+            funding_coverage_status=self.funding_coverage_status,
+            funding_coverage_policy=self.funding_coverage_policy,
+            funding_rows_count=self.funding_rows_count,
+            funding_expected_event_count=self.funding_expected_event_count,
+            funding_missing_event_count=self.funding_missing_event_count,
+            funding_reason_codes=self.funding_reason_codes,
         )
 
 
@@ -2388,7 +2538,7 @@ def _valid_request() -> dict[str, Any]:
         ],
         "risk": {"mode": "none"},
         "execution": {
-            "direction_mode": "long_short_reversal",
+            "direction_mode": "long_only",
             "fee_rate": 0.00075,
             "slippage_rate": 0.0001,
             "initial_cash_quote": 10000.0,

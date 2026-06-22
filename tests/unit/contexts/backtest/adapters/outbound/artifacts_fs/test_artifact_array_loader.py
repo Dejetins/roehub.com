@@ -14,6 +14,9 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactContextResolver,
 )
 from trading.contexts.backtest.application.dto import BacktestCoordinates
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+)
 
 
 def test_filesystem_artifact_array_loader_mmaps_prices_mappings_and_signals(
@@ -40,6 +43,40 @@ def test_filesystem_artifact_array_loader_mmaps_prices_mappings_and_signals(
     assert price_arrays_15m.ohlcv.dtype == np.float32
     assert mapping_arrays.bar_open_1m_idx.dtype == np.uint32
     assert signal_matrix.matrix.dtype == np.int8
+
+
+def test_filesystem_artifact_array_loader_mmaps_funding_arrays(tmp_path: Path) -> None:
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+        ),
+        include_funding=True,
+        funding_coverage_status="degraded",
+        funding_reason_codes=("funding_interval_gap",),
+    )
+    context = _resolve_context(
+        store=store,
+        coordinates=BacktestCoordinates(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+        ),
+    )
+    loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
+
+    funding_arrays = loader.load_funding_arrays(context=context)
+
+    assert funding_arrays.coverage_status == "degraded"
+    assert funding_arrays.manifest.coverage_policy == "degraded_with_warning"
+    assert isinstance(funding_arrays.funding_time, np.memmap)
+    assert funding_arrays.funding_time.dtype == np.int64
+    assert funding_arrays.funding_rate.dtype == np.float64
+    assert funding_arrays.mark_price.dtype == np.float64
+    assert funding_arrays.funding_interval_minutes.dtype == np.uint16
+    assert funding_arrays.data_quality.dtype == np.uint8
 
 
 def test_filesystem_artifact_array_loader_copies_contiguous_and_non_contiguous_rows(
@@ -119,21 +156,26 @@ def test_filesystem_artifact_array_loader_reports_missing_signal_artifact(
         )
 
 
-def _resolve_context(*, store: Any):
-    resolver = FilesystemBacktestArtifactContextResolver(artifact_loader=store.loader)
-    metadata = resolver.resolve_context(
-        coordinates=BacktestCoordinates(
+def _resolve_context(
+    *,
+    store: Any,
+    coordinates: BacktestCoordinates | None = None,
+):
+    effective_coordinates = (
+        BacktestCoordinates(
             exchange="binance",
             market_type="spot",
             symbol="BTCUSDT",
         )
+        if coordinates is None
+        else coordinates
+    )
+    resolver = FilesystemBacktestArtifactContextResolver(artifact_loader=store.loader)
+    metadata = resolver.resolve_context(
+        coordinates=effective_coordinates
     )
     loader = FilesystemBacktestArtifactArrayLoader(artifact_loader=store.loader)
     return loader.resolve_context(
-        coordinates=BacktestCoordinates(
-            exchange="binance",
-            market_type="spot",
-            symbol="BTCUSDT",
-        ),
+        coordinates=effective_coordinates,
         artifact_metadata=metadata,
     )

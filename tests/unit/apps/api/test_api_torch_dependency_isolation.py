@@ -17,6 +17,7 @@ from pathlib import Path
 os.environ.setdefault("ROEHUB_NUMBA_NUM_THREADS", "1")
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 os.environ.setdefault("STRATEGY_PG_DSN", "postgresql://user:pass@localhost:5432/roehub")
+os.environ["IDENTITY_FAIL_FAST"] = "false"
 
 original_read_text = Path.read_text
 

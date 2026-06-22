@@ -11,6 +11,9 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
     BacktestArtifactManifestValidatorV2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+)
 
 
 def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
@@ -55,6 +58,63 @@ def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
     assert result.hit_times_manifest is not None
     assert result.hit_times_manifest.timeline_bar_count == 2
     assert result.diagnostics == ()
+
+
+def test_backtest_artifact_manifest_validator_v2_accepts_futures_funding(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+        ),
+        include_funding=True,
+        funding_coverage_status="degraded",
+        funding_reason_codes=("funding_interval_gap",),
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
+
+    result = validator.validate_slot(
+        coordinates=store.coordinates,
+        slot=store.inactive_slot,
+        validation_spec=store.validation_spec,
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert result.slot_manifest is not None
+    assert result.slot_manifest.funding is not None
+    assert result.slot_manifest.funding.coverage_status == "degraded"
+    assert result.slot_manifest.funding.coverage_policy == "degraded_with_warning"
+    assert result.diagnostics == ()
+
+
+def test_backtest_artifact_manifest_validator_v2_requires_futures_funding(
+    tmp_path: Path,
+) -> None:
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+        ),
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
+
+    result = validator.validate_slot(
+        coordinates=store.coordinates,
+        slot=store.inactive_slot,
+        validation_spec=store.validation_spec,
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert "funding_manifest_missing_for_futures" in tuple(
+        diagnostic.code for diagnostic in result.diagnostics
+    )
 
 
 def test_backtest_artifact_manifest_validator_v2_accepts_legacy_slot_without_signal_features(

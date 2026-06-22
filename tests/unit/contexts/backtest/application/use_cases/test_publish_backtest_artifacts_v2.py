@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Sequence, cast
 
+import numpy as np
 import pytest
 
 from tests.unit.contexts.backtest.application.services.v2 import (
@@ -24,6 +25,9 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_precom
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
     BacktestArtifactSlotPublisherV2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+)
 from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
     BacktestSignalRulesEngineV2,
 )
@@ -32,6 +36,11 @@ from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2UseCase,
 )
 from trading.contexts.market_data.application.ports.stores import DailyTsOpenCount
+from trading.contexts.market_data.application.ports.stores.funding_rate_coverage_reader import (
+    FundingRateArtifactRecord,
+    FundingRateCoverageReader,
+    FundingRateCoverageSnapshot,
+)
 from trading.shared_kernel.primitives import InstrumentId, TimeRange, UtcTimestamp
 
 _PUBLISH_NOW_UTC_V2 = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
@@ -243,6 +252,50 @@ class _ZeroBlockingJobRepository:
         return 0
 
 
+class _FixedFundingCoverageReader:
+    def __init__(self, *, second_rate: float = -0.0005) -> None:
+        self._second_rate = second_rate
+
+    def read_funding_coverage(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> FundingRateCoverageSnapshot:
+        records = (
+            FundingRateArtifactRecord(
+                instrument_id=instrument_id,
+                instrument_key=f"{instrument_id.market_id.value}:{instrument_id.symbol}",
+                funding_time=UtcTimestamp(time_range.start.value + timedelta(hours=8)),
+                funding_rate=0.001,
+                mark_price=None,
+                funding_interval_minutes=480,
+                data_quality=1,
+            ),
+            FundingRateArtifactRecord(
+                instrument_id=instrument_id,
+                instrument_key=f"{instrument_id.market_id.value}:{instrument_id.symbol}",
+                funding_time=UtcTimestamp(time_range.start.value + timedelta(hours=16)),
+                funding_rate=self._second_rate,
+                mark_price=None,
+                funding_interval_minutes=480,
+                data_quality=1,
+            ),
+        )
+        return FundingRateCoverageSnapshot(
+            status="degraded",
+            coverage_policy="degraded_with_warning",
+            requested_range=time_range,
+            available_start=records[0].funding_time,
+            available_end=records[-1].funding_time,
+            expected_event_count=3,
+            observed_event_count=2,
+            missing_event_count=1,
+            reason_codes=("funding_interval_gap",),
+            records=records,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class _PublishUseCaseFixtureV2:
     """
@@ -328,6 +381,51 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     ).parent.is_dir()
     assert len(publish_fixture.index_reader.bounds_calls) == 1
     assert publish_fixture.index_reader.bounds_calls[0][1] == UtcTimestamp(_PUBLISH_NOW_UTC_V2)
+
+
+def test_publish_backtest_artifacts_v2_publishes_futures_funding_arrays(
+    tmp_path: Path,
+) -> None:
+    coordinates = ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="futures",
+        symbol="BTCUSDT",
+    )
+    publish_fixture = _build_publish_use_case_fixture_v2(
+        tmp_path=tmp_path,
+        coordinates=coordinates,
+        funding_rate_coverage_reader=_FixedFundingCoverageReader(),
+    )
+    publish_fixture.fixture.builder.current_pointer_path(coordinates).unlink()
+
+    result = publish_fixture.use_case.run(
+        PublishBacktestArtifactsV2Request(coordinates=coordinates)
+    )
+    manifest = publish_fixture.fixture.loader.load_slot_manifest(coordinates, "slot_a")
+    funding_paths = publish_fixture.fixture.loader.resolve_funding_paths(coordinates, "slot_a")
+
+    assert manifest.funding is not None
+    assert manifest.funding.coverage_status == "degraded"
+    assert manifest.funding.coverage_policy == "degraded_with_warning"
+    assert manifest.funding.funding_manifest_hash != "0" * 64
+    assert result.validation.funding_coverage_status == "degraded"
+    assert result.validation.funding_manifest_hash == manifest.funding.funding_manifest_hash
+    assert np.load(funding_paths.funding_rate, allow_pickle=False).dtype == np.float64
+
+    changed_fixture = _build_publish_use_case_fixture_v2(
+        tmp_path=tmp_path / "changed",
+        coordinates=coordinates,
+        funding_rate_coverage_reader=_FixedFundingCoverageReader(second_rate=0.002),
+    )
+    changed_fixture.fixture.builder.current_pointer_path(coordinates).unlink()
+    changed_result = changed_fixture.use_case.run(
+        PublishBacktestArtifactsV2Request(coordinates=coordinates)
+    )
+
+    assert (
+        changed_result.validation.funding_manifest_hash
+        != result.validation.funding_manifest_hash
+    )
 
 
 def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_and_recreates_pruned_slot(  # noqa: E501
@@ -464,7 +562,12 @@ def test_publish_backtest_artifacts_v2_fails_fast_on_invalid_current_pointer(
     assert len(publish_fixture.index_reader.bounds_calls) == 1
 
 
-def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixtureV2:
+def _build_publish_use_case_fixture_v2(
+    *,
+    tmp_path: Path,
+    coordinates: ArtifactCoordinatesV2 | None = None,
+    funding_rate_coverage_reader: FundingRateCoverageReader | None = None,
+) -> _PublishUseCaseFixtureV2:
     """
     Build the shared publish use-case with real runner/publisher services and temp storage.
 
@@ -487,6 +590,7 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
     """
     fixture = build_artifact_precompute_fixture_v2(
         tmp_path=tmp_path,
+        coordinates=coordinates,
         validation_signal_artifacts=(("15m", "ma.ema"),),
         precompute_signal_artifacts=(("15m", "ma.ema"),),
         require_hit_times_manifest=True,
@@ -504,6 +608,7 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
         runtime_settings=fixture.runtime_settings,
         artifact_loader=fixture.loader,
         canonical_candle_reader=precompute_runner_testkit_v2._FakeCanonicalCandleReader(rows=rows),
+        funding_rate_coverage_reader=funding_rate_coverage_reader,
         defaults_provider=defaults_provider,
         signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
         indicator_compute=precompute_runner_testkit_v2._DeterministicSignalCompute(

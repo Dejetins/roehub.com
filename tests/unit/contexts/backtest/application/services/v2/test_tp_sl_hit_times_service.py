@@ -321,6 +321,9 @@ class _CountingHitTimesLoader:
     def load_signal_rows(self, **kwargs: Any) -> Any:
         return self._inner.load_signal_rows(**kwargs)
 
+    def load_funding_arrays(self, **kwargs: Any) -> Any:
+        return self._inner.load_funding_arrays(**kwargs)
+
     def load_hit_times_grid_arrays(self, **kwargs: Any) -> Any:
         self.counts["load_hit_times_grid_arrays"] += 1
         return self._inner.load_hit_times_grid_arrays(**kwargs)

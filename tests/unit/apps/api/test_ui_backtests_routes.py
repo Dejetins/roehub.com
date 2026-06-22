@@ -106,7 +106,7 @@ def test_get_backtest_workstation_returns_bounded_read_model_without_trades() ->
     assert payload["job_table"]["items"][0]["strategy"] == "dema-1h-long-short-a1b2c3"
     assert payload["job_table"]["items"][0]["exchange"] == "binance"
     assert payload["job_table"]["items"][0]["market_type"] == "spot"
-    assert payload["job_table"]["items"][0]["direction"] == "long_short_reversal"
+    assert payload["job_table"]["items"][0]["direction"] == "long_only"
     assert payload["refresh_control"]["manual"] is True
     assert payload["refresh_control"]["default_preset"] == "15s"
     assert "trades" not in payload["job_table"]["items"][0]
