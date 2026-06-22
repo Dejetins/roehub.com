@@ -2,6 +2,13 @@
 
 Статус: architecture plan для нового цикла реализации. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает следующий самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 6h acceptance с controlled burst/load и CPU/RAM evidence.
 
+Актуализация 2026-06-23: этот live-execution план остается активным по
+собственному ledger, но должен учитывать уже принятый
+`Backtest Futures Funding And Short Direction Policy v1`. Исторические
+stage-доказательства этого плана не переписываются задним числом; новые
+запуски, repair stages и будущие rerun-доказательства обязаны соблюдать
+futures-only short-like policy и funding-aware метрики из backtest контракта.
+
 ## Цель
 
 Доказать полный пользовательский и runtime-цикл безопасной торговли стратегиями без mainnet денег:
@@ -73,7 +80,27 @@ Roehub должен дать пользователю простой путь: �
 | `spot` | Может быть реальным testnet buy/sell lifecycle, если min notional/precision/balance проходят. | В v1 не является реальным spot order без отдельного margin/borrow продукта. Acceptance для spot-short: явный blocked/unsupported scenario с reason code, а не “фейковый short”. |
 | `futures` | Может быть реальным testnet futures long при verified account/config guard. | Может быть реальным testnet futures short только при verified isolated margin, leverage `1x`, expected position mode, precision, min notional и balance projection. |
 
-Paper stage обязан пройти все `direction` branches, но не должен маскировать unsupported spot-short как production-capable real order. Testnet stage обязан выполнить реальные shorts через futures, а spot-short зафиксировать как корректно заблокированную ветку, пока margin trading не появится отдельным планом.
+Backtest funding/short-policy update: новые `short` и `long_short_reversal`
+backtest-origin strategy launches требуют `market_type=futures` даже для
+`paper`. `spot` short-like rows from earlier Stage `03`/`07`/`09` evidence are
+historical compatibility/unsupported proof only; future stages must not create a
+new paper/testnet spot short-like strategy as if it were launchable. Testnet
+stage обязан выполнять реальные shorts через futures, а spot-short фиксировать
+как корректно заблокированную legacy/compatibility ветку, пока margin trading не
+появится отдельным планом.
+
+## Backtest Funding / Short-Policy Downstream Contract
+
+Этот live-execution цикл потребляет результаты backtest runtime и поэтому
+должен следовать принятому backtest контракту:
+
+| Область | Обязательное поведение дальше |
+|---|---|
+| New short-like launches | `short` и `long_short_reversal` запускаются только как futures. Spot request должен получить стабильный blocked reason, совместимый с `short_direction_requires_futures_market`, или UI должен предложить rerun as futures. |
+| Historical spot short-like evidence | Accepted rows/reports from this plan remain factual history; they must not be reinterpreted as permission to launch new spot short-like strategies. |
+| Funding metrics | Futures variant selection/readiness should preserve gross `total_return_pct` and surface `total_return_pct_net_of_funding` when available. Strategy launch evidence should state whether funding readiness is `ready`, `degraded`, `unavailable` or `not_applicable`. |
+| Paper accounting | Paper can remain no-exchange/no-dispatch, but it must not hide funding degraded warnings for futures or pretend spot short-like is a current launchable branch. |
+| Testnet execution | Real short proof remains futures-only with isolated `1x` guard and no hidden order-time account-config mutation. |
 
 ## Термины Fail-Closed И Account Config
 
@@ -209,7 +236,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `04` | BTCUSDT market readiness | Проверить/provision readiness только для `BTCUSDT` across Binance/Bybit spot/futures; non-BTC остается out of scope. | Redis market-data freshness, ClickHouse/reference rows, API readiness, browser status. |
 | `05` | Safe testnet exchange binding | Testnet exchange selection, futures guard, safe isolated short `1x`, no hidden order-time config mutation. | Real Binance/Bybit testnet account/config reads, SQL projection, guard mismatch block; later repair adds explicit account-config command rather than mutating during submit. |
 | `06` | Supervised strategy producer | Отдельный launchd/Monit service for strategy producer, per-user/per-strategy allowlist, admin switch, no mainnet. | launchd/Monit/Prometheus evidence, health/readiness, stop/restart proof, kill switch, allowlist block/allow. |
-| `07` | Paper full branch coverage | Полная matrix coverage в paper: all sizing/risk/direction with `$50`, paper orders/fills/accounting. | API/DB/Redis/browser proof for every matrix row; PnL/fees/funding completeness flags; no exchange submit. |
+| `07` | Paper full branch coverage | Полная matrix coverage в paper для launchable rows after current compatibility policy: long spot/futures and short-like futures; historical spot short-like remains unsupported/compatibility-only. | API/DB/Redis/browser proof for every matrix row; gross/net funding completeness flags where applicable; no exchange submit. |
 | `08` | Manual entry and manual exit | UI buttons for manual entry and manual stop/exit through same source-event/risk/order path. | Playwright clicks, source-event/intent/order/outbox rows, duplicate/idempotency proof, blocked state proof. |
 | `09` | Real testnet representative orders | Binance/Bybit x spot/futures x long/short branches x sizing groups on `BTCUSDT`; spot-short is blocked/unsupported unless margin product exists, futures short only isolated `1x`. | Real testnet order submit/status/fill/cancel or close for supported branches, explicit blocked proof for unsupported spot-short, DB order/fill/reconciliation rows, Redis ack, metrics, no mainnet. |
 | `10` | Strategy UI status and journal | `/strategies` shows market/exchange/environment, producer state, latest signals, execution outcome links, manual controls. | Playwright desktop/mobile, console/network clean, DOM secret scan, API dashboard proof. |
@@ -366,6 +393,7 @@ Prompt pack для реализации этого плана должен жи�
 | `$50` может быть меньше min notional для некоторых сценариев | Stage `03`/`05`/`07`/`09` фиксируют min-notional block; капитал не увеличивается автоматически. |
 | Futures short требует account config | Stage `05`/`09` блокируют short, если isolated `1x` не доказан. Оператор может исправить testnet futures config через явную account-config command; execution всё равно проверяет read-back evidence перед order. |
 | Spot short не является обычным spot order | Stage `03`/`07`/`09` должны доказать эту ветку как blocked/unsupported без margin trading, а не симулировать ее как реальный spot short. |
+| Backtest funding/short-policy drift | Все future repair/rerun stages должны учитывать принятый `Backtest Futures Funding And Short Direction Policy v1`: short-like только futures, gross/net funding metrics visible, funding degraded warnings не скрывать. |
 | Сотни testnet strategies могут создать bursts | Stage `11` обязан доказать внутренний limiter/backpressure на testnet-mode strategies, даже если биржевые лимиты ожидаемо не достигнуты. |
 | Stage `12` может выявить отсутствие active runtime, flaky runtime или resource pressure | Каждый gate фиксирует blocker отдельно. Нельзя тратить 6 часов на idle system: `12.1` fail-fast блокирует soak, если producer disabled, allowlists empty или `running_strategy_runs = 0`. |
 | Notification delivery еще нет | Stage `13` делает delivery-neutral outbox contract, но не обещает Telegram/email доставку. |

@@ -10,7 +10,7 @@
 | `prompt_pack` | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/` |
 | `ledger_status` | `active` |
 | `current_stage` | `12.2` |
-| `updated_at` | `2026-06-21` |
+| `updated_at` | `2026-06-23` |
 | `owner` | `Roehub agents / implementation executors` |
 
 ## Правила Обновления
@@ -193,11 +193,25 @@
 | `12` | Monolithic Stage `12` approach is superseded and must not be rerun as acceptance. | superseded | Execute independent gates `12.1`-`12.5`. `12.1` owns fail-fast readiness; no 6h timer starts until active strategy runtime is proven. | Historical baseline-only evidence remains in `12-supervised-6h-soak.md`; it proves why idle/monolithic observation is insufficient. | yes, only `12.1` |
 | `12.1` | none | none | Stage `12.2` may start with selected Testnet subject `ab094ba2-...` / `ee15e181-...` / `bb5d31ca-...`; keep producer allowlist scoped and do not start burst or 6h soak from the canary prompt. | `12-1-readiness-gate.md`; `/health/ready` producer enabled `true`; allowlist entries `1/1`; SQL `running_strategy_runs=1`, `active_paper_testnet=1`; dashboard selected strategy `producer_status=running`, `run_state=running`; Redis pending `0`; Monit OK; Prometheus core targets `up=1`; exchange-execution `adapter_mode=testnet`. | yes |
 | `12.2` | Functional canary did not prove active producer progress: the declared 31m window created `0` signals and `0` source events; cycle/poll metrics stayed frozen after a pre-window burst. | high | Repair producer loop/candle freshness/readiness semantics, then rerun Stage `12.2` with a fresh declared canary window. Investigate the prior ClickHouse read-path failure and the replacement run's stale cycle metrics. | `12-2-functional-canary.md`; production `/strategies` browser/API evidence; Mac Studio DB/Redis/metrics collector evidence. | no |
+| backtest funding/short-policy sync | `Backtest Futures Funding And Short Direction Policy v1` is accepted through Stage `08`; new `short` and `long_short_reversal` backtest-origin strategy launches are futures-only even in paper. Historical spot-short rows in this strategy-producer plan remain compatibility/unsupported evidence, not current launch permission. | high | Future strategy-producer repair/rerun stages must preserve gross `total_return_pct`, surface `total_return_pct_net_of_funding` when available, carry funding readiness/degraded warnings, and reject or rerun-as-futures any new spot short-like launch. | `docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md`; `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md` | no |
+
+## Next Prompt
+
+Next prompt to run: `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/12-2-functional-canary.md`.
+
+Reason: Stage `12.2` remains `blocked`; Stage `12.3` must not start until a fresh
+Stage `12.2` canary proves in-window producer polling, signals and source events.
+Before rerun, the executor must repair or explicitly diagnose producer
+progress/candle freshness/readiness semantics. The rerun must also observe the
+accepted backtest funding/short-policy contract: no new spot short-like launch
+subjects, futures funding warnings preserved, and gross/net return fields kept
+visible when backtest variant data includes them.
 
 ## Change Log
 
 | Date | Stage | Change | Evidence |
 |---|---|---|---|
+| 2026-06-23 | docs-sync | Synchronized this live-execution plan/ledger with accepted `Backtest Futures Funding And Short Direction Policy v1`: new short-like strategy launches are futures-only even in paper; old spot-short evidence remains historical compatibility/unsupported proof; funding-aware gross/net metrics and degraded readiness warnings must be preserved in future reruns. Current stage remains `12.2 blocked`; next prompt is `12-2-functional-canary.md`, not `12-3`. | `strategy-producer-paper-testnet-trading-v1.md`; this ledger; backtest funding/short-policy Stage `08` ledger |
 | 2026-06-21 | plan / `12` | Superseded the monolithic Stage `12` prompt and split acceptance into independent gates: `12.1` readiness, `12.2` functional canary, `12.3` burst/resource, `12.4` sustained 6h soak, `12.5` closure. | `strategy-producer-paper-testnet-trading-v1.md`; prompt pack `12-1`..`12-5` |
 | 2026-06-21 | `12.1` | Repaired readiness with a scoped Testnet subject under `smoke_e2e_keycloak`: refreshed Binance spot/futures testnet account projections, created MA(3,5) BTCUSDT spot testnet strategy/profile/run through API, enabled producer through a host LaunchAgent override for only the selected user/strategy, and accepted Stage `12.1` after SQL/API/Redis/Monit/Prometheus/RSS proof. | `12-1-readiness-gate.md`; Mac Studio `/health/ready`, metrics, SQL, `/ui/strategies/dashboard?strategy_id=...`, Redis, Monit, Prometheus, process RSS evidence |
 | 2026-06-21 | `12.2` | Ran a 31m functional canary on replacement Testnet run `ec1aeb3c-...`; safety boundaries held, but the declared window produced no signal/source-event delta and producer cycle/poll metrics froze after a pre-window burst, so Stage `12.2` is blocked and `12.3` remains closed. | `12-2-functional-canary.md`; Mac Studio collector; production `/strategies` browser/API proof |
