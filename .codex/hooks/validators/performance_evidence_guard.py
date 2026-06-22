@@ -41,10 +41,26 @@ CLAIM_PATTERN = re.compile(
     r"\b\d+(?:\.\d+)?\s*(?:x|%|ms|s|sec|secs|seconds|rows/s|rps|qps|mb|gb)\b",
     re.IGNORECASE,
 )
-CLAIM_WORDS = ["speedup", "faster", "slower", "regression", "overhead", "ускор", "быстр", "медлен"]
+CLAIM_WORDS = [
+    "speedup",
+    "faster",
+    "slower",
+    "regression",
+    "overhead",
+    "ускор",
+    "быстр",
+    "медлен",
+]
 
 BASELINE_ANCHORS = ["baseline", "before", "current baseline", "базов", "до изменения"]
-CANDIDATE_ANCHORS = ["candidate", "after", "current measurement", "candidate current", "после", "кандидат"]
+CANDIDATE_ANCHORS = [
+    "candidate",
+    "after",
+    "current measurement",
+    "candidate current",
+    "после",
+    "кандидат",
+]
 EVIDENCE_ANCHORS = [
     "benchmark_results",
     "benchmark_summary",

@@ -59,9 +59,14 @@ def _missing_runtime_boundary(text: str) -> list[str]:
 
     missing: list[str] = []
     if has_any(lowered, AMBIGUOUS_PROOF_TERMS) and not has_any(lowered, BOUNDARY_LABELS):
-        missing.append("replace ambiguous target-runtime proof wording with explicit proof_boundary labels")
+        missing.append(
+            "replace ambiguous target-runtime proof wording with explicit proof_boundary labels"
+        )
     if "post_main_production_runtime_proof" in lowered and not _post_main_terms_present(lowered):
-        missing.append("post_main_production_runtime_proof must require main, green CI/GitHub Actions, and deploy/sync")
+        missing.append(
+            "post_main_production_runtime_proof must require main, green CI/GitHub Actions, "
+            "and deploy/sync"
+        )
     if (
         ("pre-main" in lowered or "before main" in lowered or "before merge" in lowered)
         and "changed code" in lowered

@@ -45,6 +45,16 @@ market_data:
       sync_whitelist: { interval_seconds: 900 }
       enrich: { interval_seconds: 7200 }
       rest_insurance_catchup: { interval_seconds: 3600 }
+      funding_rate_catchup:
+        interval_seconds: 1800
+        settlement_lag_minutes: 15
+        binance_standard_interval_hours: 8
+        allow_binance_funding_info_failure_fallback: false
+        startup_bootstrap: true
+        universe_refresh_interval_seconds: 21600
+        tail_lookback_intervals: 3
+        gap_audit_lookback_intervals: 21
+        batch_size: 1000
   backfill:
     max_days_per_insert: 7
     chunk_align: utc_day
@@ -60,6 +70,9 @@ market_data:
     assert cfg.ingestion.tail_lookback_minutes == 240
     assert cfg.ingestion.rest_inter_instrument_delay_s == 2.0
     assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 900
+    assert cfg.scheduler.jobs.funding_rate_catchup.interval_seconds == 1800
+    assert cfg.scheduler.jobs.funding_rate_catchup.settlement_lag_minutes == 15
+    assert cfg.scheduler.jobs.funding_rate_catchup.due_mode == "due_only"
     assert cfg.backfill.max_days_per_insert == 7
     assert str(cfg.markets[0].rest.earliest_available_ts_utc) == "2017-01-01T00:00:00.000Z"
 
@@ -117,7 +130,33 @@ market_data:
     assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 3600
     assert cfg.scheduler.jobs.enrich.interval_seconds == 21600
     assert cfg.scheduler.jobs.rest_insurance_catchup.interval_seconds == 3600
+    assert cfg.scheduler.jobs.funding_rate_catchup.interval_seconds == 1800
+    assert cfg.scheduler.jobs.funding_rate_catchup.enabled is True
+    assert (
+        cfg.scheduler.jobs.funding_rate_catchup.allow_binance_funding_info_failure_fallback
+        is False
+    )
     assert cfg.ingestion.rest_inter_instrument_delay_s == 0.0
+
+
+def test_funding_rate_catchup_due_mode_is_strict(tmp_path: Path) -> None:
+    p = tmp_path / "market_data.yaml"
+    p.write_text(
+        """
+version: 1
+market_data:
+  markets: []
+  ingestion: { flush_interval_ms: 250, max_buffer_rows: 1000 }
+  scheduler:
+    jobs:
+      funding_rate_catchup: { due_mode: poll_all }
+  backfill: { max_days_per_insert: 7, chunk_align: utc_day }
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_market_data_runtime_config(p)
 
 
 def test_inter_instrument_delay_must_be_non_negative(tmp_path: Path) -> None:

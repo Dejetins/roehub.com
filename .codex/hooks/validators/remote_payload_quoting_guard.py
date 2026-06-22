@@ -18,7 +18,9 @@ SSH_MACSTUDIO = re.compile(r"\bssh\b[^\n;|&]*\bmacstudio\b", re.IGNORECASE)
 CLICKHOUSE_INLINE_QUERY = re.compile(
     r"\bclickhouse(?:\s+client)?\b[^\n;|&]*\s--query(?:=|\s+)", re.IGNORECASE
 )
-SQL_VERB = re.compile(r"\b(?:SELECT|WITH|INSERT|ALTER|CREATE|DROP|OPTIMIZE|SYSTEM)\b", re.IGNORECASE)
+SQL_VERB = re.compile(
+    r"\b(?:SELECT|WITH|INSERT|ALTER|CREATE|DROP|OPTIMIZE|SYSTEM)\b", re.IGNORECASE
+)
 INLINE_JSON_CURL = re.compile(
     r"\bcurl\b[^\n;|&]*(?:--data(?:-raw|-binary)?|--json|-d)\s+['\"]?\{",
     re.IGNORECASE,

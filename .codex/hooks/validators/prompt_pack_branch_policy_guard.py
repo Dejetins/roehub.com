@@ -6,7 +6,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-from validators.common import CONTINUE_BEFORE_FINAL, Finding, is_post_tool, read_text_if_exists, resolve_repo_path, touched_paths
+from validators.common import (
+    CONTINUE_BEFORE_FINAL,
+    Finding,
+    is_post_tool,
+    read_text_if_exists,
+    resolve_repo_path,
+    touched_paths,
+)
 
 GENERATED_ROOT = ".codex/agents/generated/"
 WORKTREE_ROOT = "/Users/daniildegtyarev/Projects/roehub-worktrees"
@@ -40,7 +47,9 @@ def _pack_dir(path: Path) -> Path:
 
 def _has_branch_mention(text: str) -> bool:
     lowered = text.lower()
-    return any(term.lower() in lowered for term in BRANCH_MENTION) or bool(BRANCH_CONTEXT.search(text))
+    return any(term.lower() in lowered for term in BRANCH_MENTION) or bool(
+        BRANCH_CONTEXT.search(text)
+    )
 
 
 def _branch_names(text: str) -> set[str]:
@@ -86,7 +95,9 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
             missing.append(f"worktree_root: {WORKTREE_ROOT}")
         if "primary_checkout" not in combined or PRIMARY_CHECKOUT not in combined:
             missing.append(f"primary_checkout: {PRIMARY_CHECKOUT}")
-        if "worktree_path" not in combined and ("single_allowed_branch" in combined or _branch_names(combined)):
+        if "worktree_path" not in combined and (
+            "single_allowed_branch" in combined or _branch_names(combined)
+        ):
             missing.append("single worktree_path for the allowed branch")
         if _has_stage_branch(combined):
             missing.append("remove stage-specific branch names")
@@ -95,14 +106,22 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
         if len(names) > 1:
             missing.append("use at most one codex/* branch name across the prompt pack")
         if "git switch -c" in combined or "git checkout -b" in combined:
-            missing.append("use git worktree add instead of creating branches in the primary checkout")
+            missing.append(
+                "use git worktree add instead of creating branches in the primary checkout"
+            )
         if (
             "git worktree add -b" in combined
             and "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1" not in combined
         ):
-            missing.append("branch creation command must carry ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1")
+            missing.append(
+                "branch creation command must carry ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1"
+            )
         has_cleanup_action = any(term in lower for term in ("delete", "cleanup", "prune", "remove"))
-        has_cleanup_gate = "worktree" in lower and "main" in lower and ("merge" in lower or "delivery" in lower)
+        has_cleanup_gate = (
+            "worktree" in lower
+            and "main" in lower
+            and ("merge" in lower or "delivery" in lower)
+        )
         if names and not (has_cleanup_action and has_cleanup_gate):
             missing.append("worktree cleanup only after successful merge/delivery back to main")
 

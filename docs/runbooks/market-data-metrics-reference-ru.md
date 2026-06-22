@@ -28,7 +28,7 @@ Source of truth scrape-конфига:
 | Сервис | Критичные метрики | Что значит норма |
 |---|---|---|
 | `market-data-ws-worker` | `ws_connected`, `ws_messages_total`, `insert_errors_total`, `redis_publish_errors_total`, `ws_closed_to_insert_done_seconds` | Соединения есть, сообщения/вставки растут, ошибок за окно нет, p95 latency стабильна |
-| `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup |
+| `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`, `scheduler_funding_catchup_last_success_timestamp_seconds`, `scheduler_funding_catchup_lag_seconds`, `scheduler_funding_catchup_universe_instruments` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup, funding freshness интерпретируется с учетом funding interval и settlement lag |
 | `backtest-artifact-publisher` | `backtest_artifact_publish_runs_total`, `backtest_artifact_publish_symbols_total`, `backtest_artifact_publish_blocked_total`, `backtest_artifact_publish_last_success_unixtime`, `backtest_artifact_tail_rebuild_bars_total` | Daily publish-cycle завершается success, blocked/error серии не растут, freshness обновляется после окна `03:05 Europe/Moscow`, tail bars остаются bounded, а stage/timeframe/chunk progress читается из structured logs |
 | `clickhouse-exporter` | `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}` | `scrape_success=1`, uptime растет, вставки есть при живом потоке |
 | `postgres-exporter` | `pg_up`, `pg_exporter_last_scrape_error`, `pg_stat_database_numbackends` | `pg_up=1`, scrape без ошибок, число коннектов в разумном диапазоне |
@@ -85,6 +85,17 @@ Source of truth scrape-конфига:
 | `scheduler_rest_catchup_gap_days_with_gaps_total` | Counter | - | Дни, где найдены gaps | После стабилизации темп падает |
 | `scheduler_rest_catchup_gap_ranges_filled_total` | Counter | - | Закрытые gap-диапазоны | Рост в фазе восстановления |
 | `scheduler_rest_catchup_gap_rows_written_total` | Counter | - | Записанные строки по gaps | Ключевой индикатор реального прогресса |
+| `scheduler_funding_catchup_instruments_total` | Counter | `exchange`,`market_type`,`status` | Обработанные funding-инструменты due-only catchup | Норма: `ok` растет только на due windows, `not_due` может расти чаще |
+| `scheduler_funding_catchup_rows_written_total` | Counter | `exchange`,`market_type` | Записанные funding rows | Растет на funding settlement windows |
+| `scheduler_funding_catchup_lag_seconds` | Gauge | `exchange`,`market_type`,`status` | Наблюдаемый lag funding freshness | Интерпретировать относительно funding interval, обычно 8h, и settlement lag |
+| `scheduler_funding_catchup_last_success_timestamp_seconds` | Gauge | `exchange`,`market_type` | Unix timestamp последней успешной funding записи | Должен обновляться после due funding windows |
+| `scheduler_funding_catchup_universe_instruments` | Gauge | `exchange`,`market_type`,`status` | Funding universe по статусу interval metadata | `missing_interval > 0` = degraded symbols до появления metadata |
+
+Funding catch-up работает внутри `market-data-scheduler`, job
+`funding_rate_catchup`. Scheduler wake-up cadence не равен provider download
+cadence: история скачивается только когда символ due по своему
+`funding_interval_minutes`. Prometheus labels не включают `symbol`; per-symbol
+диагностика должна идти через structured logs или ClickHouse queries.
 
 ### 3) `backtest-artifact-publisher`
 
@@ -250,6 +261,7 @@ Source of truth scrape-конфига:
 - `enrich`
 - `startup_scan`
 - `rest_insurance_catchup`
+- `funding_rate_catchup`
 
 `scheduler reason`:
 - `scheduler_bootstrap`
@@ -258,6 +270,10 @@ Source of truth scrape-конфига:
 
 `scheduler status`:
 - `ok`
+- `dry_run`
+- `failed`
+- `not_due`
+- `skipped_missing_interval`
 - `failed`
 - `skipped_no_seed`
 

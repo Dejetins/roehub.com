@@ -38,6 +38,10 @@ Source of truth scrape-конфига:
 - `scheduler_job_errors_total`
 - `scheduler_tasks_enqueued_total`
 - `scheduler_rest_catchup_gap_rows_written_total`
+- `scheduler_funding_catchup_instruments_total`
+- `scheduler_funding_catchup_last_success_timestamp_seconds`
+- `scheduler_funding_catchup_lag_seconds`
+- `scheduler_funding_catchup_universe_instruments`
 
 ### Backtest Artifact Publisher (`backtest-artifact-publisher`)
 
@@ -114,6 +118,30 @@ Intra-run progress is intentionally split out of Prometheus and lives in structu
 | `scheduler_rest_catchup_gap_days_with_gaps_total` | Дни, где найдены gaps |
 | `scheduler_rest_catchup_gap_ranges_filled_total` | Закрытые gap-диапазоны |
 | `scheduler_rest_catchup_gap_rows_written_total` | Записанные строки по gaps |
+| `scheduler_funding_catchup_instruments_total` | Funding-инструменты, обработанные due-only catchup |
+| `scheduler_funding_catchup_rows_written_total` | Записанные funding rows |
+| `scheduler_funding_catchup_lag_seconds` | Наблюдаемый lag funding freshness |
+| `scheduler_funding_catchup_last_success_timestamp_seconds` | Unix time последней успешной funding записи |
+| `scheduler_funding_catchup_universe_instruments` | Funding universe по статусу interval metadata |
+
+### Funding Catch-Up
+
+`funding_rate_catchup` живет внутри существующего `market-data-scheduler` на
+`127.0.0.1:9202`. Wake-up interval по умолчанию `1800s`; это не значит, что
+история каждого символа скачивается каждые 30 минут. Provider history
+запрашивается только для due-symbols: `last_funding_time + funding_interval`,
+плюс settlement lag. Для обычных 8h funding windows отсутствие новых строк между
+settlement окнами является нормой.
+
+Диагностика:
+
+- рост `scheduler_job_errors_total{job="funding_rate_catchup"}` = ошибка job;
+- `scheduler_funding_catchup_universe_instruments{status="missing_interval"} > 0`
+  = часть universe временно degraded из-за отсутствия interval metadata;
+- `scheduler_funding_catchup_lag_seconds` оценивается относительно interval и
+  settlement lag, а не как minute-level свечной lag;
+- Prometheus labels намеренно агрегированы по `exchange`, `market_type`,
+  `status`; `symbol` не используется как label.
 
 ### 3) `backtest-artifact-publisher`
 
@@ -247,6 +275,7 @@ read them from logs:
 curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.health)\t\(.scrapeUrl)"' | sort
 curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
+curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_funding_catchup_'
 curl -fsS http://127.0.0.1:9203/metrics | rg '^backtest_artifact_'
 curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 curl -fsS http://127.0.0.1:9187/metrics | rg '^pg_'

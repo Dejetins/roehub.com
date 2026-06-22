@@ -69,7 +69,8 @@ RECEIPT_PATTERNS = [
     re.compile(r"(?im)^Mode:\s*(independent subagent|cold self-review fallback)\s*$"),
     re.compile(r"(?im)^Review scope:\s*\S.*$"),
     re.compile(
-        r"(?im)^Review instructions:\s*architecture-review/references/cold-head-plan-prompt-pack-review\.md\s*$"
+        r"(?im)^Review instructions:\s*architecture-review/references/"
+        r"cold-head-plan-prompt-pack-review\.md\s*$"
     ),
     re.compile(r"(?im)^Verdict:\s*(Release|Release after fixes|Block)\s*$"),
     re.compile(r"(?im)^Blockers fixed:\s*\S.*$"),

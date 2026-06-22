@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 08 - Final Verification And Delivery"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-08"
+branch: "codex/backtest-futures-funding-v1"
 scope: "Full verification, docs closure and delivery readiness for the funding/short policy line"
 language: "en"
 context_sources:
@@ -10,6 +10,9 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
+  - "Confirm previous required stage is accepted in the ledger before final verification edits."
+  - "Previous-stage ledger gate: confirm Stages 00-07 are accepted or explicitly scoped out by user decision before final verification; if any required stage is planned or blocked, stop and record Stage 08 as blocked."
   - "Do not mark the plan accepted until all prior stages are accepted or explicitly scoped out by user decision."
   - "If publishing is requested, prove exact staged paths before commit."
   - "If delivery is in scope, acceptance requires main/CI/deploy/Mac Studio/browser-runtime evidence."
@@ -26,7 +29,7 @@ skill_routing:
 target_envs:
   - "local"
   - "GitHub if publishing"
-  - "Mac Studio if delivery is in scope"
+  - "Mac Studio target host via ssh macstudio for runtime, browser, ClickHouse, scheduler metrics and deploy proof"
 required_literals:
   - "Cold-head review: completed"
   - "User required before start: nothing"
@@ -35,7 +38,7 @@ non_goals:
   - "No unrelated cleanup."
 final_report_format:
   - "Scope"
-  - "Files changed"
+  - "File manifest: created/modified/deleted"
   - "Stage acceptance summary"
   - "Validation"
   - "Delivery evidence"
@@ -50,7 +53,7 @@ validation_strategy:
   - "Browser/runtime proof for the user-facing backtest flow."
   - "Prometheus proof for scheduler_funding_catchup_* series and funding alert rules."
   - "Pre-ship review of exact branch/diff scope."
-  - "CI/deploy/Mac Studio smoke only when delivery is requested/in scope."
+  - "CI/deploy/Mac Studio smoke when delivery or runtime acceptance is in scope; local loopback is not a substitute for target-host proof."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/08-final-verification-and-delivery.md"
@@ -62,11 +65,21 @@ safety_notes:
   - "Do not include unrelated dirty files in staging."
   - "Do not run git commands in /opt/roehub/app on Mac Studio."
   - "Do not print secrets from env files."
+  - "Run remote git commands only with git -C /Users/daniildegtyarev/Projects/roehub.com; use /opt/roehub/app only for runtime smoke/deploy workflow output."
+  - "Use quoted heredoc/stdin for SSH SQL, JSON, or multiline payloads."
 ---
 
 # Task
 
 Perform final verification, documentation closure and delivery readiness for the full funding/short policy line.
+
+## Stage Gate
+
+Previous-stage ledger gate: before final verification edits, read the stage
+execution ledger and verify Stages `00` through `07` are accepted or explicitly
+removed from scope by user decision. If any required prior stage is still
+planned or blocked, do not mark Stage `08` accepted; update the Stage `08`
+report/ledger as blocked.
 
 ## Context / Current State
 
@@ -78,8 +91,8 @@ This stage is only valid after stages `00` through `07` have either been accepte
 - Confirm stage ledger status for every prior stage.
 - Refuse to mark accepted if any required prior stage is still planned or blocked.
 - Run broad local gates.
-- Run browser/runtime proof for the backtest funding and futures-only short CJM.
-- Run Prometheus/runtime proof for `scheduler_funding_catchup_*` metrics and funding alert rule assets.
+- Run Mac Studio browser/runtime proof for the backtest funding and futures-only short CJM.
+- Run Mac Studio Prometheus/runtime proof for `scheduler_funding_catchup_*` metrics and funding alert rule assets.
 - Run pre-ship gate before any publish.
 - If delivery is requested, prove exact staged paths, commit/push scope, CI/deploy status, Mac Studio checkout sync and runtime smoke.
 - Update final stage report, ledger and docs index.
@@ -109,8 +122,8 @@ Read the ledger first. Then read each accepted stage report and only the current
 1. Confirm no required stage is missing or blocked.
 2. Create final stage report and narrowed verification manifest.
 3. Run broad local gates and docs index check.
-4. Run browser/runtime proof.
-5. Run Prometheus/runtime proof for `market-data-scheduler` funding metrics and alert assets.
+4. Run Mac Studio browser/runtime proof.
+5. Run Mac Studio Prometheus/runtime proof for `market-data-scheduler` funding metrics and alert assets.
 6. Run pre-ship review.
 7. If publishing is requested, stage only intended files, commit/push, watch CI/deploy and collect Mac Studio proof.
 8. Update report and ledger with final evidence.
@@ -119,8 +132,8 @@ Read the ledger first. Then read each accepted stage report and only the current
 
 - All prior stages are accepted or explicitly removed from scope.
 - Broad gates pass or failures are classified with evidence.
-- Browser/runtime proof covers funding visibility and short-like futures-only policy.
-- Runtime proof covers automatic funding freshness metrics from `market-data-scheduler` and Prometheus funding alert assets.
+- Mac Studio browser/runtime proof covers funding visibility and short-like futures-only policy.
+- Mac Studio runtime proof covers automatic funding freshness metrics from `market-data-scheduler` and Prometheus funding alert assets.
 - Docs and ledger are current.
 - Delivery evidence is complete when delivery is in scope.
 
@@ -150,7 +163,7 @@ python -m tools.docs.generate_docs_index --check
 # Final output: report format (strict)
 
 - Scope
-- Files changed
+- File manifest: created/modified/deleted
 - Stage acceptance summary
 - Validation
 - Browser/runtime evidence

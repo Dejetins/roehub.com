@@ -21,6 +21,7 @@ rm -f \
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/live-execution-stage17.rules.yml" /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/strategy-producer.rules.yml" /opt/roehub/config/prometheus.rules/strategy-producer.rules.yml
+install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/market-data-funding.rules.yml" /opt/roehub/config/prometheus.rules/market-data-funding.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl" /opt/roehub/config/openbao/policies/roehub-api-transit-deny-decrypt.hcl

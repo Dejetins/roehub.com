@@ -7,7 +7,14 @@ import shlex
 from pathlib import Path
 from typing import Any
 
-from validators.common import FATAL_BLOCK, Finding, command_text, cwd_path, is_bash_pre_tool, is_codex_execpolicy_check
+from validators.common import (
+    FATAL_BLOCK,
+    Finding,
+    command_text,
+    cwd_path,
+    is_bash_pre_tool,
+    is_codex_execpolicy_check,
+)
 
 APPROVAL_MARKER = "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1"
 PRIMARY_CHECKOUT = Path("/Users/daniildegtyarev/Projects/roehub.com")
@@ -24,7 +31,10 @@ DIRECT_BRANCH_CREATE_PATTERNS = [
 ]
 
 WORKTREE_BRANCH_CREATE_PATTERNS = [
-    re.compile(rf"{GIT}\s+worktree\s+add\b[^\n;|&]*\s(?:-b|-B)\s+(?P<branch>[^\s;&|]+)", re.IGNORECASE),
+    re.compile(
+        rf"{GIT}\s+worktree\s+add\b[^\n;|&]*\s(?:-b|-B)\s+(?P<branch>[^\s;&|]+)",
+        re.IGNORECASE,
+    ),
 ]
 
 DIRECT_BRANCH_USE_PATTERNS = [
@@ -33,7 +43,11 @@ DIRECT_BRANCH_USE_PATTERNS = [
 ]
 
 WORKTREE_BRANCH_USE_PATTERNS = [
-    re.compile(rf"{GIT}\s+worktree\s+add\b(?![^\n;|&]*\s(?:-b|-B)\s)[^\n;|&]*\s(?P<branch>codex/[^\s;&|]+)", re.IGNORECASE),
+    re.compile(
+        rf"{GIT}\s+worktree\s+add\b(?![^\n;|&]*\s(?:-b|-B)"
+        r")[^\n;|&]*\s(?P<branch>codex/[^\s;&|]+)",
+        re.IGNORECASE,
+    ),
 ]
 
 
@@ -165,7 +179,9 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
                 target=", ".join(created),
             )
         )
-    if direct_used and (_inside_primary_checkout(cwd_path(payload)) or _command_targets_primary_checkout(command)):
+    if direct_used and (
+        _inside_primary_checkout(cwd_path(payload)) or _command_targets_primary_checkout(command)
+    ):
         non_main = [name for name in direct_used if name not in {"main", "origin/main"}]
         if non_main:
             findings.append(
@@ -182,7 +198,9 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
                 )
             )
     bad_worktrees = [
-        path for _, path in _worktree_add_targets(command) if path and not _inside_worktree_root(path)
+        path
+        for _, path in _worktree_add_targets(command)
+        if path and not _inside_worktree_root(path)
     ]
     if bad_worktrees:
         findings.append(
@@ -192,7 +210,8 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
                 message=(
                     "Create branch worktrees only under "
                     f"`{WORKTREE_ROOT}` using a branch-specific folder. "
-                    "Do not create prompt-pack worktrees inside the primary checkout or ad hoc temp paths."
+                    "Do not create prompt-pack worktrees inside the primary checkout "
+                    "or ad hoc temp paths."
                 ),
                 validator="branch_workflow_guard",
                 target=", ".join(bad_worktrees),

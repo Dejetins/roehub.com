@@ -207,10 +207,55 @@ class SchedulerJobConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class FundingRateCatchupJobConfig:
+    interval_seconds: int
+    enabled: bool
+    due_mode: str
+    settlement_lag_minutes: int
+    binance_standard_interval_hours: int
+    allow_binance_funding_info_failure_fallback: bool
+    startup_bootstrap: bool
+    universe_refresh_interval_seconds: int
+    tail_lookback_intervals: int
+    gap_audit_lookback_intervals: int
+    batch_size: int
+
+    def __post_init__(self) -> None:
+        _require_positive_int("scheduler.jobs.funding_rate_catchup.interval_seconds", self.interval_seconds)  # noqa: E501
+        if self.due_mode != "due_only":
+            raise ValueError(
+                "scheduler.jobs.funding_rate_catchup.due_mode must be 'due_only', "
+                f"got {self.due_mode!r}"
+            )
+        _require_non_negative_int(
+            "scheduler.jobs.funding_rate_catchup.settlement_lag_minutes",
+            self.settlement_lag_minutes,
+        )
+        _require_positive_int(
+            "scheduler.jobs.funding_rate_catchup.binance_standard_interval_hours",
+            self.binance_standard_interval_hours,
+        )
+        _require_positive_int(
+            "scheduler.jobs.funding_rate_catchup.universe_refresh_interval_seconds",
+            self.universe_refresh_interval_seconds,
+        )
+        _require_positive_int(
+            "scheduler.jobs.funding_rate_catchup.tail_lookback_intervals",
+            self.tail_lookback_intervals,
+        )
+        _require_positive_int(
+            "scheduler.jobs.funding_rate_catchup.gap_audit_lookback_intervals",
+            self.gap_audit_lookback_intervals,
+        )
+        _require_positive_int("scheduler.jobs.funding_rate_catchup.batch_size", self.batch_size)
+
+
+@dataclass(frozen=True, slots=True)
 class SchedulerJobsConfig:
     sync_whitelist: SchedulerJobConfig
     enrich: SchedulerJobConfig
     rest_insurance_catchup: SchedulerJobConfig
+    funding_rate_catchup: FundingRateCatchupJobConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -456,6 +501,7 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
                     default=3600,
                 )
             ),
+            funding_rate_catchup=_parse_funding_rate_catchup_job_config(scheduler_jobs),
         )
     )
 
@@ -586,6 +632,49 @@ def _parse_market(m: Any) -> MarketConfig:
         market_code=market_code,
         rest=rest,
         ws=ws,
+    )
+
+
+def _parse_funding_rate_catchup_job_config(
+    scheduler_jobs: Mapping[str, Any],
+) -> FundingRateCatchupJobConfig:
+    section = _get_mapping(scheduler_jobs, "funding_rate_catchup", required=False)
+    return FundingRateCatchupJobConfig(
+        interval_seconds=_get_int_with_default(section, "interval_seconds", default=1800),
+        enabled=_get_bool_with_default(section, "enabled", default=True),
+        due_mode=_get_str_with_default(section, "due_mode", default="due_only"),
+        settlement_lag_minutes=_get_int_with_default(
+            section,
+            "settlement_lag_minutes",
+            default=10,
+        ),
+        binance_standard_interval_hours=_get_int_with_default(
+            section,
+            "binance_standard_interval_hours",
+            default=8,
+        ),
+        allow_binance_funding_info_failure_fallback=_get_bool_with_default(
+            section,
+            "allow_binance_funding_info_failure_fallback",
+            default=False,
+        ),
+        startup_bootstrap=_get_bool_with_default(section, "startup_bootstrap", default=True),
+        universe_refresh_interval_seconds=_get_int_with_default(
+            section,
+            "universe_refresh_interval_seconds",
+            default=21600,
+        ),
+        tail_lookback_intervals=_get_int_with_default(
+            section,
+            "tail_lookback_intervals",
+            default=3,
+        ),
+        gap_audit_lookback_intervals=_get_int_with_default(
+            section,
+            "gap_audit_lookback_intervals",
+            default=21,
+        ),
+        batch_size=_get_int_with_default(section, "batch_size", default=1000),
     )
 
 

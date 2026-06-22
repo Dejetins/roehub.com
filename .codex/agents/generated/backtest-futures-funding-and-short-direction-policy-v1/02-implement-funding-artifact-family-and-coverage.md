@@ -1,7 +1,7 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 02 - Funding Artifact Family And Coverage"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1-stage-02"
+branch: "codex/backtest-futures-funding-v1"
 scope: "Funding artifact publishing, loading, manifest hashing and coverage readiness"
 language: "en"
 context_sources:
@@ -11,6 +11,9 @@ context_sources:
   - "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
+  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
+  - "Confirm previous required stage is accepted in the ledger before implementation edits."
+  - "Previous-stage ledger gate: confirm Stage 01 is accepted in the stage execution ledger before implementation; if not accepted, stop and record Stage 02 as blocked unless the user explicitly scopes this stage to offline fixtures or supersedes the gate in the current turn."
   - "Funding artifacts must become part of manifest identity for futures jobs."
   - "Funding artifacts must read from scheduler-maintained canonical_funding_rates, not from ad-hoc provider calls."
   - "Expose explicit funding_manifest_hash for diagnostics and lazy cache identity."
@@ -25,7 +28,7 @@ skill_routing:
 target_envs:
   - "local"
   - "artifact filesystem"
-  - "ClickHouse when available"
+  - "Mac Studio target host via ssh macstudio for ClickHouse-backed coverage proof when required"
 required_literals:
   - "funding_manifest_hash"
   - "coverage_status=degraded"
@@ -35,7 +38,7 @@ non_goals:
   - "No UI changes."
 final_report_format:
   - "Scope"
-  - "Files changed"
+  - "File manifest: created/modified/deleted"
   - "Artifact contract"
   - "Coverage contract"
   - "Validation"
@@ -48,10 +51,12 @@ quality_gates:
   - "python -m tools.docs.generate_docs_index --check"
 validation_strategy:
   - "Filesystem publish/load smoke against a temporary artifact root."
-  - "ClickHouse-backed coverage smoke against canonical_funding_rates when scheduler-maintained funding data is available."
+  - "ClickHouse-backed coverage smoke against canonical_funding_rates on Mac Studio when scheduler-maintained funding data is available."
   - "Manifest hash changes when funding arrays change."
 stage_execution_ledger: "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 expected_primary_touches:
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
+  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/02-funding-artifact-family-and-coverage.md"
   - "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py"
   - "src/trading/contexts/backtest_artifacts/application/services/v2/"
   - "src/trading/contexts/backtest/application/ports/artifact_arrays.py"
@@ -61,16 +66,24 @@ possible_secondary_touches:
   - "apps/cli/commands/backtest_artifact_publish.py"
   - "tests/unit/contexts/backtest_artifacts/"
   - "tests/unit/contexts/backtest/"
-  - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/02-funding-artifact-family-and-coverage.md"
   - "docs/architecture/README.md"
 safety_notes:
   - "Do not remove existing artifact families."
   - "Do not make funding mandatory for spot artifacts."
+  - "For runtime ClickHouse proof, 127.0.0.1 means Mac Studio loopback after ssh macstudio, not local Codex-host loopback."
 ---
 
 # Task
 
 Add funding as a first-class artifact family and coverage source for futures backtests.
+
+## Stage Gate
+
+Previous-stage ledger gate: before implementation edits, read the stage
+execution ledger and verify Stage `01` is accepted. If Stage `01` is not
+accepted, do not implement Stage `02`; update the Stage `02` report/ledger as
+blocked unless the user explicitly scopes this stage to offline fixtures or
+supersedes this gate in the current turn.
 
 ## Context / Current State
 
@@ -79,8 +92,9 @@ The artifact runtime currently supports prices, signals, signal_features, mappin
 ## Requirements (Must)
 
 - Record `User required before start: nothing` in the stage report before edits.
+- Previous-stage gate: Stage `01` must be `accepted` in the stage ledger before Stage `02` implementation starts; otherwise stop and mark this stage blocked unless the user explicitly supersedes Stage `01` or scopes this stage to offline fixtures.
 - Add funding artifact contracts and loader APIs.
-- Publish funding arrays from `canonical_funding_rates`.
+- Publish funding arrays from `canonical_funding_rates`; if proving this through ClickHouse, use Mac Studio target-host evidence through `ssh macstudio`.
 - Do not call Binance/Bybit REST from artifact publisher or backtest artifact loaders.
 - Include funding in root manifest identity for futures jobs.
 - Expose explicit `funding_manifest_hash`.
@@ -153,7 +167,7 @@ python -m tools.docs.generate_docs_index --check
 # Final output: report format (strict)
 
 - Scope
-- Files changed
+- File manifest: created/modified/deleted
 - Artifact contract
 - Coverage contract
 - Validation
