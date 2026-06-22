@@ -5,10 +5,13 @@ record.
 
 Date: 2026-06-22
 
-Status: blocked on post-main production runtime proof; branch implementation
-complete and pushed.
+Status: blocked on post-main production runtime proof; implementation is on
+`main` and backend deploy workflow is green, but Mac Studio SSH/Tailscale
+reachability is currently unavailable for the final runtime proof.
 
 Branch: `codex/backtest-futures-funding-v1`
+
+Delivered main revision: `d14050b235807d60ae1d8cbf951bb651e40f1f45`
 
 `User required before start: nothing`
 
@@ -57,10 +60,11 @@ Conditional service-call coverage and proof boundary:
   exposes API auth `401`, ClickHouse funding tables exist, scheduler job
   counters show one `funding_rate_catchup` run and one error, and no
   `scheduler_funding_catchup_*` sample lines are exported;
-- `post_main_production_runtime_proof`: blocked/deferred until this branch is on
-  `main`, GitHub Actions/CI is green, deployment or verified sync from the
-  `main` checkout to `/opt/roehub/app` is complete, and runtime smoke plus
-  funding metrics pass;
+- `post_main_production_runtime_proof`: still blocked. The target revision is on
+  `main`, GitHub Actions/CI is green and backend deploy workflow is green, but
+  direct Mac Studio SSH/Tailscale reachability is unavailable from the operator
+  machine, so checkout parity, ClickHouse counts, scheduler metrics and live
+  funding writes cannot yet be verified;
 - browser/API route evidence: N/A for this stage because no browser-visible API
   or UI contract is changed.
 
@@ -269,6 +273,26 @@ Additional follow-up checks after the Mac Studio runtime failure was localized:
 - `uv run ruff check .codex/hooks/validators/runtime_proof_boundary_guard.py`
   - result: passed.
 
+Post-main production fix and delivery checks:
+
+- `uv run ruff check .`
+  - result: passed.
+- `uv run pyright`
+  - result: passed, `0 errors, 0 warnings, 0 informations`.
+- `uv run pytest -q -ra`
+  - result: passed, `1283 passed, 3 warnings in 56.21s`.
+- `uv run python -m tools.docs.generate_docs_index --check`
+  - result: passed.
+- `git diff --check`
+  - result: passed.
+- GitHub Actions CI for `main` commit
+  `d14050b235807d60ae1d8cbf951bb651e40f1f45`
+  - result: passed, run `27944489784`.
+- GitHub Actions Deploy Backend after that CI
+  - result: passed, run `27944549900`.
+- GitHub Actions Deploy Web and Publish App Image after that CI
+  - result: passed, runs `27944549893` and `27944549896`.
+
 ## Real-Boundary Evidence
 
 Provider REST boundary:
@@ -299,24 +323,47 @@ Mac Studio `target_host_readiness_pre_main` boundary:
 - `grep -E '^scheduler_funding_catchup_'` returned zero sample lines on the
   current runtime.
 
-Mac Studio `read_only_existing_runtime_smoke` finding:
+Earlier Mac Studio `read_only_existing_runtime_smoke` finding before the
+`d14050b2` main delivery:
 
 - `/opt/roehub/app` matches the branch for scheduler wiring and funding DDL, but
   differs for
   `src/trading/contexts/market_data/adapters/outbound/clients/funding_rate_history_source.py`,
   so the `f94c8fa4` Bybit non-positive interval fix is not deployed there.
-- Current scheduler log still contains
+- The scheduler log at that time still contained
   `ValueError: FundingInstrument.funding_interval_minutes must be a positive integer`
   from `funding_rate_catchup`.
+
+Post-main production runtime proof attempt:
+
+- The Bybit non-positive interval parser failure was fixed and delivered to
+  `main` in `d14050b235807d60ae1d8cbf951bb651e40f1f45`.
+- A follow-up ClickHouse runtime failure was localized to
+  `ILLEGAL_AGGREGATION` in
+  `ClickHouseFundingRateStore.list_tradable_funding_instruments`: the query used
+  `max(updated_at) AS updated_at` while other aggregate expressions referenced
+  `updated_at`. The fix aliases the aggregate as `latest_updated_at` and adds a
+  regression test.
+- GitHub CI and backend deploy are green for the fixed `main` revision.
+- Direct proof collection on Mac Studio is blocked at the host-reachability
+  layer: `ssh -o ConnectTimeout=10 macstudio true` times out to
+  `100.74.213.43`; `ping -c 3 100.74.213.43` has `100%` packet loss;
+  `tailscale status` shows the local client cannot synchronize with the
+  coordination server and peer reachability may degrade; `tailscale ping
+  macstudio-daniil` times out.
+- Because SSH is unavailable, this report does not claim checkout parity,
+  `/opt/roehub/app` file parity, ClickHouse canonical row counts, scheduler
+  `scheduler_funding_catchup_*` samples or absence of fresh scheduler tracebacks
+  for `d14050b2`.
 
 Superseded diagnostic: earlier Codex-local probes to `127.0.0.1:8123` and
 `127.0.0.1:9202` refused connections, but those probes were against the Codex
 host, not the Mac Studio target runtime, and are not acceptance evidence.
 
 Decision: Stage `01` is not accepted. It is implemented, locally tested, pushed
-to `origin/codex/backtest-futures-funding-v1`, and synced into the Mac Studio
-branch worktree. Acceptance remains blocked/deferred until
-`post_main_production_runtime_proof` is eligible and proves live
+to `origin/main` and deployed by the backend workflow. Acceptance remains
+blocked until Mac Studio reachability is restored and
+`post_main_production_runtime_proof` proves live
 `scheduler_funding_catchup_*` samples plus canonical funding writes from the
 deployed `main` revision.
 
@@ -330,10 +377,9 @@ docs index state.
 Review instructions:
 `architecture-review/references/cold-head-plan-prompt-pack-review.md`
 Verdict: Block. Stage `01` acceptance must wait for
-`post_main_production_runtime_proof`: target revision on `main`, green
-GitHub Actions/CI, deploy/sync from verified `main` checkout to
-`/opt/roehub/app`, then runtime smoke with live
-`scheduler_funding_catchup_*` samples and canonical funding rows.
+`post_main_production_runtime_proof`: Mac Studio reachability, checkout/runtime
+parity for `d14050b235807d60ae1d8cbf951bb651e40f1f45`, then runtime smoke with
+live `scheduler_funding_catchup_*` samples and canonical funding rows.
 Blockers fixed: report no longer treats Codex-local loopback refusal as target
 runtime unavailability; Mac Studio path contract is recorded; report status no
 longer says accepted or ready; ledger marks Stage `01` blocked; DTO contract
@@ -341,20 +387,22 @@ impact corrected to additive compatible-change; business impact and conditional
 service-call coverage added; Bybit non-positive `fundingInterval` runtime
 failure fixed in branch commit `f94c8fa4`.
 Local follow-up check: `uv run python -m tools.docs.generate_docs_index --check`
-passed; required Stage `01` ruff/pyright/pytest gates passed; hook fixtures
-passed; Mac Studio branch worktree sync and read-only existing runtime checks
-were recorded.
-Residual risks: branch commit `f94c8fa4` is not deployed in `/opt/roehub/app`;
-current runtime still has one `funding_rate_catchup` error and no
-`scheduler_funding_catchup_*` samples. Production proof remains deferred until
-post-main delivery.
+passed; required Stage `01` ruff/pyright/pytest gates passed; full post-main
+ruff/pyright/pytest/docs-index/diff-check passed; GitHub CI and backend deploy
+passed for `d14050b2`.
+Residual risks: direct Mac Studio proof is blocked by current SSH/Tailscale peer
+reachability; runtime may be deployed by workflow, but this report does not
+claim funding catch-up success until ClickHouse, scheduler metrics and logs are
+checked through Mac Studio.
 
 ## Residual Risks
 
-- Real-boundary acceptance is blocked by missing
-  `post_main_production_runtime_proof`, not by missing Mac Studio ClickHouse
-  availability.
-- The Mac Studio branch worktree is synced, but `/opt/roehub/app` does not have
-  commit `f94c8fa4`; do not call the current runtime evidence changed-code proof.
+- Real-boundary acceptance is blocked by missing direct
+  `post_main_production_runtime_proof`, not by missing local code, CI or deploy
+  workflow evidence.
+- The target revision is on `main` at
+  `d14050b235807d60ae1d8cbf951bb651e40f1f45`, but Mac Studio SSH is currently
+  unreachable from the operator machine; do not call the green deploy workflow
+  alone changed-code runtime proof for funding catch-up.
 - Scheduler `scheduler_funding_catchup_*` samples and canonical funding rows are
   still required before Stage `01` can move from blocked to accepted.
