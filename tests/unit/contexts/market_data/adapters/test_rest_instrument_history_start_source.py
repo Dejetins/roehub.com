@@ -146,20 +146,31 @@ market_data:
     return path
 
 
-def test_history_start_source_reads_binance_futures_onboard_date(tmp_path: Path) -> None:
-    """Ensure Binance futures uses `onboardDate` from exchangeInfo."""
+def test_history_start_source_confirms_binance_futures_first_kline(tmp_path: Path) -> None:
+    """Ensure Binance futures does not treat pre-history onboardDate as first candle."""
     cfg = load_market_data_runtime_config(_config(tmp_path))
     http = _FakeHttp(
-        lambda url, params: {
-            "symbols": [
-                {
-                    "symbol": "BTCUSDT",
-                    "onboardDate": 1577836800000,
-                }
-            ]
-        }
-        if url.endswith("/fapi/v1/exchangeInfo") and params == {}
-        else (_raise_unexpected(url, params))
+        lambda url, params: (
+            {
+                "symbols": [
+                    {
+                        "symbol": "BTCUSDT",
+                        "onboardDate": 1577836800000,
+                    }
+                ]
+            }
+            if url.endswith("/fapi/v1/exchangeInfo") and params == {}
+            else [[1577923200000]]
+            if url.endswith("/fapi/v1/klines")
+            and params
+            == {
+                "symbol": "BTCUSDT",
+                "interval": "1m",
+                "startTime": 1577836800000,
+                "limit": 1,
+            }
+            else (_raise_unexpected(url, params))
+        )
     )
     source = RestInstrumentHistoryStartSource(
         cfg=cfg,
@@ -170,9 +181,9 @@ def test_history_start_source_reads_binance_futures_onboard_date(tmp_path: Path)
     first = source.get_history_start(InstrumentId(MarketId(2), Symbol("BTCUSDT")))
     second = source.get_history_start(InstrumentId(MarketId(2), Symbol("BTCUSDT")))
 
-    assert str(first) == "2020-01-01T00:00:00.000Z"
-    assert str(second) == "2020-01-01T00:00:00.000Z"
-    assert len(http.calls) == 1
+    assert str(first) == "2020-01-02T00:00:00.000Z"
+    assert str(second) == "2020-01-02T00:00:00.000Z"
+    assert len(http.calls) == 2
 
 
 def test_history_start_source_binary_searches_binance_spot_first_available_minute(

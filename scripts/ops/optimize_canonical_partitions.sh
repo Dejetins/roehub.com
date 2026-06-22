@@ -90,7 +90,16 @@ ORDER BY partition_id
 FORMAT TSVRaw
 "
 
-mapfile -t partition_rows < <(ch_query "${detect_query}")
+partition_rows_raw="$(ch_query "${detect_query}")" || {
+  echo "[$(timestamp)] failed to scan duplicate partitions." >&2
+  exit 1
+}
+
+partition_rows=()
+while IFS= read -r row; do
+  [[ -z "${row}" ]] && continue
+  partition_rows+=("${row}")
+done <<<"${partition_rows_raw}"
 
 if ((${#partition_rows[@]} == 0)); then
   echo "[$(timestamp)] no partitions with dup_rows >= ${MIN_DUP_ROWS}; nothing to do."

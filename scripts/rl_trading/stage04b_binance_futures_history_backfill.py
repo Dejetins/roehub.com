@@ -7,6 +7,7 @@ import os
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
@@ -93,6 +94,7 @@ def build_plan_manifest(
     *,
     stage04a_manifest: Mapping[str, Any],
     exchange_info: Mapping[str, Any],
+    history_start_overrides: Mapping[str, datetime] | None = None,
     latest_candle_utc: datetime,
     generated_at_utc: datetime,
     chunk_days: int,
@@ -104,6 +106,10 @@ def build_plan_manifest(
     market_id = int(stage04a_manifest["market_id"])
     accepted_windows = _source_lower_bounds_by_symbol(stage04a_manifest)
     current_windows = _current_trading_usdt_perpetual_source_lower_bounds(exchange_info)
+    confirmed_history_starts = {
+        symbol.strip().upper(): _floor_minute(start)
+        for symbol, start in (history_start_overrides or {}).items()
+    }
     current_symbols = set(current_windows)
     accepted_symbols = sorted(accepted_windows)
     stale_symbols = [symbol for symbol in accepted_symbols if symbol not in current_symbols]
@@ -115,7 +121,12 @@ def build_plan_manifest(
     symbol_plans: list[dict[str, Any]] = []
     chunks: list[dict[str, Any]] = []
     for symbol in active_symbols:
-        source_lower_bound = accepted_windows.get(symbol, current_windows[symbol])
+        lower_bound_candidates = [current_windows[symbol]]
+        if symbol in accepted_windows:
+            lower_bound_candidates.append(accepted_windows[symbol])
+        if symbol in confirmed_history_starts:
+            lower_bound_candidates.append(confirmed_history_starts[symbol])
+        source_lower_bound = max(lower_bound_candidates)
         window_plans: list[dict[str, Any]] = []
         for source_window in source_windows:
             safe_start = max(source_window.source_start, source_lower_bound)
@@ -225,6 +236,21 @@ def build_plan_manifest(
             }
             for window in source_windows
         ],
+        "history_start_probe": {
+            "enabled": bool(confirmed_history_starts),
+            "confirmed_symbol_count": len(confirmed_history_starts),
+            "confirmed_symbols_sha256": _hash_lines(sorted(confirmed_history_starts)),
+            "confirmed_starts_sha256": _hash_json(
+                {
+                    symbol: _format_utc(confirmed_history_starts[symbol])
+                    for symbol in sorted(confirmed_history_starts)
+                }
+            ),
+            "rule": (
+                "source_lower_bound=max(stage04a_lower_bound, exchangeInfo.onboardDate, "
+                "first_returned_binance_futures_1m_kline)"
+            ),
+        },
         "chunk_policy": {
             "chunk_days": chunk_days,
             "range_semantics": "half-open UTC [start, end)",
@@ -708,6 +734,16 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         if args.exchange_info_json is not None
         else _load_exchange_info(base_url=market.rest.base_url, timeout_s=market.rest.timeout_s)
     )
+    history_start_overrides = (
+        {}
+        if args.skip_first_kline_probe
+        else _load_binance_futures_first_kline_starts(
+            exchange_info=exchange_info,
+            base_url=market.rest.base_url,
+            timeout_s=market.rest.timeout_s,
+            delay_s=float(args.history_start_probe_delay_s),
+        )
+    )
     latest_candle_utc = (
         _parse_utc(args.latest_candle_utc)
         if args.latest_candle_utc is not None
@@ -716,6 +752,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     manifest = build_plan_manifest(
         stage04a_manifest=stage04a_manifest,
         exchange_info=exchange_info,
+        history_start_overrides=history_start_overrides,
         latest_candle_utc=latest_candle_utc,
         generated_at_utc=_now_utc(),
         chunk_days=int(args.chunk_days),
@@ -744,6 +781,9 @@ def _cmd_plan(args: argparse.Namespace) -> int:
                 "chunks_pending_after_reuse": manifest["summary"]["chunks_pending_after_reuse"],
                 "stale_stage04a_symbol_count": manifest["current_metadata"][
                     "stale_stage04a_symbol_count"
+                ],
+                "history_start_confirmed_symbol_count": manifest["history_start_probe"][
+                    "confirmed_symbol_count"
                 ],
             }
         )
@@ -804,6 +844,12 @@ def _build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--chunk-days", type=int, default=7)
     plan.add_argument("--previous-manifest", type=Path, default=None)
     plan.add_argument("--output-json", type=Path, default=DEFAULT_PLAN_JSON)
+    plan.add_argument(
+        "--skip-first-kline-probe",
+        action="store_true",
+        help="Use exchangeInfo onboardDate only instead of confirming first returned 1m kline.",
+    )
+    plan.add_argument("--history-start-probe-delay-s", type=float, default=0.0)
 
     execute = sub.add_parser("execute", help="Execute pending chunks from a manifest.")
     execute.add_argument("--manifest", type=Path, default=DEFAULT_PLAN_JSON)
@@ -1342,6 +1388,80 @@ def _load_exchange_info(*, base_url: str, timeout_s: float) -> Mapping[str, Any]
     )
     with urllib.request.urlopen(request, timeout=timeout_s) as response:
         return cast(Mapping[str, Any], json.load(response))
+
+
+def _load_binance_futures_first_kline_starts(
+    *,
+    exchange_info: Mapping[str, Any],
+    base_url: str,
+    timeout_s: float,
+    delay_s: float,
+) -> dict[str, datetime]:
+    if delay_s < 0:
+        raise ValueError("delay_s must be >= 0")
+    rows = exchange_info.get("symbols")
+    if not isinstance(rows, list):
+        raise ValueError("Binance exchangeInfo payload is missing symbols list")
+
+    out: dict[str, datetime] = {}
+    for item in rows:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("status") != "TRADING":
+            continue
+        if item.get("contractType") != "PERPETUAL":
+            continue
+        if item.get("quoteAsset") != "USDT":
+            continue
+        symbol = str(item.get("symbol", "")).strip().upper()
+        if not symbol:
+            continue
+
+        onboard_start = _source_lower_bound_from_exchange_symbol(item)
+        first_kline_start = _load_binance_futures_first_kline_start(
+            base_url=base_url,
+            timeout_s=timeout_s,
+            symbol=symbol,
+            start=onboard_start,
+        )
+        out[symbol] = max(onboard_start, first_kline_start or onboard_start)
+        if delay_s > 0:
+            time.sleep(delay_s)
+    return out
+
+
+def _load_binance_futures_first_kline_start(
+    *,
+    base_url: str,
+    timeout_s: float,
+    symbol: str,
+    start: datetime,
+) -> datetime | None:
+    params = urllib.parse.urlencode(
+        {
+            "symbol": symbol,
+            "interval": "1m",
+            "startTime": _dt_to_epoch_ms(_floor_minute(start)),
+            "limit": 1,
+        }
+    )
+    request = urllib.request.Request(
+        base_url.rstrip("/") + "/fapi/v1/klines?" + params,
+        headers={"User-Agent": "roehub-stage04b-history-start-probe/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout_s) as response:
+        payload = json.load(response)
+    if not isinstance(payload, list):
+        raise RuntimeError(f"Unexpected Binance kline payload type: {type(payload).__name__}")
+    if not payload:
+        return None
+    first = payload[0]
+    if not isinstance(first, list) or not first:
+        raise RuntimeError("Unexpected Binance kline payload: first item must be a non-empty list")
+    return datetime.fromtimestamp(int(first[0]) / 1000.0, tz=UTC).replace(
+        second=0,
+        microsecond=0,
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:

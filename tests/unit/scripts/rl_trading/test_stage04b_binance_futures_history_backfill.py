@@ -78,6 +78,50 @@ def test_stage04b_plan_uses_source_lower_bound_and_dynamic_extension_end() -> No
     assert extension_window["chunk_count"] > 0
 
 
+def test_stage04b_plan_uses_confirmed_first_kline_after_stage04a_lower_bound() -> None:
+    manifest = build_plan_manifest(
+        stage04a_manifest={
+            "stage": "04A",
+            "market": "binance:futures",
+            "market_id": 2,
+            "accepted_symbols": ["ICPUSDT"],
+            "accepted_symbol_source_windows": [
+                {
+                    "symbol": "ICPUSDT",
+                    "source_lower_bound_utc": "2021-07-30T07:00:00Z",
+                },
+            ],
+        },
+        exchange_info={
+            "symbols": [
+                {
+                    "symbol": "ICPUSDT",
+                    "status": "TRADING",
+                    "contractType": "PERPETUAL",
+                    "quoteAsset": "USDT",
+                    "onboardDate": 1627628400000,
+                },
+            ]
+        },
+        history_start_overrides={
+            "ICPUSDT": datetime(2022, 9, 27, 2, 30, tzinfo=UTC),
+        },
+        latest_candle_utc=datetime(2026, 6, 19, 12, 34, 45, tzinfo=UTC),
+        generated_at_utc=datetime(2026, 6, 19, 12, 35, tzinfo=UTC),
+        chunk_days=7,
+    )
+
+    symbol_plan = manifest["symbols"][0]
+    assert symbol_plan["source_lower_bound_utc"] == "2022-09-27T02:30:00Z"
+    hf_window = next(
+        item
+        for item in symbol_plan["windows"]
+        if item["dataset_version"] == DATASET_HF_PERIOD_REBUILD
+    )
+    assert hf_window["safe_source_start_utc"] == "2022-09-27T02:30:00Z"
+    assert manifest["history_start_probe"]["confirmed_symbol_count"] == 1
+
+
 def test_stage04b_plan_excludes_stage04a_symbols_missing_from_current_metadata() -> None:
     manifest = build_plan_manifest(
         stage04a_manifest={

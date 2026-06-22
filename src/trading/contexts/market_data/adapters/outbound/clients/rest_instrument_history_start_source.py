@@ -27,7 +27,8 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
     Resolve symbol-specific history starts from exchange REST metadata endpoints.
 
     Strategy:
-    - Binance futures: `/fapi/v1/exchangeInfo` -> `symbols[].onboardDate`
+    - Binance futures: `/fapi/v1/exchangeInfo` -> `symbols[].onboardDate`, then confirm
+      the first returned 1m kline because some futures symbols expose pre-history onboard dates
     - Bybit futures: `/v5/market/instruments-info` -> `list[].launchTime`
     - Binance/Bybit spot: earliest non-empty 1m kline window via binary search
 
@@ -137,7 +138,14 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
             cached = self._load_binance_futures_market_cache(market)
 
         symbol_key = str(instrument_id.symbol).upper()
-        resolved = cached.get(symbol_key)
+        metadata_start = cached.get(symbol_key)
+        resolved = self._resolve_binance_futures_first_kline_start(
+            market=market,
+            instrument_id=instrument_id,
+            start=metadata_start,
+        )
+        if resolved is None:
+            resolved = metadata_start
         with self._lock:
             self._instrument_cache[_cache_key(instrument_id)] = resolved
         return resolved
@@ -179,9 +187,31 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
             if existing is not None:
                 return existing
             self._binance_futures_market_cache[market_id_int] = out
-            for symbol_key, history_start in out.items():
-                self._instrument_cache[(market_id_int, symbol_key)] = history_start
         return out
+
+    def _resolve_binance_futures_first_kline_start(
+        self,
+        *,
+        market: MarketConfig,
+        instrument_id: InstrumentId,
+        start: UtcTimestamp | None,
+    ) -> UtcTimestamp | None:
+        probe_start = start or market.rest.earliest_available_ts_utc
+        response = self.http.get_json(
+            url=market.rest.base_url.rstrip("/") + "/fapi/v1/klines",
+            params={
+                "symbol": str(instrument_id.symbol),
+                "interval": "1m",
+                "startTime": _minute_index(probe_start.value) * 60_000,
+                "limit": 1,
+            },
+            timeout_s=market.rest.timeout_s,
+            retries=market.rest.retries,
+            backoff_base_s=market.rest.backoff.base_s,
+            backoff_max_s=market.rest.backoff.max_s,
+            backoff_jitter_s=market.rest.backoff.jitter_s,
+        )
+        return _first_binance_kline_open_utc(response.body)
 
     def _resolve_bybit_futures_history_start(
         self,
@@ -377,6 +407,17 @@ def _binance_kline_response_has_rows(body: Any) -> bool:
     if not isinstance(body, list):
         raise RuntimeError(f"Unexpected Binance kline payload type: {type(body).__name__}")
     return bool(body)
+
+
+def _first_binance_kline_open_utc(body: Any) -> UtcTimestamp | None:
+    if not isinstance(body, list):
+        raise RuntimeError(f"Unexpected Binance kline payload type: {type(body).__name__}")
+    if not body:
+        return None
+    first = body[0]
+    if not isinstance(first, list) or not first:
+        raise RuntimeError("Unexpected Binance kline payload: first item must be a non-empty list")
+    return _utc_timestamp_from_ms(first[0])
 
 
 def _bybit_kline_response_has_rows(body: Any) -> bool:
