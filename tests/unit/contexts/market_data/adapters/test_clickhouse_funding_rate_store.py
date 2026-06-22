@@ -123,3 +123,30 @@ def test_list_tradable_funding_instruments_does_not_alias_max_updated_at() -> No
     assert "max(updated_at) AS latest_updated_at" in query
     assert "max(updated_at) AS updated_at" not in query
     assert rows[0].updated_at == _ts(1)
+
+
+def test_list_tradable_funding_instruments_treats_clickhouse_naive_time_as_utc() -> None:
+    gateway = _Gateway()
+    gateway.response_rows = [
+        {
+            "market_id": 2,
+            "symbol": "BTCUSDT",
+            "instrument_key": "binance:futures:BTCUSDT",
+            "exchange": "binance",
+            "market_type": "futures",
+            "status": "TRADING",
+            "is_tradable": 1,
+            "base_asset": "BTC",
+            "quote_asset": "USDT",
+            "funding_interval_minutes": 480,
+            "funding_interval_source": "binance_standard_8h_no_adjustment_row",
+            "funding_cap": None,
+            "funding_floor": None,
+            "latest_updated_at": datetime(2026, 6, 22, 1, 0),
+        }
+    ]
+    store = ClickHouseFundingRateStore(gateway=gateway, database="market_data")
+
+    rows = store.list_tradable_funding_instruments(market_ids=(MarketId(2),))
+
+    assert rows[0].updated_at == _ts(1)

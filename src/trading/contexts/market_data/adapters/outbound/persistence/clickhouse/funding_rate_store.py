@@ -144,7 +144,9 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
             funding_interval_source=_optional_str(row.get("funding_interval_source")),
             funding_cap=_optional_float(row.get("funding_cap")),
             funding_floor=_optional_float(row.get("funding_floor")),
-            updated_at=UtcTimestamp(_ensure_utc(row.get("updated_at") or row["latest_updated_at"])),
+            updated_at=UtcTimestamp(
+                _clickhouse_datetime_utc(row.get("updated_at") or row["latest_updated_at"])
+            ),
         )
 
     def _canonical_payload(self, row: FundingRateRecord) -> Mapping[str, Any]:
@@ -175,6 +177,12 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
 def _ensure_utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("datetime must be timezone-aware")
+    return value.astimezone(timezone.utc)
+
+
+def _clickhouse_datetime_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
