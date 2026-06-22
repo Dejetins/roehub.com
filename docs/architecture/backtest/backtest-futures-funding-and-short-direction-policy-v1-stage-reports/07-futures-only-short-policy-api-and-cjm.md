@@ -5,12 +5,13 @@ preflight/create, strategy launch, scenario matrix and the backtests browser CJM
 
 Date: 2026-06-23
 
-Status: implemented locally; post-main Mac Studio browser/runtime proof pending.
+Status: accepted after post-main production runtime proof.
 
-Proof boundary: local code, local gates and local changed-code browser evidence
-are complete. This stage is not accepted until the same revision is on `main`,
-relevant CI/deploy is green, `/opt/roehub/app` is synced from that revision, and
-Mac Studio browser/runtime proof covers the changed code.
+Proof boundary: changed-code proof was collected only after commit
+`0a891812d244b846e927751c4c423face9e5269f` reached `main`, GitHub CI/deploy
+workflows were green, `/opt/roehub/app` contained the Stage `07` policy files,
+Mac Studio production smoke passed, and authenticated production browser checks
+covered `/backtests`.
 
 Execution branch policy: `main` by default; no branches, worktrees, local
 workflow folders or stashes unless the user explicitly requests that exact
@@ -113,6 +114,21 @@ Additional gates run before the final browser-found JS/CSS fixes:
 - `uv run pyright` passed with `0 errors, 0 warnings, 0 informations`.
 - `uv run pytest -q` passed with `1321 passed, 3 warnings`.
 
+Post-main delivery and runtime gates:
+
+- Commit `0a891812d244b846e927751c4c423face9e5269f` was pushed to `main`.
+- GitHub CI run `27988227358` passed.
+- GitHub Deploy Backend run `27988410745` passed.
+- GitHub Publish App Image run `27988410735` passed.
+- GitHub Deploy Web runs `27988410740` and `27988464644` passed.
+- Mac Studio remote checkout
+  `/Users/daniildegtyarev/Projects/roehub.com` was fast-forwarded to
+  `0a891812d244b846e927751c4c423face9e5269f` and was clean against
+  `origin/main`.
+- `/opt/roehub/app/src/trading/shared_kernel/direction_policy.py` existed and
+  contained `short_direction_requires_futures_market`.
+- `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app`.
+
 ## Browser Evidence
 
 Local changed-code browser QA used a real Chrome browser through Playwright
@@ -140,10 +156,42 @@ Screenshots:
 - `/tmp/roehub-stage07-results.png`
 - `/tmp/roehub-stage07-launch-modal.png`
 
-Mac Studio changed-code browser/runtime proof was not run. Per `.codex/AGENTS.md`,
-pre-main/local evidence cannot be reported as post-main production proof; this
-is deferred to delivery after the revision reaches `main`, CI/deploy is green
-and `/opt/roehub/app` is synced from that revision.
+Post-main production browser QA used a real Chrome browser against
+`https://roehub.com/backtests` with the smoke Keycloak account. The password was
+read only from the Mac Studio host-local env key
+`ROEHUB_SMOKE_E2E_PASSWORD` and was not printed, written to repo artifacts or
+stored as browser state.
+
+Assertions passed:
+
+- Authenticated `/backtests` loaded with title `Backtests | Roehub`.
+- Initial browser-visible config was `Spot` and `Long only`.
+- Browser option sets included `market_type` values `spot` and `futures`, and
+  direction values `long_only`, `short`, and `long_short_reversal`.
+- Authenticated `GET /api/backtests/runtime-defaults` returned `200`;
+  `spot.short` and `spot.long_short_reversal` both reported
+  `short_direction_requires_futures_market`; short-like modes were
+  `long_short_reversal` and `short`; futures allowed `long_short_reversal`.
+- Selecting `Long/Short` through the production DOM handlers switched the
+  selected market to `Futures` and displayed
+  `Short-capable directions require Futures. Switch market to Futures before
+  running or launching.`
+- Results view rendered `50` job rows; opening the first job row rendered
+  variant headers including `Gross return` and `Net funding return`.
+- Mobile viewport `390x844` rendered the results view with root width `374` and
+  no horizontal overflow.
+- Console errors: `0`.
+- Failed requests: `0`.
+- 4xx/5xx responses after the authenticated page load: `0`.
+
+Browser-tooling caveats:
+
+- `page.screenshot()` timed out twice after `fonts loaded` on the production
+  page, so no post-main screenshot artifact is recorded.
+- Playwright pointer `click` timed out while waiting for stable elements on the
+  production page. The verification used DOM `.click()` on the same production
+  controls, which exercised the shipped browser JS handlers without mutating
+  jobs or launching strategies.
 
 ## Cold-head Review Receipt
 
@@ -153,21 +201,21 @@ Review scope: Stage `07` report, stage ledger status, file manifest, policy
 contract, browser evidence boundary, validation evidence and residual acceptance
 boundary.
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
-Verdict: Release after fixes
+Verdict: Release
 Blockers fixed: browser QA found funding warning codes were title-only and old
 spot Long/Short launch modal policy state was overwritten after form reset; both
-were fixed and revalidated.
+were fixed and revalidated. Post-main CI/deploy, Mac Studio smoke and production
+browser assertions passed.
 Local follow-up check: completed
-Residual risks: Mac Studio changed-code browser/runtime proof remains pending
-until post-main delivery; local browser fixture is changed-code evidence but not
-production acceptance evidence.
+Residual risks: production screenshot capture timed out in Playwright; old
+spot-short launch-modal production coverage remains data-dependent and was
+covered by the local changed-code fixture plus API/use-case tests.
 
 ## Residual Risks
 
-- Stage `07` is not accepted yet because post-main Mac Studio browser/runtime
-  proof is pending.
-- The local browser fixture proved the CJM against deterministic API payloads;
-  production proof must repeat the flow against the deployed target runtime and
-  authenticated session.
-- Existing old jobs are readable and launch-blocked by policy, but production
-  old-job coverage still needs target-runtime browser evidence after delivery.
+- Production screenshot capture timed out in Playwright; browser evidence is
+  assertion-based rather than screenshot-based.
+- Existing old jobs are readable and launch-blocked by policy. Production
+  launch-modal coverage for an old spot short-like job is data-dependent; local
+  changed-code fixture and API/use-case tests covered that exact invalid launch
+  path.
