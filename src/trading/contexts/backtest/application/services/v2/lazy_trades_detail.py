@@ -17,6 +17,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestNoRiskExactConfig,
     BacktestPreparePoolsResult,
     BacktestTpSlExactConfig,
+    build_backtest_funding_read_model,
 )
 from trading.contexts.backtest.application.ports.lazy_trades_cache import (
     BacktestLazyTradesCache,
@@ -32,6 +33,9 @@ from trading.contexts.backtest.application.services.v2.execution_sizing import (
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
     BacktestPreparePoolsService,
 )
+from trading.contexts.backtest.application.services.v2.tp_sl_funding import (
+    resolve_tp_sl_selected_exit,
+)
 from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
     BacktestTpSlHitTimesService,
 )
@@ -42,6 +46,15 @@ LAZY_TRADES_COMPUTE_STAGE_NAME = "lazy_trades_compute"
 LAZY_TRADES_CACHE_HIT_STAGE_NAME = "lazy_trades_cache_hit"
 DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS = 14 * 24 * 60 * 60
 BACKTEST_ERROR_VARIANT_CONFLICT = "backtest.variant_conflict"
+MAX_FUNDING_OVERLAY_EVENTS = 1_000
+_FUNDING_SUMMARY_KEYS = frozenset(
+    {
+        "total_return_pct_net_of_funding",
+        "funding_return_pct",
+        "funding_pnl_quote",
+        "funding_events_count",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +105,7 @@ class BacktestLazyTradesDetailService:
             request_hash=job.request_hash,
             engine_params_hash=_engine_params_hash(job=job),
             artifact_manifest_hash=artifact_metadata.artifact_manifest_hash,
+            funding_manifest_hash=artifact_metadata.funding_manifest_hash,
         )
 
         lookup_start = time.perf_counter()
@@ -149,6 +163,7 @@ class BacktestLazyTradesDetailService:
             request_hash=job.request_hash,
             engine_params_hash=_engine_params_hash(job=job),
             artifact_manifest_hash=artifact_metadata.artifact_manifest_hash,
+            funding_manifest_hash=artifact_metadata.funding_manifest_hash,
         )
 
         lookup_start = time.perf_counter()
@@ -269,6 +284,33 @@ class BacktestLazyTradesDetailService:
                 message="Unsupported risk mode for lazy trades detail",
                 details={"risk_mode": risk_mode},
             )
+        summary_metrics = _merge_top_funding_summary(
+            recomputed_summary=summary_metrics,
+            row_summary=row.summary_metrics_json,
+        )
+        chart_overlay = _chart_overlay(trades=trades)
+        funding_events, overlay_status, overlay_warning_code = self._funding_overlay(
+            normalized_request=normalized_request,
+            context=context,
+            artifact_metadata=artifact_metadata,
+            trades=trades,
+        )
+        if funding_events:
+            chart_overlay["funding_events"] = funding_events
+            chart_overlay["funding_events_count"] = len(funding_events)
+            chart_overlay["funding_events_truncated"] = (
+                len(funding_events) >= MAX_FUNDING_OVERLAY_EVENTS
+            )
+        if artifact_metadata.funding_manifest_hash is not None:
+            chart_overlay["funding_manifest_hash"] = artifact_metadata.funding_manifest_hash
+        funding = build_backtest_funding_read_model(
+            summary_metrics=summary_metrics,
+            payload=row.payload_json,
+            artifact_metadata=artifact_metadata.as_mapping(),
+            funding_events_count=len(funding_events) if funding_events else None,
+            overlay_status=overlay_status,
+            overlay_warning_code=overlay_warning_code,
+        )
         payload = {
             "job_id": str(job.job_id),
             "variant_key": checked.public_variant_key,
@@ -276,11 +318,13 @@ class BacktestLazyTradesDetailService:
             "request_hash": job.request_hash,
             "engine_params_hash": _engine_params_hash(job=job),
             "artifact_manifest_hash": artifact_metadata.artifact_manifest_hash,
+            "funding_manifest_hash": artifact_metadata.funding_manifest_hash,
             "summary_metrics": summary_metrics,
             "canonical_variant_params": checked.canonical_variant_params,
             "readable_params": checked.readable_params,
             "trades": trades,
-            "chart_overlay": _chart_overlay(trades=trades),
+            "chart_overlay": chart_overlay,
+            "funding": funding,
             "cache": _cache_payload(
                 status="miss",
                 cache_key=cache_key,
@@ -290,6 +334,31 @@ class BacktestLazyTradesDetailService:
             "detail_metadata": detail_metadata,
         }
         return normalize_json_payload(payload)
+
+    def _funding_overlay(
+        self,
+        *,
+        normalized_request: Mapping[str, Any],
+        context: Any,
+        artifact_metadata: BacktestArtifactMetadata,
+        trades: Sequence[Mapping[str, Any]],
+    ) -> tuple[list[dict[str, Any]], str, str | None]:
+        if not _should_load_funding_overlay(
+            normalized_request=normalized_request,
+            artifact_metadata=artifact_metadata,
+        ):
+            return [], "not_applicable", None
+        try:
+            funding_arrays = self.prepare_pools.artifact_array_loader.load_funding_arrays(
+                context=context,
+            )
+        except Exception:  # noqa: BLE001
+            return [], "unavailable", "funding_events_unavailable"
+        events = _funding_events_overlay(
+            trades=trades,
+            funding_arrays=funding_arrays,
+        )
+        return events, "ready", None
 
     def _no_risk_detail(
         self,
@@ -513,6 +582,19 @@ def _artifact_metadata_from_job(*, job: BacktestJob) -> BacktestArtifactMetadata
         if artifact.get("hit_times_manifest_hash") is None
         else str(artifact["hit_times_manifest_hash"]),
         published_at_utc=str(artifact.get("published_at_utc", "")),
+        funding_manifest_hash=None
+        if artifact.get("funding_manifest_hash") is None
+        else str(artifact["funding_manifest_hash"]),
+        funding_coverage_status=None
+        if artifact.get("funding_coverage_status") is None
+        else str(artifact["funding_coverage_status"]),
+        funding_coverage_policy=None
+        if artifact.get("funding_coverage_policy") is None
+        else str(artifact["funding_coverage_policy"]),
+        funding_rows_count=_optional_int(artifact.get("funding_rows_count")),
+        funding_expected_event_count=_optional_int(artifact.get("funding_expected_event_count")),
+        funding_missing_event_count=_optional_int(artifact.get("funding_missing_event_count")),
+        funding_reason_codes=_string_tuple(artifact.get("funding_reason_codes")),
     )
 
 
@@ -725,15 +807,17 @@ def _tp_sl_trade_rows(
         )
         if int(closed) == 0:
             continue
-        exit_idx, exit_reason = _tp_sl_exit_for_detail(
+        selected_exit = resolve_tp_sl_selected_exit(
             direction=direction,
-            entry_idx=entry_idx,
-            signal_exit_idx=signal_exit_idx,
+            entry_abs=entry_idx,
+            signal_exit_abs=signal_exit_idx,
             best_tp_idx=best_tp_idx,
             best_sl_idx=best_sl_idx,
             hit_times=hit_times,
             runtime=runtime,
         )
+        exit_idx = selected_exit.exit_abs
+        exit_reason = selected_exit.reason
         quote_amount = execution_quote_amount_py(
             available_quote=available_quote,
             equity=equity,
@@ -791,37 +875,6 @@ def _tp_sl_trade_rows(
             )
         )
     return rows
-
-
-def _tp_sl_exit_for_detail(
-    *,
-    direction: int,
-    entry_idx: int,
-    signal_exit_idx: int,
-    best_tp_idx: int,
-    best_sl_idx: int,
-    hit_times: Any,
-    runtime: Any,
-) -> tuple[int, str]:
-    start = entry_idx + 1
-    t_exec_abs = int(runtime.t_exec_abs_15m)
-    stop_abs = signal_exit_idx if signal_exit_idx < t_exec_abs else t_exec_abs
-    if start < t_exec_abs:
-        if direction == 1:
-            t_tp = int(hit_times.long_tp[best_tp_idx, start])
-            t_sl = int(hit_times.long_sl[best_sl_idx, start])
-        else:
-            t_tp = int(hit_times.short_tp[best_tp_idx, start])
-            t_sl = int(hit_times.short_sl[best_sl_idx, start])
-        if t_tp < stop_abs and t_tp < t_sl:
-            return t_tp, "take_profit"
-        if t_sl < stop_abs and t_sl <= t_tp:
-            return t_sl, "stop_loss"
-    if signal_exit_idx < t_exec_abs:
-        return signal_exit_idx, "signal"
-    if runtime.close_on_end == 1 and t_exec_abs > 0:
-        return t_exec_abs - 1, "close_on_end"
-    return entry_idx, "open"
 
 
 def _tp_sl_exit_price(
@@ -946,6 +999,103 @@ def _chart_overlay(*, trades: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _merge_top_funding_summary(
+    *,
+    recomputed_summary: Mapping[str, Any],
+    row_summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    summary = dict(recomputed_summary)
+    for key in _FUNDING_SUMMARY_KEYS:
+        if key in row_summary:
+            summary[key] = row_summary[key]
+    return summary
+
+
+def _should_load_funding_overlay(
+    *,
+    normalized_request: Mapping[str, Any],
+    artifact_metadata: BacktestArtifactMetadata,
+) -> bool:
+    if artifact_metadata.funding_manifest_hash is None:
+        return False
+    coordinates = _mapping(normalized_request.get("coordinates"))
+    if str(coordinates.get("market_type", "")).lower() != "futures":
+        return False
+    execution = _mapping(normalized_request.get("execution"))
+    funding = _mapping(execution.get("funding"))
+    return str(funding.get("mode", "off")) != "off"
+
+
+def _funding_events_overlay(
+    *,
+    trades: Sequence[Mapping[str, Any]],
+    funding_arrays: Any,
+) -> list[dict[str, Any]]:
+    funding_time = np.asarray(funding_arrays.funding_time, dtype=np.int64)
+    funding_rate = np.asarray(funding_arrays.funding_rate, dtype=np.float64)
+    mark_price = np.asarray(funding_arrays.mark_price, dtype=np.float64)
+    funding_interval = np.asarray(funding_arrays.funding_interval_minutes, dtype=np.uint16)
+    data_quality = np.asarray(funding_arrays.data_quality, dtype=np.uint8)
+    events: list[dict[str, Any]] = []
+    for trade in trades:
+        entry_ms = _timestamp_ms(trade.get("entry_timestamp"))
+        exit_ms = _timestamp_ms(trade.get("exit_timestamp"))
+        if entry_ms is None or exit_ms is None or exit_ms < entry_ms:
+            continue
+        event_start = int(np.searchsorted(funding_time, entry_ms, side="right"))
+        event_stop = int(np.searchsorted(funding_time, exit_ms, side="right"))
+        for event_idx in range(event_start, event_stop):
+            event = _funding_overlay_event(
+                trade=trade,
+                event_idx=event_idx,
+                funding_time=funding_time,
+                funding_rate=funding_rate,
+                mark_price=mark_price,
+                funding_interval=funding_interval,
+                data_quality=data_quality,
+            )
+            events.append(event)
+            if len(events) >= MAX_FUNDING_OVERLAY_EVENTS:
+                return events
+    return events
+
+
+def _funding_overlay_event(
+    *,
+    trade: Mapping[str, Any],
+    event_idx: int,
+    funding_time: np.ndarray,
+    funding_rate: np.ndarray,
+    mark_price: np.ndarray,
+    funding_interval: np.ndarray,
+    data_quality: np.ndarray,
+) -> dict[str, Any]:
+    trade_index = int(trade.get("trade_index", 0))
+    side = str(trade.get("side") or trade.get("direction") or "")
+    rate = float(funding_rate[event_idx])
+    price = _optional_float(mark_price[event_idx])
+    quantity = _optional_float(trade.get("quantity"))
+    direction = 1 if side == "long" else -1 if side == "short" else 0
+    pnl_quote = (
+        -float(direction) * quantity * price * rate
+        if direction and quantity is not None and price is not None
+        else None
+    )
+    return {
+        "id": f"funding_{event_idx}_trade_{trade_index}",
+        "kind": "funding_event",
+        "trade_index": trade_index,
+        "timestamp": _format_timestamp_ms(int(funding_time[event_idx])),
+        "funding_time": _format_timestamp_ms(int(funding_time[event_idx])),
+        "funding_rate": rate,
+        "mark_price": price,
+        "funding_interval_minutes": int(funding_interval[event_idx]),
+        "data_quality": int(data_quality[event_idx]),
+        "side": side or None,
+        "estimated_pnl_quote": pnl_quote,
+    }
+
+
 def _cache_payload(
     *,
     status: str,
@@ -966,6 +1116,7 @@ def _cache_payload(
 
 
 def _read_model_from_payload(*, payload: Mapping[str, Any]) -> BacktestLazyTradesDetailReadModel:
+    summary_metrics = _mapping(payload.get("summary_metrics"))
     return BacktestLazyTradesDetailReadModel(
         job_id=str(payload["job_id"]),
         variant_key=str(payload["variant_key"]),
@@ -973,7 +1124,7 @@ def _read_model_from_payload(*, payload: Mapping[str, Any]) -> BacktestLazyTrade
         request_hash=str(payload["request_hash"]),
         engine_params_hash=str(payload["engine_params_hash"]),
         artifact_manifest_hash=str(payload["artifact_manifest_hash"]),
-        summary_metrics=_mapping(payload.get("summary_metrics")),
+        summary_metrics=summary_metrics,
         canonical_variant_params=_mapping(payload.get("canonical_variant_params")),
         readable_params=_mapping(payload.get("readable_params")),
         trades=tuple(
@@ -982,6 +1133,11 @@ def _read_model_from_payload(*, payload: Mapping[str, Any]) -> BacktestLazyTrade
         chart_overlay=_mapping(payload.get("chart_overlay")),
         cache=_mapping(payload.get("cache")),
         timing=_mapping(payload.get("timing")),
+        funding_manifest_hash=None
+        if payload.get("funding_manifest_hash") is None
+        else str(payload["funding_manifest_hash"]),
+        funding=_mapping(payload.get("funding"))
+        or build_backtest_funding_read_model(summary_metrics=summary_metrics),
     )
 
 
@@ -1037,6 +1193,47 @@ def _direction_mode(request: Mapping[str, Any]) -> str:
 
 def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _timestamp_ms(value: Any) -> int | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return None
+    return int(timestamp.timestamp() * 1000)
+
+
+def _format_timestamp_ms(value: int) -> str:
+    return datetime.fromtimestamp(value / 1000.0, tz=UTC).isoformat().replace("+00:00", "Z")
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        resolved = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(resolved):
+        return None
+    return resolved
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _string_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,) if value else ()
+    if not isinstance(value, (tuple, list)):
+        return ()
+    return tuple(str(item) for item in value if str(item))
 
 
 def _side(direction: int) -> str:

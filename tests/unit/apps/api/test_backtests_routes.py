@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestCoordinates,
     BacktestLazyTradesDetailReadModel,
     BacktestNoRiskTopResult,
+    build_backtest_funding_read_model,
 )
 from trading.contexts.backtest.application.ports import (
     BacktestArtifactContextUnavailable,
@@ -639,6 +640,60 @@ def test_post_backtest_variant_trades_uses_public_key_and_returns_detail() -> No
     assert raw_hash_response.status_code == 404
     assert raw_hash_response.json()["error"]["code"] == "backtest.not_found"
     assert lazy_service.requests == ((top["variant_key"], top["variant_hash"]),)
+
+
+def test_backtest_results_routes_expose_funding_fields_without_top_trades() -> None:
+    repository = _FakeJobRepository()
+    lazy_service = _FakeLazyTradesService()
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            lazy_trades_service=lazy_service,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000253"},
+        json=_valid_request(),
+    )
+    _complete_job(
+        repository=repository,
+        job_id=UUID(created.json()["job_id"]),
+        include_funding=True,
+    )
+
+    top_response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000253"},
+    )
+    top = top_response.json()["items"][0]
+    variant_response = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000253"},
+    )
+    detail_response = client.post(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}/trades",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000253"},
+    )
+
+    assert top_response.status_code == 200
+    assert variant_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert "trades" not in top
+    assert top["summary_metrics"]["total_return_pct_net_of_funding"] == pytest.approx(13.25)
+    assert top["funding_manifest_hash"] == "f" * 64
+    assert top["funding"]["metrics"]["funding_pnl_quote"] == pytest.approx(75.0)
+    assert top["funding"]["warning_codes"] == ["missing_leading_coverage"]
+    variant = variant_response.json()
+    assert variant["funding"]["effective_ranking_metric"] == (
+        "total_return_pct_net_of_funding"
+    )
+    detail = detail_response.json()
+    assert detail["funding_manifest_hash"] == "f" * 64
+    assert detail["funding"]["metrics"]["total_return_pct_net_of_funding"] == pytest.approx(
+        13.25
+    )
+    assert detail["chart_overlay"]["funding_events"][0]["kind"] == "funding_event"
 
 
 def test_post_backtest_variant_trades_cache_miss_returns_202_materialization_status() -> None:
@@ -1842,6 +1897,7 @@ def _complete_job(
     repository: "_FakeJobRepository",
     job_id: UUID,
     top_count: int = 1,
+    include_funding: bool = False,
 ) -> None:
     assert repository.jobs is not None
     job = repository.jobs[job_id]
@@ -1860,13 +1916,8 @@ def _complete_job(
             rank=index,
             score=12.5 - index,
             indicator_rows={"ma.dema": 6 + index},
-            metrics={"total_return_pct": 12.5 - index, "trade_count": 2.0 + index},
-            metadata={
-                "ma.dema.source": "close",
-                "ma.dema.window": 4 + index,
-                "confirm_count": 1,
-                "proxy_score": 0.25,
-            },
+            metrics=_top_metrics(index=index, include_funding=include_funding),
+            metadata=_top_metadata(index=index, include_funding=include_funding),
         )
         for index in range(1, top_count + 1)
     )
@@ -1885,6 +1936,45 @@ def _complete_job(
         top_variants=assembly.top_variants,
     )
     assert finished is not None
+
+
+def _top_metrics(*, index: int, include_funding: bool) -> dict[str, float]:
+    metrics = {"total_return_pct": 12.5 - index, "trade_count": 2.0 + index}
+    if include_funding and index == 1:
+        metrics.update(
+            {
+                "total_return_pct_net_of_funding": 13.25,
+                "funding_return_pct": 1.75,
+                "funding_pnl_quote": 75.0,
+                "funding_events_count": 3.0,
+            }
+        )
+    return metrics
+
+
+def _top_metadata(*, index: int, include_funding: bool) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "ma.dema.source": "close",
+        "ma.dema.window": 4 + index,
+        "confirm_count": 1,
+        "proxy_score": 0.25,
+    }
+    if include_funding and index == 1:
+        metadata.update(
+            {
+                "funding_included": True,
+                "funding_data_quality": "degraded",
+                "funding_warning_codes": ("missing_leading_coverage",),
+                "funding_adjustment_scope": "bounded_candidate_pool",
+                "funding_adjustment_exact_global_ranking": False,
+                "requested_ranking_metric": "total_return_pct",
+                "effective_ranking_metric": "total_return_pct_net_of_funding",
+                "funding_candidate_pool_size": 120,
+                "requested_top_n": 20,
+                "funding_manifest_hash": "f" * 64,
+            }
+        )
+    return metadata
 
 
 @dataclass
@@ -1909,6 +1999,33 @@ class _FakeLazyTradesService:
     ) -> "_Probe":
         variant_hash = str(row.payload_json["variant_hash"])
         self.requests = (*self.requests, (public_variant_key, variant_hash))
+        funding = build_backtest_funding_read_model(
+            summary_metrics=row.summary_metrics_json,
+            payload=row.payload_json,
+            artifact_metadata=_mapping(job.request_json.get("artifact_metadata")),
+        )
+        funding_manifest_hash = funding.get("funding_manifest_hash")
+        chart_overlay: dict[str, Any] = {
+            "schema": "backtest_chart_overlay_v1",
+            "markers": [],
+            "segments": [],
+        }
+        if funding_manifest_hash is not None:
+            chart_overlay.update(
+                {
+                    "funding_manifest_hash": funding_manifest_hash,
+                    "funding_events": [
+                        {
+                            "kind": "funding_event",
+                            "trade_index": 0,
+                            "timestamp": "2026-01-01T00:08:00Z",
+                            "funding_rate": 0.0001,
+                        }
+                    ],
+                    "funding_events_count": 1,
+                    "funding_events_truncated": False,
+                }
+            )
         trade_range = range(self.trade_count)
         if self.reverse_trades:
             trade_range = range(self.trade_count - 1, -1, -1)
@@ -1921,15 +2038,19 @@ class _FakeLazyTradesService:
             artifact_manifest_hash=str(
                 job.request_json["artifact_metadata"]["artifact_manifest_hash"]
             ),
+            funding_manifest_hash=str(funding_manifest_hash)
+            if funding_manifest_hash is not None
+            else None,
             summary_metrics=dict(row.summary_metrics_json),
             canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
             readable_params=dict(row.payload_json["readable_params"]),
             trades=tuple(
                 _fake_trade(index, include_equity=self.include_equity) for index in trade_range
             ),
-            chart_overlay={"schema": "backtest_chart_overlay_v1", "markers": [], "segments": []},
+            chart_overlay=chart_overlay,
             cache={"status": "hit" if self.cache_hit else "miss"},
             timing={"lazy_trades_cache_hit": 0.001} if self.cache_hit else {},
+            funding=funding,
         )
         self.last_detail = detail
         return _Probe(

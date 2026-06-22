@@ -11,6 +11,12 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 
+_FUNDING_METRIC_KEYS = (
+    "total_return_pct_net_of_funding",
+    "funding_return_pct",
+    "funding_pnl_quote",
+    "funding_events_count",
+)
 
 @dataclass(frozen=True, slots=True)
 class BacktestJobProgressReadModel:
@@ -106,6 +112,8 @@ class BacktestJobTopVariantReadModel:
     readable_params: Mapping[str, Any]
     links: Mapping[str, Any]
     actions: Mapping[str, Any]
+    funding_manifest_hash: str | None = None
+    funding: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "summary_metrics", MappingProxyType(dict(self.summary_metrics)))
@@ -117,6 +125,7 @@ class BacktestJobTopVariantReadModel:
         object.__setattr__(self, "readable_params", MappingProxyType(dict(self.readable_params)))
         object.__setattr__(self, "links", MappingProxyType(dict(self.links)))
         object.__setattr__(self, "actions", MappingProxyType(dict(self.actions)))
+        object.__setattr__(self, "funding", MappingProxyType(dict(self.funding)))
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -131,6 +140,8 @@ class BacktestJobTopVariantReadModel:
             "readable_params": dict(self.readable_params),
             "links": dict(self.links),
             "actions": dict(self.actions),
+            "funding_manifest_hash": self.funding_manifest_hash,
+            "funding": dict(self.funding),
         }
 
 
@@ -149,6 +160,8 @@ class BacktestLazyTradesDetailReadModel:
     chart_overlay: Mapping[str, Any]
     cache: Mapping[str, Any]
     timing: Mapping[str, Any]
+    funding_manifest_hash: str | None = None
+    funding: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -170,6 +183,7 @@ class BacktestLazyTradesDetailReadModel:
         object.__setattr__(self, "chart_overlay", MappingProxyType(dict(self.chart_overlay)))
         object.__setattr__(self, "cache", MappingProxyType(dict(self.cache)))
         object.__setattr__(self, "timing", MappingProxyType(dict(self.timing)))
+        object.__setattr__(self, "funding", MappingProxyType(dict(self.funding)))
 
     def as_mapping(self) -> dict[str, Any]:
         return {
@@ -186,6 +200,8 @@ class BacktestLazyTradesDetailReadModel:
             "chart_overlay": dict(self.chart_overlay),
             "cache": dict(self.cache),
             "timing": dict(self.timing),
+            "funding_manifest_hash": self.funding_manifest_hash,
+            "funding": dict(self.funding),
         }
 
 
@@ -308,6 +324,10 @@ def build_top_variant_read_model(
     )
     variant_hash = str(payload.get("variant_hash") or row.variant_key)
     indicator_variant_hash = payload.get("indicator_variant_hash") or row.indicator_variant_key
+    funding = build_backtest_funding_read_model(
+        summary_metrics=row.summary_metrics_json,
+        payload=payload,
+    )
     actions = _mapping_payload(payload.get("actions"))
     create_strategy_available = bool(
         _mapping_payload(payload.get("canonical_variant_params")).get("indicators")
@@ -331,7 +351,65 @@ def build_top_variant_read_model(
         readable_params=_mapping_payload(payload.get("readable_params")),
         links=_mapping_payload(payload.get("links")),
         actions=actions,
+        funding_manifest_hash=_optional_string(funding.get("funding_manifest_hash")),
+        funding=funding,
     )
+
+
+def build_backtest_funding_read_model(
+    *,
+    summary_metrics: Mapping[str, Any],
+    payload: Mapping[str, Any] | None = None,
+    artifact_metadata: Mapping[str, Any] | None = None,
+    funding_events_count: int | None = None,
+    overlay_status: str | None = None,
+    overlay_warning_code: str | None = None,
+) -> dict[str, Any]:
+    """
+    Build the additive funding read-model payload shared by top and lazy detail APIs.
+    """
+
+    source_payload = _mapping_payload(payload)
+    adjustment = _mapping_payload(source_payload.get("funding_adjustment"))
+    artifact = _mapping_payload(artifact_metadata)
+    metrics = {
+        key: summary_metrics[key]
+        for key in _FUNDING_METRIC_KEYS
+        if key in summary_metrics
+    }
+    manifest_hash = _optional_string(
+        adjustment.get("funding_manifest_hash")
+        or summary_metrics.get("funding_manifest_hash")
+        or artifact.get("funding_manifest_hash")
+    )
+    warning_codes = _string_sequence(adjustment.get("funding_warning_codes"))
+    if overlay_warning_code:
+        warning_codes = tuple(sorted({*warning_codes, overlay_warning_code}))
+    included = _optional_bool(adjustment.get("funding_included"))
+    if included is None:
+        included = bool(metrics)
+    resolved_events_count = funding_events_count
+    if resolved_events_count is None and "funding_events_count" in summary_metrics:
+        resolved_events_count = int(float(summary_metrics["funding_events_count"]))
+    funding: dict[str, Any] = {
+        "funding_manifest_hash": manifest_hash,
+        "included": included,
+        "metrics": metrics,
+        "data_quality": _optional_string(adjustment.get("funding_data_quality")),
+        "warning_codes": list(warning_codes),
+        "adjustment_scope": _optional_string(adjustment.get("funding_adjustment_scope")),
+        "adjustment_exact_global_ranking": _optional_bool(
+            adjustment.get("funding_adjustment_exact_global_ranking")
+        ),
+        "requested_ranking_metric": _optional_string(adjustment.get("requested_ranking_metric")),
+        "effective_ranking_metric": _optional_string(adjustment.get("effective_ranking_metric")),
+        "candidate_pool_size": _optional_int(adjustment.get("funding_candidate_pool_size")),
+        "requested_top_n": _optional_int(adjustment.get("requested_top_n")),
+        "funding_events_count": resolved_events_count or 0,
+    }
+    if overlay_status is not None:
+        funding["funding_events_status"] = overlay_status
+    return funding
 
 
 def _progress_from_job(
@@ -459,6 +537,44 @@ def _mapping_payload(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+    return bool(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _string_sequence(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,) if value else ()
+    if not isinstance(value, (tuple, list)):
+        return ()
+    return tuple(str(item) for item in value if str(item))
+
+
 def _sequence_payload(value: Any) -> tuple[dict[str, Any], ...]:
     if not isinstance(value, (tuple, list)):
         return ()
@@ -481,6 +597,7 @@ __all__ = [
     "BacktestJobReadModel",
     "BacktestJobTopResult",
     "BacktestJobTopVariantReadModel",
+    "build_backtest_funding_read_model",
     "build_backtest_job_read_model",
     "build_top_variant_read_model",
 ]

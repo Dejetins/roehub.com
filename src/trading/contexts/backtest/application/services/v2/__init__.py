@@ -190,6 +190,14 @@ from .tp_sl_exact import (
     event_segments_n_tp_sl_15m_grid,
     run_tp_sl_fast_vs_reference_self_check,
 )
+from .tp_sl_funding import (
+    TP_SL_FUNDING_ADJUSTMENT_STAGE_NAME,
+    TP_SL_FUNDING_METRIC_NAMES,
+    TpSlFundingAdjustmentSummary,
+    TpSlSelectedExit,
+    calculate_tp_sl_funding_adjustment,
+    resolve_tp_sl_selected_exit,
+)
 from .tp_sl_hit_times import (
     DEFAULT_TP_SL_GRID_MATCH_ATOL,
     HIT_TIMES_ARTIFACT_PATH_V2,
@@ -272,6 +280,8 @@ __all__ = [
     "TP_SL_EXACT_SCORING_ALIAS_STAGE_NAME",
     "TP_SL_EXACT_SCORING_STAGE_NAME",
     "TP_SL_FULL_METRICS_SECOND_PASS_STAGE_NAME",
+    "TP_SL_FUNDING_ADJUSTMENT_STAGE_NAME",
+    "TP_SL_FUNDING_METRIC_NAMES",
     "TP_SL_HEAP_UPDATE_STAGE_NAME",
     "TP_SL_SELF_CHECK_NOT_RUN_STATUS",
     "TP_SL_SELF_CHECK_PASSED_STATUS",
@@ -310,6 +320,8 @@ __all__ = [
     "BacktestTpSlExactRejected",
     "BacktestTpSlExactScoringService",
     "BacktestTpSlSelfCheckFailed",
+    "TpSlFundingAdjustmentSummary",
+    "TpSlSelectedExit",
     "BacktestTpSlHitTimesRejected",
     "BacktestTpSlHitTimesService",
     "BacktestTopResultAssemblyResult",
@@ -347,6 +359,7 @@ __all__ = [
     "build_segment_stack",
     "cartesian_combo_count",
     "calculate_no_risk_funding_adjustment",
+    "calculate_tp_sl_funding_adjustment",
     "decode_ordinal_combo_chunk",
     "extract_signal_rows",
     "evaluate_no_risk_exact_chunk",
@@ -377,6 +390,7 @@ __all__ = [
     "row_metadata_order_hash",
     "run_fast_vs_reference_self_check",
     "run_tp_sl_fast_vs_reference_self_check",
+    "resolve_tp_sl_selected_exit",
     "streaming_2_no_risk",
     "symbol_from_job_request",
     "time_range_slice",

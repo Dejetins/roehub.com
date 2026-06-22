@@ -63,11 +63,7 @@ class LocalFileBacktestLazyTradesCache(BacktestLazyTradesCache):
             return metadata
         payload = dict(metadata.payload)
         payload["trades"] = ()
-        payload["chart_overlay"] = {
-            "schema": "backtest_chart_overlay_v1",
-            "markers": [],
-            "segments": [],
-        }
+        payload["chart_overlay"] = _metadata_chart_overlay(payload.get("chart_overlay"))
         return BacktestLazyTradesCacheReadResult(status="hit", payload=payload)
 
     def write(
@@ -90,11 +86,7 @@ class LocalFileBacktestLazyTradesCache(BacktestLazyTradesCache):
         cache_payload = dict(_mapping(metadata_payload.get("cache")))
         cache_payload["cache_path"] = str(bundle_dir)
         metadata_payload["cache"] = cache_payload
-        metadata_payload["chart_overlay"] = {
-            "schema": "backtest_chart_overlay_v1",
-            "markers": [],
-            "segments": [],
-        }
+        metadata_payload["chart_overlay"] = _metadata_chart_overlay(payload.get("chart_overlay"))
         envelope = {
             "schema": _CACHE_SCHEMA,
             "cache_key_digest": cache_key.digest,
@@ -519,6 +511,30 @@ def _view_base(payload: Mapping[str, Any]) -> dict[str, Any]:
             "cache": _cache_hit_payload(payload=payload),
             "timing": _mapping(payload.get("timing")),
         }
+
+
+def _metadata_chart_overlay(value: Any) -> dict[str, Any]:
+    overlay = _mapping(value)
+    compact: dict[str, Any] = {
+        "schema": "backtest_chart_overlay_v1",
+        "markers": [],
+        "segments": [],
+    }
+    if "funding_manifest_hash" in overlay:
+        compact["funding_manifest_hash"] = overlay.get("funding_manifest_hash")
+    if "funding_events_count" in overlay:
+        compact["funding_events_count"] = overlay.get("funding_events_count")
+    if "funding_events_truncated" in overlay:
+        compact["funding_events_truncated"] = overlay.get("funding_events_truncated")
+    funding_events = overlay.get("funding_events")
+    if isinstance(funding_events, Sequence) and not isinstance(
+        funding_events,
+        (str, bytes, bytearray),
+    ):
+        compact["funding_events"] = [
+            dict(item) for item in funding_events if isinstance(item, Mapping)
+        ]
+    return compact
 
 
 def _cache_hit_payload(*, payload: Mapping[str, Any]) -> dict[str, Any]:

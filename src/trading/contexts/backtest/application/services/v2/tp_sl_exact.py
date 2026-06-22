@@ -59,6 +59,26 @@ from trading.contexts.backtest.application.services.v2.numba_runtime import (
 from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
     HIT_TIMES_ARTIFACT_PATH_V2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactFundingArraysV2,
+)
+
+from .no_risk_funding import (
+    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
+    FUNDING_ADJUSTMENT_SCOPE,
+    FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+    FUNDING_ADJUSTMENT_SCOPE_UNAVAILABLE,
+    FUNDING_DATA_QUALITY,
+    FUNDING_INCLUDED,
+    FUNDING_WARNING_CODES,
+    TOTAL_RETURN_PCT_NET_OF_FUNDING,
+)
+from .tp_sl_funding import (
+    TP_SL_FUNDING_ADJUSTMENT_STAGE_NAME,
+    TP_SL_FUNDING_METRIC_NAMES,
+    calculate_tp_sl_funding_adjustment,
+    resolve_tp_sl_selected_exit,
+)
 
 TP_SL_EXACT_BOUNDARY_STAGE_NAME = "tp_sl_exact_boundary"
 TP_SL_EXACT_SCORING_STAGE_NAME = "exact_scoring"
@@ -129,6 +149,51 @@ def _min_closed_trades_from_normalized(normalized_request: Mapping[str, Any]) ->
     return int(raw_min_closed_trades)
 
 
+def _ranking_from_normalized(
+    normalized_request: Mapping[str, Any],
+    *,
+    effective: bool,
+) -> _RankingSpec:
+    ranking = _mapping_payload(normalized_request.get("ranking"))
+    requested_metric = str(
+        ranking.get("requested_primary_metric", ranking.get("primary_metric", "total_return_pct"))
+    )
+    metric_name = requested_metric
+    if effective:
+        metric_name = str(ranking.get("effective_primary_metric", requested_metric))
+        if (
+            metric_name == "total_return_pct"
+            and _funding_adjustment_enabled(normalized_request=normalized_request)
+        ):
+            metric_name = TOTAL_RETURN_PCT_NET_OF_FUNDING
+    direction = str(ranking.get("direction", "desc")).lower()
+    if direction not in {"asc", "desc"}:
+        direction = "desc"
+    return _RankingSpec(metric_name=metric_name, direction=direction)
+
+
+def _funding_adjustment_enabled(*, normalized_request: Mapping[str, Any]) -> bool:
+    coordinates = _mapping_payload(normalized_request.get("coordinates"))
+    risk = _mapping_payload(normalized_request.get("risk"))
+    execution = _mapping_payload(normalized_request.get("execution"))
+    funding = _mapping_payload(execution.get("funding"))
+    return (
+        str(coordinates.get("market_type")) == "futures"
+        and str(risk.get("mode")) == "tp_sl_grid"
+        and str(funding.get("mode")) == "include_when_futures"
+    )
+
+
+def _funding_candidate_pool_size(requested_top_n: int) -> int:
+    return max(int(requested_top_n) * 5, int(requested_top_n) + 100)
+
+
+def _mapping_payload(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
 @dataclass(frozen=True, slots=True)
 class _TpSlRuntimeContext:
     run_abs_start_15m: np.int32
@@ -171,6 +236,12 @@ class _SelectedCandidateBatch:
 
 
 @dataclass(frozen=True, slots=True)
+class _RankingSpec:
+    metric_name: str
+    direction: str
+
+
+@dataclass(frozen=True, slots=True)
 class _TopKContext:
     indicator_ids: tuple[str, ...]
     row_ids_by_pos: tuple[np.ndarray, ...]
@@ -206,6 +277,7 @@ class BacktestTpSlExactScoringService:
         combo_planning_result: BacktestComboPlanningResult,
         hit_times_result: BacktestTpSlHitTimesResult,
         normalized_request: Mapping[str, Any],
+        funding_arrays: ArtifactFundingArraysV2 | None = None,
     ) -> BacktestTpSlExactResult:
         boundary_start = time.perf_counter()
         risk_mode = _risk_mode_from_normalized(normalized_request)
@@ -250,6 +322,16 @@ class BacktestTpSlExactScoringService:
         request_top_n = _request_top_n_from_normalized(
             normalized_request,
             default_request_top_n=self.config.default_request_top_n,
+        )
+        requested_ranking = _ranking_from_normalized(normalized_request, effective=False)
+        effective_ranking = _ranking_from_normalized(normalized_request, effective=True)
+        funding_adjustment_enabled = _funding_adjustment_enabled(
+            normalized_request=normalized_request
+        )
+        candidate_pool_top_k = (
+            _funding_candidate_pool_size(request_top_n)
+            if funding_adjustment_enabled
+            else request_top_n
         )
         min_closed_trades = _min_closed_trades_from_normalized(normalized_request)
         top_k_context = _top_k_context_from_prepared(prepared_result)
@@ -329,7 +411,7 @@ class BacktestTpSlExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=request_top_n,
+                    top_k=candidate_pool_top_k,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
                     cell_block_tp_count=cell_block_tp_count,
@@ -356,7 +438,7 @@ class BacktestTpSlExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=request_top_n,
+                    top_k=candidate_pool_top_k,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
                     cell_block_tp_count=cell_block_tp_count,
@@ -376,6 +458,22 @@ class BacktestTpSlExactScoringService:
                 top_k_context=top_k_context,
                 direction_mode=backend.direction_mode,
             )
+            if funding_adjustment_enabled:
+                funding_start = time.perf_counter()
+                top_results = _apply_funding_adjustment_to_top_results(
+                    top_results=top_results,
+                    prepared_result=prepared_result,
+                    hit_times=hit_times,
+                    runtime=runtime,
+                    direction_mode=backend.direction_mode,
+                    funding_arrays=funding_arrays,
+                    requested_top_n=request_top_n,
+                    requested_ranking=requested_ranking,
+                    effective_ranking=effective_ranking,
+                )
+                stage_timings[TP_SL_FUNDING_ADJUSTMENT_STAGE_NAME] = (
+                    time.perf_counter() - funding_start
+                )
             stage_timings[TP_SL_FULL_METRICS_SECOND_PASS_STAGE_NAME] = (
                 time.perf_counter() - metrics_start
             )
@@ -390,7 +488,7 @@ class BacktestTpSlExactScoringService:
                 stage_timings=stage_timings,
                 request_top_n=request_top_n,
                 benchmark_top_k=self.config.benchmark_top_k,
-                heap_capacity=request_top_n,
+                heap_capacity=candidate_pool_top_k,
                 top_results_count=len(top_results),
                 exact_candidates_evaluated=scored_count,
                 risk_mode=risk_mode,
@@ -400,7 +498,8 @@ class BacktestTpSlExactScoringService:
                 status=TP_SL_EXACT_SCORED_STATUS,
                 backend_logical_name=backend_logical_name,
                 backend_implementation_id=backend.backend_id,
-                metric_names=TP_SL_EXACT_METRIC_NAMES,
+                metric_names=TP_SL_EXACT_METRIC_NAMES
+                + (TP_SL_FUNDING_METRIC_NAMES if funding_adjustment_enabled else ()),
                 sample_metrics=sample_metrics,
                 numba_num_threads=int(numba_telemetry["numba_num_threads"]),
                 numba_thread_source=str(numba_telemetry["numba_thread_source"]),
@@ -2949,6 +3048,234 @@ def _top_result_metadata(
     return metadata
 
 
+def _apply_funding_adjustment_to_top_results(
+    *,
+    top_results: tuple[BacktestTpSlTopResult, ...],
+    prepared_result: BacktestPreparePoolsResult,
+    hit_times: BacktestTpSlHitTimesSubset,
+    runtime: _TpSlRuntimeContext,
+    direction_mode: str,
+    funding_arrays: ArtifactFundingArraysV2 | None,
+    requested_top_n: int,
+    requested_ranking: _RankingSpec,
+    effective_ranking: _RankingSpec,
+) -> tuple[BacktestTpSlTopResult, ...]:
+    time_arrays = _tp_sl_time_arrays_from_prepared(prepared_result)
+    if funding_arrays is None or time_arrays is None:
+        return _rerank_funding_adjusted_top_results(
+            tuple(
+                _annotate_no_funding_available(
+                    top_result=top_result,
+                    requested_ranking=requested_ranking,
+                    effective_ranking=effective_ranking,
+                    requested_top_n=requested_top_n,
+                    candidate_pool_size=len(top_results),
+                )
+                for top_result in top_results
+            ),
+            requested_top_n=requested_top_n,
+            effective_ranking=effective_ranking,
+        )
+
+    open_time_15m, close_time_15m, execution_close_time_1m = time_arrays
+    execution_close_1m = np.ascontiguousarray(
+        np.asarray(prepared_result.execution_close_1m, dtype=np.float32)
+    )
+    adjusted: list[BacktestTpSlTopResult] = []
+    for top_result in top_results:
+        local_indices = _local_indices_from_top_result(
+            prepared_result=prepared_result,
+            top_result=top_result,
+        )
+        entry_abs, dir_arr, sig_exit_abs = build_trade_list_15m_for_indicator_rows_slow(
+            prepared_result=prepared_result,
+            local_indices=local_indices,
+            direction_mode=direction_mode,
+        )
+        trade_returns, _bars_held = _selected_cell_trade_returns(
+            entry_abs=entry_abs,
+            dir_arr=dir_arr,
+            sig_exit_abs=sig_exit_abs,
+            best_tp_idx=top_result.best_tp_idx,
+            best_sl_idx=top_result.best_sl_idx,
+            hit_times=hit_times,
+            runtime=runtime,
+        )
+        funding_summary = calculate_tp_sl_funding_adjustment(
+            entry_abs=entry_abs,
+            dir_arr=dir_arr,
+            sig_exit_abs=sig_exit_abs,
+            trade_returns=trade_returns,
+            best_tp_idx=top_result.best_tp_idx,
+            best_sl_idx=top_result.best_sl_idx,
+            hit_times=hit_times,
+            runtime=runtime,
+            open_time_15m=open_time_15m,
+            close_time_15m=close_time_15m,
+            execution_close_1m=execution_close_1m,
+            execution_close_time_1m=execution_close_time_1m,
+            funding_time=funding_arrays.funding_time,
+            funding_rate=funding_arrays.funding_rate,
+            mark_price=funding_arrays.mark_price,
+            data_quality=funding_arrays.data_quality,
+            funding_data_quality=str(funding_arrays.coverage_status),
+            warning_codes=funding_arrays.manifest.reason_codes,
+        )
+        funding_metrics = funding_summary.metric_payload(
+            gross_total_return_pct=float(top_result.metrics["total_return_pct"]),
+            initial_cash_quote=float(runtime.initial_cash_quote),
+        )
+        adjusted.append(
+            BacktestTpSlTopResult(
+                rank=top_result.rank,
+                score=top_result.score,
+                indicator_rows=top_result.indicator_rows,
+                best_tp_idx=top_result.best_tp_idx,
+                best_sl_idx=top_result.best_sl_idx,
+                metrics={**dict(top_result.metrics), **funding_metrics},
+                metadata={
+                    **dict(top_result.metadata),
+                    FUNDING_INCLUDED: True,
+                    FUNDING_DATA_QUALITY: funding_summary.funding_data_quality,
+                    FUNDING_WARNING_CODES: funding_summary.funding_warning_codes,
+                    FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+                    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+                    "requested_ranking_metric": requested_ranking.metric_name,
+                    "effective_ranking_metric": effective_ranking.metric_name,
+                    "funding_candidate_pool_size": len(top_results),
+                    "requested_top_n": requested_top_n,
+                    "funding_manifest_hash": funding_arrays.funding_manifest_hash,
+                },
+            )
+        )
+    return _rerank_funding_adjusted_top_results(
+        tuple(adjusted),
+        requested_top_n=requested_top_n,
+        effective_ranking=effective_ranking,
+    )
+
+
+def _annotate_no_funding_available(
+    *,
+    top_result: BacktestTpSlTopResult,
+    requested_ranking: _RankingSpec,
+    effective_ranking: _RankingSpec,
+    requested_top_n: int,
+    candidate_pool_size: int,
+) -> BacktestTpSlTopResult:
+    gross_return = float(top_result.metrics["total_return_pct"])
+    return BacktestTpSlTopResult(
+        rank=top_result.rank,
+        score=top_result.score,
+        indicator_rows=top_result.indicator_rows,
+        best_tp_idx=top_result.best_tp_idx,
+        best_sl_idx=top_result.best_sl_idx,
+        metrics={
+            **dict(top_result.metrics),
+            TOTAL_RETURN_PCT_NET_OF_FUNDING: gross_return,
+            "funding_return_pct": 0.0,
+            "funding_pnl_quote": 0.0,
+            "funding_events_count": 0.0,
+        },
+        metadata={
+            **dict(top_result.metadata),
+            FUNDING_INCLUDED: False,
+            FUNDING_DATA_QUALITY: "unavailable",
+            FUNDING_WARNING_CODES: ("funding_artifacts_unavailable",),
+            FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_UNAVAILABLE,
+            FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+            "requested_ranking_metric": requested_ranking.metric_name,
+            "effective_ranking_metric": effective_ranking.metric_name,
+            "funding_candidate_pool_size": candidate_pool_size,
+            "requested_top_n": requested_top_n,
+            "funding_manifest_hash": None,
+        },
+    )
+
+
+def _rerank_funding_adjusted_top_results(
+    top_results: tuple[BacktestTpSlTopResult, ...],
+    *,
+    requested_top_n: int,
+    effective_ranking: _RankingSpec,
+) -> tuple[BacktestTpSlTopResult, ...]:
+    def sort_key(item: BacktestTpSlTopResult) -> tuple[float, int]:
+        score = float(item.metrics[effective_ranking.metric_name])
+        comparable_score = -score if effective_ranking.direction == "desc" else score
+        return comparable_score, item.rank
+
+    ranked = sorted(top_results, key=sort_key)[:requested_top_n]
+    return tuple(
+        BacktestTpSlTopResult(
+            rank=rank,
+            score=float(item.metrics[effective_ranking.metric_name]),
+            indicator_rows=item.indicator_rows,
+            best_tp_idx=item.best_tp_idx,
+            best_sl_idx=item.best_sl_idx,
+            metrics=item.metrics,
+            metadata=item.metadata,
+        )
+        for rank, item in enumerate(ranked, start=1)
+    )
+
+
+def _tp_sl_time_arrays_from_prepared(
+    prepared_result: BacktestPreparePoolsResult,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    if (
+        prepared_result.execution_open_time_1m is None
+        or prepared_result.execution_close_time_1m is None
+    ):
+        return None
+    open_time_1m = np.ascontiguousarray(
+        np.asarray(prepared_result.execution_open_time_1m, dtype=np.int64)
+    )
+    close_time_1m = np.ascontiguousarray(
+        np.asarray(prepared_result.execution_close_time_1m, dtype=np.int64)
+    )
+    mapping = prepared_result.execution_mapping
+    open_idx = np.asarray(mapping.run_bar_open_1m_idx_15m, dtype=np.int32)
+    close_idx = np.asarray(mapping.run_bar_close_1m_idx_15m, dtype=np.int32)
+    start = int(prepared_result.time_slice_start_15m)
+    stop = int(prepared_result.time_slice_stop_15m)
+    if stop <= start:
+        return None
+    if int(open_idx.shape[0]) != stop - start or int(close_idx.shape[0]) != stop - start:
+        return None
+    if int(np.max(open_idx)) >= int(open_time_1m.shape[0]) or int(np.max(close_idx)) >= int(
+        close_time_1m.shape[0]
+    ):
+        return None
+    open_time_15m = np.zeros(stop, dtype=np.int64)
+    close_time_15m = np.zeros(stop, dtype=np.int64)
+    open_time_15m[start:stop] = open_time_1m[open_idx]
+    close_time_15m[start:stop] = close_time_1m[close_idx]
+    return (
+        np.ascontiguousarray(open_time_15m),
+        np.ascontiguousarray(close_time_15m),
+        close_time_1m,
+    )
+
+
+def _local_indices_from_top_result(
+    *,
+    prepared_result: BacktestPreparePoolsResult,
+    top_result: BacktestTpSlTopResult,
+) -> tuple[int, ...]:
+    pools_by_id = _pool_by_id(prepared_result)
+    local_indices: list[int] = []
+    for indicator_id in prepared_result.indicator_ids:
+        row_id = int(top_result.indicator_rows[indicator_id])
+        row_ids = np.asarray(pools_by_id[indicator_id].row_ids, dtype=np.int64)
+        matches = np.flatnonzero(row_ids == row_id)
+        if int(matches.shape[0]) == 0:
+            raise BacktestTpSlExactRejected(
+                f"funding adjustment cannot find original row {row_id}"
+            )
+        local_indices.append(int(matches[0]))
+    return tuple(local_indices)
+
+
 def _full_metrics_for_heap_entry(
     *,
     entry: _TpSlHeapEntry,
@@ -3019,49 +3346,18 @@ def _selected_cell_trade_returns(
             trade_return = -1.0
         else:
             trade_return = math.exp(log_value) - 1.0
-        exit_abs = _tp_sl_exit_abs_for_cell(
-            dirn=int(dir_arr[trade_idx]),
+        selected_exit = resolve_tp_sl_selected_exit(
+            direction=int(dir_arr[trade_idx]),
             entry_abs=int(entry_abs[trade_idx]),
-            sig_exit_abs=int(sig_exit_abs[trade_idx]),
-            tp_i=best_tp_idx,
-            sl_i=best_sl_idx,
+            signal_exit_abs=int(sig_exit_abs[trade_idx]),
+            best_tp_idx=best_tp_idx,
+            best_sl_idx=best_sl_idx,
             hit_times=hit_times,
             runtime=runtime,
         )
         trade_returns.append(trade_return)
-        bars_held.append(max(0.0, float(exit_abs - int(entry_abs[trade_idx]))))
+        bars_held.append(max(0.0, float(selected_exit.exit_abs - int(entry_abs[trade_idx]))))
     return trade_returns, bars_held
-
-
-def _tp_sl_exit_abs_for_cell(
-    *,
-    dirn: int,
-    entry_abs: int,
-    sig_exit_abs: int,
-    tp_i: int,
-    sl_i: int,
-    hit_times: BacktestTpSlHitTimesSubset,
-    runtime: _TpSlRuntimeContext,
-) -> int:
-    start = entry_abs + 1
-    t_exec_abs = int(runtime.t_exec_abs_15m)
-    stop_abs = sig_exit_abs if sig_exit_abs < t_exec_abs else t_exec_abs
-    if start < t_exec_abs:
-        if dirn == 1:
-            t_tp = int(hit_times.long_tp[tp_i, start])
-            t_sl = int(hit_times.long_sl[sl_i, start])
-        else:
-            t_tp = int(hit_times.short_tp[tp_i, start])
-            t_sl = int(hit_times.short_sl[sl_i, start])
-        if t_tp < stop_abs and t_tp < t_sl:
-            return t_tp
-        if t_sl < stop_abs and t_sl <= t_tp:
-            return t_sl
-    if sig_exit_abs < t_exec_abs:
-        return sig_exit_abs
-    if runtime.close_on_end == 1 and t_exec_abs > 0:
-        return t_exec_abs - 1
-    return entry_abs
 
 
 def _summary_metrics_from_trade_returns(

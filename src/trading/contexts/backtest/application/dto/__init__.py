@@ -10,6 +10,7 @@ from .backtest_jobs import (
     BacktestLazyTradesDetailReadModel,
     BacktestLazyTradesMaterializationReadModel,
     BacktestLazyTradesResultReadModel,
+    build_backtest_funding_read_model,
     build_backtest_job_read_model,
     build_top_variant_read_model,
 )
@@ -130,6 +131,7 @@ __all__ = [
     "BacktestTpSlSelfCheckSummary",
     "BacktestTpSlTopResult",
     "BacktestValidationIssue",
+    "build_backtest_funding_read_model",
     "CompactScalar",
     "JsonMapping",
     "PreparedExecutionMapping",

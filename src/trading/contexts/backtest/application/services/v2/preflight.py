@@ -729,15 +729,15 @@ class BacktestPreflightService:
         )
         if primary_metric == "total_return_pct_net_of_funding" and not (
             coordinates.market_type == "futures"
-            and str(risk.get("mode")) == "none"
+            and str(risk.get("mode")) in {"none", "tp_sl_grid"}
             and _mapping_payload(execution.get("funding")).get("mode")
             == "include_when_futures"
         ):
             raise _invalid_request(
                 path="ranking.primary_metric",
-                code="funding_metric_requires_futures_funding_no_risk",
+                code="funding_metric_requires_futures_funding",
                 message=(
-                    "total_return_pct_net_of_funding can only rank no-risk futures "
+                    "total_return_pct_net_of_funding can only rank futures "
                     "requests with funding included"
                 ),
             )
@@ -745,7 +745,7 @@ class BacktestPreflightService:
         if (
             primary_metric == "total_return_pct"
             and coordinates.market_type == "futures"
-            and str(risk.get("mode")) == "none"
+            and str(risk.get("mode")) in {"none", "tp_sl_grid"}
             and _mapping_payload(execution.get("funding")).get("mode")
             == "include_when_futures"
         ):

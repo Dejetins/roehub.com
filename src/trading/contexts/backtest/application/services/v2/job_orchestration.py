@@ -200,12 +200,23 @@ class BacktestRuntimeJobOrchestrationService:
                     normalized_request=normalized_request,
                     requested_backend_id=requested_tp_sl_backend_id,
                 )
-                exact_result = self.tp_sl_exact.execute(
-                    prepared_result=prepared_result,
-                    combo_planning_result=combo_result,
-                    hit_times_result=hit_times_result,
+                funding_arrays = None
+                if _should_load_tp_sl_funding_arrays(
                     normalized_request=normalized_request,
-                )
+                    preflight=preflight,
+                ):
+                    funding_arrays = self.artifact_array_loader.load_funding_arrays(
+                        context=context
+                    )
+                exact_kwargs = {
+                    "prepared_result": prepared_result,
+                    "combo_planning_result": combo_result,
+                    "hit_times_result": hit_times_result,
+                    "normalized_request": normalized_request,
+                }
+                if funding_arrays is not None:
+                    exact_kwargs["funding_arrays"] = funding_arrays
+                exact_result = self.tp_sl_exact.execute(**exact_kwargs)
                 if tp_sl_selected_cell_shadow_enabled():
                     tp_sl_selected_cells = build_tp_sl_selected_cell_shadow(
                         prepared_result=prepared_result,
@@ -756,6 +767,26 @@ def _should_load_no_risk_funding_arrays(
         and str(coordinates.get("market_type")) == "futures"
         and isinstance(risk, Mapping)
         and str(risk.get("mode")) == "none"
+        and isinstance(funding, Mapping)
+        and str(funding.get("mode")) == "include_when_futures"
+        and preflight.artifact_metadata.funding_coverage_status in {"ready", "degraded"}
+    )
+
+
+def _should_load_tp_sl_funding_arrays(
+    *,
+    normalized_request: Mapping[str, Any],
+    preflight: BacktestPreflightResult,
+) -> bool:
+    coordinates = normalized_request.get("coordinates")
+    execution = normalized_request.get("execution")
+    risk = normalized_request.get("risk")
+    funding = execution.get("funding") if isinstance(execution, Mapping) else None
+    return (
+        isinstance(coordinates, Mapping)
+        and str(coordinates.get("market_type")) == "futures"
+        and isinstance(risk, Mapping)
+        and str(risk.get("mode")) == "tp_sl_grid"
         and isinstance(funding, Mapping)
         and str(funding.get("mode")) == "include_when_futures"
         and preflight.artifact_metadata.funding_coverage_status in {"ready", "degraded"}

@@ -102,7 +102,7 @@ class BacktestTpSlTopResult:
     best_tp_idx: int
     best_sl_idx: int
     metrics: Mapping[str, float]
-    metadata: Mapping[str, int | float | str | bool | None]
+    metadata: Mapping[str, int | float | str | bool | tuple[str, ...] | None]
 
     def __post_init__(self) -> None:
         if self.rank <= 0:
@@ -370,9 +370,11 @@ class BacktestTpSlExactResult:
         return [top_result.as_canonical_mapping() for top_result in self.top_results]
 
 
-def _compact_scalar(value: object) -> int | float | str | bool | None:
+def _compact_scalar(value: object) -> int | float | str | bool | tuple[str, ...] | None:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, tuple) and all(isinstance(item, str) for item in value):
+        return tuple(value)
     item = getattr(value, "item", None)
     if callable(item):
         scalar = item()

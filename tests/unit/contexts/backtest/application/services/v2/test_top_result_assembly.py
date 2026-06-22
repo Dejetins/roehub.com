@@ -156,6 +156,72 @@ def test_tp_sl_top_result_assembly_persists_best_cell_summary_only() -> None:
     assert row.trades_json is None
 
 
+def test_tp_sl_funding_adjustment_metadata_is_persisted_summary_only() -> None:
+    result = BacktestTopResultAssemblyService().assemble(
+        job_id=uuid4(),
+        normalized_request=_request(
+            risk={
+                "mode": "tp_sl_grid",
+                "tp": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+                "sl": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+            }
+        ),
+        top_results=(
+            BacktestTpSlTopResult(
+                rank=1,
+                score=31.75,
+                indicator_rows={"ma.dema": 17},
+                best_tp_idx=2,
+                best_sl_idx=3,
+                metrics={
+                    "total_return_pct": 33.0,
+                    TOTAL_RETURN_PCT_NET_OF_FUNDING: 31.75,
+                    FUNDING_RETURN_PCT: -1.25,
+                    FUNDING_PNL_QUOTE: -125.0,
+                    FUNDING_EVENTS_COUNT: 2.0,
+                    "trade_count": 4.0,
+                    "best_tp_pct": 3.0,
+                    "best_sl_pct": 3.5,
+                },
+                metadata={
+                    "ma.dema.source": "close",
+                    "ma.dema.window": 192,
+                    FUNDING_INCLUDED: True,
+                    FUNDING_DATA_QUALITY: "ready",
+                    FUNDING_WARNING_CODES: (),
+                    FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+                    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+                    "requested_ranking_metric": "total_return_pct",
+                    "effective_ranking_metric": TOTAL_RETURN_PCT_NET_OF_FUNDING,
+                    "funding_candidate_pool_size": 101,
+                    "requested_top_n": 1,
+                    "funding_manifest_hash": "f" * 64,
+                },
+            ),
+        ),
+        updated_at=datetime(2026, 5, 1, tzinfo=UTC),
+    )
+
+    row = result.top_variants[0]
+    assert row.total_return_pct == 33.0
+    assert row.summary_metrics_json["total_return_pct"] == 33.0
+    assert row.summary_metrics_json[TOTAL_RETURN_PCT_NET_OF_FUNDING] == 31.75
+    assert row.trades_json is None
+    assert row.report_table_md is None
+    assert row.payload_json["funding_adjustment"] == {
+        FUNDING_INCLUDED: True,
+        FUNDING_DATA_QUALITY: "ready",
+        FUNDING_WARNING_CODES: [],
+        FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+        FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+        "requested_ranking_metric": "total_return_pct",
+        "effective_ranking_metric": TOTAL_RETURN_PCT_NET_OF_FUNDING,
+        "funding_candidate_pool_size": 101,
+        "requested_top_n": 1,
+        "funding_manifest_hash": "f" * 64,
+    }
+
+
 def test_tp_sl_top_result_assembly_omits_disabled_side_best_level() -> None:
     result = BacktestTopResultAssemblyService().assemble(
         job_id=uuid4(),

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, cast
 from uuid import uuid4
 
@@ -108,6 +109,20 @@ def test_lazy_trades_cache_read_failure_recomputes_successfully(tmp_path: Path) 
     assert result.cache["warning"] == "bad json"
     assert result.trades
     assert len(cache.writes) == 1
+
+
+def test_lazy_trades_cache_key_uses_funding_manifest_hash(tmp_path: Path) -> None:
+    service, _cache, job, row = _service_fixture(tmp_path=tmp_path, risk_mode="none")
+    job = _job_with_funding_manifest_hash(job=job, funding_manifest_hash="f" * 64)
+
+    probe = service.read_cached(
+        job=job,
+        row=row,
+        public_variant_key=row.payload_json["public_variant_key"],
+    )
+
+    assert probe.cache_key.funding_manifest_hash == "f" * 64
+    assert probe.cache_key.as_mapping()["funding_manifest_hash"] == "f" * 64
 
 
 def test_lazy_trades_cache_write_failure_returns_recomputed_payload(tmp_path: Path) -> None:
@@ -243,6 +258,64 @@ def test_tp_sl_detail_row_can_report_take_profit_exit_reason() -> None:
 
     assert rows[0]["exit_reason"] == "take_profit"
     assert rows[0]["exit_bar_index"] == 2
+
+
+def test_tp_sl_detail_row_uses_same_bar_stop_loss_precedence() -> None:
+    hit_times = BacktestTpSlHitTimesSubset(
+        tp_values=np.asarray([0.02], dtype=np.float32),
+        sl_values=np.asarray([0.01], dtype=np.float32),
+        long_tp=np.asarray([[4, 4, 2, 4]], dtype=np.uint32),
+        long_sl=np.asarray([[4, 4, 2, 4]], dtype=np.uint32),
+        short_tp=np.asarray([[4, 4, 4, 4]], dtype=np.uint32),
+        short_sl=np.asarray([[4, 4, 4, 4]], dtype=np.uint32),
+        sentinel_index=4,
+    )
+    runtime = _Runtime()
+
+    rows = detail_module._tp_sl_trade_rows(
+        entry_abs=np.asarray([1], dtype=np.int32),
+        dir_arr=np.asarray([1], dtype=np.int8),
+        sig_exit_abs=np.asarray([3], dtype=np.int32),
+        best_tp_idx=0,
+        best_sl_idx=0,
+        hit_times=hit_times,
+        runtime=runtime,
+        execution_settings=cast(Any, runtime.execution_settings),
+        open_time_15m=np.asarray([0, 900000, 1800000, 2700000], dtype=np.int64),
+        close_time_15m=np.asarray([899999, 1799999, 2699999, 3599999], dtype=np.int64),
+    )
+
+    assert rows[0]["exit_reason"] == "stop_loss"
+    assert rows[0]["exit_bar_index"] == 2
+
+
+def test_funding_events_overlay_uses_entry_exclusive_exit_inclusive() -> None:
+    funding_arrays = SimpleNamespace(
+        funding_time=np.asarray([1_000, 2_000, 3_000, 4_000], dtype=np.int64),
+        funding_rate=np.asarray([0.1, 0.2, -0.1, 0.3], dtype=np.float64),
+        mark_price=np.asarray([100.0, 101.0, 102.0, 103.0], dtype=np.float64),
+        funding_interval_minutes=np.asarray([480, 480, 480, 480], dtype=np.uint16),
+        data_quality=np.asarray([1, 1, 1, 1], dtype=np.uint8),
+    )
+
+    events = detail_module._funding_events_overlay(
+        trades=[
+            {
+                "trade_index": 7,
+                "entry_timestamp": "1970-01-01T00:00:01Z",
+                "exit_timestamp": "1970-01-01T00:00:03Z",
+                "side": "long",
+                "quantity": 2.0,
+            }
+        ],
+        funding_arrays=funding_arrays,
+    )
+
+    assert [event["funding_rate"] for event in events] == [0.2, -0.1]
+    assert events[0]["kind"] == "funding_event"
+    assert events[0]["trade_index"] == 7
+    assert events[0]["estimated_pnl_quote"] == pytest.approx(-40.4)
+    assert events[1]["timestamp"] == "1970-01-01T00:00:03Z"
 
 
 @dataclass
@@ -531,3 +604,15 @@ def _cached_payload(*, job: BacktestJob, row: BacktestJobTopVariant) -> dict[str
         "cache": {"status": "miss"},
         "timing": {},
     }
+
+
+def _job_with_funding_manifest_hash(
+    *,
+    job: BacktestJob,
+    funding_manifest_hash: str,
+) -> BacktestJob:
+    request = dict(job.request_json)
+    artifact_metadata = dict(request["artifact_metadata"])
+    artifact_metadata["funding_manifest_hash"] = funding_manifest_hash
+    request["artifact_metadata"] = artifact_metadata
+    return replace(job, request_json=request)

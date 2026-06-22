@@ -24,20 +24,27 @@ class BacktestLazyTradesCacheKey:
     request_hash: str
     engine_params_hash: str
     artifact_manifest_hash: str
+    funding_manifest_hash: str | None = None
 
-    def as_mapping(self) -> dict[str, str]:
-        return {
+    def as_mapping(self) -> dict[str, str | None]:
+        payload: dict[str, str | None] = {
             "job_id": self.job_id,
             "variant_key": self.variant_key,
             "variant_hash": self.variant_hash,
             "request_hash": self.request_hash,
             "engine_params_hash": self.engine_params_hash,
             "artifact_manifest_hash": self.artifact_manifest_hash,
+            "funding_manifest_hash": self.funding_manifest_hash,
         }
+        return payload
+
+    def identity_mapping(self) -> dict[str, str]:
+        payload = {key: value for key, value in self.as_mapping().items() if value is not None}
+        return {key: str(value) for key, value in payload.items()}
 
     @property
     def digest(self) -> str:
-        return canonical_json_sha256(self.as_mapping())
+        return canonical_json_sha256(self.identity_mapping())
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +131,7 @@ def build_lazy_trades_cache_key(
     request_hash: str,
     engine_params_hash: str,
     artifact_manifest_hash: str,
+    funding_manifest_hash: str | None = None,
 ) -> BacktestLazyTradesCacheKey:
     return BacktestLazyTradesCacheKey(
         job_id=job_id,
@@ -132,6 +140,7 @@ def build_lazy_trades_cache_key(
         request_hash=request_hash,
         engine_params_hash=engine_params_hash,
         artifact_manifest_hash=artifact_manifest_hash,
+        funding_manifest_hash=funding_manifest_hash,
     )
 
 

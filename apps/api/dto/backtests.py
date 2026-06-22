@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from trading.contexts.backtest.application.dto import (
     BacktestJobCreateResult,
@@ -110,6 +110,8 @@ class BacktestTopVariantResponse(BaseModel):
     readable_params: dict[str, Any]
     links: dict[str, Any]
     actions: dict[str, Any]
+    funding_manifest_hash: str | None = None
+    funding: dict[str, Any] = Field(default_factory=dict)
 
 
 class BacktestTopVariantsResponse(BaseModel):
@@ -130,6 +132,8 @@ class BacktestLazyTradesDetailResponse(BaseModel):
     chart_overlay: dict[str, Any]
     cache: dict[str, Any]
     timing: dict[str, Any]
+    funding_manifest_hash: str | None = None
+    funding: dict[str, Any] = Field(default_factory=dict)
 
 
 class BacktestLazyTradesMaterializationResponse(BaseModel):

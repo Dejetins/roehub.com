@@ -478,6 +478,38 @@ def test_preflight_tp_sl_grid_validates_cells_and_configured_coverage() -> None:
     assert result.cost_estimate.tp_sl_cells == 2209
 
 
+def test_preflight_tp_sl_futures_funding_defaults_to_net_effective_ranking() -> None:
+    request = _valid_request()
+    request["coordinates"]["market_type"] = "futures"
+    request["risk"] = {
+        "mode": "tp_sl_grid",
+        "tp": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+        "sl": {"start_pct": 2.0, "stop_pct": 25.0, "step_pct": 0.5},
+    }
+    resolver = _FakeArtifactResolver(
+        funding_coverage_status="ready",
+        funding_coverage_policy="ready",
+        funding_manifest_hash="c" * 64,
+        funding_rows_count=6,
+        funding_expected_event_count=6,
+        funding_missing_event_count=0,
+    )
+
+    result = _service(resolver=resolver).execute(request)
+
+    assert result.normalized_request["execution"]["funding"] == {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning",
+    }
+    assert result.normalized_request["ranking"] == {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct_net_of_funding",
+        "direction": "desc",
+    }
+    assert result.cost_estimate.risk_mode == "tp_sl_grid"
+
+
 def test_preflight_tp_sl_grid_accepts_one_sided_risk() -> None:
     request = _valid_request()
     request["risk"] = {
