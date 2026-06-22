@@ -1,7 +1,11 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 08 - Final Verification And Delivery"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1"
+branch: "main"
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Full verification, docs closure and delivery readiness for the funding/short policy line"
 language: "en"
 context_sources:
@@ -10,7 +14,7 @@ context_sources:
   - "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1-stage-reports/backtest-futures-funding-and-short-direction-policy-v1-stage-ledger.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
-  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
+  - "Use main by default. Do not create any git branch, worktree, temporary checkout, folder, stash, or auxiliary file unless the user explicitly requests that exact workflow. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before final verification edits."
   - "Previous-stage ledger gate: confirm Stages 00-07 are accepted or explicitly scoped out by user decision before final verification; if any required stage is planned or blocked, stop and record Stage 08 as blocked."
   - "Do not mark the plan accepted until all prior stages are accepted or explicitly scoped out by user decision."
@@ -104,7 +108,7 @@ This stage is only valid after stages `00` through `07` have either been accepte
 
 ## Requirements (Nice-to-have)
 
-- Archive old temporary branches if created during this line and safe to remove.
+- Record any historical branch/PR evidence only if it already exists. Do not create new branches, worktrees, temporary checkouts, folders, stashes, or auxiliary files unless the user explicitly requests that workflow.
 
 # Context acquisition protocol
 

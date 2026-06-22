@@ -3,7 +3,7 @@
     "hook_event_name": "PreToolUse",
     "tool_name": "Bash",
     "tool_input": {
-      "command": "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1 git switch -c codex/backtest-futures-funding-v1"
+      "command": "ROEHUB_WORKTREE_APPROVED=1 git worktree add /tmp/roehub-branch codex/backtest-futures-funding-v1"
     }
   },
   "expect": {

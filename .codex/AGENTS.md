@@ -175,15 +175,13 @@ Remote command quoting contract:
 Prompt-pack branch policy:
 - Default execution branch is `main`. Agents MUST NOT create a separate branch for a prompt pack unless the user explicitly requested branch-based execution or delivery for that prompt pack.
 - If the user explicitly requested a branch, the entire prompt pack MUST use at most one dedicated branch. Do not create one branch per stage.
-- The primary checkout `/Users/daniildegtyarev/Projects/roehub.com` MUST stay on `main` by default. Do not switch this checkout to a prompt-pack branch for implementation work.
-- Every user-approved prompt-pack branch MUST use its own `git worktree` folder under `/Users/daniildegtyarev/Projects/roehub-worktrees/`.
-- Worktree folder names MUST be deterministic and branch-specific: replace `/` in the branch name with `__`; for example `codex/backtest-futures-funding-v1` uses `/Users/daniildegtyarev/Projects/roehub-worktrees/codex__backtest-futures-funding-v1`.
-- Create or attach a prompt-pack branch with `git worktree add`, not with `git switch -c`, `git checkout -b`, or by switching the primary checkout away from `main`.
-- A branch worktree is local execution state. Delete/prune its folder only after the branch has been successfully merged or otherwise delivered back to `main`, and after no pending stage ledger, evidence, or handoff state remains in that worktree.
 - Stage-specific branch names are forbidden for prompt-pack execution, including names like `*-stage-00`, `*-stage-01`, `*/stage-01`, or similar per-stage variants.
-- Generated prompt packs that mention branch work MUST define one branch policy shared by all stages: default branch, whether a separate branch was explicitly requested by the user, the single allowed branch name when applicable, the single worktree path when applicable, and the rule that all stages reuse that branch and worktree until final delivery or cleanup.
+- Agents MUST NOT create branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary files solely to manage prompt-pack execution unless the user explicitly requested that exact artifact or workflow.
+- If the checkout is dirty, mixed, or otherwise unsafe for the requested work, do not create a parallel work folder as a workaround. Report the blocker or stage only the explicitly scoped files when publishing is requested.
+- Generated prompt packs that mention branch work MUST define one branch policy shared by all stages: default branch, whether a separate branch was explicitly requested by the user, the single allowed branch name when applicable, and the rule that all stages reuse that branch until final delivery or cleanup.
 - If no branch was explicitly requested, generated prompts MUST instruct executors to work from `main` and deliver according to the repository publish/deploy workflow, not to create `codex/...` branches speculatively.
 - Any branch creation command must be deliberate and auditable. The hook layer blocks branch creation unless the command includes `ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1`, and this marker may be used only when the user explicitly requested a separate branch for the prompt pack.
+- Any `git worktree add` command must be even more explicit and include `ROEHUB_WORKTREE_APPROVED=1`; this marker may be used only when the user specifically requested a separate worktree/folder workflow.
 
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
 

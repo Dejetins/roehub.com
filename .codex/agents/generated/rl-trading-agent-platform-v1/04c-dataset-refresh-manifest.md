@@ -2,6 +2,10 @@
 prompt_name: 04c-dataset-refresh-manifest
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Freeze Binance Futures dataset refresh versions and manifests before raw feature slab construction."
 language:
   implementation: python
@@ -67,10 +71,10 @@ task_toggles:
   allow_browser_runtime_verification: false
   allow_tests_only_acceptance: false
 skill_routing:
-  - skill: github:yeet
-    use_when: "publishing accepted stage changes to GitHub through a scoped branch and draft PR"
+  - skill: publish-ci-deploy
+    use_when: "publishing accepted stage changes through the default direct-main delivery workflow"
     timing: "before ship"
-    reason: "owns scoped staging, branch push, draft PR creation, and branch hygiene"
+    reason: "owns scoped staging, main delivery, CI/deploy follow-up, and Mac Studio verification; branch/PR only when explicitly requested by the user"
   - skill: data-analytics-methodology
     use_when: "freezing dataset-version methodology and residual-gap decisions"
     timing: "during investigation"
@@ -189,7 +193,7 @@ Read `.codex/AGENTS.md`, RL plan, ledger, Stage 02A, Stage 04A and Stage 04B rep
 
 Skill routing:
 
-- `github:yeet`: use before ship when publishing accepted stage changes through a scoped branch and draft PR; do not push directly to `main`.
+- `publish-ci-deploy`: use before ship when publishing accepted stage changes through the default direct-main delivery workflow; owns scoped staging, main delivery, CI/deploy/Mac Studio follow-up, and branch hygiene only when the user explicitly requested branch/PR delivery.
 - `data-analytics-methodology`: use for dataset version methodology and coverage/residual-gap interpretation.
 - `backend-quality-gates`: use for focused tests/lint/type gates when code changes.
 - `contract-impact-analysis`: use for manifest schema or metadata contract changes.
@@ -206,7 +210,7 @@ Skill routing:
 - Stage 05 has one explicit accepted input manifest over the corrected full current USDT perpetual universe or is blocked; no implicit six-symbol fallback or 215-symbol HF-intersection fallback is allowed.
 - External HF baseline remains immutable and separate from Roehub-native refresh versions.
 - Stage ledger is updated after validation and before final response.
-- Delivery state is explicit: `local-only`, `published-to-branch/draft-pr`, `delivered-to-main`, and/or `deployed-on-macstudio`, with evidence appropriate to the stage.
+- Delivery state is explicit: `local-only`, `delivered-to-main`, `deployed-on-macstudio`, and `published-to-branch/draft-pr` only when the user explicitly requested branch/PR delivery, with evidence appropriate to the stage.
 
 # Implementation constraints
 
@@ -224,14 +228,11 @@ Skill routing:
 ## GitHub delivery and branch hygiene
 
 - Default delivery during stage work is `local-only` until an explicit publish step is required.
-- Do not push directly to `main` and do not run `git push origin main` from this prompt.
-- If publishing is required, use the `github:yeet` workflow: inspect `git status -sb` and the diff, stage only intended files, commit tersely, push a branch with tracking, and open a draft PR.
-- Branch creation rule: create one `codex/<stage-scope>` branch only when currently on `main`, `master`, or another default branch. If already on a suitable task branch, stay on it and do not create another branch.
-- Do not use `git add -A` in a mixed worktree unless the user explicitly confirms that the whole worktree belongs to this stage.
-- A stage may report `published-to-branch/draft-pr` while the PR is open. It may report `delivered-to-main` only after the PR has been merged and evidence proves the delivered SHA is on `origin/main`.
-- After successful PR merge and required tests/deploy checks, delete only the temporary `codex/*` branch created for that stage from local and remote. Never delete user-owned or pre-existing branches.
-- `publish-ci-deploy` may be used for CI/deploy/Mac Studio verification after GitHub publication or merge, but it does not replace `github:yeet` for branch/PR publishing.
-- If a user explicitly requests a direct main push, stop and record the request as a delivery-policy deviation before doing anything; do not infer direct-main push permission from `delivered-to-main` wording.
+- Default publish target is `main`. Do not create a branch, draft PR, worktree, temporary checkout, local folder, stash, or auxiliary workflow artifact unless the user explicitly requests that exact workflow.
+- If publishing is required, use `publish-ci-deploy` direct-main discipline: inspect `git status -sb` and the diff, stage only intended files, run required gates, commit on `main`, push `origin main`, and follow CI/deploy/Mac Studio verification when required by the stage.
+- Do not use `git add -A` in a mixed working tree unless the user explicitly confirms that the whole working tree belongs to this stage.
+- A stage may report `delivered-to-main` only after evidence proves the delivered SHA is on `origin/main`; local-only work remains `local-only`.
+- If the user explicitly requests branch/PR delivery, use at most one branch for the entire prompt pack, never per-stage branches, and record the explicit request plus branch evidence in the report and ledger.
 ## Documentation
 
 - Update only directly relevant docs.

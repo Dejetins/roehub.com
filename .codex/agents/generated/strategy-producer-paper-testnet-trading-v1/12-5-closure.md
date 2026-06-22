@@ -2,6 +2,10 @@
 prompt_name: 12-5-closure
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Close Stage 12 after all sub-gates pass: browser proof, cleanup, ledger, docs, delivery, and pass/fail decision."
 language:
   implementation: markdown/shell
@@ -80,7 +84,7 @@ Run Stage `12.5` closure.
 - Confirm cleanup: no stale collector, no unexpected active temp process, Redis pending/retry/DLQ deltas within accepted thresholds, no new unknown/reconciliation debt beyond accepted thresholds, no mainnet attempt, no secret leakage.
 - Summarize all Stage `12` sub-gate evidence and produce a final Stage `12` pass/fail decision.
 - Update the ledger so Stage `12.5` is accepted or blocked and Stage `13` is allowed only if `12.5 accepted`.
-- Run docs index check and publish scoped report/ledger/docs changes through `github:yeet`/`publish-ci-deploy` discipline. Do not stage unrelated dirty files.
+- Run docs index check and publish scoped report/ledger/docs changes through `publish-ci-deploy` direct-main discipline. Do not stage unrelated dirty files.
 
 ## Acceptance Criteria
 

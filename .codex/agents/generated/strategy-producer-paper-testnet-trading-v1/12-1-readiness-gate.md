@@ -2,6 +2,10 @@
 prompt_name: 12-1-readiness-gate
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Prove Stage 12 readiness before any functional canary, burst, or 6h soak starts."
 language:
   implementation: python/shell/markdown
@@ -93,7 +97,7 @@ Run Stage `12.1` readiness gate. This gate proves the platform is ready to start
   - exchange-execution remains `testnet` and no mainnet path is enabled;
   - CPU/RAM baseline queries and process RSS sampling are available.
 - If any readiness condition fails, write a blocked report and ledger update; do not start Stage `12.2`.
-- If accepted and files changed, publish scoped docs/report changes through `github:yeet`/`publish-ci-deploy` discipline. Runtime sync may be `N/A docs/report-only` unless code/config changed.
+- If accepted and files changed, publish scoped docs/report changes through `publish-ci-deploy` direct-main discipline. Runtime sync may be `N/A docs/report-only` unless code/config changed.
 
 ## Acceptance Criteria
 

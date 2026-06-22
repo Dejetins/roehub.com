@@ -2,6 +2,10 @@
 prompt_name: 13-notifications-runbooks
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Finalize notification outbox compatibility, alert severity/owner/escalation, and operator runbooks."
 language:
   implementation: python/yaml/markdown
@@ -28,10 +32,6 @@ skill_routing:
     use_when: "changing outbox/event DTOs"
     timing: during implementation
     reason: "future delivery services depend on event contract"
-  - skill: github:yeet
-    use_when: "accepted changes need GitHub publish after validation"
-    timing: before ship
-    reason: "explicit user-required publish flow; verifies gh auth and scoped staging; branches/PRs are temporary and must be delivered to main and cleaned up before acceptance"
   - skill: publish-ci-deploy
     use_when: "accepted changes need shipping"
     timing: before ship
@@ -78,7 +78,7 @@ Finalize delivery-neutral notification outbox compatibility and operator alert/r
 - Before implementation, explicitly state `User required before start: ...`; if nothing is required, state `User required before start: nothing`. If user-provided keys, artifacts, or access are needed, stop before implementation and list the exact requirement; do not ask for secrets in chat. Record this pre-start line in the stage report.
 - Previous stage ledger gate: read `stage_execution_ledger.path` before implementation and verify Stage `12.5` is accepted in the ledger, and verify `12.1` through `12.4` are also accepted in the ledger; record the ledger evidence in the Stage `13` report.
 - Before implementation, verify Stage `12.5` is `accepted` in the stage ledger, and verify `12.1` through `12.4` are also accepted. Stop if any Stage `12.x` gate is blocked, pending, skipped, or superseded unless this task is explicitly converted into an unblock/repair task.
-- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `github:yeet`/`publish-ci-deploy` discipline for scoped publish, but do not leave the stage on a per-stage branch or draft PR. Temporary branches are allowed only when useful; before marking the stage `accepted`, deliver the changes to `main`, push `origin main`, verify main contains the changes, delete any temporary local/remote branch, and record main-branch delivery plus branch-cleanup evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
+- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `publish-ci-deploy` direct-main discipline for scoped publish on `main`; do not create a branch, draft PR, worktree, temporary checkout, local folder, stash, or auxiliary workflow artifact unless the user explicitly requests that exact workflow. Before marking the stage `accepted`, verify `origin/main` contains the changes and record main-branch delivery evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
 - The stage report must include a file manifest table: `Created / Modified / Deleted / Reason / Contract impact`; justify any touched file outside expected paths.
 - Credential redaction rule: never write secrets, passwords, cookies, tokens, DSNs, exchange keys, raw credentials, or session values to reports, logs, screenshots, ledger, commits, or final output.
 - If authenticated browser/API smoke is needed for notification surfaces, use Keycloak username `smoke_e2e_keycloak`. On `macstudio`, read the password only from `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; outside `macstudio`, use securely exported local `ROEHUB_SMOKE_E2E_PASSWORD`. Do not ask for or print the password.

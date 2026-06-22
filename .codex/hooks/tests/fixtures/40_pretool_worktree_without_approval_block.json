@@ -3,13 +3,13 @@
     "hook_event_name": "PreToolUse",
     "tool_name": "Bash",
     "tool_input": {
-      "command": "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1 git switch -c codex/backtest-futures-funding-v1"
+      "command": "git worktree add /tmp/roehub-branch codex/backtest-futures-funding-v1"
     }
   },
   "expect": {
     "returncode": 0,
     "json_path": "hookSpecificOutput.permissionDecision",
     "json_value": "deny",
-    "stdout_contains": "Prompt-pack branch work must use a dedicated worktree"
+    "stdout_contains": "Worktree creation requires explicit user approval marker"
   }
 }

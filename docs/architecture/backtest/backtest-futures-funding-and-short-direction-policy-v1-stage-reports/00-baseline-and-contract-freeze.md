@@ -6,7 +6,9 @@ Date: 2026-06-22
 
 Status: accepted, docs-only baseline evidence.
 
-Branch: `codex/backtest-futures-funding-v1`
+Execution branch policy: `main` by default; do not create branches, worktrees or
+local workflow folders unless the user explicitly requests them. Historical
+branch `codex/backtest-futures-funding-v1` remains evidence only.
 
 `User required before start: nothing`
 
@@ -78,9 +80,9 @@ Startup state:
 - `git status --short`: clean before edits.
 - No unrelated dirty files were present.
 - Original Stage `00` work was first published on historical branch
-  `codex/backtest-futures-funding-v1-stage-00`. The active prompt-pack branch is
-  now `codex/backtest-futures-funding-v1`; later stages must continue on that
-  branch and use the stage ledger for iteration boundaries.
+  `codex/backtest-futures-funding-v1-stage-00`. Later stages must use `main` by
+  default and the stage ledger for iteration boundaries; do not create branches
+  or worktree/folder workflows unless the user explicitly requests them.
 
 Delivery state:
 

@@ -16,12 +16,9 @@ from validators.common import (
 )
 
 GENERATED_ROOT = ".codex/agents/generated/"
-WORKTREE_ROOT = "/Users/daniildegtyarev/Projects/roehub-worktrees"
-PRIMARY_CHECKOUT = "/Users/daniildegtyarev/Projects/roehub.com"
 BRANCH_MENTION = [
     "branch_policy",
     "single_allowed_branch",
-    "worktree_path",
     "git switch",
     "git checkout -b",
     "git branch",
@@ -91,39 +88,25 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
             missing.append("default_branch: main")
         if "stage_specific_branches_forbidden" not in combined:
             missing.append("stage_specific_branches_forbidden=true")
-        if "worktree_root" not in combined or WORKTREE_ROOT not in combined:
-            missing.append(f"worktree_root: {WORKTREE_ROOT}")
-        if "primary_checkout" not in combined or PRIMARY_CHECKOUT not in combined:
-            missing.append(f"primary_checkout: {PRIMARY_CHECKOUT}")
-        if "worktree_path" not in combined and (
-            "single_allowed_branch" in combined or _branch_names(combined)
-        ):
-            missing.append("single worktree_path for the allowed branch")
         if _has_stage_branch(combined):
             missing.append("remove stage-specific branch names")
         names = _branch_names(combined)
-        lower = combined.lower()
         if len(names) > 1:
             missing.append("use at most one codex/* branch name across the prompt pack")
-        if "git switch -c" in combined or "git checkout -b" in combined:
-            missing.append(
-                "use git worktree add instead of creating branches in the primary checkout"
-            )
         if (
-            "git worktree add -b" in combined
+            ("git switch -c" in combined or "git checkout -b" in combined or "git worktree add -b" in combined)
             and "ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1" not in combined
         ):
             missing.append(
                 "branch creation command must carry ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1"
             )
-        has_cleanup_action = any(term in lower for term in ("delete", "cleanup", "prune", "remove"))
-        has_cleanup_gate = (
-            "worktree" in lower
-            and "main" in lower
-            and ("merge" in lower or "delivery" in lower)
-        )
-        if names and not (has_cleanup_action and has_cleanup_gate):
-            missing.append("worktree cleanup only after successful merge/delivery back to main")
+        if (
+            ("git worktree add" in combined or "worktree_path" in combined or "worktree_root" in combined)
+            and "ROEHUB_WORKTREE_APPROVED=1" not in combined
+        ):
+            missing.append(
+                "remove worktree/folder instructions unless the user explicitly requested them"
+            )
 
         if missing:
             findings.append(

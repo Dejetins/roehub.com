@@ -2,6 +2,10 @@
 prompt_name: 12-4-sustained-6h-soak
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Run the actual 6-hour sustained soak with active strategies after readiness, canary, and burst gates pass."
 language:
   implementation: python/shell/markdown
@@ -86,7 +90,7 @@ Run Stage `12.4` sustained 6-hour soak.
 - Track deltas relative to the Stage `12.4` start baseline, not only absolute historical counts.
 - No new unknown unreconciled state, retry/DLQ growth beyond thresholds, mainnet attempt, secret leak, uncontrolled crash, or sustained resource saturation is allowed.
 - Capture final browser/API state for `/strategies` or defer final browser proof to `12.5` only if `12.4` records the exact reason and API evidence is complete.
-- If accepted and files changed, publish scoped report/ledger/docs changes through `github:yeet`/`publish-ci-deploy` discipline.
+- If accepted and files changed, publish scoped report/ledger/docs changes through `publish-ci-deploy` direct-main discipline.
 
 ## Acceptance Criteria
 

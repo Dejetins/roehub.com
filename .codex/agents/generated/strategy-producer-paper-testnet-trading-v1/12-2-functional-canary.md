@@ -2,6 +2,10 @@
 prompt_name: 12-2-functional-canary
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Prove real active strategies produce signals/events before load or long soak."
 language:
   implementation: python/shell/markdown
@@ -84,7 +88,7 @@ Run Stage `12.2` functional canary for active paper/testnet strategies.
 - Record pre/post deltas for Redis pending/retry/DLQ, DB unknown/reconciliation/outbox rows, producer metrics, and execution metrics.
 - If no source event/signal appears within the declared canary window, mark `12.2 blocked`; do not proceed to burst or 6h soak.
 - Capture `/strategies` browser/API evidence for the active runs and latest signal/journal state.
-- If accepted and files changed, publish scoped report/ledger/docs changes through `github:yeet`/`publish-ci-deploy` discipline.
+- If accepted and files changed, publish scoped report/ledger/docs changes through `publish-ci-deploy` direct-main discipline.
 
 ## Acceptance Criteria
 

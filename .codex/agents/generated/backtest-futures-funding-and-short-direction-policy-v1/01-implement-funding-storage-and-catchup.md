@@ -1,7 +1,11 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 01 - Funding Storage Automatic Catchup And Observability"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1"
+branch: "main"
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Market-data funding-rate storage, provider source, writer, manual CLI, automatic scheduler catch-up and Prometheus observability"
 language: "en"
 context_sources:
@@ -14,7 +18,7 @@ context_sources:
   - "docs/runbooks/market-data-metrics.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
-  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
+  - "Use main by default. Do not create any git branch, worktree, temporary checkout, folder, stash, or auxiliary file unless the user explicitly requests that exact workflow. Record iteration state in the stage ledger and stage report."
   - "Confirm previous required stage is accepted in the ledger before implementation edits."
   - "Previous-stage ledger gate: confirm Stage 00 is accepted in the stage execution ledger before implementation; if it is not accepted, stop and record Stage 01 as blocked unless the user explicitly supersedes Stage 00 in the current turn."
   - "Keep funding ingestion in market_data context, not backtest context."

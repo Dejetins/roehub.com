@@ -1,0 +1,15 @@
+{
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "ROEHUB_WORKTREE_APPROVED=1 ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1 git worktree add -b codex/backtest-futures-funding-v1-stage-02 /tmp/roehub-stage main"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "hookSpecificOutput.permissionDecision",
+    "json_value": "deny",
+    "stdout_contains": "Stage-specific prompt-pack branch is forbidden"
+  }
+}

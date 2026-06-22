@@ -2,16 +2,16 @@
 
 ## Статус
 
-Active prompt-pack branch: `codex/backtest-futures-funding-v1`.
+Default execution branch: `main`.
 
 Stage numbers are iteration boundaries in this ledger and in the stage reports;
-they are not separate git branch boundaries. Do not create new
-`codex/backtest-futures-funding-v1-stage-XX` branches for this prompt pack unless
-the user explicitly changes this branch policy. Historical remote branches
-`origin/codex/backtest-futures-funding-v1-stage-00` and
-`origin/codex/backtest-futures-funding-v1-stage-01` exist only as superseded
-delivery artifacts from earlier iterations and are not the working branch for
-new stages.
+they are not separate git branch boundaries. Do not create git branches,
+worktrees, temporary checkouts, folders, stashes, or auxiliary files for this
+prompt pack unless the user explicitly requests that exact workflow. Historical
+remote branches `origin/codex/backtest-futures-funding-v1-stage-00`,
+`origin/codex/backtest-futures-funding-v1-stage-01`, and
+`origin/codex/backtest-futures-funding-v1` exist only as superseded delivery
+artifacts from earlier iterations and are not the working model for new stages.
 
 Stage `00` accepted как docs-only baseline freeze; evidence commit
 `7dc0e726fc6babe8c101369a40a4119d5d23fd03` is retained in the unified branch
@@ -53,10 +53,10 @@ Stage `00` report:
   stage-specific explanation why the real boundary is not applicable yet.
 - Delivery stages не смешивают чужие локальные изменения; scope должен быть
   проверен перед staging/commit/push.
-- Для этого prompt pack используется одна git branch:
-  `codex/backtest-futures-funding-v1`. Stage-итерации ведутся через этот ledger,
-  stage reports и commits внутри этой ветки, а не через отдельные ветки на
-  каждый stage.
+- Для этого prompt pack default execution branch is `main`. Stage-итерации
+  ведутся через этот ledger, stage reports и commits, а не через отдельные
+  ветки, worktree-папки или другие локальные workflow-артефакты без явной
+  просьбы пользователя.
 - Закрытая линия `backtest-compute-acceleration-v1` не переоткрывается.
 
 ## Required Roehub context
@@ -102,8 +102,8 @@ Stage `00` report:
 
 | Stage | Branch | Commit / SHA | PR | Local gates | Remote / runtime evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| `00` | `codex/backtest-futures-funding-v1` | `7dc0e726fc6babe8c101369a40a4119d5d23fd03` | N/A | `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Local probes unavailable: `127.0.0.1:9202`, `8123`, `8000`, `3000` refused connections. | Accepted docs-only baseline evidence; not main/Mac runtime deployed because Stage `00` has no runtime behavior. Historical `origin/codex/backtest-futures-funding-v1-stage-00` remains superseded and should not be used for new work. |
-| `01` | `main` plus prompt-pack branch `codex/backtest-futures-funding-v1` | `a77c001c375b101af4ddca51f63c7d6da60e21ea` on `main`; prompt-pack branch to be fast-forwarded after acceptance docs commit | N/A | Stage-local gates passed; final post-main full gates passed: `uv run ruff check .`, `uv run pyright`, `uv run pytest -q -ra` with `1285 passed`, docs index and `git diff --check`. | Provider REST smokes passed; GitHub CI `27945620135`, Deploy Backend `27945683469`, Deploy Web `27945698512` and Publish App Image `27945683522` passed. Mac Studio `post_main_production_runtime_proof` passed after `main` plus green Actions plus deploy/sync: remote `main` matches `origin/main`, runtime funding files are synced, API auth smoke on `/auth/current-user` returned `401`, ClickHouse ping returned `Ok.`, scheduler `funding_rate_catchup` completed with `instruments_total=1258`, `due=1221`, `ok=1221`, `skipped=37`, `failed=0`, `rows_written=3661`, and `scheduler_funding_catchup_*` metrics are exported. | Accepted. Historical `origin/codex/backtest-futures-funding-v1-stage-01` remains superseded and should not be used for new work. |
+| `00` | historical `codex/backtest-futures-funding-v1` | `7dc0e726fc6babe8c101369a40a4119d5d23fd03` | N/A | `uv run python -m tools.docs.generate_docs_index --check`, `python -m tools.docs.generate_docs_index --check` and `git diff --check` passed after edits. | Local probes unavailable: `127.0.0.1:9202`, `8123`, `8000`, `3000` refused connections. | Accepted docs-only baseline evidence; not main/Mac runtime deployed because Stage `00` has no runtime behavior. Historical branch artifacts remain superseded and should not be used for new work. |
+| `01` | `main` | `a77c001c375b101af4ddca51f63c7d6da60e21ea` on `main` | N/A | Stage-local gates passed; final post-main full gates passed: `uv run ruff check .`, `uv run pyright`, `uv run pytest -q -ra` with `1285 passed`, docs index and `git diff --check`. | Provider REST smokes passed; GitHub CI `27945620135`, Deploy Backend `27945683469`, Deploy Web `27945698512` and Publish App Image `27945683522` passed. Mac Studio `post_main_production_runtime_proof` passed after `main` plus green Actions plus deploy/sync: remote `main` matches `origin/main`, runtime funding files are synced, API auth smoke on `/auth/current-user` returned `401`, ClickHouse ping returned `Ok.`, scheduler `funding_rate_catchup` completed with `instruments_total=1258`, `due=1221`, `ok=1221`, `skipped=37`, `failed=0`, `rows_written=3661`, and `scheduler_funding_catchup_*` metrics are exported. | Accepted. Historical `origin/codex/backtest-futures-funding-v1-stage-01` and `origin/codex/backtest-futures-funding-v1` remain superseded and should not be used for new work. |
 | `02` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `03` | TBD | TBD | TBD | TBD | TBD | TBD |
 | `04` | TBD | TBD | TBD | TBD | TBD | TBD |
@@ -129,8 +129,8 @@ Stage `00` report:
 | 2026-06-22 | Stage `00` baseline evidence promotes Stage `00` to `accepted` and unblocks the Stage `01` previous-stage gate. | Evidence commit `7dc0e726fc6babe8c101369a40a4119d5d23fd03` is retained in unified branch history; Stage `00` is docs-only, so main/Mac runtime proof is not applicable to this acceptance. |
 | 2026-06-22 | Superseded Stage `01` pre-acceptance finding: local implementation alone was not sufficient runtime proof. | Funding storage, provider adapters, scheduler job, CLI, Prometheus rules and runbooks were implemented with local gates passing at `c26cef9e5f7405746566bd1d41da7121507d8709`; Mac Studio ClickHouse and scheduler baseline endpoints were reachable, but Stage `01` DDL/query and `scheduler_funding_catchup_*` export still had to be proven on target runtime before acceptance. Final accepted proof is recorded in the later `a77c001c` decision row. |
 | 2026-06-22 | Runtime smoke loopback means Mac Studio loopback for this plan. | Codex-local `127.0.0.1` probes are diagnostics only; acceptance probes for ClickHouse, API/web, scheduler metrics, Prometheus and benchmarks must run through `ssh macstudio` unless a stage explicitly declares local-only evidence. |
-| 2026-06-22 | Use one git branch for the whole prompt pack: `codex/backtest-futures-funding-v1`. | Stage boundaries are tracked in prompts, reports and this ledger. The earlier `codex/backtest-futures-funding-v1-stage-00` and `codex/backtest-futures-funding-v1-stage-01` branches are historical/superseded and must not be used as the model for later stages. |
-| 2026-06-22 | Superseded Stage `01` branch-head smoke finding: branch sync was not changed-code production proof. | Commit `f94c8fa4a197626d45b3f2190d229d5cd9f9544f` fixed the Bybit non-positive `fundingInterval` crash and was pushed to `origin/codex/backtest-futures-funding-v1`; Mac Studio branch worktree was clean at that SHA. The then-current `/opt/roehub/app` lacked that parser fix and still had one `funding_rate_catchup` runtime error, so existing runtime evidence was only `read_only_existing_runtime_smoke`, not changed-code production proof. |
+| 2026-06-22 | Default future execution for this prompt pack is `main`; do not create branches or worktrees unless the user explicitly requests them. | Stage boundaries are tracked in prompts, reports and this ledger. The earlier `codex/backtest-futures-funding-v1-stage-00`, `codex/backtest-futures-funding-v1-stage-01`, and `codex/backtest-futures-funding-v1` branches are historical/superseded and must not be used as the model for later stages. |
+| 2026-06-22 | Superseded Stage `01` branch-head smoke finding: branch sync was not changed-code production proof. | Commit `f94c8fa4a197626d45b3f2190d229d5cd9f9544f` fixed the Bybit non-positive `fundingInterval` crash and was pushed to `origin/codex/backtest-futures-funding-v1`; the then-current `/opt/roehub/app` lacked that parser fix and still had one `funding_rate_catchup` runtime error, so existing runtime evidence was only `read_only_existing_runtime_smoke`, not changed-code production proof. |
 | 2026-06-22 | Superseded Stage `01` first-main delivery finding: deploy was green but final runtime proof still had to be collected. | Main commit `d14050b235807d60ae1d8cbf951bb651e40f1f45` fixed the ClickHouse `ILLEGAL_AGGREGATION` alias regression after the first post-main deploy attempt; GitHub CI `27944489784` and backend deploy `27944549900` passed. Mac Studio SSH/Tailscale reachability was unavailable during that proof attempt, so acceptance waited for the later `a77c001c` main revision, green deploy/sync and runtime proof. |
 | 2026-06-22 | Stage `01` is accepted after final post-main runtime proof. | Main commit `a77c001c375b101af4ddca51f63c7d6da60e21ea` fixes the empty-history latest timestamp regression after the earlier ClickHouse alias and timezone fixes; GitHub CI/deploy workflows passed, Mac Studio SSH is restored, ClickHouse funding rows are present, `scheduler_funding_catchup_*` metrics are exported, and the deployed scheduler pass completed with `failed=0` and `rows_written=3661`. |
 
@@ -143,6 +143,6 @@ stage delivery ledger, previous-stage gates and Mac Studio target-runtime
 acceptance wording.
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
 Verdict: Release after fixes
-Blockers fixed: Bybit category mapping; standalone `short` runtime gap; strategy direction storage gap; spot default + long-short UI contradiction; net ranking ambiguity; missing automatic all-futures funding scheduler mode; missing dedicated exchange-discovered funding universe; mandatory interval metadata contract; missing Prometheus metrics/alerts/runbook coverage; prompt pack now uses one active branch instead of per-stage branches.
+Blockers fixed: Bybit category mapping; standalone `short` runtime gap; strategy direction storage gap; spot default + long-short UI contradiction; net ranking ambiguity; missing automatic all-futures funding scheduler mode; missing dedicated exchange-discovered funding universe; mandatory interval metadata contract; missing Prometheus metrics/alerts/runbook coverage; prompt pack no longer uses per-stage branches.
 Local follow-up check: completed.
 Residual risks: historical remote `*-stage-00` and `*-stage-01` branches still exist as superseded artifacts; they were not deleted without explicit user confirmation. Historical runtime logs still contain pre-fix Stage `01` scheduler failures, but the fresh post-main run is successful. Performance evidence is still required for funding candidate-pool stages; provider API behavior must be rechecked by downstream implementation agents when their stages depend on new provider surfaces; Stage `07` must prove direction metadata reaches the live launch boundary.

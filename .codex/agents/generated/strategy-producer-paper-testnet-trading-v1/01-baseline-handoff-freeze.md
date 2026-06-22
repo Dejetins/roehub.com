@@ -2,6 +2,10 @@
 prompt_name: 01-baseline-handoff-freeze
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Freeze the current live-execution foundation and Mac Studio runtime baseline for the new paper/testnet strategy producer cycle."
 language:
   implementation: python
@@ -32,10 +36,6 @@ skill_routing:
     use_when: "capturing browser-visible /settings, /backtests, or /strategies state"
     timing: during verification
     reason: "browser-visible baseline must be observed, not inferred"
-  - skill: github:yeet
-    use_when: "accepted changes need GitHub publish after validation"
-    timing: before ship
-    reason: "explicit user-required publish flow; verifies gh auth and scoped staging; branches/PRs are temporary and must be delivered to main and cleaned up before acceptance"
   - skill: publish-ci-deploy
     use_when: "publishing accepted docs or drift repairs"
     timing: before ship
@@ -77,9 +77,11 @@ Done means:
 ## Requirements (Must)
 
 - Before implementation, explicitly state `User required before start: ...`; if nothing is required, state `User required before start: nothing`. If user-provided keys, artifacts, or access are needed, stop before implementation and list the exact requirement; do not ask for secrets in chat. Record this pre-start line in the stage report.
+- Previous stage ledger gate: `N/A` because Stage `01` is the first stage; before edits, confirm the plan and stage ledger exist and record the current Stage `01` state in the report.
 - Verify git state locally and, if using Mac Studio, use `git -C /Users/daniildegtyarev/Projects/roehub.com` for repository commands.
 - Collect real evidence with concrete commands/calls: authenticated API where needed, SQL inventory, Redis `XINFO`/stream checks, Monit summary, Prometheus target/metric probes, and browser screenshots.
-- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `github:yeet`/`publish-ci-deploy` discipline for scoped publish, but do not leave the stage on a per-stage branch or draft PR. Temporary branches are allowed only when useful; before marking the stage `accepted`, deliver the changes to `main`, push `origin main`, verify main contains the changes, delete any temporary local/remote branch, and record main-branch delivery plus branch-cleanup evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
+- For authenticated browser evidence, use the Roehub smoke Keycloak username `smoke_e2e_keycloak`; the password source of truth on `macstudio` is `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`. Do not write the password into prompts, logs, screenshots, traces, reports, or ledgers; if the source is unavailable, report browser auth as blocked.
+- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `publish-ci-deploy` direct-main discipline for scoped publish on `main`; do not create a branch, draft PR, worktree, temporary checkout, local folder, stash, or auxiliary workflow artifact unless the user explicitly requests that exact workflow. Before marking the stage `accepted`, verify `origin/main` contains the changes and record main-branch delivery evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
 - Explicitly mark stale docs/code/runtime drift as `drift`, not as implemented fact.
 - Confirm no mainnet submit path is enabled for this cycle.
 - Update `01-baseline-handoff-freeze.md` and the stage ledger before final report.
@@ -93,7 +95,7 @@ Done means:
 3. Inspect current browser-visible flows for `/settings`, `/backtests`, and `/strategies`.
 4. Record facts, blockers, and next-stage handoff in the stage report.
 5. Run docs index verification.
-6. If changes were made and accepted, publish/deliver to `main`, clean up any temporary branch/PR, and sync Mac Studio as required; otherwise report no publish.
+6. If changes were made and accepted, publish/deliver to `main`, handle only explicitly user-requested or already-existing branch/PR artifacts if present, and sync Mac Studio as required; otherwise report no publish.
 
 ## Acceptance Criteria
 

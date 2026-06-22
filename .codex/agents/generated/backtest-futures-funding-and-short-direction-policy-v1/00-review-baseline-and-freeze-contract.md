@@ -1,7 +1,11 @@
 ---
 prompt_name: "Backtest Futures Funding v1 Stage 00 - Baseline And Contract Freeze"
 repo: "roehub.com"
-branch: "codex/backtest-futures-funding-v1"
+branch: "main"
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Architecture and implementation baseline freeze before code changes"
 language: "en"
 context_sources:
@@ -15,7 +19,7 @@ context_sources:
   - "docs/runbooks/market-data-metrics-reference-ru.md"
 hard_requirements:
   - "Record `User required before start: nothing` before edits."
-  - "Use the active prompt-pack branch codex/backtest-futures-funding-v1 for every stage; do not create per-stage git branches. Record iteration state in the stage ledger and stage report."
+  - "Use main by default. Do not create any git branch, worktree, temporary checkout, folder, stash, or auxiliary file unless the user explicitly requests that exact workflow. Record iteration state in the stage ledger and stage report."
   - "Previous-stage ledger gate: N/A for Stage 00 because this stage creates/repairs the baseline ledger; still read and update the ledger before final report."
   - "Previous stage: N/A; there is no previous required stage for Stage 00."
   - "Do not implement production code in this stage."

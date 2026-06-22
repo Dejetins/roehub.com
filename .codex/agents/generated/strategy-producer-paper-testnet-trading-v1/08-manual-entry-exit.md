@@ -2,6 +2,10 @@
 prompt_name: 08-manual-entry-exit
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Add manual entry and manual stop/exit controls that use the same execution source-event path."
 language:
   implementation: python/javascript
@@ -32,10 +36,6 @@ skill_routing:
     use_when: "adding manual action API DTOs"
     timing: during implementation
     reason: "manual commands are public API contracts"
-  - skill: github:yeet
-    use_when: "accepted changes need GitHub publish after validation"
-    timing: before ship
-    reason: "explicit user-required publish flow; verifies gh auth and scoped staging; branches/PRs are temporary and must be delivered to main and cleaned up before acceptance"
   - skill: publish-ci-deploy
     use_when: "accepted changes need shipping"
     timing: before ship
@@ -77,7 +77,7 @@ Add separate manual entry and manual stop/exit controls on `/strategies`. They m
 
 - Before implementation, explicitly state `User required before start: ...`; if nothing is required, state `User required before start: nothing`. If user-provided keys, artifacts, or access are needed, stop before implementation and list the exact requirement; do not ask for secrets in chat. Record this pre-start line in the stage report.
 - Before implementation, verify Stage `07` is `accepted` in the stage ledger; stop if it is blocked or pending unless this task is explicitly converted into an unblock/repair task.
-- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `github:yeet`/`publish-ci-deploy` discipline for scoped publish, but do not leave the stage on a per-stage branch or draft PR. Temporary branches are allowed only when useful; before marking the stage `accepted`, deliver the changes to `main`, push `origin main`, verify main contains the changes, delete any temporary local/remote branch, and record main-branch delivery plus branch-cleanup evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
+- Do not publish/deploy if acceptance is blocked. If accepted and files changed, use `publish-ci-deploy` direct-main discipline for scoped publish on `main`; do not create a branch, draft PR, worktree, temporary checkout, local folder, stash, or auxiliary workflow artifact unless the user explicitly requests that exact workflow. Before marking the stage `accepted`, verify `origin/main` contains the changes and record main-branch delivery evidence in the stage report and ledger. For runtime/code stages, also record Mac Studio host sync/deploy smoke.
 - The stage report must include a file manifest table: `Created / Modified / Deleted / Reason / Contract impact`; justify any touched file outside expected paths.
 - Before editing, narrow any broad expected directory path to a concrete file list or planned new files and record that list in the stage report.
 - Add idempotent manual entry and manual exit commands.

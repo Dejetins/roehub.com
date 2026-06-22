@@ -9,7 +9,9 @@ Status: accepted. The implementation is on `main`, GitHub CI/deploy workflows
 are green, and Mac Studio `post_main_production_runtime_proof` passed for live
 ClickHouse funding writes plus exported scheduler funding metrics.
 
-Branch: `codex/backtest-futures-funding-v1`
+Execution branch policy: `main` by default; do not create branches, worktrees or
+local workflow folders unless the user explicitly requests them. Historical
+branch `codex/backtest-futures-funding-v1` remains evidence only.
 
 Delivered main revision: `a77c001c375b101af4ddca51f63c7d6da60e21ea`
 
@@ -54,8 +56,8 @@ Conditional service-call coverage and proof boundary:
 
 - provider REST: applicable and partially proven by Binance and Bybit public
   funding-history smoke checks;
-- `target_host_readiness_pre_main`: Mac Studio SSH, primary checkout, prompt-pack
-  branch worktree, ClickHouse ping/query and scheduler `/metrics` are reachable;
+- `target_host_readiness_pre_main`: Mac Studio SSH, primary checkout, historical
+  prompt-pack branch state, ClickHouse ping/query and scheduler `/metrics` are reachable;
 - `read_only_existing_runtime_smoke`: superseded by post-main proof. Earlier
   existing-runtime checks correctly identified that old deployed code still
   lacked the final parser and ClickHouse read fixes;
@@ -344,10 +346,9 @@ Mac Studio `target_host_readiness_pre_main` boundary:
   `SSH_AUTH_SOCK=$(launchctl getenv SSH_AUTH_SOCK)`.
 - Primary checkout `/Users/daniildegtyarev/Projects/roehub.com` is clean on
   `main` at `d85ef43ccd4bc3b1717d396bae1bdcaf65d48b79`.
-- Prompt-pack branch worktree exists at
-  `/Users/daniildegtyarev/Projects/roehub-worktrees/codex__backtest-futures-funding-v1`,
-  is clean on `codex/backtest-futures-funding-v1`, and is synced to
-  `f94c8fa4a197626d45b3f2190d229d5cd9f9544f`.
+- Historical prompt-pack branch `codex/backtest-futures-funding-v1` was synced
+  to `f94c8fa4a197626d45b3f2190d229d5cd9f9544f` during pre-main diagnosis. This
+  is retained as historical evidence only, not as a workflow requirement.
 - ClickHouse HTTP endpoint on Mac Studio is reachable:
   `curl http://127.0.0.1:8123/ping` returned `Ok.`.
 - ClickHouse funding tables exist on the current runtime:

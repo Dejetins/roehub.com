@@ -2,6 +2,10 @@
 prompt_name: 12-3-burst-resource-gate
 repo: roehub.com
 branch: main
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: false
+  stage_specific_branches_forbidden: true
 scope: "Run controlled burst/load and prove CPU/RAM/Redis/DB recovery without replacing the functional canary."
 language:
   implementation: python/shell/markdown
@@ -79,7 +83,7 @@ Run Stage `12.3` burst/resource gate.
 - Capture during-burst and post-burst snapshots. Post-burst must prove queues/resource usage return to the predeclared acceptable band.
 - Record exact PromQL/commands, values, thresholds, and deltas.
 - If the harness fails, retry/DLQ grows, Redis pending remains nonzero, CPU/RAM saturation persists, or resource usage does not recover, mark `12.3 blocked`.
-- If accepted and files changed, publish scoped report/ledger/docs changes through `github:yeet`/`publish-ci-deploy` discipline.
+- If accepted and files changed, publish scoped report/ledger/docs changes through `publish-ci-deploy` direct-main discipline.
 
 ## Acceptance Criteria
 
