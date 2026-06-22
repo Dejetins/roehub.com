@@ -313,6 +313,11 @@ Validation depth policy (mandatory for implementation prompts)
 - Generated prompts MUST include `validation_strategy` for implementation prompts and prompt-pack stages.
 - Use `depth=tests_only` only for trivial internal-only changes with no contract, persistence, browser-visible, runtime, ops, performance, integration, or delivery impact; require `tests_only_allowed_reason`.
 - Otherwise select the nearest real-boundary or end-to-end acceptance surface: API/use-case smoke, database/migration integration, browser runtime QA, target-host runtime smoke, external adapter safe smoke, benchmark/profile, CI/deploy status, or production-safe smoke.
+- For Mac Studio/runtime prompts, explicitly set `proof_boundary` instead of using ambiguous "target-runtime proof":
+  - `target_host_readiness_pre_main` for pre-main read-only SSH/path/env/service/readiness checks;
+  - `read_only_existing_runtime_smoke` for observing the currently deployed `/opt/roehub/app` without sync, reload, migration, provider mutation, or changed-code claims;
+  - `post_main_production_runtime_proof` for changed-code proof only after the target revision is on `main`, GitHub Actions/CI is green, deploy/sync from the verified `main` checkout to `/opt/roehub/app` has occurred, and runtime/browser/API/service smoke has passed.
+- If a stage wants changed-code production runtime proof before `main` + green CI + deploy/sync, generated prompts MUST mark that proof as blocked/deferred post-main handoff, not weaken it into host readiness evidence.
 - Acceptance criteria must require the selected validation evidence before marking the stage accepted.
 - For staged work, require the executor to record validation depth, evidence path, residual risk, and next-stage allowance in the stage execution ledger.
 - If the selected real-boundary validation cannot be collected, the stage must be marked blocked or accepted-with-explicit-residual-risk only when the prompt allows that state.
@@ -428,6 +433,7 @@ Default quality gates to include (adapt only when justified)
 Default validation strategy to include (adapt to task surface)
 - Local gates first: lint/type/focused tests.
 - Then one nearest acceptance surface: API/use-case, database/migration, browser runtime, target-host runtime, external adapter, benchmark/profile, CI/deploy, or production-safe smoke.
+- For Mac Studio acceptance surfaces, name the proof boundary: `target_host_readiness_pre_main`, `read_only_existing_runtime_smoke`, or `post_main_production_runtime_proof`. Do not call pre-main host/read-only smoke "changed-code runtime proof".
 - Never mark a non-trivial stage accepted from tests alone.
 
 For browser-visible tasks, also include one of:

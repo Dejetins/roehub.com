@@ -51,6 +51,7 @@ as attempted shell execution.
 - `docs_index_drift_guard.py`: reminds agents to refresh/check generated docs indexes after docs edits.
 - `architecture_doc_linter.py`: warns about missing architecture documentation anchors.
 - `validation_depth_linter.py`: flags tests-only validation for runtime/integration surfaces.
+- `runtime_proof_boundary_guard.py`: requires Mac Studio prompt/docs wording to distinguish pre-main host/read-only checks from post-main changed-code production runtime proof.
 - `performance_evidence_guard.py`: requires comparable baseline/candidate evidence for performance claims.
 - `cold_head_gate.py`: requires cold-head evidence before finalizing architecture or prompt artifacts.
 - `skill_lint_guard.py`: warns about missing `SKILL.md` frontmatter.

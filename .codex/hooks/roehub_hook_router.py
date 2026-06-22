@@ -40,6 +40,7 @@ VALIDATOR_MODULES = [
     "validators.docs_index_drift_guard",
     "validators.architecture_doc_linter",
     "validators.validation_depth_linter",
+    "validators.runtime_proof_boundary_guard",
     "validators.performance_evidence_guard",
     "validators.cold_head_gate",
     "validators.skill_lint_guard",
