@@ -4,7 +4,7 @@ import heapq
 import math
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Iterator, Mapping, NamedTuple
 
 import numba as nb
@@ -57,6 +57,25 @@ from trading.contexts.backtest.application.services.v2.matrix_backend.prefix_tra
 from trading.contexts.backtest.application.services.v2.numba_runtime import (
     current_backtest_numba_telemetry,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactFundingArraysV2,
+)
+
+from .no_risk_funding import (
+    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
+    FUNDING_ADJUSTMENT_SCOPE,
+    FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+    FUNDING_ADJUSTMENT_SCOPE_UNAVAILABLE,
+    FUNDING_DATA_QUALITY,
+    FUNDING_EVENTS_COUNT,
+    FUNDING_INCLUDED,
+    FUNDING_PNL_QUOTE,
+    FUNDING_RETURN_PCT,
+    FUNDING_WARNING_CODES,
+    NO_RISK_FUNDING_METRIC_NAMES,
+    TOTAL_RETURN_PCT_NET_OF_FUNDING,
+    calculate_no_risk_funding_adjustment,
+)
 
 NO_RISK_EXACT_BOUNDARY_STAGE_NAME = "no_risk_exact_boundary"
 NO_RISK_EXACT_SCORING_STAGE_NAME = "exact_scoring"
@@ -68,6 +87,7 @@ NO_RISK_COMBO_CHUNK_DECODE_STAGE_NAME = "combo_chunk_decode"
 NO_RISK_PROXY_FILTER_STAGE_NAME = "proxy_filter"
 NO_RISK_METRIC_BUFFER_ALLOCATION_STAGE_NAME = "metric_buffer_allocation"
 NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME = "full_metric_second_pass"
+NO_RISK_FUNDING_ADJUSTMENT_STAGE_NAME = "funding_adjustment"
 NO_RISK_TELEMETRY_BUILD_STAGE_NAME = "telemetry_build"
 NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME = "matrix_bitset_backend_pack"
 NO_RISK_EXACT_BOUNDARY_STATUS = "boundary_ready"
@@ -184,6 +204,7 @@ class BacktestNoRiskExactScoringService:
         prepared_result: BacktestPreparePoolsResult,
         combo_planning_result: BacktestComboPlanningResult,
         normalized_request: Mapping[str, Any],
+        funding_arrays: ArtifactFundingArraysV2 | None = None,
     ) -> BacktestNoRiskExactResult:
         """
         Validate the no-risk boundary, run optional self-check, score candidates,
@@ -221,11 +242,24 @@ class BacktestNoRiskExactScoringService:
             normalized_request,
             default_request_top_n=self.config.default_request_top_n,
         )
-        ranking = _ranking_from_normalized(normalized_request)
+        requested_ranking = _ranking_from_normalized(normalized_request, effective=False)
+        effective_ranking = _ranking_from_normalized(normalized_request, effective=True)
+        funding_adjustment_enabled = _funding_adjustment_enabled(
+            normalized_request=normalized_request
+        )
+        candidate_pool_top_k = (
+            _funding_candidate_pool_size(request_top_n)
+            if funding_adjustment_enabled
+            else request_top_n
+        )
+        base_ranking = _base_ranking_for_candidate_pool(
+            requested_ranking=requested_ranking,
+            effective_ranking=effective_ranking,
+        )
         min_closed_trades = _min_closed_trades_from_normalized(normalized_request)
         metric_profile = (
             NO_RISK_SEARCH_METRIC_PROFILE
-            if ranking.is_default_total_return_desc
+            if base_ranking.is_default_total_return_desc
             else NO_RISK_FULL_METRIC_PROFILE
         )
         top_k_context = _top_k_context_from_prepared(prepared_result)
@@ -318,8 +352,8 @@ class BacktestNoRiskExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=request_top_n,
-                    ranking=ranking,
+                    top_k=candidate_pool_top_k,
+                    ranking=base_ranking,
                     min_closed_trades=min_closed_trades,
                     metric_profile=metric_profile,
                     scratch=scratch,
@@ -345,8 +379,8 @@ class BacktestNoRiskExactScoringService:
                     sample_metrics=sample_metrics,
                     heap=heap,
                     top_k_context=top_k_context,
-                    top_k=request_top_n,
-                    ranking=ranking,
+                    top_k=candidate_pool_top_k,
+                    ranking=base_ranking,
                     min_closed_trades=min_closed_trades,
                     metric_profile=metric_profile,
                     scratch=scratch,
@@ -367,6 +401,22 @@ class BacktestNoRiskExactScoringService:
                 stage_timings=stage_timings,
                 scratch=scratch,
             )
+            if funding_adjustment_enabled:
+                funding_start = time.perf_counter()
+                top_results = _apply_funding_adjustment_to_top_results(
+                    top_results=top_results,
+                    prepared_result=prepared_result,
+                    execution_settings=execution_settings,
+                    execution_open_1m=execution_open_1m,
+                    execution_close_1m=execution_close_1m,
+                    funding_arrays=funding_arrays,
+                    requested_top_n=request_top_n,
+                    requested_ranking=requested_ranking,
+                    effective_ranking=effective_ranking,
+                )
+                stage_timings[NO_RISK_FUNDING_ADJUSTMENT_STAGE_NAME] = (
+                    time.perf_counter() - funding_start
+                )
             stage_timings[NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME] = (
                 time.perf_counter() - top_result_start
             )
@@ -383,7 +433,7 @@ class BacktestNoRiskExactScoringService:
                 stage_timings=stage_timings,
                 request_top_n=request_top_n,
                 benchmark_top_k=self.config.benchmark_top_k,
-                heap_capacity=request_top_n,
+                heap_capacity=candidate_pool_top_k,
                 top_results_count=len(top_results),
                 exact_candidates_evaluated=scored_count,
                 risk_mode=risk_mode,
@@ -393,7 +443,8 @@ class BacktestNoRiskExactScoringService:
                 status=NO_RISK_EXACT_SCORED_STATUS,
                 backend_logical_name=backend_logical_name,
                 backend_implementation_id=backend.backend_id,
-                metric_names=NO_RISK_METRIC_NAMES,
+                metric_names=NO_RISK_METRIC_NAMES
+                + (NO_RISK_FUNDING_METRIC_NAMES if funding_adjustment_enabled else ()),
                 sample_metrics=sample_metrics,
                 numba_num_threads=int(numba_telemetry["numba_num_threads"]),
                 numba_thread_source=str(numba_telemetry["numba_thread_source"]),
@@ -3167,18 +3218,236 @@ def _proxy_fill_for_heap_entry(
     )
 
 
-def _ranking_from_normalized(normalized_request: Mapping[str, Any]) -> _RankingSpec:
+def _apply_funding_adjustment_to_top_results(
+    *,
+    top_results: tuple[BacktestNoRiskTopResult, ...],
+    prepared_result: BacktestPreparePoolsResult,
+    execution_settings: _ExecutionSettings,
+    execution_open_1m: np.ndarray,
+    execution_close_1m: np.ndarray,
+    funding_arrays: ArtifactFundingArraysV2 | None,
+    requested_top_n: int,
+    requested_ranking: _RankingSpec,
+    effective_ranking: _RankingSpec,
+) -> tuple[BacktestNoRiskTopResult, ...]:
+    execution_times = _execution_time_arrays_from_prepared(prepared_result)
+    if funding_arrays is None or execution_times is None:
+        return _rerank_funding_adjusted_top_results(
+            tuple(
+                _annotate_no_funding_available(
+                    top_result,
+                    requested_ranking=requested_ranking,
+                    effective_ranking=effective_ranking,
+                    requested_top_n=requested_top_n,
+                    candidate_pool_size=len(top_results),
+                )
+                for top_result in top_results
+            ),
+            requested_top_n=requested_top_n,
+            effective_ranking=effective_ranking,
+        )
+
+    execution_open_time_1m, execution_close_time_1m = execution_times
+    pools_by_id = _pool_by_id(prepared_result)
+    adjusted: list[BacktestNoRiskTopResult] = []
+    for top_result in top_results:
+        local_indices = tuple(
+            _local_index_for_original_row(
+                row_ids=pools_by_id[indicator_id].row_ids,
+                original_row=int(top_result.indicator_rows[indicator_id]),
+            )
+            for indicator_id in prepared_result.indicator_ids
+        )
+        entry_arr, direction_arr, exit_arr = build_trade_list_for_indicator_rows_slow(
+            prepared_result=prepared_result,
+            local_indices=local_indices,
+            direction_mode=execution_settings.direction_mode,
+        )
+        funding_summary = calculate_no_risk_funding_adjustment(
+            entry_exec_idx=entry_arr,
+            dir_arr=direction_arr,
+            sig_exit_exec_idx=exit_arr,
+            execution_open_1m=execution_open_1m,
+            execution_close_1m=execution_close_1m,
+            execution_open_time_1m=execution_open_time_1m,
+            execution_close_time_1m=execution_close_time_1m,
+            funding_time=funding_arrays.funding_time,
+            funding_rate=funding_arrays.funding_rate,
+            mark_price=funding_arrays.mark_price,
+            data_quality=funding_arrays.data_quality,
+            execution_settings=execution_settings,
+            t_exec=int(prepared_result.execution_mapping.t_exec_limit_1m),
+            funding_data_quality=str(funding_arrays.coverage_status),
+            warning_codes=funding_arrays.manifest.reason_codes,
+        )
+        gross_total_return_pct = float(top_result.metrics["total_return_pct"])
+        funding_metrics = funding_summary.metric_payload(
+            gross_total_return_pct=gross_total_return_pct,
+            initial_cash_quote=execution_settings.initial_cash_quote,
+        )
+        adjusted.append(
+            replace(
+                top_result,
+                metrics={**dict(top_result.metrics), **funding_metrics},
+                metadata={
+                    **dict(top_result.metadata),
+                    FUNDING_INCLUDED: True,
+                    FUNDING_DATA_QUALITY: funding_summary.funding_data_quality,
+                    FUNDING_WARNING_CODES: funding_summary.funding_warning_codes,
+                    FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+                    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+                    "requested_ranking_metric": requested_ranking.metric_name,
+                    "effective_ranking_metric": effective_ranking.metric_name,
+                    "funding_candidate_pool_size": len(top_results),
+                    "requested_top_n": requested_top_n,
+                    "funding_manifest_hash": funding_arrays.funding_manifest_hash,
+                },
+            )
+        )
+    return _rerank_funding_adjusted_top_results(
+        tuple(adjusted),
+        requested_top_n=requested_top_n,
+        effective_ranking=effective_ranking,
+    )
+
+
+def _annotate_no_funding_available(
+    top_result: BacktestNoRiskTopResult,
+    *,
+    requested_ranking: _RankingSpec,
+    effective_ranking: _RankingSpec,
+    requested_top_n: int,
+    candidate_pool_size: int,
+) -> BacktestNoRiskTopResult:
+    gross_total_return_pct = float(top_result.metrics["total_return_pct"])
+    return replace(
+        top_result,
+        metrics={
+            **dict(top_result.metrics),
+            TOTAL_RETURN_PCT_NET_OF_FUNDING: gross_total_return_pct,
+            FUNDING_RETURN_PCT: 0.0,
+            FUNDING_PNL_QUOTE: 0.0,
+            FUNDING_EVENTS_COUNT: 0.0,
+        },
+        metadata={
+            **dict(top_result.metadata),
+            FUNDING_INCLUDED: False,
+            FUNDING_DATA_QUALITY: "unavailable",
+            FUNDING_WARNING_CODES: ("funding_artifacts_unavailable",),
+            FUNDING_ADJUSTMENT_SCOPE: FUNDING_ADJUSTMENT_SCOPE_UNAVAILABLE,
+            FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING: False,
+            "requested_ranking_metric": requested_ranking.metric_name,
+            "effective_ranking_metric": effective_ranking.metric_name,
+            "funding_candidate_pool_size": candidate_pool_size,
+            "requested_top_n": requested_top_n,
+            "funding_manifest_hash": None,
+        },
+    )
+
+
+def _rerank_funding_adjusted_top_results(
+    top_results: tuple[BacktestNoRiskTopResult, ...],
+    *,
+    requested_top_n: int,
+    effective_ranking: _RankingSpec,
+) -> tuple[BacktestNoRiskTopResult, ...]:
+    def sort_key(item: BacktestNoRiskTopResult) -> tuple[float, int]:
+        score = float(item.metrics[effective_ranking.metric_name])
+        comparable_score = -score if effective_ranking.direction == "desc" else score
+        return (comparable_score, int(item.rank))
+
+    ordered = sorted(top_results, key=sort_key)[:requested_top_n]
+    return tuple(
+        replace(
+            item,
+            rank=rank,
+            score=float(item.metrics[effective_ranking.metric_name]),
+        )
+        for rank, item in enumerate(ordered, start=1)
+    )
+
+
+def _execution_time_arrays_from_prepared(
+    prepared_result: BacktestPreparePoolsResult,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    if (
+        prepared_result.execution_open_time_1m is None
+        or prepared_result.execution_close_time_1m is None
+    ):
+        return None
+    open_time = np.ascontiguousarray(
+        np.asarray(prepared_result.execution_open_time_1m, dtype=np.int64)
+    )
+    close_time = np.ascontiguousarray(
+        np.asarray(prepared_result.execution_close_time_1m, dtype=np.int64)
+    )
+    t_exec = int(prepared_result.execution_mapping.t_exec_limit_1m)
+    if int(open_time.shape[0]) < t_exec or int(close_time.shape[0]) < t_exec:
+        return None
+    return open_time, close_time
+
+
+def _local_index_for_original_row(*, row_ids: np.ndarray, original_row: int) -> int:
+    matches = np.flatnonzero(np.asarray(row_ids, dtype=np.int64) == int(original_row))
+    if int(matches.shape[0]) == 0:
+        raise BacktestNoRiskExactRejected(
+            f"funding adjustment cannot find original row {original_row}"
+        )
+    return int(matches[0])
+
+
+def _funding_adjustment_enabled(*, normalized_request: Mapping[str, Any]) -> bool:
+    coordinates = normalized_request.get("coordinates")
+    execution = normalized_request.get("execution")
+    risk = normalized_request.get("risk")
+    funding = execution.get("funding") if isinstance(execution, Mapping) else None
+    return (
+        isinstance(coordinates, Mapping)
+        and str(coordinates.get("market_type")) == "futures"
+        and isinstance(risk, Mapping)
+        and str(risk.get("mode")) == "none"
+        and isinstance(funding, Mapping)
+        and str(funding.get("mode")) == "include_when_futures"
+    )
+
+
+def _funding_candidate_pool_size(requested_top_n: int) -> int:
+    return max(int(requested_top_n) * 5, int(requested_top_n) + 100)
+
+
+def _base_ranking_for_candidate_pool(
+    *,
+    requested_ranking: _RankingSpec,
+    effective_ranking: _RankingSpec,
+) -> _RankingSpec:
+    if effective_ranking.metric_name == TOTAL_RETURN_PCT_NET_OF_FUNDING:
+        return _RankingSpec(
+            metric_name="total_return_pct",
+            direction=effective_ranking.direction,
+        )
+    return requested_ranking
+
+
+def _ranking_from_normalized(
+    normalized_request: Mapping[str, Any],
+    *,
+    effective: bool,
+) -> _RankingSpec:
     ranking = normalized_request.get("ranking")
     if ranking is None:
         return _RankingSpec(metric_name="total_return_pct", direction="desc")
     if not isinstance(ranking, Mapping):
         raise BacktestNoRiskExactRejected("normalized_request.ranking must be a mapping")
-    raw_metric = ranking.get("primary_metric", ranking.get("metric", "total_return_pct"))
+    metric_key = "effective_primary_metric" if effective else "requested_primary_metric"
+    raw_metric = ranking.get(
+        metric_key,
+        ranking.get("primary_metric", ranking.get("metric", "total_return_pct")),
+    )
     metric_name = str(raw_metric)
-    if metric_name not in NO_RISK_METRIC_NAMES:
+    if metric_name not in (*NO_RISK_METRIC_NAMES, TOTAL_RETURN_PCT_NET_OF_FUNDING):
         raise BacktestNoRiskExactRejected(
             f"unsupported no-risk ranking metric {metric_name!r}; expected one of "
-            f"{NO_RISK_METRIC_NAMES!r}"
+            f"{(*NO_RISK_METRIC_NAMES, TOTAL_RETURN_PCT_NET_OF_FUNDING)!r}"
         )
     direction = str(ranking.get("direction", "desc"))
     if direction not in ("asc", "desc"):
@@ -3236,6 +3505,7 @@ __all__ = [
     "NO_RISK_EXACT_BOUNDARY_STATUS",
     "NO_RISK_EXACT_SCORED_STATUS",
     "NO_RISK_EXACT_SCORING_STAGE_NAME",
+    "NO_RISK_FUNDING_ADJUSTMENT_STAGE_NAME",
     "NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME",
     "NO_RISK_HEAP_UPDATE_STAGE_NAME",
     "NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME",

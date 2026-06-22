@@ -340,6 +340,12 @@ class BacktestPreparePoolsService:
             execution_close_1m=np.ascontiguousarray(
                 np.asarray(runtime_arrays.price_arrays_1m.ohlcv[:, 3], dtype=np.float32)
             ),
+            execution_open_time_1m=np.ascontiguousarray(
+                np.asarray(runtime_arrays.price_arrays_1m.open_time, dtype=np.int64)
+            ),
+            execution_close_time_1m=np.ascontiguousarray(
+                np.asarray(runtime_arrays.price_arrays_1m.close_time, dtype=np.int64)
+            ),
         )
         return result
 

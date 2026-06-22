@@ -246,15 +246,20 @@ class BacktestPreflightService:
             payload=payload,
             guardrails=guardrails,
         )
+        risk, tp_sl_cells = self._normalize_risk(payload=payload, guardrails=guardrails)
         execution = self._normalize_execution(payload=payload, coordinates=coordinates)
-        ranking = self._normalize_ranking(payload=payload)
+        ranking = self._normalize_ranking(
+            payload=payload,
+            coordinates=coordinates,
+            execution=execution,
+            risk=risk,
+        )
         top_n = self._normalize_top_n(payload=payload)
         quality_constraints = self._normalize_quality_constraints(
             payload=payload,
             timeframe=timeframe,
             time_range=time_range,
         )
-        risk, tp_sl_cells = self._normalize_risk(payload=payload, guardrails=guardrails)
 
         too_expensive_issues = self._cost_guardrail_issues(
             indicators=indicators,
@@ -695,7 +700,14 @@ class BacktestPreflightService:
             "funding": funding,
         }
 
-    def _normalize_ranking(self, *, payload: Mapping[str, Any]) -> dict[str, str]:
+    def _normalize_ranking(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        coordinates: BacktestCoordinates,
+        execution: Mapping[str, Any],
+        risk: Mapping[str, Any],
+    ) -> dict[str, str]:
         raw_ranking = payload.get("ranking", {})
         if raw_ranking is None:
             raw_ranking = {}
@@ -715,7 +727,35 @@ class BacktestPreflightService:
             path="ranking.direction",
             allowed=("asc", "desc"),
         )
-        return {"primary_metric": primary_metric, "direction": direction}
+        if primary_metric == "total_return_pct_net_of_funding" and not (
+            coordinates.market_type == "futures"
+            and str(risk.get("mode")) == "none"
+            and _mapping_payload(execution.get("funding")).get("mode")
+            == "include_when_futures"
+        ):
+            raise _invalid_request(
+                path="ranking.primary_metric",
+                code="funding_metric_requires_futures_funding_no_risk",
+                message=(
+                    "total_return_pct_net_of_funding can only rank no-risk futures "
+                    "requests with funding included"
+                ),
+            )
+        effective_primary_metric = primary_metric
+        if (
+            primary_metric == "total_return_pct"
+            and coordinates.market_type == "futures"
+            and str(risk.get("mode")) == "none"
+            and _mapping_payload(execution.get("funding")).get("mode")
+            == "include_when_futures"
+        ):
+            effective_primary_metric = "total_return_pct_net_of_funding"
+        return {
+            "primary_metric": primary_metric,
+            "requested_primary_metric": primary_metric,
+            "effective_primary_metric": effective_primary_metric,
+            "direction": direction,
+        }
 
     def _normalize_top_n(self, *, payload: Mapping[str, Any]) -> int:
         raw_top_n = payload.get("top_n", DEFAULT_BACKTEST_TOP_N_V1)
@@ -1053,6 +1093,10 @@ def _funding_default_for_market(*, market_type: str) -> dict[str, str]:
         "mode": "include_when_futures" if market_type == "futures" else "off",
         "coverage_policy": "degraded_with_warning",
     }
+
+
+def _mapping_payload(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _normalize_funding(value: Any, *, market_type: str) -> dict[str, str]:

@@ -21,6 +21,7 @@ RankingMetricsV1 = Mapping[str, float]
 BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1 = MappingProxyType(
     {
         "total_return_pct": "DESC",
+        "total_return_pct_net_of_funding": "DESC",
         "max_drawdown_pct": "ASC",
         "return_over_max_drawdown": "DESC",
         "profit_factor": "DESC",
@@ -31,6 +32,7 @@ BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1 = MappingProxyType(
 BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1 = MappingProxyType(
     {
         "total_return_pct": ("total_return_pct", "Total Return [%]"),
+        "total_return_pct_net_of_funding": ("total_return_pct_net_of_funding",),
         "max_drawdown_pct": ("max_drawdown_pct", "Max. Drawdown [%]"),
         "return_over_max_drawdown": ("return_over_max_drawdown",),
         "profit_factor": ("profit_factor",),

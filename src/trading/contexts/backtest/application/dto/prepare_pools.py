@@ -159,6 +159,8 @@ class BacktestPreparePoolsResult:
     timing: PreparePoolsTiming
     execution_open_1m: np.ndarray | None = None
     execution_close_1m: np.ndarray | None = None
+    execution_open_time_1m: np.ndarray | None = None
+    execution_close_time_1m: np.ndarray | None = None
 
 
 __all__ = [

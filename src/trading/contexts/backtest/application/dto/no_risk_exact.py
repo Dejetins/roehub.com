@@ -8,7 +8,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
-CompactScalar = str | int | float | bool | None
+CompactScalar = str | int | float | bool | tuple[str, ...] | None
 NO_RISK_CANONICAL_INTEGER_FIELDS = frozenset({"confirm_count", "trade_count"})
 NO_RISK_CANONICAL_PROXY_FIELDS = ("confirm_count", "proxy_score")
 
@@ -458,6 +458,8 @@ def _normalize_canonical_scalar(value: object) -> CompactScalar:
 def _compact_scalar(value: object) -> CompactScalar:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, (tuple, list)):
+        return tuple(str(item) for item in value)
     raise TypeError(f"metadata value {value!r} is not a compact scalar")
 
 

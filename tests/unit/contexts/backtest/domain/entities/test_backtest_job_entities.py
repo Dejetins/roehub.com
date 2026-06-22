@@ -235,7 +235,7 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
         timeframe="1H",
         requested_top_n=25,
         ranking_primary_metric=" total_return_pct ",
-        ranking_secondary_metric=" profit_factor ",
+        ranking_secondary_metric=" total_return_pct_net_of_funding ",
     )
 
     claimed = queued.claim(
@@ -256,7 +256,7 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     assert queued.timeframe == "1h"
     assert queued.requested_top_n == 25
     assert queued.ranking_primary_metric == "total_return_pct"
-    assert queued.ranking_secondary_metric == "profit_factor"
+    assert queued.ranking_secondary_metric == "total_return_pct_net_of_funding"
     assert claimed.execution_mode == queued.execution_mode
     assert claimed.execution_profile_mode_hint == queued.execution_profile_mode_hint
     assert (

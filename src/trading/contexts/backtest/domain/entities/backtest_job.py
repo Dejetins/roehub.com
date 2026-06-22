@@ -48,6 +48,7 @@ _BACKGROUND_JOB_EXECUTION_MODES: frozenset[str] = frozenset(
 _ALLOWED_RANKING_METRICS: frozenset[str] = frozenset(
     {
         "total_return_pct",
+        "total_return_pct_net_of_funding",
         "max_drawdown_pct",
         "return_over_max_drawdown",
         "profit_factor",

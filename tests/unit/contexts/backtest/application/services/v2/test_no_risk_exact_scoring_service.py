@@ -32,11 +32,21 @@ from trading.contexts.backtest.application.services.v2 import (
     COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     EVENT_SEGMENTS_2_NO_RISK_BACKEND,
     EVENT_SEGMENTS_N_NO_RISK_BACKEND,
+    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
+    FUNDING_ADJUSTMENT_SCOPE,
+    FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL,
+    FUNDING_DATA_QUALITY,
+    FUNDING_EVENTS_COUNT,
+    FUNDING_INCLUDED,
+    FUNDING_PNL_QUOTE,
+    FUNDING_RETURN_PCT,
+    FUNDING_WARNING_CODES,
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
     NO_RISK_EXACT_BOUNDARY_STAGE_NAME,
     NO_RISK_EXACT_SCORED_STATUS,
     NO_RISK_EXACT_SCORING_STAGE_NAME,
     NO_RISK_FULL_METRIC_SECOND_PASS_STAGE_NAME,
+    NO_RISK_FUNDING_ADJUSTMENT_STAGE_NAME,
     NO_RISK_HEAP_UPDATE_STAGE_NAME,
     NO_RISK_MATRIX_BITSET_PACK_STAGE_NAME,
     NO_RISK_METRIC_NAMES,
@@ -45,11 +55,22 @@ from trading.contexts.backtest.application.services.v2 import (
     NO_RISK_SELF_CHECK_STAGE_NAME,
     NO_RISK_TOP_RESULT_PROXY_FILL_STAGE_NAME,
     STREAMING_2_NO_RISK_BACKEND,
+    TOTAL_RETURN_PCT_NET_OF_FUNDING,
     BacktestNoRiskExactRejected,
     BacktestNoRiskExactScoringService,
     BacktestNoRiskSelfCheckFailed,
+    NoRiskFundingAdjustmentSummary,
     build_segment_stack,
     build_signal_segments,
+    calculate_no_risk_funding_adjustment,
+)
+from trading.contexts.backtest.application.services.v2.execution_sizing import (
+    execution_settings_from_normalized,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactArrayMetadataV2,
+    ArtifactFundingArraysV2,
+    ArtifactFundingManifestV2,
 )
 
 
@@ -177,6 +198,207 @@ def test_no_risk_heap_capacity_uses_request_top_n_not_benchmark_top_k() -> None:
     assert result.telemetry.exact_candidates_evaluated == 12
     assert result.telemetry.top_results_count == 4
     assert len(result.top_results) == 4
+
+
+def test_no_risk_funding_formula_applies_positive_rate_against_longs_and_for_shorts() -> None:
+    request = _normalized_request(
+        market_type="futures",
+        funding_mode="include_when_futures",
+        initial_cash_quote=10_000.0,
+        sizing={"mode": "fixed_quote", "quote_amount": 10_000.0},
+    )
+    settings = execution_settings_from_normalized(
+        request,
+        expected_direction_mode="long_short_reversal",
+        config=BacktestNoRiskExactConfig(),
+        rejection_cls=BacktestNoRiskExactRejected,
+    )
+    kwargs = {
+        "entry_exec_idx": np.asarray([0], dtype=np.int32),
+        "sig_exit_exec_idx": np.asarray([3], dtype=np.int32),
+        "execution_open_1m": np.asarray([100.0, 100.0, 100.0, 100.0], dtype=np.float32),
+        "execution_close_1m": np.asarray([100.0, 100.0, 100.0, 100.0], dtype=np.float32),
+        "execution_open_time_1m": np.asarray([0, 60_000, 120_000, 180_000], dtype=np.int64),
+        "execution_close_time_1m": np.asarray(
+            [59_999, 119_999, 179_999, 239_999],
+            dtype=np.int64,
+        ),
+        "funding_time": np.asarray([60_000, 120_000], dtype=np.int64),
+        "funding_rate": np.asarray([0.01, -0.02], dtype=np.float64),
+        "mark_price": np.asarray([100.0, 100.0], dtype=np.float64),
+        "data_quality": np.asarray([1, 1], dtype=np.uint8),
+        "execution_settings": settings,
+        "t_exec": 4,
+        "funding_data_quality": "ready",
+    }
+
+    long_summary = calculate_no_risk_funding_adjustment(
+        dir_arr=np.asarray([1], dtype=np.int8),
+        **kwargs,
+    )
+    short_summary = calculate_no_risk_funding_adjustment(
+        dir_arr=np.asarray([-1], dtype=np.int8),
+        **kwargs,
+    )
+
+    assert long_summary.funding_pnl_quote == pytest.approx(100.0)
+    assert short_summary.funding_pnl_quote == pytest.approx(-100.0)
+    assert long_summary.metric_payload(
+        gross_total_return_pct=0.0,
+        initial_cash_quote=10_000.0,
+    )[FUNDING_RETURN_PCT] == pytest.approx(1.0)
+    assert short_summary.metric_payload(
+        gross_total_return_pct=0.0,
+        initial_cash_quote=10_000.0,
+    )[FUNDING_RETURN_PCT] == pytest.approx(-1.0)
+
+
+def test_no_risk_funding_uses_bounded_candidate_pool_and_reranks_by_net(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta", "gamma"))
+    _patch_exact_scores(
+        monkeypatch,
+        scores=(100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 20.0, 10.0, 5.0, 1.0),
+    )
+    summaries = [
+        NoRiskFundingAdjustmentSummary(
+            funding_pnl_quote=-20_000.0,
+            funding_events_count=1,
+            funding_data_quality="ready",
+            funding_warning_codes=(),
+        ),
+        NoRiskFundingAdjustmentSummary(
+            funding_pnl_quote=20_000.0,
+            funding_events_count=1,
+            funding_data_quality="ready",
+            funding_warning_codes=(),
+        ),
+    ]
+
+    def fixed_funding_summary(**_: Any) -> NoRiskFundingAdjustmentSummary:
+        if summaries:
+            return summaries.pop(0)
+        return NoRiskFundingAdjustmentSummary(
+            funding_pnl_quote=0.0,
+            funding_events_count=0,
+            funding_data_quality="ready",
+            funding_warning_codes=(),
+        )
+
+    monkeypatch.setattr(
+        no_risk_exact_module,
+        "calculate_no_risk_funding_adjustment",
+        fixed_funding_summary,
+    )
+
+    result = BacktestNoRiskExactScoringService(
+        config=BacktestNoRiskExactConfig(default_request_top_n=1),
+    ).execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(prepared=prepared),
+        normalized_request=_normalized_request(
+            top_n=1,
+            market_type="futures",
+            funding_mode="include_when_futures",
+        ),
+        funding_arrays=_funding_arrays(),
+    )
+
+    top = result.top_results[0]
+    assert result.telemetry.heap_capacity == 101
+    assert result.telemetry.top_results_count == 1
+    assert NO_RISK_FUNDING_ADJUSTMENT_STAGE_NAME in result.telemetry.stage_timings
+    assert top.rank == 1
+    assert "total_return_pct" in top.metrics
+    assert TOTAL_RETURN_PCT_NET_OF_FUNDING in top.metrics
+    assert FUNDING_PNL_QUOTE in top.metrics
+    assert FUNDING_EVENTS_COUNT in top.metrics
+    assert top.metadata[FUNDING_INCLUDED] is True
+    assert top.metadata[FUNDING_DATA_QUALITY] == "ready"
+    assert top.metadata[FUNDING_WARNING_CODES] == ()
+    assert top.metadata[FUNDING_ADJUSTMENT_SCOPE] == FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL
+    assert top.metadata[FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING] is False
+    assert top.metadata["requested_ranking_metric"] == "total_return_pct"
+    assert top.metadata["effective_ranking_metric"] == TOTAL_RETURN_PCT_NET_OF_FUNDING
+
+
+def test_no_risk_funding_reranks_explicit_candidate_pool_by_net(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = _prepared_result(indicator_ids=("alpha", "beta", "gamma"))
+    request = _normalized_request(
+        top_n=1,
+        market_type="futures",
+        funding_mode="include_when_futures",
+    )
+    settings = execution_settings_from_normalized(
+        request,
+        expected_direction_mode="long_short_reversal",
+        config=BacktestNoRiskExactConfig(),
+        rejection_cls=BacktestNoRiskExactRejected,
+    )
+    summaries = [
+        NoRiskFundingAdjustmentSummary(
+            funding_pnl_quote=-20_000.0,
+            funding_events_count=1,
+            funding_data_quality="ready",
+            funding_warning_codes=(),
+        ),
+        NoRiskFundingAdjustmentSummary(
+            funding_pnl_quote=20_000.0,
+            funding_events_count=1,
+            funding_data_quality="ready",
+            funding_warning_codes=(),
+        ),
+    ]
+
+    def fixed_funding_summary(**_: Any) -> NoRiskFundingAdjustmentSummary:
+        return summaries.pop(0)
+
+    monkeypatch.setattr(
+        no_risk_exact_module,
+        "calculate_no_risk_funding_adjustment",
+        fixed_funding_summary,
+    )
+
+    adjusted = no_risk_exact_module._apply_funding_adjustment_to_top_results(
+        top_results=(
+            BacktestNoRiskTopResult(
+                rank=1,
+                score=100.0,
+                indicator_rows={"alpha": 0, "beta": 0, "gamma": 0},
+                metrics={"total_return_pct": 100.0, "trade_count": 1.0},
+                metadata={},
+            ),
+            BacktestNoRiskTopResult(
+                rank=2,
+                score=90.0,
+                indicator_rows={"alpha": 0, "beta": 1, "gamma": 0},
+                metrics={"total_return_pct": 90.0, "trade_count": 1.0},
+                metadata={},
+            ),
+        ),
+        prepared_result=prepared,
+        execution_settings=settings,
+        execution_open_1m=np.asarray(prepared.execution_open_1m),
+        execution_close_1m=np.asarray(prepared.execution_close_1m),
+        funding_arrays=_funding_arrays(),
+        requested_top_n=1,
+        requested_ranking=no_risk_exact_module._RankingSpec(
+            metric_name="total_return_pct",
+            direction="desc",
+        ),
+        effective_ranking=no_risk_exact_module._RankingSpec(
+            metric_name=TOTAL_RETURN_PCT_NET_OF_FUNDING,
+            direction="desc",
+        ),
+    )
+
+    assert len(adjusted) == 1
+    assert adjusted[0].rank == 1
+    assert adjusted[0].metrics["total_return_pct"] == pytest.approx(90.0)
+    assert adjusted[0].metrics[TOTAL_RETURN_PCT_NET_OF_FUNDING] == pytest.approx(290.0)
 
 
 def test_no_risk_request_top_n_50_can_return_50_results(
@@ -1111,6 +1333,14 @@ def _prepared_from_pools(
         ),
         execution_open_1m=np.asarray([100.0, 101.0, 103.0, 99.0, 98.0], dtype=np.float32),
         execution_close_1m=np.asarray([100.5, 102.0, 100.0, 98.0, 97.0], dtype=np.float32),
+        execution_open_time_1m=np.asarray(
+            [0, 60_000, 120_000, 180_000, 240_000],
+            dtype=np.int64,
+        ),
+        execution_close_time_1m=np.asarray(
+            [59_999, 119_999, 179_999, 239_999, 299_999],
+            dtype=np.int64,
+        ),
     )
 
 
@@ -1176,6 +1406,14 @@ def _prepared_result(*, indicator_ids: Sequence[str]) -> BacktestPreparePoolsRes
         ),
         execution_open_1m=np.asarray([100.0, 101.0, 103.0, 99.0, 98.0], dtype=np.float32),
         execution_close_1m=np.asarray([100.5, 102.0, 100.0, 98.0, 97.0], dtype=np.float32),
+        execution_open_time_1m=np.asarray(
+            [0, 60_000, 120_000, 180_000, 240_000],
+            dtype=np.int64,
+        ),
+        execution_close_time_1m=np.asarray(
+            [59_999, 119_999, 179_999, 239_999, 299_999],
+            dtype=np.int64,
+        ),
     )
 
 
@@ -1416,6 +1654,7 @@ def _combo_planning_result(
 def _normalized_request(
     *,
     risk_mode: str = "none",
+    market_type: str = "spot",
     direction_mode: str = "long_short_reversal",
     fee_rate: float = 0.0,
     slippage_rate: float = 0.0,
@@ -1425,9 +1664,29 @@ def _normalized_request(
     sizing: Mapping[str, float | str] | None = None,
     profit_lock_enabled: bool = False,
     close_on_end: bool = True,
+    funding_mode: str | None = None,
 ) -> dict[str, Any]:
     sizing_payload = dict(sizing or {"mode": sizing_mode, "quote_amount": 100.0})
+    resolved_funding_mode = (
+        funding_mode
+        if funding_mode is not None
+        else ("include_when_futures" if market_type == "futures" else "off")
+    )
+    effective_metric = (
+        TOTAL_RETURN_PCT_NET_OF_FUNDING
+        if (
+            market_type == "futures"
+            and risk_mode == "none"
+            and resolved_funding_mode == "include_when_futures"
+        )
+        else "total_return_pct"
+    )
     return {
+        "coordinates": {
+            "exchange": "binance",
+            "market_type": market_type,
+            "symbol": "BTCUSDT",
+        },
         "top_n": top_n,
         "risk": {"mode": risk_mode},
         "execution": {
@@ -1441,8 +1700,82 @@ def _normalized_request(
                 "safe_profit_percent": 30.0,
             },
             "close_on_end": close_on_end,
+            "funding": {
+                "mode": resolved_funding_mode,
+                "coverage_policy": "degraded_with_warning",
+            },
+        },
+        "ranking": {
+            "primary_metric": "total_return_pct",
+            "requested_primary_metric": "total_return_pct",
+            "effective_primary_metric": effective_metric,
+            "direction": "desc",
         },
     }
+
+
+def _funding_arrays(
+    *,
+    funding_time: Sequence[int] = (60_000,),
+    funding_rate: Sequence[float] = (0.001,),
+    mark_price: Sequence[float] = (100.0,),
+    data_quality: Sequence[int] = (1,),
+) -> ArtifactFundingArraysV2:
+    rows_count = len(tuple(funding_time))
+    manifest = ArtifactFundingManifestV2(
+        coverage_status="ready",
+        coverage_policy="ready",
+        funding_manifest_hash="f" * 64,
+        rows_count=rows_count,
+        expected_event_count=rows_count,
+        missing_event_count=0,
+        reason_codes=(),
+        funding_time=_array_metadata(
+            path="funding/funding_time.i64.npy",
+            dtype="int64",
+            rows_count=rows_count,
+        ),
+        funding_rate=_array_metadata(
+            path="funding/funding_rate.f64.npy",
+            dtype="float64",
+            rows_count=rows_count,
+        ),
+        mark_price=_array_metadata(
+            path="funding/mark_price.f64.npy",
+            dtype="float64",
+            rows_count=rows_count,
+        ),
+        funding_interval_minutes=_array_metadata(
+            path="funding/funding_interval_minutes.u16.npy",
+            dtype="uint16",
+            rows_count=rows_count,
+        ),
+        data_quality=_array_metadata(
+            path="funding/data_quality.u8.npy",
+            dtype="uint8",
+            rows_count=rows_count,
+        ),
+    )
+    return ArtifactFundingArraysV2(
+        manifest=manifest,
+        funding_manifest_hash=manifest.funding_manifest_hash,
+        coverage_status=manifest.coverage_status,
+        funding_time=np.asarray(funding_time, dtype=np.int64),
+        funding_rate=np.asarray(funding_rate, dtype=np.float64),
+        mark_price=np.asarray(mark_price, dtype=np.float64),
+        funding_interval_minutes=np.full(rows_count, 480, dtype=np.uint16),
+        data_quality=np.asarray(data_quality, dtype=np.uint8),
+    )
+
+
+def _array_metadata(*, path: str, dtype: str, rows_count: int) -> ArtifactArrayMetadataV2:
+    return ArtifactArrayMetadataV2(
+        path=path,
+        dtype=dtype,
+        shape=(rows_count,),
+        axis_order=("funding_event",),
+        sha256="a" * 64,
+    )
 
 
 def _execute_no_risk_execution_sizing(

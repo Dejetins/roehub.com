@@ -43,6 +43,7 @@ def test_runtime_defaults_expose_iteration_1_public_contract() -> None:
         "fixed_equity_pct_max_quote",
     ]
     assert "total_return_pct" in response["ranking_metrics"]
+    assert "total_return_pct_net_of_funding" in response["ranking_metrics"]
     assert response["top_n_default"] == 10
     assert response["guardrails"]["max_candidate_combinations"] == 10_000_000_000_000
     assert response["quality_constraints_default"] == {
@@ -91,6 +92,12 @@ def test_preflight_success_returns_normalized_request_hash_artifact_and_cost() -
     assert first.normalized_request["execution"]["funding"] == {
         "mode": "off",
         "coverage_policy": "degraded_with_warning",
+    }
+    assert first.normalized_request["ranking"] == {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct",
+        "direction": "desc",
     }
     assert first.funding_readiness == {
         "status": "not_applicable",
@@ -160,6 +167,12 @@ def test_preflight_futures_short_defaults_to_funding_include_and_ready() -> None
     assert result.normalized_request["execution"]["funding"] == {
         "mode": "include_when_futures",
         "coverage_policy": "degraded_with_warning",
+    }
+    assert result.normalized_request["ranking"] == {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct_net_of_funding",
+        "direction": "desc",
     }
     assert result.funding_readiness == {
         "status": "ready",

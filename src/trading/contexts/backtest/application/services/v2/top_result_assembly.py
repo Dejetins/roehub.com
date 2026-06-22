@@ -16,6 +16,14 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 
+from .no_risk_funding import (
+    FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
+    FUNDING_ADJUSTMENT_SCOPE,
+    FUNDING_DATA_QUALITY,
+    FUNDING_INCLUDED,
+    FUNDING_WARNING_CODES,
+)
+
 TOP_RESULT_ASSEMBLY_STAGE_NAME = "top_result_assembly"
 
 
@@ -136,6 +144,7 @@ def _build_top_variant(
         "best_tp_pct": best_tp_pct,
         "best_sl_pct": best_sl_pct,
     }
+    funding_adjustment = _funding_adjustment_payload(metadata=top_result.metadata)
     payload = {
         "schema": "backtest_top_variant_summary_v1",
         "public_variant_key": public_variant_key,
@@ -156,6 +165,8 @@ def _build_top_variant(
         },
         "source_top_result": _normalize_json(top_result.as_mapping()),
     }
+    if funding_adjustment:
+        payload["funding_adjustment"] = funding_adjustment
     return BacktestJobTopVariant(
         job_id=job_id,
         rank=top_result.rank,
@@ -267,6 +278,23 @@ def _mapping_payload(value: Any) -> dict[str, Any]:
 
 def _risk_side_disabled(risk: Mapping[str, Any], side: str) -> bool:
     return _mapping_payload(risk.get(side)).get("enabled") is False
+
+
+def _funding_adjustment_payload(*, metadata: Mapping[str, Any]) -> dict[str, Any]:
+    keys = (
+        FUNDING_INCLUDED,
+        FUNDING_DATA_QUALITY,
+        FUNDING_WARNING_CODES,
+        FUNDING_ADJUSTMENT_SCOPE,
+        FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
+        "requested_ranking_metric",
+        "effective_ranking_metric",
+        "funding_candidate_pool_size",
+        "requested_top_n",
+        "funding_manifest_hash",
+    )
+    payload = {key: metadata[key] for key in keys if key in metadata}
+    return _normalize_json(payload) if payload else {}
 
 
 def _optional_float(value: Any) -> float | None:
