@@ -5,11 +5,14 @@ already used by lazy trade detail.
 
 Date: 2026-06-22
 
-Status: accepted for Stage `05` implementation gates.
+Status: accepted.
 
-Proof boundary: this report records local implementation gates plus a Mac Studio
-target-host benchmark with a transient uncommitted candidate patch. It is not
-post-main CI/deploy or production runtime proof.
+Proof boundary: this report records local implementation gates, Mac Studio
+artifact-backed benchmark evidence, direct `main` delivery, green GitHub
+CI/deploy, `/opt/roehub/app` runtime hash parity and production smoke. The
+performance benchmark itself was collected before delivery with a transient
+candidate patch; post-main proof verifies the delivered code and runtime
+deployment boundary, not a rerun of that benchmark.
 
 Execution branch policy: `main` by default; do not create branches, worktrees,
 local workflow folders or stashes unless the user explicitly requests them.
@@ -153,6 +156,29 @@ Required gates:
 - `uv run pytest -q tests/unit/contexts/backtest`: passed with `389 passed`.
 - `python -m tools.docs.generate_docs_index --check`: passed.
 
+Delivery gates:
+
+- Pre-publish broad gate `uv run ruff check .`: passed.
+- Pre-publish broad gate `uv run pyright`: passed with `0 errors`.
+- Pre-publish broad gate `uv run pytest -q -ra`: passed with `1319 passed,
+  3 warnings`.
+- Pre-publish docs gate `uv run python -m tools.docs.generate_docs_index --check`:
+  passed.
+- Scoped commit `d165d18e951b5470e0b275a4d30c73c3d5ae1321` delivered Stage
+  `05` and Stage `06` funding scope to `main`.
+- GitHub CI run `27985018813`: passed.
+- GitHub Deploy Backend run `27985269835`: passed.
+- GitHub Publish App Image run `27985269851`: passed.
+- GitHub Deploy Web runs `27985269883` and `27985281326`: passed.
+- Mac Studio checkout `/Users/daniildegtyarev/Projects/roehub.com`
+  fast-forwarded to `d165d18e951b5470e0b275a4d30c73c3d5ae1321`; remaining
+  dirty files were unrelated ML/backfill files and were not part of this
+  delivery.
+- Runtime tree `/opt/roehub/app` hash parity matched commit `d165d18e` for
+  `src/trading/contexts/backtest/application/services/v2/tp_sl_funding.py`
+  (`c5ceab1d1ef8f72b33053656b64ec9a15a089f90af1e7408b289f18c01b5fb83`).
+- `bash scripts/macos/smoke_prod.sh` passed in `/opt/roehub/app`.
+
 Regression coverage added:
 
 - TP/SL top funding uses the shared exact exit resolver.
@@ -247,14 +273,16 @@ Residual risks:
 
 - Independent subagent review was unavailable in this turn; this receipt is a
   cold self-review fallback.
-- Stage `05` is accepted at implementation-gate boundary only and has not been
-  committed, pushed, run through CI/deploy, or proven in production runtime.
+- The Mac Studio performance benchmark was not rerun after delivery. Delivery
+  proof verifies the committed/deployed code boundary; the benchmark evidence
+  remains the pre-delivery same-host baseline/candidate measurement described
+  above.
 
 ## Residual Risks
 
-- This is not post-main/CI/deploy production proof. The performance benchmark
-  applied the candidate as a transient patch to a clean Mac Studio checkout and
-  reversed it after measurement.
+- The performance benchmark applied the candidate as a transient patch to a
+  clean Mac Studio checkout and reversed it after measurement; it was not rerun
+  after commit `d165d18e`.
 - Funding coverage in the active benchmark artifact is degraded
   (`missing_leading_coverage`).
 - Mark-price fallback from 1m execution close was used for benchmark top rows.

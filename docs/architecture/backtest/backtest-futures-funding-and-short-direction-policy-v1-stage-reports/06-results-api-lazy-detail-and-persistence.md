@@ -5,11 +5,11 @@ identity while keeping top rows summary-only.
 
 Date: 2026-06-22
 
-Status: accepted for Stage `06` local implementation gates.
+Status: accepted.
 
-Proof boundary: this report records local implementation gates and local
-TestClient route smoke. It is not post-main CI/deploy or Mac Studio
-changed-code runtime proof.
+Proof boundary: this report records local implementation gates, local and Mac
+Studio `TestClient` route smoke, direct `main` delivery, green GitHub CI/deploy,
+`/opt/roehub/app` runtime hash parity and production smoke.
 
 Execution branch policy: `main` by default; do not create branches, worktrees,
 local workflow folders or stashes unless the user explicitly requests them.
@@ -172,6 +172,39 @@ Required gates:
 - `uv run pytest -q tests/unit/apps/api tests/unit/contexts/backtest`: passed
   with `602 passed`.
 
+Delivery gates:
+
+- Pre-publish broad gate `uv run ruff check .`: passed.
+- Pre-publish broad gate `uv run pyright`: passed with `0 errors`.
+- Pre-publish broad gate `uv run pytest -q -ra`: passed with `1319 passed,
+  3 warnings`.
+- Pre-publish docs gate `uv run python -m tools.docs.generate_docs_index --check`:
+  passed.
+- Scoped commit `d165d18e951b5470e0b275a4d30c73c3d5ae1321` delivered Stage
+  `05` and Stage `06` funding scope to `main`.
+- GitHub CI run `27985018813`: passed.
+- GitHub Deploy Backend run `27985269835`: passed.
+- GitHub Publish App Image run `27985269851`: passed.
+- GitHub Deploy Web runs `27985269883` and `27985281326`: passed.
+- Mac Studio checkout `/Users/daniildegtyarev/Projects/roehub.com`
+  fast-forwarded to `d165d18e951b5470e0b275a4d30c73c3d5ae1321`; remaining
+  dirty files were unrelated ML/backfill files and were not part of this
+  delivery.
+- Runtime tree `/opt/roehub/app` hash parity matched commit `d165d18e` for:
+  - `apps/api/dto/backtests.py`
+    (`bf81bf0f3f5eeff707205ed9dfc9d6d66a8df31ecf747fd3d1c8486f747c00eb`);
+  - `src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py`
+    (`0a8ba8c0126a49a3064ea296672c1c66eeb4a3d55ea1bbbc53428127c89996a3`);
+  - `src/trading/contexts/backtest/application/services/v2/tp_sl_funding.py`
+    (`c5ceab1d1ef8f72b33053656b64ec9a15a089f90af1e7408b289f18c01b5fb83`).
+- `bash scripts/macos/smoke_prod.sh` passed in `/opt/roehub/app`.
+- Runtime API smoke on Mac Studio returned `/health` `200` and
+  `/auth/current-user` `401 missing_session_id`, proving the deployed API
+  process is reachable and auth still fails closed without a session.
+- Target-host route smoke on Mac Studio checkout passed:
+  `uv run pytest -q tests/unit/apps/api/test_backtests_routes.py::test_backtest_results_routes_expose_funding_fields_without_top_trades`
+  with `1 passed`.
+
 Regression coverage added:
 
 - cache key digest changes when `funding_manifest_hash` changes;
@@ -197,11 +230,14 @@ Local API route smoke:
 
 Mac Studio changed-code runtime proof:
 
-- Not run and not claimed in this stage.
-- No deploy, remote sync, production runtime mutation or post-main proof was
-  performed.
-- Stage `08` remains responsible for delivery, CI/deploy and Mac Studio
-  post-main production runtime proof if publishing is in scope.
+- Commit `d165d18e951b5470e0b275a4d30c73c3d5ae1321` is on `main`.
+- GitHub CI/deploy workflows for that commit passed.
+- Deploy Backend synced the source bundle into `/opt/roehub/app`, ran bootstrap,
+  migrations, launchd reload and backend smoke.
+- Runtime hash parity proved the deployed Stage `06` DTO and lazy-detail files
+  match the committed source.
+- `smoke_prod.sh`, API health/current-user smoke and target-host route smoke
+  passed.
 
 ## Cold-Head Review Receipt
 
@@ -242,16 +278,15 @@ Residual risks:
 
 - independent subagent review was not used in this turn; this receipt is a cold
   self-review fallback;
-- no Mac Studio changed-code runtime proof is claimed before delivery to `main`;
+- Mac Studio changed-code runtime proof was collected after delivery to `main`;
 - lazy-detail funding PnL per event is presented as overlay estimate when
   mark-price artifacts are available; authoritative net metrics remain the
   persisted summary metrics from the accepted Stage `04`/`05` scoring path.
 
 ## Residual Risks
 
-- Stage `06` is accepted only at the local implementation-gate boundary. It has
-  not been committed, pushed, run through GitHub CI/deploy or proven in
-  `/opt/roehub/app`.
+- Stage `06` is accepted after direct `main` delivery, green GitHub CI/deploy
+  and Mac Studio post-main production runtime proof.
 - Existing materialized no-funding lazy-detail bundles keep their legacy digest
   because null `funding_manifest_hash` is omitted from identity; funding-enabled
   bundles use the new digest.
