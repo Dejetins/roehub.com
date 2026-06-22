@@ -13,13 +13,14 @@ class _Gateway:
     def __init__(self):
         self.inserts = []
         self.select_rows = []
+        self.response_rows = []
 
     def insert_rows(self, table, rows):
         self.inserts.append((table, list(rows)))
 
     def select(self, query, parameters):
         self.select_rows.append((query, dict(parameters)))
-        return []
+        return list(self.response_rows)
 
 
 def _ts(hour: int) -> UtcTimestamp:
@@ -92,3 +93,33 @@ def test_upsert_funding_universe_keeps_interval_metadata() -> None:
     assert gateway.inserts[0][1][0]["funding_interval_source"] == (
         "binance_standard_8h_no_adjustment_row"
     )
+
+
+def test_list_tradable_funding_instruments_does_not_alias_max_updated_at() -> None:
+    gateway = _Gateway()
+    gateway.response_rows = [
+        {
+            "market_id": 2,
+            "symbol": "BTCUSDT",
+            "instrument_key": "binance:futures:BTCUSDT",
+            "exchange": "binance",
+            "market_type": "futures",
+            "status": "TRADING",
+            "is_tradable": 1,
+            "base_asset": "BTC",
+            "quote_asset": "USDT",
+            "funding_interval_minutes": 480,
+            "funding_interval_source": "binance_standard_8h_no_adjustment_row",
+            "funding_cap": None,
+            "funding_floor": None,
+            "latest_updated_at": _ts(1).value,
+        }
+    ]
+    store = ClickHouseFundingRateStore(gateway=gateway, database="market_data")
+
+    rows = store.list_tradable_funding_instruments(market_ids=(MarketId(2),))
+
+    query = gateway.select_rows[0][0]
+    assert "max(updated_at) AS latest_updated_at" in query
+    assert "max(updated_at) AS updated_at" not in query
+    assert rows[0].updated_at == _ts(1)

@@ -51,7 +51,7 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
             argMax(funding_interval_source, updated_at) AS funding_interval_source,
             argMax(funding_cap, updated_at) AS funding_cap,
             argMax(funding_floor, updated_at) AS funding_floor,
-            max(updated_at) AS updated_at
+            max(updated_at) AS latest_updated_at
         FROM {self._db}.funding_instrument_universe
         WHERE market_id IN %(market_ids)s
         GROUP BY market_id, symbol
@@ -144,7 +144,7 @@ class ClickHouseFundingRateStore(FundingRateWriter, FundingInstrumentUniverseSto
             funding_interval_source=_optional_str(row.get("funding_interval_source")),
             funding_cap=_optional_float(row.get("funding_cap")),
             funding_floor=_optional_float(row.get("funding_floor")),
-            updated_at=UtcTimestamp(_ensure_utc(row["updated_at"])),
+            updated_at=UtcTimestamp(_ensure_utc(row.get("updated_at") or row["latest_updated_at"])),
         )
 
     def _canonical_payload(self, row: FundingRateRecord) -> Mapping[str, Any]:
