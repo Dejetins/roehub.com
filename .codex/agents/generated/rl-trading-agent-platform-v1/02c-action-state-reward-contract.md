@@ -292,7 +292,7 @@ Skill routing for this task:
 
 - Domain tests cover hold/open_long/open_short/close, no-pyramiding, close-without-position, and no-cross-strategy-close.
 - Reward compatibility fixtures prove opening fee, closing PnL-fee, flat hold penalty, open hold no MTM reward, and forced final close behavior.
-- Stage 07 has explicit fixtures to use before training acceptance.
+- Stage `07A` has explicit fixtures to use before trainer-smoke acceptance, and Stage `07B` must reuse them before full candidate training can be accepted.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/02c-action-state-reward-contract.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

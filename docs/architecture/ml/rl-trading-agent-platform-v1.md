@@ -79,7 +79,7 @@ Current identity source of truth is not these product labels. Existing code expo
 - backend entitlement limits без billing/payment integration;
 - staged rollout до mainnet live с отдельным approval gate.
 
-Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, Stage `07` training, and Stage `08` research evaluation are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
+Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, Stage `07A`/`07B` training, and Stage `08` research evaluation are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
 
 Не входит:
 
@@ -429,19 +429,21 @@ Training/retraining является платформенным offline-проц
 Минимальный v1 lifecycle:
 
 1. `dataset_version` создается из ClickHouse/artifacts с deterministic manifest, hashes, split policy и feature availability mask.
-2. `training_run` создает candidate model от frozen config. Для дообучения допустимы два режима:
+2. Stage `07A` создает trainer/runtime capability: D3QN/PER model, replay buffer, environment fixtures, deterministic small smoke and resource evidence. Это доказывает, что обучение технически работает, но не создает модель для оценки.
+3. Stage `07B` запускает full candidate training run по accepted Stage `06` `binance:futures` dataset. Это первый stage, который обязан получить обученный candidate checkpoint/report для Stage `08`; если полный run не завершен, `07B` остается `in_progress` и Stage `08` не стартует.
+4. `training_run` создает candidate model от frozen config. Для дообучения допустимы два режима:
    - `full_retrain`: полный replay на новом dataset_version;
    - `fine_tune`: продолжение от accepted champion checkpoint только если config/hash compatibility явно подтверждена.
-3. `candidate` никогда не активируется автоматически. Promotion требует:
+5. `candidate` никогда не активируется автоматически. Promotion требует:
    - положительный Roehub backtest после fees/slippage/funding policy;
    - per-ticker/per-market calibration report;
    - latency/resource evidence на Mac Studio;
    - rollback_manifest;
    - stage report + ledger update.
-4. `champion` модель platform-wide. Per-ticker поведение задается calibration/weights/thresholds/head metadata, но не пользовательскими training jobs.
-5. `challenger` может работать только в `monitor_only` shadow mode, пока Stage `13+` не подтвердит signal parity, latency и drift evidence.
-6. Drift monitoring сравнивает live feature distribution, action distribution, skipped-action reasons и paper/testnet/live outcomes с promotion baseline. Drift сам по себе не обновляет модель; он создает retraining candidate task.
-7. Rollback всегда переводит активную модель/калибровку на предыдущий accepted champion без удаления audit trail.
+6. `champion` модель platform-wide. Per-ticker поведение задается calibration/weights/thresholds/head metadata, но не пользовательскими training jobs.
+7. `challenger` может работать только в `monitor_only` shadow mode, пока Stage `13+` не подтвердит signal parity, latency и drift evidence.
+8. Drift monitoring сравнивает live feature distribution, action distribution, skipped-action reasons и paper/testnet/live outcomes с promotion baseline. Drift сам по себе не обновляет модель; он создает retraining candidate task.
+9. Rollback всегда переводит активную модель/калибровку на предыдущий accepted champion без удаления audit trail.
 
 Retraining triggers/cadence v1:
 
@@ -692,9 +694,10 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `04C` | Dataset refresh manifest | Freeze dataset refresh versions and source-window manifests for HF-period rebuild and post-HF extension before feature-slab construction. | `04B` | `hf_period_rebuild_current_trading` and `post_hf_extension_current_trading` manifests, dataset lineage/hashes, blocked symbols and residual gaps recorded. |
 | `05` | Roehub dataset builder v1 | Build raw `binance:futures` feature slabs/manifests and golden fixtures from the accepted dataset refresh manifest; explicitly record spot/Bybit branches as blocked for v1 training. Stage `05` does not emit final accepted trainable/sessionized datasets. | `04C` | raw Binance Futures slab manifests, feature stats, deterministic rebuild hash, offline/live feature golden fixtures, live-feed feature parity decision implemented, no accepted sessionized training artifact yet. |
 | `06` | Dataset QA and session extractor | Implement Binance Futures high-volatility session extraction and data QA; emit accepted sessionized train/val/test/backtest datasets. | `05` | sessionized Binance Futures dataset hashes, session counts, gap report, machine-readable leakage/embargo report, no look-ahead/survivorship-bias proof, reproducible split. |
-| `07` | D3QN/PER training runner | Port/adapt D3QN/PER training into Roehub ML app. | `04`,`06` | focused tests, training smoke, CPU/MPS performance evidence, accepted/rejected run records. |
-| `08` | Roehub backtest/evaluation harness | Evaluate model decisions with Roehub fee/slippage/funding/risk/backtest semantics, diagnostic sanity baselines and simulator/accounting parity. | `07` | research candidate may be accepted only with positive PnL after costs, scorecard, sanity baseline artifacts, drawdown/stability report and offline simulator/accounting parity fixture; promotion-grade not granted here. |
-| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | `07`,`08` | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
+| `07A` | D3QN/PER training runner smoke | Port/adapt D3QN/PER training into Roehub ML app and prove deterministic small training smoke. | `04`,`06` | model/replay/training-loop/environment fixture tests, Stage `02C` action/reward compatibility, Mac Studio small training smoke, CPU/MPS/RSS evidence, accepted/rejected run-record schema; no full candidate or model-quality claim. |
+| `07B` | Full candidate training run | Run full candidate training on the accepted Stage `06` `binance:futures` dataset using frozen config/seeds and Stage `07A` trainer. | `07A`,`06` | completed candidate training report, checkpoint/config/dataset/model-architecture hashes, training/validation curves, resource budget evidence, deterministic resume/failure behavior, candidate artifact path under `/opt/roehub/state/rl_trading/`; no registry activation or promotion. |
+| `08` | Roehub backtest/evaluation harness | Evaluate the Stage `07B` candidate decisions with Roehub fee/slippage/funding/risk/backtest semantics, diagnostic sanity baselines and simulator/accounting parity. | `07B` | research candidate may be accepted only with positive PnL after costs, scorecard, sanity baseline artifacts, drawdown/stability report and offline simulator/accounting parity fixture; promotion-grade not granted here. |
+| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | `07B`,`08` | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
 | `09B` | Local artifact backup and restore drill | Backup accepted champion/calibration/source manifests/registry metadata locally and prove restore/rollback drill before runtime activation. | `09` | backup manifest, registry metadata dump, restore to separate path, hash validation after restore, rollback to previous accepted champion; residual single-host disk risk recorded. |
 | `10` | Per-ticker calibration | Create per-ticker/per-market calibration thresholds, weights, or heads. | `08`,`09B` | calibration report per ticker, no global-only threshold activation unless accepted. |
 | `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | `08`,`09B`,`10` | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
@@ -726,7 +729,9 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `04C` | Dataset refresh manifests under `/opt/roehub/state/rl_trading/`, sanitized manifest summary report, source-window lineage and residual-gap decision. |
 | `05` | Dataset builder, raw feature slabs, feature parity fixtures, raw manifests and deterministic rebuild tests. |
 | `06` | Session extractor, accepted sessionized train/val/test/backtest datasets, leak-check tests, overlap/embargo reports, `/opt/roehub/state/rl_trading/datasets/*` runtime artifacts. |
-| `07`-`10A` | Trainer app, model code, simulator/accounting parity fixtures, sanity baseline evaluator, registry state machine/metadata, artifact retention/quota controls, checkpoint security, calibration/promotion artifacts, host-local rollback command/runbook, tests, metrics reports. |
+| `07A` | Trainer app skeleton, D3QN/PER model/replay code, environment fixtures, run-record schema, deterministic small smoke artifacts and CPU/MPS/RSS report. |
+| `07B` | Full candidate training command/job, checkpoint/report artifacts, training curves, frozen config/seed/dataset/model hashes, resumability/failure evidence and candidate handoff manifest for Stage `08`. |
+| `08`-`10A` | Simulator/accounting parity fixtures, sanity baseline evaluator, registry state machine/metadata, artifact retention/quota controls, checkpoint security, calibration/promotion artifacts, host-local rollback command/runbook, tests, metrics reports. |
 | `09B` | Local backup path, backup manifest, registry metadata dump, restore drill report and rollback evidence. |
 | `11`-`12` | API DTO/routes/read models, UI tab assets/locales, server-side operator/admin guard for model action controls, entitlement use cases/migrations/tests. |
 | `13`-`18` | Inference producer app, launchd/Monit/Prometheus config, source event integration, paper/testnet evidence reports, simulator-paper parity report, incident drill reports. |
@@ -802,10 +807,10 @@ Prompt-pack readiness on 2026-06-17: `.codex/agents/generated/rl-trading-agent-p
 | Classic strategy producer Stage `05` is blocked | RL data/model/UI/monitor-only work may proceed, but RL paper/testnet/live stages depend on classic Stage `05` repair and accepted classic Stage `07`/`09`. |
 | External repo is demo, not production module | Treat as research input; port concepts with attribution, do not blindly vendor code. |
 | Positive backtest alone is not production promotion | Stage `08` accepts only research candidates; Stage `10A` requires numeric promotion-grade threshold profile before paper/testnet/live progression. |
-| MPS support may be incomplete for chosen ops | Stage `03`/`07` benchmark CPU vs MPS and define accepted fallback. |
+| MPS support may be incomplete for chosen ops | Stage `03`/`07A`/`07B` benchmark CPU vs MPS and define accepted fallback. |
 | Futures funding/contract metadata may be incomplete | Stage `02B` must define Binance Futures funding, mark/index, filters, leverage tiers and explicitly block or mark the `binance:futures` training/evaluation branch as `research_only_approximation` before Stage `05`/`08`. |
 | Retraining can silently change live behavior | Stage `10A` requires candidate/champion gates, no auto-activation, rollback manifest and drift-triggered retraining task instead of in-place live mutation. |
-| Action/reward semantics can drift from external repo | Stage `02C` records Roehub action/state/reward contract and Stage `07` tests it against external-repo-compatible fixtures before training acceptance. |
+| Action/reward semantics can drift from external repo | Stage `02C` records Roehub action/state/reward contract, Stage `07A` tests it against external-repo-compatible fixtures before trainer-smoke acceptance, and Stage `07B` must reuse the accepted fixtures before full candidate training acceptance. |
 | Train/live features can diverge | Stage `05`/`13` require golden feature parity fixtures and shared feature builder contract before monitor/paper/testnet activation. |
 | Overlapping sessions can leak across splits | Overlap is allowed only inside a split; Stage `06` must prove time embargo and lifecycle-aware split boundaries. |
 | Local artifacts remain single-host risk | Stage `09B` must add local backup/restore drill; Stage `19`/`21` must either prove backup path is sufficient or explicitly accept residual single-host disk risk. |

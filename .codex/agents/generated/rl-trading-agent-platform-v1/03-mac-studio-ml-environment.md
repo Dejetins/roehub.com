@@ -310,7 +310,7 @@ Skill routing for this task:
 
 - Mac Studio ML env can run PyTorch CPU/MPS smoke.
 - API/runtime import smoke shows torch is not required by the main API path.
-- Stage report includes device/fallback policy and resource isolation rules for Stage 07/13/17.
+- Stage report includes device/fallback policy and resource isolation rules for Stage `07A`/`07B`/`13`/`17`.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/03-mac-studio-ml-environment.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

@@ -299,7 +299,7 @@ Skill routing for this task:
 
 - Binance Futures sessionized dataset manifests and hashes are derived from the accepted Stage 04C refresh manifest and exist under the local artifact store.
 - Leakage/embargo/gap/lifecycle reports are machine-readable and summarized in the stage report.
-- Stage 07 is allowed only for accepted `binance:futures` dataset branches.
+- Stage `07A` is allowed only for accepted `binance:futures` dataset branches, and Stage `07B` must use only the accepted Stage `06` dataset manifest.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.
