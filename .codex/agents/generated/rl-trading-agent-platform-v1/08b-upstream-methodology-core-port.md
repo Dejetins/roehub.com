@@ -1,5 +1,5 @@
 ---
-prompt_name: 07d-upstream-methodology-core-port
+prompt_name: 08b-upstream-methodology-core-port
 repo: roehub.com
 branch: main
 branch_policy:
@@ -18,7 +18,7 @@ context_sources:
       why: "RL plan and parity target"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger and current stage"
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07c-upstream-methodology-parity-audit.md
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
       why: "authoritative parity checklist"
   task_entrypoints:
     - path: src/trading/contexts/rl_trading/domain
@@ -42,7 +42,7 @@ context_sources:
         - test_agent.py
         - backtest_engine.py
         - utils.py
-      rule: "Use the same pinned source SHA recorded by Stage 07C."
+      rule: "Use the same pinned source SHA recorded by Stage 08A."
 hard_requirements:
   update_stage_ledger: true
   stage_report_file_manifest: true
@@ -74,9 +74,9 @@ target_envs:
 required_literals:
   - "roehub_d3qn_cnn_dueling_v1"
   - "upstream_methodology_parity"
-  - "07D"
+  - "08B"
 non_goals:
-  - "Do not run full HF or Roehub-native training in Stage 07D."
+  - "Do not run full HF or Roehub-native training in Stage 08B."
   - "Do not evaluate candidate quality or advance registry/promotion."
   - "Do not remove historical Stage 07A/07B artifacts; mark old MLP path smoke/debug only."
 quality_gates:
@@ -96,10 +96,10 @@ validation_strategy:
     - "upstream-compatible unit/golden tests"
     - "tiny environment-rollout training smoke"
     - "filtered backtest policy fixture"
-  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07d-upstream-methodology-core-port.md
+  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-upstream-methodology-core-port.md
 stage_execution_ledger:
   path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
-  current_stage: "07D"
+  current_stage: "08B"
   required_update: true
 expected_primary_touches:
   - "src/trading/contexts/rl_trading"
@@ -107,7 +107,7 @@ expected_primary_touches:
   - "apps/worker/rl_trading_trainer"
   - "tests/unit/contexts/rl_trading"
   - "tests/perf_smoke/contexts/rl_trading"
-  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07d-upstream-methodology-core-port.md"
+  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-upstream-methodology-core-port.md"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
 possible_secondary_touches:
   - "pyproject.toml"
@@ -121,16 +121,17 @@ safety_notes:
 
 # Task
 
-Implement Stage `07D` upstream-compatible RL core port.
+Implement Stage `08B` upstream-compatible RL core port.
 
-This stage changes the core methodology, but it must remain a small non-production port/smoke stage. Full trainings happen later in `07E` and `07F`.
+This stage changes the core methodology, but it must remain a small non-production port/smoke stage. Full trainings happen later in `08C` and `08E`.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: before any edits, read the ledger and verify Stage `07C` is `accepted` and `current_stage` allows Stage `07D`. If not true, write/update the Stage `07D` report as `blocked`, update the ledger, and stop.
+- Previous-stage ledger gate: before any edits, read the ledger and verify Stage `08A` is `accepted` and `current_stage` allows Stage `08B`. If not true, write/update the Stage `08B` report as `blocked`, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for this offline ML core stage. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
+- File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08B` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Compute and record this prompt hash.
 - Implement upstream-compatible components in Roehub style:
   - CNN dueling Q-network with dropout and target network support.
@@ -144,7 +145,7 @@ This stage changes the core methodology, but it must remain a small non-producti
 - Keep historical MLP/scripted-transition functions only as smoke/debug helpers; they must not be the candidate-training default.
 - Add focused golden tests using tiny synthetic fixtures and, where available, tiny HF-like session fixtures.
 - Run a bounded Mac Studio smoke only for core capability/resource evidence, not full training.
-- Write Stage `07D` report and update ledger. `07E` may start only if the port has complete parity fixtures and no candidate-quality claim.
+- Write Stage `08B` report and update ledger. `08C` may start only if the port has complete parity fixtures and no candidate-quality claim.
 
 ## Acceptance Criteria
 
@@ -156,4 +157,4 @@ This stage changes the core methodology, but it must remain a small non-producti
 
 ## Final Output
 
-Respond in Russian with result/status, file manifest, parity evidence, quality gates, contract impact, residual risks and `07E` handoff.
+Respond in Russian with result/status, file manifest, parity evidence, quality gates, contract impact, residual risks and `08C` handoff.

@@ -79,7 +79,7 @@ Current identity source of truth is not these product labels. Existing code expo
 - backend entitlement limits без billing/payment integration;
 - staged rollout до mainnet live с отдельным approval gate.
 
-Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, historical Stage `07A`/`07B`/`08` evidence, and new Stage `07E`/`08A`/`07F`/`08B` methodology-parity training/evaluation are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
+Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, historical Stage `07A`/`07B`/`08` evidence, and the new Stage `08A`-`08F` methodology-parity chain are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
 
 Не входит:
 
@@ -445,7 +445,7 @@ Required upstream parity surface:
 | Training loop | Episode-based rollout through `TradingEnvironment`; store transition after each step; `learn()` after replay warmup; save `best.pth` by validation mean PnL and `final.pth`. | Candidate training progress records episodes and environment steps. `best` checkpoint selected by validation metric is the evaluation default. |
 | Environment/reward | Actions `0 hold`, `1 long`, `2 short`, `3 close`; no pyramiding; last-step forced close; reward is realized PnL change divided by initial balance minus flat-hold inaction penalty. | Stage `02C` contract remains the money-boundary translation, but implementation fixtures must match upstream behavior step-for-step. |
 | Evaluation | Test-set episode evaluation loads train normalization stats, model checkpoint, and reports reward/PnL/win-rate distributions. | HF-original evaluation must first prove the upstream-like train/test lifecycle before Roehub-native training is considered valid. |
-| Backtest | Group sessions by signal timestamp, bound `max_parallel_sessions`, size by `position_fraction`, use Q-value cache, and filter weak actions by advantage thresholds or MC-dropout ensemble uncertainty. | Stage `08A`/`08B` must evaluate filtered decisions, action rejection counts, turnover, fees/slippage and full scorecard; raw argmax-only backtest is diagnostic, not acceptance. |
+| Backtest | Group sessions by signal timestamp, bound `max_parallel_sessions`, size by `position_fraction`, use Q-value cache, and filter weak actions by advantage thresholds or MC-dropout ensemble uncertainty. | Stage `08D`/`08F` must evaluate filtered decisions, action rejection counts, turnover, fees/slippage and full scorecard; raw argmax-only backtest is diagnostic, not acceptance. |
 | Hyperparameters | `configs/alpha.py` family: CNN maps `[32,64,128]`, kernels `[7,5,3]`, strides `[2,1,1]`, dense `[128,64]`, dropout `0.1`, `episodes=55_000`, `batch_size=16`, `learning_rate=1e-4`, `train_start=10_000`, PER capacity `230_000`, action-history length `3`, advantage thresholds from config. | Roehub default full-training config starts from upstream `alpha.py`. Any deviation must be recorded as an explicit adaptation with evidence, not as a silent default. |
 | Optuna/tuning | Backtest thresholds can be tuned through the upstream optimization path. | Tuning is allowed only after HF-original methodology parity is proven; tuned thresholds/calibration are versioned artifacts, not hard-coded magic constants. |
 
@@ -461,12 +461,12 @@ If `hf_original_full_training` fails to reproduce an internally coherent upstrea
 1. `dataset_version` создается из ClickHouse/artifacts с deterministic manifest, hashes, split policy и feature availability mask.
 2. Stage `07A` создает trainer/runtime capability smoke. После Stage `08` rejection этот stage остается техническим smoke, но не считается достаточным переносом upstream methodology.
 3. Stage `07B` historical run остается accepted как завершенный runtime experiment, но его candidate rejected/superseded after Stage `08`; он не может питать Stage `09`.
-4. Stage `07C` фиксирует upstream methodology parity matrix: source file/function map, gap list, tests to add, accepted deviations and license/attribution notes.
-5. Stage `07D` переносит upstream-compatible core into Roehub: CNN dueling model, environment rollout training loop, PER/epsilon/target sync/gradient clipping, train-only normalization, action-history state builder, best/final checkpoint policy, Q-value cache and filtered backtest policy.
-6. Stage `07E` выполняет full training on original HF dataset with the upstream-compatible config/methodology and writes `hf_original_candidate`.
-7. Stage `08A` evaluates `hf_original_candidate` on HF test/backtest splits with upstream-compatible test/backtest lifecycle. It blocks Roehub-native training if methodology parity fails.
-8. Stage `07F` выполняет full training on the accepted Roehub-native Stage `06` dataset using the same methodology and documented adaptations only.
-9. Stage `08B` evaluates `roehub_native_candidate` and decides whether a research candidate may move to Stage `09`.
+4. Stage `08A` фиксирует upstream methodology parity matrix: source file/function map, gap list, tests to add, accepted deviations and license/attribution notes.
+5. Stage `08B` переносит upstream-compatible core into Roehub: CNN dueling model, environment rollout training loop, PER/epsilon/target sync/gradient clipping, train-only normalization, action-history state builder, best/final checkpoint policy, Q-value cache and filtered backtest policy.
+6. Stage `08C` выполняет full training on original HF dataset with the upstream-compatible config/methodology and writes `hf_original_candidate`.
+7. Stage `08D` evaluates `hf_original_candidate` on HF test/backtest splits with upstream-compatible test/backtest lifecycle. It blocks Roehub-native training if methodology parity fails.
+8. Stage `08E` выполняет full training on the accepted Roehub-native Stage `06` dataset using the same methodology and documented adaptations only.
+9. Stage `08F` evaluates `roehub_native_candidate` and decides whether a research candidate may move to Stage `09`.
 10. `training_run` создает candidate model от frozen config. Для дообучения допустимы два режима:
    - `full_retrain`: полный replay на новом dataset_version;
    - `fine_tune`: продолжение от accepted champion checkpoint только если config/hash compatibility явно подтверждена.
@@ -504,13 +504,13 @@ Operator authority v1:
 
 ### Promotion scorecard
 
-Stage `08B`/`10A` не принимает candidate только по одному числу PnL. Historical Stage `08` is rejection evidence only.
+Stage `08F`/`10A` не принимает candidate только по одному числу PnL. Historical Stage `08` is rejection evidence only.
 
 V1 разделяет уровни допуска:
 
 | Level | Meaning | Gate |
 |---|---|---|
-| `research_candidate` | Модель может быть сохранена и анализироваться offline. | Stage `08B`: positive PnL after costs плюс полный scorecard и sanity baselines. Stage `08A` must first prove HF-original methodology parity. |
+| `research_candidate` | Модель может быть сохранена и анализироваться offline. | Stage `08F`: positive PnL after costs плюс полный scorecard и sanity baselines. Stage `08D` must first prove HF-original methodology parity. |
 | `promotion_grade_candidate` | Модель может идти в `monitor_only`/`paper`/`testnet` pipeline. | Stage `10A`: versioned numeric threshold profile approved by operator/admin confirmation. |
 | `live_candidate` | Модель может попасть в bounded mainnet canary. | Stage `19`: отдельный go/no-go review, incident drills, legal/product checklist and explicit approval. |
 
@@ -543,7 +543,7 @@ Mandatory scorecard fields:
 
 Sanity baselines не являются пользовательским benchmark и не меняют RL policy. Они нужны, чтобы поймать ошибки симулятора, reward shaping, feature leakage или backtest accounting.
 
-Stage `08A`/`08B` должны сохранять рядом с candidate evaluation:
+Stage `08D`/`08F` должны сохранять рядом с candidate evaluation:
 
 - `no_trade/hold` baseline;
 - random valid-action baseline with fixed seed;
@@ -558,10 +558,10 @@ RL backtest должен доказывать совместимость не т
 
 Required parity ladder:
 
-1. Stage `08A`/`08B` create deterministic decision-sequence fixtures: same candle window, same feature vectors, same model/action sequence for their candidate branch.
+1. Stage `08D`/`08F` create deterministic decision-sequence fixtures: same candle window, same feature vectors, same model/action sequence for their candidate branch.
 2. Offline simulator computes realized PnL, fees, slippage/funding and position transitions from that sequence.
 3. Roehub paper/execution accounting model replays the same accepted intents without exchange submit and reconciles within documented tolerance.
-4. Stage `15` completes paper parity by running the same or equivalent decision sequence through paper execution ledgers and comparing outcome to the accepted Stage `08B` simulator/accounting artifact.
+4. Stage `15` completes paper parity by running the same or equivalent decision sequence through paper execution ledgers and comparing outcome to the accepted Stage `08F` simulator/accounting artifact.
 
 If offline simulator outcome and paper/execution ledger accounting diverge beyond tolerance, the model cannot advance beyond research candidate regardless of PnL.
 
@@ -733,16 +733,16 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `07A` | D3QN/PER training runner smoke | Historical smoke stage: prove minimal trainer mechanics and Mac Studio optional-ML runtime. | `04`,`06` | accepted smoke evidence only; no full candidate or methodology-parity claim. |
 | `07B` | Historical full candidate training run | Historical run that produced the rejected Stage `08` candidate. Retained as evidence, not as the path to registry. | `07A`,`06` | completed candidate artifacts and progress evidence remain recorded, but the candidate is rejected/superseded after Stage `08`. |
 | `08` | Historical Roehub backtest/evaluation harness | Historical evaluation that rejected the Stage `07B` MLP/scripted-transition candidate. | `07B` | blocked evidence; no Stage `09` advancement. |
-| `07C` | Upstream methodology parity audit | Build a source-to-Roehub methodology matrix for the original repo/Habr method and define exact acceptance fixtures before new implementation. | `08` blocked evidence, `04`, `06` | source file/function map, parity checklist, gap list, accepted deviations, license/attribution note, exact prompts/expected files for `07D`-`08B`; no training. |
-| `07D` | Upstream-compatible RL core port | Port the original methodology into Roehub: CNN dueling D3QN, environment rollout training loop, PER/epsilon/target sync/gradient clipping, train-only normalization, action-history state, checkpoint selection, Q-value cache, filtered backtest policies. | `07C` | upstream-compatible unit/golden tests, HF fixture parity, Stage `02C` reward compatibility, no scripted-transition candidate path, MLP marked smoke/debug only. |
-| `07E` | Original HF full training run | Train `hf_original_candidate` on the external HF original dataset splits using the upstream-compatible `alpha.py`-family config and Roehub artifact/progress conventions. | `07D`, `04` | completed HF candidate with `best` and `final` checkpoints, episode/step progress, validation curves, normalization stats from train only, resource evidence and hashes. |
-| `08A` | Original HF evaluation/backtest | Evaluate `hf_original_candidate` with upstream-compatible test and backtest lifecycle before any Roehub-native candidate is trusted. | `07E` | HF test metrics, realistic grouped backtest, action filter statistics, sanity baselines, scorecard, methodology-parity verdict. Failure blocks `07F`. |
-| `07F` | Roehub-native full training run | Train `roehub_native_candidate` on accepted Stage `06` Roehub-native Binance Futures dataset with the same methodology and only documented adaptations. | `08A`, `06` | completed Roehub-native candidate with full lineage, progress, best/final checkpoints, train-only stats, resource evidence, and explicit adaptation diff from HF-original branch. |
-| `08B` | Roehub-native evaluation/backtest | Evaluate `roehub_native_candidate` with the same filtered backtest lifecycle, Roehub costs/scorecard, and sanity baselines. | `07F` | research candidate may be accepted only with positive PnL after costs, scorecard, sanity baseline artifacts, drawdown/stability/action-filter report, simulator/accounting parity fixture, and methodology-parity evidence; promotion-grade not granted here. |
-| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | `08B` accepted research candidate | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
+| `08A` | Upstream methodology parity audit | Build a source-to-Roehub methodology matrix for the original repo/Habr method and define exact acceptance fixtures before new implementation. | `08` blocked evidence, `04`, `06` | source file/function map, parity checklist, gap list, accepted deviations, license/attribution note, exact prompts/expected files for `08B`-`08F`; no training. |
+| `08B` | Upstream-compatible RL core port | Port the original methodology into Roehub: CNN dueling D3QN, environment rollout training loop, PER/epsilon/target sync/gradient clipping, train-only normalization, action-history state, checkpoint selection, Q-value cache, filtered backtest policies. | `08A` | upstream-compatible unit/golden tests, HF fixture parity, Stage `02C` reward compatibility, no scripted-transition candidate path, MLP marked smoke/debug only. |
+| `08C` | Original HF full training run | Train `hf_original_candidate` on the external HF original dataset splits using the upstream-compatible `alpha.py`-family config and Roehub artifact/progress conventions. | `08B`, `04` | completed HF candidate with `best` and `final` checkpoints, episode/step progress, validation curves, normalization stats from train only, resource evidence and hashes. |
+| `08D` | Original HF evaluation/backtest | Evaluate `hf_original_candidate` with upstream-compatible test and backtest lifecycle before any Roehub-native candidate is trusted. | `08C` | HF test metrics, realistic grouped backtest, action filter statistics, sanity baselines, scorecard, methodology-parity verdict. Failure blocks `08E`. |
+| `08E` | Roehub-native full training run | Train `roehub_native_candidate` on accepted Stage `06` Roehub-native Binance Futures dataset with the same methodology and only documented adaptations. | `08D`, `06` | completed Roehub-native candidate with full lineage, progress, best/final checkpoints, train-only stats, resource evidence, and explicit adaptation diff from HF-original branch. |
+| `08F` | Roehub-native evaluation/backtest | Evaluate `roehub_native_candidate` with the same filtered backtest lifecycle, Roehub costs/scorecard, and sanity baselines. | `08E` | research candidate may be accepted only with positive PnL after costs, scorecard, sanity baseline artifacts, drawdown/stability/action-filter report, simulator/accounting parity fixture, and methodology-parity evidence; promotion-grade not granted here. |
+| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | `08F` accepted research candidate | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
 | `09B` | Local artifact backup and restore drill | Backup accepted champion/calibration/source manifests/registry metadata locally and prove restore/rollback drill before runtime activation. | `09` | backup manifest, registry metadata dump, restore to separate path, hash validation after restore, rollback to previous accepted champion; residual single-host disk risk recorded. |
-| `10` | Per-ticker calibration | Create per-ticker/per-market calibration thresholds, weights, or heads. | `08B`,`09B` | calibration report per ticker, no global-only threshold activation unless accepted. |
-| `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | `08B`,`09B`,`10` | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
+| `10` | Per-ticker calibration | Create per-ticker/per-market calibration thresholds, weights, or heads. | `08F`,`09B` | calibration report per ticker, no global-only threshold activation unless accepted. |
+| `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | `08F`,`09B`,`10` | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
 | `11` | RL tab UI skeleton | Add `/strategies` RL/ML tab for model status, ticker slots, modes, risk config and authorized operator controls for retraining/rollback actions; extend the reusable strategy signal/outcome read model instead of creating an RL-only signal panel. | `09B`,`10A` | browser QA, API read models, authorized rollback UI control test, delivery-neutral signal/outcome read model, no live side effects. |
 | `12` | Backend entitlements | Enforce active live ticker quotas from current `paid_level` (`base/free/pro/ultra`) plus optional RL override for Enterprise/custom. | `11` | transactional quota tests, UI blocked reason, audit rows, unknown/ambiguous level fail-closed tests. |
 | `13` | Monitor-only inference producer | Supervised inference producer emits `ml_agent_decision` source events with `no_intent` and proves train/live feature parity. | `10`,`10A`,`11`,`12` | Monit/Prometheus, Redis/canonical feed with ClickHouse repair only on gaps, DB source events, Redis/live vs offline golden feature parity, common UI signal/outcome journal for `source_type=ml_agent_decision`. |
@@ -774,12 +774,12 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `07A` | Historical trainer smoke artifacts and CPU/MPS/RSS report; smoke/debug only after Stage `08` rejection. |
 | `07B` | Historical rejected candidate training command/job, checkpoint/report artifacts, durable `progress.jsonl`, training curves and manifest; retained as rejected evidence, not reusable for registry. |
 | `08` | Historical blocked evaluation report and runtime artifacts proving the Stage `07B` candidate failed research-save gates. |
-| `07C` | Upstream methodology parity report, source file/function matrix, Roehub gap list, accepted-deviation register, license/attribution note, fixture inventory, and updated prompt handoff for `07D`-`08B`. |
-| `07D` | Upstream-compatible Roehub core implementation: CNN dueling D3QN, environment rollout trainer, PER/epsilon/target-sync/gradient-clipping, train-only normalization, action-history state builder, best/final checkpoint selection, Q-value cache, advantage/ensemble filtered backtest policies, parity fixtures/tests. |
-| `07E` | HF-original full training command/job, `hf_original_candidate` best/final checkpoints, train normalization stats, episode/step `progress.jsonl`, validation curves, resource report and manifest under `/opt/roehub/state/rl_trading/`. |
-| `08A` | HF-original test/backtest evaluation report, grouped backtest scorecards, action-filter/rejection stats, sanity baselines, comparison against upstream expected behavior, and block/pass methodology-parity verdict. |
-| `07F` | Roehub-native full training command/job, `roehub_native_candidate` best/final checkpoints, Stage `06` lineage, adaptation diff from HF branch, progress/resource evidence and manifest. |
-| `08B` | Roehub-native evaluation/backtest report, Roehub cost/funding policy notes, sanity baselines, simulator/accounting parity fixture, stability/action-filter scorecard and research candidate decision for Stage `09`. |
+| `08A` | Upstream methodology parity report, source file/function matrix, Roehub gap list, accepted-deviation register, license/attribution note, fixture inventory, and updated prompt handoff for `08B`-`08F`. |
+| `08B` | Upstream-compatible Roehub core implementation: CNN dueling D3QN, environment rollout trainer, PER/epsilon/target-sync/gradient-clipping, train-only normalization, action-history state builder, best/final checkpoint selection, Q-value cache, advantage/ensemble filtered backtest policies, parity fixtures/tests. |
+| `08C` | HF-original full training command/job, `hf_original_candidate` best/final checkpoints, train normalization stats, episode/step `progress.jsonl`, validation curves, resource report and manifest under `/opt/roehub/state/rl_trading/`. |
+| `08D` | HF-original test/backtest evaluation report, grouped backtest scorecards, action-filter/rejection stats, sanity baselines, comparison against upstream expected behavior, and block/pass methodology-parity verdict. |
+| `08E` | Roehub-native full training command/job, `roehub_native_candidate` best/final checkpoints, Stage `06` lineage, adaptation diff from HF branch, progress/resource evidence and manifest. |
+| `08F` | Roehub-native evaluation/backtest report, Roehub cost/funding policy notes, sanity baselines, simulator/accounting parity fixture, stability/action-filter scorecard and research candidate decision for Stage `09`. |
 | `09`-`10A` | Registry state machine/metadata, artifact retention/quota controls, checkpoint security, calibration/promotion artifacts, host-local rollback command/runbook, tests, metrics reports. |
 | `09B` | Local backup path, backup manifest, registry metadata dump, restore drill report and rollback evidence. |
 | `11`-`12` | API DTO/routes/read models, UI tab assets/locales, server-side operator/admin guard for model action controls, entitlement use cases/migrations/tests. |
@@ -855,12 +855,12 @@ Prompt-pack readiness on 2026-06-17: `.codex/agents/generated/rl-trading-agent-p
 | Bybit lacks `trades_count` in current canonical rows | Bybit is `blocked_not_training_source_v1`; no Bybit enrich/feature-mask training branch is planned in the current cycle. A later accepted plan may reopen this. |
 | Classic strategy producer Stage `05` is blocked | RL data/model/UI/monitor-only work may proceed, but RL paper/testnet/live stages depend on classic Stage `05` repair and accepted classic Stage `07`/`09`. |
 | External repo is demo, not production module | Treat as research input with attribution, but fully port the methodology before claiming candidate quality. Generic D3QN/PER is insufficient after Stage `08`; the required parity surface is CNN dueling architecture, environment rollout, train-only normalization, epsilon/PER training, validation-selected checkpoint, Q-value cache and filtered backtest. |
-| Historical Stage `07B` candidate failed Stage `08` | Keep the candidate as rejected/superseded evidence. Do not register, promote, activate, paper/testnet/live trade, or use it as the baseline for Stage `09`; run `07C`-`08B` first. |
-| Positive backtest alone is not production promotion | Stage `08B` accepts only research candidates; Stage `10A` requires numeric promotion-grade threshold profile before paper/testnet/live progression. |
-| MPS support may be incomplete for chosen ops | Stage `03`/`07A`/`07D`/`07E`/`07F` benchmark CPU vs MPS where relevant and define accepted fallback. |
-| Futures funding/contract metadata may be incomplete | Stage `02B` must define Binance Futures funding, mark/index, filters, leverage tiers and explicitly block or mark the `binance:futures` training/evaluation branch as `research_only_approximation` before Stage `05`/`08B`. |
+| Historical Stage `07B` candidate failed Stage `08` | Keep the candidate as rejected/superseded evidence. Do not register, promote, activate, paper/testnet/live trade, or use it as the baseline for Stage `09`; run `08A`-`08F` first. |
+| Positive backtest alone is not production promotion | Stage `08F` accepts only research candidates; Stage `10A` requires numeric promotion-grade threshold profile before paper/testnet/live progression. |
+| MPS support may be incomplete for chosen ops | Stage `03`/`07A`/`08B`/`08C`/`08E` benchmark CPU vs MPS where relevant and define accepted fallback. |
+| Futures funding/contract metadata may be incomplete | Stage `02B` must define Binance Futures funding, mark/index, filters, leverage tiers and explicitly block or mark the `binance:futures` training/evaluation branch as `research_only_approximation` before Stage `05`/`08F`. |
 | Retraining can silently change live behavior | Stage `10A` requires candidate/champion gates, no auto-activation, rollback manifest and drift-triggered retraining task instead of in-place live mutation. |
-| Action/reward semantics can drift from external repo | Stage `02C` records Roehub action/state/reward contract, Stage `07D` must reconcile it against the upstream environment contract, and Stage `07E`/`07F` must reuse the accepted fixtures before full candidate training acceptance. |
+| Action/reward semantics can drift from external repo | Stage `02C` records Roehub action/state/reward contract, Stage `08B` must reconcile it against the upstream environment contract, and Stage `08C`/`08E` must reuse the accepted fixtures before full candidate training acceptance. |
 | Train/live features can diverge | Stage `05`/`13` require golden feature parity fixtures and shared feature builder contract before monitor/paper/testnet activation. |
 | Overlapping sessions can leak across splits | Overlap is allowed only inside a split; Stage `06` must prove time embargo and lifecycle-aware split boundaries. |
 | Local artifacts remain single-host risk | Stage `09B` must add local backup/restore drill; Stage `19`/`21` must either prove backup path is sufficient or explicitly accept residual single-host disk risk. |

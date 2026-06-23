@@ -38,7 +38,7 @@ Out of scope:
 
 Stage `08` отвечает на один практический вопрос: можно ли сохранять исследовательскую модель Stage `07B` как кандидат для следующих registry/promotion stages. Ответ по текущим данным отрицательный. На held-out sessions модель теряет деньги после комиссий и slippage, не обгоняет базовый вариант `hold`/`no_trade`, а training/evaluation metrics показывают признаки переобучения. Поэтому результат Stage `08` намеренно блокирующий: следующий stage не должен регистрировать, продвигать или подключать эту модель к paper/testnet/live execution.
 
-После review 2026-06-24 этот blocker трактуется шире, чем плохой seed/config. Stage `07B` candidate не считается полным переносом methodology из `YuriyKolesnikov/rl-trading-binance`: он использовал Roehub MLP-D3QN, offline scripted transitions и raw argmax evaluation вместо upstream CNN dueling model, environment-rollout training, epsilon-greedy/PER lifecycle, train-only normalization, validation-selected checkpoint and filtered backtest. Поэтому следующий допустимый путь не повторяет Stage `07B`; он начинается с corrective Stage `07C` methodology parity audit, затем `07D` core port, `07E` HF-original training, `08A` HF evaluation, `07F` Roehub-native training and `08B` Roehub-native evaluation.
+После review 2026-06-24 этот blocker трактуется шире, чем плохой seed/config. Stage `07B` candidate не считается полным переносом methodology из `YuriyKolesnikov/rl-trading-binance`: он использовал Roehub MLP-D3QN, offline scripted transitions и raw argmax evaluation вместо upstream CNN dueling model, environment-rollout training, epsilon-greedy/PER lifecycle, train-only normalization, validation-selected checkpoint and filtered backtest. Поэтому следующий допустимый путь не повторяет Stage `07B`; он начинается с corrective Stage `08A` methodology parity audit, затем `08B` core port, `08C` HF-original training, `08D` HF evaluation, `08E` Roehub-native training and `08F` Roehub-native evaluation.
 
 ## File Manifest
 
@@ -234,6 +234,6 @@ Final classification:
 
 Stage `09` is not allowed. Do not register, promote, activate, paper trade, testnet trade, live trade, or mainnet submit this candidate.
 
-This report is now historical rejection evidence. The next active prompt is `.codex/agents/generated/rl-trading-agent-platform-v1/07c-upstream-methodology-parity-audit.md`.
+This report is now historical rejection evidence. The next active prompt is `.codex/agents/generated/rl-trading-agent-platform-v1/08a-upstream-methodology-parity-audit.md`.
 
-Do not rerun historical Stage `08` or repair Stage `07B` as the active path unless the user explicitly asks to reproduce the rejection evidence. The corrective path is Stage `07C -> 07D -> 07E -> 08A -> 07F -> 08B`; Stage `09` remains blocked until Stage `08B` accepts a Roehub-native research candidate. Preserve the completed Stage `08` artifact paths/hashes above as the rejection evidence.
+Do not rerun historical Stage `08` or repair Stage `07B` as the active path unless the user explicitly asks to reproduce the rejection evidence. The corrective path is Stage `08A -> 08B -> 08C -> 08D -> 08E -> 08F`; Stage `09` remains blocked until Stage `08F` accepts a Roehub-native research candidate. Preserve the completed Stage `08` artifact paths/hashes above as the rejection evidence.

@@ -101,11 +101,11 @@ required_literals:
   - "/opt/roehub/state/rl_trading/"
   - "ml_agent_decision"
 superseded_notice:
-  status: "superseded_by_08A_and_08B"
-  reason: "The old Stage 08 evaluation is blocked evidence for the non-parity 07B candidate; new evaluations must use 08A for original HF and 08B for Roehub-native."
-  current_next_prompt: ".codex/agents/generated/rl-trading-agent-platform-v1/07c-upstream-methodology-parity-audit.md"
+  status: "superseded_by_08D_and_08F"
+  reason: "The old Stage 08 evaluation is blocked evidence for the non-parity 07B candidate; new evaluations must use 08D for original HF and 08F for Roehub-native."
+  current_next_prompt: ".codex/agents/generated/rl-trading-agent-platform-v1/08a-upstream-methodology-parity-audit.md"
 non_goals:
-  - "Do not use this prompt as the next active stage while the ledger current_stage is 07C or later."
+  - "Do not use this prompt as the next active stage while the ledger current_stage is 08A or later."
   - "Do not train user-owned custom models."
   - "Do not add cloud/S3/model hosting."
   - "Do not bypass live_execution or exchange-execution."
@@ -159,7 +159,7 @@ safety_notes:
   - "Runtime ML artifacts live under /opt/roehub/state/rl_trading/ and are not committed to git."
   - "Mac Studio git commands must use /Users/daniildegtyarev/Projects/roehub.com; /opt/roehub/app is runtime state only."
   - "ML trainer/inference code must not call exchange SDKs or resolve exchange secrets directly."
-  - "Previous-stage ledger gate: read docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md before any work and stop unless the ledger explicitly permits this superseded Stage 08 path; when current_stage is 07C or later, report blocked/no-op and point to 07C."
+  - "Previous-stage ledger gate: read docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md before any work and stop unless the ledger explicitly permits this superseded Stage 08 path; when current_stage is 08A or later, report blocked/no-op and point to 08A."
   - "File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the stage report and ledger update; any path outside expected_primary_touches/possible_secondary_touches requires an explicit manifest justification."
   - "Browser/auth is N/A for this offline evaluation stage. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD` unless a later browser-visible task explicitly requires it; never print or persist that secret."
   - "Credential redaction rule: never print, persist, screenshot, trace, or commit `ROEHUB_SMOKE_E2E_PASSWORD`, cookies, tokens, exchange credentials, signed requests, or secret-bearing provider payloads."
@@ -167,7 +167,7 @@ safety_notes:
 
 # Task
 
-Superseded prompt guard: this file is retained only to preserve the historical Stage `08` task body and rejection trail. Before doing any implementation, apply `superseded_notice` and the ledger gate above. If the ledger `current_stage` is `07C` or later, do not execute this task body; report a blocked/no-op result and point the operator to `07c-upstream-methodology-parity-audit.md`.
+Superseded prompt guard: this file is retained only to preserve the historical Stage `08` task body and rejection trail. Before doing any implementation, apply `superseded_notice` and the ledger gate above. If the ledger `current_stage` is `08A` or later, do not execute this task body; report a blocked/no-op result and point the operator to `08a-upstream-methodology-parity-audit.md`.
 
 Implement Stage 08 Roehub backtest/evaluation harness. Evaluate model decisions with fees, slippage, funding where available, drawdown, stability, trade counts, sanity baselines, and simulator/accounting parity. Stage 08 may accept only a research candidate, not production promotion.
 

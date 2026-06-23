@@ -1,5 +1,5 @@
 ---
-prompt_name: 07c-upstream-methodology-parity-audit
+prompt_name: 08a-upstream-methodology-parity-audit
 repo: roehub.com
 branch: main
 branch_policy:
@@ -76,7 +76,7 @@ target_envs:
   - "read-only external source clone or GitHub source read"
 required_literals:
   - "rl-trading-agent-platform-v1"
-  - "07C"
+  - "08A"
   - "methodology_parity_not_yet_ported"
 non_goals:
   - "Do not implement the upstream core in this stage."
@@ -93,21 +93,21 @@ validation_strategy:
     - "source-to-Roehub parity matrix"
     - "explicit downstream stage/prompt checklist"
     - "ledger current_stage handoff"
-  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07c-upstream-methodology-parity-audit.md
+  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
 stage_execution_ledger:
   path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
   plan_doc: docs/architecture/ml/rl-trading-agent-platform-v1.md
-  current_stage: "07C"
+  current_stage: "08A"
   required_update: true
 expected_primary_touches:
   - "docs/architecture/ml/rl-trading-agent-platform-v1.md"
-  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07c-upstream-methodology-parity-audit.md"
+  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
-  - ".codex/agents/generated/rl-trading-agent-platform-v1/07d-upstream-methodology-core-port.md"
-  - ".codex/agents/generated/rl-trading-agent-platform-v1/07e-original-hf-full-training-run.md"
-  - ".codex/agents/generated/rl-trading-agent-platform-v1/08a-original-hf-backtest-evaluation.md"
-  - ".codex/agents/generated/rl-trading-agent-platform-v1/07f-roehub-native-full-training-run.md"
-  - ".codex/agents/generated/rl-trading-agent-platform-v1/08b-roehub-native-backtest-evaluation.md"
+  - ".codex/agents/generated/rl-trading-agent-platform-v1/08b-upstream-methodology-core-port.md"
+  - ".codex/agents/generated/rl-trading-agent-platform-v1/08c-original-hf-full-training-run.md"
+  - ".codex/agents/generated/rl-trading-agent-platform-v1/08d-original-hf-backtest-evaluation.md"
+  - ".codex/agents/generated/rl-trading-agent-platform-v1/08e-roehub-native-full-training-run.md"
+  - ".codex/agents/generated/rl-trading-agent-platform-v1/08f-roehub-native-backtest-evaluation.md"
   - ".codex/agents/generated/rl-trading-agent-platform-v1/09-model-registry-activation.md"
   - ".codex/agents/generated/rl-trading-agent-platform-v1/10-per-ticker-calibration.md"
   - ".codex/agents/generated/rl-trading-agent-platform-v1/10a-retraining-promotion-lifecycle.md"
@@ -123,23 +123,23 @@ safety_notes:
 
 # Task
 
-Implement Stage `07C` upstream methodology parity audit.
+Implement Stage `08A` upstream methodology parity audit.
 
 The Stage `08` result proved that the historical Stage `07B` candidate is not good enough and is not a full methodology port. This stage must freeze exactly what "fully port the original methodology" means before implementation resumes.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: before any edits, read the ledger and verify Stage `08` is `blocked` with rejected-candidate evidence and `current_stage` allows corrective Stage `07C`. If not true, write/update the Stage `07C` report as `blocked`, update the ledger, and stop.
+- Previous-stage ledger gate: before any edits, read the ledger and verify Stage `08` is `blocked` with rejected-candidate evidence and `current_stage` allows corrective Stage `08A`. If not true, write/update the Stage `08A` report as `blocked`, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for this docs/review stage. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
-- Compute and record this prompt hash: `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/07c-upstream-methodology-parity-audit.md`.
-- File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `07C` report and ledger update; any prompt file outside the exact primary/secondary touch lists above requires explicit outside-manifest justification and must not be changed speculatively.
+- Compute and record this prompt hash: `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/08a-upstream-methodology-parity-audit.md`.
+- File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08A` report and ledger update; any prompt file outside the exact primary/secondary touch lists above requires explicit outside-manifest justification and must not be changed speculatively.
 - Read the upstream repo files listed in front matter from a pinned commit or record the observed clone/source SHA. Repo source is stronger than README/Habr when there is conflict.
-- Produce `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07c-upstream-methodology-parity-audit.md`.
+- Produce `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md`.
 - Update the plan and ledger only where they need to reflect the frozen parity contract and next-stage handoff.
 - Update downstream prompts if the parity audit finds missing instructions.
-- Do not implement code, run training, or evaluate new candidates in `07C`.
+- Do not implement code, run training, or evaluate new candidates in `08A`.
 
 ## Required Methodology Matrix
 
@@ -158,10 +158,10 @@ The report must map each upstream component to Roehub implementation requirement
 
 ## Acceptance Criteria
 
-- Stage `07C` report exists with prompt hash, upstream source SHA/URL, parity matrix, gap list, accepted deviations, and downstream checklist.
+- Stage `08A` report exists with prompt hash, upstream source SHA/URL, parity matrix, gap list, accepted deviations, and downstream checklist.
 - The report explicitly states that MLP-D3QN, offline scripted transitions and raw argmax-only evaluation are not accepted for candidate quality.
-- Ledger current stage advances to `07D` only if the parity matrix is complete and downstream prompts have exact implementation requirements.
-- Stage `09` remains blocked until `08B` is accepted.
+- Ledger current stage advances to `08B` only if the parity matrix is complete and downstream prompts have exact implementation requirements.
+- Stage `09` remains blocked until `08F` is accepted.
 
 ## Final Output
 

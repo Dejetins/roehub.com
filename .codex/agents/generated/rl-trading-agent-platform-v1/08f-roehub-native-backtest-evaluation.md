@@ -1,5 +1,5 @@
 ---
-prompt_name: 08b-roehub-native-backtest-evaluation
+prompt_name: 08f-roehub-native-backtest-evaluation
 repo: roehub.com
 branch: main
 branch_policy:
@@ -18,9 +18,9 @@ context_sources:
       why: "RL plan"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger"
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07f-roehub-native-full-training-run.md
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08e-roehub-native-full-training-run.md
       why: "Roehub-native candidate manifest and hashes"
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-original-hf-backtest-evaluation.md
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
       why: "HF methodology-parity baseline"
   task_entrypoints:
     - path: src/trading/contexts/rl_trading
@@ -53,9 +53,9 @@ target_envs:
   - "macstudio for Roehub-native evaluation/backtest"
 required_literals:
   - "roehub_native_candidate"
-  - "08B"
+  - "08F"
 non_goals:
-  - "Do not train a new model in Stage 08B."
+  - "Do not train a new model in Stage 08F."
   - "Do not register, promote, activate, paper/testnet/live trade, or mainnet submit."
 quality_gates:
   - cmd: "uv run ruff check src/trading/contexts/rl_trading apps tests"
@@ -74,17 +74,17 @@ validation_strategy:
     - "Roehub-native held-out evaluation"
     - "Roehub-native grouped backtest with action filters"
     - "sanity baselines, simulator/accounting parity and research candidate decision"
-  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-roehub-native-backtest-evaluation.md
+  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md
 stage_execution_ledger:
   path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
-  current_stage: "08B"
+  current_stage: "08F"
   required_update: true
 expected_primary_touches:
   - "src/trading/contexts/rl_trading"
   - "scripts/rl_trading"
   - "tests/unit/contexts/rl_trading"
   - "tests/perf_smoke/contexts/rl_trading"
-  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-roehub-native-backtest-evaluation.md"
+  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
 possible_secondary_touches:
   - "docs/architecture/ml/rl-trading-agent-platform-v1.md"
@@ -93,19 +93,20 @@ possible_secondary_touches:
 
 # Task
 
-Implement Stage `08B` Roehub-native evaluation/backtest.
+Implement Stage `08F` Roehub-native evaluation/backtest.
 
-This is the new research-save gate for the platform. Stage `09` remains blocked unless `08B` accepts a Roehub-native research candidate.
+This is the new research-save gate for the platform. Stage `09` remains blocked unless `08F` accepts a Roehub-native research candidate.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: before any edits or evaluation launch, read the ledger and verify Stage `07F` is `accepted`, provides `roehub_native_candidate`, and `current_stage` allows Stage `08B`. If not true, write/update the Stage `08B` report as `blocked`, update the ledger, and stop.
+- Previous-stage ledger gate: before any edits or evaluation launch, read the ledger and verify Stage `08E` is `accepted`, provides `roehub_native_candidate`, and `current_stage` allows Stage `08F`. If not true, write/update the Stage `08F` report as `blocked`, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for this offline evaluation stage. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
+- File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08F` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Evaluate `best` checkpoint by default and use train-only normalization stats.
 - Evaluate held-out test/backtest splits from the accepted Stage `06` dataset. Do not evaluate train split as acceptance.
-- Use the same upstream-compatible filtered backtest lifecycle as `08A`: grouped signals, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage/ensemble filters, action rejection counts, fees/slippage/funding policy.
+- Use the same upstream-compatible filtered backtest lifecycle as `08D`: grouped signals, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage/ensemble filters, action rejection counts, fees/slippage/funding policy.
 - Run sanity baselines: hold/no-trade, deterministic random, simple threshold and any accepted HF baseline diagnostics.
 - Include simulator/accounting parity fixture and make divergence a blocker.
 - Candidate may be saved as `research_candidate` only if net PnL after costs is positive and scorecard/sanity/overfit checks do not block.
@@ -115,7 +116,7 @@ This is the new research-save gate for the platform. Stage `09` remains blocked 
 
 - Stage report records scorecard by split/ticker/month/volatility bucket, trade count, action distribution, skipped/rejected actions, drawdown, stability, overfit warnings, latency/resource notes and cost/funding policy.
 - Evaluation artifacts are written under `/opt/roehub/state/rl_trading/` with hashes only in docs.
-- Ledger advances to `09` only if `08B` is accepted. Otherwise it remains blocked with exact repair instructions.
+- Ledger advances to `09` only if `08F` is accepted. Otherwise it remains blocked with exact repair instructions.
 
 ## Final Output
 

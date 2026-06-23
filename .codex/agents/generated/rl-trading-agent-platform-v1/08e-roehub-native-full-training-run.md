@@ -1,5 +1,5 @@
 ---
-prompt_name: 07f-roehub-native-full-training-run
+prompt_name: 08e-roehub-native-full-training-run
 repo: roehub.com
 branch: main
 branch_policy:
@@ -18,7 +18,7 @@ context_sources:
       why: "RL plan"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger"
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-original-hf-backtest-evaluation.md
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
       why: "accepted HF methodology-parity gate"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md
       why: "accepted Roehub-native dataset manifest"
@@ -54,10 +54,10 @@ target_envs:
 required_literals:
   - "roehub_native_candidate"
   - "/opt/roehub/state/rl_trading/"
-  - "07F"
+  - "08E"
 non_goals:
-  - "Do not train on the HF original dataset in Stage 07F."
-  - "Do not run Stage 08B evaluation inside Stage 07F."
+  - "Do not train on the HF original dataset in Stage 08E."
+  - "Do not run Stage 08F evaluation inside Stage 08E."
   - "Do not register, promote, activate, paper/testnet/live trade, or mainnet submit."
 quality_gates:
   - cmd: "uv run ruff check src/trading/contexts/rl_trading apps tests"
@@ -76,10 +76,10 @@ validation_strategy:
     - "completed full Roehub-native training run"
     - "best/final checkpoint hashes"
     - "episode/step progress and resource evidence"
-  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07f-roehub-native-full-training-run.md
+  evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08e-roehub-native-full-training-run.md
 stage_execution_ledger:
   path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
-  current_stage: "07F"
+  current_stage: "08E"
   required_update: true
 expected_primary_touches:
   - "src/trading/contexts/rl_trading"
@@ -87,7 +87,7 @@ expected_primary_touches:
   - "apps/worker/rl_trading_trainer"
   - "tests/unit/contexts/rl_trading"
   - "tests/perf_smoke/contexts/rl_trading"
-  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/07f-roehub-native-full-training-run.md"
+  - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08e-roehub-native-full-training-run.md"
   - "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
 possible_secondary_touches:
   - "configs/dev"
@@ -98,30 +98,31 @@ possible_secondary_touches:
 
 # Task
 
-Implement Stage `07F` Roehub-native full training run.
+Implement Stage `08E` Roehub-native full training run.
 
 Train the upstream-compatible Roehub agent on the accepted Stage `06` Roehub-native Binance Futures dataset. This is the platform-quality training branch after HF methodology parity has been accepted.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: before any edits or training launch, read the ledger and verify Stage `08A` is `accepted`, Stage `06` is `accepted`, and `current_stage` allows Stage `07F`. If not true, write/update the Stage `07F` report as `blocked`, update the ledger, and stop.
+- Previous-stage ledger gate: before any edits or training launch, read the ledger and verify Stage `08D` is `accepted`, Stage `06` is `accepted`, and `current_stage` allows Stage `08E`. If not true, write/update the Stage `08E` report as `blocked`, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for this offline training stage. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
+- File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08E` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Use accepted Stage `06` sessionized dataset only; do not use six-symbol fallback, old 215-symbol subset, or external HF data.
-- Use the same methodology/config family as `07E`; any adaptation for dataset size, symbol count, train/val split, cost policy or resource budget must be listed in an adaptation diff.
+- Use the same methodology/config family as `08C`; any adaptation for dataset size, symbol count, train/val split, cost policy or resource budget must be listed in an adaptation diff.
 - Progress must be durable and episode/environment-step based.
-- If full training cannot complete in the active session, launch only through a managed resumable/background path, prove a fresh `running` event and leave Stage `07F` `in_progress`. Do not mark accepted until full training completes.
+- If full training cannot complete in the active session, launch only through a managed resumable/background path, prove a fresh `running` event and leave Stage `08E` `in_progress`. Do not mark accepted until full training completes.
 - On completion, write `roehub_native_candidate` manifest with Stage `06` dataset hash, config hash, code state, train-only normalization stats hash, `best` checkpoint hash, `final` checkpoint hash, validation curves, resource metrics and progress hash.
-- Do not evaluate candidate quality here; Stage `08B` owns evaluation.
+- Do not evaluate candidate quality here; Stage `08F` owns evaluation.
 
 ## Acceptance Criteria
 
 - Completed full Roehub-native training manifest exists under `/opt/roehub/state/rl_trading/`.
 - Candidate path uses environment rollout and validation-selected `best` checkpoint.
 - Stage report includes adaptation diff from `hf_original_candidate` training.
-- Ledger advances to `08B` only after completed `roehub_native_candidate` evidence.
+- Ledger advances to `08F` only after completed `roehub_native_candidate` evidence.
 
 ## Final Output
 
-Respond in Russian with result/status, file manifest, training evidence, adaptation diff, progress/resource evidence, gates, residual risks and `08B` handoff.
+Respond in Russian with result/status, file manifest, training evidence, adaptation diff, progress/resource evidence, gates, residual risks and `08F` handoff.

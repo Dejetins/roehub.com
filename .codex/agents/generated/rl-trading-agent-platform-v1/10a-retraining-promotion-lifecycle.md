@@ -21,7 +21,7 @@ context_sources:
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "optional compact state; ignore if unrelated"
   task_entrypoints:
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-roehub-native-backtest-evaluation.md
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md
       why: "accepted Roehub-native research candidate and scorecard"
       inspect_symbols:
         - "research candidate decision"
@@ -213,7 +213,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `08B`, Stage `09B`, Stage `10`. Historical Stage `08` is rejected evidence and is not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `08F`, Stage `09B`, Stage `10`. Historical Stage `08` is rejected evidence and is not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for Stage `10A` unless this prompt is explicitly expanded into browser-visible operator controls. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/10a-retraining-promotion-lifecycle.md` and record the prompt path and hash in the stage report.
