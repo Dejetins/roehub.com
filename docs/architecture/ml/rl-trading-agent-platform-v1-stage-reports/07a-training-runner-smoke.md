@@ -79,7 +79,7 @@ Outside expected paths: none.
 | Required prerequisites | Stage `04` accepted; Stage `06` accepted |
 | Stage `06` input manifest | `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1/stage06_sessionized_manifest.json` |
 | Stage `06` input manifest sha256 | `61995c61228705090a9cd5d868776c14435ae421bdf35677a7f5c654af71ac08` |
-| Delivery state | `local-only-with-target_host_non_production_sample_pre_main`; not committed, not pushed, not delivered to `origin/main`, no `/opt/roehub/app` deploy |
+| Delivery state | Direct-main delivery requested after Stage `07A` acceptance; primary implementation delivery commit `a5415627fd9ac3fd413199202bd83070ffdbe468`; final `origin/main`/host sync evidence is recorded by the delivery run |
 
 ## Implementation Summary
 
@@ -160,6 +160,11 @@ Result: `8 passed in 1.25s`.
 | Prompt gate `uv run pyright src/trading/contexts/rl_trading apps tests` | passed; `0 errors` |
 | Prompt gate `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps` | passed; `391 passed, 1 skipped, 3 warnings`; skip is optional Torch in default non-`rl-ml` env |
 | `python -m tools.docs.generate_docs_index --check` | passed after docs index regeneration |
+| Direct-main publish prep `uv sync --locked --all-groups` | passed; `Resolved 205 packages`, `Audited 176 packages` |
+| Direct-main publish prep `uv run ruff check .` | passed |
+| Direct-main publish prep `uv run pyright` | passed; `0 errors` |
+| Direct-main publish prep `uv run pytest -q -ra` | passed; `1343 passed, 2 skipped, 3 warnings` |
+| Direct-main publish prep `uv run python -m tools.docs.generate_docs_index --check` | passed; docs index up to date |
 
 ## Contract Impact
 
@@ -187,7 +192,7 @@ Result: `8 passed in 1.25s`.
 | `target_host_readiness_pre_main` | collected | SSH reached `MacStudioDaniil`; source checkout at `/Users/daniildegtyarev/Projects/roehub.com` was fast-forwarded to clean `main...origin/main` at `89e9a092`; accepted Stage `06` manifest hash matched. |
 | `target_host_non_production_sample_pre_main` | collected and accepted for Stage `07A` | Scoped Stage `07A` diff was applied temporarily, optional `rl-ml` focused tests passed, deterministic small smoke wrote sanitized artifacts under `/opt/roehub/state/rl_trading/training_smokes/stage07a_training_runner_smoke_v1`, then the diff was reversed and checkout returned clean. |
 | `read_only_existing_runtime_smoke` | N/A | No existing `/opt/roehub/app` service or browser/runtime behavior was changed. |
-| `post_main_production_runtime_proof` | N/A | Stage `07A` was not delivered to `main` in this turn and does not change a production service surface. |
+| `post_main_production_runtime_proof` | tracked by delivery run | Stage `07A` does not change a production service/browser surface; source/runtime host sync and smoke evidence are collected by the direct-main delivery run after commit `a5415627fd9ac3fd413199202bd83070ffdbe468`. |
 
 ## Cold Self-Review
 
@@ -198,12 +203,12 @@ Review instructions: architecture-review/references/cold-head-plan-prompt-pack-r
 Verdict: Release after fixes
 Blockers fixed: added this cold-head receipt after the hook flagged the missing readiness-gate report.
 Local follow-up check: completed
-Residual risks: Stage `07A` delivery state remains `local-only-with-target_host_non_production_sample_pre_main`; clean-main Stage `07B` needs these changes carried forward or delivered first. Stage `07A` smoke artifact is not a candidate model.
+Residual risks: Stage `07A` is accepted only as smoke mechanics; clean-main Stage `07B` must start from the synced `main` checkout verified by the delivery run and must not reuse the Stage `07A` smoke artifact as a candidate model.
 
 Checklist result:
 
 - prerequisite continuity: Stage `04` and Stage `06` are accepted before Stage `07A`;
-- stage ledger continuity: ledger now records `current_stage=07B`, Stage `07A` accepted, Stage `07B` pending, delivery caveat, evidence path and next-stage handoff;
+- stage ledger continuity: ledger now records `current_stage=07B`, Stage `07A` accepted, Stage `07B` pending, primary implementation delivery commit, evidence path and next-stage handoff;
 - validation depth: tests-only acceptance is not used; Mac Studio `target_host_non_production_sample_pre_main` is recorded with resource evidence;
 - file manifest discipline: report lists created, modified, deleted and outside-expected paths;
 - Mac Studio path contract: git operations are under `/Users/daniildegtyarev/Projects/roehub.com`; runtime artifacts are under `/opt/roehub/state/rl_trading/`; `/opt/roehub/app` is not claimed;
@@ -218,7 +223,7 @@ Checklist result:
 | Stage `07A` prerequisites | No blocker | Stage `04` and Stage `06` were accepted before implementation. |
 | Full candidate training | Not done by design | Stage `07B` must run the full candidate training job from accepted Stage `06` data. |
 | Candidate/model quality | Not claimed | Stage `08` must evaluate the concrete Stage `07B` candidate artifact. |
-| Delivery | Residual handoff risk | Current delivery state is `local-only-with-target_host_non_production_sample_pre_main`; a clean-main Stage `07B` executor needs these Stage `07A` changes carried forward or delivered first. |
+| Delivery | Direct-main delivery recorded | Primary implementation delivery commit `a5415627fd9ac3fd413199202bd83070ffdbe468` is recorded in the ledger; a clean-main Stage `07B` executor must start from the synced `main` checkout verified by the delivery run. |
 | Runtime artifacts | Smoke-only, host-local | Smoke model state is not a candidate and is not registered/promoted/activated. |
 
 ## Next-Stage Handoff
