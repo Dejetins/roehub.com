@@ -10,6 +10,7 @@ from trading.contexts.rl_trading.domain import (
     ACTION_STATE_REWARD_CONTRACT_HASH_V1,
     FEATURE_NAMES_V1,
     STAGE07A_REQUIRED_ACTION_STATE_REWARD_CONTRACT_HASH_V1,
+    CandidateTrainingConfig,
     D3qnArchitectureConfig,
     PrioritizedReplayBuffer,
     PrioritizedReplayConfig,
@@ -18,7 +19,9 @@ from trading.contexts.rl_trading.domain import (
     assert_stage02c_action_state_reward_compatibility_v1,
     assert_stage07a_trainable_source_v1,
     build_stage07a_transition_set_v1,
+    build_stage07b_transition_set_v1,
     build_training_run_record_v1,
+    d3qn_architecture_config_for_stage07b_v1,
     d3qn_architecture_config_for_transition_set_v1,
     run_d3qn_per_training_smoke_v1,
 )
@@ -142,6 +145,46 @@ def test_d3qn_architecture_and_run_record_hash_are_deterministic() -> None:
     assert record["config_hash"] == config.config_hash()
     assert record["architecture_hash"] == architecture.architecture_hash()
     assert record["safety"]["candidate_model_claim"] is False
+
+
+def test_stage07b_candidate_config_and_transition_contract_are_deterministic() -> None:
+    config = CandidateTrainingConfig(
+        seed=17,
+        batch_size=4,
+        planned_training_steps=3,
+        progress_emit_every_steps=1,
+        checkpoint_every_steps=2,
+        validation_every_steps=1,
+        replay=PrioritizedReplayConfig(capacity=64),
+        hidden_dims=(32, 32),
+    )
+    transitions = build_stage07b_transition_set_v1(
+        session_features=_session_features(session_count=3),
+        config=config,
+    )
+    repeated = build_stage07b_transition_set_v1(
+        session_features=_session_features(session_count=3),
+        config=config,
+    )
+    architecture = d3qn_architecture_config_for_stage07b_v1(
+        transitions=transitions,
+        config=config,
+    )
+
+    assert transitions.transition_count == 30
+    assert transitions.transition_set_hash() == repeated.transition_set_hash()
+    assert config.as_payload()["config_id"] == "roehub_stage07b_candidate_training_config_v1"
+    assert config.config_hash() == CandidateTrainingConfig(
+        seed=17,
+        batch_size=4,
+        planned_training_steps=3,
+        progress_emit_every_steps=1,
+        checkpoint_every_steps=2,
+        validation_every_steps=1,
+        replay=PrioritizedReplayConfig(capacity=64),
+        hidden_dims=(32, 32),
+    ).config_hash()
+    assert architecture.as_payload()["hidden_dims"] == [32, 32]
 
 
 def test_torch_d3qn_per_update_shapes_when_optional_extra_is_available(tmp_path: Path) -> None:

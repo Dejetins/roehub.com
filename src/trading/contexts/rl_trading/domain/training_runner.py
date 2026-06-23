@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, cast
 
 import numpy as np
 
@@ -44,6 +44,11 @@ STAGE07A_RUNTIME_ARTIFACT_ROOT_V1 = "/opt/roehub/state/rl_trading/"
 STAGE07A_REQUIRED_ACTION_STATE_REWARD_CONTRACT_HASH_V1 = (
     "255d765b9474620671167412465fc55a058c0233d5da242a276143fb6816b557"
 )
+STAGE07B_CANDIDATE_RUN_SCHEMA_VERSION_V1 = 1
+STAGE07B_CANDIDATE_RUN_KIND_V1 = "rl_trading_stage07b_full_candidate_training_run"
+STAGE07B_CANDIDATE_CONFIG_ID_V1 = "roehub_stage07b_candidate_training_config_v1"
+STAGE07B_PROGRESS_KIND_V1 = "rl_trading_stage07b_training_progress"
+STAGE07B_CANDIDATE_MANIFEST_KIND_V1 = "rl_trading_stage07b_candidate_manifest"
 D3QN_ARCHITECTURE_ID_V1 = "roehub_d3qn_mlp_v1"
 PER_REPLAY_BUFFER_ID_V1 = "roehub_per_replay_v1"
 TRAINING_SMOKE_CONFIG_ID_V1 = "roehub_stage07a_training_smoke_config_v1"
@@ -51,6 +56,7 @@ STAGE07A_TRANSITION_SET_KIND_V1 = "rl_trading_stage07a_transition_set"
 
 DevicePolicy = Literal["cpu_only_deterministic", "mps_preferred_cpu_fallback"]
 RunStatus = Literal["accepted", "blocked"]
+CandidateTrainingStatus = Literal["starting", "running", "completed", "failed", "interrupted"]
 
 
 class TrainingRunnerError(ValueError):
@@ -200,6 +206,126 @@ class TrainingSmokeConfig:
 
     def config_hash(self) -> str:
         return hash_json_payload_v1(self.as_payload())
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateTrainingConfig:
+    seed: int = 240723
+    train_dataset_version: str = "hf_period_rebuild_current_trading"
+    train_split: str = "train"
+    validation_dataset_version: str = "hf_period_rebuild_current_trading"
+    validation_split: str = "validation"
+    agent_history_len: int = SESSIONIZED_AGENT_HISTORY_LEN_V1
+    agent_session_len: int = SESSIONIZED_AGENT_SESSION_LEN_V1
+    initial_balance: float = 100.0
+    slippage: float = 0.0
+    transaction_fee: float = 0.001
+    inaction_penalty_ratio: float = 0.0001
+    batch_size: int = 256
+    planned_training_steps: int = 100_000
+    progress_emit_every_steps: int = 10_000
+    progress_emit_every_sec: int = 300
+    checkpoint_every_steps: int = 10_000
+    validation_every_steps: int = 10_000
+    validation_max_transitions: int = 4_096
+    gamma: float = 0.99
+    learning_rate: float = 0.0005
+    target_sync_interval: int = 1_000
+    torch_num_threads: int = 4
+    torch_num_interop_threads: int = 1
+    device_policy: DevicePolicy = "cpu_only_deterministic"
+    replay: PrioritizedReplayConfig = field(
+        default_factory=lambda: PrioritizedReplayConfig(capacity=200_000)
+    )
+    hidden_dims: tuple[int, ...] = (128, 128)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.seed, bool) or self.seed < 0:
+            raise TrainingRunnerError(reason="invalid_seed", field="seed")
+        _non_empty_text(self.train_dataset_version, "train_dataset_version")
+        _non_empty_text(self.train_split, "train_split")
+        _non_empty_text(self.validation_dataset_version, "validation_dataset_version")
+        _non_empty_text(self.validation_split, "validation_split")
+        _positive_int(self.agent_history_len, "agent_history_len")
+        _positive_int(self.agent_session_len, "agent_session_len")
+        _positive_float(self.initial_balance, "initial_balance")
+        _non_negative_float(self.slippage, "slippage")
+        _non_negative_float(self.transaction_fee, "transaction_fee")
+        _non_negative_float(self.inaction_penalty_ratio, "inaction_penalty_ratio")
+        _positive_int(self.batch_size, "batch_size")
+        _positive_int(self.planned_training_steps, "planned_training_steps")
+        _positive_int(self.progress_emit_every_steps, "progress_emit_every_steps")
+        _positive_int(self.progress_emit_every_sec, "progress_emit_every_sec")
+        _positive_int(self.checkpoint_every_steps, "checkpoint_every_steps")
+        _positive_int(self.validation_every_steps, "validation_every_steps")
+        _positive_int(self.validation_max_transitions, "validation_max_transitions")
+        _bounded_float(self.gamma, "gamma", low=0.0, high=1.0)
+        _positive_float(self.learning_rate, "learning_rate")
+        _positive_int(self.target_sync_interval, "target_sync_interval")
+        _positive_int(self.torch_num_threads, "torch_num_threads")
+        _positive_int(self.torch_num_interop_threads, "torch_num_interop_threads")
+        if self.device_policy not in {"cpu_only_deterministic", "mps_preferred_cpu_fallback"}:
+            raise TrainingRunnerError(reason="unsupported_device_policy", field="device_policy")
+        if not self.hidden_dims:
+            raise TrainingRunnerError(reason="hidden_dims_required", field="hidden_dims")
+        for index, dim in enumerate(self.hidden_dims):
+            _positive_int(dim, f"hidden_dims[{index}]")
+
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "agent_history_len": self.agent_history_len,
+            "agent_session_len": self.agent_session_len,
+            "batch_size": self.batch_size,
+            "checkpoint_every_steps": self.checkpoint_every_steps,
+            "config_id": STAGE07B_CANDIDATE_CONFIG_ID_V1,
+            "device_policy": self.device_policy,
+            "gamma": self.gamma,
+            "hidden_dims": list(self.hidden_dims),
+            "inaction_penalty_ratio": self.inaction_penalty_ratio,
+            "initial_balance": self.initial_balance,
+            "learning_rate": self.learning_rate,
+            "planned_training_steps": self.planned_training_steps,
+            "progress_emit_every_sec": self.progress_emit_every_sec,
+            "progress_emit_every_steps": self.progress_emit_every_steps,
+            "replay": self.replay.as_payload(),
+            "seed": self.seed,
+            "slippage": self.slippage,
+            "target_sync_interval": self.target_sync_interval,
+            "torch_num_interop_threads": self.torch_num_interop_threads,
+            "torch_num_threads": self.torch_num_threads,
+            "train_dataset_version": self.train_dataset_version,
+            "train_split": self.train_split,
+            "transaction_fee": self.transaction_fee,
+            "validation_dataset_version": self.validation_dataset_version,
+            "validation_every_steps": self.validation_every_steps,
+            "validation_max_transitions": self.validation_max_transitions,
+            "validation_split": self.validation_split,
+        }
+
+    def config_hash(self) -> str:
+        return hash_json_payload_v1(self.as_payload())
+
+    def as_smoke_compatible_config(self, *, max_sessions: int) -> TrainingSmokeConfig:
+        return TrainingSmokeConfig(
+            seed=self.seed,
+            max_sessions=max_sessions,
+            agent_history_len=self.agent_history_len,
+            agent_session_len=self.agent_session_len,
+            initial_balance=self.initial_balance,
+            slippage=self.slippage,
+            transaction_fee=self.transaction_fee,
+            inaction_penalty_ratio=self.inaction_penalty_ratio,
+            batch_size=self.batch_size,
+            update_steps=min(self.planned_training_steps, 1),
+            gamma=self.gamma,
+            learning_rate=self.learning_rate,
+            target_sync_interval=self.target_sync_interval,
+            torch_num_threads=self.torch_num_threads,
+            torch_num_interop_threads=self.torch_num_interop_threads,
+            device_policy=self.device_policy,
+            replay=self.replay,
+            hidden_dims=self.hidden_dims,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,6 +497,40 @@ class PrioritizedReplayBuffer:
                 abs(_finite_float(float(error), "td_error")) + self.config.epsilon,
                 self.config.min_priority,
             )
+
+    def priority_state_payload(self) -> dict[str, object]:
+        return {
+            "next_idx": self._next_idx,
+            "priorities": np.ascontiguousarray(
+                self._priorities[: self._size],
+                dtype=np.float64,
+            ),
+            "rng_state": self._rng.bit_generator.state,
+            "size": self._size,
+        }
+
+    def restore_priority_state(self, payload: dict[str, object]) -> None:
+        size = payload["size"]
+        next_idx = payload["next_idx"]
+        if not isinstance(size, int) or isinstance(size, bool):
+            raise TrainingRunnerError(reason="replay_priority_state_size_invalid")
+        if not isinstance(next_idx, int) or isinstance(next_idx, bool):
+            raise TrainingRunnerError(reason="replay_priority_state_next_idx_invalid")
+        if size < 0 or size > self._size:
+            raise TrainingRunnerError(reason="replay_priority_state_size_mismatch")
+        if next_idx < 0 or next_idx >= self.config.capacity:
+            raise TrainingRunnerError(reason="replay_priority_state_next_idx_mismatch")
+        priorities = np.asarray(payload["priorities"], dtype=np.float64)
+        if priorities.ndim != 1 or priorities.shape[0] != size:
+            raise TrainingRunnerError(reason="replay_priority_state_priorities_mismatch")
+        self._priorities[:size] = priorities
+        if size < self._priorities.shape[0]:
+            self._priorities[size:] = 0.0
+        self._next_idx = next_idx
+        self._size = size
+        rng_state = payload.get("rng_state")
+        if isinstance(rng_state, dict):
+            self._rng.bit_generator.state = rng_state
 
 
 def assert_stage02c_action_state_reward_compatibility_v1() -> None:
@@ -639,6 +799,503 @@ def run_d3qn_per_training_smoke_v1(
     return record
 
 
+def default_stage07b_candidate_training_config_v1() -> CandidateTrainingConfig:
+    return CandidateTrainingConfig()
+
+
+def build_stage07b_transition_set_v1(
+    *,
+    session_features: np.ndarray,
+    config: CandidateTrainingConfig | None = None,
+) -> TrainingTransitionSet:
+    selected_config = (
+        default_stage07b_candidate_training_config_v1() if config is None else config
+    )
+    features = _validate_session_features(session_features)
+    smoke_config = selected_config.as_smoke_compatible_config(
+        max_sessions=int(features.shape[0]),
+    )
+    return build_stage07a_transition_set_v1(
+        session_features=features,
+        config=smoke_config,
+    )
+
+
+def d3qn_architecture_config_for_stage07b_v1(
+    *,
+    transitions: TrainingTransitionSet,
+    config: CandidateTrainingConfig | None = None,
+) -> D3qnArchitectureConfig:
+    selected_config = (
+        default_stage07b_candidate_training_config_v1() if config is None else config
+    )
+    return D3qnArchitectureConfig(
+        input_dim=transitions.state_dim,
+        hidden_dims=selected_config.hidden_dims,
+    )
+
+
+def run_stage07b_candidate_training_v1(
+    *,
+    train_transitions: TrainingTransitionSet,
+    validation_transitions: TrainingTransitionSet,
+    dataset_manifest_path: str,
+    dataset_manifest_sha256: str,
+    output_root: Path,
+    run_id: str,
+    config: CandidateTrainingConfig | None = None,
+    generated_at_utc: datetime | None = None,
+    code_version: dict[str, object] | None = None,
+    resume: bool = False,
+) -> dict[str, Any]:
+    assert_stage02c_action_state_reward_compatibility_v1()
+    selected_config = (
+        default_stage07b_candidate_training_config_v1() if config is None else config
+    )
+    if train_transitions.transition_count < selected_config.batch_size:
+        raise TrainingRunnerError(reason="not_enough_train_transitions_for_batch")
+    if validation_transitions.transition_count <= 0:
+        raise TrainingRunnerError(reason="validation_transitions_required")
+    if selected_config.replay.capacity < train_transitions.transition_count:
+        raise TrainingRunnerError(
+            reason="replay_capacity_below_train_transition_count",
+            field="replay.capacity",
+        )
+
+    torch = _import_torch()
+    _seed_training_libraries(torch=torch, seed=selected_config.seed)
+    _configure_torch_threads_for_values(
+        torch=torch,
+        torch_num_threads=selected_config.torch_num_threads,
+        torch_num_interop_threads=selected_config.torch_num_interop_threads,
+    )
+    device, device_payload = _select_torch_device_for_policy(
+        torch=torch,
+        device_policy=selected_config.device_policy,
+    )
+    architecture = d3qn_architecture_config_for_stage07b_v1(
+        transitions=train_transitions,
+        config=selected_config,
+    )
+    model = _build_torch_d3qn_modules(torch=torch, architecture=architecture, device=device)
+    target_model = _build_torch_d3qn_modules(torch=torch, architecture=architecture, device=device)
+    _copy_torch_modules_state(target=target_model, source=model)
+    optimizer = torch.optim.Adam(
+        _torch_module_parameters(model),
+        lr=selected_config.learning_rate,
+    )
+    replay = _build_replay_from_transitions_v1(
+        transitions=train_transitions,
+        config=selected_config.replay,
+        seed=selected_config.seed,
+    )
+
+    run_dir = output_root / run_id
+    checkpoints_dir = run_dir / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    generated = generated_at_utc or datetime.now(UTC).replace(microsecond=0)
+    paths = {
+        "candidate_manifest": run_dir / "candidate_manifest.json",
+        "candidate_report": run_dir / "candidate_training_report.json",
+        "latest_checkpoint": run_dir / "latest_checkpoint.json",
+        "latest_status": run_dir / "latest_status.json",
+        "progress": run_dir / "progress.jsonl",
+        "training_config": run_dir / "training_config.json",
+    }
+    source_payload = {} if code_version is None else code_version
+    training_config_payload = {
+        "action_state_reward_contract_hash": ACTION_STATE_REWARD_CONTRACT_HASH_V1,
+        "architecture": architecture.as_payload(),
+        "architecture_hash": architecture.architecture_hash(),
+        "code_version": source_payload,
+        "config": selected_config.as_payload(),
+        "config_hash": selected_config.config_hash(),
+        "dataset_dependency": {
+            "manifest_path": dataset_manifest_path,
+            "manifest_sha256": dataset_manifest_sha256,
+            "stage": "06",
+            "training_source": "binance:futures",
+        },
+        "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
+        "generated_at_utc": _format_utc(generated),
+        "run_id": run_id,
+        "schema_version": STAGE07B_CANDIDATE_RUN_SCHEMA_VERSION_V1,
+        "stage": "07B",
+        "training_plan": _stage07b_training_plan_payload(selected_config),
+    }
+    training_config_payload = {
+        **training_config_payload,
+        "training_config_hash": hash_json_payload_v1(training_config_payload),
+    }
+    _atomic_write_json(paths["training_config"], training_config_payload)
+
+    writer = _Stage07bProgressWriter(
+        run_id=run_id,
+        progress_path=paths["progress"],
+        latest_status_path=paths["latest_status"],
+        planned_training_steps=selected_config.planned_training_steps,
+        device=str(device_payload["selected_device"]),
+    )
+    completed_steps = 0
+    train_curve: list[dict[str, object]] = []
+    validation_curve: list[dict[str, object]] = []
+    loss_window: list[float] = []
+    checkpoint_payload: dict[str, object] | None = None
+    if resume:
+        checkpoint_payload = _load_latest_stage07b_checkpoint_payload(
+            torch=torch,
+            latest_checkpoint_path=paths["latest_checkpoint"],
+            device=device,
+        )
+        if checkpoint_payload is not None:
+            completed_steps_payload = checkpoint_payload["completed_training_steps"]
+            if not isinstance(completed_steps_payload, int) or isinstance(
+                completed_steps_payload,
+                bool,
+            ):
+                raise TrainingRunnerError(reason="checkpoint_completed_steps_invalid")
+            completed_steps = completed_steps_payload
+            _load_torch_modules_state(target=model, state=checkpoint_payload["model_state"])
+            _load_torch_modules_state(
+                target=target_model,
+                state=checkpoint_payload["target_model_state"],
+            )
+            optimizer.load_state_dict(checkpoint_payload["optimizer_state"])
+            replay_priority_state = checkpoint_payload["replay_priority_state"]
+            if not isinstance(replay_priority_state, dict):
+                raise TrainingRunnerError(reason="replay_priority_state_invalid")
+            replay.restore_priority_state(replay_priority_state)
+            train_curve_payload = checkpoint_payload.get("train_curve", [])
+            validation_curve_payload = checkpoint_payload.get("validation_curve", [])
+            if not isinstance(train_curve_payload, list):
+                raise TrainingRunnerError(reason="checkpoint_train_curve_invalid")
+            if not isinstance(validation_curve_payload, list):
+                raise TrainingRunnerError(reason="checkpoint_validation_curve_invalid")
+            train_curve = cast(list[dict[str, object]], train_curve_payload)
+            validation_curve = cast(list[dict[str, object]], validation_curve_payload)
+
+    writer.emit(
+        status="starting" if completed_steps == 0 else "running",
+        completed_training_steps=completed_steps,
+        details={
+            "checkpoint_resume": checkpoint_payload is not None,
+            "config_hash": selected_config.config_hash(),
+            "dataset_manifest_sha256": dataset_manifest_sha256,
+            "train_transition_count": train_transitions.transition_count,
+            "validation_transition_count": validation_transitions.transition_count,
+        },
+    )
+    start_usage = resource.getrusage(resource.RUSAGE_SELF)
+    last_emit_step = completed_steps
+    last_emit_wall = time.perf_counter()
+    status: CandidateTrainingStatus = "running"
+    try:
+        for step in range(completed_steps + 1, selected_config.planned_training_steps + 1):
+            loss_value, td_abs_mean = _run_d3qn_per_update_step_v1(
+                torch=torch,
+                model=model,
+                target_model=target_model,
+                optimizer=optimizer,
+                replay=replay,
+                batch_size=selected_config.batch_size,
+                gamma=selected_config.gamma,
+                device=device,
+            )
+            loss_window.append(loss_value)
+            if step % selected_config.target_sync_interval == 0:
+                _copy_torch_modules_state(target=target_model, source=model)
+            should_validate = (
+                step == 1
+                or step == selected_config.planned_training_steps
+                or step % selected_config.validation_every_steps == 0
+            )
+            if should_validate:
+                train_summary = {
+                    "completed_training_steps": step,
+                    "loss_window_mean": _round_float(
+                        float(np.mean(np.asarray(loss_window, dtype=np.float64)))
+                    ),
+                    "loss_window_size": len(loss_window),
+                    "mean_abs_td_error_last": _round_float(td_abs_mean),
+                }
+                train_curve.append(train_summary)
+                validation_curve.append(
+                    {
+                        "completed_training_steps": step,
+                        **_compute_validation_curve_point_v1(
+                            torch=torch,
+                            model=model,
+                            target_model=target_model,
+                            transitions=validation_transitions,
+                            batch_size=selected_config.batch_size,
+                            gamma=selected_config.gamma,
+                            max_transitions=selected_config.validation_max_transitions,
+                            device=device,
+                        ),
+                    }
+                )
+                loss_window = []
+            should_checkpoint = (
+                step == selected_config.planned_training_steps
+                or step % selected_config.checkpoint_every_steps == 0
+            )
+            if should_checkpoint:
+                _save_stage07b_checkpoint_v1(
+                    torch=torch,
+                    path=checkpoints_dir / f"checkpoint_step_{step:08d}.pt",
+                    latest_checkpoint_path=paths["latest_checkpoint"],
+                    model=model,
+                    target_model=target_model,
+                    optimizer=optimizer,
+                    replay=replay,
+                    completed_training_steps=step,
+                    run_id=run_id,
+                    config_hash=selected_config.config_hash(),
+                    architecture_hash=architecture.architecture_hash(),
+                    dataset_manifest_sha256=dataset_manifest_sha256,
+                    train_curve=train_curve,
+                    validation_curve=validation_curve,
+                )
+            wall_now = time.perf_counter()
+            should_emit = (
+                step == 1
+                or step == selected_config.planned_training_steps
+                or (step - last_emit_step) >= selected_config.progress_emit_every_steps
+                or (wall_now - last_emit_wall) >= selected_config.progress_emit_every_sec
+            )
+            if should_emit:
+                writer.emit(
+                    status="running",
+                    completed_training_steps=step,
+                    details={
+                        "last_loss": _round_float(loss_value),
+                        "train_curve_points": len(train_curve),
+                        "validation_curve_points": len(validation_curve),
+                    },
+                )
+                last_emit_step = step
+                last_emit_wall = wall_now
+        status = "completed"
+    except KeyboardInterrupt:
+        status = "interrupted"
+        writer.emit(
+            status="interrupted",
+            completed_training_steps=max(last_emit_step, completed_steps),
+            details={"reason": "keyboard_interrupt"},
+        )
+        raise
+    except Exception as exc:
+        status = "failed"
+        writer.emit(
+            status="failed",
+            completed_training_steps=max(last_emit_step, completed_steps),
+            details={"reason": type(exc).__name__},
+        )
+        raise
+
+    _synchronize_if_needed(torch=torch, device_type=str(device.type))
+    end_usage = resource.getrusage(resource.RUSAGE_SELF)
+    resource_usage = _stage07b_resource_usage_payload(
+        torch=torch,
+        start_usage=start_usage,
+        end_usage=end_usage,
+        device_payload=device_payload,
+        progress_writer=writer,
+        completed_training_steps=selected_config.planned_training_steps,
+    )
+    final_checkpoint_path = checkpoints_dir / (
+        f"checkpoint_step_{selected_config.planned_training_steps:08d}.pt"
+    )
+    writer.emit(
+        status=status,
+        completed_training_steps=selected_config.planned_training_steps,
+        details={
+            "final_checkpoint_path": str(final_checkpoint_path),
+            "train_curve_points": len(train_curve),
+            "validation_curve_points": len(validation_curve),
+        },
+    )
+    artifact_hashes = {
+        "candidate_checkpoint": _file_payload(final_checkpoint_path),
+        "latest_status": _file_payload(paths["latest_status"]),
+        "latest_checkpoint": _file_payload(paths["latest_checkpoint"]),
+        "progress_jsonl": _file_payload(paths["progress"]),
+        "training_config": _file_payload(paths["training_config"]),
+        "train_transition_set": {
+            "sha256": train_transitions.transition_set_hash(),
+            "transitions": train_transitions.transition_count,
+        },
+        "validation_transition_set": {
+            "sha256": validation_transitions.transition_set_hash(),
+            "transitions": validation_transitions.transition_count,
+        },
+    }
+    metrics = {
+        "completed_training_steps": selected_config.planned_training_steps,
+        "planned_training_steps": selected_config.planned_training_steps,
+        "progress_pct": 100.0,
+        "throughput_steps_per_sec": _round_float(
+            selected_config.planned_training_steps / max(writer.elapsed_sec(), 1e-9)
+        ),
+        "train_curve": train_curve,
+        "train_transition_count": train_transitions.transition_count,
+        "validation_curve": validation_curve,
+        "validation_transition_count": validation_transitions.transition_count,
+    }
+    report = build_stage07b_candidate_report_v1(
+        generated_at_utc=generated,
+        finished_at_utc=datetime.now(UTC).replace(microsecond=0),
+        run_id=run_id,
+        run_dir=run_dir,
+        config=selected_config,
+        architecture=architecture,
+        dataset_manifest_path=dataset_manifest_path,
+        dataset_manifest_sha256=dataset_manifest_sha256,
+        code_version=source_payload,
+        metrics=metrics,
+        resource_usage=resource_usage,
+        artifact_hashes=artifact_hashes,
+    )
+    _atomic_write_json(paths["candidate_report"], report)
+    artifact_hashes = {
+        **artifact_hashes,
+        "candidate_report": _file_payload(paths["candidate_report"]),
+    }
+    manifest = build_stage07b_candidate_manifest_v1(
+        generated_at_utc=generated,
+        run_id=run_id,
+        run_dir=run_dir,
+        config=selected_config,
+        architecture=architecture,
+        dataset_manifest_path=dataset_manifest_path,
+        dataset_manifest_sha256=dataset_manifest_sha256,
+        code_version=source_payload,
+        metrics=metrics,
+        resource_usage=resource_usage,
+        artifact_hashes=artifact_hashes,
+    )
+    _atomic_write_json(paths["candidate_manifest"], manifest)
+    manifest = {
+        **manifest,
+        "artifact_hashes": artifact_hashes,
+        "candidate_manifest_path": str(paths["candidate_manifest"]),
+    }
+    manifest = finalize_stage07b_candidate_manifest_v1(manifest)
+    _atomic_write_json(paths["candidate_manifest"], manifest)
+    return manifest
+
+
+def build_stage07b_candidate_report_v1(
+    *,
+    generated_at_utc: datetime,
+    finished_at_utc: datetime,
+    run_id: str,
+    run_dir: Path,
+    config: CandidateTrainingConfig,
+    architecture: D3qnArchitectureConfig,
+    dataset_manifest_path: str,
+    dataset_manifest_sha256: str,
+    code_version: dict[str, object],
+    metrics: dict[str, Any],
+    resource_usage: dict[str, Any],
+    artifact_hashes: dict[str, Any],
+) -> dict[str, Any]:
+    payload = {
+        "action_state_reward_contract_hash": ACTION_STATE_REWARD_CONTRACT_HASH_V1,
+        "architecture": architecture.as_payload(),
+        "architecture_hash": architecture.architecture_hash(),
+        "artifact_hashes": artifact_hashes,
+        "artifact_kind": STAGE07B_CANDIDATE_RUN_KIND_V1,
+        "code_version": code_version,
+        "config": config.as_payload(),
+        "config_hash": config.config_hash(),
+        "dataset_dependency": {
+            "manifest_path": dataset_manifest_path,
+            "manifest_sha256": dataset_manifest_sha256,
+            "stage": "06",
+            "training_source": "binance:futures",
+        },
+        "dependency_isolation": {
+            "default_api_runtime_requires_torch": False,
+            "torch_extra": "rl-ml",
+        },
+        "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
+        "finished_at_utc": _format_utc(finished_at_utc),
+        "generated_at_utc": _format_utc(generated_at_utc),
+        "metrics": metrics,
+        "resource_usage": resource_usage,
+        "run_dir": str(run_dir),
+        "run_id": run_id,
+        "safety": _stage07b_safety_payload(),
+        "schema_version": STAGE07B_CANDIDATE_RUN_SCHEMA_VERSION_V1,
+        "stage": "07B",
+        "status": "completed",
+        "training_plan": _stage07b_training_plan_payload(config),
+    }
+    return {**payload, "candidate_report_hash": hash_json_payload_v1(payload)}
+
+
+def build_stage07b_candidate_manifest_v1(
+    *,
+    generated_at_utc: datetime,
+    run_id: str,
+    run_dir: Path,
+    config: CandidateTrainingConfig,
+    architecture: D3qnArchitectureConfig,
+    dataset_manifest_path: str,
+    dataset_manifest_sha256: str,
+    code_version: dict[str, object],
+    metrics: dict[str, Any],
+    resource_usage: dict[str, Any],
+    artifact_hashes: dict[str, Any],
+) -> dict[str, Any]:
+    payload = {
+        "action_state_reward_contract_hash": ACTION_STATE_REWARD_CONTRACT_HASH_V1,
+        "architecture_hash": architecture.architecture_hash(),
+        "artifact_hashes": artifact_hashes,
+        "artifact_kind": STAGE07B_CANDIDATE_MANIFEST_KIND_V1,
+        "candidate_level": "candidate_for_stage08_evaluation_only",
+        "code_version": code_version,
+        "config_hash": config.config_hash(),
+        "dataset_dependency": {
+            "manifest_path": dataset_manifest_path,
+            "manifest_sha256": dataset_manifest_sha256,
+            "stage": "06",
+            "training_source": "binance:futures",
+        },
+        "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
+        "generated_at_utc": _format_utc(generated_at_utc),
+        "metrics_summary": {
+            "completed_training_steps": metrics["completed_training_steps"],
+            "planned_training_steps": metrics["planned_training_steps"],
+            "progress_pct": metrics["progress_pct"],
+            "throughput_steps_per_sec": metrics["throughput_steps_per_sec"],
+            "train_curve_points": len(metrics["train_curve"]),
+            "train_transition_count": metrics["train_transition_count"],
+            "validation_curve_points": len(metrics["validation_curve"]),
+            "validation_transition_count": metrics["validation_transition_count"],
+        },
+        "next_stage_handoff": {
+            "stage08_allowed": True,
+            "stage08_input": "candidate_manifest_path",
+        },
+        "resource_summary": resource_usage,
+        "run_dir": str(run_dir),
+        "run_id": run_id,
+        "safety": _stage07b_safety_payload(),
+        "schema_version": STAGE07B_CANDIDATE_RUN_SCHEMA_VERSION_V1,
+        "stage": "07B",
+        "status": "completed",
+        "training_plan": _stage07b_training_plan_payload(config),
+    }
+    return finalize_stage07b_candidate_manifest_v1(payload)
+
+
+def finalize_stage07b_candidate_manifest_v1(manifest: dict[str, Any]) -> dict[str, Any]:
+    payload = {key: value for key, value in manifest.items() if key != "candidate_manifest_hash"}
+    return {**payload, "candidate_manifest_hash": hash_json_payload_v1(payload)}
+
+
 def build_training_run_record_v1(
     *,
     generated_at_utc: datetime,
@@ -702,6 +1359,369 @@ def finalize_training_run_record_v1(record: dict[str, Any]) -> dict[str, Any]:
 
 def render_training_run_record_v1(record: dict[str, Any]) -> str:
     return render_raw_feature_json_payload_v1(record)
+
+
+class _Stage07bProgressWriter:
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        progress_path: Path,
+        latest_status_path: Path,
+        planned_training_steps: int,
+        device: str,
+    ) -> None:
+        self.run_id = run_id
+        self.progress_path = progress_path
+        self.latest_status_path = latest_status_path
+        self.planned_training_steps = planned_training_steps
+        self.device = device
+        self.started_at_wall = time.perf_counter()
+        self.started_at_utc = datetime.now(UTC).replace(microsecond=0)
+        self.progress_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def elapsed_sec(self) -> float:
+        return _round_float(time.perf_counter() - self.started_at_wall)
+
+    def emit(
+        self,
+        *,
+        status: CandidateTrainingStatus,
+        completed_training_steps: int,
+        details: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        elapsed = self.elapsed_sec()
+        progress_pct = _round_float(
+            (completed_training_steps / self.planned_training_steps) * 100.0
+        )
+        eta_sec: float | None = None
+        if status in {"starting", "running"} and completed_training_steps > 0:
+            remaining = self.planned_training_steps - completed_training_steps
+            eta_sec = _round_float((elapsed / completed_training_steps) * remaining)
+        elif status == "completed":
+            eta_sec = 0.0
+        event = {
+            "artifact_kind": STAGE07B_PROGRESS_KIND_V1,
+            "completed_training_steps": completed_training_steps,
+            "details": {} if details is None else details,
+            "device": self.device,
+            "elapsed_sec": elapsed,
+            "eta_sec": eta_sec,
+            "planned_training_steps": self.planned_training_steps,
+            "progress_pct": progress_pct,
+            "resource_snapshot": _resource_snapshot_payload(),
+            "run_id": self.run_id,
+            "stage": "07B",
+            "started_at_utc": _format_utc(self.started_at_utc),
+            "status": status,
+            "timestamp": _format_utc(datetime.now(UTC).replace(microsecond=0)),
+        }
+        rendered = _render_json_line_payload(event)
+        with self.progress_path.open("a", encoding="utf-8") as handle:
+            handle.write(rendered + "\n")
+        latest = {
+            **event,
+            "latest_status_path": str(self.latest_status_path),
+            "progress_path": str(self.progress_path),
+        }
+        _atomic_write_json(self.latest_status_path, latest)
+        return event
+
+
+def _build_replay_from_transitions_v1(
+    *,
+    transitions: TrainingTransitionSet,
+    config: PrioritizedReplayConfig,
+    seed: int,
+) -> PrioritizedReplayBuffer:
+    if config.capacity < transitions.transition_count:
+        raise TrainingRunnerError(
+            reason="replay_capacity_below_train_transition_count",
+            field="replay.capacity",
+        )
+    replay = PrioritizedReplayBuffer(
+        observation_dim=transitions.state_dim,
+        config=config,
+        seed=seed,
+    )
+    for idx in range(transitions.transition_count):
+        replay.add(
+            observation=transitions.observations[idx],
+            action=int(transitions.actions[idx]),
+            reward=float(transitions.rewards[idx]),
+            next_observation=transitions.next_observations[idx],
+            done=bool(transitions.dones[idx]),
+        )
+    return replay
+
+
+def _run_d3qn_per_update_step_v1(
+    *,
+    torch: Any,
+    model: dict[str, Any],
+    target_model: dict[str, Any],
+    optimizer: Any,
+    replay: PrioritizedReplayBuffer,
+    batch_size: int,
+    gamma: float,
+    device: Any,
+) -> tuple[float, float]:
+    sample = replay.sample(batch_size=batch_size)
+    observations = torch.as_tensor(sample.observations, dtype=torch.float32, device=device)
+    actions = torch.as_tensor(sample.actions, dtype=torch.long, device=device)
+    rewards = torch.as_tensor(sample.rewards, dtype=torch.float32, device=device)
+    next_observations = torch.as_tensor(
+        sample.next_observations,
+        dtype=torch.float32,
+        device=device,
+    )
+    dones = torch.as_tensor(sample.dones.astype(np.float32), dtype=torch.float32, device=device)
+    weights = torch.as_tensor(sample.weights, dtype=torch.float32, device=device)
+
+    q_values = _torch_d3qn_forward(model, observations)
+    selected_q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+    with torch.no_grad():
+        next_actions = _torch_d3qn_forward(model, next_observations).argmax(dim=1)
+        next_target_q = _torch_d3qn_forward(target_model, next_observations).gather(
+            1,
+            next_actions.unsqueeze(1),
+        ).squeeze(1)
+        target_q = rewards + (1.0 - dones) * gamma * next_target_q
+    td_errors = target_q - selected_q_values
+    loss = torch.mean(weights * torch.square(td_errors))
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+    td_np = np.asarray(td_errors.detach().cpu().numpy(), dtype=np.float64)
+    replay.update_priorities(indices=sample.indices, td_errors=td_np)
+    return float(loss.detach().cpu()), float(np.mean(np.abs(td_np), dtype=np.float64))
+
+
+def _compute_validation_curve_point_v1(
+    *,
+    torch: Any,
+    model: dict[str, Any],
+    target_model: dict[str, Any],
+    transitions: TrainingTransitionSet,
+    batch_size: int,
+    gamma: float,
+    max_transitions: int,
+    device: Any,
+) -> dict[str, object]:
+    limit = min(transitions.transition_count, max_transitions)
+    if limit <= 0:
+        raise TrainingRunnerError(reason="validation_transitions_required")
+    losses: list[float] = []
+    td_means: list[float] = []
+    with torch.no_grad():
+        for start in range(0, limit, batch_size):
+            end = min(start + batch_size, limit)
+            observations = torch.as_tensor(
+                transitions.observations[start:end],
+                dtype=torch.float32,
+                device=device,
+            )
+            actions = torch.as_tensor(
+                transitions.actions[start:end],
+                dtype=torch.long,
+                device=device,
+            )
+            rewards = torch.as_tensor(
+                transitions.rewards[start:end],
+                dtype=torch.float32,
+                device=device,
+            )
+            next_observations = torch.as_tensor(
+                transitions.next_observations[start:end],
+                dtype=torch.float32,
+                device=device,
+            )
+            dones = torch.as_tensor(
+                transitions.dones[start:end].astype(np.float32),
+                dtype=torch.float32,
+                device=device,
+            )
+            q_values = _torch_d3qn_forward(model, observations)
+            selected_q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+            next_actions = _torch_d3qn_forward(model, next_observations).argmax(dim=1)
+            next_target_q = _torch_d3qn_forward(target_model, next_observations).gather(
+                1,
+                next_actions.unsqueeze(1),
+            ).squeeze(1)
+            target_q = rewards + (1.0 - dones) * gamma * next_target_q
+            td_errors = target_q - selected_q_values
+            losses.append(float(torch.mean(torch.square(td_errors)).detach().cpu()))
+            td_np = np.asarray(td_errors.detach().cpu().numpy(), dtype=np.float64)
+            td_means.append(float(np.mean(np.abs(td_np), dtype=np.float64)))
+    return {
+        "batch_count": len(losses),
+        "max_transitions": max_transitions,
+        "mean_abs_td_error": _round_float(float(np.mean(np.asarray(td_means)))),
+        "sampled_transition_count": limit,
+        "td_mse": _round_float(float(np.mean(np.asarray(losses, dtype=np.float64)))),
+    }
+
+
+def _save_stage07b_checkpoint_v1(
+    *,
+    torch: Any,
+    path: Path,
+    latest_checkpoint_path: Path,
+    model: dict[str, Any],
+    target_model: dict[str, Any],
+    optimizer: Any,
+    replay: PrioritizedReplayBuffer,
+    completed_training_steps: int,
+    run_id: str,
+    config_hash: str,
+    architecture_hash: str,
+    dataset_manifest_sha256: str,
+    train_curve: list[dict[str, object]],
+    validation_curve: list[dict[str, object]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "architecture_hash": architecture_hash,
+        "completed_training_steps": completed_training_steps,
+        "config_hash": config_hash,
+        "dataset_manifest_sha256": dataset_manifest_sha256,
+        "model_state": _cpu_state_dict_payload(model),
+        "optimizer_state": optimizer.state_dict(),
+        "replay_priority_state": replay.priority_state_payload(),
+        "run_id": run_id,
+        "schema_version": STAGE07B_CANDIDATE_RUN_SCHEMA_VERSION_V1,
+        "stage": "07B",
+        "target_model_state": _cpu_state_dict_payload(target_model),
+        "train_curve": train_curve,
+        "validation_curve": validation_curve,
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    torch.save(payload, tmp)
+    tmp.replace(path)
+    _atomic_write_json(
+        latest_checkpoint_path,
+        {
+            "checkpoint": _file_payload(path),
+            "completed_training_steps": completed_training_steps,
+            "run_id": run_id,
+            "stage": "07B",
+        },
+    )
+
+
+def _load_latest_stage07b_checkpoint_payload(
+    *,
+    torch: Any,
+    latest_checkpoint_path: Path,
+    device: Any,
+) -> dict[str, object] | None:
+    if not latest_checkpoint_path.exists():
+        return None
+    latest = _read_json_payload(latest_checkpoint_path)
+    checkpoint = latest.get("checkpoint")
+    if not isinstance(checkpoint, dict):
+        raise TrainingRunnerError(reason="latest_checkpoint_payload_invalid")
+    path_value = checkpoint.get("path")
+    if not isinstance(path_value, str):
+        raise TrainingRunnerError(reason="latest_checkpoint_path_missing")
+    checkpoint_path = Path(path_value)
+    if not checkpoint_path.exists():
+        raise TrainingRunnerError(reason="latest_checkpoint_file_missing", field=path_value)
+    payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    if not isinstance(payload, dict):
+        raise TrainingRunnerError(reason="stage07b_checkpoint_payload_invalid")
+    return payload
+
+
+def _load_torch_modules_state(*, target: dict[str, Any], state: object) -> None:
+    if not isinstance(state, dict):
+        raise TrainingRunnerError(reason="torch_module_state_invalid")
+    for name in ("shared", "value", "advantage"):
+        if name not in state:
+            raise TrainingRunnerError(reason="torch_module_state_missing", field=name)
+        target[name].load_state_dict(state[name])
+
+
+def _stage07b_training_plan_payload(config: CandidateTrainingConfig) -> dict[str, object]:
+    return {
+        "checkpoint_every_steps": config.checkpoint_every_steps,
+        "device_policy": config.device_policy,
+        "planned_training_steps": config.planned_training_steps,
+        "progress_emit_every_sec": config.progress_emit_every_sec,
+        "progress_emit_every_steps": config.progress_emit_every_steps,
+        "progress_pct_rule": "completed_training_steps / planned_training_steps * 100",
+        "resume_behavior": (
+            "rebuild deterministic replay transitions from the frozen Stage 06 manifest, "
+            "then restore model, target model, optimizer, replay priorities and replay RNG "
+            "from latest_checkpoint.json"
+        ),
+        "train_dataset_version": config.train_dataset_version,
+        "train_split": config.train_split,
+        "validation_dataset_version": config.validation_dataset_version,
+        "validation_every_steps": config.validation_every_steps,
+        "validation_split": config.validation_split,
+    }
+
+
+def _stage07b_safety_payload() -> dict[str, object]:
+    return {
+        "candidate_for_stage08_evaluation_only": True,
+        "contains_raw_provider_payloads": False,
+        "contains_secrets": False,
+        "exchange_side_effects": False,
+        "mainnet_submit": False,
+        "model_registry_write": False,
+        "paper_testnet_live_enabled": False,
+        "promotion_or_activation": False,
+        "runtime_artifact_root": STAGE07A_RUNTIME_ARTIFACT_ROOT_V1,
+    }
+
+
+def _stage07b_resource_usage_payload(
+    *,
+    torch: Any,
+    start_usage: Any,
+    end_usage: Any,
+    device_payload: dict[str, object],
+    progress_writer: _Stage07bProgressWriter,
+    completed_training_steps: int,
+) -> dict[str, object]:
+    elapsed = progress_writer.elapsed_sec()
+    return {
+        "completed_training_steps": completed_training_steps,
+        "cpu_system_seconds_delta": _round_float(end_usage.ru_stime - start_usage.ru_stime),
+        "cpu_user_seconds_delta": _round_float(end_usage.ru_utime - start_usage.ru_utime),
+        "mps_available": bool(device_payload["mps_available"]),
+        "mps_built": bool(device_payload["mps_built"]),
+        "process_threads_observed": _process_thread_count(),
+        "rss_mb_after": _rss_mb(),
+        "selected_device": device_payload["selected_device"],
+        "torch_num_interop_threads": int(torch.get_num_interop_threads()),
+        "torch_num_threads": int(torch.get_num_threads()),
+        "wall_seconds": elapsed,
+    }
+
+
+def _resource_snapshot_payload() -> dict[str, object]:
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    return {
+        "cpu_system_seconds": _round_float(usage.ru_stime),
+        "cpu_user_seconds": _round_float(usage.ru_utime),
+        "process_threads_observed": _process_thread_count(),
+        "rss_mb": _rss_mb(),
+    }
+
+
+def _read_json_payload(path: Path) -> dict[str, Any]:
+    import json
+
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _render_json_line_payload(payload: dict[str, object]) -> str:
+    import json
+
+    return json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
 
 def _validate_session_features(session_features: np.ndarray) -> np.ndarray:
@@ -780,10 +1800,23 @@ def _seed_training_libraries(*, torch: Any, seed: int) -> None:
 
 
 def _configure_torch_threads(*, torch: Any, config: TrainingSmokeConfig) -> None:
-    torch.set_num_threads(config.torch_num_threads)
+    _configure_torch_threads_for_values(
+        torch=torch,
+        torch_num_threads=config.torch_num_threads,
+        torch_num_interop_threads=config.torch_num_interop_threads,
+    )
+
+
+def _configure_torch_threads_for_values(
+    *,
+    torch: Any,
+    torch_num_threads: int,
+    torch_num_interop_threads: int,
+) -> None:
+    torch.set_num_threads(torch_num_threads)
     current_interop_threads = int(torch.get_num_interop_threads())
-    if current_interop_threads != config.torch_num_interop_threads:
-        torch.set_num_interop_threads(config.torch_num_interop_threads)
+    if current_interop_threads != torch_num_interop_threads:
+        torch.set_num_interop_threads(torch_num_interop_threads)
 
 
 def _select_torch_device(
@@ -791,15 +1824,23 @@ def _select_torch_device(
     torch: Any,
     config: TrainingSmokeConfig,
 ) -> tuple[Any, dict[str, object]]:
+    return _select_torch_device_for_policy(torch=torch, device_policy=config.device_policy)
+
+
+def _select_torch_device_for_policy(
+    *,
+    torch: Any,
+    device_policy: DevicePolicy,
+) -> tuple[Any, dict[str, object]]:
     mps_backend = getattr(torch.backends, "mps", None)
     mps_built = bool(mps_backend is not None and mps_backend.is_built())
     mps_available = bool(mps_backend is not None and mps_backend.is_available())
     selected_device = "cpu"
-    if config.device_policy == "mps_preferred_cpu_fallback" and mps_available:
+    if device_policy == "mps_preferred_cpu_fallback" and mps_available:
         selected_device = "mps"
     device = torch.device(selected_device)
     return device, {
-        "device_policy": config.device_policy,
+        "device_policy": device_policy,
         "mps_available": mps_available,
         "mps_built": mps_built,
         "selected_device": selected_device,
@@ -971,3 +2012,9 @@ def _bounded_float(value: float, field: str, *, low: float, high: float) -> floa
     if out < low or out > high:
         raise TrainingRunnerError(reason="float_out_of_bounds", field=field)
     return out
+
+
+def _non_empty_text(value: str, field: str) -> str:
+    if not value.strip():
+        raise TrainingRunnerError(reason="empty_text", field=field)
+    return value
