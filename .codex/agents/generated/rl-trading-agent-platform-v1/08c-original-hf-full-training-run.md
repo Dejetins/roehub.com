@@ -20,6 +20,8 @@ context_sources:
       why: "stage ledger"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08b-upstream-methodology-core-port.md
       why: "accepted upstream-compatible core"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
+      why: "frozen upstream source-profile and parity checklist"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/04-hf-reproducibility.md
       why: "HF dataset manifests, hashes and local paths"
   task_entrypoints:
@@ -114,7 +116,7 @@ Train the upstream-compatible Roehub agent on the original external HF dataset s
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08C` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Use the original HF dataset files and hashes recorded by Stage `04`; do not use Stage `06` Roehub-native data.
-- Use upstream `configs/alpha.py` as the default full-training profile: CNN maps/kernels/strides, dense layers, dropout, action-history length, `episodes=55_000`, `batch_size=16`, `learning_rate=1e-4`, `train_start=10_000`, PER capacity `230_000`, validation cadence and advantage thresholds. Any deviation must be explicit and justified.
+- Use the frozen Stage `08A` methodology matrix and upstream `configs/alpha.py` as the default full-training profile: feature order `open, high, volume_weighted_average, low, close, volume, num_trades`; `full_seq_len=150`, `pre_signal_len=90`, `agent_history_len=30`, `agent_session_len=10`, `action_history_len=3`; CNN maps/kernels/strides `[32,64,128]` / `[7,5,3]` / `[2,1,1]`; dense value/advantage `[128,64]`; dropout `0.1`; `episodes=55_000`, `batch_size=16`, `learning_rate=1e-4`, `train_start=10_000`, PER capacity `230_000`, validation every `1000`, validation-selected `best.pth`, `final.pth`, train-only normalization stats, and backtest thresholds recorded for later `08D`. Any deviation must be explicit and justified.
 - Progress must be durable and episode/environment-step based: `progress.jsonl`, latest status, completed episodes, planned episodes, completed env steps, elapsed, ETA, device/resource snapshot and status.
 - If full training cannot complete in the active session, launch only through a managed resumable/background path, prove a fresh `running` event and leave Stage `08C` `in_progress`. Do not mark accepted until full training completes.
 - On completion, write `hf_original_candidate` manifest with train dataset hashes, config hash, code state, train-only normalization stats hash, `best` checkpoint hash, `final` checkpoint hash, validation curves, resource metrics and progress hash.

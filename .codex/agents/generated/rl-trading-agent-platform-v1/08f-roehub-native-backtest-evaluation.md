@@ -22,6 +22,8 @@ context_sources:
       why: "Roehub-native candidate manifest and hashes"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
       why: "HF methodology-parity baseline"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
+      why: "frozen upstream grouped-backtest and acceptance checklist"
   task_entrypoints:
     - path: src/trading/contexts/rl_trading
       why: "evaluation/backtest code"
@@ -106,7 +108,7 @@ This is the new research-save gate for the platform. Stage `09` remains blocked 
 - File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08F` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Evaluate `best` checkpoint by default and use train-only normalization stats.
 - Evaluate held-out test/backtest splits from the accepted Stage `06` dataset. Do not evaluate train split as acceptance.
-- Use the same upstream-compatible filtered backtest lifecycle as `08D`: grouped signals, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage/ensemble filters, action rejection counts, fees/slippage/funding policy.
+- Use the same Stage `08A`/`08D` upstream-compatible filtered backtest lifecycle: grouped signals by timestamp, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage threshold filter and/or MC-dropout ensemble filter, action rejection/skipped-signal counts, optional risk-management diagnostics, balance curve, fees/slippage/funding policy and cache statistics. Raw argmax-only evaluation is diagnostic only and cannot accept the research candidate.
 - Run sanity baselines: hold/no-trade, deterministic random, simple threshold and any accepted HF baseline diagnostics.
 - Include simulator/accounting parity fixture and make divergence a blocker.
 - Candidate may be saved as `research_candidate` only if net PnL after costs is positive and scorecard/sanity/overfit checks do not block.

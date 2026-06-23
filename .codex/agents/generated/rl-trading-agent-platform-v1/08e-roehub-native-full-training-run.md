@@ -20,6 +20,10 @@ context_sources:
       why: "stage ledger"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
       why: "accepted HF methodology-parity gate"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
+      why: "frozen upstream source-profile and accepted deviations"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08c-original-hf-full-training-run.md
+      why: "HF-original training profile and checkpoint/progress contract"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md
       why: "accepted Roehub-native dataset manifest"
   task_entrypoints:
@@ -110,7 +114,7 @@ Train the upstream-compatible Roehub agent on the accepted Stage `06` Roehub-nat
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - File manifest gate: every created, modified, deleted, and runtime artifact path must be listed in the Stage `08E` report and ledger update; any file outside expected paths requires explicit outside-manifest justification and must not be changed speculatively.
 - Use accepted Stage `06` sessionized dataset only; do not use six-symbol fallback, old 215-symbol subset, or external HF data.
-- Use the same methodology/config family as `08C`; any adaptation for dataset size, symbol count, train/val split, cost policy or resource budget must be listed in an adaptation diff.
+- Use the same Stage `08A`/`08C` methodology/config family: environment rollout through agent actions, train-only normalization stats, CNN dueling D3QN with dropout, epsilon/PER lifecycle, target sync, gradient clipping, validation-selected `best` plus `final`, and durable episode/env-step progress. Any adaptation for Stage `06` dataset size, symbol count, train/val split, cost/funding policy or resource budget must be listed in an adaptation diff.
 - Progress must be durable and episode/environment-step based.
 - If full training cannot complete in the active session, launch only through a managed resumable/background path, prove a fresh `running` event and leave Stage `08E` `in_progress`. Do not mark accepted until full training completes.
 - On completion, write `roehub_native_candidate` manifest with Stage `06` dataset hash, config hash, code state, train-only normalization stats hash, `best` checkpoint hash, `final` checkpoint hash, validation curves, resource metrics and progress hash.
