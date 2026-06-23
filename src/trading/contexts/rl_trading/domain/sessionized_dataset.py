@@ -253,45 +253,69 @@ def select_high_volatility_session_candidates_v1(
     open_time_ms = slab.open_time_ms
     signal_start_idx = int(np.searchsorted(open_time_ms, signal_start_ms, side="left"))
     signal_end_idx = int(np.searchsorted(open_time_ms, signal_end_ms, side="left"))
-    stride_ms = selected_policy.signal_stride_minutes * SESSIONIZED_MINUTE_MS_V1
+
+    signal_indices = np.arange(
+        signal_start_idx,
+        signal_end_idx,
+        selected_policy.signal_stride_minutes,
+        dtype=np.int64,
+    )
+    if signal_indices.size == 0:
+        return ()
+    in_bounds = (signal_indices >= selected_policy.pre_signal_len) & (
+        signal_indices + selected_policy.post_signal_len <= slab.row_count()
+    )
+    signal_indices = signal_indices[in_bounds]
+    if signal_indices.size == 0:
+        return ()
+
+    score_payload = _score_pre_signal_windows(
+        slab=slab,
+        signal_indices=signal_indices,
+        policy=selected_policy,
+    )
+    valid_signal_indices = score_payload["signal_indices"]
+    if valid_signal_indices.size == 0:
+        return ()
+
+    selected_offsets = _select_top_candidate_offsets(
+        volatility_scores=score_payload["volatility_scores"],
+        signal_times_ms=open_time_ms[valid_signal_indices],
+        policy=selected_policy,
+    )
+    selected_offsets = selected_offsets[
+        np.argsort(open_time_ms[valid_signal_indices[selected_offsets]], kind="stable")
+    ]
 
     candidates: list[SessionCandidate] = []
-    for signal_idx in range(signal_start_idx, signal_end_idx):
-        signal_ts_ms = int(open_time_ms[signal_idx])
-        if (signal_ts_ms - signal_start_ms) % stride_ms != 0:
-            continue
+    upper_symbol = symbol.upper()
+    for offset in selected_offsets:
+        signal_idx = int(valid_signal_indices[int(offset)])
         session_start_idx = signal_idx - selected_policy.pre_signal_len
         session_end_idx = signal_idx + selected_policy.post_signal_len
-        if session_start_idx < 0 or session_end_idx > slab.row_count():
-            continue
-        score_payload = _score_pre_signal_window(
-            slab.features_f32[session_start_idx:signal_idx, :],
-        )
-        if score_payload is None:
-            continue
+        signal_ts_ms = int(open_time_ms[signal_idx])
         session_start_ms = int(open_time_ms[session_start_idx])
         session_end_ms = int(open_time_ms[session_end_idx - 1]) + SESSIONIZED_MINUTE_MS_V1
         candidates.append(
             SessionCandidate(
                 dataset_version=split_window.dataset_version,
                 split=split_window.split,
-                symbol=symbol.upper(),
+                symbol=upper_symbol,
                 signal_index=signal_idx,
                 signal_ts_open_ms=signal_ts_ms,
                 session_start_ms=session_start_ms,
                 session_end_ms=session_end_ms,
                 score_window_start_ms=session_start_ms,
                 score_window_end_ms=signal_ts_ms,
-                volatility_score=score_payload["volatility_score"],
-                pre_signal_log_return=score_payload["pre_signal_log_return"],
-                pre_signal_realized_volatility=score_payload["pre_signal_realized_volatility"],
-                pre_signal_range_ratio=score_payload["pre_signal_range_ratio"],
+                volatility_score=float(score_payload["volatility_scores"][offset]),
+                pre_signal_log_return=float(score_payload["log_returns"][offset]),
+                pre_signal_realized_volatility=float(
+                    score_payload["realized_volatilities"][offset]
+                ),
+                pre_signal_range_ratio=float(score_payload["range_ratios"][offset]),
             )
         )
-
-    if not candidates:
-        return ()
-    return _select_top_candidates(candidates, policy=selected_policy)
+    return tuple(candidates)
 
 
 def materialize_session_features_v1(
@@ -606,19 +630,107 @@ def _score_pre_signal_window(window: np.ndarray) -> dict[str, float] | None:
     }
 
 
-def _select_top_candidates(
-    candidates: Sequence[SessionCandidate],
+def _score_pre_signal_windows(
     *,
+    slab: RawFeatureSlab,
+    signal_indices: np.ndarray,
     policy: SessionExtractionPolicy,
-) -> tuple[SessionCandidate, ...]:
-    target_count = max(1, math.ceil(len(candidates) * policy.high_volatility_top_fraction))
+) -> dict[str, np.ndarray]:
+    close_idx = FEATURE_NAMES_V1.index("close")
+    high_idx = FEATURE_NAMES_V1.index("high")
+    low_idx = FEATURE_NAMES_V1.index("low")
+    close = np.asarray(slab.features_f32[:, close_idx], dtype=np.float64)
+    high = np.asarray(slab.features_f32[:, high_idx], dtype=np.float64)
+    low = np.asarray(slab.features_f32[:, low_idx], dtype=np.float64)
+
+    finite_price = np.isfinite(close) & np.isfinite(high) & np.isfinite(low) & (close > 0.0)
+    valid_price_prefix = np.concatenate(
+        (np.asarray([0], dtype=np.int64), np.cumsum(~finite_price, dtype=np.int64))
+    )
+    valid_price_counts = (
+        valid_price_prefix[signal_indices]
+        - valid_price_prefix[signal_indices - policy.pre_signal_len]
+    )
+    valid_signal_mask = valid_price_counts == 0
+    if not np.any(valid_signal_mask):
+        return _empty_score_payload()
+
+    signal_indices = signal_indices[valid_signal_mask]
+    log_close = np.zeros_like(close, dtype=np.float64)
+    log_close[finite_price] = np.log(close[finite_price])
+    log_returns = np.diff(log_close)
+    return_count = policy.pre_signal_len - 1
+    return_prefix = np.concatenate(
+        (np.asarray([0.0], dtype=np.float64), np.cumsum(log_returns, dtype=np.float64))
+    )
+    return_sq_prefix = np.concatenate(
+        (
+            np.asarray([0.0], dtype=np.float64),
+            np.cumsum(log_returns * log_returns, dtype=np.float64),
+        )
+    )
+    return_start = signal_indices - policy.pre_signal_len
+    return_end = signal_indices - 1
+    return_sum = return_prefix[return_end] - return_prefix[return_start]
+    return_sq_sum = return_sq_prefix[return_end] - return_sq_prefix[return_start]
+    return_mean = return_sum / float(return_count)
+    variance = np.maximum(
+        (return_sq_sum / float(return_count)) - (return_mean * return_mean),
+        0.0,
+    )
+    realized_volatility = np.sqrt(variance, dtype=np.float64)
+
+    range_ratio = np.zeros_like(close, dtype=np.float64)
+    range_ratio[finite_price] = (high[finite_price] - low[finite_price]) / close[finite_price]
+    range_prefix = np.concatenate(
+        (np.asarray([0.0], dtype=np.float64), np.cumsum(range_ratio, dtype=np.float64))
+    )
+    range_mean = (
+        range_prefix[signal_indices] - range_prefix[signal_indices - policy.pre_signal_len]
+    ) / float(policy.pre_signal_len)
+    clipped_range_mean = np.maximum(range_mean, 0.0)
+    total_log_return = (
+        log_close[signal_indices - 1] - log_close[signal_indices - policy.pre_signal_len]
+    )
+    volatility_score = realized_volatility + clipped_range_mean
+    finite_scores = (
+        np.isfinite(volatility_score)
+        & np.isfinite(total_log_return)
+        & np.isfinite(realized_volatility)
+        & np.isfinite(clipped_range_mean)
+    )
+    return {
+        "signal_indices": signal_indices[finite_scores],
+        "log_returns": total_log_return[finite_scores],
+        "realized_volatilities": realized_volatility[finite_scores],
+        "range_ratios": clipped_range_mean[finite_scores],
+        "volatility_scores": volatility_score[finite_scores],
+    }
+
+
+def _empty_score_payload() -> dict[str, np.ndarray]:
+    return {
+        "signal_indices": np.asarray([], dtype=np.int64),
+        "log_returns": np.asarray([], dtype=np.float64),
+        "realized_volatilities": np.asarray([], dtype=np.float64),
+        "range_ratios": np.asarray([], dtype=np.float64),
+        "volatility_scores": np.asarray([], dtype=np.float64),
+    }
+
+
+def _select_top_candidate_offsets(
+    *,
+    volatility_scores: np.ndarray,
+    signal_times_ms: np.ndarray,
+    policy: SessionExtractionPolicy,
+) -> np.ndarray:
+    target_count = max(
+        1,
+        math.ceil(int(volatility_scores.size) * policy.high_volatility_top_fraction),
+    )
     target_count = min(target_count, policy.max_sessions_per_symbol_split)
-    ranked = sorted(
-        candidates,
-        key=lambda item: (-item.volatility_score, item.signal_ts_open_ms, item.symbol),
-    )[:target_count]
-    ranked.sort(key=lambda item: (item.signal_ts_open_ms, item.symbol))
-    return tuple(ranked)
+    ranked_offsets = np.lexsort((signal_times_ms, -volatility_scores))
+    return ranked_offsets[:target_count]
 
 
 def _split_window_embargo_violations(
