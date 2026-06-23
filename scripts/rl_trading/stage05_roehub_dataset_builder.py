@@ -26,8 +26,13 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gatew
     ClickHouseConnectGateway,
     ClickHouseGateway,
 )
+from trading.contexts.rl_trading.domain.feature_contract import (  # noqa: E402
+    FEATURE_CONTRACT_HASH_V1,
+)
 from trading.contexts.rl_trading.domain.raw_feature_dataset import (  # noqa: E402
     BLOCKED_NOT_TRAINING_SOURCE_REASON_V1,
+    RAW_FEATURE_DATASET_SCHEMA_VERSION_V1,
+    RAW_FEATURE_SLAB_KIND_V1,
     RawFeatureCandleBatch,
     RawFeatureDatasetError,
     RawFeatureSlab,
@@ -83,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
             max_symbols=args.max_symbols,
             max_minutes_per_symbol=args.max_minutes_per_symbol,
             chunk_minutes=int(args.chunk_minutes),
+            resume_existing_slabs=bool(args.resume_existing_slabs),
             generated_at_utc=(
                 _parse_utc(args.generated_at_utc)
                 if args.generated_at_utc is not None
@@ -129,6 +135,7 @@ def build_raw_feature_dataset_from_clickhouse(
     max_symbols: int | None,
     max_minutes_per_symbol: int | None,
     chunk_minutes: int,
+    resume_existing_slabs: bool,
     generated_at_utc: datetime,
 ) -> dict[str, Any]:
     if chunk_minutes <= 0:
@@ -185,6 +192,7 @@ def build_raw_feature_dataset_from_clickhouse(
             output_root=output_root,
             chunk_minutes=chunk_minutes,
             build_parity_fixture=parity_fixture is None,
+            resume_existing_slabs=resume_existing_slabs,
         )
         slab_entries.append(entry)
         if parity_fixture is None:
@@ -223,6 +231,7 @@ def _materialize_slab(
     output_root: Path,
     chunk_minutes: int,
     build_parity_fixture: bool,
+    resume_existing_slabs: bool,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     if source_window.expected_minutes <= 0:
         raise RawFeatureDatasetError(reason="empty_source_window", field=source_window.symbol)
@@ -233,6 +242,14 @@ def _materialize_slab(
     open_time_path = slab_root / "open_time_ms.i64.npy"
     close_time_path = slab_root / "close_time_ms.i64.npy"
     slab_manifest_path = slab_root / "manifest.json"
+
+    if resume_existing_slabs and not build_parity_fixture:
+        existing_entry = _existing_slab_entry_if_resumable(
+            slab_manifest_path=slab_manifest_path,
+            source_window=source_window,
+        )
+        if existing_entry is not None:
+            return existing_entry, None
 
     features_mm = np.lib.format.open_memmap(
         features_path,
@@ -507,8 +524,64 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--max-minutes-per-symbol", type=int, default=None)
     parser.add_argument("--chunk-minutes", type=int, default=DEFAULT_CHUNK_MINUTES)
+    parser.add_argument(
+        "--resume-existing-slabs",
+        action="store_true",
+        help="Reuse completed per-slab manifests and arrays from output-root.",
+    )
     parser.add_argument("--generated-at-utc", type=str, default=None)
     return parser
+
+
+def _existing_slab_entry_if_resumable(
+    *,
+    slab_manifest_path: Path,
+    source_window: RawFeatureSourceWindow,
+) -> dict[str, Any] | None:
+    if not slab_manifest_path.exists():
+        return None
+
+    entry = _read_json(slab_manifest_path)
+    expected_fields: Mapping[str, object] = {
+        "artifact_kind": RAW_FEATURE_SLAB_KIND_V1,
+        "dataset_version": source_window.dataset_version,
+        "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
+        "market": "binance:futures",
+        "market_id": source_window.market_id,
+        "row_count": source_window.expected_minutes,
+        "schema_version": RAW_FEATURE_DATASET_SCHEMA_VERSION_V1,
+        "source_end_utc": source_window.source_end_utc,
+        "source_start_utc": source_window.source_start_utc,
+        "symbol": source_window.symbol,
+    }
+    for field, expected in expected_fields.items():
+        if entry.get(field) != expected:
+            raise RawFeatureDatasetError(
+                reason="resume_slab_manifest_mismatch",
+                field=f"{slab_manifest_path}:{field}",
+            )
+
+    files = entry.get("files")
+    if not isinstance(files, Mapping):
+        raise RawFeatureDatasetError(
+            reason="resume_slab_manifest_mismatch",
+            field=f"{slab_manifest_path}:files",
+        )
+    for file_key in ("features", "open_time_ms", "close_time_ms"):
+        file_payload = files.get(file_key)
+        if not isinstance(file_payload, Mapping):
+            raise RawFeatureDatasetError(
+                reason="resume_slab_manifest_mismatch",
+                field=f"{slab_manifest_path}:files.{file_key}",
+            )
+        file_path = Path(str(file_payload.get("path") or ""))
+        if not file_path.exists():
+            raise RawFeatureDatasetError(
+                reason="resume_slab_file_missing",
+                field=str(file_path),
+            )
+    entry["manifest_path"] = str(slab_manifest_path)
+    return entry
 
 
 def _render_status(payload: Mapping[str, Any]) -> str:

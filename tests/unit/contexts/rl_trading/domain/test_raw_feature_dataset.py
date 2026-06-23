@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+from scripts.rl_trading.stage05_roehub_dataset_builder import _existing_slab_entry_if_resumable
 from trading.contexts.rl_trading.domain import (
     BLOCKED_NOT_TRAINING_SOURCE_REASON_V1,
     FEATURE_CONTRACT_HASH_V1,
@@ -20,6 +22,7 @@ from trading.contexts.rl_trading.domain import (
     feature_stats_payload_v1,
     hash_raw_feature_slab_payload_v1,
     raw_feature_source_windows_from_stage04c_v1,
+    render_raw_feature_json_payload_v1,
     training_source_gate_payload_v1,
 )
 
@@ -187,6 +190,57 @@ def test_missing_feature_fields_fail_closed_before_slab_materialization() -> Non
 
     assert exc_info.value.reason == "non_finite_array"
     assert exc_info.value.field == "volume_quote_f32"
+
+
+def test_existing_slab_manifest_resume_validation_fails_closed(tmp_path: Path) -> None:
+    window = RawFeatureSourceWindow(
+        dataset_version="post_hf_extension_current_trading",
+        symbol="BTCUSDT",
+        market_id=2,
+        source_start_utc="2025-05-31T22:30:00Z",
+        source_end_utc="2025-05-31T22:33:00Z",
+        expected_minutes=3,
+    )
+    batch = _batch()
+    slab = build_raw_feature_slab_v1(batch)
+    slab_root = tmp_path / "post_hf_extension_current_trading" / "BTCUSDT"
+    slab_root.mkdir(parents=True)
+    artifact_files = {
+        "features": {"path": str(slab_root / "features.f32.npy"), "sha256": "a" * 64},
+        "open_time_ms": {"path": str(slab_root / "open_time_ms.i64.npy"), "sha256": "b" * 64},
+        "close_time_ms": {"path": str(slab_root / "close_time_ms.i64.npy"), "sha256": "c" * 64},
+    }
+    for payload in artifact_files.values():
+        Path(str(payload["path"])).write_bytes(b"existing")
+    entry = build_raw_feature_slab_manifest_entry_v1(
+        source_window=window,
+        slab=slab,
+        feature_stats=feature_stats_payload_v1(slab.features_f32),
+        artifact_files=artifact_files,
+    )
+    slab_manifest_path = slab_root / "manifest.json"
+    entry["manifest_path"] = str(slab_manifest_path)
+    slab_manifest_path.write_text(render_raw_feature_json_payload_v1(entry), encoding="utf-8")
+
+    assert _existing_slab_entry_if_resumable(
+        slab_manifest_path=slab_manifest_path,
+        source_window=window,
+    ) == entry
+
+    stale_entry = dict(entry)
+    stale_entry["row_count"] = 2
+    slab_manifest_path.write_text(
+        render_raw_feature_json_payload_v1(stale_entry),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RawFeatureDatasetError) as exc_info:
+        _existing_slab_entry_if_resumable(
+            slab_manifest_path=slab_manifest_path,
+            source_window=window,
+        )
+
+    assert exc_info.value.reason == "resume_slab_manifest_mismatch"
 
 
 def _batch() -> RawFeatureCandleBatch:
