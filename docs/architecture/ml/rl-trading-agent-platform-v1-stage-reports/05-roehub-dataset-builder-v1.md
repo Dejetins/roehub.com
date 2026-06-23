@@ -15,6 +15,8 @@ User required before start: nothing unless a listed prerequisite is not accepted
 
 Stage `05` стартовал после проверки ledger: Stage `04C` имеет статус `accepted`, `current_stage=05`, а accepted Stage `04C` manifest path/hash зафиксирован для единственного входа Stage `05`.
 
+Stage `05` завершен как delivered clean-main state, а не sample-only/local-only: код доставлен в `origin/main`, CI зеленый, Mac Studio checkout чистый на commit `1d08bf4a53c94757f3ef4be4f85e54e0403786b3`, и полный raw feature dataset manifest записан под `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1`.
+
 ## Scope
 
 Входит:
@@ -23,7 +25,8 @@ Stage `05` стартовал после проверки ledger: Stage `04C` и
 - построить raw `binance:futures` feature slabs и sanitized manifests из accepted Stage `04C` refresh manifest;
 - записать deterministic rebuild hash, manifest schema и feature stats;
 - явно заблокировать `binance:spot`, `bybit:spot` и `bybit:futures` как `blocked_not_training_source_v1`;
-- создать golden fixture, доказывающий parity offline/live-equivalent feature vector через общий Stage `02B` feature builder.
+- создать golden fixture, доказывающий parity offline/live-equivalent feature vector через общий Stage `02B` feature builder;
+- доставить Stage `05` code/docs в `origin/main` и материализовать полный all-symbol raw dataset artifact на Mac Studio.
 
 Не входит:
 
@@ -31,7 +34,8 @@ Stage `05` стартовал после проверки ledger: Stage `04C` и
 - model training, checkpoints, registry writes or calibration packs;
 - exchange/account/order/provider side effects;
 - browser/UI/API changes;
-- rediscovering universe/backfill scope or changing Stage `04C` manifest semantics.
+- rediscovering universe/backfill scope or changing Stage `04C` manifest semantics;
+- accepting Stage `06` or starting Stage `07`.
 
 ## File Manifest
 
@@ -50,14 +54,16 @@ Initial contract impact: `compatible-change`; Stage `05` adds an opt-in raw data
 | Created | Modified | Deleted | Reason | Contract impact |
 |---|---|---|---|---|
 | `src/trading/contexts/rl_trading/domain/raw_feature_dataset.py` | - | - | Pure Stage `05` raw feature slab, manifest, stats and golden parity helper. | `compatible-change` additive domain helper |
-| `scripts/rl_trading/stage05_roehub_dataset_builder.py` | - | - | Opt-in CLI to consume accepted Stage `04C` manifest and write runtime raw feature artifacts. | `compatible-change` operator helper |
-| `tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | - | - | Focused deterministic coverage for slab shape/order/hash, source gating and parity fixtures. | `compatible-change` test-only |
+| `scripts/rl_trading/stage05_roehub_dataset_builder.py` | - | - | Opt-in CLI to consume accepted Stage `04C` manifest and write runtime raw feature artifacts; later made resume-safe for long materialization. | `compatible-change` operator helper |
+| `tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | - | - | Focused deterministic coverage for slab shape/order/hash, source gating, parity fixtures and resume validation. | `compatible-change` test-only |
 | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/05-roehub-dataset-builder-v1.md` | - | - | Stage `05` report. | `compatible-change` docs/report only |
-| - | `src/trading/contexts/rl_trading/domain/__init__.py` | - | Export Stage `05` helper surface for tests and later stages. | `compatible-change` additive exports |
-| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Record Stage `05` evidence, blockers and Stage `06` handoff. | `compatible-change` docs/ledger only |
-| - | `docs/architecture/README.md` | - | Docs index regeneration after adding Stage `05` report. | `compatible-change` docs index only |
+| - | `src/trading/contexts/rl_trading/domain/__init__.py` | - | Export Stage `05` helper surface while keeping Stage `06` local-only exports out of the clean Stage `05` publish. | `compatible-change` additive exports |
+| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Record Stage `05` full materialization evidence, blockers and Stage `06` handoff. | `compatible-change` docs/ledger only |
+| - | `docs/architecture/README.md` | - | Docs index regeneration after adding Stage `05` report; later repaired to exclude untracked Stage `06` report from Stage `05` publish. | `compatible-change` docs index only |
 
-## Prompt Evidence
+Out of scope and intentionally not published as Stage `05`: local Stage `06` files under `06-dataset-qa-session-extractor.md`, `stage06_dataset_qa_session_extractor.py`, `sessionized_dataset.py`, and `test_sessionized_dataset.py`.
+
+## Prompt And Delivery Evidence
 
 | Field | Value |
 |---|---|
@@ -67,16 +73,10 @@ Initial contract impact: `compatible-change`; Stage `05` adds an opt-in raw data
 | Required prerequisite | Stage `04C` accepted |
 | Stage `04C` input manifest | `/opt/roehub/state/rl_trading/stage04c_dataset_refresh_manifest/stage04c_dataset_refresh_manifest.json` |
 | Stage `04C` input sha256 | `9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344` |
-| Delivery state | `local-only`; no branch, PR, main delivery or deploy. Mac Studio evidence is a bounded pre-main target-host sample run from the temporary scoped Stage `05` diff, not production deploy proof. |
-
-## Observed State
-
-| Area | Evidence summary |
-|---|---|
-| Stage prerequisite | Ledger records Stage `04C` as `accepted`; Stage `05` is the current stage. |
-| Feature contract | Stage `02B` accepted feature hash `d2e99786b68482d730494c6aeec72a1e9f40ac225729019fac5c82f96f900be9` and channel order `open`, `high`, `volume_weighted_average`, `low`, `close`, `volume`, `num_trades`. |
-| Stage `04C` manifest | Accepted input path/hash are fixed; Stage `05` must consume this manifest and must not rediscover universe or backfill scope. |
-| Market scope | `binance:futures` only is trainable in v1; `binance:spot`, `bybit:spot`, `bybit:futures` are blocked as `blocked_not_training_source_v1`. |
+| Implementation commit | `6b46c3bae6b7ee0843d5a2a7d77891f5713cde40` (`Deliver RL Stage 05 raw feature builder`) |
+| Docs index repair commit | `48c9e6b1` (`Fix RL Stage 05 docs index scope`) |
+| Resume/full-build commit | `1d08bf4a53c94757f3ef4be4f85e54e0403786b3` (`Make RL Stage 05 builder resumable`) |
+| Delivery state | `delivered-to-main`; `origin/main` at `1d08bf4a53c94757f3ef4be4f85e54e0403786b3` before full Mac Studio materialization |
 
 ## Contract Impact
 
@@ -103,14 +103,42 @@ Initial contract impact: `compatible-change`; Stage `05` adds an opt-in raw data
 |---|---|---|
 | `target_host_readiness_pre_main` | collected | SSH reached `MacStudioDaniil`; remote git commands were run only in `/Users/daniildegtyarev/Projects/roehub.com`; accepted Stage `04C` manifest path/hash exists under `/opt/roehub/state/rl_trading/`. |
 | `read_only_existing_runtime_smoke` | N/A | No existing production service or browser/runtime smoke was needed; Stage `05` does not change `/opt/roehub/app` behavior. |
-| `target_host_non_production_sample_pre_main` | collected | Temporary scoped Stage `05` diff was applied to the Mac Studio git checkout, a bounded dataset sample was written under `/opt/roehub/state/rl_trading/datasets/`, and the diff was reversed. This is not production deploy proof. |
-| `post_main_production_runtime_proof` | not collected | Requires the target revision on `main`, green GitHub Actions/CI, deploy or verified sync into `/opt/roehub/app` when service/runtime code is affected, and then runtime smoke. This stage report does not claim that proof. |
+| `target_host_non_production_sample_pre_main` | collected historically | Temporary scoped Stage `05` diff produced the earlier `BTCUSDT` 5-row sample. This evidence is retained as historical debugging/proof only and is not the final acceptance boundary. |
+| `post_main_dataset_materialization_proof` | collected | Mac Studio git checkout was clean at `1d08bf4a53c94757f3ef4be4f85e54e0403786b3` on `main...origin/main`; full Stage `05` raw feature dataset manifest was written under `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1`. |
+| `post_main_production_runtime_proof` | N/A | Stage `05` changed no `/opt/roehub/app` service/runtime/browser surface. The relevant post-main proof for this stage is dataset materialization from the clean Mac Studio git checkout, not service deploy/reload. |
+
+## Runtime Artifact Evidence
+
+| Field | Value |
+|---|---|
+| Host | `MacStudioDaniil` |
+| Mac Studio checkout commit | `1d08bf4a53c94757f3ef4be4f85e54e0403786b3` |
+| Mac Studio checkout state | `## main...origin/main` with no local changes reported |
+| Output root | `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1` |
+| Manifest path | `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1/stage05_raw_feature_manifest.json` |
+| Manifest file sha256 | `393461747be00aff457858473637d978791525cb629e60199c1e74c1148807f1` |
+| Manifest deterministic rebuild hash | `4c2c99524c8c3d4ff60ae10e03be926ea1c4734d0bdda1b8c986e67d55d4890b` |
+| Manifest status | `accepted` |
+| Build scope | `full_selected_windows`, `all_symbols=true` |
+| Selected symbol count | `528` |
+| Slab count | `886` |
+| Total rows | `618,533,473` |
+| `hf_period_rebuild_current_trading` | `358` slabs / `358` symbols / `361,453,025` rows |
+| `post_hf_extension_current_trading` | `528` slabs / `528` symbols / `257,080,448` rows |
+| Stage `04C` dependency sha256 | `9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344` |
+| Feature contract hash | `d2e99786b68482d730494c6aeec72a1e9f40ac225729019fac5c82f96f900be9` |
+| Golden parity fixture | `3` samples, `max_abs_diff=0.0`, symbol `1000000MOGUSDT`, dataset version `hf_period_rebuild_current_trading` |
+| Artifact safety flags | `contains_sessionized_training_dataset=false`, `contains_raw_provider_payloads=false`, `contains_secrets=false`, `exchange_side_effects=false`, `market_data_writes=false` |
+| Final artifact directory size | `25,966` MiB at completion probe |
+| ClickHouse health after materialization | `/ping` returned `Ok.` |
+
+The first full run was interrupted after `283` slab manifests by a transient ClickHouse HTTP `127.0.0.1:8123` connection refusal. ClickHouse returned healthy on `/ping` immediately after the interruption. Stage `05` therefore added `--resume-existing-slabs`, with fail-closed validation of existing slab manifests/files before reuse, then completed the full materialization from the same accepted Stage `04C` manifest.
 
 ## Business Impact
 
-- Stage `05` gives Stage `06` deterministic raw feature slabs and manifests from the accepted Stage `04C` source of truth, so session extraction no longer chooses universe/window scope itself.
-- Operators get a bounded CLI that can build full selected windows or a small sample without opening exchange, account, order, browser or model-training surfaces.
-- `binance:spot`, `bybit:spot` and `bybit:futures` remain explicitly blocked for v1 training as `blocked_not_training_source_v1`.
+- Stage `06` now has a full Roehub-native raw feature source of truth for all accepted Stage `04C` `binance:futures` windows, not a local sample.
+- Session extraction can consume deterministic slab manifests, row counts and rebuild hashes instead of rediscovering universe, lifecycle windows or feature semantics.
+- Operators can rerun or resume Stage `05` without opening exchange/provider/account/order surfaces, and stale partial slabs fail closed instead of silently entering the training pipeline.
 
 ## Conditional Service-Call Coverage
 
@@ -120,14 +148,14 @@ Initial contract impact: `compatible-change`; Stage `05` adds an opt-in raw data
 | ClickHouse | Read-only `SELECT ... FINAL` against `market_data.canonical_candles_1m` through existing ClickHouse settings; no writes. |
 | Runtime artifact writes | Writes `.npy` slabs and sanitized JSON manifests under `/opt/roehub/state/rl_trading/datasets/`. |
 | Auth/secrets | Existing host-local ClickHouse env is used on Mac Studio; no credential values are printed, copied or committed. |
-| Timeout/retry/error behavior | No retry loop is added. Missing candles, null `volume_quote`, null `trades_count`, invalid OHLC, non-monotonic time or parity mismatch fail closed. |
-| Idempotency/unknown state | Re-running with the same manifest/window/input rows rewrites the same output paths and records deterministic rebuild hashes. |
+| Timeout/retry/error behavior | The builder itself does not blindly retry ClickHouse reads. Resume mode reuses only previously accepted slab manifests whose schema, source window, row count, files and feature contract match the current request; stale or corrupt slabs fail closed. |
+| Idempotency/unknown state | Re-running with the same manifest/window/input rows rewrites or validates the same output paths and records deterministic rebuild hashes. |
 | Browser/UI | `N/A`; prompt disabled browser runtime verification and no browser-visible behavior changed. |
 
 ## Logging, Redaction, Alerts, Runbook
 
 - Runtime manifests contain symbol names, timestamps, row counts, feature stats and hashes only; no raw provider payloads, tokens, cookies, credentials, signed requests or checkpoint contents.
-- The Mac Studio sample command used the host-local env file through shell sourcing but did not echo environment values.
+- The Mac Studio commands used the host-local env file through shell sourcing but did not echo environment values.
 - No logs, metrics, alert routes, Monit/launchd settings, scheduler intervals or runbook actions changed.
 - Full artifact retention/backup remains owned by later Stage `09B`; Stage `05` does not add cleanup policy.
 
@@ -136,71 +164,44 @@ Initial contract impact: `compatible-change`; Stage `05` adds an opt-in raw data
 | Gate | Result |
 |---|---|
 | `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/05-roehub-dataset-builder-v1.md` | passed; `7a8d14125b6950edd1150af53ea75a8ce2d952cfae86ea6cc1215b0702704e61` |
-| `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed; `5 passed` |
-| `uv run ruff check src/trading/contexts/rl_trading/domain/raw_feature_dataset.py src/trading/contexts/rl_trading/domain/__init__.py scripts/rl_trading/stage05_roehub_dataset_builder.py tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed |
-| `uv run pyright src/trading/contexts/rl_trading/domain/raw_feature_dataset.py scripts/rl_trading/stage05_roehub_dataset_builder.py tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed; `0 errors` |
-| `uv run pytest -q tests/unit/contexts/rl_trading` | passed; `31 passed` |
-| `uv run ruff check src/trading/contexts/rl_trading apps tests` | passed |
-| `uv run pyright src/trading/contexts/rl_trading apps tests` | passed; `0 errors` |
-| `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps` | passed; `377 passed, 3 warnings` |
+| `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed after resume patch; `6 passed` |
+| `uv run ruff check scripts/rl_trading/stage05_roehub_dataset_builder.py tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed |
+| `uv run pyright scripts/rl_trading/stage05_roehub_dataset_builder.py tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` | passed; `0 errors` |
+| `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps --ignore=tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed; `378 passed, 3 warnings`; ignored only the untracked local Stage `06` test to mirror a clean Stage `05` checkout |
+| Mac Studio `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_raw_feature_dataset.py` at `1d08bf4a` | passed; `6 passed` |
 | CLI fail-closed smoke: `uv run python scripts/rl_trading/stage05_roehub_dataset_builder.py --exchange bybit --market-type spot --symbol BTCUSDT` | passed; exited `2` with `reason=blocked_not_training_source_v1` |
-| Mac Studio focused test from temporary scoped Stage `05` diff | passed; `5 passed` |
-| `uv run python -m tools.docs.generate_docs_index --check` | passed after `uv run python -m tools.docs.generate_docs_index` updated `docs/architecture/README.md` |
+| GitHub Actions run `28034733779` for `1d08bf4a` | passed; status `completed`, conclusion `success` |
+| Mac Studio full materialization command with `--all-symbols --resume-existing-slabs` | passed; `status=accepted`, `slab_count=886`, `total_rows=618533473` |
 
-## Evidence
+## Historical Sample Evidence
 
-Mac Studio Stage `04C` input manifest readback:
-
-| Field | Value |
-|---|---|
-| Host | `MacStudioDaniil` |
-| Manifest path | `/opt/roehub/state/rl_trading/stage04c_dataset_refresh_manifest/stage04c_dataset_refresh_manifest.json` |
-| Manifest sha256 | `9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344` |
-
-Bounded target-host sample evidence:
+The earlier bounded Mac Studio sample remains useful as a debugging trace, but it is no longer the acceptance boundary.
 
 | Field | Value |
 |---|---|
 | Evidence label | `target_host_non_production_sample_pre_main` |
-| Code path | Temporary scoped Stage `05` diff applied to `/Users/daniildegtyarev/Projects/roehub.com`, then reversed; remote checkout returned clean. |
 | Command scope | `BTCUSDT`, `post_hf_extension_current_trading`, first `5` minutes, `chunk_minutes=5` |
 | Output root | `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1_sample` |
-| Manifest status | `accepted` |
 | Manifest file sha256 | `163d4d09cb1cba86894878bd98cad4d87cecfa928603db61b6f024f07d0ae7a3` |
 | Manifest deterministic rebuild hash | `e8ce5fe0699f70a682ae8232fee3c10c3e3fe41479c3591b51915a8544a8a25b` |
 | Slab count / rows | `1` slab / `5` rows |
-| Slab rebuild hash | `6c4d7a87a56b38cc9e0136c0b9504f81586dadae4e317ce279d777e4d8f76e4e` |
-| `features.f32.npy` sha256 | `29513496948a106662642e08f3abf3b2ab3da75beceb9dde6d959746cf72e3a7` |
-| `open_time_ms.i64.npy` sha256 | `9c9fe67e0586934c532a8d5e8932ed643ba47c485725e13142fd6a439a12af04` |
-| `close_time_ms.i64.npy` sha256 | `20439e8e635dd207fad5d4da712051ff01b20b92661a6f6265155b8536279545` |
-| Feature stats | `7` features recorded in sanitized slab manifest |
 | Golden parity fixture | `3` samples, `max_abs_diff=0.0`, feature hash `d2e99786b68482d730494c6aeec72a1e9f40ac225729019fac5c82f96f900be9` |
-
-Implementation notes:
-
-- Raw slab materialization uses Stage `02B` channel order and dtype `float32`.
-- VWAP parity bug found by the first Mac Studio sample was fixed: vectorized VWAP now matches the shared feature builder after `float32` materialization.
-- The existing `CanonicalCandleBatch1m` / backtest artifact 5-column OHLCV contract was not changed; Stage `05` keeps the 7-channel RL feature slab contract inside `rl_trading`.
 
 ## Cold Self-Review
 
 Cold-head review: completed
 Mode: cold self-review fallback
-Review scope: Stage `05` report, stage ledger update, file manifest, contract-impact table, Mac Studio proof-boundary wording, service-call/redaction/alert coverage, quality-gate evidence and Stage `06` handoff.
+Review scope: Stage `05` report, stage ledger update, file manifest, contract-impact table, Mac Studio proof-boundary wording, service-call/redaction/alert coverage, quality-gate evidence, full-materialization manifest evidence and Stage `06` handoff.
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
 Verdict: Release after fixes
-Blockers fixed: Added the missing cold-head receipt required by the artifact gate; no additional Blocker or High artifact findings remained after checking file manifest, proof-boundary labels, validation depth, service-call coverage, redaction and docs-index evidence.
+Blockers fixed: Replaced stale `local-only` / sample-only wording with delivered clean-main full-materialization evidence; removed the Stage `06` blocker clause that said the Stage `05` full raw manifest was unavailable in a delivered clean checkout; recorded the ClickHouse interruption and fail-closed resume mitigation; preserved Stage `06`/`07` boundaries.
 Local follow-up check: completed
-Residual risks: Delivery remains `local-only`; `post_main_production_runtime_proof` was not collected; full all-symbol raw slab materialization is supported by the CLI but not executed in this stage.
+Residual risks: Stage `06` full sessionized train/validation/test/backtest datasets are still not materialized or accepted; no `/opt/roehub/app` service deploy was needed or performed because Stage `05` has no service/browser/runtime surface; Stage `09B` still owns backup/restore policy for large artifacts.
 
 ## Blockers And Handoff
 
-Stage `05` is `accepted` with delivery state `local-only`.
+Stage `05` is `accepted`, delivered to `origin/main`, and fully materialized under `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1`.
 
-No blocker remains for Stage `06` to consume the Stage `05` raw feature builder and manifests in this checkout. Stage `06` must still create accepted sessionized train/validation/test/backtest datasets and prove split/leak/overlap policy; it must not treat the Stage `05` sample artifact as a full accepted training dataset.
+No blocker remains for Stage `06` to consume the Stage `05` raw feature builder and full raw manifest. Stage `06` itself remains `blocked` until full accepted `binance:futures` train/validation/test/backtest sessionized datasets are materialized and their split/leak/overlap/gap/lifecycle evidence is recorded.
 
-Handoff caveats:
-
-- The Mac Studio sample is `target_host_non_production_sample_pre_main`, not `post_main_production_runtime_proof` and not a service deploy.
-- Repository changes are not delivered to `origin/main` in this stage report. A separate publish step is required before another clean checkout can run Stage `06` without carrying this local diff.
-- Full all-symbol raw slab materialization is supported by the CLI with `--all-symbols`, but Stage `05` acceptance evidence used a bounded sample to avoid launching a multi-hundred-symbol build inside this agent turn.
+Stage `07` must not start from the raw Stage `05` manifest or the bounded Stage `06` sample. Training, checkpoints, registry writes, calibration, provider/exchange side effects and activation remain out of scope until the required later stages are accepted.
