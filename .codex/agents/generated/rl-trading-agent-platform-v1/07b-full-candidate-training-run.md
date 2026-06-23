@@ -149,9 +149,10 @@ Done means:
 
 - full candidate training completes on the accepted Stage `06` dataset, not a tiny smoke subset;
 - candidate checkpoint/report/config artifacts are written under `/opt/roehub/state/rl_trading/`;
+- durable progress artifacts exist and show step-based progress, percentage, elapsed time, ETA, and run status;
 - hashes and resource evidence are recorded;
 - Stage `08` receives one explicit candidate manifest path/hash;
-- if full training cannot finish, Stage `07B` remains `in_progress` with resume instructions and Stage `08` remains blocked.
+- if full training cannot finish, Stage `07B` remains `in_progress` with resume instructions, latest progress event/status, and Stage `08` remains blocked.
 
 ## Context / Current State
 
@@ -167,7 +168,11 @@ Done means:
 - Before editing, narrow expected directories to a concrete file list and record it in the stage report.
 - Use the accepted Stage `06` `binance:futures` sessionized dataset manifest exactly. Do not train on spot, Bybit, six-symbol fallback, old 215-symbol subset, or smoke fixtures.
 - Freeze and hash the training config, dataset manifest, model architecture, seed, code version, device policy, and resource limits.
+- Define a frozen training plan before launch with `planned_training_steps`, `progress_emit_every_steps`, `progress_emit_every_sec`, checkpoint cadence, validation cadence, and selected device policy. Do not report progress as raw rows/slabs read; progress is step-based: `progress_pct = completed_training_steps / planned_training_steps * 100`.
+- Write durable progress under the run directory, including at minimum `progress.jsonl` and a latest status snapshot. Every progress event must include `run_id`, `stage`, `status`, `completed_training_steps`, `planned_training_steps`, `progress_pct`, `elapsed_sec`, `eta_sec`, `device`, resource snapshot or resource summary reference, and timestamp. Status values must cover `starting`, `running`, `completed`, `failed`, and `interrupted`.
+- Emit progress at least every configured step interval or configured time interval, whichever comes first. Recommended defaults for the full run are every `10_000` training steps or every `300` seconds unless Stage `07A` evidence or Mac Studio constraints justify a different value.
 - Run full candidate training on Mac Studio. If it is too long for the interactive session, launch only through a managed resumable/background path with durable manifest/logs; prove the job state, record `in_progress`, and stop instead of keeping the agent session open just to watch training. Do not mark `07B` accepted until the full candidate run completes.
+- If launching background/resumable training, prove not only that the process started but also that the durable progress file exists and has at least one fresh `running` progress event from the current run. Record where to inspect progress and the exact resume/status command in the stage report and ledger.
 - On completion, write candidate checkpoint/report/manifest under `/opt/roehub/state/rl_trading/` and record sha256 hashes. Do not commit checkpoints or tensor dumps.
 - Record wall-clock, RSS, CPU/MPS usage, throughput, train/validation curves, selected checkpoint policy, and rejected/failed-run behavior.
 - Do not register or promote the model. Stage `09` owns registry/checkpoint security; Stage `08` owns evaluation.
@@ -191,14 +196,16 @@ Read `.codex/AGENTS.md`, the RL plan, ledger, Stage `07A` report, Stage `06` rep
 2. Record `User required before start`, prompt path/hash, planned file list, and blockers in the Stage `07B` report.
 3. Resolve the exact Stage `06` manifest path/hash and accepted train/validation split artifacts.
 4. Freeze the full candidate training config and create a deterministic run directory under `/opt/roehub/state/rl_trading/`.
-5. Run full candidate training on Mac Studio or start a managed resumable job if the run cannot complete within the session.
-6. If the run is incomplete, update report/ledger as `in_progress` with resume command, job state, logs, and blockers; do not start Stage `08`.
-7. If the run completes, validate checkpoint/report hashes, collect resource evidence, run focused gates, update report/ledger, and hand Stage `08` the candidate manifest path/hash.
+5. Freeze the progress contract for the run: planned steps, emission cadence, `progress.jsonl` path, latest status snapshot path, status/resume command, and ETA calculation rule.
+6. Run full candidate training on Mac Studio or start a managed resumable job if the run cannot complete within the session.
+7. If the run is incomplete, prove a fresh `running` progress event, then update report/ledger as `in_progress` with resume command, job state, progress path, latest progress event, logs, and blockers; do not start Stage `08`.
+8. If the run completes, validate checkpoint/report hashes, final `completed` progress event at `100%`, collect resource evidence, run focused gates, update report/ledger, and hand Stage `08` the candidate manifest path/hash.
 
 # Acceptance Criteria
 
 - A completed candidate training manifest exists under `/opt/roehub/state/rl_trading/` and references the accepted Stage `06` dataset hash.
-- Candidate artifacts include checkpoint hash, config hash, dataset hash, model architecture hash, seed, code/delivery state, training curves, validation metrics, and resource metrics.
+- Candidate artifacts include checkpoint hash, config hash, dataset hash, model architecture hash, seed, code/delivery state, training curves, validation metrics, resource metrics, `progress.jsonl`, and latest status snapshot.
+- Progress evidence is step-based and durable: final accepted run has a `completed` event with `completed_training_steps == planned_training_steps` and `progress_pct == 100.0`; incomplete/background runs have a fresh `running` event, ETA, status/resume command, and remain `in_progress`.
 - Resume/failure behavior is deterministic and documented.
 - Stage report includes prompt path/hash, file manifest, evidence, contract impact, and next-stage handoff.
 - Ledger `current_stage` advances to `08` only after completed `07B` candidate evidence. Start-only or partial training evidence leaves Stage `07B` `in_progress`.
