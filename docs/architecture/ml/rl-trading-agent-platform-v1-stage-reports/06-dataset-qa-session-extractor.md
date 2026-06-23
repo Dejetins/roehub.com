@@ -1,7 +1,7 @@
 ---
 doc: rl-trading-agent-platform-v1-stage-06-dataset-qa-session-extractor
 stage: "06"
-status: blocked
+status: accepted
 plan: docs/architecture/ml/rl-trading-agent-platform-v1.md
 ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
 collected_at: "2026-06-23"
@@ -9,13 +9,13 @@ collected_at: "2026-06-23"
 
 # Stage 06: Dataset QA And Session Extractor
 
-Status: `blocked`.
+Status: `accepted`.
 
 User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat.
 
-Stage `06` started after checking the ledger: Stage `05` is `accepted`, `current_stage=06`, and the Stage `05` report explicitly says the local checkout may continue Stage `06` even though Stage `05` delivery state is still `local-only`.
+Stage `06` started after checking the ledger: Stage `05` is `accepted`, delivered to `origin/main`, and fully materialized under `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1`.
 
-The Stage `06` code path is implemented and a bounded Mac Studio ClickHouse-backed sample is accepted, but the stage is **not accepted** because the required full sessionized train/validation/test/backtest datasets were not materialized. Stage `07` remains blocked.
+Stage `06` is accepted after full Mac Studio materialization from the delivered Stage `05` raw manifest. The accepted full sessionized dataset has final hashes, counts, split artifacts, gap evidence and leakage evidence. Stage `07` may start; no training, checkpoint, registry, exchange, paper/testnet/live or mainnet behavior was started by Stage `06`.
 
 ## Scope
 
@@ -51,17 +51,17 @@ Final file manifest:
 
 | Created | Modified | Deleted | Reason | Contract impact |
 |---|---|---|---|---|
-| `src/trading/contexts/rl_trading/domain/sessionized_dataset.py` | - | - | Pure Stage `06` session extraction, split-window, leakage, gap and manifest helper contract. | `compatible-change` additive domain helper |
-| `scripts/rl_trading/stage06_dataset_qa_session_extractor.py` | - | - | Opt-in CLI to consume Stage `04C` manifest plus either Stage `05` raw slabs or explicit ClickHouse reads and write runtime sessionized artifacts. | `compatible-change` operator helper |
-| `tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | - | - | Focused deterministic tests for split parsing, source gating, past-only high-volatility scoring, overlap/embargo/leakage reports and manifest payloads. | `compatible-change` test-only |
+| `src/trading/contexts/rl_trading/domain/sessionized_dataset.py` | - | - | Pure Stage `06` session extraction, vectorized high-volatility selection, split-window embargo, leakage, gap and manifest helper contract. | `compatible-change` additive domain helper |
+| `scripts/rl_trading/stage06_dataset_qa_session_extractor.py` | - | - | Opt-in CLI to consume Stage `04C` manifest plus either Stage `05` raw slabs or explicit ClickHouse reads and write runtime sessionized artifacts. It records effective embargo-adjusted split windows. | `compatible-change` operator helper |
+| `tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | - | - | Focused deterministic tests for split parsing, source gating, past-only high-volatility scoring, overlap/embargo/leakage reports, split embargo and manifest payloads. | `compatible-change` test-only |
 | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md` | - | - | Stage `06` report. | `compatible-change` docs/report only |
 | - | `src/trading/contexts/rl_trading/domain/__init__.py` | - | Export Stage `06` helper surface for tests and later stages. | `compatible-change` additive exports |
-| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Record Stage `06` evidence, blocker and Stage `07` handoff. | `compatible-change` docs/ledger only |
+| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Record Stage `06` full materialization evidence and Stage `07` handoff. | `compatible-change` docs/ledger only |
 | - | `docs/architecture/README.md` | - | Docs index regeneration after adding Stage `06` report. | `compatible-change` docs index only |
 
 Outside expected paths: none.
 
-Pre-existing local-only Stage `05` files remain in the working tree and are required context for this checkout, but they are not counted as new Stage `06` touches.
+Stage `06` delivery also included follow-up repair commits after the initial user push: package exports, vectorized selector performance, and split-embargo enforcement for full acceptance.
 
 ## Prompt Evidence
 
@@ -71,14 +71,16 @@ Pre-existing local-only Stage `05` files remain in the working tree and are requ
 | Prompt sha256 | `2e9b44c51bc31d7d5e8601730ac6208a4f9f451e95949ef963878c05720176b0` |
 | Ledger state before implementation | Stage `05` accepted; `current_stage=06`; Stage `06` pending |
 | Required prerequisite | Stage `05` accepted |
-| Stage `05` caveat | Delivery state is `local-only`; Stage `05` sample artifact is not a full accepted training dataset. |
-| Delivery state | `local-only`; no branch, PR, main delivery or deploy. |
+| Stage `05` input manifest | `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1/stage05_raw_feature_manifest.json` |
+| Stage `05` input sha256 | `393461747be00aff457858473637d978791525cb629e60199c1e74c1148807f1` |
+| Stage `06` implementation commits | `328a9a3a` initial Stage `06` files; `cfc8cde6` package exports/docs index; `7359d721` vectorized selector; `bcdc2473` split embargo |
+| Delivery state | `delivered-to-main`; Mac Studio checkout clean on `bcdc247320cf6a7cffad643673ad5b91bd34d39c`; no `/opt/roehub/app` service deploy needed. |
 
 ## Observed State
 
 | Area | Evidence summary |
 |---|---|
-| Stage prerequisite | Ledger records Stage `05` as `accepted`; Stage `06` was current and pending before this run. |
+| Stage prerequisite | Ledger records Stage `05` as `accepted`; Stage `05` full raw manifest exists and is accepted. |
 | Feature contract | Stage `02B` accepted feature hash `d2e99786b68482d730494c6aeec72a1e9f40ac225729019fac5c82f96f900be9` and channel order `open`, `high`, `volume_weighted_average`, `low`, `close`, `volume`, `num_trades`. |
 | Stage `04C` manifest | Accepted input path is `/opt/roehub/state/rl_trading/stage04c_dataset_refresh_manifest/stage04c_dataset_refresh_manifest.json` with sha256 `9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344`. |
 | Market scope | `binance:futures` only is trainable in v1; `binance:spot`, `bybit:spot`, `bybit:futures` stay blocked as `blocked_not_training_source_v1`. |
@@ -106,11 +108,63 @@ Pre-existing local-only Stage `05` files remain in the working tree and are requ
 | High-volatility proxy | `pre_signal_realized_volatility_plus_range_v1`: realized close volatility plus average high/low range ratio over the 90 pre-signal rows. |
 | Default selection | 30-minute stride, top 1% by score per symbol/split, capped at 64 sessions per symbol/split. CLI exposes explicit overrides for bounded evidence runs. |
 | Overlap | Allowed inside a split; reported as `within_split_overlap_pairs`. Cross-split overlap blocks the leakage report. |
-| Embargo | Split-boundary embargo is at least 150 minutes. Violations block the leakage report. |
+| Embargo | Split-boundary embargo is 150 minutes. Effective right-hand split signal starts are shifted to `previous.signal_end + 150m`; violations block the leakage report. |
 | Lifecycle/gap | Sessions are built only inside Stage `04C` safe source windows; minute gaps in source slabs block materialization. |
 | Keys | Session key includes `exchange_name`, `market_type`, `symbol`, `instrument_key`, `signal_ts_open`, `split`, `feature_contract_hash`. |
 
 ## Runtime Evidence
+
+Accepted full Mac Studio materialization:
+
+| Field | Value |
+|---|---|
+| Evidence label | `post_main_dataset_materialization_proof` |
+| Host | `MacStudioDaniil` |
+| Remote checkout path | `/Users/daniildegtyarev/Projects/roehub.com` |
+| Remote checkout commit | `bcdc247320cf6a7cffad643673ad5b91bd34d39c` |
+| Remote checkout state | `## main...origin/main` |
+| Runtime artifact root | `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1` |
+| Manifest path | `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1/stage06_sessionized_manifest.json` |
+| Manifest status | `accepted` |
+| Manifest file sha256 | `61995c61228705090a9cd5d868776c14435ae421bdf35677a7f5c654af71ac08` |
+| Manifest deterministic rebuild hash | `a28084ac5dfe6533446ed3da45bfca955e36f0451ae6d00ff4cac55ea9582b56` |
+| Leakage report path | `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1/stage06_leakage_report.json` |
+| Leakage report sha256 | `cbe1424bab47b4907cdee4b4585d107a449650dcde9f8b39b06d4f867e2e370a` |
+| Input Stage `04C` manifest sha256 | `9e633516cbc4aa4a711802b586e942a0a20638a4789ca6d19792fe7c78040344` |
+| Input Stage `05` raw manifest | `/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1/stage05_raw_feature_manifest.json` |
+| Build scope | `full_selected_windows`, `all_symbols=true`, `from_clickhouse=false` |
+| Dataset versions | `hf_period_rebuild_current_trading`, `post_hf_extension_current_trading` |
+| Selected symbols | `528` |
+| Split artifact count | `1,656` |
+| Total sessions | `83,772` |
+| Artifact directory size / files | `426M` / `6,626` files |
+| Runtime | `112.25s` wall, max RSS `2,281,766,912` bytes |
+| Gap report summary | `1,656/1,656` split artifacts accepted; `gap_count_total=0`, `missing_minutes_total=0` |
+| Leakage report summary | `status=accepted`, `cross_split_overlap_violations=0`, `embargo_violations=0`, `lookahead_violations=0`, `lifecycle_violations=0`, `within_split_overlap_pairs=60,145` |
+| Rejected windows | `304`, all `lifecycle_no_signal_overlap_for_split` |
+| Safety flags | `contains_model_checkpoint=false`, `contains_raw_provider_payloads=false`, `contains_secrets=false`, `exchange_side_effects=false`, `market_data_writes=false`, `score_uses_post_signal_rows=false` |
+
+Accepted full split/session distribution:
+
+| Dataset version / split | Split artifacts | Sessions |
+|---|---:|---:|
+| `hf_period_rebuild_current_trading:train` | `220` | `13,381` |
+| `hf_period_rebuild_current_trading:validation` | `250` | `10,249` |
+| `hf_period_rebuild_current_trading:test` | `300` | `12,346` |
+| `hf_period_rebuild_current_trading:backtest` | `358` | `14,731` |
+| `post_hf_extension_current_trading:post_hf_extension` | `528` | `33,065` |
+
+Effective split embargo windows:
+
+| Dataset version | Split | Effective signal window |
+|---|---|---|
+| `hf_period_rebuild_current_trading` | `train` | `[2020-01-14T00:00:00Z, 2024-08-31T00:00:00Z)` |
+| `hf_period_rebuild_current_trading` | `validation` | `[2024-09-01T00:00:00Z, 2024-12-01T00:00:00Z)` |
+| `hf_period_rebuild_current_trading` | `test` | `[2024-12-01T02:30:00Z, 2025-03-01T00:00:00Z)` |
+| `hf_period_rebuild_current_trading` | `backtest` | `[2025-03-01T02:30:00Z, 2025-06-01T00:00:00Z)` |
+| `post_hf_extension_current_trading` | `post_hf_extension` | `[2025-06-01T00:00:00Z, 2026-06-21T14:10:00Z)` |
+
+Full-run repair note: the first full raw-manifest run proved full-scale materialization performance but returned `status=blocked` because Stage `04C` `validation->test` and `test->backtest` signal windows are contiguous. Stage `06` then added effective split embargo enforcement (`right.signal_start >= previous.signal_end + 150m`) and the accepted rerun cleared embargo and cross-split overlap violations.
 
 Accepted bounded Mac Studio sample:
 
@@ -159,10 +213,10 @@ Implementation note: the first Mac Studio sample exposed a timezone boundary bug
 
 ## Business Impact
 
-- Stage `06` now defines the deterministic sessionized dataset contract that Stage `07` training must consume.
+- Stage `06` now provides the accepted deterministic sessionized dataset contract that Stage `07` training must consume.
 - The implementation prevents accidental training on spot/Bybit branches and prevents session overlap or look-ahead leakage from being hidden in later model metrics.
 - Business/user-facing trading behavior does not change: no strategy launch, entitlement, order, paper/testnet/live or mainnet capability is enabled.
-- Full ML progression is still blocked until the complete accepted train/validation/test/backtest datasets are materialized and recorded.
+- Stage `07` can start from the accepted Stage `06` manifest; later paper/testnet/live paths remain gated by their own stages and classic producer prerequisites.
 
 ## Conditional Service-Call Coverage
 
@@ -189,57 +243,66 @@ Implementation note: the first Mac Studio sample exposed a timezone boundary bug
 |---|---|---|
 | `target_host_readiness_pre_main` | collected | SSH reached `MacStudioDaniil`; remote git commands were run only in `/Users/daniildegtyarev/Projects/roehub.com`; accepted Stage `04C` manifest path/hash exists under `/opt/roehub/state/rl_trading/`. |
 | `read_only_existing_runtime_smoke` | N/A | No existing production service or browser/runtime smoke was needed; Stage `06` does not change `/opt/roehub/app` behavior. |
-| `target_host_non_production_sample_pre_main` | collected | Temporary scoped Stage `05`+`06` diff was applied to the Mac Studio git checkout, focused tests and bounded dataset sample ran, and the diff was reversed. Remote checkout returned clean. |
-| `post_main_production_runtime_proof` | not collected | Requires the target revision on `main`, green GitHub Actions/CI, deploy or verified sync into `/opt/roehub/app` when service/runtime code is affected, and then runtime smoke. This stage report does not claim that proof. |
+| `target_host_non_production_sample_pre_main` | collected historically | Temporary scoped Stage `05`+`06` diff was applied to the Mac Studio git checkout, focused tests and bounded dataset sample ran, and the diff was reversed. This is retained as historical debugging evidence only. |
+| `post_main_dataset_materialization_proof` | collected | Mac Studio git checkout was clean at `bcdc247320cf6a7cffad643673ad5b91bd34d39c` on `main...origin/main`; full Stage `06` raw-manifest materialization wrote accepted artifacts under `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1`. |
+| `post_main_production_runtime_proof` | N/A | Stage `06` changes no `/opt/roehub/app` service/runtime/browser surface. The relevant proof is dataset materialization from the clean Mac Studio git checkout, not service deploy/reload. |
 
 ## Quality Gates
 
 | Gate | Result |
 |---|---|
 | `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/06-dataset-qa-session-extractor.md` | passed; `2e9b44c51bc31d7d5e8601730ac6208a4f9f451e95949ef963878c05720176b0` |
-| `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed; `6 passed` |
+| `uv run pytest -q tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed after split-embargo repair; `7 passed` |
 | `uv run ruff check src/trading/contexts/rl_trading/domain/sessionized_dataset.py src/trading/contexts/rl_trading/domain/__init__.py scripts/rl_trading/stage06_dataset_qa_session_extractor.py tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed |
-| `uv run pyright src/trading/contexts/rl_trading/domain/sessionized_dataset.py scripts/rl_trading/stage06_dataset_qa_session_extractor.py tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed; `0 errors` |
+| `uv run pyright src/trading/contexts/rl_trading/domain/sessionized_dataset.py src/trading/contexts/rl_trading/domain/__init__.py scripts/rl_trading/stage06_dataset_qa_session_extractor.py tests/unit/contexts/rl_trading/domain/test_sessionized_dataset.py` | passed; `0 errors` |
 | CLI fail-closed smoke: `uv run python scripts/rl_trading/stage06_dataset_qa_session_extractor.py --exchange bybit --market-type spot --symbol BTCUSDT` | passed; exited `2` with `reason=blocked_not_training_source_v1` |
-| Mac Studio focused tests from temporary scoped Stage `05`+`06` diff | passed; `11 passed` |
-| Mac Studio focused ruff from temporary scoped Stage `05`+`06` diff | passed |
-| Mac Studio focused pyright from temporary scoped Stage `05`+`06` diff | passed; `0 errors` |
+| Mac Studio focused tests after `bcdc2473` sync | passed; `7 passed` |
+| Mac Studio focused ruff after `bcdc2473` sync | passed |
+| Mac Studio focused pyright after `bcdc2473` sync | passed; `0 errors` |
 | Mac Studio bounded ClickHouse-backed Stage `06` sample | passed for bounded sample; manifest status `accepted`, `2` sessions |
 | `uv run ruff check src/trading/contexts/rl_trading apps tests` | passed |
 | `uv run pyright src/trading/contexts/rl_trading apps tests` | passed; `0 errors` |
-| `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps` | passed; `383 passed, 3 warnings` |
-| `uv run python -m tools.docs.generate_docs_index --check` | passed after `uv run python -m tools.docs.generate_docs_index` updated `docs/architecture/README.md` |
+| `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps` | passed after split-embargo repair; `385 passed, 3 warnings` |
+| `uv run python -m tools.docs.generate_docs_index --check` | passed |
+| GitHub Actions run `28043055395` for `7359d721` | passed; status `completed`, conclusion `success` |
+| GitHub Actions run `28043371282` for `bcdc2473` | passed; status `completed`, conclusion `success` |
+| GitHub deploy/image workflows for `bcdc2473` | passed; Deploy Backend `28043668302`, Publish App Image `28043667093`, Deploy Web `28043665654`/`28043681387` |
+| Mac Studio first full Stage `06` raw-manifest run | blocked as designed; `83,772` sessions written but leakage report had `2` embargo and `3` cross-split overlap violations before effective split embargo repair |
+| Mac Studio accepted full Stage `06` raw-manifest run at `bcdc2473` | passed; `status=accepted`, `split_artifact_count=1,656`, `total_sessions=83,772`, manifest sha256 `61995c61228705090a9cd5d868776c14435ae421bdf35677a7f5c654af71ac08` |
 
 ## Cold Self-Review
 
 Cold-head review: completed
 Mode: cold self-review fallback
-Review scope: Stage `06` report, stage ledger update, file manifest, contract-impact table, Mac Studio proof-boundary wording, service-call/redaction/alert coverage, quality-gate evidence and Stage `07` handoff.
+Review scope: Stage `06` report, stage ledger update, file manifest, contract-impact table, Mac Studio proof-boundary wording, service-call/redaction/alert coverage, quality-gate evidence, full-materialization manifest evidence and Stage `07` handoff.
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
 Verdict: Release after fixes
-Blockers fixed: Added the explicit blocked acceptance state, full-dataset blocker, business impact, conditional service-call coverage, logging/redaction, alert/runbook N/A coverage, exact runtime sample path/hash/counts, proof-boundary labels and docs-index gate placeholder.
+Blockers fixed: Replaced blocked/sample-only wording with accepted full-materialization evidence; recorded package-export, vectorized-selector and split-embargo repairs; preserved no-training/no-exchange/no-service-deploy boundaries; recorded final hashes, counts, split distribution, gap/leakage reports and Stage `07` handoff.
 Local follow-up check: completed
-Residual risks: Stage `06` remains blocked for acceptance until the complete train/validation/test/backtest sessionized datasets are materialized; repository changes remain `local-only`; `post_main_production_runtime_proof` was not collected.
+Residual risks: Stage `09B` still owns backup/restore policy for large artifacts; Stage `07` must prove training/resource behavior before any model, checkpoint, registry, paper/testnet/live or activation claim.
 
 ## Blockers And Handoff
 
-Stage `06` is `blocked`.
+Stage `06` is `accepted`.
 
-Implemented and verified locally:
+Implemented and verified:
 
 - additive sessionized dataset domain contract;
 - opt-in Stage `06` CLI;
 - deterministic tests for split parsing, source gating, past-only high-volatility scoring, session shape, overlap/embargo/leakage and manifest payloads;
-- bounded Mac Studio `BTCUSDT` sample under `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1_sample`.
+- vectorized full-scale high-volatility selection;
+- effective 150-minute split embargo;
+- bounded Mac Studio `BTCUSDT` sample under `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1_sample`;
+- full Mac Studio accepted sessionized dataset under `/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1`.
 
-Acceptance blocker:
+No Stage `06` acceptance blocker remains.
 
-- full accepted `binance:futures` sessionized train/validation/test/backtest datasets were not materialized and therefore do not yet have final hashes, counts and split/leakage/gap reports.
+Stage `07` may start from:
 
-Stage `07` is **not allowed**.
+`/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1/stage06_sessionized_manifest.json`
+
+Stage `07` must still not treat Stage `06` acceptance as a model-quality, profitability, backtest, registry, paper/testnet/live, exchange or activation approval.
 
 Next action:
 
-- run the Stage `06` CLI against the complete accepted Stage `04C`/Stage `05` source universe, preferably after the Stage `05` local-only diff is published or a full Stage `05` raw manifest is available in the target checkout;
-- record final full-dataset manifest hashes/counts and leakage/gap/lifecycle reports;
-- only then update this report and ledger from `blocked` to `accepted`.
+- start Stage `07` D3QN/PER training runner only from the accepted Stage `06` manifest and keep all training/checkpoint/registry/resource claims inside Stage `07`.
