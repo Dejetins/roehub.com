@@ -13,6 +13,7 @@ from trading.contexts.rl_trading.domain import (
     SessionExtractionPolicy,
     SessionizedDatasetError,
     SessionSplitWindow,
+    apply_session_split_embargo_v1,
     assert_sessionized_trainable_source_v1,
     build_gap_report_v1,
     build_leakage_report_v1,
@@ -152,6 +153,34 @@ def test_leakage_report_allows_within_split_overlap_and_blocks_short_embargo() -
     )
     assert blocked_report["status"] == "blocked"
     assert blocked_report["embargo_violations_count"] == 1
+
+
+def test_split_embargo_shifts_right_split_signal_start() -> None:
+    policy = SessionExtractionPolicy()
+    windows = [
+        SessionSplitWindow(
+            dataset_version="hf_period_rebuild_current_trading",
+            split="validation",
+            signal_start_utc="2024-09-01T00:00:00Z",
+            signal_end_utc="2024-12-01T00:00:00Z",
+            source_start_utc="2024-08-31T22:30:00Z",
+            source_end_utc="2024-12-01T01:00:00Z",
+        ),
+        SessionSplitWindow(
+            dataset_version="hf_period_rebuild_current_trading",
+            split="test",
+            signal_start_utc="2024-12-01T00:00:00Z",
+            signal_end_utc="2025-03-01T00:00:00Z",
+            source_start_utc="2024-11-30T22:30:00Z",
+            source_end_utc="2025-03-01T01:00:00Z",
+        ),
+    ]
+
+    adjusted = apply_session_split_embargo_v1(windows, policy=policy)
+    report = build_leakage_report_v1(candidates=[], split_windows=adjusted, policy=policy)
+
+    assert adjusted[1].signal_start_utc == "2024-12-01T02:30:00Z"
+    assert report["embargo_violations_count"] == 0
 
 
 def test_split_entry_and_dataset_manifest_capture_hashes_policy_and_safety() -> None:

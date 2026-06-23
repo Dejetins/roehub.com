@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
@@ -230,6 +230,36 @@ def session_split_windows_from_stage04c_v1(
         if missing:
             raise SessionizedDatasetError(reason="requested_split_not_found", field=missing[0])
     return tuple(windows)
+
+
+def apply_session_split_embargo_v1(
+    split_windows: Sequence[SessionSplitWindow],
+    *,
+    policy: SessionExtractionPolicy | None = None,
+) -> tuple[SessionSplitWindow, ...]:
+    selected_policy = default_session_extraction_policy_v1() if policy is None else policy
+    by_version: dict[str, list[SessionSplitWindow]] = {}
+    for window in split_windows:
+        by_version.setdefault(window.dataset_version, []).append(window)
+
+    adjusted: list[SessionSplitWindow] = []
+    embargo_ms = selected_policy.embargo_minutes * SESSIONIZED_MINUTE_MS_V1
+    for windows in by_version.values():
+        previous: SessionSplitWindow | None = None
+        for window in sorted(windows, key=lambda item: _parse_utc_ms(item.signal_start_utc)):
+            signal_start_ms = _parse_utc_ms(window.signal_start_utc)
+            if previous is not None:
+                minimum_start_ms = _parse_utc_ms(previous.signal_end_utc) + embargo_ms
+                signal_start_ms = max(signal_start_ms, minimum_start_ms)
+            effective_window = replace(
+                window,
+                signal_start_utc=_format_utc_from_ms(signal_start_ms),
+            )
+            adjusted.append(effective_window)
+            previous = effective_window
+
+    adjusted.sort(key=lambda item: (item.dataset_version, _parse_utc_ms(item.signal_start_utc)))
+    return tuple(adjusted)
 
 
 def select_high_volatility_session_candidates_v1(

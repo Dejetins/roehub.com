@@ -34,6 +34,7 @@ from trading.contexts.rl_trading.domain import (  # noqa: E402
     SessionExtractionPolicy,
     SessionizedDatasetError,
     SessionSplitWindow,
+    apply_session_split_embargo_v1,
     assert_sessionized_trainable_source_v1,
     build_gap_report_v1,
     build_leakage_report_v1,
@@ -173,6 +174,7 @@ def build_sessionized_dataset(
         dataset_versions=dataset_versions,
         splits=splits,
     )
+    split_windows = apply_session_split_embargo_v1(split_windows, policy=policy)
     source_windows = list(
         raw_feature_source_windows_from_stage04c_v1(
             manifest=refresh_manifest,
@@ -282,6 +284,7 @@ def build_sessionized_dataset(
         "max_symbols": max_symbols,
         "raw_feature_manifest": None if from_clickhouse else str(raw_feature_manifest_path),
         "selected_symbols": sorted({window.symbol for window in source_windows}),
+        "effective_split_windows": [window.as_payload() for window in split_windows],
         "splits": sorted({window.split for window in split_windows}),
         "scope": (
             "bounded_sample"
