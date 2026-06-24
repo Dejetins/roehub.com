@@ -25,3 +25,13 @@ def test_rl_trading_trainer_entrypoint_dispatches_stage07b_status(tmp_path, caps
     assert result == 2
     assert payload["status"] == "blocked"
     assert payload["reason"] == "latest_status_missing"
+
+
+def test_rl_trading_trainer_entrypoint_dispatches_stage08c_status(tmp_path, capsys) -> None:
+    result = main(["stage08c", "status", "--run-dir", str(tmp_path / "missing-run")])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert result == 2
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "latest_status_missing"

@@ -62,7 +62,7 @@ as attempted shell execution.
 - `PermissionRequest`: deterministic `FATAL_BLOCK` returns `decision.behavior: "deny"`.
 - `PostToolUse`: blocking findings return `decision: "block"` as feedback. This does not undo side effects.
 - `UserPromptSubmit`: secret findings block prompt submission; warnings add additional context.
-- `Stop`: required final gates return `decision: "block"` to create one continuation prompt.
+- `Stop`: required final gates return `decision: "block"` to create one continuation prompt. The continuation prompt is user-facing Russian, includes the original assistant answer from `last_assistant_message`, and instructs the model to return that answer fully before adding a readable `Проверка перед финалом` section. Stop hooks must not replace a useful final answer with a terse technical receipt.
 
 `Stop` validators must avoid loops. The router suppresses repeated continuation
 when `stop_hook_active` is already true or when the same reason marker is already
@@ -112,6 +112,7 @@ After edits, review and trust hook definitions through `/hooks` in Codex.
 - Repo-local hooks run only when the project `.codex/` layer is trusted.
 - `.codex/rules/*.rules` are an experimental execpolicy layer and should be tested with `codex execpolicy check`.
 - Hooks cannot prove that a named cold-head review actually happened; they only
-  prevent finalizing relevant artifacts without a structured reported cold-head
-  receipt that names scope, instructions, verdict, fixes, local follow-up, and
-  residual risks.
+  prevent finalizing relevant artifacts without a reported cold-head receipt.
+  The preferred user-facing receipt is the Russian `Проверка перед финалом`
+  block. The legacy compact English `Cold-head review: completed` block remains
+  accepted for backward compatibility.

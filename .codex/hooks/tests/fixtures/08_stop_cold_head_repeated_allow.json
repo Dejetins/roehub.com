@@ -6,6 +6,6 @@
   },
   "expect": {
     "returncode": 0,
-    "stdout_contains": "suppressed repeated continuation"
+    "stdout_contains": "повторное continuation подавлено"
   }
 }

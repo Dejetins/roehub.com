@@ -8,6 +8,6 @@
     "returncode": 0,
     "json_path": "decision",
     "json_value": "block",
-    "stdout_contains": "structured receipt block"
+    "stdout_contains": "Проверка перед финалом"
   }
 }

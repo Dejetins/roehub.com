@@ -202,7 +202,22 @@ If subagents are unavailable, the agent MUST run the same checklist locally and 
 
 The cold-head gate MUST check the applicable lenses for the artifact: architecture-design quality, architecture-review evidence discipline, prompt-pack/stage execution readiness, stage ledger continuity, traceability, validation depth, conditional service-call/docs/retry/redaction/alert coverage, Mac Studio path contract, and browser auth/tooling rules when browser flows are in scope.
 
-Before using readiness language for architecture or prompt-management artifacts, the final response MUST include this structured receipt:
+Before using readiness language for architecture or prompt-management artifacts, the final response MUST include a cold-head receipt, but it MUST NOT replace the normal user-facing answer with a terse technical receipt.
+
+For Russian conversations, the agent MUST return the full normal answer first in Russian, then add this preferred readable receipt below it:
+
+```text
+**Проверка перед финалом**
+- Статус проверки: выполнена | заблокирована
+- Режим: independent subagent | cold self-review fallback
+- Что проверено: ...
+- Итог: Release | Release after fixes | Block
+- Что исправлено/добавлено: ...
+- Остаточные риски: ...
+- Что это значит для следующего шага: ...
+```
+
+The legacy compact receipt below remains allowed for machine-oriented reports and backward compatibility:
 
 ```text
 Cold-head review: completed

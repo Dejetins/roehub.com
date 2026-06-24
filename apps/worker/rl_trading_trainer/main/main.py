@@ -13,6 +13,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         return smoke08b_main(selected_argv[1:])
+    if selected_argv[:1] == ["stage08c"]:
+        from scripts.rl_trading.stage08c_original_hf_full_training_run import (
+            main as training08c_main,
+        )
+
+        return training08c_main(selected_argv[1:])
 
     from scripts.rl_trading.stage07a_training_runner_smoke import main as smoke_main
 

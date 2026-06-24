@@ -874,6 +874,92 @@ class SumTreePrioritizedReplayBuffer:
             self._update_tree(int(tree_idx), priority)
             self.max_priority = max(self.max_priority, priority)
 
+    def state_payload(self) -> dict[str, object]:
+        state_dim = self.state_dim
+        if state_dim is None:
+            state_dim = 0
+        states = np.zeros((self.size, state_dim), dtype=np.float32)
+        next_states = np.zeros((self.size, state_dim), dtype=np.float32)
+        actions = np.zeros((self.size,), dtype=np.int64)
+        rewards = np.zeros((self.size,), dtype=np.float32)
+        dones = np.zeros((self.size,), dtype=np.bool_)
+        for idx in range(self.size):
+            row = self.data[idx]
+            if row is None:
+                raise UpstreamMethodologyError(reason="replay_state_missing_row")
+            state, action, reward, next_state, done = row
+            states[idx] = state
+            actions[idx] = action
+            rewards[idx] = reward
+            next_states[idx] = next_state
+            dones[idx] = done
+        return {
+            "actions": actions,
+            "alpha": self.alpha,
+            "beta_frames": self.beta_frames,
+            "beta_start": self.beta_start,
+            "capacity": self.capacity,
+            "dones": dones,
+            "epsilon": self.epsilon,
+            "frame_idx": self.frame_idx,
+            "idx": self.idx,
+            "max_priority": self.max_priority,
+            "next_states": next_states,
+            "rewards": rewards,
+            "rng_state": self._rng.bit_generator.state,
+            "size": self.size,
+            "state_dim": state_dim,
+            "states": states,
+            "tree": np.ascontiguousarray(self.tree, dtype=np.float64),
+            "tree_capacity": self.tree_capacity,
+        }
+
+    def restore_state_payload(self, payload: Mapping[str, object]) -> None:
+        capacity = _payload_int(payload.get("capacity"), "capacity")
+        tree_capacity = _payload_int(payload.get("tree_capacity"), "tree_capacity")
+        size = _payload_int(payload.get("size"), "size")
+        idx = _payload_int(payload.get("idx"), "idx")
+        state_dim = _payload_int(payload.get("state_dim"), "state_dim")
+        if capacity != self.capacity:
+            raise UpstreamMethodologyError(reason="replay_capacity_mismatch")
+        if tree_capacity != self.tree_capacity:
+            raise UpstreamMethodologyError(reason="replay_tree_capacity_mismatch")
+        if size < 0 or size > self.capacity:
+            raise UpstreamMethodologyError(reason="replay_size_out_of_range")
+        if idx < 0 or idx >= self.capacity:
+            raise UpstreamMethodologyError(reason="replay_idx_out_of_range")
+        tree = np.asarray(payload.get("tree"), dtype=np.float64)
+        if tree.shape != self.tree.shape:
+            raise UpstreamMethodologyError(reason="replay_tree_shape_mismatch")
+        states = np.asarray(payload.get("states"), dtype=np.float32)
+        next_states = np.asarray(payload.get("next_states"), dtype=np.float32)
+        actions = np.asarray(payload.get("actions"), dtype=np.int64)
+        rewards = np.asarray(payload.get("rewards"), dtype=np.float32)
+        dones = np.asarray(payload.get("dones"), dtype=np.bool_)
+        expected_2d = (size, state_dim)
+        if states.shape != expected_2d or next_states.shape != expected_2d:
+            raise UpstreamMethodologyError(reason="replay_state_array_shape_mismatch")
+        if actions.shape != (size,) or rewards.shape != (size,) or dones.shape != (size,):
+            raise UpstreamMethodologyError(reason="replay_vector_shape_mismatch")
+        self.tree = np.ascontiguousarray(tree, dtype=np.float64)
+        self.data = [None] * self.capacity
+        for row_idx in range(size):
+            self.data[row_idx] = (
+                np.ascontiguousarray(states[row_idx], dtype=np.float32),
+                normalize_rl_action_id_v1(int(actions[row_idx])),
+                float(rewards[row_idx]),
+                np.ascontiguousarray(next_states[row_idx], dtype=np.float32),
+                bool(dones[row_idx]),
+            )
+        self.idx = idx
+        self.size = size
+        self.max_priority = _payload_float(payload.get("max_priority"), "max_priority")
+        self.frame_idx = _payload_int(payload.get("frame_idx"), "frame_idx")
+        self.state_dim = None if state_dim == 0 else state_dim
+        rng_state = payload.get("rng_state")
+        if isinstance(rng_state, dict):
+            self._rng.bit_generator.state = rng_state
+
     def _retrieve(self, idx: int, value: float) -> int:
         left = (2 * idx) + 1
         right = left + 1
@@ -1090,6 +1176,8 @@ class TorchD3qnPerAgent:
             return None
         if len(self.replay_buffer) < self.config.batch_size:
             return None
+        self.policy_net.train()
+        self.target_net.eval()
         sample = self.replay_buffer.sample(self.config.batch_size)
         states = self.torch.as_tensor(sample.states, dtype=self.torch.float32, device=self.device)
         actions = self.torch.as_tensor(sample.actions, dtype=self.torch.long, device=self.device)

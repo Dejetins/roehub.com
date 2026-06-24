@@ -139,10 +139,22 @@ def test_sumtree_per_sampling_and_priority_updates_are_deterministic() -> None:
     sample = buffer.sample(batch_size=3)
     before_total = float(buffer.tree[0])
     buffer.update_priorities(sample.tree_indices, np.asarray([0.1, 0.5, 1.0]))
+    payload = buffer.state_payload()
+    restored = SumTreePrioritizedReplayBuffer(
+        capacity=8,
+        alpha=0.6,
+        beta_start=0.4,
+        beta_frames=100,
+        epsilon=1e-6,
+        seed=17,
+    )
+    restored.restore_state_payload(payload)
 
     assert sample.states.shape == (3, 2)
     assert sample.weights.shape == (3,)
     assert float(buffer.tree[0]) != before_total
+    assert len(restored) == len(buffer)
+    assert np.array_equal(restored.tree, buffer.tree)
 
 
 def test_filtered_policy_rejects_weak_actions_and_records_cache_stats() -> None:

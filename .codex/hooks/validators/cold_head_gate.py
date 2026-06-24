@@ -69,8 +69,8 @@ RECEIPT_PATTERNS = [
     re.compile(r"(?im)^Mode:\s*(independent subagent|cold self-review fallback)\s*$"),
     re.compile(r"(?im)^Review scope:\s*\S.*$"),
     re.compile(
-        r"(?im)^Review instructions:\s*architecture-review/references/"
-        r"cold-head-plan-prompt-pack-review\.md\s*$"
+        r"(?im)^Review instructions:\s*`?architecture-review/references/"
+        r"cold-head-plan-prompt-pack-review\.md`?\s*$"
     ),
     re.compile(r"(?im)^Verdict:\s*(Release|Release after fixes|Block)\s*$"),
     re.compile(r"(?im)^Blockers fixed:\s*\S.*$"),
@@ -78,9 +78,38 @@ RECEIPT_PATTERNS = [
     re.compile(r"(?im)^Residual risks:\s*\S.*$"),
 ]
 
+HUMAN_RECEIPT_PATTERNS = [
+    re.compile(r"(?im)^\s*(?:#{1,6}\s*)?(?:\*\*)?Проверка перед финалом(?:\*\*)?:?\s*$"),
+    re.compile(
+        r"(?im)^\s*-\s*Статус проверки:\s*"
+        r"(выполнена|проведена|completed|заблокирована|blocked)\b.*$"
+    ),
+    re.compile(
+        r"(?im)^\s*-\s*Режим:\s*"
+        r"(independent subagent|cold self-review fallback|независимая проверка|"
+        r"холодная самопроверка|самопроверка)\b.*$"
+    ),
+    re.compile(r"(?im)^\s*-\s*Что проверено:\s*\S.*$"),
+    re.compile(
+        r"(?im)^\s*-\s*Итог:\s*"
+        r"(Release|Release after fixes|Block|можно продолжать|нужны исправления|"
+        r"заблокировано|заблокирован)\b.*$"
+    ),
+    re.compile(
+        r"(?im)^\s*-\s*(Что исправлено/добавлено|Что исправлено|Что добавлено|"
+        r"Исправлено/добавлено):\s*\S.*$"
+    ),
+    re.compile(r"(?im)^\s*-\s*Остаточные риски:\s*\S.*$"),
+    re.compile(
+        r"(?im)^\s*-\s*(Что это значит для следующего шага|Следующий шаг):\s*\S.*$"
+    ),
+]
+
 
 def _has_structured_receipt(text: str) -> bool:
-    return all(pattern.search(text) for pattern in RECEIPT_PATTERNS)
+    return all(pattern.search(text) for pattern in RECEIPT_PATTERNS) or all(
+        pattern.search(text) for pattern in HUMAN_RECEIPT_PATTERNS
+    )
 
 
 def _has_artifact_path(text: str) -> bool:
@@ -105,16 +134,16 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
         return []
     if _looks_like_artifact_completion(text) and not _has_structured_receipt(text):
         message = (
-            "Architecture and prompt-manager artifacts must pass one cold-head "
-            "review gate before being reported as ready. Add the structured "
-            "receipt block: Cold-head review, Mode, Review scope, Review "
-            "instructions, Verdict, Blockers fixed, Local follow-up check, "
-            "and Residual risks."
+            "Перед финальным ответом по architecture/prompt artifacts нужен "
+            "понятный cold-head блок. Верните исходный ответ полностью и ниже "
+            "добавьте раздел `Проверка перед финалом` со статусом, режимом, "
+            "объемом проверки, итогом, исправлениями, остаточными рисками и "
+            "смыслом для следующего шага."
         )
         return [
             Finding(
                 severity=CONTINUE_BEFORE_FINAL,
-                title="Cold-head artifact gate not reported",
+                title="Cold-head финальный блок не найден",
                 message=message,
                 validator="cold_head_gate",
                 target="last_assistant_message",
