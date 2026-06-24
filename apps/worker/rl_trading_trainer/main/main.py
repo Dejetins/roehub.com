@@ -7,6 +7,12 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.rl_trading.stage07b_full_candidate_training_run import main as candidate_main
 
         return candidate_main(selected_argv[1:])
+    if selected_argv[:1] == ["stage08b"]:
+        from scripts.rl_trading.stage08b_upstream_methodology_core_smoke import (
+            main as smoke08b_main,
+        )
+
+        return smoke08b_main(selected_argv[1:])
 
     from scripts.rl_trading.stage07a_training_runner_smoke import main as smoke_main
 
