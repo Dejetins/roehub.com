@@ -74,7 +74,7 @@ validation_strategy:
   acceptance_surfaces:
     - "HF test evaluation"
     - "HF grouped backtest with action filters"
-    - "sanity baselines and methodology-parity verdict"
+    - "sanity baselines, methodology-execution verdict, and warning register"
   evidence_target: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
 stage_execution_ledger:
   path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
@@ -96,7 +96,7 @@ possible_secondary_touches:
 
 Implement Stage `08D` original HF evaluation/backtest.
 
-This stage proves whether the Roehub port can run the original dataset lifecycle coherently before the platform spends time training on the Roehub-native dataset.
+This stage proves whether the Roehub port can run the original dataset lifecycle coherently before the platform spends time training on the Roehub-native dataset. It is a methodology-execution gate, not a final HF profitability gate.
 
 ## Requirements (Must)
 
@@ -111,17 +111,18 @@ This stage proves whether the Roehub port can run the original dataset lifecycle
 - Run grouped backtest using upstream-compatible `backtest_engine.py` semantics: signal grouping by timestamp, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage filter and/or MC-dropout ensemble filter.
 - Record raw-argmax diagnostics separately, but raw argmax-only cannot be the acceptance backtest.
 - Run technical baselines/sanity checks and action-filter/rejection counts.
-- Produce a methodology-parity verdict:
-  - `accepted` only if the HF lifecycle runs end to end with no unresolved implementation gap and scorecard is internally coherent;
-  - `blocked` if metrics are negative or materially inconsistent without an explained dataset/config reason.
-- `08E` may start only if `08D` is accepted.
+- Produce a methodology-execution verdict:
+  - `accepted` if the HF lifecycle runs end to end with no unresolved implementation gap, no split/normalization/data-leakage issue, no grouped-backtest lifecycle gap, and complete scorecards/manifests;
+  - `blocked` only if `best.pth` cannot load, normalization is not train-only, test/backtest split use is wrong, grouped backtest diverges from the upstream lifecycle, action filter/Q-cache/parallel-session mechanics are broken, scorecards/manifests are incomplete, or leakage/data inconsistency is found;
+  - weak profitability, a stronger simple baseline, low positive-session ratio, missing Optuna/tuning, and the `30/10` demo profile are warnings, not blockers for `08E`.
+- `08E` may start if `08D` is accepted for methodology execution, even when the Stage `08D` report carries quality warnings.
 
 ## Acceptance Criteria
 
-- Stage report records HF test and backtest scorecards, action filter thresholds, rejection counts, baselines, metrics by period/ticker and overfit warnings.
+- Stage report records HF test and backtest scorecards, action filter thresholds, rejection counts, baselines, metrics by period/ticker, blocker checks and warning checks.
 - Evaluation artifacts are written under `/opt/roehub/state/rl_trading/` with hashes only in docs.
-- Ledger advances to `08E` only after accepted HF methodology-parity evidence.
+- Ledger advances to `08E` only after accepted HF methodology-execution evidence; weak untuned HF-demo score is recorded as warning-only.
 
 ## Final Output
 
-Respond in Russian with result/status, file manifest, HF evaluation evidence, parity verdict, gates, residual risks and `08E` handoff.
+Respond in Russian with result/status, file manifest, HF evaluation evidence, execution/parity verdict, warning register, gates, residual risks and `08E` handoff.

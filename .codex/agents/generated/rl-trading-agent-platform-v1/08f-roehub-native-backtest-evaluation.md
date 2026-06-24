@@ -21,7 +21,7 @@ context_sources:
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08e-roehub-native-full-training-run.md
       why: "Roehub-native candidate manifest and hashes"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08d-original-hf-backtest-evaluation.md
-      why: "HF methodology-parity baseline"
+      why: "HF methodology-execution evidence and warning register"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08a-upstream-methodology-parity-audit.md
       why: "frozen upstream grouped-backtest and acceptance checklist"
   task_entrypoints:
@@ -111,12 +111,13 @@ This is the new research-save gate for the platform. Stage `09` remains blocked 
 - Use the same Stage `08A`/`08D` upstream-compatible filtered backtest lifecycle: grouped signals by timestamp, `max_parallel_sessions`, `position_fraction`, Q-value cache, advantage threshold filter and/or MC-dropout ensemble filter, action rejection/skipped-signal counts, optional risk-management diagnostics, balance curve, fees/slippage/funding policy and cache statistics. Raw argmax-only evaluation is diagnostic only and cannot accept the research candidate.
 - Run sanity baselines: hold/no-trade, deterministic random, simple threshold and any accepted HF baseline diagnostics.
 - Include simulator/accounting parity fixture and make divergence a blocker.
-- Candidate may be saved as `research_candidate` only if net PnL after costs is positive and scorecard/sanity/overfit checks do not block.
+- Candidate may be saved as `research_candidate` only if net PnL after costs is positive and execution/parity checks do not block. Baseline dominance, low positive-session ratio, missing tuning, or weak demo-HF carryover are warning signals unless they reveal simulator/accounting leakage, reward-shaping failure, invalid split/normalization, or no actionable native research signal.
+- Record whether stronger `90/60` or larger-profile training, multiple seeds, or Optuna/tuned backtest calibration are required before promotion-grade review. Do not run those inside Stage `08F` unless the prompt is explicitly superseded.
 - Positive research candidate does not grant promotion-grade or runtime activation; Stage `09` may only register candidate metadata and Stage `10A` owns promotion thresholds.
 
 ## Acceptance Criteria
 
-- Stage report records scorecard by split/ticker/month/volatility bucket, trade count, action distribution, skipped/rejected actions, drawdown, stability, overfit warnings, latency/resource notes and cost/funding policy.
+- Stage report records scorecard by split/ticker/month/volatility bucket, trade count, action distribution, skipped/rejected actions, drawdown, stability, overfit warnings, Stage `08D` carried-forward warnings, latency/resource notes and cost/funding policy.
 - Evaluation artifacts are written under `/opt/roehub/state/rl_trading/` with hashes only in docs.
 - Ledger advances to `09` only if `08F` is accepted. Otherwise it remains blocked with exact repair instructions.
 
