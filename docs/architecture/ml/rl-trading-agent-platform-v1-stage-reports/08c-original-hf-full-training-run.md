@@ -1,7 +1,7 @@
 ---
 doc: rl-trading-agent-platform-v1-stage-08c-original-hf-full-training-run
 stage: "08C"
-status: in_progress
+status: accepted
 plan: docs/architecture/ml/rl-trading-agent-platform-v1.md
 ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
 collected_at: "2026-06-24"
@@ -9,7 +9,7 @@ collected_at: "2026-06-24"
 
 # Stage 08C: Original HF Full Training Run
 
-Status: `in_progress`.
+Status: `accepted`.
 
 User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat.
 
@@ -18,10 +18,16 @@ Stage `08B` is `accepted`, `current_stage=08C`, and Stage `08C` is allowed.
 Browser/auth QA is `N/A` for this offline training stage; the Roehub smoke
 Keycloak username and host-local password source were not used.
 
-This report records implementation and a managed Mac Studio full training launch.
-It is not accepted yet because the full `hf_original_candidate` manifest is not
-complete. Stage `08D` remains blocked until the completed full-training manifest
-exists and the ledger is advanced after fresh completion evidence.
+This report records implementation and
+`target_host_non_production_training_pre_main` completion on Mac Studio. It is
+not `post_main_production_runtime_proof`: no production `/opt/roehub/app` sync,
+service reload, browser/auth proof, registry write, promotion, activation,
+exchange side effect, paper/testnet/live run, or mainnet submit was performed.
+The accepted handoff artifact is the completed `hf_original_candidate` manifest.
+The initial MPS run stopped after a Metal Performance Shaders internal
+command-buffer error; the same run was resumed from `latest_resume.pth` in
+CPU-only mode and completed without a new stderr error. Stage `08D` is now
+allowed to consume the completed candidate manifest.
 
 ## Source Pinning
 
@@ -43,37 +49,61 @@ exists and the ledger is advanced after fresh completion evidence.
 | `scripts/rl_trading/stage08c_original_hf_full_training_run.py` | - | - | Operator CLI for real Stage `04` HF NPZ loading, strict hash checks, status/resume support and full Mac Studio training launch. | `compatible-change` additive opt-in CLI |
 | `tests/unit/contexts/rl_trading/domain/test_hf_original_training.py` | - | - | Focused unit coverage for progress, checkpoint policy, manifest and no scripted-transition path. | `none` test-only |
 | `tests/perf_smoke/contexts/rl_trading/test_stage08c_original_hf_training.py` | - | - | Tiny CLI fixture smoke for the Stage `08C` operator surface. | `none` test-only |
-| `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08c-original-hf-full-training-run.md` | - | - | This in-progress Stage `08C` report. | `compatible-change` docs/report |
+| `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08c-original-hf-full-training-run.md` | - | - | This accepted Stage `08C` report. | `compatible-change` docs/report |
 | - | `src/trading/contexts/rl_trading/domain/upstream_methodology.py` | - | Add PER buffer state snapshot/restore for resumable full training and ensure `learn()` returns the policy network to train mode after validation/inference. | `compatible-change` additive Python behavior for offline training |
 | - | `src/trading/contexts/rl_trading/domain/__init__.py` | - | Export additive Stage `08C` trainer identifiers and helpers. | `compatible-change` additive Python export |
 | - | `apps/worker/rl_trading_trainer/main/main.py` | - | Add `stage08c` dispatch to the existing trainer worker entrypoint. | `compatible-change` additive worker subcommand |
 | - | `tests/unit/contexts/rl_trading/domain/test_upstream_methodology.py` | - | Cover PER state snapshot/restore. | `none` test-only |
 | - | `tests/unit/apps/worker/test_rl_trading_trainer.py` | - | Cover `stage08c status` worker dispatch. | `none` test-only |
-| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Mark Stage `08C` `in_progress` and keep `08D` blocked. | `compatible-change` docs/ledger |
+| - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Mark Stage `08C` `accepted` and advance `current_stage` to `08D`. | `compatible-change` docs/ledger |
 | - | `docs/architecture/README.md` | - | Docs index regeneration after adding this report. | `compatible-change` docs index |
 
 Outside expected paths: none in git.
 
-Runtime artifacts:
+Runtime artifacts (`proof_boundary=target_host_non_production_training_pre_main`):
 
 | Path | Host | Reason | sha256 / state |
 |---|---|---|---|
 | `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/` | Mac Studio | Non-production code snapshot used because the Mac Studio git checkout was already dirty/stale and missing Stage `08B` files. This avoided mutating `/Users/daniildegtyarev/Projects/roehub.com` and `/opt/roehub/app`. | directory artifact |
 | `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/macstudio_smoke/stage08c_macstudio_smoke_clean/hf_original_candidate_manifest.json` | Mac Studio | Tiny real-HF target-host smoke with Stage `04` hash checks enabled; not a full candidate. | manifest hash `b500b825f72d5c434d3b97b89476acaeb464af78c09c79522a1ec19158660e98` |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/stdout.log` | Mac Studio | Managed background run stdout. | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/stderr.log` | Mac Studio | Managed background run stderr. | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/training_config.json` | Mac Studio | Full-run sanitized config and source/dataset lineage. | exists; sanitized JSON |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/train_only_normalization_stats.json` | Mac Studio | Train-only normalization stats from original HF train split. | exists; sanitized JSON |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/progress.jsonl` | Mac Studio | Durable episode/env-step progress. | `d3f8119b53b35168b50061acf9b1af6b4309f5d8d9a268e6401cba081b2864c2` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/latest_status.json` | Mac Studio | Latest full-run status. | `f1403d1b8cc4e8d8dfa44687639166d26d8c1785ce4725a3366eaa658d5f251e` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/latest_checkpoint.json` | Mac Studio | Resume checkpoint pointer. | `36d6848d524ccc70e60155e2f65a9adf1087503c3a44917867279fb0a199df46` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/checkpoints/best.pth` | Mac Studio | Current validation-selected best checkpoint at the first validation point; not final acceptance evidence. | `684ff16df4b989d5e4eae98eb8c637546bc39e4eae610b7f3e3affb48417db34` at evidence snapshot |
-| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/checkpoints/latest_resume.pth` | Mac Studio | Managed resumable checkpoint with model/optimizer/PER state. | `294b619f6e141e32fa001d8ce7ca6c56de077cf59c03a80aa71c5f46167d00c4` at evidence snapshot |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/hf_original_candidate_manifest.json` | Mac Studio | Completed full original-HF candidate manifest. | file sha256 `189370a40c874481a52262902884c1be3bd58b1faa0f7a581d6d04a6ae9e80d4`; manifest `candidate_manifest_hash` `c144111b5e74246589b55b1160aa869e0e6de9505f1311a12d8dadd452c50abc` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/hf_original_training_report.json` | Mac Studio | Completed full-run training report. | `f6c0b49e31191500ac305cf3c81875f1f74d686fda766e043ff84f951c2aaf8b` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/training_config.json` | Mac Studio | Full-run sanitized config and source/dataset lineage. | `4be3a8febc02354c5f56fbf11311d5ca58a2c7eb5bcc3bda04e21f87ff97c7f1` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/train_only_normalization_stats.json` | Mac Studio | Train-only normalization stats from original HF train split. | `c4e03bdb28447d789a8a097d44c73c77140348d841edfd9a4de7b752fd60f51e` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/progress.jsonl` | Mac Studio | Durable episode/env-step progress. | `987e8e56f611dcf8096386d258df4779769b607450dec618330dec9be4be096c` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/latest_status.json` | Mac Studio | Final full-run status. | `1ca938d5f482ce2f824c0c1db9d0be4efe06a8e4ff26b990ed0173865181e355` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/latest_checkpoint.json` | Mac Studio | Resume checkpoint pointer. | `4f4f1ef32dfb022e43b9f5a5ce06b3a2cd5764cc958b55364381719de8c5efe7` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/checkpoints/best.pth` | Mac Studio | Validation-selected best checkpoint for Stage `08D` evaluation. | `3538c77abb363f6ade74cc98113fc5a19be78b2f63c5449e675485ee8ce36e0c` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/checkpoints/final.pth` | Mac Studio | Final checkpoint; diagnostic unless selected by evaluation. | `791b7e9d9d9d61ee657886121680844ad6d5b4b9aac124aa838e3a8f6a4fc229` |
+| `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/checkpoints/latest_resume.pth` | Mac Studio | Managed resumable checkpoint with model/optimizer/PER state. | `7cc6d8ca2028b9559de7ab29e5628a7e717b118d7b8c83b098941eed0320e0b2` |
 
-No completed full-run `hf_original_candidate_manifest.json` existed at the evidence
-snapshot. The stage therefore remains `in_progress`.
+Delivery state: `local-only` implementation plus
+`target_host_non_production_training_pre_main` managed run. This is not
+`post_main_production_runtime_proof`. A future
+`post_main_production_runtime_proof` would require the target revision on
+`main`, green CI/GitHub Actions for that revision, deploy or verified sync from
+the Mac Studio checkout into `/opt/roehub/app`, and then the appropriate
+production runtime smoke. None of those production-proof actions were performed
+by Stage `08C`.
 
-Delivery state: `local-only` implementation plus `target_host_non_production_training_pre_main` managed run. No branch, commit, PR, production deploy, `/opt/roehub/app` sync, browser/auth proof, registry write, promotion, activation, exchange side effect, paper/testnet/live run, or mainnet submit was performed.
+## Операторский Итог
+
+Stage `08C` дал первый полный кандидат на оригинальном HF dataset в новой
+upstream-compatible цепочке. Бизнес-смысл этого шага узкий: теперь можно
+оценивать методологически корректный HF-original candidate в Stage `08D`, вместо
+того чтобы снова возвращаться к rejected MLP/scripted-transition path. Это еще
+не разрешение на registry, promotion, activation, paper/testnet/live execution
+или mainnet.
+
+Logging/redaction coverage: only sanitized paths, hashes, metrics, config ids
+and resource counters are recorded in this report and ledger. Secrets, raw
+provider payloads, credentials, cookies, tokens and exchange side-effect payloads
+are `N/A` and were not used.
+
+Alerts/monitoring/runbook coverage: production alerting is `N/A` because this is
+an offline non-production training run under `/opt/roehub/state/rl_trading/`, not
+a service deployment. Operational follow-up is the Stage `08D` prompt consuming
+the candidate manifest.
 
 ## Implemented Training Path
 
@@ -105,40 +135,18 @@ Tiny real-HF smoke:
 | Final checkpoint sha256 | `67aa57a35d008c82b6616ab0227c69e36d0ecd70c8a60366d77148e5e9d29191` |
 | Progress sha256 | `e6bcc3b175f13d79ff1c0e4c2385178eee594211e29d842fe1ff11d4d84bc3d5` |
 
-Full managed background run:
+Full managed run lifecycle
+(`proof_boundary=target_host_non_production_training_pre_main`):
 
-| Field | Value |
+| Event | Evidence |
 |---|---|
-| PID | `74035` |
-| Run id | `stage08c_hf_original_full` |
-| Run dir | `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full` |
-| Command boundary | `PYTHONPATH=/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/src uv run --extra rl-ml python ... stage08c_original_hf_full_training_run.py run --output-root .../full --run-id stage08c_hf_original_full --device-policy mps_preferred_cpu_fallback --torch-num-threads 1 --torch-num-interop-threads 1` |
-| Evidence snapshot timestamp | `2026-06-24T07:49:27Z` |
-| Status | `running` |
-| Completed episodes / planned episodes | `4601 / 55000` |
-| Completed env steps / planned env steps | `46010 / 550000` |
-| Progress | `8.3654545455%` |
-| Device | `mps` |
-| Validation points | `4` |
-| Current best episode / metric | `1000` / `0.4938830067` |
-| Learn updates | `36011` |
-| RSS | `1799.9375 MiB` |
-| CPU user/system seconds | `199.43395` / `37.267538` |
-| Latest status sha256 | `f1403d1b8cc4e8d8dfa44687639166d26d8c1785ce4725a3366eaa658d5f251e` |
-| Progress sha256 | `d3f8119b53b35168b50061acf9b1af6b4309f5d8d9a268e6401cba081b2864c2` |
-| Resume checkpoint sha256 | `294b619f6e141e32fa001d8ce7ca6c56de077cf59c03a80aa71c5f46167d00c4` |
-
-Status command:
-
-```bash
-ssh macstudio 'zsh -lc '"'"'cd /Users/daniildegtyarev/Projects/roehub.com && PYTHONPATH=/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/src uv run --extra rl-ml python /opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/scripts/rl_trading/stage08c_original_hf_full_training_run.py status --run-dir /opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full'"'"''
-```
-
-Resume command if the process stops before completion:
-
-```bash
-ssh macstudio 'zsh -lc '"'"'cd /Users/daniildegtyarev/Projects/roehub.com && PYTHONPATH=/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/src uv run --extra rl-ml python /opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/code_snapshot/scripts/rl_trading/stage08c_original_hf_full_training_run.py run --resume --run-id stage08c_hf_original_full --output-root /opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full --device-policy mps_preferred_cpu_fallback --torch-num-threads 1 --torch-num-interop-threads 1'"'"''
-```
+| Initial launch | PID `74035`; `device_policy=mps_preferred_cpu_fallback`; run dir `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full` |
+| Last healthy MPS snapshot | `2026-06-24T07:49:27Z`; `4601/55000` episodes; `46010/550000` env steps; `8.3654545455%`; device `mps`; latest status sha256 `f1403d1b8cc4e8d8dfa44687639166d26d8c1785ce4725a3366eaa658d5f251e` |
+| MPS stop reason | `stderr.log` recorded Apple Metal Performance Shaders command-buffer `Internal Error (00000001:Internal Error)`; no completed manifest existed at that point. |
+| CPU resume | PID `7465`; resumed from `latest_resume.pth` with `device_policy=cpu_only_deterministic`; no new stderr error was observed in `resume_cpu_20260624T100311Z.stderr.log`. |
+| Final status | `completed`; timestamp `2026-06-24T10:28:11Z`; device `cpu`; `55000/55000` episodes; `550000/550000` env steps; `100.0%`; wall seconds `1490.868954959`; RSS after `5160.390625 MiB`; throughput `368.8390507376` env steps/sec. |
+| Best checkpoint policy | validation metric `Validation_mean_pnl`; best step `470000`; best metric `49.6091622024`; default evaluation checkpoint `best.pth`. |
+| Dataset hashes | Stage `04` train hash matched `1c5cdf179777f0a68a81da915749f50d97826282e1419a5314a67b170e9cb14d`; validation hash matched `1e1e347bd4f842680f8a1781bc1e51f790f5e5865796e9ef3bd69548e20c51f4`. |
 
 ## Contract Impact
 
@@ -153,7 +161,7 @@ ssh macstudio 'zsh -lc '"'"'cd /Users/daniildegtyarev/Projects/roehub.com && PYT
 | Service-call auth/timeout/retry/error semantics | `none` | No service calls or auth surfaces changed. |
 | External side effects / unknown-state semantics | `none` | No exchange, DB, Redis, registry, paper/testnet/live or mainnet side effect. |
 | Logs / metrics / traces / audit / reports | `compatible-change` | Adds sanitized progress, status, manifest/report and stage ledger evidence under the ML artifact root. |
-| Benchmark / rollout gates | `compatible-change` | Stage `08C` is now `in_progress`; Stage `08D` stays blocked until full candidate completion. |
+| Benchmark / rollout gates | `compatible-change` | Stage `08C` is accepted; Stage `08D` is now allowed to consume the completed `hf_original_candidate` manifest. |
 | Browser-visible behavior | `none` | Browser/auth QA is `N/A`. |
 | Performance hot path | `none` | Offline training only; no API or live inference hot path changed. Runtime resource evidence is training-progress evidence, not a production-latency claim. |
 
@@ -170,7 +178,7 @@ ssh macstudio 'zsh -lc '"'"'cd /Users/daniildegtyarev/Projects/roehub.com && PYT
 | `uv run pyright src/trading/contexts/rl_trading apps tests` | passed; `0 errors` |
 | `uv run pytest -q tests/unit/contexts/rl_trading tests/unit/apps` | passed; `411 passed, 3 warnings` |
 | Mac Studio tiny real-HF smoke | passed; manifest hash `b500b825f72d5c434d3b97b89476acaeb464af78c09c79522a1ec19158660e98`; train/validation split hashes matched Stage `04` |
-| Mac Studio full HF run | in progress; fresh `running` event observed with PID `74035`, `1701/55000` episodes and resumable checkpoint |
+| Mac Studio full HF run | passed as `target_host_non_production_training_pre_main`; final status `completed`, `55000/55000` episodes, `550000/550000` env steps, manifest file sha256 `189370a40c874481a52262902884c1be3bd58b1faa0f7a581d6d04a6ae9e80d4` |
 | `uv run python -m tools.docs.generate_docs_index --check` | passed after docs index regeneration |
 
 ## Cold-Head Review
@@ -187,44 +195,42 @@ manifest, proof-boundary/browser-auth wording, contract impact, quality gates an
 
 Review instructions: `architecture-review/references/cold-head-plan-prompt-pack-review.md`.
 
-Verdict: Block for Stage acceptance until the full HF training run completes and
-writes the `hf_original_candidate` manifest.
+Verdict: Release after fixes for Stage `08C` acceptance.
 
-Blockers fixed: local implementation/gates, target-host smoke, managed background
-launch and fresh running event are present; the report and ledger explicitly avoid
-acceptance language.
+Blockers fixed: the full original-HF run completed, the candidate manifest and
+checkpoint/progress/status hashes are recorded, the proof boundary is explicit as
+`target_host_non_production_training_pre_main`, and the ledger is advanced to
+`08D`.
 
 Local follow-up check: completed. Focused tests, required ruff/pyright/unit gates
 and docs index check passed.
 
-Residual risks: the background run may fail or stop before completion; the current
-`best.pth` is only an intermediate validation-selected checkpoint; Stage `08D`
-cannot start until a completed `hf_original_candidate` manifest exists and the
-ledger advances to `08D`.
+Residual risks: Stage `08D` evaluation/backtest has not run yet, and this stage
+does not provide `post_main_production_runtime_proof`.
 
 ## Residual Risks
 
-- Stage `08C` is not accepted yet. The full run has no completed candidate
-  manifest at the evidence snapshot.
 - The run is executing from a non-production code snapshot because the Mac Studio
   git checkout was dirty/stale. This is valid `target_host_non_production_training_pre_main`
   evidence, not post-main production runtime proof.
-- `best.pth` currently exists only as an intermediate checkpoint after the first
-  validation point. Completion must record final `best.pth`, `final.pth`, validation
-  curves, progress hash and manifest hash before acceptance.
+- `best.pth` is validation-selected training output, not an evaluation/backtest
+  acceptance result. Stage `08D` must still score it against sanity baselines and
+  methodology-parity rules.
 - No `08D` evaluation/backtest, registry write, promotion, activation, paper/testnet/live
   execution or mainnet submit was performed.
 
 ## 08D Handoff
 
-Stage `08D` remains blocked.
+Stage `08D` is now allowed.
 
-The next executor must first re-check:
+The next executor must first consume:
 
-1. the full-run process/status under `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full`;
-2. the presence and sha256 of `hf_original_candidate_manifest.json`;
-3. final progress is `55000/55000` episodes and `550000/550000` env steps;
-4. final manifest records Stage `04` train/validation dataset hashes, train-only normalization stats, config hash, code state, validation-selected `best.pth`, `final.pth`, validation curves, resource metrics and progress hash.
+1. `hf_original_candidate_manifest.json` at `/opt/roehub/state/rl_trading/training_runs/stage08c_original_hf_full_training_run_v1/full/stage08c_hf_original_full/hf_original_candidate_manifest.json`;
+2. manifest file sha256 `189370a40c874481a52262902884c1be3bd58b1faa0f7a581d6d04a6ae9e80d4`;
+3. final progress `55000/55000` episodes and `550000/550000` env steps;
+4. validation-selected `best.pth` sha256 `3538c77abb363f6ade74cc98113fc5a19be78b2f63c5449e675485ee8ce36e0c`;
+5. final checkpoint sha256 `791b7e9d9d9d61ee657886121680844ad6d5b4b9aac124aa838e3a8f6a4fc229`;
+6. progress sha256 `987e8e56f611dcf8096386d258df4779769b607450dec618330dec9be4be096c`.
 
-Only after that evidence exists may the ledger mark `08C` `accepted` and advance
-`current_stage` to `08D`.
+The next prompt is
+`.codex/agents/generated/rl-trading-agent-platform-v1/08d-original-hf-backtest-evaluation.md`.
