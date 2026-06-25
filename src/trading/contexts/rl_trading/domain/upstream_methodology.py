@@ -1243,6 +1243,9 @@ class TorchD3qnPerAgent:
     def increment_step(self) -> None:
         self.total_steps += 1
 
+    def release_device_cache(self) -> None:
+        _release_device_cache_if_needed(torch=self.torch, device_type=str(self.device.type))
+
 
 def build_torch_cnn_dueling_q_network_v1(
     *,
@@ -1718,6 +1721,15 @@ def _select_device(
 def _synchronize_if_needed(*, torch: Any, device_type: str) -> None:
     if device_type == "mps" and hasattr(torch, "mps"):
         torch.mps.synchronize()
+
+
+def _release_device_cache_if_needed(*, torch: Any, device_type: str) -> None:
+    if device_type != "mps" or not hasattr(torch, "mps"):
+        return
+    torch.mps.synchronize()
+    empty_cache = getattr(torch.mps, "empty_cache", None)
+    if callable(empty_cache):
+        empty_cache()
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:

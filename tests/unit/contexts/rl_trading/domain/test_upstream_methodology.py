@@ -30,6 +30,9 @@ from trading.contexts.rl_trading.domain import (
     torch_cnn_dueling_forward_v1,
     valid_upstream_training_actions_v1,
 )
+from trading.contexts.rl_trading.domain.upstream_methodology import (
+    _release_device_cache_if_needed,
+)
 
 
 def test_upstream_alpha_config_exposes_architecture_and_parity_literals() -> None:
@@ -155,6 +158,28 @@ def test_sumtree_per_sampling_and_priority_updates_are_deterministic() -> None:
     assert float(buffer.tree[0]) != before_total
     assert len(restored) == len(buffer)
     assert np.array_equal(restored.tree, buffer.tree)
+
+
+def test_release_device_cache_only_flushes_mps_cache() -> None:
+    calls: list[str] = []
+
+    class FakeMps:
+        @staticmethod
+        def synchronize() -> None:
+            calls.append("synchronize")
+
+        @staticmethod
+        def empty_cache() -> None:
+            calls.append("empty_cache")
+
+    class FakeTorch:
+        mps = FakeMps()
+
+    _release_device_cache_if_needed(torch=FakeTorch(), device_type="cpu")
+    assert calls == []
+
+    _release_device_cache_if_needed(torch=FakeTorch(), device_type="mps")
+    assert calls == ["synchronize", "empty_cache"]
 
 
 def test_filtered_policy_rejects_weak_actions_and_records_cache_stats() -> None:
