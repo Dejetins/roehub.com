@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "08F выполнен, результат: `blocked`. Stage `09` не открывается.\n\nКлючевое evidence: Mac Studio `target_host_non_production_evaluation_pre_main` завершил native grouped filtered backtest с manifest.\n\nГлавный blocker: `candidate_non_positive_native_backtest_pnl`.\n\nМетрики acceptance surface:\n- filtered native backtest PnL after costs: `-31754.48132078`\n- simulator/accounting parity: passed\n\nИзменены/добавлены Stage 08F evaluator, CLI, unit/perf smoke tests, отчет и ledger:\n- [08F report](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md)\n\nVerification:\n- `uv run ruff check src/trading/contexts/rl_trading apps tests` passed\n\nI also tightened the report’s proof-boundary language.\n\nNo files were staged or committed."
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "decision",
+    "json_value": "block",
+    "stdout_contains": "Качественно переведи пользовательские заголовки"
+  }
+}

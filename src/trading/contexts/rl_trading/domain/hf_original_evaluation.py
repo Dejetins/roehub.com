@@ -60,6 +60,7 @@ class HfOriginalSplitData:
     symbols: tuple[str, ...]
     signal_times_utc: tuple[str | None, ...]
     source_payload: Mapping[str, object]
+    volatility_scores: tuple[float | None, ...] = ()
 
     def __post_init__(self) -> None:
         features = _validate_sequences(self.sequences, field=self.split_name)
@@ -70,8 +71,19 @@ class HfOriginalSplitData:
                 reason="signal_time_count_mismatch",
                 field=self.split_name,
             )
+        volatility_scores = (
+            self.volatility_scores
+            if self.volatility_scores
+            else tuple(None for _ in range(features.shape[0]))
+        )
+        if len(volatility_scores) != features.shape[0]:
+            raise HfOriginalEvaluationError(
+                reason="volatility_score_count_mismatch",
+                field=self.split_name,
+            )
         object.__setattr__(self, "sequences", features)
         object.__setattr__(self, "symbols", tuple(str(item).upper() for item in self.symbols))
+        object.__setattr__(self, "volatility_scores", tuple(volatility_scores))
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,6 +356,7 @@ def evaluate_stage08d_grouped_backtest_v1(
         symbols=tuple(split.symbols[idx] for idx in selected_indices),
         signal_times_utc=tuple(split.signal_times_utc[idx] for idx in selected_indices),
         source_payload=split.source_payload,
+        volatility_scores=tuple(split.volatility_scores[idx] for idx in selected_indices),
     )
     backtest_alpha = _position_fraction_alpha(config.alpha)
     environment = UpstreamTradingEnvironment(
@@ -502,6 +515,7 @@ def evaluate_stage08d_baseline_backtest_v1(
         symbols=tuple(split.symbols[idx] for idx in selected_indices),
         signal_times_utc=tuple(split.signal_times_utc[idx] for idx in selected_indices),
         source_payload=split.source_payload,
+        volatility_scores=tuple(split.volatility_scores[idx] for idx in selected_indices),
     )
     backtest_alpha = _position_fraction_alpha(config.alpha)
     action_counts = _empty_action_counts()
@@ -720,6 +734,13 @@ def _scorecard_payload(
             session_profitable_trades=session_profitable_trades,
             initial_balance=config.alpha.initial_balance,
         ),
+        "metrics_by_volatility_bucket": _volatility_bucket_payload(
+            volatility_scores=split.volatility_scores,
+            session_pnls=session_pnls,
+            session_closed_trades=session_closed_trades,
+            session_profitable_trades=session_profitable_trades,
+            initial_balance=config.alpha.initial_balance,
+        ),
         "net_pnl_after_costs_quote": _round_float(net_pnl),
         "out_of_sample_period": _period_payload(split.signal_times_utc),
         "policy_kind": policy_kind,
@@ -897,6 +918,7 @@ def _limit_split(split: HfOriginalSplitData, limit: int | None) -> HfOriginalSpl
         symbols=split.symbols[:limit],
         signal_times_utc=split.signal_times_utc[:limit],
         source_payload={**dict(split.source_payload), "selected_session_count": limit},
+        volatility_scores=split.volatility_scores[:limit],
     )
 
 
@@ -1150,6 +1172,63 @@ def _period_stability_payload(
                     (pnl / (len(indices) * initial_balance)) * 100.0
                 ),
                 "session_count": int(len(indices)),
+                "win_rate": _round_float(profitable / trades if trades else 0.0),
+            }
+        )
+    return rows
+
+
+def _volatility_bucket_payload(
+    *,
+    volatility_scores: Sequence[float | None],
+    session_pnls: np.ndarray,
+    session_closed_trades: np.ndarray,
+    session_profitable_trades: np.ndarray,
+    initial_balance: float,
+) -> list[dict[str, object]]:
+    if not volatility_scores:
+        volatility_scores = tuple(None for _ in range(int(session_pnls.size)))
+    finite = np.asarray(
+        [float(item) for item in volatility_scores if item is not None and np.isfinite(item)],
+        dtype=np.float64,
+    )
+    if finite.size:
+        q33 = float(np.quantile(finite, 1.0 / 3.0))
+        q66 = float(np.quantile(finite, 2.0 / 3.0))
+    else:
+        q33 = q66 = 0.0
+    buckets: dict[str, list[int]] = {}
+    for idx, value in enumerate(volatility_scores):
+        if value is None or not np.isfinite(float(value)):
+            bucket = "unknown"
+        elif float(value) <= q33:
+            bucket = "low"
+        elif float(value) <= q66:
+            bucket = "medium"
+        else:
+            bucket = "high"
+        buckets.setdefault(bucket, []).append(idx)
+    rows: list[dict[str, object]] = []
+    for bucket in sorted(buckets):
+        indices = np.asarray(buckets[bucket], dtype=np.int64)
+        pnl = float(np.sum(session_pnls[indices], dtype=np.float64))
+        trades = int(np.sum(session_closed_trades[indices], dtype=np.int64))
+        profitable = int(np.sum(session_profitable_trades[indices], dtype=np.int64))
+        rows.append(
+            {
+                "bucket": bucket,
+                "closed_trades": trades,
+                "net_pnl_after_costs_quote": _round_float(pnl),
+                "profitable_trades": profitable,
+                "return_pct_after_costs": _round_float(
+                    (pnl / (len(indices) * initial_balance)) * 100.0
+                ),
+                "session_count": int(len(indices)),
+                "volatility_bucket_method": (
+                    "tertiles_within_scorecard_split"
+                    if finite.size
+                    else "metadata_missing"
+                ),
                 "win_rate": _round_float(profitable / trades if trades else 0.0),
             }
         )

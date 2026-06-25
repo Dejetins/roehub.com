@@ -53,6 +53,7 @@ as attempted shell execution.
 - `validation_depth_linter.py`: flags tests-only validation for runtime/integration surfaces.
 - `runtime_proof_boundary_guard.py`: requires Mac Studio prompt/docs wording to distinguish pre-main host/read-only checks from post-main changed-code production runtime proof.
 - `performance_evidence_guard.py`: requires comparable baseline/candidate evidence for performance claims.
+- `russian_final_answer_guard.py`: requires Russian user-facing final reports while allowing technical identifiers, commands, paths, hashes, and backticked values to stay unchanged.
 - `cold_head_gate.py`: requires cold-head evidence before finalizing architecture or prompt artifacts.
 - `skill_lint_guard.py`: warns about missing `SKILL.md` frontmatter.
 
@@ -62,7 +63,7 @@ as attempted shell execution.
 - `PermissionRequest`: deterministic `FATAL_BLOCK` returns `decision.behavior: "deny"`.
 - `PostToolUse`: blocking findings return `decision: "block"` as feedback. This does not undo side effects.
 - `UserPromptSubmit`: secret findings block prompt submission; warnings add additional context.
-- `Stop`: required final gates return `decision: "block"` to create one continuation prompt. The continuation prompt is user-facing Russian, includes the original assistant answer from `last_assistant_message`, and instructs the model to return that answer fully before adding a readable `Проверка перед финалом` section. Stop hooks must not replace a useful final answer with a terse technical receipt.
+- `Stop`: required final gates return `decision: "block"` to create one continuation prompt. The continuation prompt is user-facing Russian, includes the original assistant answer from `last_assistant_message`, and instructs the model to return a full corrected Russian answer. When cold-head evidence is missing, it also requires a readable `Проверка перед финалом` section. Stop hooks must not replace a useful final answer with a terse technical receipt.
 
 `Stop` validators must avoid loops. The router suppresses repeated continuation
 when `stop_hook_active` is already true or when the same reason marker is already

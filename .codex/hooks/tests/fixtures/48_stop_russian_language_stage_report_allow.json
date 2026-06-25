@@ -1,0 +1,11 @@
+{
+  "payload": {
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "08F выполнен, результат: `blocked`. Stage `09` не открывается, `research_candidate` не сохранен, регистрации/промоушена/активации/деплоя/`production sync` не было.\n\nКлючевое доказательство: Mac Studio `target_host_non_production_evaluation_pre_main` завершил нативный `grouped filtered backtest` с `manifest`.\n\nХеш `manifest`: `6854055bd89f82446bb9952a3e98b66d9a20c0f5d72c74848be38caaf325581c`.\nХеш оценки: `1a068069d91f642d4cf10e8f545380943a6ff697ac1f7589cf0160b2bea9c1b8`.\n\nГлавный блокер: `candidate_non_positive_native_backtest_pnl`.\n\nМетрики приемки:\n- `filtered native backtest PnL after costs`: `-31754.48132078`\n- `simulator/accounting parity`: пройдено\n\nИзменены/добавлены оценщик Stage 08F, CLI, `unit/perf smoke tests`, отчет и `ledger`:\n- [отчет 08F](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md)\n\nПроверка:\n- `uv run ruff check src/trading/contexts/rl_trading apps tests` пройдена.\n- Файлы не добавлялись через `git add`, `git commit` не выполнялся.\n\nЯ также уточнил `proof-boundary` формулировку отчета: снимок Mac Studio не является `post_main_production_runtime_proof`.\n\n**Проверка перед финалом**\n- Статус проверки: выполнена\n- Режим: cold self-review fallback\n- Что проверено: язык финального отчета, `proof-boundary` формулировка, блокирующий результат 08F и передача Stage 09.\n- Итог: Block\n- Что исправлено/добавлено: отчет сформулирован на русском, технические идентификаторы сохранены без перевода.\n- Остаточные риски: Stage 09 остается закрытым до положительного результата оценки.\n- Что это значит для следующего шага: нужно разбирать причину отрицательного PnL, а не регистрировать кандидата."
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_empty": true
+  }
+}

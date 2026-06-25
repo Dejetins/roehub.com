@@ -2,7 +2,7 @@
   "payload": {
     "hook_event_name": "Stop",
     "stop_hook_active": false,
-    "last_assistant_message": "Обсудили, почему hook может реагировать на architecture и ready wording. Файлы не менялись, artifact readiness не заявляю."
+    "last_assistant_message": "Обсудили, почему hook может реагировать на слова `architecture` и `ready`. Файлы не менялись, готовность артефактов не заявляю."
   },
   "expect": {
     "returncode": 0,

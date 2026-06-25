@@ -987,6 +987,17 @@ Use short examples when they clarify a contract, data flow, rollout step, or ope
 
 This rule does not change the `prompt-manager` contract: executor prompts and prompt packs MUST remain in English unless the user explicitly asks for another language.
 
+### 13.7 User-facing final answer language
+User-facing final answers, status reports, handoffs, stage results, verification summaries, and cold-head review additions MUST be written in Russian by default.
+
+The agent MUST translate user-facing headings and explanatory prose such as `Verification`, `Key evidence`, `passed`, `failed`, `No files were staged`, and proof-boundary commentary into natural Russian.
+
+Keep technical identifiers unchanged when translating the surrounding explanation:
+- code identifiers, module names, classes, functions, API routes, env vars, config keys, schema names, metrics, hashes, process ids, file paths, commands, branch names, statuses in backticks, and exact artifact names;
+- prompt artifacts produced by `prompt-manager`, when the artifact itself is supposed to remain English.
+
+This is a final-answer contract, not permission to translate code, commands, paths, identifiers, or prompt-pack body content that intentionally remains English.
+
 ---
 
 ## 14) Implementation hygiene and quality gates

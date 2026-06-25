@@ -43,6 +43,7 @@ VALIDATOR_MODULES = [
     "validators.validation_depth_linter",
     "validators.runtime_proof_boundary_guard",
     "validators.performance_evidence_guard",
+    "validators.russian_final_answer_guard",
     "validators.cold_head_gate",
     "validators.skill_lint_guard",
 ]
@@ -109,6 +110,13 @@ def _human_finding_line(finding: Finding) -> str:
             "исходный ответ полностью и ниже добавить краткую cold-head проверку "
             "простым языком."
         )
+    if finding.validator == "russian_final_answer_guard":
+        return (
+            "- Финальный ответ содержит англоязычный пользовательский текст. "
+            "Нужно качественно переписать отчет на русском, сохранив команды, "
+            "пути, имена файлов, хеши, статусы и технические идентификаторы "
+            "в исходном виде."
+        )
     target = f" ({finding.target})" if finding.target else ""
     return f"- {finding.title}{target}: {finding.message}"
 
@@ -120,20 +128,31 @@ def stop_continuation_reason(
 ) -> str:
     original_answer = _truncate_original_answer(assistant_text(payload))
     finding_lines = "\n".join(_human_finding_line(finding) for finding in findings)
-    return f"""Roehub hook: нужно завершить ответ понятным русским итогом.
-
-Не заменяй исходный ответ техническим receipt и не отвечай только служебным блоком.
-В следующем сообщении:
-1. Верни полный исходный ответ модели на русском языке без сокращений.
-2. Ниже добавь раздел **Проверка перед финалом** простым языком.
-3. Не оформляй этот раздел как code block и не переходи на английский.
-
-Исходный ответ модели:
---- НАЧАЛО ИСХОДНОГО ОТВЕТА ---
-{original_answer}
---- КОНЕЦ ИСХОДНОГО ОТВЕТА ---
-
-Добавь ниже исходного ответа такой человекочитаемый блок:
+    needs_cold_head = any(finding.validator == "cold_head_gate" for finding in findings)
+    needs_russian = any(
+        finding.validator == "russian_final_answer_guard" for finding in findings
+    )
+    first_action = (
+        "Верни полный исправленный ответ на русском языке без сокращений. "
+        "Качественно переведи пользовательские заголовки, пояснения и статусы; "
+        "технические идентификаторы, команды, пути, хеши и значения в backticks "
+        "сохрани как есть."
+        if needs_russian
+        else "Верни полный исходный ответ модели на русском языке без сокращений."
+    )
+    formatting_action = (
+        "Не оформляй этот раздел как code block и не переходи на английский."
+        if needs_cold_head
+        else "Не переходи на английский в пользовательском тексте."
+    )
+    cold_head_action = (
+        "2. Ниже добавь раздел **Проверка перед финалом** простым языком.\n"
+        if needs_cold_head
+        else "2. Не добавляй cold-head раздел, если он не требуется исходной задачей.\n"
+    )
+    cold_head_template = (
+        """
+Добавь ниже ответа такой человекочитаемый блок:
 
 **Проверка перед финалом**
 - Статус проверки: выполнена | заблокирована
@@ -143,6 +162,23 @@ def stop_continuation_reason(
 - Что исправлено/добавлено: ...
 - Остаточные риски: ...
 - Что это значит для следующего шага: ...
+"""
+        if needs_cold_head
+        else ""
+    )
+    return f"""Roehub hook: нужно завершить ответ понятным русским итогом.
+
+Не заменяй исходный ответ техническим receipt и не отвечай только служебным блоком.
+В следующем сообщении:
+1. {first_action}
+{cold_head_action.rstrip()}
+3. {formatting_action}
+
+Исходный ответ модели:
+--- НАЧАЛО ИСХОДНОГО ОТВЕТА ---
+{original_answer}
+--- КОНЕЦ ИСХОДНОГО ОТВЕТА ---
+{cold_head_template}
 
 Почему hook попросил продолжение:
 {finding_lines}
