@@ -22,7 +22,7 @@
 - обучается на сессиях, где движение есть, но направление не предсказуемо из доступной истории;
 - получает слишком редкий reward-сигнал и поэтому не учится устойчивой политике.
 
-В этом stage нет live trading, exchange submit, пользовательских денег, новых secrets, миграций БД, API-контрактов или browser-visible UI. Операционный риск ограничен CPU/RAM/IO на `macstudio` и дисковыми ML artifacts под `/opt/roehub/state/rl_trading/`.
+В этом stage нет live trading, exchange submit, пользовательских денег, новых secrets, миграций БД, API-контрактов или browser-visible UI. Операционный риск ограничен CPU/MPS/RAM/IO на `macstudio` и дисковыми ML artifacts под `/opt/roehub/state/rl_trading/`.
 
 ## Операционные поверхности
 
@@ -33,7 +33,7 @@
 | Secrets/redaction | N/A: новые secrets не читаются; reports фиксируют только sanitized paths, counts, hashes и метрики. |
 | Database/API/browser contracts | N/A: нет migrations, API routes, DTO, UI или browser-visible changes. |
 | Alerts/monitoring | N/A для production; runtime monitoring этого stage — ручной polling PID/status files на `macstudio`. |
-| Runbook action | Проверять PID `9704`/`9706`/`9707`, `latest_status.json`, `progress.jsonl` и итоговый `stage08h_dual_branch_cpu_run_summary.json`; Stage `09` не запускать до accepted verdict. |
+| Runbook action | Проверять PID `15037`/`15039`/`15041`, `latest_status.json`, `progress.jsonl` и итоговый `stage08h_dual_branch_cpu_run_summary.json`; Stage `09` не запускать до accepted verdict. |
 
 ## Что проверяется
 
@@ -57,9 +57,12 @@
 | `90/60` smoke sha256 | `d95ef5b47f18adc1671811e1f126393da323081516eecdb4d00f2c9358f1d194` |
 | Superseded single-thread `90/60` run id | `stage08h_dual_branch_cpu_90_60_full_20260626T141800Z` |
 | Superseded single-thread PIDs | `97712`, `97713`, `97714` stopped on `macstudio` after user requested max CPU threads |
-| Current full `90/60` run id | `stage08h_dual_branch_cpu_90_60_full_max_threads_20260626T211226Z` |
-| Current full `90/60` PIDs | orchestrator `9704`, Python orchestrator `9706`, HF training `9707` on `macstudio` |
-| Latest observed HF training status | `401/55000` episodes, `24060/3300000` env steps, `progress_pct=0.7290909091`, `device=cpu`, `status=running`, `torch_num_threads=12` |
+| Superseded max-thread CPU `90/60` run id | `stage08h_dual_branch_cpu_90_60_full_max_threads_20260626T211226Z` |
+| Deleted CPU runtime artifacts | Removed exact old CPU paths under `/opt/roehub/state/rl_trading/evaluation_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/dual_branch_runs/` and `/opt/roehub/state/rl_trading/training_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/hf_original/`; `stage08h_mps_speed_canary_v1` was left intact. |
+| `MPS` speed canary run id | `stage08h_hf_90_60_mps_speed_canary_20260626T214237Z` completed `1000/1000` episodes on `device=mps` in `619.546755542` sec, about `1.61` episodes/sec. |
+| Current full `90/60` run id | `stage08h_dual_branch_mps_90_60_full_20260626T215849Z` |
+| Current full `90/60` PIDs | orchestrator `15037`, Python orchestrator `15039`, HF training `15041` on `macstudio` |
+| Latest observed HF training status | `601/55000` episodes, `36060/3300000` env steps, `progress_pct=1.0927272727`, `device=mps`, `status=running`, `torch_num_threads=12` |
 
 ## Диагностический вывод
 
@@ -106,29 +109,34 @@ Reward proxy показывает разреженность сигнала. Д�
 | `stage08c_original_hf_full_training_run.py`, `stage08e_roehub_native_full_training_run.py`, `stage08g_cpu_optuna_calibration.py`, `stage08g_dual_branch_cpu_training_evaluation.py` и `UpstreamAlphaConfig` теперь используют `os.cpu_count()` как default для `torch_num_threads`. | Новый стандартный режим должен использовать максимально доступное число CPU threads на target host, если пользователь явно не передал другой `--torch-num-threads`. |
 | `stage08g_cpu_optuna_calibration.py` получил профильные параметры и `--stage-label`. | `Optuna` должен оценивать checkpoint с той же формой входа, с которой модель обучалась. |
 | `stage08g_dual_branch_cpu_training_evaluation.py` получил профильные параметры и `--stage-label 08H`. | `08H` summary должен быть помечен как `08H`, а не как новый `08G`. |
+| `stage08g_dual_branch_cpu_training_evaluation.py` получил `--device-policy`. | Полный `08H` должен уметь запускать HF-original и Roehub-native training на `mps_preferred_cpu_fallback`, а не быть навсегда зафиксированным на `cpu_only_deterministic`. |
 | Добавлен `scripts/rl_trading/stage08h_oracle_supervised_dataset_diagnostics.py`. | Нужна отдельная диагностика данных/цели до финального качества модели. |
 
 ## Текущий полный run
 
 Первый полный run `stage08h_dual_branch_cpu_90_60_full_20260626T141800Z` был остановлен после пользовательского запроса использовать максимально доступное число CPU cores. Причина остановки: этот run был запущен с `--torch-num-threads 1`, фактически грузил около одного CPU core, а пользователь признал такой режим неприемлемо долгим для полного `08H`.
 
-Новый полный run запущен на `macstudio` с `--torch-num-threads 12` и `--torch-num-interop-threads 1`:
+Второй run `stage08h_dual_branch_cpu_90_60_full_max_threads_20260626T211226Z` был остановлен после `MPS` speed canary, потому что пробный HF-original `90/60` запуск `stage08h_hf_90_60_mps_speed_canary_20260626T214237Z` завершил `1000/1000` episodes на `device=mps` за `619.546755542` sec, примерно `1.61` episodes/sec, что примерно в `3x` быстрее наблюдавшегося CPU-хвоста `0.46-0.52` episodes/sec. По явной просьбе пользователя старые CPU runtime artifacts были удалены; `MPS` canary оставлен как evidence.
+
+Текущий полный run запущен на `macstudio` с `--device-policy mps_preferred_cpu_fallback`, `--torch-num-threads 12` и `--torch-num-interop-threads 1`:
 
 | Поле | Значение |
 |---|---|
-| `run_id` | `stage08h_dual_branch_cpu_90_60_full_max_threads_20260626T211226Z` |
+| `run_id` | `stage08h_dual_branch_mps_90_60_full_20260626T215849Z` |
 | `status` | `running` |
-| `completed_episodes` | `401/55000` |
-| `completed_env_steps` | `24060/3300000` |
-| `progress_pct` | `0.7290909091` |
-| `device` | `cpu` |
+| `completed_episodes` | `601/55000` |
+| `completed_env_steps` | `36060/3300000` |
+| `progress_pct` | `1.0927272727` |
+| `device` | `mps` |
+| `device_policy` | `mps_preferred_cpu_fallback` |
 | `torch_num_threads` | `12` |
 | `torch_num_interop_threads` | `1` |
-| `latest_status_timestamp` | `2026-06-26T21:20:10Z` |
-| `eta_sec` | `61928.6657257932` for the current HF-original training branch only |
-| `main_pid` | `9704` |
-| `python_orchestrator_pid` | `9706` |
-| `child_training_pid` | `9707` |
+| `latest_status_timestamp` | `2026-06-26T22:03:07Z` |
+| `eta_sec` | `22602.1924621059` for the current HF-original training branch only |
+| `main_pid` | `15037` |
+| `python_orchestrator_pid` | `15039` |
+| `child_training_pid` | `15041` |
+| `hf_training_run_id` | `stage08c_hf_original_0df6fc8eac61d2e0bc02` |
 | `summary_exists` | `false` for `stage08h_dual_branch_cpu_run_summary.json` |
 | `roehub_native_branch_started` | `false` |
 
@@ -136,19 +144,19 @@ Reward proxy показывает разреженность сигнала. Д�
 
 Proof boundary: это `target_host_non_production_training_pre_main` / offline ML runtime evidence на `macstudio`. Это не `post_main_production_runtime_proof`, не browser-visible proof и не проверка `/opt/roehub/app`. Для `post_main_production_runtime_proof` потребовались бы target revision on `main`, зеленые GitHub Actions/CI, deploy или verified sync из `main` checkout в `/opt/roehub/app`, а затем production smoke/API/browser verification по измененному production runtime.
 
-Environment/comparability note: наблюдение выполнено на том же `macstudio` (`12` CPU cores: `8` performance + `4` efficiency), в том же `08H` HF-original `90/60` training stage, на том же HF dataset и с теми же основными hyperparameters; отличался `torch_num_threads` и restart state. Это не финальный benchmark acceptance: старый single-thread run был уже прогрет и находился на episode `2801 -> 2901`, новый max-thread run был свежим и наблюдался на episode `201 -> 301`, поэтому сравнение является directional runtime evidence, а не строгим proof ускорения.
+Environment/comparability note: `MPS` canary выполнен на том же `macstudio`, в том же `08H` HF-original `90/60` training stage, на том же HF dataset и с теми же основными hyperparameters. Отличался только лимит `episodes=1000` и отдельный `run_id/output-root`; canary является directional speed evidence, а не финальным acceptance proof полного `55000`-episode run. Он подтвердил, что training CLI реально работает на `device=mps`, а не уходит в CPU fallback.
 
-Performance observation: max-thread режим был включен и наблюдался `5` минут. Новый training PID `9707` использовал около `185%` CPU, то есть больше одного core, но не насыщал все `12` cores. После начала learning updates хвост `201 -> 301` episodes занял примерно `194.145129625` seconds, около `0.515078` episode/sec. Последний наблюдавшийся single-thread хвост старого run `2801 -> 2901` episodes занимал примерно `163.728928584` seconds, около `0.610766` episode/sec. Вывод: max-thread default включен по пользовательскому решению, но 5-минутная проверка пока не доказывает ускорение; вероятен overhead на маленьком batch/PyTorch updates.
+Performance observation: `MPS` canary `stage08h_hf_90_60_mps_speed_canary_20260626T214237Z` завершил `60000/60000` env steps за `619.546755542` sec, около `96.77` steps/sec. Текущий полный `MPS` run стартовал с той же device policy, и первый observed status подтвердил `device=mps`.
 
 ## Пауза до завершения обучения
 
-Текущий этап зафиксирован как `08H in_progress`. Это не accepted verdict и не blocked verdict по качеству модели. Это handoff-состояние: диагностика данных завершена, полный `90/60` dual-branch CPU run запущен и живой, но финальные HF/Roehub-native результаты еще не существуют.
+Текущий этап зафиксирован как `08H in_progress`. Это не accepted verdict и не blocked verdict по качеству модели. Это handoff-состояние: диагностика данных завершена, полный `90/60` dual-branch `MPS` run запущен и живой, но финальные HF/Roehub-native результаты еще не существуют.
 
 Следующий агент или следующий проход должен начинать не с перезапуска обучения, а с проверки уже идущего запуска:
 
-1. Проверить, живы ли PID `9704`, `9706`, `9707`, либо завершился ли orchestrator.
-2. Прочитать свежий HF-original `latest_status.json` и `progress.jsonl` под `/opt/roehub/state/rl_trading/training_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/hf_original/stage08c_hf_original_7bad309170f3ddf2749b/`.
-3. Проверить, появился ли итоговый файл `/opt/roehub/state/rl_trading/evaluation_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/dual_branch_runs/stage08h_dual_branch_cpu_90_60_full_max_threads_20260626T211226Z/stage08h_dual_branch_cpu_run_summary.json`.
+1. Проверить, живы ли PID `15037`, `15039`, `15041`, либо завершился ли orchestrator.
+2. Прочитать свежий HF-original `latest_status.json` и `progress.jsonl` под `/opt/roehub/state/rl_trading/training_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/hf_original/stage08c_hf_original_0df6fc8eac61d2e0bc02/`.
+3. Проверить, появился ли итоговый файл `/opt/roehub/state/rl_trading/evaluation_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/dual_branch_runs/stage08h_dual_branch_mps_90_60_full_20260626T215849Z/stage08h_dual_branch_cpu_run_summary.json`.
 4. Если HF-original training завершился, проверить candidate manifest, `best.pth`, `final.pth`, final status, количество эпизодов `55000/55000` и шагов `3300000/3300000`.
 5. Проверить HF-original `Optuna`: должно быть `100/100` trials, профиль должен остаться `agent_history_len=90`, `agent_session_len=60`.
 6. Проверить HF-original final holdout: PnL после costs, количество закрытых сделок, action distribution, skipped/filtered signals, сравнение с sanity baselines и `stage09_allowed` на уровне branch.
@@ -175,8 +183,8 @@ Performance observation: max-thread режим был включен и набл
 | - | `scripts/rl_trading/stage08c_original_hf_full_training_run.py` | - | Add profile CLI parameters for HF training. | `compatible-change` additive opt-in CLI options |
 | - | `scripts/rl_trading/stage08e_roehub_native_full_training_run.py` | - | Add profile CLI parameters for native training. | `compatible-change` additive opt-in CLI options |
 | - | `scripts/rl_trading/stage08g_cpu_optuna_calibration.py` | - | Add profile-aware evaluation and stage labeling. | `compatible-change` additive opt-in CLI options |
-| - | `scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py` | - | Add profile-aware orchestration and `08H` stage label. | `compatible-change` additive opt-in CLI options |
+| - | `scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py` | - | Add profile-aware orchestration, `08H` stage label and explicit `--device-policy` for full `MPS` training. | `compatible-change` additive opt-in CLI options |
 | - | `tests/unit/contexts/rl_trading/domain/test_upstream_methodology.py` | - | Lock payload profile fields. | `none` test-only |
-| - | `tests/unit/scripts/rl_trading/test_stage08g_dual_branch_cpu_training_evaluation.py` | - | Cover `stage-label=08H` dry-run. | `none` test-only |
+| - | `tests/unit/scripts/rl_trading/test_stage08g_dual_branch_cpu_training_evaluation.py` | - | Cover `stage-label=08H` and `mps_preferred_cpu_fallback` dry-runs. | `none` test-only |
 | - | `docs/architecture/ml/rl-trading-agent-platform-v1.md` | - | Insert Stage `08H` as current corrective research gate. | `compatible-change` docs/plan |
 | - | `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | - | Mark `08H` current/in-progress and keep `09` blocked. | `compatible-change` docs/ledger |

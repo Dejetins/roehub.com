@@ -154,6 +154,40 @@ def test_stage08g_dual_branch_dry_run_can_label_corrective_stage08h(
     )
 
 
+def test_stage08g_dual_branch_dry_run_can_use_mps_training_device_policy(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    result = stage08g.main(
+        [
+            "--dry-run",
+            "--stage-label",
+            "08H",
+            "--device-policy",
+            "mps_preferred_cpu_fallback",
+            "--output-root",
+            str(tmp_path / "runs"),
+            "--hf-training-output-root",
+            str(tmp_path / "hf_training"),
+            "--native-training-output-root",
+            str(tmp_path / "native_training"),
+            "--evaluation-output-root",
+            str(tmp_path / "evaluation"),
+            "--generated-at-utc",
+            "2026-06-26T12:00:00Z",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    summary = json.loads(Path(payload["summary_path"]).read_text(encoding="utf-8"))
+    commands = [step["command"] for step in summary["steps"]]
+
+    assert result == 0
+    assert summary["methodology"]["device_policy"] == "mps_preferred_cpu_fallback"
+    assert "--device-policy mps_preferred_cpu_fallback" in commands[0]
+    assert "--device-policy mps_preferred_cpu_fallback" in commands[2]
+
+
 def _completed_training(
     *,
     tmp_path: Path,

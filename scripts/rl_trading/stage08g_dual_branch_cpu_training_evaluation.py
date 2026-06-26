@@ -236,7 +236,7 @@ def _hf_training_command(
         "--output-root",
         str(output_root),
         "--device-policy",
-        "cpu_only_deterministic",
+        args.device_policy,
         "--episodes",
         str(args.episodes),
         "--seed",
@@ -302,7 +302,7 @@ def _native_training_command(
         "--output-root",
         str(output_root),
         "--device-policy",
-        "cpu_only_deterministic",
+        args.device_policy,
         "--episodes",
         str(args.episodes),
         "--seed",
@@ -467,7 +467,7 @@ def _summary_payload(
         "execution_mode": args.execution_mode,
         "generated_at_utc": _format_utc(generated_at_utc),
         "methodology": {
-            "device_policy": "cpu_only_deterministic",
+            "device_policy": args.device_policy,
             "hf_training_dataset": "original_hf_stage04_dataset",
             "native_training_dataset": "accepted_stage06_roehub_sessionized_dataset",
             "optuna_trials_default_source": "Habr workflow command uses --trials 100 --jobs 1",
@@ -729,6 +729,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--validation-max-sessions", type=_optional_positive_int, default=None)
     parser.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
     parser.add_argument("--torch-num-interop-threads", type=int, default=1)
+    parser.add_argument(
+        "--device-policy",
+        choices=("cpu_only_deterministic", "mps_preferred_cpu_fallback"),
+        default="cpu_only_deterministic",
+    )
 
     parser.add_argument("--trials", type=int, default=100)
     parser.add_argument("--jobs", type=int, default=1)
