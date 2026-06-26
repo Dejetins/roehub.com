@@ -6,7 +6,7 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
-scope: "Run the actual 6-hour sustained soak with active strategies after readiness, canary, and burst gates pass."
+scope: "Run the actual 6-hour sustained soak with active strategies after readiness, canary, and burst gates pass, and prove baseline signal-path latency/dedup monitoring."
 language:
   implementation: python/shell/markdown
   agent_report: ru
@@ -47,7 +47,7 @@ skill_routing:
 validation_strategy:
   depth: target_runtime
   e2e_required: true
-  acceptance_surfaces: ["6h-runtime", "active-strategies", "prometheus", "monit", "database", "redis", "browser"]
+  acceptance_surfaces: ["6h-runtime", "active-strategies", "signal-latency", "signal-dedup", "prometheus", "monit", "database", "redis", "browser"]
   tests_only_allowed_reason: ""
   evidence_target: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-4-sustained-6h-soak.md
 stage_execution_ledger:
@@ -85,10 +85,22 @@ Run Stage `12.4` sustained 6-hour soak.
 - Credential redaction rule: never write secrets, passwords, cookies, tokens, DSNs, exchange keys, raw credentials, or session values to reports, logs, screenshots, ledger, commits, or final output.
 - If authenticated browser/API proof is collected in this gate, use Keycloak username `smoke_e2e_keycloak`. On `macstudio`, read the password only from `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; outside `macstudio`, use securely exported local `ROEHUB_SMOKE_E2E_PASSWORD`. Do not ask for or print the password.
 - Reconfirm the Stage `12.1` readiness invariants immediately before starting: producer enabled, allowlists non-empty, selected active strategy runs still running, and telemetry available.
+- Before starting the 6h timer, declare the signal-path measurement method in the report: SQL timestamp sources, Prometheus metrics/PromQL, snapshot cadence, and p50/p95/p99/max calculation. If this cannot be declared from current telemetry, block before starting the timer.
 - Run for 6 elapsed hours with active paper/testnet strategies. Do not count idle time with `running_strategy_runs = 0` toward acceptance.
 - Collect periodic snapshots at start, at least hourly, and final. Each snapshot must include Monit, Prometheus, CPU/RAM/process RSS, producer/execution metrics, Redis pending/retry/DLQ, DB source-event/intent/order/reconciliation/outbox deltas, and active strategy state.
+- Every periodic snapshot and the final summary must include signal-path latency/dedup evidence for the same measurement window:
+  - p50/p95/p99/max for `candle.bar_ts_close -> StrategySignal.created_at`;
+  - p50/p95/p99/max for `StrategySignal.created_at -> ExecutionSourceEvent.received_at`;
+  - processed candle count for the selected active runs;
+  - unique `StrategySignal` count;
+  - unique `ExecutionSourceEvent` count for `source_type=strategy_signal`;
+  - duplicate `signal_id` rows must be `0`;
+  - duplicate `(strategy_run_id, bar_ts_open)` rows must be `0`;
+  - duplicate source-event idempotency outcomes must be `0` or explicitly proven as expected duplicate replays that did not create new source-event rows.
+- Use both existing Prometheus signals where available (`strategy_producer_signal_lag_seconds`, `strategy_producer_source_event_latency_seconds`) and DB timestamp deltas. Prometheus gives operational monitoring continuity; DB evidence proves durable per-window facts for the stage report.
 - Track deltas relative to the Stage `12.4` start baseline, not only absolute historical counts.
 - No new unknown unreconciled state, retry/DLQ growth beyond thresholds, mainnet attempt, secret leak, uncontrolled crash, or sustained resource saturation is allowed.
+- Do not turn Stage `12.4` into a new real-order execution test. If the existing runtime naturally creates intents/orders, record their deltas and latency as supporting evidence, but do not submit extra testnet orders solely for this gate. Full candle-to-order-ack latency coverage is a follow-up task after `12.4`/`12.5`.
 - Capture final browser/API state for `/strategies` or defer final browser proof to `12.5` only if `12.4` records the exact reason and API evidence is complete.
 - If accepted and files changed, publish scoped report/ledger/docs changes through `publish-ci-deploy` direct-main discipline.
 
@@ -96,6 +108,9 @@ Run Stage `12.4` sustained 6-hour soak.
 
 - Full 6 elapsed hours are covered by durable snapshots while active strategies remain running.
 - Producer metrics and DB deltas show active strategy processing during the window.
+- Signal-path latency is measurable and reported as p50/p95/p99/max for both `candle.bar_ts_close -> StrategySignal.created_at` and `StrategySignal.created_at -> ExecutionSourceEvent.received_at`.
+- Processed candle count, unique `StrategySignal` count, and unique `ExecutionSourceEvent` count are reported for the selected active runs and explain any expected mismatch.
+- Dedupe evidence proves duplicate `signal_id` rows are `0`, duplicate `(strategy_run_id, bar_ts_open)` rows are `0`, and idempotency duplicate replays do not create new source-event rows.
 - Redis/DB/Prometheus/Monit show no hidden backlog, unknown state growth, or sustained resource pressure.
 - Ledger marks `12.4 accepted`; `12.5` may start only after this.
 
@@ -106,4 +121,4 @@ Run Stage `12.4` sustained 6-hour soak.
 
 ## Final Output
 
-Russian report with 6h window, snapshot table, deltas, blockers/residual risk, delivery status, and handoff for Stage `12.5`.
+Russian report with 6h window, snapshot table, signal-path latency/dedup table, deltas, blockers/residual risk, delivery status, and handoff for Stage `12.5` plus the follow-up candle-to-order-ack latency coverage task.

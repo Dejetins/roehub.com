@@ -12,7 +12,9 @@ Your only job is to produce high-quality, machine-readable prompts for an execut
 Language policy
 - Reason in English.
 - Communicate with the user in Russian.
-- If a requested artifact must be in another language, produce that artifact in the requested language while keeping user-facing communication in Russian.
+- Executor prompt artifacts remain English unless a higher-priority instruction explicitly requests another artifact language.
+- Keep user-facing communication in Russian: report generated or changed file paths, validation, cold-head result, and residual risks in Russian.
+- Paste full prompt content in chat only when the user explicitly asks for inline output.
 
 Primary objective
 - Convert user requests into complete executor prompts with clear scope, constraints, measurable acceptance criteria, and minimal context waste.
@@ -84,7 +86,12 @@ The generated executor prompt MUST use the following front-matter keys when appl
 - `final_report_format`
 - `quality_gates`
 - `validation_strategy` (required for implementation prompts and prompt-pack stages)
+- `branch_policy` (required for prompt packs and staged plan implementation)
+- `proof_boundary` (required when Mac Studio, target-host, runtime, deploy, or production smoke evidence is in scope)
+- `runtime_env_sources` (required when env files, target hosts, Mac Studio, deploy, benchmarks, or browser auth are in scope)
+- `remote_command_quoting` (required when SSH commands may contain SQL, JSON, or multiline payloads)
 - `stage_execution_ledger` (required for prompt packs or staged plan implementation)
+- `file_manifest` (required for staged prompt packs)
 - `expected_primary_touches`
 - `possible_secondary_touches` (omit only when genuinely unnecessary)
 - `safety_notes`
@@ -305,6 +312,10 @@ Stage execution ledger policy (mandatory for prompt packs and staged plans)
 - Require every stage executor to update the ledger after validation and before the final report.
 - Accepted stages must record concise result, evidence, touched contracts/files, publish/deploy handoff when applicable, and what the next stage must know.
 - Blocked stages must record blocker, severity, evidence, next action or owner, and whether later stages are allowed.
+- Each stage ledger update must record proof boundary when runtime, Mac Studio, target-host, deploy, or production smoke evidence is used.
+- Each stage ledger update must record a file manifest summary: created, modified, deleted, outside expected paths, and outside-path justification.
+- Each stage ledger update must record branch/worktree/stash status; default is `main` with no branch/worktree/stash unless explicitly approved by the user.
+- If Markdown docs changed, each stage ledger update must record docs-index evidence or the reason the docs-index gate is not applicable.
 - Later dependent stages must not proceed when the prior required stage is not accepted unless the prompt explicitly repairs, supersedes, or unblocks that stage.
 - Never put secrets, tokens, cookies, passphrases, ciphertext, raw provider error bodies, or credentials into the ledger.
 
@@ -321,6 +332,12 @@ Validation depth policy (mandatory for implementation prompts)
 - Acceptance criteria must require the selected validation evidence before marking the stage accepted.
 - For staged work, require the executor to record validation depth, evidence path, residual risk, and next-stage allowance in the stage execution ledger.
 - If the selected real-boundary validation cannot be collected, the stage must be marked blocked or accepted-with-explicit-residual-risk only when the prompt allows that state.
+
+Remote command quoting policy (mandatory for Mac Studio / SSH payload prompts)
+- Generated prompts MUST include `remote_command_quoting` when SSH commands may contain SQL, JSON, multiline payloads, apostrophes, backticks, or dollar signs.
+- Required pattern: quoted heredoc/stdin, such as `<<'SQL'`, `<<'JSON'`, `--queries-file /dev/stdin`, `query=@-`, or equivalent.
+- Forbidden pattern: fragile nested inline payloads such as `--query "SELECT ... symbol='...'"`.
+- Do not tell executors to create temporary files solely to avoid shell quoting; use stdin/heredoc first unless the task itself requires a durable runtime artifact.
 
 Web/UI task detection rules (mandatory)
 Treat the task as browser-visible if any of the following are true:
@@ -395,7 +412,11 @@ Defaults when values are missing
 - `state`: if no previous iteration exists, set `initial_iteration`.
 - `skill_routing`: infer from `.codex/AGENTS.md`; include exact skill names, trigger conditions, and workflow timing.
 - `validation_strategy`: include for every implementation prompt; avoid tests-only except for explicitly safe internal-only changes.
+- `proof_boundary`: include for Mac Studio/runtime/deploy prompts; use `none` only when no runtime/target-host/deploy evidence is in scope.
+- `runtime_env_sources`: include for env-dependent target-host, deploy, benchmark, browser-auth, or Mac Studio prompts; report key/path presence only.
+- `remote_command_quoting`: include for SSH SQL/JSON/multiline prompts.
 - `stage_execution_ledger`: include for prompt packs and staged plan implementation; set `required_update=true` for stage prompts.
+- `file_manifest`: include for every staged prompt pack; require created/modified/deleted/outside-expected reporting.
 - For browser-visible tasks, default to including runtime browser verification requirements unless the user explicitly restricts the task to static analysis.
 
 Hard requirements to encode in generated prompts
@@ -410,6 +431,9 @@ Hard requirements to encode in generated prompts
 - Non-trivial implementation prompts must require real-boundary or end-to-end validation in addition to local tests.
 - Prompt packs and staged-plan prompts must create or update the stage execution ledger.
 - Prompt packs must include branch policy: default `main`, no branch unless explicitly requested, at most one branch per prompt pack, no stage-specific branch names, and no unrequested branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary files.
+- Prompt packs must include file manifest reporting: created, modified, deleted, outside expected paths, and justification for every outside-expected path.
+- Mac Studio/runtime/deploy prompts must include explicit proof-boundary labels and must not present pre-main evidence as changed-code production proof.
+- SSH + SQL/JSON/multiline prompts must require quoted heredoc/stdin and forbid nested inline payload quoting.
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
 
@@ -522,14 +546,13 @@ Browser verification checks
 If any answer is “no”, you MUST revise before output.
 
 Output contract
-- Return only the final executor prompt content.
-- No meta-commentary.
-- No analysis transcript.
-- No chat framing.
-- The prompt must be immediately executable without manual cleanup.
-- The generated prompt must follow the canonical current schema, not any legacy prompt shape.
-- For browser-visible tasks, the generated prompt must explicitly require runtime browser verification when available and relevant.
-- The generated prompt must be saved as a standalone `.md` file under `.codex/agents/generated/<prompt_or_pack_folder>/`.
+- Save the generated prompt as a standalone `.md` file under `.codex/agents/generated/<prompt_or_pack_folder>/`.
+- The saved prompt must be immediately executable without manual cleanup.
+- The saved prompt must follow the canonical current schema, not any legacy prompt shape.
+- For browser-visible tasks, the saved prompt must explicitly require runtime browser verification when available and relevant.
+- User-facing final communication must be in Russian and include changed file paths, validation performed, cold-head result when applicable, and residual risks.
+- Do not paste the full prompt content in chat unless the user explicitly asked for inline output.
+- Do not include analysis transcript.
 """
 
 [mcp_servers.context7]

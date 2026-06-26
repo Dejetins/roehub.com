@@ -80,6 +80,15 @@ non_goals:
   - "<explicit non-goal 1>"
   - "<explicit non-goal 2>"
 
+branch_policy:
+  default_branch: main
+  separate_branch_allowed: <true|false>
+  single_allowed_branch: <branch_name_or_null>
+  stage_specific_branches_forbidden: true
+  worktree_allowed: <true|false>
+  stash_allowed: <true|false>
+  approval_required_for_branch_or_worktree: true
+
 final_report_format:
   language: <ru|en|...>
   sections:
@@ -103,12 +112,56 @@ validation_strategy:
   tests_only_allowed_reason: "<required if depth is tests_only>"
   evidence_target: "<stage_ledger_path_or_report_path>"
 
+proof_boundary:
+  required_when: "<Mac Studio, runtime, deploy, target-host, or production smoke evidence is in scope>"
+  label: <none|target_host_readiness_pre_main|read_only_existing_runtime_smoke|post_main_production_runtime_proof>
+  changed_code_production_claim_allowed: <true|false>
+  blocked_or_deferred_reason: "<required when production proof is needed but main+green CI+deploy/sync is not complete>"
+
+runtime_env_sources:
+  roehub_env_file_order:
+    - "$ROEHUB_ENV_FILE"
+    - "/Users/daniildegtyarev/.config/roehub/roehub.env"
+    - "/etc/roehub/roehub.env"
+  report_only_key_presence: true
+  forbidden_in_reports:
+    - "raw secrets"
+    - "tokens"
+    - "credentials"
+    - "cookies"
+
+remote_command_quoting:
+  applies_when: "SSH commands contain SQL, JSON, multiline payloads, apostrophes, backticks, or dollar signs"
+  required_pattern: "quoted heredoc or stdin, such as <<'SQL', <<'JSON', --queries-file /dev/stdin, query=@-"
+  forbidden_pattern: "nested inline --query \"... symbol='...'\" or equivalent fragile quoting"
+  temporary_files_allowed_only_when_task_requires_durable_artifact: true
+
 stage_execution_ledger:
   path: <stage_ledger_path_if_plan_or_prompt_pack>
   plan_doc: <architecture_or_implementation_plan_path>
   current_stage: <stage_id_or_name>
   required_update: <true|false>
   template: .codex/agents/stage_execution_ledger_template.md
+
+file_manifest:
+  required_for_stage_prompts: <true|false>
+  expected_groups:
+    code:
+      - "<src_or_app_path>"
+    config_infra_migrations:
+      - "<config_or_migration_path>"
+    docs_runbooks:
+      - "<docs_or_runbook_path>"
+    prompt_artifacts:
+      - "<prompt_or_template_path>"
+    ledger_and_evidence:
+      - "<ledger_or_evidence_path>"
+  final_report_required_fields:
+    - created
+    - modified
+    - deleted
+    - outside_expected_paths
+    - outside_expected_paths_justification
 
 expected_primary_touches:
   - "<path_directly_likely_to_change_1>"
@@ -180,6 +233,10 @@ Additional context:
 - For non-trivial implementation, run local gates plus the nearest meaningful real-boundary or end-to-end validation surface. Tests-only acceptance requires an explicit safe reason.
 - If this prompt implements a plan stage, read the stage execution ledger before implementation and update it after validation and before the final report.
 - If a previous required stage is not accepted, stop unless this prompt explicitly repairs, supersedes, or unblocks that stage.
+- Follow the front-matter `branch_policy`: work from `main` by default, do not create branches/worktrees/stashes unless explicitly allowed there, and never create per-stage branches.
+- If Mac Studio, runtime, deploy, target-host, or production smoke evidence is in scope, use the front-matter `proof_boundary` label exactly and do not present pre-main evidence as changed-code production proof.
+- If SSH commands include SQL, JSON, multiline payloads, apostrophes, backticks, or dollar signs, use quoted heredoc/stdin per `remote_command_quoting`; do not use nested inline quoting or temporary files created only to dodge quoting.
+- If this is a stage prompt, maintain the front-matter `file_manifest` contract and include created/modified/deleted/outside-expected files in the final report.
 
 - <task-specific must requirement 1>
 - <task-specific must requirement 2>
@@ -301,6 +358,20 @@ Skill routing for this task:
 - If tests-only is sufficient, state why no contract, persistence, browser-visible, runtime, ops, performance, integration, or delivery surface is affected.
 - Record validation evidence in the stage ledger or final report.
 
+## Branch and workspace policy
+
+- Use the front-matter `branch_policy` as the source of truth.
+- Default to `main` unless the user explicitly approved one branch for the whole prompt pack.
+- Do not create stage-specific branches, branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary workflow files unless the exact artifact is explicitly allowed in `branch_policy`.
+
+## Proof boundary and remote command safety
+
+- Record `proof_boundary.label` in the stage ledger or final report whenever runtime, target-host, Mac Studio, deploy, or production smoke evidence is used.
+- `target_host_readiness_pre_main` and `read_only_existing_runtime_smoke` are not changed-code production proof.
+- `post_main_production_runtime_proof` requires the target revision on `main`, green CI, deploy/sync from the verified `main` checkout, and runtime/browser/API/service smoke.
+- For Mac Studio git state, use `/Users/daniildegtyarev/Projects/roehub.com`; treat `/opt/roehub/app` as runtime state only.
+- For SSH + SQL/JSON/multiline payloads, use quoted heredoc/stdin and keep local shell, SSH, remote shell, and payload parsing separate.
+
 # Files to indicate (expected touched areas)
 
 Primary touches:
@@ -314,6 +385,17 @@ Possible secondary touches:
 - `<secondary_touch_1>`
 - `<secondary_touch_2>`
 - `<secondary_touch_3>`
+
+Final report file manifest:
+
+- created:
+  - `<path or none>`
+- modified:
+  - `<path or none>`
+- deleted:
+  - `<path or none>`
+- outside_expected_paths:
+  - `<path or none>` — `<justification>`
 
 # Non-goals
 
@@ -340,3 +422,5 @@ Your final message MUST be in <ru|en|...> and follow exactly:
 4) **<section_4>**
 
 5) **<section_5>**
+
+It MUST also include the file manifest fields required by `file_manifest.final_report_required_fields` when this is a stage prompt.

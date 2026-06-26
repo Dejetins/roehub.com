@@ -178,6 +178,7 @@ Service shape v1: переиспользуем существующий runtime 
 | Scenario matrix artifact | Durable record of all discovered entry sizing/risk/direction combinations and which were paper/testnet-covered. |
 | Safe futures guard | Records account config evidence: isolated margin, leverage `1x`, position mode, filters, min notional, precision, projection age. Evidence can come from read-only account-state or from the explicit testnet account-config command followed by read-back. |
 | Latency ledger | Stores timestamps for signal observed, source event persisted, intent persisted, risk accepted, dispatch, exchange submit, ack, fill/reconcile. |
+| Signal-path latency/dedup evidence | Stage `12.4` must repeatedly measure `candle.bar_ts_close -> StrategySignal.created_at` and `StrategySignal.created_at -> ExecutionSourceEvent.received_at`, count processed candles, unique `StrategySignal`, unique `ExecutionSourceEvent`, and prove duplicate `signal_id` rows are `0` plus duplicate idempotency outcomes create no new source-event rows. This is the baseline monitoring contract for future Grafana panels. |
 | Outbox contract | Internal notification rows/events are delivery-neutral and safe for future Telegram/email reuse. |
 
 Все sensitive fields запрещены в logs/docs/metrics/screenshots: API keys, secrets, cookies, tokens, raw signed payloads, OpenBao tokens, raw Authorization headers.
@@ -221,6 +222,8 @@ Service shape v1: переиспользуем существующий runtime 
 | Strategy producer down | Monit service not running, `/metrics` absent | critical | operator |
 | Mainnet submit attempted | Counter/audit event must stay zero | critical | operator |
 | Signal-to-submit latency high | p95/p99 gap by stage, no user/order labels | warning/critical by threshold | operator |
+| Signal-path latency high | p50/p95/p99/max for `candle.bar_ts_close -> StrategySignal.created_at` and `StrategySignal.created_at -> ExecutionSourceEvent.received_at`; Prometheus metrics `strategy_producer_signal_lag_seconds` and `strategy_producer_source_event_latency_seconds`; DB timestamp deltas for the same window | warning/critical by threshold | operator |
+| Signal dedupe regression | duplicate `StrategySignal.signal_id`, duplicate `(strategy_run_id, bar_ts_open)`, or duplicate source-event idempotency rows that create new records | critical | operator |
 | Redis dispatch lag | pending, retry, DLQ, consumer lag | warning | operator |
 | Exchange adapter rate limit/backpressure | limiter wait, retry budget, DLQ | warning | operator |
 | Config guard mismatch | blocked scenario counters | info/warning | product/operator |
@@ -244,7 +247,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `12.1` | Readiness gate | Доказать, что runtime готов до любого soak: producer включен, allowlists заданы, выбранные strategy runs реально running, telemetry доступна. | API/DB/Redis/Monit/Prometheus/browser proof; `running_strategy_runs > 0`; active paper/testnet strategy runs selected; producer enabled; allowlists non-empty; no active stale collector. |
 | `12.2` | Functional canary | Доказать, что реальная стратегия работает до нагрузки: producer poll'ит active runs и создает source events/signals. | 30-60 минут runtime evidence: producer polls grow, source events/signals appear, paper/testnet paths write expected rows, no mainnet, no new unknown/DLQ/retry debt. |
 | `12.3` | Burst/resource gate | Доказать, что controlled burst не ломает систему и не маскирует functional canary. | Stage `11`/existing harness burst evidence; CPU/RAM/Redis/DB baseline/during/post deltas; queues return to accepted band; no provider/mainnet load path. |
-| `12.4` | Sustained 6h soak | Доказать длительную стабильность active paper/testnet strategies без подмены одним burst. | 6h periodic snapshots with active strategies, no new unknown/DLQ/retry growth beyond thresholds, Monit uptime, Prometheus resource evidence, Redis/DB deltas, final runtime state. |
+| `12.4` | Sustained 6h soak | Доказать длительную стабильность active paper/testnet strategies без подмены одним burst и зафиксировать базовую observability для скорости обработки сигналов. | 6h periodic snapshots with active strategies, no new unknown/DLQ/retry growth beyond thresholds, Monit uptime, Prometheus resource evidence, Redis/DB deltas, final runtime state, signal-path p50/p95/p99/max latency, processed candles, unique signals/source events, and dedupe proof. |
 | `12.5` | Closure | Собрать финальные доказательства и принять/заблокировать Stage `12` как целое. | Browser proof, report/ledger/docs index, cleanup, pass/fail decision, publish/delivery evidence where files changed. Stage `13` opens only after `12.5 accepted`. |
 | `13` | Notifications and operator runbooks | Outbox/event contract for future delivery, alert severity/owner/escalation, runbooks. | Outbox rows for rejected/fill/exit/kill/unknown, Prometheus rules, runbook drill evidence. |
 | `14` | Final readiness and docs closure | Stage reports, ledger, docs index, prompt pack closure, delivery readiness. | All stage reports accepted, docs index check, `github:yeet` publish evidence, main-branch delivery evidence, CI/deploy/host-sync evidence where applicable, final go/no-go for separate mainnet plan. |
@@ -267,7 +270,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `12.1` | readiness report only unless blocker requires narrow repair | `12-1-readiness-gate.md` |
 | `12.2` | functional canary report, active strategy evidence | `12-2-functional-canary.md` |
 | `12.3` | controlled burst/resource report, Stage `11` harness evidence | `12-3-burst-resource-gate.md` |
-| `12.4` | sustained 6h soak report, periodic Mac Studio logs/evidence summaries | `12-4-sustained-6h-soak.md` |
+| `12.4` | sustained 6h soak report, periodic Mac Studio logs/evidence summaries, signal-path latency/dedup SQL and Prometheus evidence for future Grafana | `12-4-sustained-6h-soak.md` |
 | `12.5` | closure report, docs/ledger/index, delivery evidence | `12-5-closure.md` |
 | `13` | notification outbox compatibility, alert rules, runbooks | `13-notifications-runbooks.md` |
 | `14` | final docs, index, stage ledger closure, prompt pack audit | `14-final-readiness-docs-closure.md` |
@@ -348,7 +351,42 @@ docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stag
 | No secrets in evidence | Нельзя писать ключи, secrets, cookies, tokens, raw signed payloads. |
 | Dependent stages blocked | Следующий зависимый stage не стартует, пока предыдущий не accepted или не superseded repair stage. |
 | Mac Studio runtime | Git на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks в `/opt/roehub/app` только для deploy/smoke. |
-| Stage `12` gates | Stage `12` нельзя заменить одним collector или коротким smoke. `12.1` и `12.2` должны доказать active strategy runtime до burst/soak; `12.3` доказывает resource/load; `12.4` доказывает фактические 6h; `12.5` закрывает evidence/publish/cleanup. |
+| Stage `12` gates | Stage `12` нельзя заменить одним collector или коротким smoke. `12.1` и `12.2` должны доказать active strategy runtime до burst/soak; `12.3` доказывает resource/load; `12.4` доказывает фактические 6h и обязательные signal-path latency/dedup metrics; `12.5` закрывает evidence/publish/cleanup. |
+
+## Следующее Покрытие После Signal Path
+
+Stage `12.4` намеренно измеряет только путь сигнала:
+
+```text
+candle.bar_ts_close -> StrategySignal.created_at -> ExecutionSourceEvent.received_at
+```
+
+Его нельзя незаметно расширять до нового теста реального исполнения ордеров. Полная атрибуция задержки от свечи до исполнения остается следующей задачей покрытия после `12.4`/`12.5`:
+
+```text
+candle.bar_ts_close
+  -> StrategySignal.created_at
+  -> ExecutionSourceEvent.received_at
+  -> ExecutionIntent.created_at
+  -> Redis dispatch timestamp
+  -> exchange-execution observed/ack
+  -> testnet order ack/fill/reconciliation
+```
+
+Эта следующая задача должна явно показать, где именно появляется задержка и на что Roehub может влиять: `strategy producer`, запись в БД / `source-event`, путь `intent/risk`, Redis dispatch, consumer `exchange-execution`, native exchange adapter или сама testnet-биржа.
+
+Минимальный контракт для следующей задачи полного покрытия:
+
+| Сегмент | Что измерить | Где фиксировать | На что Roehub влияет |
+|---|---|---|---|
+| `candle.bar_ts_close -> StrategySignal.created_at` | p50/p95/p99/max, processed candles, skipped/dedup candles | Prometheus + DB deltas | polling cadence, candle readiness, strategy evaluator latency |
+| `StrategySignal.created_at -> ExecutionSourceEvent.received_at` | p50/p95/p99/max, unique source events, idempotency duplicate replay count | Prometheus + DB source-event timestamps | DB write path, idempotency lookup, source-event transaction |
+| `ExecutionSourceEvent.received_at -> ExecutionIntent.created_at` | p50/p95/p99/max, accepted/rejected risk decisions | DB intent/risk timestamps | risk rules, account/position/capital locks, transaction latency |
+| `ExecutionIntent.created_at -> Redis dispatch timestamp` | queueing latency, publish latency, dispatch failures | Redis stream/DB dispatch timestamps | dispatcher batching, retry/backpressure, Redis availability |
+| `Redis dispatch -> exchange-execution observed/ack` | consumer lag, processing lag, retry/DLQ counts | Redis consumer metrics + `exchange-execution` metrics | consumer concurrency, limiter/backpressure, poison-message handling |
+| `exchange-execution -> native adapter -> testnet order ack/fill/reconciliation` | submit latency, ack latency, fill/reconcile latency, unknown-state count | exchange-execution metrics + DB order/fill/reconciliation rows | adapter timeout/retry policy and reconciliation behavior; exchange-side latency is external but must be separated |
+
+Критерии приемки для этой будущей задачи: каждый сегмент имеет p50/p95/p99/max, счетчики строк, счетчики ошибок, явного владельца задержки и доказательство того, является ли задержка управляемой внутри Roehub или находится на стороне exchange/testnet. Эта задача не должна смешиваться с `12.4`; она начинается только после принятого signal-path soak и должна иметь отдельный prompt, report и ledger entry до выполнения.
 
 ## Delivery, Main И Host Sync Contract
 
@@ -395,5 +433,5 @@ Prompt pack для реализации этого плана должен жи�
 | Spot short не является обычным spot order | Stage `03`/`07`/`09` должны доказать эту ветку как blocked/unsupported без margin trading, а не симулировать ее как реальный spot short. |
 | Backtest funding/short-policy drift | Все future repair/rerun stages должны учитывать принятый `Backtest Futures Funding And Short Direction Policy v1`: short-like только futures, gross/net funding metrics visible, funding degraded warnings не скрывать. |
 | Сотни testnet strategies могут создать bursts | Stage `11` обязан доказать внутренний limiter/backpressure на testnet-mode strategies, даже если биржевые лимиты ожидаемо не достигнуты. |
-| Stage `12` может выявить отсутствие active runtime, flaky runtime или resource pressure | Каждый gate фиксирует blocker отдельно. Нельзя тратить 6 часов на idle system: `12.1` fail-fast блокирует soak, если producer disabled, allowlists empty или `running_strategy_runs = 0`. |
+| Stage `12` может выявить отсутствие active runtime, flaky runtime или resource pressure | Каждый gate фиксирует blocker отдельно. Нельзя тратить 6 часов на idle system: `12.1` fail-fast блокирует soak, если producer disabled, allowlists empty или `running_strategy_runs = 0`. `12.4` также блокируется, если нельзя посчитать signal-path latency/dedup baseline для будущего мониторинга. |
 | Notification delivery еще нет | Stage `13` делает delivery-neutral outbox contract, но не обещает Telegram/email доставку. |
