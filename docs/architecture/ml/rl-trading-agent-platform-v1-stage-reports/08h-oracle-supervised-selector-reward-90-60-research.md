@@ -57,7 +57,7 @@
 | `90/60` smoke sha256 | `d95ef5b47f18adc1671811e1f126393da323081516eecdb4d00f2c9358f1d194` |
 | Full `90/60` run id | `stage08h_dual_branch_cpu_90_60_full_20260626T141800Z` |
 | Full `90/60` PID | `97712` on `macstudio` |
-| Latest observed HF training status | `1001/55000` episodes, `60060/3300000` env steps, `device=cpu`, `status=running` |
+| Latest observed HF training status | `2201/55000` episodes, `132060/3300000` env steps, `progress_pct=4.0018181818`, `device=cpu`, `status=running` |
 
 ## Диагностический вывод
 
@@ -107,16 +107,54 @@ Reward proxy показывает разреженность сигнала. Д�
 
 ## Текущий полный run
 
-Команда запущена на `macstudio` в фоне через PID `97712`. Первый проверенный статус HF-original training:
+Команда запущена на `macstudio` в фоне через PID `97712`. По пользовательскому решению активное ожидание в этом agent run приостановлено. Следующий проход должен продолжить после завершения runtime artifacts, а не по предположениям из переписки.
+
+Последний проверенный статус HF-original training на момент фиксации:
 
 | Поле | Значение |
 |---|---|
 | `status` | `running` |
-| `completed_episodes` | `1001/55000` |
-| `completed_env_steps` | `60060/3300000` |
+| `completed_episodes` | `2201/55000` |
+| `completed_env_steps` | `132060/3300000` |
+| `progress_pct` | `4.0018181818` |
 | `device` | `cpu` |
+| `latest_status_timestamp` | `2026-06-26T20:52:54Z` |
+| `best_validation_metric` | `-49.6725532598` at episode `2000` |
+| `eta_sec` | `91200.1433740785` for the current HF-original training branch only |
+| `main_pid` | `97712` |
+| `child_training_pid` | `97714` |
+| `summary_exists` | `false` for `stage08h_dual_branch_cpu_run_summary.json` |
+| `roehub_native_branch_started` | `false` |
 
 Пока этот run не завершится, `08H` не может быть `accepted`, а Stage `09` не может стартовать.
+
+Proof boundary: это `target_host_non_production_training_pre_main` / offline ML runtime evidence на `macstudio`. Это не `post_main_production_runtime_proof`, не browser-visible proof и не проверка `/opt/roehub/app`. Для `post_main_production_runtime_proof` потребовались бы target revision on `main`, зеленые GitHub Actions/CI, deploy или verified sync из `main` checkout в `/opt/roehub/app`, а затем production smoke/API/browser verification по измененному production runtime.
+
+Performance/comparability note: `eta_sec` является live-status observation для текущего PID, а не сравнительным performance claim. Сравнительный benchmark CPU/MPS/GPU в этом handoff не выполнялся.
+
+## Пауза до завершения обучения
+
+Текущий этап зафиксирован как `08H in_progress`. Это не accepted verdict и не blocked verdict по качеству модели. Это handoff-состояние: диагностика данных завершена, полный `90/60` dual-branch CPU run запущен и живой, но финальные HF/Roehub-native результаты еще не существуют.
+
+Следующий агент или следующий проход должен начинать не с перезапуска обучения, а с проверки уже идущего запуска:
+
+1. Проверить, живы ли PID `97712` и дочерний training PID, либо завершился ли orchestrator.
+2. Прочитать свежий HF-original `latest_status.json` и `progress.jsonl` под `/opt/roehub/state/rl_trading/training_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/hf_original/`.
+3. Проверить, появился ли итоговый файл `/opt/roehub/state/rl_trading/evaluation_runs/stage08h_oracle_supervised_selector_reward_90_60_v1/dual_branch_runs/stage08h_dual_branch_cpu_90_60_full_20260626T141800Z/stage08h_dual_branch_cpu_run_summary.json`.
+4. Если HF-original training завершился, проверить candidate manifest, `best.pth`, `final.pth`, final status, количество эпизодов `55000/55000` и шагов `3300000/3300000`.
+5. Проверить HF-original `Optuna`: должно быть `100/100` trials, профиль должен остаться `agent_history_len=90`, `agent_session_len=60`.
+6. Проверить HF-original final holdout: PnL после costs, количество закрытых сделок, action distribution, skipped/filtered signals, сравнение с sanity baselines и `stage09_allowed` на уровне branch.
+7. Дождаться и проверить Roehub-native training с тем же профилем `90/60`, без отката к `30/10`.
+8. Проверить Roehub-native `Optuna`: `100/100` trials, тот же профиль, корректные overrides и сохраненный summary.
+9. Проверить Roehub-native final holdout: PnL после costs, количество закрытых сделок, positive session ratio, monthly/volatility stability, action/filter distribution и сравнение с best sanity baseline.
+10. Отдельно проверить, что итог не повторяет дефект `08G` с очень малым числом сделок (`19` и `3`) без объяснения. Малое число сделок допустимо только если оно явно объяснено calibration/result artifacts и не маскирует переобучение.
+11. Сравнить финальные HF-original и Roehub-native результаты с уже готовой диагностикой `08H`: oracle opportunity, past-only supervised sanity, selector regimes и reward sparsity proxy.
+12. Если Roehub-native final holdout не проходит quality gate, оставить Stage `09` закрытым и записать конкретный blocker по runtime manifests.
+13. Если Roehub-native проходит gate, все равно проверить, что нет переобучения на calibration split, что baseline-сравнение честное, а `stage09_allowed=true` подтверждено итоговым summary.
+14. Обновить этот `08H` report, общий ledger и общий план только по фактическим runtime artifacts.
+15. Запустить документационные проверки, минимум `uv run python -m tools.docs.generate_docs_index --check` и `git diff --check`; для code changes дополнительно вернуть focused `ruff`, `pyright`, `pytest`.
+16. Синхронизировать локальный `main`, `origin/main` и checkout на `macstudio`, если документы или код менялись.
+17. Не трогать `/opt/roehub/app` и не заявлять `post_main_production_runtime_proof`: этот stage пишет offline ML artifacts под `/opt/roehub/state/rl_trading/`, а не меняет production service.
 
 ## File manifest
 
