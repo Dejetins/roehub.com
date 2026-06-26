@@ -12,6 +12,8 @@ from trading.contexts.rl_trading.domain import (
     HfOriginalSplitData,
     HfOriginalTrainingConfig,
     UpstreamAlphaConfig,
+    alpha_with_evaluation_overrides_v1,
+    evaluate_stage08d_baseline_backtest_v1,
     run_stage08c_hf_original_training_v1,
     run_stage08d_hf_original_evaluation_v1,
 )
@@ -102,6 +104,64 @@ def test_stage08d_hf_original_evaluation_separates_raw_and_filtered_surfaces(
     assert filtered["q_value_cache"]["misses"] > 0
     assert Path(manifest["artifact_hashes"]["scorecards"]["path"]).exists()
     assert Path(manifest["artifact_hashes"]["balance_curve"]["path"]).exists()
+
+
+def test_alpha_evaluation_overrides_do_not_change_training_hyperparameters() -> None:
+    base = UpstreamAlphaConfig(learning_rate=0.0003, batch_size=32, replay_capacity=1000)
+    overrides = UpstreamAlphaConfig(
+        learning_rate=0.99,
+        batch_size=2,
+        replay_capacity=8,
+        long_action_threshold=0.02,
+        short_action_threshold=0.003,
+        close_action_threshold=0.004,
+        use_risk_management=True,
+        stop_loss=0.015,
+        take_profit=0.035,
+        trailing_stop=0.012,
+        max_parallel_sessions=3,
+        position_fraction=0.4,
+    )
+
+    merged = alpha_with_evaluation_overrides_v1(base, overrides)
+
+    assert merged.learning_rate == base.learning_rate
+    assert merged.batch_size == base.batch_size
+    assert merged.replay_capacity == base.replay_capacity
+    assert merged.long_action_threshold == 0.02
+    assert merged.use_risk_management is True
+    assert merged.max_parallel_sessions == 3
+    assert merged.position_fraction == 0.4
+
+
+def test_baseline_backtest_applies_risk_management_forced_close() -> None:
+    alpha = UpstreamAlphaConfig(
+        initial_balance=100.0,
+        use_risk_management=True,
+        stop_loss=0.5,
+        take_profit=0.0001,
+        trailing_stop=0.5,
+        position_fraction=1.0,
+    )
+    split = HfOriginalSplitData(
+        split_name="backtest",
+        sequences=_session_features(1, alpha=alpha),
+        symbols=("BTCUSDT",),
+        signal_times_utc=("2026-06-26T00:00:00Z",),
+        source_payload={"split_name": "backtest", "sha256": "e" * 64},
+    )
+
+    scorecard = evaluate_stage08d_baseline_backtest_v1(
+        split=split,
+        config=HfOriginalEvaluationConfig(alpha=alpha),
+        policy_name="always_long_fixture",
+        fixed_action_id=1,
+    )
+
+    risk_management = scorecard["risk_management"]
+    assert risk_management["use_risk_management"] is True
+    assert risk_management["reason_counts"]["risk_management_take_profit_forced_close"] > 0
+    assert scorecard["closed_trades"] > 0
 
 
 def _session_features(session_count: int, *, alpha: UpstreamAlphaConfig) -> np.ndarray:

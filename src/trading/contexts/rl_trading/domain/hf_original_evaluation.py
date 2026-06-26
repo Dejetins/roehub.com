@@ -4,7 +4,7 @@ import json
 import resource
 import time
 from collections.abc import Hashable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -86,6 +86,12 @@ class HfOriginalSplitData:
         object.__setattr__(self, "volatility_scores", tuple(volatility_scores))
 
 
+@dataclass(slots=True)
+class _BacktestRiskManagementState:
+    trailing_max_price: float | None = None
+    trailing_min_price: float | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class HfOriginalEvaluationConfig:
     alpha: UpstreamAlphaConfig = field(default_factory=default_upstream_alpha_config_v1)
@@ -131,6 +137,13 @@ def default_hf_original_evaluation_config_v1() -> HfOriginalEvaluationConfig:
     return HfOriginalEvaluationConfig()
 
 
+def alpha_with_evaluation_overrides_v1(
+    base: UpstreamAlphaConfig,
+    overrides: UpstreamAlphaConfig,
+) -> UpstreamAlphaConfig:
+    return _alpha_with_evaluation_overrides_v1(base, overrides)
+
+
 def run_stage08d_hf_original_evaluation_v1(
     *,
     candidate_manifest: Mapping[str, Any],
@@ -151,7 +164,7 @@ def run_stage08d_hf_original_evaluation_v1(
         HfOriginalEvaluationConfig(alpha=alpha)
         if config is None
         else HfOriginalEvaluationConfig(
-            alpha=alpha,
+            alpha=_alpha_with_evaluation_overrides_v1(alpha, config.alpha),
             checkpoint_name=config.checkpoint_name,
             selection_strategy=config.selection_strategy,
             device_policy=config.device_policy,
@@ -372,6 +385,7 @@ def evaluate_stage08d_grouped_backtest_v1(
     requested_action_counts = _empty_action_counts()
     raw_argmax_action_counts = _empty_action_counts()
     audit_reason_counts: dict[str, int] = {}
+    risk_management_reason_counts: dict[str, int] = {}
     session_pnls: list[float] = []
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
@@ -387,6 +401,7 @@ def evaluate_stage08d_grouped_backtest_v1(
         done = False
         latest_info: Mapping[str, object] = {}
         session_net_pnl = 0.0
+        risk_state = _BacktestRiskManagementState()
         while not done:
             q_values = _q_values_for_state(
                 agent=agent,
@@ -421,9 +436,31 @@ def evaluate_stage08d_grouped_backtest_v1(
             else:
                 decision = filter_policy.select_from_q_values(masked_q_values)
             requested_action_counts[ACTION_NAMES_BY_ID_V1[decision.requested_action_id]] += 1
-            next_state, reward, done, _, info = environment.step(decision.effective_action_id)
+            state_before_action = environment.state
+            forced_action, risk_reason = _risk_management_action_override_v1(
+                state=state_before_action,
+                session=environment.sequences[session_idx],
+                step_idx=environment.step_idx,
+                config=backtest_alpha,
+                risk_state=risk_state,
+            )
+            action_for_environment = (
+                decision.effective_action_id if forced_action is None else forced_action
+            )
+            if risk_reason is not None:
+                risk_management_reason_counts[risk_reason] = (
+                    risk_management_reason_counts.get(risk_reason, 0) + 1
+                )
+            next_state, reward, done, _, info = environment.step(action_for_environment)
             effective_action = _payload_int(info["effective_action_id"], "effective_action_id")
             pnl_change = _payload_float(info["pnl_change"], "pnl_change")
+            _update_risk_management_state_after_step_v1(
+                risk_state=risk_state,
+                state_before=state_before_action,
+                state_after=environment.state,
+                closed_position=bool(info.get("closed_position", False)),
+                config=backtest_alpha,
+            )
             action_counts[ACTION_NAMES_BY_ID_V1[effective_action]] += 1
             audit_reason = str(info["audit_reason"])
             audit_reason_counts[audit_reason] = audit_reason_counts.get(audit_reason, 0) + 1
@@ -491,6 +528,10 @@ def evaluate_stage08d_grouped_backtest_v1(
                 wall_seconds=wall_seconds,
                 decisions_count=decisions_count,
             ),
+            "risk_management": _risk_management_payload_v1(
+                config=backtest_alpha,
+                reason_counts=risk_management_reason_counts,
+            ),
             "selection_strategy": config.selection_strategy,
         },
     )
@@ -520,6 +561,7 @@ def evaluate_stage08d_baseline_backtest_v1(
     backtest_alpha = _position_fraction_alpha(config.alpha)
     action_counts = _empty_action_counts()
     audit_reason_counts: dict[str, int] = {}
+    risk_management_reason_counts: dict[str, int] = {}
     session_pnls: list[float] = []
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
@@ -531,6 +573,7 @@ def evaluate_stage08d_baseline_backtest_v1(
         session_pnl = 0.0
         latest_closed = 0
         latest_profitable = 0
+        risk_state = _BacktestRiskManagementState()
         for step_idx in range(backtest_alpha.agent_session_len):
             price = session_close_price_v1(session, step_idx=step_idx, config=backtest_alpha)
             action_id = (
@@ -549,6 +592,20 @@ def evaluate_stage08d_baseline_backtest_v1(
                 position_side=state.position_side,
                 is_last_step=step_idx == backtest_alpha.agent_session_len - 1,
             )
+            forced_action, risk_reason = _risk_management_action_override_v1(
+                state=state,
+                session=session,
+                step_idx=step_idx,
+                config=backtest_alpha,
+                risk_state=risk_state,
+            )
+            if forced_action is not None:
+                action_id = forced_action
+            if risk_reason is not None:
+                risk_management_reason_counts[risk_reason] = (
+                    risk_management_reason_counts.get(risk_reason, 0) + 1
+                )
+            state_before_action = state
             result = apply_training_reward_step_v1(
                 state=state,
                 action_id=action_id,
@@ -560,6 +617,13 @@ def evaluate_stage08d_baseline_backtest_v1(
                 is_last_step=step_idx == backtest_alpha.agent_session_len - 1,
             )
             state = result.state
+            _update_risk_management_state_after_step_v1(
+                risk_state=risk_state,
+                state_before=state_before_action,
+                state_after=state,
+                closed_position=result.closed_position,
+                config=backtest_alpha,
+            )
             action_history = [*action_history[1:], result.effective_action_id]
             action_counts[ACTION_NAMES_BY_ID_V1[result.effective_action_id]] += 1
             audit_reason_counts[result.audit_reason] = (
@@ -595,6 +659,10 @@ def evaluate_stage08d_baseline_backtest_v1(
             "filter_policy": None,
             "grouping": grouping_payload,
             "position_fraction": config.alpha.position_fraction,
+            "risk_management": _risk_management_payload_v1(
+                config=backtest_alpha,
+                reason_counts=risk_management_reason_counts,
+            ),
         },
     )
     return {**scorecard, "scorecard_hash": hash_json_payload_v1(scorecard)}
@@ -863,6 +931,10 @@ def _alpha_config_from_training_config_payload(payload: Mapping[str, Any]) -> Up
         long_action_threshold=float(value_for("long_action_threshold")),
         short_action_threshold=float(value_for("short_action_threshold")),
         close_action_threshold=float(value_for("close_action_threshold")),
+        use_risk_management=bool(value_for("use_risk_management")),
+        stop_loss=float(value_for("stop_loss")),
+        take_profit=float(value_for("take_profit")),
+        trailing_stop=float(value_for("trailing_stop")),
         ensemble_n_samples=int(value_for("ensemble_n_samples")),
         ensemble_max_sigma=float(value_for("ensemble_max_sigma")),
         max_parallel_sessions=int(value_for("max_parallel_sessions")),
@@ -870,6 +942,28 @@ def _alpha_config_from_training_config_payload(payload: Mapping[str, Any]) -> Up
         torch_num_threads=int(value_for("torch_num_threads")),
         torch_num_interop_threads=int(value_for("torch_num_interop_threads")),
         dtype=str(value_for("dtype")),
+    )
+
+
+def _alpha_with_evaluation_overrides_v1(
+    base: UpstreamAlphaConfig,
+    overrides: UpstreamAlphaConfig,
+) -> UpstreamAlphaConfig:
+    return replace(
+        base,
+        long_action_threshold=overrides.long_action_threshold,
+        short_action_threshold=overrides.short_action_threshold,
+        close_action_threshold=overrides.close_action_threshold,
+        use_risk_management=overrides.use_risk_management,
+        stop_loss=overrides.stop_loss,
+        take_profit=overrides.take_profit,
+        trailing_stop=overrides.trailing_stop,
+        ensemble_n_samples=overrides.ensemble_n_samples,
+        ensemble_max_sigma=overrides.ensemble_max_sigma,
+        max_parallel_sessions=overrides.max_parallel_sessions,
+        position_fraction=overrides.position_fraction,
+        torch_num_threads=overrides.torch_num_threads,
+        torch_num_interop_threads=overrides.torch_num_interop_threads,
     )
 
 
@@ -1016,6 +1110,10 @@ def _position_fraction_alpha(config: UpstreamAlphaConfig) -> UpstreamAlphaConfig
         long_action_threshold=config.long_action_threshold,
         short_action_threshold=config.short_action_threshold,
         close_action_threshold=config.close_action_threshold,
+        use_risk_management=config.use_risk_management,
+        stop_loss=config.stop_loss,
+        take_profit=config.take_profit,
+        trailing_stop=config.trailing_stop,
         ensemble_n_samples=config.ensemble_n_samples,
         ensemble_max_sigma=config.ensemble_max_sigma,
         max_parallel_sessions=config.max_parallel_sessions,
@@ -1024,6 +1122,98 @@ def _position_fraction_alpha(config: UpstreamAlphaConfig) -> UpstreamAlphaConfig
         torch_num_interop_threads=config.torch_num_interop_threads,
         dtype=config.dtype,
     )
+
+
+def _risk_management_action_override_v1(
+    *,
+    state: RlTrainingState,
+    session: np.ndarray,
+    step_idx: int,
+    config: UpstreamAlphaConfig,
+    risk_state: _BacktestRiskManagementState,
+) -> tuple[int | None, str | None]:
+    if not config.use_risk_management or state.position_side is None:
+        return None, None
+    if state.entry_price is None:
+        raise HfOriginalEvaluationError(reason="risk_management_entry_price_missing")
+    price = session_close_price_v1(session, step_idx=step_idx, config=config)
+    entry_price = _positive_float(state.entry_price, "entry_price")
+    stop_loss = float(config.stop_loss)
+    take_profit = float(config.take_profit)
+    trailing_stop = float(config.trailing_stop)
+    if state.position_side == "long":
+        risk_state.trailing_max_price = (
+            price
+            if risk_state.trailing_max_price is None
+            else max(risk_state.trailing_max_price, price)
+        )
+        sl_trigger = price <= entry_price * (1.0 - stop_loss)
+        tp_trigger = price >= entry_price * (1.0 + take_profit)
+        trailing_trigger = (
+            risk_state.trailing_max_price is not None
+            and price <= risk_state.trailing_max_price * (1.0 - trailing_stop)
+        )
+    elif state.position_side == "short":
+        risk_state.trailing_min_price = (
+            price
+            if risk_state.trailing_min_price is None
+            else min(risk_state.trailing_min_price, price)
+        )
+        sl_trigger = price >= entry_price * (1.0 + stop_loss)
+        tp_trigger = price <= entry_price * (1.0 - take_profit)
+        trailing_trigger = (
+            risk_state.trailing_min_price is not None
+            and price >= risk_state.trailing_min_price * (1.0 + trailing_stop)
+        )
+    else:
+        return None, None
+    if sl_trigger:
+        return 3, "risk_management_stop_loss_forced_close"
+    if tp_trigger:
+        return 3, "risk_management_take_profit_forced_close"
+    if trailing_trigger:
+        return 3, "risk_management_trailing_stop_forced_close"
+    return None, None
+
+
+def _update_risk_management_state_after_step_v1(
+    *,
+    risk_state: _BacktestRiskManagementState,
+    state_before: RlTrainingState,
+    state_after: RlTrainingState,
+    closed_position: bool,
+    config: UpstreamAlphaConfig,
+) -> None:
+    if not config.use_risk_management:
+        return
+    if closed_position or state_after.position_side is None:
+        risk_state.trailing_max_price = None
+        risk_state.trailing_min_price = None
+        return
+    if state_before.position_side is not None:
+        return
+    if state_after.entry_price is None:
+        return
+    if state_after.position_side == "long":
+        risk_state.trailing_max_price = state_after.entry_price
+        risk_state.trailing_min_price = None
+    elif state_after.position_side == "short":
+        risk_state.trailing_min_price = state_after.entry_price
+        risk_state.trailing_max_price = None
+
+
+def _risk_management_payload_v1(
+    *,
+    config: UpstreamAlphaConfig,
+    reason_counts: Mapping[str, int],
+) -> dict[str, object]:
+    return {
+        "reason_counts": dict(sorted(reason_counts.items())),
+        "stop_loss": config.stop_loss,
+        "take_profit": config.take_profit,
+        "trailing_stop": config.trailing_stop,
+        "use_risk_management": config.use_risk_management,
+    }
 
 
 def _baseline_threshold_action(

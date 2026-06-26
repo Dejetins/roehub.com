@@ -76,6 +76,9 @@ from .hf_original_evaluation import (
     evaluate_stage08d_test_episodes_v1,
     run_stage08d_hf_original_evaluation_v1,
 )
+from .hf_original_evaluation import (
+    alpha_with_evaluation_overrides_v1 as alpha_with_evaluation_overrides_v1,
+)
 from .hf_original_training import (
     STAGE08C_CANDIDATE_LEVEL_V1,
     STAGE08C_CANDIDATE_MANIFEST_KIND_V1,

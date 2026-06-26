@@ -58,6 +58,7 @@ dependencies = [
 
 [project.optional-dependencies]
 rl-ml = [
+  "optuna>=4.2,<5",
   "torch>=2.7,<3",
 ]
 

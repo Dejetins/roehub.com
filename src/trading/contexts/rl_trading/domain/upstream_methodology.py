@@ -99,6 +99,10 @@ class UpstreamAlphaConfig:
     long_action_threshold: float = 0.012695
     short_action_threshold: float = 0.009902
     close_action_threshold: float = 0.001141
+    use_risk_management: bool = False
+    stop_loss: float = 0.01
+    take_profit: float = 0.02
+    trailing_stop: float = 0.005
     ensemble_n_samples: int = 5
     ensemble_max_sigma: float = 0.01
     max_parallel_sessions: int = 2
@@ -142,6 +146,11 @@ class UpstreamAlphaConfig:
                 reason="action_history_len_exceeds_session_len",
                 field="action_history_len",
             )
+        if not isinstance(self.use_risk_management, bool):
+            raise UpstreamMethodologyError(
+                reason="invalid_use_risk_management",
+                field="use_risk_management",
+            )
         for field_name in (
             "initial_balance",
             "gamma",
@@ -154,7 +163,17 @@ class UpstreamAlphaConfig:
             "position_fraction",
         ):
             _positive_float(getattr(self, field_name), field_name)
-        for field_name in ("transaction_fee", "slippage", "inaction_penalty_ratio"):
+        for field_name in (
+            "transaction_fee",
+            "slippage",
+            "inaction_penalty_ratio",
+            "long_action_threshold",
+            "short_action_threshold",
+            "close_action_threshold",
+            "stop_loss",
+            "take_profit",
+            "trailing_stop",
+        ):
             _non_negative_float(getattr(self, field_name), field_name)
         for field_name in (
             "gamma",
@@ -215,6 +234,7 @@ class UpstreamAlphaConfig:
             "action_history_len": self.action_history_len,
             "architecture_id": UPSTREAM_METHODOLOGY_ARCHITECTURE_ID_V1,
             "batch_size": self.batch_size,
+            "close_action_threshold": self.close_action_threshold,
             "cnn_input_shape": list(self.cnn_input_shape),
             "cnn_kernels": list(self.cnn_kernels),
             "cnn_maps": list(self.cnn_maps),
@@ -223,6 +243,9 @@ class UpstreamAlphaConfig:
             "dense_adv": list(self.dense_adv),
             "dense_val": list(self.dense_val),
             "dropout_p": self.dropout_p,
+            "dtype": self.dtype,
+            "ensemble_max_sigma": self.ensemble_max_sigma,
+            "ensemble_n_samples": self.ensemble_n_samples,
             "eps_decay_frames": self.eps_decay_frames,
             "eps_end": self.eps_end,
             "eps_start": self.eps_start,
@@ -230,20 +253,33 @@ class UpstreamAlphaConfig:
             "feature_names": list(FEATURE_NAMES_V1),
             "gamma": self.gamma,
             "initial_balance": self.initial_balance,
+            "inaction_penalty_ratio": self.inaction_penalty_ratio,
             "input_history_len": self.input_history_len,
             "learning_rate": self.learning_rate,
+            "long_action_threshold": self.long_action_threshold,
             "max_gradient_norm": self.max_gradient_norm,
+            "max_parallel_sessions": self.max_parallel_sessions,
             "methodology_parity_id": UPSTREAM_METHODOLOGY_PARITY_ID_V1,
             "per_alpha": self.per_alpha,
             "per_beta_frames": self.per_beta_frames,
             "per_beta_start": self.per_beta_start,
             "per_epsilon": self.per_epsilon,
+            "position_fraction": self.position_fraction,
             "replay_capacity": self.replay_capacity,
             "seed": self.seed,
+            "short_action_threshold": self.short_action_threshold,
+            "slippage": self.slippage,
             "state_dim": self.state_dim,
+            "stop_loss": self.stop_loss,
             "target_update_freq": self.target_update_freq,
+            "take_profit": self.take_profit,
             "train_start": self.train_start,
+            "trailing_stop": self.trailing_stop,
+            "transaction_fee": self.transaction_fee,
+            "torch_num_interop_threads": self.torch_num_interop_threads,
+            "torch_num_threads": self.torch_num_threads,
             "upstream_source_sha": UPSTREAM_SOURCE_SHA_STAGE08A_V1,
+            "use_risk_management": self.use_risk_management,
         }
 
     def config_hash(self) -> str:

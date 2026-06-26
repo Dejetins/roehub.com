@@ -46,7 +46,30 @@ def test_upstream_alpha_config_exposes_architecture_and_parity_literals() -> Non
     assert payload["cnn_maps"] == [32, 64, 128]
     assert payload["batch_size"] == 16
     assert payload["train_start"] == 10_000
+    assert payload["long_action_threshold"] == 0.012695
+    assert payload["short_action_threshold"] == 0.009902
+    assert payload["close_action_threshold"] == 0.001141
+    assert payload["max_parallel_sessions"] == 2
+    assert payload["position_fraction"] == 0.5
+    assert payload["use_risk_management"] is False
     assert config.state_dim == (29 * len(FEATURE_NAMES_V1)) + 4 + (3 * 4)
+
+
+def test_upstream_alpha_config_hash_changes_for_backtest_overrides() -> None:
+    base = UpstreamAlphaConfig()
+    tuned = UpstreamAlphaConfig(
+        long_action_threshold=0.02,
+        short_action_threshold=0.003,
+        close_action_threshold=0.004,
+        use_risk_management=True,
+        stop_loss=0.015,
+        take_profit=0.035,
+        trailing_stop=0.012,
+    )
+
+    assert base.config_hash() != tuned.config_hash()
+    assert tuned.as_payload()["use_risk_management"] is True
+    assert tuned.as_payload()["stop_loss"] == 0.015
 
 
 def test_normalization_stats_are_train_only_without_validation_leakage() -> None:

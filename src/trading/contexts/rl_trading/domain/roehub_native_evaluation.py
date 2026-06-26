@@ -25,6 +25,7 @@ from .hf_original_evaluation import (
     _alpha_config_from_training_config_payload,
     _artifact_path,
     _atomic_write_json,
+    _BacktestRiskManagementState,
     _empty_action_counts,
     _file_payload,
     _format_utc,
@@ -33,10 +34,14 @@ from .hf_original_evaluation import (
     _load_normalization_stats,
     _position_fraction_alpha,
     _read_json_payload,
+    _risk_management_action_override_v1,
+    _risk_management_payload_v1,
     _round_float,
     _scorecard_by_name,
     _scorecard_payload,
+    _update_risk_management_state_after_step_v1,
     _without_hash,
+    alpha_with_evaluation_overrides_v1,
     default_hf_original_evaluation_config_v1,
     evaluate_stage08d_baseline_backtest_v1,
     evaluate_stage08d_grouped_backtest_v1,
@@ -144,7 +149,7 @@ def run_stage08f_roehub_native_evaluation_v1(
     selected_config = (
         default_roehub_native_evaluation_config_v1().with_alpha(alpha)
         if config is None
-        else config.with_alpha(alpha)
+        else config.with_alpha(alpha_with_evaluation_overrides_v1(alpha, config.alpha))
     )
     if (
         selected_config.checkpoint_name == "best"
@@ -275,6 +280,7 @@ def evaluate_stage08f_random_baseline_backtest_v1(
     rng = np.random.default_rng(config.deterministic_random_seed)
     action_counts = _empty_action_counts()
     audit_reason_counts: dict[str, int] = {}
+    risk_management_reason_counts: dict[str, int] = {}
     session_pnls: list[float] = []
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
@@ -285,6 +291,7 @@ def evaluate_stage08f_random_baseline_backtest_v1(
         session_pnl = 0.0
         latest_closed = 0
         latest_profitable = 0
+        risk_state = _BacktestRiskManagementState()
         for step_idx in range(backtest_alpha.agent_session_len):
             price = session_close_price_v1(session, step_idx=step_idx, config=backtest_alpha)
             requested_action_id = int(rng.integers(0, len(ACTION_NAMES_BY_ID_V1)))
@@ -293,6 +300,20 @@ def evaluate_stage08f_random_baseline_backtest_v1(
                 position_side=state.position_side,
                 is_last_step=step_idx == backtest_alpha.agent_session_len - 1,
             )
+            forced_action, risk_reason = _risk_management_action_override_v1(
+                state=state,
+                session=session,
+                step_idx=step_idx,
+                config=backtest_alpha,
+                risk_state=risk_state,
+            )
+            if forced_action is not None:
+                action_id = forced_action
+            if risk_reason is not None:
+                risk_management_reason_counts[risk_reason] = (
+                    risk_management_reason_counts.get(risk_reason, 0) + 1
+                )
+            state_before_action = state
             result = apply_training_reward_step_v1(
                 state=state,
                 action_id=action_id,
@@ -304,6 +325,13 @@ def evaluate_stage08f_random_baseline_backtest_v1(
                 is_last_step=step_idx == backtest_alpha.agent_session_len - 1,
             )
             state = result.state
+            _update_risk_management_state_after_step_v1(
+                risk_state=risk_state,
+                state_before=state_before_action,
+                state_after=state,
+                closed_position=result.closed_position,
+                config=backtest_alpha,
+            )
             action_counts[ACTION_NAMES_BY_ID_V1[result.effective_action_id]] += 1
             audit_reason_counts[result.audit_reason] = (
                 audit_reason_counts.get(result.audit_reason, 0) + 1
@@ -339,6 +367,10 @@ def evaluate_stage08f_random_baseline_backtest_v1(
             "filter_policy": None,
             "grouping": grouping_payload,
             "position_fraction": config.alpha.position_fraction,
+            "risk_management": _risk_management_payload_v1(
+                config=backtest_alpha,
+                reason_counts=risk_management_reason_counts,
+            ),
         },
     )
     return {**scorecard, "scorecard_hash": hash_json_payload_v1(scorecard)}

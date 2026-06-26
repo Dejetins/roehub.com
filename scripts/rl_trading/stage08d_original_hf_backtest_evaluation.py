@@ -98,6 +98,17 @@ def _run_command(args: argparse.Namespace) -> dict[str, Any]:
         allow_fixture_hashes=args.allow_fixture_hashes,
     )
     alpha = UpstreamAlphaConfig(
+        long_action_threshold=args.long_action_threshold,
+        short_action_threshold=args.short_action_threshold,
+        close_action_threshold=args.close_action_threshold,
+        use_risk_management=args.use_risk_management,
+        stop_loss=args.stop_loss,
+        take_profit=args.take_profit,
+        trailing_stop=args.trailing_stop,
+        ensemble_n_samples=args.ensemble_n_samples,
+        ensemble_max_sigma=args.ensemble_max_sigma,
+        max_parallel_sessions=args.max_parallel_sessions,
+        position_fraction=args.position_fraction,
         torch_num_threads=args.torch_num_threads,
         torch_num_interop_threads=args.torch_num_interop_threads,
     )
@@ -347,6 +358,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-test-sessions", type=_optional_positive_int, default=None)
     parser.add_argument("--max-backtest-sessions", type=_optional_positive_int, default=None)
     parser.add_argument("--simple-threshold-return", type=float, default=0.001)
+    parser.add_argument("--long-action-threshold", type=float, default=0.012695)
+    parser.add_argument("--short-action-threshold", type=float, default=0.009902)
+    parser.add_argument("--close-action-threshold", type=float, default=0.001141)
+    parser.add_argument("--use-risk-management", action="store_true")
+    parser.add_argument("--stop-loss", type=float, default=0.01)
+    parser.add_argument("--take-profit", type=float, default=0.02)
+    parser.add_argument("--trailing-stop", type=float, default=0.005)
+    parser.add_argument("--ensemble-n-samples", type=int, default=5)
+    parser.add_argument("--ensemble-max-sigma", type=float, default=0.01)
+    parser.add_argument("--max-parallel-sessions", type=int, default=2)
+    parser.add_argument("--position-fraction", type=float, default=0.5)
     parser.add_argument(
         "--checkpoint-name",
         choices=("best", "final"),
