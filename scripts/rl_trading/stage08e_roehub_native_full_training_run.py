@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -41,6 +42,7 @@ DEFAULT_OUTPUT_ROOT = (
     / "training_runs"
     / STAGE08E_RUNTIME_ARTIFACT_SUBDIR_V1
 )
+DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
 DEFAULT_DATASET_VERSION = "hf_period_rebuild_current_trading"
 DEFAULT_TRAIN_SPLIT = "train"
 DEFAULT_VALIDATION_SPLIT = "validation"
@@ -527,7 +529,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--checkpoint-every-episodes", type=int, default=1_000)
     run.add_argument("--progress-emit-every-episodes", type=int, default=100)
     run.add_argument("--progress-emit-every-sec", type=int, default=300)
-    run.add_argument("--torch-num-threads", type=int, default=1)
+    run.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
     run.add_argument("--torch-num-interop-threads", type=int, default=1)
     run.add_argument(
         "--device-policy",

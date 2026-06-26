@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -39,6 +40,7 @@ DEFAULT_ORCHESTRATOR_OUTPUT_ROOT = (
     / optuna_cli.STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1
     / "dual_branch_runs"
 )
+DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
 
 
 class Stage08GDualBranchRunError(ValueError):
@@ -725,7 +727,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--progress-emit-every-episodes", type=int, default=100)
     parser.add_argument("--progress-emit-every-sec", type=int, default=300)
     parser.add_argument("--validation-max-sessions", type=_optional_positive_int, default=None)
-    parser.add_argument("--torch-num-threads", type=int, default=1)
+    parser.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
     parser.add_argument("--torch-num-interop-threads", type=int, default=1)
 
     parser.add_argument("--trials", type=int, default=100)

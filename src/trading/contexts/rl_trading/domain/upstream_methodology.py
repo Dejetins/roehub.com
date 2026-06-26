@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import math
+import os
 import random
 import resource
 import time
@@ -42,6 +43,7 @@ UPSTREAM_SOURCE_SHA_STAGE08A_V1 = "f71130903f8237351164f4b875494185465bf1ea"
 STAGE08B_CORE_SMOKE_KIND_V1 = "rl_trading_stage08b_upstream_methodology_core_smoke"
 STAGE08B_CORE_SMOKE_SCHEMA_VERSION_V1 = 1
 STAGE08B_CORE_SMOKE_CONFIG_ID_V1 = "roehub_stage08b_upstream_methodology_core_smoke_v1"
+DEFAULT_TORCH_NUM_THREADS_V1 = max(1, os.cpu_count() or 1)
 
 UPSTREAM_PRICE_CHANNELS_V1: tuple[str, ...] = (
     "open",
@@ -107,7 +109,7 @@ class UpstreamAlphaConfig:
     ensemble_max_sigma: float = 0.01
     max_parallel_sessions: int = 2
     position_fraction: float = 0.5
-    torch_num_threads: int = 1
+    torch_num_threads: int = DEFAULT_TORCH_NUM_THREADS_V1
     torch_num_interop_threads: int = 1
     dtype: str = FEATURE_DTYPE_V1
 

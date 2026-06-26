@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import os
 import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -44,6 +45,7 @@ DEFAULT_OUTPUT_ROOT = (
     / "evaluation_runs"
     / STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1
 )
+DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
 
 BranchName = str
 
@@ -613,7 +615,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ensemble-max-sigma", type=float, default=0.01)
     parser.add_argument("--max-parallel-sessions", type=int, default=2)
     parser.add_argument("--position-fraction", type=float, default=0.5)
-    parser.add_argument("--torch-num-threads", type=int, default=1)
+    parser.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
     parser.add_argument("--torch-num-interop-threads", type=int, default=1)
     parser.add_argument("--deterministic-random-seed", type=int, default=806)
     parser.add_argument("--generated-at-utc", type=str, default=None)
