@@ -70,6 +70,8 @@ def _run_command(args: argparse.Namespace) -> int:
     try:
         alpha = UpstreamAlphaConfig(
             seed=args.seed,
+            agent_history_len=args.agent_history_len,
+            agent_session_len=args.agent_session_len,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
             train_start=args.train_start,
@@ -453,6 +455,8 @@ def _resume_command_for_args(*, args: argparse.Namespace, run_id: str) -> str:
         f"--train-split {args.train_split}",
         f"--validation-split {args.validation_split}",
         f"--episodes {args.episodes}",
+        f"--agent-history-len {args.agent_history_len}",
+        f"--agent-session-len {args.agent_session_len}",
         f"--validation-every-episodes {args.validation_every_episodes}",
         f"--checkpoint-every-episodes {args.checkpoint_every_episodes}",
         f"--progress-emit-every-episodes {args.progress_emit_every_episodes}",
@@ -510,6 +514,8 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-validation-artifacts", type=_optional_positive_int, default=None)
     run.add_argument("--validation-max-sessions", type=_optional_positive_int, default=None)
     run.add_argument("--seed", type=int, default=25)
+    run.add_argument("--agent-history-len", type=int, default=30)
+    run.add_argument("--agent-session-len", type=int, default=10)
     run.add_argument("--episodes", type=int, default=55_000)
     run.add_argument("--batch-size", type=int, default=16)
     run.add_argument("--learning-rate", type=float, default=1e-4)

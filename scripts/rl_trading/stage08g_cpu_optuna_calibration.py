@@ -69,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run(args: argparse.Namespace) -> dict[str, Any]:
     optuna = _load_optuna()
+    stage_label = str(args.stage_label)
+    stage_label_lower = stage_label.lower()
     generated = (
         _parse_utc(args.generated_at_utc)
         if args.generated_at_utc is not None
@@ -104,7 +106,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             seed=args.optuna_seed,
         ),
         pruner=optuna.pruners.MedianPruner(n_warmup_steps=5, interval_steps=2),
-        study_name=f"stage08g_{branch}_{generated.strftime('%Y%m%dT%H%M%SZ')}",
+        study_name=f"stage{stage_label_lower}_{branch}_{generated.strftime('%Y%m%dT%H%M%SZ')}",
         storage=study_storage,
         load_if_exists=False,
     )
@@ -187,7 +189,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         trial_records=trial_records,
         final_manifest=final_manifest,
     )
-    summary_path = run_dir / "stage08g_optuna_summary.json"
+    summary_path = run_dir / f"stage{stage_label_lower}_optuna_summary.json"
     _atomic_write_json(summary_path, summary)
     return {
         "best_trial_number": best_trial.number,
@@ -291,6 +293,8 @@ def _trial_alpha(*, args: argparse.Namespace, trial: Any) -> UpstreamAlphaConfig
     if args.selection_strategy == "ensemble_q_filter":
         ensemble_max_sigma = float(trial.suggest_float("max_sigma", 0.001, 0.015, log=True))
     return UpstreamAlphaConfig(
+        agent_history_len=args.agent_history_len,
+        agent_session_len=args.agent_session_len,
         long_action_threshold=float(trial.suggest_float("long_thr", 0.001, 0.03, log=True)),
         short_action_threshold=float(trial.suggest_float("short_thr", 0.001, 0.03, log=True)),
         close_action_threshold=float(trial.suggest_float("close_thr", 0.001, 0.03, log=True)),
@@ -317,6 +321,8 @@ def _alpha_from_params(
     if args.selection_strategy == "ensemble_q_filter" and "max_sigma" in params:
         ensemble_max_sigma = float(params["max_sigma"])
     return UpstreamAlphaConfig(
+        agent_history_len=args.agent_history_len,
+        agent_session_len=args.agent_session_len,
         long_action_threshold=float(params["long_thr"]),
         short_action_threshold=float(params["short_thr"]),
         close_action_threshold=float(params["close_thr"]),
@@ -439,7 +445,7 @@ def _summary_payload(
         else "completed"
     )
     payload = {
-        "artifact_kind": "rl_trading_stage08g_cpu_optuna_summary",
+        "artifact_kind": f"rl_trading_stage{str(args.stage_label).lower()}_cpu_optuna_summary",
         "best_alpha_config": best_alpha.as_payload(),
         "best_alpha_config_hash": best_alpha.config_hash(),
         "best_trial_number": int(best_trial.number),
@@ -484,7 +490,7 @@ def _summary_payload(
         "run_dir": str(run_dir),
         "run_id": run_id,
         "schema_version": 1,
-        "stage": "08G",
+        "stage": str(args.stage_label),
         "status": status,
         "study_storage": study_storage,
         "trial_count_requested": args.trials,
@@ -514,11 +520,13 @@ def _default_run_id(
             "max_parallel_sessions": args.max_parallel_sessions,
             "position_fraction": args.position_fraction,
             "selection_strategy": args.selection_strategy,
-            "stage": "08G",
+            "stage": args.stage_label,
             "trials": args.trials,
         }
     )
-    return f"stage08g_{branch}_{candidate_manifest_sha256[:8]}_{digest[:20]}"
+    stage_label = str(args.stage_label).lower()
+    candidate_prefix = candidate_manifest_sha256[:8]
+    return f"stage{stage_label}_{branch}_{candidate_prefix}_{digest[:20]}"
 
 
 def _source_state_payload() -> dict[str, object]:
@@ -588,9 +596,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--allow-fixture-hashes", action="store_true")
+    parser.add_argument("--stage-label", choices=("08G", "08H"), default="08G")
     parser.add_argument("--trials", type=int, default=100)
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--optuna-seed", type=int, default=1708)
+    parser.add_argument("--agent-history-len", type=int, default=30)
+    parser.add_argument("--agent-session-len", type=int, default=10)
     parser.add_argument("--checkpoint-name", choices=("best", "final"), default="best")
     parser.add_argument(
         "--selection-strategy",

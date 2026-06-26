@@ -121,6 +121,39 @@ def test_stage08g_dual_branch_run_passes_fresh_candidate_sha_to_optuna(
     assert summary["branches"]["roehub_native"]["stage09_allowed"] is True
 
 
+def test_stage08g_dual_branch_dry_run_can_label_corrective_stage08h(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    result = stage08g.main(
+        [
+            "--dry-run",
+            "--stage-label",
+            "08H",
+            "--output-root",
+            str(tmp_path / "runs"),
+            "--generated-at-utc",
+            "2026-06-26T12:00:00Z",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    summary = json.loads(Path(payload["summary_path"]).read_text(encoding="utf-8"))
+    commands = [step["command"] for step in summary["steps"]]
+
+    assert result == 0
+    assert summary["artifact_kind"] == "rl_trading_stage08h_dual_branch_cpu_run"
+    assert summary["stage"] == "08H"
+    assert (
+        "stage08g_cpu_optuna_calibration.py --branch hf_original --stage-label 08H"
+        in commands[1]
+    )
+    assert (
+        "stage08g_cpu_optuna_calibration.py --branch roehub_native --stage-label 08H"
+        in commands[3]
+    )
+
+
 def _completed_training(
     *,
     tmp_path: Path,

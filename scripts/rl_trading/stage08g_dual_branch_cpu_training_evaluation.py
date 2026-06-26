@@ -164,7 +164,8 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             reason=exc.reason,
             field=exc.field,
         )
-    summary_path = run_dir / "stage08g_dual_branch_cpu_run_summary.json"
+    summary_name = f"stage{str(args.stage_label).lower()}_dual_branch_cpu_run_summary.json"
+    summary_path = run_dir / summary_name
     _atomic_write_json(summary_path, summary)
     return {
         "run_dir": str(run_dir),
@@ -238,6 +239,10 @@ def _hf_training_command(
         str(args.episodes),
         "--seed",
         str(args.seed),
+        "--agent-history-len",
+        str(args.agent_history_len),
+        "--agent-session-len",
+        str(args.agent_session_len),
         "--batch-size",
         str(args.batch_size),
         "--learning-rate",
@@ -300,6 +305,10 @@ def _native_training_command(
         str(args.episodes),
         "--seed",
         str(args.seed),
+        "--agent-history-len",
+        str(args.agent_history_len),
+        "--agent-session-len",
+        str(args.agent_session_len),
         "--batch-size",
         str(args.batch_size),
         "--learning-rate",
@@ -352,6 +361,8 @@ def _optuna_command(
         "scripts/rl_trading/stage08g_cpu_optuna_calibration.py",
         "--branch",
         branch,
+        "--stage-label",
+        args.stage_label,
         "--candidate-manifest",
         str(candidate_manifest_path),
         "--output-root",
@@ -362,6 +373,10 @@ def _optuna_command(
         str(args.jobs),
         "--optuna-seed",
         str(args.optuna_seed),
+        "--agent-history-len",
+        str(args.agent_history_len),
+        "--agent-session-len",
+        str(args.agent_session_len),
         "--checkpoint-name",
         args.checkpoint_name,
         "--selection-strategy",
@@ -431,7 +446,7 @@ def _summary_payload(
         else "completed"
     )
     payload = {
-        "artifact_kind": STAGE08G_DUAL_BRANCH_RUN_KIND_V1,
+        "artifact_kind": _dual_branch_artifact_kind(args.stage_label),
         "branch_order": ["hf_original", "roehub_native"],
         "branches": {
             "hf_original": {
@@ -458,6 +473,10 @@ def _summary_payload(
             "parallel_training_reason": (
                 "single host CPU reproducibility; parallel training would compete for CPU/RAM/IO"
             ),
+            "training_profile": {
+                "agent_history_len": args.agent_history_len,
+                "agent_session_len": args.agent_session_len,
+            },
             "stage06_training_split": args.native_train_split,
             "stage06_validation_split": args.native_validation_split,
             "upstream_source_sha": "f71130903f8237351164f4b875494185465bf1ea",
@@ -465,7 +484,7 @@ def _summary_payload(
         "run_dir": str(run_dir),
         "run_id": run_id,
         "schema_version": STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1,
-        "stage": "08G",
+        "stage": args.stage_label,
         "stage09_allowed": bool(hf_stage09 and native_stage09),
         "status": status,
         "steps": list(steps),
@@ -484,7 +503,7 @@ def _blocked_summary_payload(
     field: str | None,
 ) -> dict[str, Any]:
     payload = {
-        "artifact_kind": STAGE08G_DUAL_BRANCH_RUN_KIND_V1,
+        "artifact_kind": _dual_branch_artifact_kind(args.stage_label),
         "blocked_reason": reason,
         "blocked_field": field,
         "execution_mode": args.execution_mode,
@@ -492,7 +511,7 @@ def _blocked_summary_payload(
         "run_dir": str(run_dir),
         "run_id": run_id,
         "schema_version": STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1,
-        "stage": "08G",
+        "stage": args.stage_label,
         "stage09_allowed": False,
         "status": "blocked",
         "steps": list(steps),
@@ -543,13 +562,21 @@ def _default_run_id(*, args: argparse.Namespace) -> str:
             "native_final_split": args.native_final_split,
             "native_train_split": args.native_train_split,
             "native_validation_split": args.native_validation_split,
+            "agent_history_len": args.agent_history_len,
+            "agent_session_len": args.agent_session_len,
             "selection_strategy": args.selection_strategy,
-            "stage": "08G",
+            "stage": args.stage_label,
             "stage06_manifest_path": str(args.stage06_manifest_path),
             "trials": args.trials,
         }
     )
-    return f"stage08g_dual_branch_cpu_{digest[:20]}"
+    return f"stage{str(args.stage_label).lower()}_dual_branch_cpu_{digest[:20]}"
+
+
+def _dual_branch_artifact_kind(stage_label: str) -> str:
+    if stage_label == "08G":
+        return STAGE08G_DUAL_BRANCH_RUN_KIND_V1
+    return f"rl_trading_stage{stage_label.lower()}_dual_branch_cpu_run"
 
 
 def _append_optional(command: list[str], option: str, value: object | None) -> None:
@@ -627,6 +654,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--generated-at-utc", type=str, default=None)
+    parser.add_argument("--stage-label", choices=("08G", "08H"), default="08G")
     parser.add_argument(
         "--execution-mode",
         choices=("sequential_cpu",),
@@ -683,6 +711,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume-training", action="store_true")
 
     parser.add_argument("--seed", type=int, default=25)
+    parser.add_argument("--agent-history-len", type=int, default=30)
+    parser.add_argument("--agent-session-len", type=int, default=10)
     parser.add_argument("--episodes", type=int, default=55_000)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--learning-rate", type=float, default=1e-4)

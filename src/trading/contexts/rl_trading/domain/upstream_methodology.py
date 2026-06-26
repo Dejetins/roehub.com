@@ -141,6 +141,16 @@ class UpstreamAlphaConfig:
                 reason="agent_history_len_too_short",
                 field="agent_history_len",
             )
+        if self.agent_history_len > self.pre_signal_len:
+            raise UpstreamMethodologyError(
+                reason="agent_history_len_exceeds_pre_signal_len",
+                field="agent_history_len",
+            )
+        if (self.pre_signal_len - 1 + self.agent_session_len) > self.full_seq_len:
+            raise UpstreamMethodologyError(
+                reason="agent_session_len_exceeds_available_sequence",
+                field="agent_session_len",
+            )
         if self.action_history_len > self.agent_session_len:
             raise UpstreamMethodologyError(
                 reason="action_history_len_exceeds_session_len",
@@ -232,6 +242,8 @@ class UpstreamAlphaConfig:
     def as_payload(self) -> dict[str, object]:
         return {
             "action_history_len": self.action_history_len,
+            "agent_history_len": self.agent_history_len,
+            "agent_session_len": self.agent_session_len,
             "architecture_id": UPSTREAM_METHODOLOGY_ARCHITECTURE_ID_V1,
             "batch_size": self.batch_size,
             "close_action_threshold": self.close_action_threshold,
@@ -251,6 +263,7 @@ class UpstreamAlphaConfig:
             "eps_start": self.eps_start,
             "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
             "feature_names": list(FEATURE_NAMES_V1),
+            "full_seq_len": self.full_seq_len,
             "gamma": self.gamma,
             "initial_balance": self.initial_balance,
             "inaction_penalty_ratio": self.inaction_penalty_ratio,
@@ -265,6 +278,7 @@ class UpstreamAlphaConfig:
             "per_beta_start": self.per_beta_start,
             "per_epsilon": self.per_epsilon,
             "position_fraction": self.position_fraction,
+            "pre_signal_len": self.pre_signal_len,
             "replay_capacity": self.replay_capacity,
             "seed": self.seed,
             "short_action_threshold": self.short_action_threshold,

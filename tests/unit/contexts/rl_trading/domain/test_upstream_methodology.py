@@ -44,6 +44,11 @@ def test_upstream_alpha_config_exposes_architecture_and_parity_literals() -> Non
     assert payload["methodology_parity_id"] == UPSTREAM_METHODOLOGY_PARITY_ID_V1
     assert payload["methodology_parity_id"] == "upstream_methodology_parity"
     assert payload["cnn_maps"] == [32, 64, 128]
+    assert payload["full_seq_len"] == 150
+    assert payload["pre_signal_len"] == 90
+    assert payload["agent_history_len"] == 30
+    assert payload["agent_session_len"] == 10
+    assert payload["input_history_len"] == 29
     assert payload["batch_size"] == 16
     assert payload["train_start"] == 10_000
     assert payload["long_action_threshold"] == 0.012695
