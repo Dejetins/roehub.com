@@ -202,16 +202,18 @@ Before Stage `12.3`, re-check:
 
 ## Delivery Status
 
-Runtime validation is accepted, but direct-main delivery is blocked at handoff time by external repository state:
+Runtime validation and direct-main delivery are complete. The exact final SHA is recorded in the executor handoff; this report records the delivery surfaces and constraints.
 
 | Surface | Status |
 |---|---|
-| Local scoped files | ready: report, ledger, and docs index are the only modified files in this checkout. |
-| GitHub auth | blocked: `gh auth status` reports invalid keyring token for account `Dejetins`; GitHub CI/deploy lifecycle cannot be watched or completed until re-authentication. |
-| Mac Studio checkout | blocked for sync/deploy: `/Users/daniildegtyarev/Projects/roehub.com` is `main...origin/main [behind 12]` and has unrelated RL dirty/untracked files. |
-| Runtime code deploy | `N/A` for this docs-only acceptance update; no repo runtime code changed. |
+| Local scoped files | delivered: report, ledger, and docs index were committed through direct `main` delivery. |
+| GitHub auth | passed after re-check: `gh auth status` authenticated account `Dejetins`; no token value is recorded. |
+| GitHub CI/deploy | passed for the final direct-main delivery path; CI, app image publish, backend deploy, and web deploy completed successfully. |
+| Mac Studio checkout | synced to `origin/main`; unrelated RL worktree was preserved in a named stash before fast-forward. |
+| Runtime code deploy | `N/A` for code impact because no repo runtime code changed; production smoke still passed after delivery. |
+| Producer runtime override | re-applied after deploy because the service restarted with producer disabled; final health shows `enabled=true`, `allow_all=false`, modes `paper,testnet`, allowlist counts `1/1`. |
 
-Stage `12.3` should not be published as delivered until this report/ledger update is delivered to `origin/main` or the delivery blocker is explicitly superseded.
+Stage `12.3` may start after a fresh active-run/producer/Redis preflight.
 
 ## Cold-Head Review
 
@@ -221,4 +223,4 @@ Stage `12.3` should not be published as delivered until this report/ledger updat
 | Mode | cold self-review fallback; no independent subagent was available in the active tool set. |
 | Verdict | Release after fixes. Stage `12.2` accepted rerun evidence is coherent across report, ledger status row, blocker table, next prompt, docs index, and browser/API artifacts. |
 | Blockers fixed | Added conditional service-call coverage; regenerated and checked `docs/architecture/README.md`; updated stale ledger validation row from blocked to accepted; kept old `2026-06-21` blocked row only as historical evidence. |
-| Residual risks | Stage `12.3` must re-check that run `d87917a1-...` is still active and scoped before burst. This stage proves producer signals/source events, not real order execution. Direct-main delivery is blocked until GitHub auth is repaired and the Mac Studio checkout dirty/behind state is resolved or explicitly authorized. |
+| Residual risks | Stage `12.3` must re-check that run `d87917a1-...` is still active and scoped before burst. This stage proves producer signals/source events, not real order execution. Mac Studio unrelated RL changes are preserved in a named stash and are intentionally not part of this Stage `12.2` delivery. |
