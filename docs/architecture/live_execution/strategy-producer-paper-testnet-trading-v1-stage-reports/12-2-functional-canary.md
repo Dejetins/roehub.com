@@ -1,14 +1,14 @@
 # Stage 12.2: Functional Canary
 
-Статус: `blocked`.
+Статус: `accepted`.
 
-Дата проверки: `2026-06-21`.
+Дата принятого rerun: `2026-06-26`.
 
 ## Pre-Start
 
-User required before start: none beyond the provided prompt. The canary used existing Mac Studio/runtime/browser access and stopped short of any acceptance downgrade or secret request if runtime evidence could not be produced safely.
+User required before start: none beyond the provided prompt. The rerun used existing Mac Studio/runtime/browser access, the already configured selected Testnet subject, and no secrets from chat.
 
-Stage `12.1` gate: `accepted` in `strategy-producer-paper-testnet-trading-v1-stage-ledger.md`. The selected subject from Stage `12.1` was:
+Stage `12.1` gate: `accepted` in `strategy-producer-paper-testnet-trading-v1-stage-ledger.md`. The rerun reused the selected Stage `12.1` subject and did not broaden producer allowlists:
 
 | Field | Value |
 |---|---|
@@ -16,268 +16,209 @@ Stage `12.1` gate: `accepted` in `strategy-producer-paper-testnet-trading-v1-sta
 | strategy `id` | `ee15e181-309f-478e-8726-04a299f1292f` |
 | profile `id` | `5103b2db-5211-4f62-9e0e-a23605de9b41` |
 | Stage `12.1` run `id` | `bb5d31ca-3f82-4237-bfb1-25cc9d6bf156` |
+| accepted rerun `id` | `d87917a1-1d72-49a8-b5c5-e40290bd3096` |
 | connection `id` | `8cec780c-c19c-4781-bd22-2af1d592039d` |
 | mode / exchange / market | `testnet` / `binance` / `spot` |
 | instrument | `binance:spot:BTCUSDT` |
 | strategy spec | `MA(3,5)`, `1m`, `spot`, `BTCUSDT` |
 
-No source code change was planned or made for this gate. The gate was runtime evidence plus report/ledger/docs-index synchronization.
+## File Manifest
 
-## Concrete File List Before Edits
-
-| Path | Planned action | Reason |
-|---|---:|---|
-| `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-2-functional-canary.md` | create | Record canary evidence and blocked decision. |
-| `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | update | Mark `12.2 blocked` and keep `12.3` closed. |
-| `docs/architecture/README.md` | generated check/update if required | Required docs index consistency after adding a stage report. |
-| `output/playwright/stage12-2-functional-canary/*` | create evidence artifacts | Production `/strategies` browser proof and request/console summaries. |
-| `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist` | host-runtime reapply | Reapply the Stage `12.1` scoped producer allowlist after runtime drift showed the producer disabled. |
-| `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist.stage12-2-pre-canary-backup` | host-runtime backup | Recovery copy before reapplying the non-secret LaunchAgent environment variables. |
+| Created | Modified | Deleted | Reason | Contract impact |
+|---|---|---|---|---|
+| `output/playwright/stage12-2-functional-canary-rerun/*` | none | none | Browser/API evidence artifacts for the accepted rerun. | `none`; evidence artifacts only. |
+| none | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-2-functional-canary.md` | none | Replace the previous blocked decision with accepted rerun evidence while retaining the blocker/root-cause explanation. | `compatible-change`; docs/status handoff only. |
+| none | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | none | Mark Stage `12.2 accepted`, open Stage `12.3`, and record repair evidence. | `compatible-change`; staged workflow status only. |
+| none | `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist` | none | Re-applied scoped host-runtime producer enablement/allowlist after runtime drift showed producer disabled. | `compatible-change`; host runtime config stayed scoped to selected `paper,testnet` subject. |
+| `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist.stage12-2-20260626T190736Z.bak` | none | none | Recovery copy before the host-runtime LaunchAgent update. | `none`; host-local backup. |
 
 ## Decision
 
-Final decision: `blocked`.
+Final decision: `accepted`.
 
-Stage `12.2` did not prove functional canary acceptance. A replacement run was started and produced a pre-window burst, but the declared 31-minute canary window produced:
+The accepted canary window ran for `32m03s`, from `2026-06-26T19:28:10.541433Z` to `2026-06-26T20:00:13.589485Z`. During that declared window the selected active Testnet strategy produced in-window DB rows and live producer metrics:
 
-| Metric | In-window result |
-|---|---:|
-| new strategy signals | `0` |
-| new actionable strategy signals | `0` |
-| new execution source events | `0` |
-| new execution intents | `0` |
-| new execution orders | `0` |
-| mainnet orders | `0` |
-| Redis pending requests | `0` |
+| Surface | Baseline | Final | Delta / result |
+|---|---:|---:|---:|
+| strategy signals | `9` | `41` | `+32` |
+| actionable `signal` outcomes | `1` | `8` | `+7` |
+| execution source events | `9` | `41` | `+32` |
+| source events `recorded` | `1` | `8` | `+7` |
+| execution intents | `0` | `0` | `0` |
+| execution orders in window | `0` | `0` | `0` |
+| mainnet orders in window | `0` | `0` | `0` |
+| Redis candle consumer pending | `0` | `0` | no growth |
+| Redis candle consumer lag | `0` | `0` | no growth |
+| `strategy_live_runner_iterations_total` | `169.0` | `779.0` | `+610` |
+| `strategy_live_runner_iteration_errors_total` | `0.0` | `0.0` | no errors |
+| `strategy_producer_polled_runs` | `1.0` | `1.0` | selected run polled |
+| `strategy_producer_active_instruments` | `1.0` | `1.0` | selected instrument active |
 
-The producer and exchange-execution health endpoints stayed `ready`, but producer cycle/poll metrics did not advance during the canary. That combination is not acceptance for an active strategy runtime. Stage `12.3` remains blocked until Stage `12.2` is repaired and rerun successfully.
+Stage `12.3` may start after this Stage `12.2` handoff is delivered.
 
 ## Бизнес-Читаемое Резюме
 
-Stage `12.2` должен был доказать не просто зеленый статус сервиса, а живую работу strategy producer в течение 30-60 минут: новые сигналы, новые source events, отсутствие mainnet/order side effects и видимость состояния в `/strategies`.
+Первый Stage `12.2` на `2026-06-21` правильно заблокировал продолжение: UI/API показывали активную стратегию, но внутри заявленного окна не появлялись новые signals/source events. Это был именно тот false-positive, который Stage `12.2` должен был поймать до burst/soak.
 
-Проверка показала безопасный, но неприемлемый результат. Система осталась в Testnet, не создала mainnet/order side effects и корректно отображала выбранную стратегию в UI, но после начального всплеска до окна canary не было ни одного нового сигнала или source event. Поэтому следующий stage нельзя начинать: иначе burst/resource gate будет измерять не активную нагрузку, а фактически простаивающий или зависший producer.
+Rerun `2026-06-26` исправил runtime-состояние и доказал живую работу producer-а: каждую минуту появлялись новые `strategy_signals` и связанные `execution_source_events`, checkpoint двигался по текущим свечам, Redis consumer group не накапливала долг, а mainnet/orders/intents не появились. Это достаточно для перехода к Stage `12.3` burst/resource gate.
 
-## Business Impact
+## Repair Evidence Before Rerun
 
-| Layer | Impact |
+The previous blocked state was caused by a combination of runtime drift and stale stream/checkpoint state:
+
+| Finding | Evidence / action |
 |---|---|
-| Operator confidence | Stage `12.2` prevented a false-positive soak. The UI/API could show a `running` Testnet strategy, but runtime evidence proved that the active loop did not keep producing new signals/source events during the declared canary window. |
-| Release risk | The next burst/resource gate remains closed. Accepting this gate would let later stages measure an idle or stale producer, which is the exact failure mode the Stage `12.1`/`12.2` split was designed to catch. |
-| Money safety | Safety boundaries held: mode stayed `testnet`, `exchange-execution` stayed `adapter_mode=testnet`, mainnet orders stayed `0`, Redis dispatch streams did not grow, and no execution orders were created. |
-| Customer-visible behavior | `/strategies` can show the selected strategy and pre-window journal rows, but those rows are not proof of ongoing canary progress. Operators need a repaired run before relying on the status as active runtime evidence. |
-| Operations | The blocked result points to a repairable runtime-progress/readiness gap: health can remain ready while cycle/poll metrics are stale. Future gates should require explicit in-window deltas, not only ready status. |
+| Stage `12.1` run was no longer active | Prior accepted run `bb5d31ca-...` had failed before rerun; no active runs were available at the start of repair. |
+| Producer was disabled by host runtime drift | `/health/ready` showed producer disabled and empty allowlists. |
+| Scoped producer allowlist was re-applied | `ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED=true`, `allow_all=false`, modes `paper,testnet`, allowed owner/strategy counts `1/1`. |
+| Account projection was stale before restart | API start correctly failed closed with `capital_projection_stale`. |
+| Account projection refreshed through existing exchange-control path | Snapshot `7ca08303-2d0b-4ee0-b3a1-38c4c436fc2d`, observed `2026-06-26T19:25:24.980554Z`, status `fresh/account_state_read_ok`. |
+| Intermediate run exposed the real blocker | Run `dceeae42-...` stuck in gap repair because checkpoint was far behind and Redis consumer group delivered current messages; `run_once()` spent the first cycle in repair sleep/backoff. |
+| Runtime recovery was scoped | Stopped only the selected run, stopped `strategy-live-runner`, destroyed only Redis consumer group `strategy.live_runner.v1` on `md.candles.1m.binance:spot:BTCUSDT`, then restarted the service. Redis stream/candle data and ClickHouse data were not deleted. |
+| Accepted rerun was created through the API | Run `d87917a1-1d72-49a8-b5c5-e40290bd3096` reached `running` and advanced from current candles. |
 
-## Runtime Preparation Evidence
-
-The Stage `12.1` selected run was no longer usable at canary start:
-
-| Check | Result |
-|---|---|
-| Stage `12.1` run `bb5d31ca-...` | state `failed` |
-| selected profile | still `ready`, mode `testnet` |
-| failure class | local ClickHouse read path refused connection during gap repair |
-| historical rows | the failed run had prior signals, but no execution intents or orders |
-
-Runtime drift was also found before the canary: the LaunchAgent had lost the non-secret Stage `12.1` producer enablement/allowlist environment. The canary re-applied only the scoped settings:
-
-| Setting | Runtime value |
-|---|---|
-| `ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED` | `true` |
-| `ROEHUB_STRATEGY_PRODUCER_ALLOW_ALL` | `false` |
-| `ROEHUB_STRATEGY_PRODUCER_ALLOWED_MODES` | `paper,testnet` |
-| `ROEHUB_STRATEGY_PRODUCER_ALLOWED_USER_IDS` | `ab094ba2-61d7-4fbf-be8f-cbad9f351572` |
-| `ROEHUB_STRATEGY_PRODUCER_ALLOWED_STRATEGY_IDS` | `ee15e181-309f-478e-8726-04a299f1292f` |
-
-Recovery file: `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist.stage12-2-pre-canary-backup`.
-
-After reapply, producer readiness showed `ready=True`, `enabled=True`, `allow_all=False`, allowed modes `paper,testnet`, and allowlist counts `1/1`. `exchange-execution` readiness remained `ready` with `adapter_mode=testnet`.
-
-The first API restart attempt was correctly blocked by stale capital projection. The account projection was refreshed through the existing exchange-control path, then the strategy run API started replacement run `ec1aeb3c-dfeb-4684-a459-8dc9f736414b`, which reached `running`.
-
-Immediately before the declared canary window, the replacement run produced a one-time burst:
-
-| Surface | Pre-window value |
-|---|---:|
-| total signals on replacement run | `16` |
-| actionable signals on replacement run | `3` |
-| source events on replacement run | `16` |
-| execution intents | `0` |
-| execution orders | `0` |
-| paper orders/fills/accounting | `0` |
-
-That burst is useful diagnostic evidence, but it is not counted as Stage `12.2` acceptance because it occurred before the declared window and did not continue.
+The recovery did not enable mainnet and did not broaden producer scope beyond the selected owner/strategy.
 
 ## Canary Window
 
 | Field | Value |
 |---|---|
-| declared start UTC | `2026-06-21T15:56:26.695105+00:00` |
-| declared end UTC | `2026-06-21T16:27:26.984444+00:00` |
-| declared start Moscow | `2026-06-21 18:56:26+03` |
-| declared end Moscow | `2026-06-21 19:27:26+03` |
-| duration | `1860s` / `31m` |
-| run under observation | `ec1aeb3c-dfeb-4684-a459-8dc9f736414b` |
+| declared start UTC | `2026-06-26T19:28:10.541433+00:00` |
+| declared end UTC | `2026-06-26T20:00:13.589485+00:00` |
+| declared start Moscow | `2026-06-26 22:28:10+03` |
+| declared end Moscow | `2026-06-26 23:00:13+03` |
+| duration | `1923s` / `32m03s` |
+| run under observation | `d87917a1-1d72-49a8-b5c5-e40290bd3096` |
+| run state at final sample | `running` |
+| checkpoint at final sample | `2026-06-26 22:59:00+03` |
+| `last_error` | empty |
 
-Snapshots were collected before, during, and after the window at roughly five-minute intervals. The key values were unchanged from start to finish:
+Final monitor sample:
 
-| Surface | Start | End | Result |
-|---|---:|---:|---|
-| run state | `running` | `running` | stayed active but made no progress |
-| run checkpoint | `2026-06-19T02:45:00+03:00` | same | stale |
-| signals since canary start | `0` | `0` | failed active-signal requirement |
-| actionable signals since canary start | `0` | `0` | failed active-signal requirement |
-| source events since canary start | `0` | `0` | failed execution-source-event requirement |
-| total signals on replacement run | `16` | `16` | no in-window delta |
-| total source events on replacement run | `16` | `16` | no in-window delta |
-| total intents | `0` | `0` | expected for current testnet producer behavior; no dispatch occurred |
-| total orders | `0` | `0` | no order side effect |
-| mainnet orders since start | `0` | `0` | safety boundary held |
-| Redis `execution.requests.v1` length | `41` | `41` | no dispatch growth |
-| Redis pending for `exchange-execution.v1` | `0` | `0` | no stuck execution requests |
-| Redis retry / DLQ lengths | `1` / `2` | `1` / `2` | no new retry/DLQ growth |
-| `strategy_live_runner_iterations_total` | `70.0` | `70.0` | producer loop metric frozen |
-| `strategy_live_runner_iteration_errors_total` | `0.0` | `0.0` | no surfaced loop error |
-| `strategy_producer_polled_runs` | `0.0` | `0.0` | no active polling metric delta |
-| `strategy_producer_active_instruments` | `0.0` | `0.0` | no active instrument metric delta |
-| strategy producer health | `ready` | `ready` | ready status did not prove progress |
-| exchange-execution health | `ready` | `ready` | execution service remained available |
-| strategy-live-runner RSS | `68144 KiB` | `70736 KiB` | bounded process growth |
-| exchange-execution RSS | `97136 KiB` | `97200 KiB` | stable |
-
-Producer signal counters also stayed frozen during the window:
-
-| Metric | Value |
+| Surface | Final sample value |
 |---|---:|
-| `strategy_producer_source_event_total{mode="testnet", outcome="warmup"}` | `4` |
-| `strategy_producer_source_event_total{mode="testnet", outcome="no_signal"}` | `9` |
-| `strategy_producer_source_event_total{mode="testnet", outcome="signal"}` | `3` |
-| `strategy_signal_total{mode="testnet", signal="close"}` | `2` |
-| `strategy_signal_total{mode="testnet", signal="open"}` | `1` |
-| `strategy_signal_total{mode="testnet", signal="no_signal"}` | `9` |
-| `strategy_signal_total{mode="testnet", signal="warmup"}` | `4` |
-| `strategy_producer_signal_lag_seconds` | `230877.84196209908` |
+| signals total on run | `41` |
+| source events total on run | `41` |
+| source outcomes | `no_intent/ma_cross_no_change=28`, `recorded/source_event_recorded=8`, `warmup_not_satisfied=4`, `ma_cross_baseline_ready=1` |
+| Redis group | `consumers=1`, `pending=0`, `lag=0`, `entries-read=136388` |
+| producer metrics | `iterations_total=779.0`, `iteration_errors_total=0.0`, `polled_runs=1.0`, `active_instruments=1.0`, `signal_lag_seconds=0.861814022064209` |
+
+Independent DB/Redis/metrics post-snapshot at `2026-06-26T20:08:21Z` confirmed the in-window rows without relying on terminal monitor state:
+
+| Surface | In-window value |
+|---|---:|
+| `strategy_signals` rows | `32` |
+| actionable signal rows | `7` |
+| `execution_source_events` rows joined to selected run | `32` |
+| source outcomes | `no_intent/ma_cross_no_change=25`, `recorded/source_event_recorded=7` |
+| `execution_intents` rows | `0` |
+| `execution_orders` rows | `0` |
+| mainnet orders | `0` |
+| active runs for selected strategy | `1` |
+| Redis group after post-snapshot | `pending=0`, `lag=0`, `entries-read=136396` |
+| current run checkpoint after post-snapshot | `2026-06-26 23:07:00+03` |
+
+The post-snapshot also showed the run continued after the declared window (`signals_total=49`, `actionable=10`) with `last_error=""`, which supports handoff continuity for Stage `12.3`.
 
 ## Browser and API Evidence
 
-Production browser proof was collected against `https://roehub.com/strategies?strategy_id=ee15e181-309f-478e-8726-04a299f1292f` with a temporary authenticated session for the selected owner. The session was revoked after proof; active recent proof sessions returned `0`.
+Production browser/API proof was collected against `https://roehub.com/strategies?strategy_id=ee15e181-309f-478e-8726-04a299f1292f` with a temporary authenticated session for the selected owner. The session value was not written to artifacts, logs, the report, or the ledger; the session was revoked after proof and active recent proof sessions returned `0`.
 
 | Artifact | Result |
 |---|---|
-| `output/playwright/stage12-2-functional-canary/strategies-prod-blocked-canary.png` | Screenshot captured the selected strategy page. |
-| `output/playwright/stage12-2-functional-canary/strategies-prod.snapshot.txt` | Page title `Strategies | Roehub`; selected strategy `BTCUSDT 1m [MA(3,5)] #288FDBB3`; mode `testnet`; producer/runtime `running`; profile `ready`. |
-| `output/playwright/stage12-2-functional-canary/strategies-prod.console-error.txt` | `Total messages: 0 (Errors: 0, Warnings: 0)`. |
-| `output/playwright/stage12-2-functional-canary/strategies-prod.requests.txt` | Dashboard API request returned `200`. |
+| `output/playwright/stage12-2-functional-canary-rerun/strategies-prod-rerun-20260626T2000Z.png` | Screenshot captured `/strategies` showing the selected `BTCUSDT 1m [MA(3,5)]` strategy as `live`, producer/run `running`, `testnet`, readiness `ready`, and latest signals after `23:00` Moscow. |
+| `output/playwright/stage12-2-functional-canary-rerun/strategies-prod-rerun.snapshot.txt` | Text snapshot includes selected strategy, `running`, `testnet`, `testnet_ready_recent_auth_and_connection`, `binance:spot:BTCUSDT`, and latest signal/source rows through `06/26, 11:20 PM`. |
+| `output/playwright/stage12-2-functional-canary-rerun/strategies-prod-rerun.console-network.json` | Dashboard API requests returned `200`; console errors `0`, warnings `0`, failed requests `0`. |
+| `output/playwright/stage12-2-functional-canary-rerun/strategies-prod-rerun.api-summary.json` | Manual dashboard API fetch returned `200`; selected strategy id/status/runtime state matched the page. |
 
-The `/strategies` dashboard showed the pre-window `06/21, 06:53 PM` source-event/signal rows and the replacement run as `running`. It did not show new in-window source-event progression. Direct API evidence matched the UI:
+## Safety Boundaries
 
-| Field | Value |
+| Boundary | Result |
 |---|---|
-| API status | `200` |
-| selected strategy | `ee15e181-309f-478e-8726-04a299f1292f` |
-| selected status | `live` |
-| live profile mode | `testnet` |
-| readiness | `ready`, `testnet_ready_recent_auth_and_connection` |
-| runtime run state | `running` |
-| runtime producer status | `running` |
-| runtime run id | `ec1aeb3c-dfeb-4684-a459-8dc9f736414b` |
-| signal count in dashboard response | `20` |
-| latest signal `created_at` | `2026-06-21T15:53:57.795000Z` |
-| latest signal outcome / reason | `no_signal` / `ma_cross_no_change` |
-| latest intent/order status | `null` / `null` |
-
-## Root-Cause Notes for Repair
-
-Evidence supports two separate issues:
-
-1. The Stage `12.1` run failed before this canary after a local ClickHouse read path refused connection during gap repair.
-2. The replacement run processed one initial historical-candle burst, then the producer cycle/poll metrics stopped advancing while `/health/ready` remained ready.
-
-The next repair should investigate the live runner loop, candle/gap repair behavior, and readiness semantics. A rerun should start from a fresh, explicitly declared canary window and require in-window signal/source-event deltas before opening Stage `12.3`.
+| Mainnet submit | Passed: no mainnet orders in the declared window. |
+| Execution dispatch | Passed: no execution intents/orders in the declared window; current Stage `12.2` acceptance is source-event/signal canary, not real-order proof. |
+| Redis backlog | Passed: candle consumer pending and lag stayed `0`. |
+| Retry/DLQ growth | No new growth observed for the canary scope. |
+| Secrets/redaction | Passed by inspection: no cookies, tokens, DSNs, exchange keys, raw provider payloads, or session values are recorded. |
+| Producer scope | Passed: producer remains scoped to `paper,testnet` and selected owner/strategy; `allow_all=false`. |
+| Backtest short/funding downstream policy | Not directly exercised: selected subject is historical `long/short` spot Testnet canary evidence; no new short-like launch was created during the rerun. Future new short-like launches still require futures-only policy. |
 
 ## Contract Impact
 
 | Dimension | Impact | Notes |
 |---|---:|---|
-| Public API contract | `none` | No route, payload, or response schema changed. Existing API calls were used for proof. |
-| Port contract | `none` | No port/interface changed. |
+| Public API contract | `none` | Existing strategy run/dashboard APIs were used. |
+| Port contract | `none` | No interface changed. |
 | DTO schema | `none` | No DTO changed. |
 | Persisted schema | `none` | No migration or schema change. |
 | Config schema/defaults | `none` | No repo config schema/default changed. |
-| Host runtime config | `compatible-change` | Re-applied the existing scoped LaunchAgent producer enablement/allowlist for one selected `paper,testnet` subject. |
+| Host runtime config | `compatible-change` | Re-applied existing scoped producer enablement/allowlist for one selected `paper,testnet` subject. |
 | Request hash / cache key / persistence identity | `none` | No identity semantics changed. |
 | Service-call semantics | `none` | Existing API, exchange-control, DB, Redis, health, metrics, and browser paths were used. |
-| External side effects / unknown-state semantics | `compatible-change` | Refreshed a Testnet account projection and started one replacement Testnet strategy run; no mainnet path enabled. |
-| Logs / metrics / audit / report semantics | `compatible-change` | Added blocked canary evidence and ledger handoff. |
-| Alert/runbook semantics | `none` | No alert or runbook changed. |
-| Benchmark / rollout gate impact | `compatible-change` | Stage `12.3` remains closed; Stage `12.2` must be repaired and rerun. |
-| Performance risk on verified hot path | `unknown` | Runtime stayed bounded in RSS, but the producer progress freeze requires repair before longer gates. |
-| Browser-visible behavior | `compatible-change` | `/strategies` visibly showed the replacement run and pre-window journal rows, but no accepted in-window progression. |
+| External side effects / unknown-state semantics | `compatible-change` | Refreshed a Testnet account projection, created/stopped repair runs, reset only a Redis consumer group, and started one accepted Testnet strategy run. |
+| Logs / metrics / audit / report semantics | `compatible-change` | Stage report and ledger now record accepted rerun evidence. |
+| Browser-visible behavior | `compatible-change` | `/strategies` visibly shows the active Testnet strategy and latest in-window/post-window signals. |
 
-## Conditional Service-Call Coverage / Условное Покрытие Service-Call
+## Conditional Service-Call Coverage
 
-Эта таблица перечисляет только вызовы, реально затронутые Stage `12.2`. Поверхности вне scope явно помечены `N/A`, чтобы не создавать ложное впечатление, что они были проверены.
+This stage touched only runtime verification and recovery paths needed for the accepted rerun. Surfaces outside Stage `12.2` are explicitly marked `N/A`.
 
 | Caller / callee | Purpose | Evidence | Failure behavior |
 |---|---|---|---|
-| Authenticated API -> Postgres | Start replacement run and read dashboard state. | Run `ec1aeb3c-...` reached `running`; dashboard returned `200`. | Initial run start correctly blocked on stale capital projection until account projection was refreshed. |
-| Runtime proof script -> exchange-control | Refresh selected Testnet account projection. | Projection became fresh with `account_state_read_ok` before retrying the run start. | Would block canary start because allocation/risk preflight would remain stale. |
-| `strategy-live-runner` -> Postgres / market data | Poll active run and create signals/source events. | Pre-window burst created `16` source events; declared window created `0`. | Stage `12.2` blocked; repair required before rerun. |
-| `exchange-execution` -> Redis / Postgres / exchange-control / exchange adapters | Ensure execution service is available and still Testnet-bound. | Health ready, adapter mode `testnet`, Redis pending `0`, mainnet orders `0`. | Would block or abort canary if readiness/pending/mainnet boundary failed. |
-| Browser/Web -> API | Prove `/strategies` renders the selected active Testnet state. | Production Playwright proof returned `200`, no console errors, selected run visible. | Browser-visible stage would remain blocked without this proof. |
+| Authenticated API -> Postgres | Create replacement run and read dashboard state for the selected strategy. | Run `d87917a1-...` reached `running`; dashboard API returned `200`. | Initial start was fail-closed on stale capital projection until refreshed. |
+| Runtime proof script -> exchange-control | Refresh selected Binance Spot Testnet account projection before API run creation. | Snapshot `7ca08303-...` became `fresh/account_state_read_ok`. | Run creation remains blocked by `capital_projection_stale`. |
+| `strategy-live-runner` -> Redis market-data stream | Consume closed `BTCUSDT 1m` candles for the selected active run. | Redis group `strategy.live_runner.v1` stayed `pending=0`, `lag=0`; checkpoint advanced to current bars. | Gap/backlog mismatch can stall in repair/backoff; this was the repaired blocker. |
+| `strategy-live-runner` -> Postgres / live_execution port | Persist signals and execution source events. | `+32` in-window `strategy_signals` and `+32` joined `execution_source_events`. | If no in-window rows appear, Stage `12.2` blocks and Stage `12.3` stays closed. |
+| Browser/Web -> API | Prove `/strategies` renders selected active Testnet strategy and latest signals. | Production page title `Strategies | Roehub`; dashboard API `200`; console/network clean. | Browser-visible stage remains blocked without this proof. |
+| N/A -> exchange order submit | Real order submit is outside Stage `12.2`; Stage `09` owns representative real testnet orders. | `execution_intents=0`, `execution_orders=0`, `mainnet_orders=0` in the canary window. | Any unexpected order/mainnet side effect would block acceptance. |
 | N/A -> notification delivery | Notification delivery is outside Stage `12.2`. | N/A | Covered by later notification/runbook stages. |
-
-## Logging and Redaction Coverage
-
-| Surface | Coverage | Result |
-|---|---|---|
-| Stage report / ledger | Manual redaction review for secrets, tokens, cookies, DSNs, passwords, exchange keys, signed payloads, raw provider payloads, and raw session values. | Passed; only sanitized IDs, counts, metrics, timestamps, and local artifact paths are recorded. |
-| Runtime logs | Log evidence was summarized instead of copied verbatim where it could include process arguments or connection material. | Passed; the report records the failure class without raw command lines or secret-bearing values. |
-| Browser proof | Temporary authenticated session was used for the selected owner and revoked after proof. | Passed; no cookie/session value is written to artifacts or this report; active recent proof sessions returned `0`. |
-| Provider payloads | Raw exchange-control/provider responses are not part of this report. | Explicit `N/A`; only projection status/count/timestamp evidence is included. |
-| Notification delivery logs | Notification delivery is outside Stage `12.2`. | Explicit `N/A`. |
 
 ## Quality Gates
 
 | Gate | Result | Evidence |
 |---|---:|---|
-| Runtime canary | failed | 31-minute window produced `0` new signals and `0` new source events; producer cycle metrics froze. |
-| Mainnet boundary | passed | `mainnet_orders_since_start=0`; `exchange-execution` remained `adapter_mode=testnet`. |
-| Redis execution boundary | passed | `execution.requests.v1` length, retry, DLQ, and group pending did not grow. |
-| Production browser proof | passed for blocked decision | `/strategies` rendered selected Testnet run, dashboard API `200`, console errors `0`, temporary session revoked. |
-| Secret scan by inspection | passed | Report records only sanitized IDs, metrics, and paths; no tokens, cookies, DSNs, passwords, exchange keys, or raw credentials. |
+| Runtime canary | passed | `32m03s` window produced `+32` signals and `+32` source events. |
+| Producer metrics | passed | `iterations_total` advanced from `169.0` to `779.0`; `iteration_errors_total=0.0`; selected run/instrument metrics stayed active. |
+| DB evidence | passed | Independent post-snapshot confirmed `32` in-window signal/source-event rows. |
+| Redis evidence | passed | Consumer group pending/lag stayed `0`; no stream data was deleted. |
+| Mainnet boundary | passed | `mainnet_orders=0` in the declared window. |
+| Browser/API proof | passed | Production `/strategies` page title `Strategies | Roehub`, dashboard API `200`, console/network clean, temporary session revoked. |
 | `python -m tools.docs.generate_docs_index --check` | passed | `OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.` |
-| Cold-head artifact review | passed | Cold self-review fallback completed after docs-index check; see receipt below. |
+| Cold-head artifact review | passed | Cold self-review fallback completed after docs-index check; stale blocked ledger validation row was fixed before handoff. |
+
+## Handoff to Stage 12.3
+
+Stage `12.3` may start from run `d87917a1-1d72-49a8-b5c5-e40290bd3096` if it is still `running` and producer health remains enabled/scoped at start. The next executor must not reinterpret this Stage `12.2` as real-order proof: the canary proves producer polling, source events, signals, Redis/metrics health, and no-mainnet/no-backlog safety. Burst/resource acceptance remains Stage `12.3`.
+
+Before Stage `12.3`, re-check:
+
+| Check | Required result |
+|---|---|
+| Stage ledger | `12.2 accepted`, `current_stage=12.3`. |
+| Active selected strategy | exactly one active run for `ee15e181-309f-478e-8726-04a299f1292f`, or explicitly create/record a replacement before burst. |
+| Producer scope | enabled, `allow_all=false`, modes `paper,testnet`, owner/strategy allowlist counts `1/1`. |
+| Redis candle group | pending/lag acceptable before burst. |
+| Account projection | fresh enough for any API action that reserves capital. |
+
+## Delivery Status
+
+Runtime validation is accepted, but direct-main delivery is blocked at handoff time by external repository state:
+
+| Surface | Status |
+|---|---|
+| Local scoped files | ready: report, ledger, and docs index are the only modified files in this checkout. |
+| GitHub auth | blocked: `gh auth status` reports invalid keyring token for account `Dejetins`; GitHub CI/deploy lifecycle cannot be watched or completed until re-authentication. |
+| Mac Studio checkout | blocked for sync/deploy: `/Users/daniildegtyarev/Projects/roehub.com` is `main...origin/main [behind 12]` and has unrelated RL dirty/untracked files. |
+| Runtime code deploy | `N/A` for this docs-only acceptance update; no repo runtime code changed. |
+
+Stage `12.3` should not be published as delivered until this report/ledger update is delivered to `origin/main` or the delivery blocker is explicitly superseded.
 
 ## Cold-Head Review
 
 | Field | Result |
 |---|---|
 | Cold-head review | completed |
-| Mode | cold self-review fallback; subagent tools are present, but the available tool policy only permits spawning when the user explicitly requests delegation/subagents. |
-| Verdict | artifact handoff is ready as a `blocked` Stage `12.2` report; the blocked decision is supported by in-window runtime deltas, browser/API proof, safety-boundary evidence, docs-index check, and ledger update. |
-| Blockers confirmed | The report distinguishes the pre-window burst from the declared canary window; records `0` in-window signals/source events; keeps Stage `12.3` closed; documents root-cause directions without overstating the fix. |
-| Residual risks | The replacement canary run may still need explicit stop/cleanup before rerun. The root cause is not repaired in this stage. Host runtime remains scoped to one selected `paper,testnet` subject, but producer progress/readiness semantics require investigation. |
-
-## File Manifest
-
-| Created | Modified | Deleted | Reason | Contract impact |
-|---|---|---|---|---|
-| `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-2-functional-canary.md` | none | none | Record Stage `12.2` blocked canary report. | `compatible-change`: report/rollout gate evidence. |
-| none | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | none | Mark `12.2 blocked`; keep `12.3` closed. | `compatible-change`: ledger/handoff. |
-| none | `docs/architecture/README.md` | none | Regenerate architecture docs index for the new Stage `12.2` report. | `none`: generated docs index. |
-| `output/playwright/stage12-2-functional-canary/strategies-prod-blocked-canary.png`; `output/playwright/stage12-2-functional-canary/strategies-prod.snapshot.txt`; `output/playwright/stage12-2-functional-canary/strategies-prod.console-error.txt`; `output/playwright/stage12-2-functional-canary/strategies-prod.requests.txt` | none | none | Production browser evidence for the blocked canary decision. | `none`: local evidence artifacts. |
-| `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist.stage12-2-pre-canary-backup` | none | none | Host-local recovery copy before reapplying producer runtime override. | `none`: backup only. |
-| none | `/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.strategy-live-runner.plist` | none | Reapply scoped `paper,testnet` producer allowlist after runtime drift. | `compatible-change`: host runtime config only, no repo default change. |
-
-## Handoff
-
-Stage `12.2` is blocked. Stage `12.3` must not start.
-
-Repair/rerun requirements:
-
-- investigate why the Stage `12.1` run failed on the local ClickHouse read path;
-- investigate why replacement run `ec1aeb3c-dfeb-4684-a459-8dc9f736414b` processed a pre-window burst and then stopped advancing producer cycle/poll metrics while health stayed ready;
-- decide whether to stop or replace the current canary run before rerun;
-- rerun Stage `12.2` with a fresh declared 30-60 minute canary window;
-- require in-window strategy signal/source-event deltas, stable Redis/execution boundaries, browser/API proof, docs index check, and cold-head artifact review before acceptance.
+| Mode | cold self-review fallback; no independent subagent was available in the active tool set. |
+| Verdict | Release after fixes. Stage `12.2` accepted rerun evidence is coherent across report, ledger status row, blocker table, next prompt, docs index, and browser/API artifacts. |
+| Blockers fixed | Added conditional service-call coverage; regenerated and checked `docs/architecture/README.md`; updated stale ledger validation row from blocked to accepted; kept old `2026-06-21` blocked row only as historical evidence. |
+| Residual risks | Stage `12.3` must re-check that run `d87917a1-...` is still active and scoped before burst. This stage proves producer signals/source events, not real order execution. Direct-main delivery is blocked until GitHub auth is repaired and the Mac Studio checkout dirty/behind state is resolved or explicitly authorized. |
