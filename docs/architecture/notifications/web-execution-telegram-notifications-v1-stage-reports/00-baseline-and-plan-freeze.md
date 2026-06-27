@@ -4,7 +4,7 @@
 
 Статус: `completed-local`
 
-Acceptance boundary: этот отчет фиксирует локально готовый architecture/stage plan в branch `codex/web-execution-telegram-notifications-v1`. Это не `accepted` в смысле main delivery, CI/deploy или Mac Studio runtime proof.
+Acceptance boundary: этот отчет фиксирует локально готовый architecture/stage plan на `main`. Это не production-runtime acceptance для будущих code stages.
 
 ## User Required Before Start
 
@@ -25,17 +25,17 @@ Stage `00` зафиксировал:
 - weekly/monthly portfolio reports;
 - synthetic notification matrix for future implementation stages;
 - contract-impact baseline and stage ledger;
-- single-branch prompt execution contract for all future Notifications v1 stages.
+- main-only prompt execution contract for all future Notifications v1 stages.
 
-## Branch And Prompt Execution Contract
+## Main And Prompt Execution Contract
 
 All future Notifications v1 work must use:
 
 - checkout: `/Users/daniildegtyarev/Projects/roehub.com`;
-- branch: `codex/web-execution-telegram-notifications-v1`;
-- prompt contract: `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`.
+- branch: `main`;
+- prompt contract: `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md`.
 
-No future stage prompt may create a per-stage branch or sibling worktree by default. If a future executor finds unrelated dirty work in the checkout, it must preserve it explicitly and continue on the same notifications branch without mixing unrelated files into the stage.
+No future stage prompt may create a branch, per-stage branch, sibling worktree, temporary checkout, local coordination folder, or stash-based workflow by default. If a future executor finds unrelated dirty work in the checkout, it must stage only the explicitly scoped files or report the blocker.
 
 ## Current-State Facts
 
@@ -139,12 +139,12 @@ Required evidence per type:
 
 Cold-head review: completed
 Mode: cold self-review fallback
-Review scope: `docs/architecture/notifications/web-execution-telegram-notifications-v1.md`, `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md`, `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/00-baseline-and-plan-freeze.md`, `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`, `.codex/PLANS.md`, `docs/architecture/README.md`
+Review scope: `docs/architecture/notifications/web-execution-telegram-notifications-v1.md`, `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md`, `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/00-baseline-and-plan-freeze.md`, `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md`, `.codex/agents/generated/web-execution-telegram-notifications-v1/01-notifications-schema-domain-ports.md`..`11-final-docs-and-main-closure.md`, `.codex/PLANS.md`, `docs/architecture/README.md`
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
 Verdict: Release after fixes
-Blockers fixed: added source-path evidence for current-state claims, updated Stage `00` validation and file manifest from draft/planned to actual local results, clarified same-branch Stage `01` continuation vs production acceptance, added mandatory single-checkout/single-branch prompt contract for future stage prompts.
+Blockers fixed: added source-path evidence for current-state claims, updated Stage `00` validation and file manifest from draft/planned to actual local results, replaced the earlier branch contract with mandatory `main` execution, added access/user-presence matrix and full Stage `01`-`11` prompt pack.
 Local follow-up check: completed
-Residual risks: schema/table names, stats query cost, host-local Telegram canary setup, Strategy direct notifier migration, and future prompt-pack expansion remain future-stage risks.
+Residual risks: schema/table names, stats query cost, host-local Telegram canary setup, Strategy direct notifier migration and final product rollout approval remain future-stage risks.
 
 ## File Manifest
 
@@ -153,7 +153,7 @@ Residual risks: schema/table names, stats query cost, host-local Telegram canary
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1.md` | created | Architecture plan for notifications bounded context. | `none` now, planned compatible changes. |
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` | created | Stage ledger and synthetic notification proof matrix. | `none` now, planned compatible changes. |
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/00-baseline-and-plan-freeze.md` | created | Stage `00` local report. | `none`. |
-| `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md` | created | Mandatory branch and prompt execution contract for future stages. | `none`. |
+| `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` | created | Mandatory main-branch prompt execution/access contract for future stages. | `none`. |
 | `.codex/PLANS.md` | modified | Add compact active workstream checkpoint. | `none`. |
 | `docs/architecture/README.md` | modified | Regenerated architecture docs index. | `none`. |
 

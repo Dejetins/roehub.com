@@ -9,11 +9,11 @@
 | `plan_doc` | `docs/architecture/notifications/web-execution-telegram-notifications-v1.md` |
 | `ledger_status` | `active` |
 | `current_stage` | `00` |
-| `updated_at` | `2026-06-22` |
+| `updated_at` | `2026-06-27` |
 | `owner` | `Roehub agents / notifications executors` |
-| `branch` | `codex/web-execution-telegram-notifications-v1` |
+| `branch` | `main` |
 | `checkout_path` | `/Users/daniildegtyarev/Projects/roehub.com` |
-| `prompt_contract` | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md` |
+| `prompt_contract` | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` |
 
 ## Правила Обновления
 
@@ -22,7 +22,7 @@
 | Обязательность | Каждый stage обновляет этот ledger после validation и до финального отчета. |
 | Источник фактов | Писать только проверенные факты: tests, runtime calls, DB evidence, browser QA, CI, deploy/smoke или явно помеченные blockers. |
 | Статусы | Использовать `pending`, `in_progress`, `completed-local`, `accepted`, `blocked`, `skipped`, `superseded`. |
-| Local не accepted | `completed-local` означает, что работа готова в обычном локальном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `codex/web-execution-telegram-notifications-v1`. `accepted` разрешен только после согласованного delivery path, main evidence и runtime/browser evidence когда они применимы. |
+| Local не accepted | `completed-local` означает, что работа готова в обычном локальном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `main`, но еще не имеет полной delivery/runtime evidence если она применима. `accepted` разрешен только после согласованного delivery path, main evidence и runtime/browser evidence когда они применимы. |
 | Tests не acceptance | Unit/integration/static checks обязательны как gates, но non-trivial stage accepted только после real-boundary/e2e evidence по затронутой поверхности. |
 | Секреты | Не писать secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, HMAC, API keys или credentials. Telegram token/chat ids не выводить в docs/logs. |
 | Synthetic proof | До готовности всех producer paths использовать синтетические source facts/fixtures на тестовом аккаунте и фиксировать type-by-type evidence. |
@@ -30,9 +30,10 @@
 | Provider boundary | Реальный Telegram provider включать только в canary stage. До этого использовать `log_only` или fake adapter. |
 | Unknown state | Любой provider timeout/ambiguous send фиксировать как `unknown` и не делать blind retry для trade/critical user messages. |
 | Mac Studio | Git-команды на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks допускаются в `/opt/roehub/app`. |
-| Branch lifecycle | Работа ведется только в обычном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `codex/web-execution-telegram-notifications-v1`. Не создавать per-stage branches и sibling worktrees для этого плана. Branch/PR сами по себе не равны delivery в `main`. |
-| Prompt contract | Каждый будущий executor prompt для этого плана обязан включать `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md` в required context и проверить ветку до чтения широкого контекста или edits. |
-| Unrelated dirty work | Если checkout не на notifications branch или есть unrelated dirty changes, executor обязан сохранить их явно и не смешивать с notifications commits. |
+| Branch lifecycle | Работа ведется только в обычном checkout `/Users/daniildegtyarev/Projects/roehub.com` на ветке `main`. Не создавать branches, per-stage branches, sibling worktrees, temporary checkouts, local coordination folders или stash-based workflow для этого плана. |
+| Prompt contract | Каждый будущий executor prompt для этого плана обязан включать `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` в required context и проверить ветку до чтения широкого контекста или edits. |
+| Unrelated dirty work | Если checkout не на `main` или есть unrelated dirty changes, executor не создает branch/worktree/stash workaround; он stage'ит только явно scoped files или сообщает blocker. |
+| User presence | Каждый stage обязан зафиксировать `User required before start: ...`; реальные Telegram token/admin recipient/binding/canary действия требуют пользователя только в stages `04`, `07`, `09` и финальном rollout sign-off. |
 | File manifest | Каждый stage report обязан фиксировать `Created / Modified / Deleted / Reason / Contract impact`. |
 | Docs index | При изменении markdown docs обязательно обновить или проверить `docs/architecture/README.md` через `uv run python -m tools.docs.generate_docs_index --check`. |
 
@@ -40,7 +41,7 @@
 
 | Stage | Статус | Stage report | Validation depth | Ключевой результат | User required before start | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|---|
-| `00` Baseline and plan freeze | completed-local | `00-baseline-and-plan-freeze.md` | docs/current-state/code-contract inventory + docs index + cold-head review | Target architecture, provider-neutral contracts, synthetic notification matrix and staged execution plan are recorded in a separate branch. Not delivered to `main`. | nothing | none for local planning | yes for same-branch Stage `01` continuation after cold-head; production/downstream acceptance still requires delivery evidence |
+| `00` Baseline and plan freeze | completed-local | `00-baseline-and-plan-freeze.md` | docs/current-state/code-contract inventory + docs index + cold-head review | Target architecture, provider-neutral contracts, synthetic notification matrix, main-only execution contract and staged prompt pack are recorded on `main`. | nothing | none for local planning | yes, Stage `01` may start on `main` after prompt-pack cold-head review |
 | `01` Notifications schema/domain/ports | pending | `01-notifications-schema-domain-ports.md` | migration/domain/unit tests | Add `notifications` bounded context tables, domain objects, repositories and ports without provider side effects. | nothing | Stage `00` delivery/review decision | no |
 | `02` Source router synthetic event coverage | pending | `02-source-router-synthetic-event-coverage.md` | unit/integration synthetic matrix | Map strategy/live_execution/admin/report source facts into generic notification events and delivery decisions using `log_only`. | nothing | Stage `01 accepted` | no |
 | `03` Dispatcher and provider plug-in contract | pending | `03-dispatcher-provider-plugin-contract.md` | dispatcher lease/retry/unknown tests + fake/log provider | Implement delivery dispatcher, provider adapter interface, attempts, retries, unknown/dead-letter and metrics. Telegram adapter stays feature-flagged. | nothing for fake/log provider; host-local Telegram token only for optional local canary | Stage `02 accepted` | no |
@@ -51,6 +52,7 @@
 | `08` Web settings UI integration | pending | `08-web-settings-ui-integration.md` | API/browser QA with smoke account | Add Telegram binding status, scoped modes and report schedule to settings UI/API. | smoke account access via existing host-local flow | Stage `04 accepted` and Stage `06 accepted` | no |
 | `09` Mac Studio production canary | pending | `09-mac-studio-production-canary.md` | Mac Studio workers + log_only then one test Telegram/admin route | Prove production topology, metrics, redaction, worker health, synthetic matrix, and bounded real Telegram canary. | test Telegram bot token/chat binding/admin route through host-local config/UI | Stage `08 accepted` | no |
 | `10` Migrate/deprecate direct Strategy Telegram notifier | pending | `10-strategy-telegram-migration.md` | strategy failure notification parity + fallback toggle | Route Strategy direct Telegram notifications through `notifications`; keep temporary rollback flag. | nothing | Stage `09 accepted` | no |
+| `11` Final docs and delivery closure | pending | `11-final-docs-and-main-closure.md` | docs/prompt closure + CI/deploy/readiness evidence | Close docs/runbooks/prompt pack, verify ledger consistency, and record final rollout state. | user sign-off only if expanding beyond smoke/test recipients | Stage `10 accepted` | no |
 
 ## Synthetic Notification Coverage Matrix
 
@@ -106,7 +108,7 @@ Every implementation stage that changes event routing or delivery must update th
 
 | Stage | Local gates | Real-boundary / e2e evidence | Result | Evidence path |
 |---|---|---|---|---|
-| `00` | `uv run python -m tools.docs.generate_docs_index --check` passed; cold-head architecture review completed | Runtime sync `N/A`, docs-only local branch | completed-local | `00-baseline-and-plan-freeze.md` |
+| `00` | `uv run python -m tools.docs.generate_docs_index --check` passed; cold-head architecture review completed | Runtime sync `N/A`, docs-only local `main` checkout | completed-local | `00-baseline-and-plan-freeze.md` |
 | `01` | migration/domain/unit/focused ruff/pyright | DB migration apply/rollback or test DB proof | TBD | Stage report |
 | `02` | synthetic router tests for every category in matrix | DB rows for events/routes/deliveries through fake/log provider | TBD | Stage report |
 | `03` | dispatcher lease/retry/unknown/dead-letter tests | fake/log provider backlog drain and metrics proof | TBD | Stage report |
@@ -133,5 +135,6 @@ Every implementation stage that changes event routing or delivery must update th
 
 | Date | Stage | Change | Evidence |
 |---|---|---|---|
-| 2026-06-22 | `00` | Created Notifications v1 plan and stage ledger on branch `codex/web-execution-telegram-notifications-v1`; fixed provider-neutral architecture, Telegram bot command contract, stats/report scope and synthetic notification matrix. | `web-execution-telegram-notifications-v1.md`; this ledger |
-| 2026-06-22 | branch contract | Fixed the single-branch execution rule: all Notifications v1 prompts/stages must run from `/Users/daniildegtyarev/Projects/roehub.com` on `codex/web-execution-telegram-notifications-v1`; per-stage branches and sibling worktrees are forbidden unless the user explicitly changes this contract in repo docs. | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`; this ledger |
+| 2026-06-22 | `00` | Created Notifications v1 plan and stage ledger; fixed provider-neutral architecture, Telegram bot command contract, stats/report scope and synthetic notification matrix. Earlier branch-specific wording was superseded by the 2026-06-27 `main` contract. | `web-execution-telegram-notifications-v1.md`; this ledger |
+| 2026-06-22 | superseded branch contract | Historical note only: an earlier branch contract existed and is no longer valid. Use the 2026-06-27 `main` prompt pack contract instead. | superseded by `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` |
+| 2026-06-27 | main prompt pack | User corrected execution policy: all Notifications v1 work must run on `main`. Updated plan/ledger/prompt contract, added user-presence/access matrix, and prepared full Stage `01`-`11` prompt pack. | `.codex/agents/generated/web-execution-telegram-notifications-v1/`; this ledger |

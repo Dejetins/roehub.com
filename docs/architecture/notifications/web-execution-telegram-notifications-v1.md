@@ -13,21 +13,52 @@
 | `ledger` | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` |
 | `scope` | provider-neutral notifications, Telegram bot, user/admin alerts, day/week/month stats, weekly/monthly reports |
 
-## Branch And Prompt Execution Contract
+## Main And Prompt Execution Contract
 
 All Notifications v1 stages run in the normal repository checkout:
 
 `/Users/daniildegtyarev/Projects/roehub.com`
 
-The only working branch for this plan is:
+The working branch for this plan is:
 
-`codex/web-execution-telegram-notifications-v1`
+`main`
 
-Future executor prompts must not create per-stage branches or sibling worktrees. They must include and follow:
+Future executor prompts must not create branches, per-stage branches, sibling worktrees, temporary checkouts, local coordination folders, or stash-based workflows. They must include and follow:
 
-`.codex/agents/generated/web-execution-telegram-notifications-v1/00-branch-and-stage-execution-contract.md`
+`.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md`
 
-Before any edit, each executor must verify `git status --short --branch` in `/Users/daniildegtyarev/Projects/roehub.com`. If the checkout is not on `codex/web-execution-telegram-notifications-v1`, the executor must switch the same checkout to that branch. If unrelated dirty work exists, it must be preserved explicitly before switching; it must not be mixed into Notifications v1 commits.
+Before any edit, each executor must verify `git status --short --branch` in `/Users/daniildegtyarev/Projects/roehub.com`. If the checkout is not on `main`, the executor must stop and report the blocker unless the user explicitly changes the contract. If unrelated dirty work exists, the executor must not create a branch/worktree/stash workaround; it must either stage only the explicitly scoped files or report the blocker.
+
+## Completeness Review Against Original Request
+
+| Original requirement | Covered by | Remaining execution requirement |
+|---|---|---|
+| Bounded context `notifications`, provider-neutral and easy to extend with new services. | Stages `01`, `03`, `10`; provider adapter contract in this plan. | Stage `01` must create the context boundary and Stage `03` must prove adapter plug-in semantics with fake/log provider before Telegram canary. |
+| Telegram bot for user trade notifications. | Stages `02`, `03`, `04`, `09`, `10`. | Stage `09` must prove one real test Telegram route only after fake/log synthetic proof passes. |
+| Modes: critical only, signals, trades/fills, reports, all. | Stages `01`, `02`, `08`. | Stage `08` must expose scoped settings without breaking existing `/ui/account/notifications`. |
+| Bot on-demand stats for day/week/month. | Stages `04`, `05`. | Stage `05` must return `complete`, `partial`, or `unavailable`; no invented PnL. |
+| Stats by strategy and exchange. | Stage `05`; bot commands in Stage `04`. | Ownership filters and unavailable-source behavior must be tested. |
+| Automatic weekly/monthly portfolio summaries per user. | Stage `06`; delivery through Stage `03`. | Scheduler must use idempotent period keys and missed-run alerts. |
+| Separate admin reports, critical alerts and normal alerts. | Stage `07`, canary in Stage `09`. | Admin routes must be separate from user routes and synthetic drills must prove no cross-route leakage. |
+| Manageable, observable and traceable delivery. | Stages `03`, `07`, `09`, `11`. | Dispatcher attempts, unknown state, metrics, alerts, runbooks and dead-letter flow must be recorded. |
+| Synthetic checks for every notification type because producers are incomplete. | Stage `02`; coverage matrix in ledger; re-run in Stage `09`. | Each type must have source fact, event, route, delivery, attempt, metric and redaction evidence. |
+| Handoff implementation with needed accesses/API keys. | This section, execution contract, every prompt's `User required before start`. | Secrets must be read only from host-local env sources; user presence is required only for BotFather/token setup, test `/start`, real canary receipt and expansion approval. |
+
+## Handoff Access And User-Presence Matrix
+
+| Stage | User presence before start | Access/API key source the executor may use |
+|---|---|---|
+| `01` Schema/domain/ports | `nothing` | Local repo and test DB only. |
+| `02` Synthetic source router | `nothing` | Local test fixtures only. |
+| `03` Dispatcher/provider contract | `nothing` for fake/log provider | Local test env; no Telegram token required. |
+| `04` Telegram binding/bot commands | Required only for real Telegram binding smoke; otherwise `nothing` | `ROEHUB_NOTIFICATIONS_TELEGRAM_BOT_TOKEN` preferred; `TELEGRAM_BOT_TOKEN` fallback only by explicit implementation choice; smoke user password from `ROEHUB_SMOKE_E2E_PASSWORD`. |
+| `05` Stats query service | `nothing` | Existing DB/test fixtures and smoke account ownership. |
+| `06` Scheduled reports | `nothing` | Existing DB/test fixtures; no provider token for fake/log delivery. |
+| `07` Admin notifications/runbooks | Required to choose/confirm admin recipient for real provider drill | `ROEHUB_NOTIFICATIONS_ADMIN_TELEGRAM_CHAT_ID` or persisted admin route; report only redacted presence/hash. |
+| `08` Web settings UI | Required only if smoke auth env is missing | `ROEHUB_SMOKE_E2E_PASSWORD` from host-local env; no raw credentials in reports. |
+| `09` Mac Studio production canary | Required for final real Telegram message confirmation and approval of canary recipient | Mac Studio env `/Users/daniildegtyarev/.config/roehub/roehub.env`; Telegram token/admin chat keys by name only; SSH alias `macstudio`. |
+| `10` Strategy Telegram migration | `nothing` if Stage `09` accepted | Existing notification dispatcher/provider config and rollback flag. |
+| `11` Final closure | Required only for product sign-off beyond test/smoke rollout | GitHub/CI/deploy access through existing repo workflow; no new secrets in chat. |
 
 ## Цель
 
@@ -484,6 +515,7 @@ High-level sequence:
 9. Stage `08` - web settings UI integration.
 10. Stage `09` - Mac Studio production canary.
 11. Stage `10` - migrate/deprecate direct Strategy Telegram notifier after canary evidence.
+12. Stage `11` - final docs, prompt closure and main delivery readiness.
 
 ## Synthetic Test Account Matrix
 
