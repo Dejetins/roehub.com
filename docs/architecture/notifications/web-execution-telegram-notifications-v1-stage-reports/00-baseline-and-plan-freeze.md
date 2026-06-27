@@ -2,9 +2,9 @@
 
 Дата: `2026-06-22`
 
-Статус: `completed-local`
+Статус: `blocked`
 
-Acceptance boundary: этот отчет фиксирует локально готовый architecture/stage plan на `main`. Это не production-runtime acceptance для будущих code stages.
+Acceptance boundary: этот отчет фиксирует опубликованный на `main` architecture/stage plan, но Stage `00` не accepted. `origin/main` содержит prompt pack на `5aad584d069d5020d19775ab24dce333cbeb7801`, GitHub docs-only CI прошел, но host-checkout sync на `macstudio` заблокирован несвязанными dirty RL-изменениями, которые пересекаются с `origin/main`.
 
 ## User Required Before Start
 
@@ -36,6 +36,19 @@ All future Notifications v1 work must use:
 - prompt contract: `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md`.
 
 No future stage prompt may create a branch, per-stage branch, sibling worktree, temporary checkout, local coordination folder, or stash-based workflow by default. If a future executor finds unrelated dirty work in the checkout, it must stage only the explicitly scoped files or report the blocker.
+
+## Delivery Audit 2026-06-27
+
+| Surface | Evidence | Result |
+|---|---|---|
+| Local checkout | `git status -sb` returned `## main...origin/main`; local `HEAD` is `5aad584d069d5020d19775ab24dce333cbeb7801`. | passed |
+| Main publication | `git ls-remote origin refs/heads/main` returned `5aad584d069d5020d19775ab24dce333cbeb7801`. | passed |
+| GitHub CI | `gh run view 28288227251` for `5aad584d069d5020d19775ab24dce333cbeb7801`: docs-only CI passed; docs index drift check passed; broader test shards were skipped by path routing. | passed for docs-only Stage `00` |
+| GitHub deploy | `gh run view 28288236320`: `Deploy Backend` workflow completed, but the `deploy` job was `skipped` because the Stage `00` diff was docs/prompt-only. | no runtime sync evidence |
+| Mac Studio checkout | `ssh macstudio git -C /Users/daniildegtyarev/Projects/roehub.com status --short --branch`: checkout is `main...origin/main [behind 7]` with dirty RL files. | blocked |
+| Dirty/target overlap | Intersection between remote dirty files and `HEAD..origin/main` includes RL training scripts, RL docs, `src/trading/contexts/rl_trading/domain/upstream_methodology.py`, and `tests/unit/scripts/rl_trading/test_stage08g_dual_branch_cpu_training_evaluation.py`. `git merge --ff-only --no-commit origin/main` aborted before updating because those files would be overwritten. | safe fast-forward blocked |
+
+Blocked decision: Stage `00` remains not accepted, and Stage `01` must not start. The executor must not reset, stash, overwrite, or branch around the unrelated `macstudio` RL work. The blocker is resolved only when the host checkout owner preserves/publishes/removes those RL changes or explicitly accepts a narrower runtime-only sync boundary for this prompt pack.
 
 ## Current-State Facts
 
@@ -132,7 +145,8 @@ Required evidence per type:
 | Current-state code/docs inventory | passed | Identity, Strategy Telegram, Live Execution notification outbox and stats ledgers were inspected before writing the plan. |
 | Docs index | passed | `uv run python -m tools.docs.generate_docs_index` updated `docs/architecture/README.md`; `uv run python -m tools.docs.generate_docs_index --check` passed. |
 | Cold-head review | passed after fixes | `architecture-review/references/cold-head-plan-prompt-pack-review.md`, cold self-review fallback. |
-| Runtime sync | N/A | Docs-only local branch. |
+| Main delivery audit | blocked | `origin/main` is `5aad584d069d5020d19775ab24dce333cbeb7801` with docs-only CI passed, but `macstudio` git-checkout sync is blocked by unrelated dirty RL files overlapping `origin/main`. |
+| Runtime sync | not proven | `Deploy Backend` run `28288236320` skipped the deploy job because Stage `00` was docs/prompt-only. |
 | Browser QA | N/A | No browser-visible code changed. |
 
 ## Cold-Head Review Receipt
@@ -156,10 +170,13 @@ Residual risks: schema/table names, stats query cost, host-local Telegram canary
 | `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` | created | Mandatory main-branch prompt execution/access contract for future stages. | `none`. |
 | `.codex/PLANS.md` | modified | Add compact active workstream checkpoint. | `none`. |
 | `docs/architecture/README.md` | modified | Regenerated architecture docs index. | `none`. |
+| `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/00-baseline-and-plan-freeze.md` | modified | Record Stage `00` delivery audit and host-checkout sync blocker. | `none`. |
+| `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` | modified | Reclassify Stage `00` as blocked and keep Stage `01` closed. | `none`. |
 
 ## Residual Risks
 
 - The first code stage still needs exact table/index naming and migration design.
+- Stage `01` is blocked until `macstudio` checkout sync is safe or the sync boundary is explicitly narrowed.
 - Stats quality depends on source ledger completeness; unavailable fields must stay explicit.
 - Telegram provider canary needs host-local token/admin route setup without exposing secrets.
 - Strategy direct Telegram path must remain controlled until migration Stage `10`.
