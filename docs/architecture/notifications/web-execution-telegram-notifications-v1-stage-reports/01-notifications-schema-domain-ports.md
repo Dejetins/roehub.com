@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `01` добавляет provider-neutral foundation для bounded context `notifications`. На момент этого отчета реализация прошла локальные focused gates и real-boundary schema smoke, но еще требует публикации в `main`, GitHub CI и `macstudio` sync перед переводом в `accepted`.
+Acceptance boundary: Stage `01` добавляет provider-neutral foundation для bounded context `notifications`. Stage accepted после публикации в `main`: implementation commit `51172c21e3c0f5d8d7f022b2693acb502173fd05`, docs-index fix commit `14fe0d9a12cdd2e9bc3bf1974de085fc67b2bf63`, CI/deploy evidence и `macstudio` checkout/smoke синхронизированы.
 
 ## User Required Before Start
 
@@ -61,7 +61,11 @@ Transactional schema smoke on `macstudio` executed the new migration against a d
 | `uv run pyright` | passed |
 | `uv run pytest -q -ra` | passed: `1395 passed`, 3 existing `httpx` deprecation warnings |
 | Real-boundary schema smoke on `macstudio` transactional disposable schema | passed |
-| `uv run python -m tools.docs.generate_docs_index --check` | locally polluted by unrelated untracked market-data docs after scoped README pruning; CI on clean `main` must provide final docs-index evidence |
+| `uv run python -m tools.docs.generate_docs_index --check` | local dirty checkout was polluted by unrelated untracked market-data docs; final clean `main` CI run `28390654585` passed docs-index check after scoped README fix |
+| GitHub CI `28390450121` for `51172c21e3c0f5d8d7f022b2693acb502173fd05` | migrations and test shard passed; static failed on docs-index drift from unrelated market-data index entries that were accidentally committed |
+| GitHub CI `28390654585` for `14fe0d9a12cdd2e9bc3bf1974de085fc67b2bf63` | passed; docs-index clean on final `main` SHA |
+| GitHub deploy runs for `51172c21e3c0f5d8d7f022b2693acb502173fd05` | `Deploy Backend` run `28390568363`, `Deploy Web` run `28390568382`, and `Publish App Image` run `28390568380` passed |
+| `macstudio` checkout sync and smoke | `git -C /Users/daniildegtyarev/Projects/roehub.com pull --ff-only origin main` reached `14fe0d9a12cdd2e9bc3bf1974de085fc67b2bf63`; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 ## Contract Impact
 
@@ -98,6 +102,6 @@ Transactional schema smoke on `macstudio` executed the new migration against a d
 
 ## Residual Risks
 
-- Stage `01` is not `accepted` until the diff is published to `main`, CI is green, and `macstudio` checkout/smoke evidence is recorded.
+- Stage `02` must implement source routing without widening producer contracts; no Telegram provider side effects are allowed yet.
 - Future stages still need repository adapter implementations, route-decision logic, dispatcher leases/retries/unknown handling, metrics and provider wiring.
 - The current schema intentionally avoids cross-context FKs so isolated migration proof is possible; source ownership and ACL checks must be enforced in later adapters/use cases.
