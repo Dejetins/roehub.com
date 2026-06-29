@@ -12,9 +12,13 @@ User required before start: `nothing`; Stage `09` was accepted in the ledger bef
 
 Unrelated dirty changes observed and excluded: foreign Market Data hunk in `docs/architecture/README.md`, live-execution ledger, market-data ledger and untracked market-data Stage `02` report.
 
-Acceptance boundary: Stage `10` migrates Strategy `failed` notification routing from direct Strategy Telegram delivery to the `notifications` context while keeping direct Strategy Telegram adapters as rollback-only modes. The stage is not accepted until the implementation revision is on `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, `smoke_prod.sh` passes and a post-main production runtime proof verifies the Strategy notifications mode without real Telegram send.
+Acceptance boundary: Stage `10` migrates Strategy `failed` notification routing from direct Strategy Telegram delivery to the `notifications` context while keeping direct Strategy Telegram adapters as rollback-only modes. The stage is not accepted until the implementation revision is on `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, `smoke_prod.sh` passes and `post_main_production_runtime_proof` verifies the Strategy notifications mode without real Telegram send.
 
-Current blocker: `none`. The previous `macstudio` SSH authentication blocker is resolved. Post-main production runtime proof passed after cleanup.
+The `post_main_production_runtime_proof` boundary requires the changed revision to be on `main`, relevant GitHub Actions/CI and deploy workflows to be green, the `macstudio` checkout/runtime to be deployed or synchronized to that revision, and only then production runtime evidence may be used as changed-code proof.
+
+Current blocker: `none`. The previous `macstudio` SSH authentication blocker is resolved. `post_main_production_runtime_proof` passed after cleanup.
+
+Пояснение для бизнеса и операций: ошибки Strategy теперь по умолчанию попадают в общий lifecycle `notifications`, а не в отдельный прямой Strategy Telegram путь. Это дает операторам одну очередь, один audit trail и одну rollout-границу для Strategy-сообщений. Реальная Telegram-рассылка этим stage не расширялась; accepted runtime proof использовал `log_only`.
 
 ## Scope
 
@@ -67,7 +71,7 @@ The proof runs a controlled Strategy live-runner failure through the real Strate
 - pending `NotificationDelivery` is created for the active route;
 - no direct Telegram provider call is used.
 
-Post-main production runtime proof passed for acceptance.
+Proof boundary `post_main_production_runtime_proof` passed for acceptance after `main` delivery, green GitHub Actions/CI, green deploy workflows, `macstudio` checkout/runtime sync and `smoke_prod.sh`.
 
 ## Delivery Evidence
 
@@ -76,25 +80,26 @@ Post-main production runtime proof passed for acceptance.
 | Implementation commit | `fc16cf45535b25f8380843426fbc2f02fb4593b6` on `main` |
 | Runtime SQL fix commit | `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` on `main` |
 | Blocker handoff commits | `cd40967111ba884dc804a601fef2b7fc10a34b25`, `a96375e37ee3102233deb56978ff96f560cc25ce` on `main` |
-| CI | `28403603093` passed for implementation commit; `28404136929` passed for SQL fix commit; `28404891770` passed for final blocker-handoff cleanup commit |
-| Deploy | implementation deploys passed: app image `28403840215`, backend `28403840173`, web `28403840225` and `28403851307`; SQL fix deploys passed: app image `28404382172`, backend `28404382260`, web `28404382157` and `28404393463`; final blocker-handoff deploys passed: app image `28404911402`, backend `28404911449`, web `28404911500` and `28404918607` |
-| Mac Studio sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `a96375e37ee3102233deb56978ff96f560cc25ce` |
+| Acceptance documentation commit | `82019464c748bb24da3ed55b9bc9fce2aae1b682` on `main` |
+| CI | `28403603093` passed for implementation commit; `28404136929` passed for SQL fix commit; `28404891770` passed for final blocker-handoff cleanup commit; `28406583313` passed for acceptance documentation commit |
+| Deploy | implementation deploys passed: app image `28403840215`, backend `28403840173`, web `28403840225` and `28403851307`; SQL fix deploys passed: app image `28404382172`, backend `28404382260`, web `28404382157` and `28404393463`; final blocker-handoff deploys passed: app image `28404911402`, backend `28404911449`, web `28404911500` and `28404918607`; acceptance documentation deploys passed: app image `28406613854`, backend `28406613828`, web `28406613859` and `28406621560` |
+| Mac Studio sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `82019464c748bb24da3ed55b9bc9fce2aae1b682` |
 | Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app` after sync |
-| Targeted runtime proof | passed: `stage10_strategy_notifications_mode` created `source_context=strategy`, `source_event_type=failed`, `category=strategy_run_failed`, `severity=warning`, `provider_key=log_only`, `template_key=strategy_run_failed.v1`, `delivery_status_before_cleanup=pending`, `delivery_status_after_cleanup=suppressed`, `route_status_after_cleanup=disabled`, `real_telegram_send=false` |
+| Proof boundary `post_main_production_runtime_proof` | passed: `stage10_strategy_notifications_mode` created `source_context=strategy`, `source_event_type=failed`, `category=strategy_run_failed`, `severity=warning`, `provider_key=log_only`, `template_key=strategy_run_failed.v1`, `delivery_status_before_cleanup=pending`, `delivery_status_after_cleanup=suppressed`, `route_status_after_cleanup=disabled`, `real_telegram_send=false` |
 
 ## Runtime Issue Fixed Before Proof
 
-The first post-main runtime proof attempt surfaced a production PostgreSQL issue in `PostgresNotificationRepository.list_active_routes`: `owner_user_id` was used in `IS NULL` and equality predicates without an explicit UUID type, so PostgreSQL could not infer the bind parameter type.
+The first `post_main_production_runtime_proof` attempt surfaced a production PostgreSQL issue in `PostgresNotificationRepository.list_active_routes`: `owner_user_id` was used in `IS NULL` and equality predicates without an explicit UUID type, so PostgreSQL could not infer the bind parameter type.
 
 Fix commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` adds `%(owner_user_id)s::uuid` in that query and regression coverage in `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py`.
 
-Cleanup result: before the accepted runtime proof, the possible temporary proof route `00000000-0000-0000-0000-00000000c010` was disabled. The cleanup updated `cleanup_route_rows_before_proof=1` and `cleanup_delivery_rows_before_proof=0`. No real Telegram send was performed.
+Cleanup result: before the accepted `post_main_production_runtime_proof`, the possible temporary proof route `00000000-0000-0000-0000-00000000c010` was disabled. The cleanup updated `cleanup_route_rows_before_proof=1` and `cleanup_delivery_rows_before_proof=0`. No real Telegram send was performed.
 
 ## Artifact Review
 
 Review mode: cold self-review fallback. Independent review was not available in the current environment.
 
-Verdict: local Stage `10` artifacts are ready for implementation commit and post-main proof. Fixed blocker: direct Strategy Telegram remains as explicit rollback-only modes rather than being removed or silently disabled. Follow-up check: after deployment, prove Mac Studio checkout/runtime sync, `smoke_prod.sh`, and a bounded Strategy notifications-mode runtime smoke without real Telegram send. Residual risk: pending `telegram_bot_api` deliveries will not be claimed while production notification dispatcher remains in `log_only` provider mode, which is expected until final rollout approval.
+Verdict: Stage `10` is accepted after implementation delivery, SQL fix delivery, `macstudio` sync, `smoke_prod.sh` and bounded `post_main_production_runtime_proof` without real Telegram send. Fixed blocker: direct Strategy Telegram remains as explicit rollback-only mode rather than being removed or silently disabled. Residual risk: pending `telegram_bot_api` deliveries will not be claimed while production notification dispatcher remains in `log_only` provider mode, which is expected until final rollout approval.
 
 ## Contract Impact
 
@@ -111,6 +116,12 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 | Alerts/runbooks | `compatible-change` | Old Strategy Telegram doc now documents fallback state; Notifications runbook remains the dispatcher/send source of truth. |
 | Browser-visible behavior | `none` | No UI changed. |
 | Performance | `unknown` | Strategy failure path adds one notification event and route/delivery query on failure; no hot-path benchmark was run because normal candle processing is unchanged. |
+
+## Service-Call Coverage
+
+Strategy no longer calls Telegram directly in default `notifications` mode. It writes durable notification event/delivery rows and leaves provider sends to the notifications dispatcher. Rollback-only `telegram` mode still uses the existing direct adapter if explicitly configured.
+
+Logging and redaction coverage: no raw Telegram token, chat id, provider payload, DSN, cookie or credential was printed. Runtime proof evidence records only provider key, route/delivery statuses, category/source fields and internal proof ids.
 
 ## File Manifest
 
@@ -129,7 +140,7 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 | `tests/unit/contexts/strategy/adapters/test_notifications_telegram_notifier.py` | created | Cover adapter event/delivery queueing and skipped-route behavior. | `none` |
 | `tests/unit/contexts/strategy/application/test_strategy_live_runner.py` | modified | Add controlled live-runner failure proof through notifications. | `none` |
 | `tests/unit/contexts/strategy/adapters/test_strategy_live_runner_runtime_config.py` | modified | Update expected default mode. | `none` |
-| `src/trading/contexts/notifications/adapters/outbound/persistence/postgres/notification_repository.py` | modified | Fix PostgreSQL type inference for nullable route owner filter found during runtime proof. | `none` |
+| `src/trading/contexts/notifications/adapters/outbound/persistence/postgres/notification_repository.py` | modified | Fix PostgreSQL type inference for nullable route owner filter found during `post_main_production_runtime_proof`. | `none` |
 | `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py` | modified | Cover typed owner filter in active route lookup. | `none` |
 | `docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md` | modified | Document Stage `10` migration/fallback state. | `none` |
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/10-strategy-telegram-migration.md` | created | Stage `10` local report. | `none` |
@@ -137,7 +148,7 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 
 ## Residual Risks
 
-- Stage `10` is accepted after post-main production runtime proof on `macstudio`.
+- Stage `10` is accepted after `post_main_production_runtime_proof` on `macstudio`.
 - Temporary proof route cleanup was performed before the accepted proof; the accepted proof route was disabled and its delivery was suppressed after verification.
 - Direct `telegram` rollback still exists and can send real Telegram messages if explicitly configured with token and active bindings.
 - Production dispatcher currently runs in `log_only` provider mode; pending `telegram_bot_api` deliveries are intentionally not claimed until final rollout approval.

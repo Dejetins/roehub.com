@@ -6,12 +6,18 @@
 
 | Поле | Значение |
 |---|---|
-| `status` | `plan-ready-local` |
+| `status` | `stage-11-closed` |
 | `created_at` | `2026-06-22` |
 | `owner` | `Roehub agents / notifications` |
 | `prompt_pack` | `.codex/agents/generated/web-execution-telegram-notifications-v1/` |
 | `ledger` | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` |
 | `scope` | provider-neutral notifications, Telegram bot, user/admin alerts, day/week/month stats, weekly/monthly reports |
+
+## Final Closure State
+
+As of Stage `11` on `2026-06-30`, the Notifications v1 staged prompt pack is closed through provider-neutral implementation, log-only production proofs, docs/runbook reconciliation and main-branch delivery evidence.
+
+This is not broad product approval for real Telegram traffic. Real Telegram expansion beyond test/smoke recipients still requires a separate user-approved canary or rollout prompt, an active approved route, readiness proof without secrets in logs, one bounded send and recorded receipt confirmation.
 
 ## Main And Prompt Execution Contract
 

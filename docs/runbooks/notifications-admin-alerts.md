@@ -27,6 +27,19 @@ Replay policy:
 - Manual replay must create a new delivery linked in operator notes to the unknown delivery id.
 - Replays require an operator decision after checking whether the provider may already have accepted the message.
 
+## Manual Replay
+
+Use replay only after the operator has inspected the original delivery, attempt rows and provider health.
+
+Required checks:
+
+- Confirm the original delivery status and sanitized `last_error_code`.
+- Confirm whether the source category is trade-related, critical or admin-only.
+- Check whether the provider may already have accepted the message.
+- Link the new delivery to the original delivery id in operator notes.
+
+Do not mutate the original `unknown` delivery into `pending`. Keep it as evidence and create a new delivery for the replay decision.
+
 ## Stale Pending Deliveries
 
 Alert: `NotificationsDispatcherPendingOld`.
@@ -41,6 +54,23 @@ Action:
 
 - Drain through the dispatcher path only.
 - Do not update delivery rows manually except as part of a documented repair.
+
+## Route Disable Or Rebind
+
+Use this when a Telegram route is invalid, unsafe, mis-scoped or blocked by provider errors.
+
+Diagnosis:
+
+- Inspect the route by internal ids only.
+- Confirm `recipient_kind`, `user_id`, `channel_key`, `provider_key`, `mode`, `category_filter`, `scope_filter_json` and `status`.
+- For 400/403-style provider errors, prefer `requires_rebind` over blind retry.
+- For operator-forced shutdown, set the route to `disabled` or `paused` according to the incident scope.
+
+Action:
+
+- Rebind requires a fresh web-generated one-time code or an authenticated admin/user action.
+- Do not copy raw Telegram chat ids into notes, tickets or chat.
+- After rebind, run a `log_only` or approved canary proof before enabling broad real-provider traffic.
 
 ## Worker Down
 
@@ -87,10 +117,30 @@ Action:
 - Re-run scheduler for the affected period.
 - Confirm no duplicate `NotificationReportRun` is created for the same user/report type/period/scope.
 
+## Canary Rollback
+
+Use this when a real Telegram canary or provider expansion produces unexpected delivery state, route leakage, provider errors or user/operator confusion.
+
+Rollback actions:
+
+- Disable or pause the canary route first.
+- Keep the dispatcher in `log_only` provider mode unless the incident owner explicitly approves another bounded provider mode.
+- Stop any real-provider worker path that was enabled only for the canary.
+- Preserve delivery, attempt, route and report-run rows for investigation.
+- Do not delete ledger rows or proof rows as a rollback mechanism.
+
+Recovery criteria:
+
+- `smoke_prod.sh` passes on `macstudio`.
+- Dispatcher metrics are reachable.
+- No unexplained `unknown`, `dead_letter` or stale pending growth remains.
+- A fresh user-approved canary recipient is available before another real Telegram send.
+
 ## Stage Evidence
 
 - Stage report: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/07-admin-notifications-runbooks.md`.
 - Stage `09` canary report: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/09-mac-studio-production-canary.md`.
+- Stage `11` final closure report: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/11-final-docs-and-main-closure.md`.
 - Ledger: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md`.
 
 ## Stage 09 Production Canary

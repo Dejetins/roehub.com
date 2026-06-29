@@ -187,7 +187,7 @@ This section tracks the major project streams at a strategic level.
 | Web UI / Gateway | same-origin browser control surface for backtests and strategies | active | active | keep browser flows consistent with backend/runtime contracts |
 | ML | future feature registry and inference path | planned | planned | no active checkpoint |
 | Live Execution | future order routing and execution gateway | planned | planned | no active checkpoint |
-| Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | prompt pack freeze | active | Stage 00 plus full Stage 01-11 prompt pack on `main` |
+| Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | staged pack closed | active | Stages `00`-`11` closed on `main`; next step is a separate user-approved real Telegram canary/rollout beyond test/smoke recipients |
 | Cross-cutting Architecture / Docs | roadmap integrity, design docs, milestone coordination | always-on | active | keep architecture docs aligned with delivery |
 
 ---
@@ -268,14 +268,13 @@ High-level milestones:
 
 ### 6.8 Notifications
 High-level milestones:
-- M11 active planning
-- intended direction:
-  - provider-neutral `notifications` bounded context,
-  - Telegram bot binding, commands and delivery,
-  - user modes for critical-only, signals, trades and reports,
-  - day/week/month portfolio, strategy and exchange stats,
-  - separate admin critical alerts, ops alerts and reports,
-  - synthetic type-by-type proof before real Telegram canary
+- M11 delivered provider-neutral foundation through the Stage `00`-`11` prompt pack
+- current rollout boundary:
+  - provider-neutral `notifications` bounded context is implemented and documented,
+  - Telegram bot binding, commands, delivery queue, stats and reports have staged evidence,
+  - user modes for critical-only, signals, trades and reports are additive settings surfaces,
+  - admin critical alerts, ops alerts and reports have synthetic/log-only evidence,
+  - real Telegram expansion beyond test/smoke recipients still requires a separate user-approved canary/rollout prompt
 - execution contract:
   - all stages run in `/Users/daniildegtyarev/Projects/roehub.com`,
   - the only working branch is `main`,
@@ -297,7 +296,7 @@ This section is operational and should stay current.
 
 ### Primary active project focus
 - Backtest runtime evolution under staged, rollout-safe architecture
-- Notifications bounded-context architecture freeze, staged Telegram delivery plan and main-only prompt pack
+- Notifications final rollout boundary: staged pack closed; real Telegram canary requires user-approved recipient scope
 - Web/runtime contract consistency for browser-visible flows
 - Architecture-document iteration across active streams
 - Cross-stream planning discipline to keep milestones bounded
@@ -397,6 +396,7 @@ Keep this list short and current.
 - Large architecture prompts can still drift if they are not checkpoint-bounded.
 - Browser-visible behavior may be misjudged if prompts forget to require runtime browser verification through an available browser surface.
 - Backtest/runtime work remains the highest-risk source of scope explosion because it crosses performance, contracts, docs, and rollout.
+- Notifications real Telegram provider expansion remains deferred until an approved recipient/canary scope and active route readiness are available.
 - A single global `PLANS.md` can become noisy unless old decisions and outcomes are rotated aggressively.
 - Future ML and live execution work can distort current architecture if introduced too early into active planning.
 
@@ -422,7 +422,7 @@ Keep this list current and short.
 2. Prompt-generation workflow has been migrated away from flat broad-reading prompt structure.
 3. Browser/runtime verification is being incorporated as a first-class concern through available browser automation surfaces.
 4. A single project-level execution map is now recognized as necessary for multi-iteration design and roadmap work.
-5. Notifications Stage `00` is captured as an architecture/stage plan with a mandatory `main` prompt contract before schema, provider or Telegram bot implementation starts.
+5. Notifications Stages `00`-`11` are closed as a main-only staged prompt pack; broad real Telegram rollout remains a separate approval-gated follow-up.
 
 ---
 
