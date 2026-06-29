@@ -40,6 +40,12 @@ from .telegram_commands import (
     TelegramCommandHandlingResult,
     TelegramInboundCommand,
 )
+from .user_settings import (
+    UserNotificationReportSchedule,
+    UserNotificationSettingsService,
+    UserNotificationSettingsUpdate,
+    UserNotificationSettingsView,
+)
 
 __all__ = [
     "NotificationRepository",
@@ -61,6 +67,10 @@ __all__ = [
     "NotificationSyntheticFlowResult",
     "NotificationTelegramBindingService",
     "NotificationTelegramBindingStatus",
+    "UserNotificationReportSchedule",
+    "UserNotificationSettingsService",
+    "UserNotificationSettingsUpdate",
+    "UserNotificationSettingsView",
     "SyntheticNotificationSourceFact",
     "InMemoryNotificationTelegramBindingStore",
     "TelegramCommandHandler",

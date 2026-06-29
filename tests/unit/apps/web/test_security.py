@@ -60,3 +60,27 @@ def test_shell_no_longer_references_public_user_badge_partial() -> None:
 
     for template_path in shell_templates:
         assert "/_partial/user_badge" not in template_path.read_text(encoding="utf-8")
+
+
+def test_settings_notifications_expose_scoped_telegram_hooks_without_chat_id_copy() -> None:
+    settings_template = (WEB_TEMPLATES / "pages" / "settings.html").read_text(
+        encoding="utf-8"
+    )
+    notifications_fragment = (
+        WEB_TEMPLATES / "fragments" / "account" / "notifications.html"
+    ).read_text(encoding="utf-8")
+    settings_asset = (WEB_DIST / "js" / "pages" / "settings.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'data-notification-scoped-endpoint="/api/ui/account/notifications/scoped"' in (
+        settings_template
+    )
+    assert "data-notification-scoped" in notifications_fragment
+    assert "data-telegram-binding-status" in notifications_fragment
+    assert "data-report-schedule-toggle=\"weekly\"" in notifications_fragment
+    assert "data-report-schedule-toggle=\"monthly\"" in notifications_fragment
+    assert "chat_id" not in notifications_fragment
+    assert "notificationScopedEndpoint" in settings_asset
+    assert "data-scoped-mode-option" in settings_asset
+    assert "settings.notifications.telegram_bound" in settings_asset

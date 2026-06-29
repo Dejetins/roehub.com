@@ -14,6 +14,15 @@ ExchangeNameValue = Literal["binance", "bybit"]
 ExchangeMarketTypeValue = Literal["spot", "futures"]
 ExchangeEnvironmentValue = Literal["mainnet", "testnet"]
 ExchangePermissionsValue = Literal["read", "trade"]
+NotificationScopedModeValue = Literal[
+    "off",
+    "critical_only",
+    "signals",
+    "trades",
+    "reports",
+    "all",
+]
+NotificationRouteStatusValue = Literal["active", "paused", "requires_rebind", "disabled"]
 
 
 class AccountProfileResponse(BaseModel):
@@ -285,6 +294,35 @@ class TelegramBindingStatusResponse(BaseModel):
     is_confirmed: bool
     chat_id_ref_masked: str | None
     confirmed_at: datetime | None
+
+
+class NotificationReportScheduleResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    weekly_enabled: bool
+    monthly_enabled: bool
+    timezone: str
+
+
+class NotificationScopedSettingsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    telegram_binding: TelegramBindingStatusResponse
+    mode: NotificationScopedModeValue
+    route_status: NotificationRouteStatusValue
+    recipient_address_ref_masked: str | None
+    report_schedule: NotificationReportScheduleResponse
+    available_modes: list[NotificationScopedModeValue]
+    updated_at: datetime
+
+
+class UpdateNotificationScopedSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: NotificationScopedModeValue
+    weekly_enabled: bool
+    monthly_enabled: bool
+    timezone: str | None = Field(default=None, max_length=80)
 
 
 class AccountAutorefreshPreferenceResponse(BaseModel):

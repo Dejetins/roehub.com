@@ -28,6 +28,8 @@ from apps.api.dto.ui_account import (
     ExchangeConnectionMarketCreateResult,
     ExchangeConnectionResponse,
     ExchangeConnectionsResponse,
+    NotificationReportScheduleResponse,
+    NotificationScopedSettingsResponse,
     RotateExchangeConnectionRequest,
     StrategyExchangeBindingResponse,
     StrategyExchangeBindingsResponse,
@@ -37,6 +39,7 @@ from apps.api.dto.ui_account import (
     UpdateAccountNotificationRequest,
     UpdateAccountPreferencesRequest,
     UpdateAccountProfileRequest,
+    UpdateNotificationScopedSettingsRequest,
 )
 from apps.api.exchange_control_client import (
     ExchangeConnectionCommandResult,
@@ -61,10 +64,16 @@ from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
     AccountSettingsValidationError,
 )
+from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
     NotificationTelegramBindingService,
+    NotificationTelegramBindingStatus,
+    UserNotificationSettingsService,
+    UserNotificationSettingsUpdate,
+    UserNotificationSettingsView,
 )
+from trading.contexts.notifications.application.ports import NotificationRepository
 from trading.contexts.strategy.application.use_cases.exchange_bindings import (
     StrategyExchangeBindingService,
     StrategyExchangeBindingView,
@@ -85,6 +94,7 @@ def build_ui_account_router(
     exchange_control_client: ExchangeControlClient | None = None,
     strategy_binding_service: StrategyExchangeBindingService | None = None,
     telegram_binding_service: NotificationTelegramBindingService | None = None,
+    notification_repository: NotificationRepository | None = None,
 ) -> APIRouter:
     if account_settings is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires account_settings")
@@ -98,6 +108,9 @@ def build_ui_account_router(
         else NotificationTelegramBindingService(
             store=InMemoryNotificationTelegramBindingStore()
         )
+    )
+    notification_settings = UserNotificationSettingsService(
+        repository=notification_repository or InMemoryNotificationRepository()
     )
 
     router = APIRouter(tags=["ui-account"])
@@ -697,6 +710,58 @@ def build_ui_account_router(
             confirmed_at=status.confirmed_at,
         )
 
+    @router.get(
+        "/ui/account/notifications/scoped",
+        response_model=NotificationScopedSettingsResponse,
+    )
+    def get_scoped_notifications(
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> NotificationScopedSettingsResponse:
+        profile = account_settings.get_profile(owner_user_id=principal.user_id)
+        binding_status = effective_telegram_binding_service.get_binding_status(
+            owner_user_id=principal.user_id
+        )
+        settings = notification_settings.get_settings(
+            owner_user_id=principal.user_id,
+            now=clock.now(),
+            default_timezone=profile.timezone,
+        )
+        return _scoped_notification_response(
+            settings=settings,
+            binding_status=binding_status,
+        )
+
+    @router.put(
+        "/ui/account/notifications/scoped",
+        response_model=NotificationScopedSettingsResponse,
+    )
+    def put_scoped_notifications(
+        request: Request,
+        payload: UpdateNotificationScopedSettingsRequest,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> NotificationScopedSettingsResponse:
+        _enforce_same_origin_mutation(request=request)
+        profile = account_settings.get_profile(owner_user_id=principal.user_id)
+        binding_status = effective_telegram_binding_service.get_binding_status(
+            owner_user_id=principal.user_id
+        )
+        settings = notification_settings.update_settings(
+            owner_user_id=principal.user_id,
+            update=UserNotificationSettingsUpdate(
+                mode=payload.mode,
+                weekly_enabled=payload.weekly_enabled,
+                monthly_enabled=payload.monthly_enabled,
+                timezone=payload.timezone,
+                recipient_address_ref=binding_status.chat_id_ref,
+            ),
+            now=clock.now(),
+            default_timezone=profile.timezone,
+        )
+        return _scoped_notification_response(
+            settings=settings,
+            binding_status=binding_status,
+        )
+
     @router.get("/ui/account/preferences", response_model=AccountPreferencesResponse)
     def get_preferences(
         principal: CurrentUserPrincipal = Depends(require_account_user),
@@ -1163,6 +1228,32 @@ def _notification_response(
         label=label_by_key[notification.channel_key],
         mode=notification.mode,
         updated_at=notification.updated_at,
+    )
+
+
+def _scoped_notification_response(
+    *,
+    settings: UserNotificationSettingsView,
+    binding_status: NotificationTelegramBindingStatus,
+) -> NotificationScopedSettingsResponse:
+    return NotificationScopedSettingsResponse(
+        telegram_binding=TelegramBindingStatusResponse(
+            is_confirmed=binding_status.is_confirmed,
+            chat_id_ref_masked=_masked_chat_ref(chat_id_ref=binding_status.chat_id_ref),
+            confirmed_at=binding_status.confirmed_at,
+        ),
+        mode=settings.mode,
+        route_status=settings.status,
+        recipient_address_ref_masked=_masked_chat_ref(
+            chat_id_ref=settings.recipient_address_ref
+        ),
+        report_schedule=NotificationReportScheduleResponse(
+            weekly_enabled=settings.report_schedule.weekly_enabled,
+            monthly_enabled=settings.report_schedule.monthly_enabled,
+            timezone=settings.report_schedule.timezone,
+        ),
+        available_modes=["off", "critical_only", "signals", "trades", "reports", "all"],
+        updated_at=settings.updated_at,
     )
 
 

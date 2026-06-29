@@ -21,6 +21,7 @@ const state = {
   exchangeStatusFilter: "active",
   sessionsCursor: null,
   auditCursor: null,
+  notificationScoped: null,
 };
 
 const SETTINGS_TABS = new Set(["profile", "api", "integrations", "security"]);
@@ -562,6 +563,88 @@ function renderNotifications(payload) {
   initDropdowns(root);
 }
 
+function renderScopedNotifications(payload) {
+  const root = qs("[data-notification-scoped]");
+  if (!root) return;
+  const fallback = {
+    mode: "off",
+    route_status: "disabled",
+    telegram_binding: { is_confirmed: false },
+    report_schedule: { weekly_enabled: false, monthly_enabled: false, timezone: "UTC" },
+    available_modes: ["off", "critical_only", "signals", "trades", "reports", "all"],
+  };
+  const model = { ...fallback, ...(payload || {}) };
+  model.telegram_binding = { ...fallback.telegram_binding, ...(payload?.telegram_binding || {}) };
+  model.report_schedule = { ...fallback.report_schedule, ...(payload?.report_schedule || {}) };
+  state.notificationScoped = model;
+
+  const bindingStatus = qs("[data-telegram-binding-status]");
+  const bindingPill = qs("[data-telegram-binding-pill]");
+  const isBound = Boolean(model.telegram_binding.is_confirmed);
+  if (bindingStatus) {
+    bindingStatus.textContent = isBound
+      ? t("settings.notifications.telegram_bound")
+      : t("settings.notifications.telegram_unbound");
+  }
+  if (bindingPill) {
+    bindingPill.textContent = isBound ? t("settings.state.active") : t("settings.state.paused");
+    bindingPill.classList.toggle("settings-pill--ok", isBound);
+    bindingPill.classList.toggle("settings-pill--warn", !isBound);
+  }
+
+  const modeRow = qs("[data-scoped-mode-row]");
+  if (modeRow) {
+    modeRow.replaceChildren();
+    const copy = document.createElement("div");
+    copy.innerHTML = `<strong>${t("settings.notifications.scoped_mode")}</strong><span>${t(`settings.notifications.mode.${model.mode}`)}</span>`;
+    modeRow.append(copy);
+    modeRow.append(
+      modeDropdown({
+        label: t("settings.notifications.mode"),
+        value: model.mode,
+        values: model.available_modes,
+        dataAttr: "data-scoped-mode-option",
+      })
+    );
+  }
+
+  const timezone = qs("[data-report-schedule-timezone]");
+  if (timezone) {
+    timezone.textContent = model.report_schedule.timezone || "UTC";
+  }
+  root.querySelectorAll("[data-report-schedule-toggle]").forEach((button) => {
+    const key = button.dataset.reportScheduleToggle;
+    const enabled = key === "weekly"
+      ? Boolean(model.report_schedule.weekly_enabled)
+      : Boolean(model.report_schedule.monthly_enabled);
+    button.textContent = `${t(`settings.notifications.${key}`)}: ${enabled ? "ON" : "OFF"}`;
+    button.classList.toggle("rh-button--primary", enabled);
+    button.classList.toggle("rh-button--secondary", !enabled);
+    button.setAttribute("aria-pressed", enabled ? "true" : "false");
+  });
+  initDropdowns(root);
+}
+
+async function saveScopedNotifications(root, patch) {
+  const current = state.notificationScoped || {
+    mode: "off",
+    report_schedule: { weekly_enabled: false, monthly_enabled: false, timezone: "UTC" },
+  };
+  const schedule = current.report_schedule || {};
+  const saved = await apiFetch(endpoint(root, "notificationScopedEndpoint"), {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      mode: patch.mode || current.mode || "off",
+      weekly_enabled: patch.weekly_enabled ?? Boolean(schedule.weekly_enabled),
+      monthly_enabled: patch.monthly_enabled ?? Boolean(schedule.monthly_enabled),
+      timezone: patch.timezone || schedule.timezone || "UTC",
+    }),
+  });
+  renderScopedNotifications(saved);
+  setStatus(t("settings.state.saved"), true);
+}
+
 function renderPreferences(payload) {
   if (!payload) return;
   state.preferences = {
@@ -730,6 +813,7 @@ async function initSettings(root) {
     limits,
     integrations,
     notifications,
+    notificationScoped,
     preferences,
     exchangeKeys,
     sessions,
@@ -739,6 +823,7 @@ async function initSettings(root) {
     loadJson(endpoint(root, "limitsEndpoint"), null),
     loadJson(endpoint(root, "integrationsEndpoint"), { items: [] }),
     loadJson(endpoint(root, "notificationsEndpoint"), { items: [] }),
+    loadJson(endpoint(root, "notificationScopedEndpoint"), null),
     loadJson(endpoint(root, "preferencesEndpoint"), null),
     loadJson(exchangeKeysPath(root, "active"), []),
     loadJson(`${endpoint(root, "sessionsEndpoint")}?limit=5`, { items: [], next_cursor: null }),
@@ -748,6 +833,7 @@ async function initSettings(root) {
   renderLimits(limits);
   renderIntegrations(integrations);
   renderNotifications(notifications);
+  renderScopedNotifications(notificationScoped);
   renderPreferences(preferences);
   setExchangeStatusFilter(root, "active");
   renderExchangeKeys(exchangeKeys);
@@ -804,6 +890,23 @@ function initEvents(root) {
     const notifications = await loadJson(endpoint(root, "notificationsEndpoint"), { items: [] });
     renderNotifications(notifications);
     setStatus(t("settings.state.saved"), true);
+  });
+  on(root, "click", "[data-scoped-mode-option]", async (_event, item) => {
+    const mode = item.dataset.scopedModeOption;
+    if (!mode) return;
+    closeDropdownForItem(item);
+    await saveScopedNotifications(root, { mode });
+  });
+  on(root, "click", "[data-report-schedule-toggle]", async (_event, item) => {
+    const key = item.dataset.reportScheduleToggle;
+    const schedule = state.notificationScoped?.report_schedule || {};
+    if (key === "weekly") {
+      await saveScopedNotifications(root, { weekly_enabled: !Boolean(schedule.weekly_enabled) });
+      return;
+    }
+    if (key === "monthly") {
+      await saveScopedNotifications(root, { monthly_enabled: !Boolean(schedule.monthly_enabled) });
+    }
   });
   on(root, "click", "[data-exchange-validate]", async (_event, item) => {
     const connectionId = item.dataset.exchangeValidate;

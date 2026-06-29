@@ -37,6 +37,7 @@ from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
     NotificationTelegramBindingService,
@@ -1183,6 +1184,62 @@ def test_ui_account_telegram_binding_code_and_status_are_secret_safe() -> None:
     assert payload["code"] not in repr(stored_codes[0])
 
 
+def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() -> None:
+    binding_store = InMemoryNotificationTelegramBindingStore()
+    binding_service = NotificationTelegramBindingService(store=binding_store)
+    notification_repository = InMemoryNotificationRepository()
+    client, _account_repository, session_ids = _build_test_client(
+        telegram_binding_service=binding_service,
+        notification_repository=notification_repository,
+    )
+    chat_ref = "telegram_ref:abcdef123456:masked"
+    binding_store.confirm_chat(
+        owner_user_id=session_ids["first_user_id"],
+        chat_id_ref=chat_ref,
+        confirmed_at=datetime(2026, 2, 15, 13, 5, tzinfo=timezone.utc),
+    )
+
+    legacy_before = client.get("/ui/account/notifications")
+    initial = client.get("/ui/account/notifications/scoped")
+    updated = client.put(
+        "/ui/account/notifications/scoped",
+        json={
+            "mode": "all",
+            "weekly_enabled": True,
+            "monthly_enabled": False,
+            "timezone": "Europe/Moscow",
+        },
+        headers={"origin": "http://testserver"},
+    )
+    legacy_after = client.get("/ui/account/notifications")
+
+    assert legacy_before.status_code == 200
+    assert initial.status_code == 200
+    assert initial.json()["telegram_binding"]["is_confirmed"] is True
+    assert chat_ref not in initial.text
+    assert initial.json()["mode"] == "off"
+    assert updated.status_code == 200
+    payload = updated.json()
+    assert payload["mode"] == "all"
+    assert payload["route_status"] == "active"
+    assert payload["report_schedule"] == {
+        "weekly_enabled": True,
+        "monthly_enabled": False,
+        "timezone": "Europe/Moscow",
+    }
+    assert chat_ref not in updated.text
+    assert legacy_after.status_code == 200
+    assert len(legacy_after.json()["items"]) == 7
+    assert legacy_after.json()["items"] == legacy_before.json()["items"]
+    assert len(notification_repository.routes) == 1
+    route = next(iter(notification_repository.routes.values()))
+    assert route.owner_user_id == session_ids["first_user_id"]
+    assert route.mode == "all"
+    assert route.schedule_json["weekly"] == {"enabled": True}
+    assert route.schedule_json["monthly"] == {"enabled": False}
+    assert route.schedule_json["timezone"] == "Europe/Moscow"
+
+
 def test_ui_account_sessions_and_audit_are_owner_scoped_and_cursor_paginated() -> None:
     client, account_repository, session_ids = _build_test_client()
     account_repository.append_audit_event(
@@ -1426,6 +1483,7 @@ def _build_test_client(
     exchange_control_client: ExchangeControlClient | None = None,
     strategy_binding_service: StrategyExchangeBindingService | None = None,
     telegram_binding_service: NotificationTelegramBindingService | None = None,
+    notification_repository: InMemoryNotificationRepository | None = None,
 ) -> tuple[
     TestClient,
     InMemoryAccountSettingsRepository,
@@ -1525,6 +1583,7 @@ def _build_test_client(
             exchange_control_client=exchange_control_client or InMemoryExchangeControlClient(),
             strategy_binding_service=strategy_binding_service,
             telegram_binding_service=telegram_binding_service,
+            notification_repository=notification_repository,
         )
     )
     client = TestClient(app)

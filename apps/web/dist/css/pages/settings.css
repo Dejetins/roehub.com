@@ -245,6 +245,30 @@
   grid-area: notifications;
 }
 
+.settings-notification-scope {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-list-row--stacked {
+  align-items: start;
+}
+
+.settings-list-row--stacked > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .settings-panel[data-settings-panel="security"] {
   grid-area: security;
 }

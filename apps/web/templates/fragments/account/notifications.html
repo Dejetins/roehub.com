@@ -2,5 +2,25 @@
   <header class="panel-heading">
     <h2>{{ t("settings.notifications.title") }}</h2>
   </header>
+  <div class="settings-notification-scope" data-notification-scoped>
+    <div class="settings-list-row settings-list-row--stacked">
+      <div>
+        <strong>{{ t("settings.notifications.telegram_binding") }}</strong>
+        <span data-telegram-binding-status>{{ t("settings.loading") }}</span>
+      </div>
+      <span class="settings-pill settings-pill--warn" data-telegram-binding-pill>{{ t("settings.loading") }}</span>
+    </div>
+    <div class="settings-list-row" data-scoped-mode-row></div>
+    <div class="settings-list-row settings-list-row--stacked">
+      <div>
+        <strong>{{ t("settings.notifications.report_schedule") }}</strong>
+        <span data-report-schedule-timezone>--</span>
+      </div>
+      <div class="settings-inline-actions">
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-report-schedule-toggle="weekly">--</button>
+        <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-report-schedule-toggle="monthly">--</button>
+      </div>
+    </div>
+  </div>
   <div class="settings-list settings-list--dense" data-notifications-list></div>
 </section>

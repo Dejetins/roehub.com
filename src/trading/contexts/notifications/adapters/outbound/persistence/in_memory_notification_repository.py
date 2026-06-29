@@ -41,6 +41,9 @@ class InMemoryNotificationRepository:
         self.routes[route.route_id] = route
         return route
 
+    def get_route(self, *, route_id: UUID) -> NotificationRoute | None:
+        return self.routes.get(route_id)
+
     def list_active_routes(
         self, *, owner_user_id: UserId | None, recipient_kind: str, category: str
     ) -> tuple[NotificationRoute, ...]:
