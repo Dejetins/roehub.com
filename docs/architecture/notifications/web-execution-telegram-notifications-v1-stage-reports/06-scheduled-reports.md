@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `06` добавляет provider-neutral weekly/monthly portfolio report scheduler. Stage remains `completed-local` until implementation commit is published to `main`, GitHub CI/deploy passes, `macstudio` checkout is synchronized and production smoke passes.
+Acceptance boundary: Stage `06` добавляет provider-neutral weekly/monthly portfolio report scheduler. Stage accepted after implementation commit `e3d28f7811ecafd6b329d1b1f2d17cd77da4d55a` was published to `main`, GitHub CI/deploy passed, `macstudio` checkout synchronized to the same commit and production smoke passed.
 
 ## User Required Before Start
 
@@ -67,6 +67,10 @@ Seeded scheduler smoke executed with application wiring, seeded stats rows and `
 | `uv run pyright src/trading/contexts/notifications apps/worker/notification_report_scheduler tests/unit/contexts/notifications tests/unit/apps` | passed |
 | Seeded scheduler smoke | passed: `stage06_scheduler_smoke=ok ... attempts=2` |
 | `uv run python -m tools.docs.generate_docs_index --check` | local check expected to fail until unrelated untracked `market-data-live-tail-repair-v1` docs are either indexed or removed from the dirty checkout; this Stage `06` report entry was added to `docs/architecture/README.md` manually |
+| GitHub CI for implementation commit `e3d28f7811ecafd6b329d1b1f2d17cd77da4d55a` | passed: run `28396303302` |
+| GitHub deploy/image for implementation commit `e3d28f7811ecafd6b329d1b1f2d17cd77da4d55a` | passed: Backend `28396409107`, Web `28396409103`, App Image `28396409084` |
+| `macstudio` checkout sync | passed: `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `e3d28f7811ecafd6b329d1b1f2d17cd77da4d55a` |
+| `macstudio` production smoke | passed: `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh` exited `0` |
 
 ## Contract Impact
 
