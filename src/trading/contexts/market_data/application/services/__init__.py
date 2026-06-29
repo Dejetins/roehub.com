@@ -1,3 +1,7 @@
+from .closed_candle_tail_provider import (
+    ClosedCandleHotCache,
+    MarketDataClosedCandleTailProvider,
+)
 from .gap_tracker import WsMinuteGapTracker
 from .insert_buffer import AsyncRawInsertBuffer, InsertBufferHooks
 from .minute_utils import ensure_tz_utc, floor_to_minute_utc, minute_key
@@ -7,7 +11,9 @@ from .scheduler_backfill_planner import SchedulerBackfillPlanner
 
 __all__ = [
     "AsyncRawInsertBuffer",
+    "ClosedCandleHotCache",
     "InsertBufferHooks",
+    "MarketDataClosedCandleTailProvider",
     "WsMinuteGapTracker",
     "ReconnectTailFillPlanner",
     "SchedulerBackfillPlanner",
