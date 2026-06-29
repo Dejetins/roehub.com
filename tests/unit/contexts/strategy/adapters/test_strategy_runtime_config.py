@@ -68,6 +68,7 @@ strategy:
       consumer_group: strategy.live_runner.v1
       read_count: 10
       block_ms: 0
+      pending_claim_min_idle_ms: 250
     repair:
       retry_attempts: 2
       retry_backoff_seconds: 1.5
@@ -113,6 +114,7 @@ strategy:
     assert config.live_worker.redis_streams.host == "redis"
     assert config.live_worker.redis_streams.port == 6379
     assert config.live_worker.redis_streams.db == 1
+    assert config.live_worker.redis_streams.pending_claim_min_idle_ms == 250
     assert config.live_worker.repair.retry_attempts == 2
     assert config.live_worker.repair.retry_backoff_seconds == 1.5
     assert config.realtime_output.redis_streams.enabled is True

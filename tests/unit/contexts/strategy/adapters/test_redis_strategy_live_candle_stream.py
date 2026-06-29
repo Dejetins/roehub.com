@@ -32,6 +32,7 @@ class _FakeRedis:
         """
         self._read_batches = list(read_batches)
         self.group_calls: list[dict[str, Any]] = []
+        self.claim_calls: list[dict[str, Any]] = []
         self.ack_calls: list[tuple[str, str, str]] = []
 
     def xgroup_create(self, *, name: str, groupname: str, id: str, mkstream: bool) -> None:
@@ -97,6 +98,27 @@ class _FakeRedis:
             raise AssertionError("xreadgroup queue is exhausted")
         return self._read_batches.pop(0)
 
+    def xautoclaim(
+        self,
+        name: str,
+        groupname: str,
+        consumername: str,
+        min_idle_time: int,
+        start_id: str,
+        count: int,
+    ) -> Any:
+        self.claim_calls.append(
+            {
+                "name": name,
+                "groupname": groupname,
+                "consumername": consumername,
+                "min_idle_time": min_idle_time,
+                "start_id": start_id,
+                "count": count,
+            }
+        )
+        return ("0-0", [])
+
     def xack(self, stream: str, group: str, message_id: str) -> None:
         """
         Record ack calls for assertions.
@@ -124,7 +146,7 @@ def test_redis_strategy_live_candle_stream_reads_and_parses_payload() -> None:
     instrument_key = "binance:spot:BTCUSDT"
     stream_name = f"md.candles.1m.{instrument_key}"
     payload = _build_valid_payload()
-    redis_client = _FakeRedis(read_batches=[[(stream_name, [("1000-0", payload)])]])
+    redis_client = _FakeRedis(read_batches=[[], [(stream_name, [("1000-0", payload)])]])
     adapter = RedisStrategyLiveCandleStream(
         config=_build_config(),
         environ={},
@@ -139,6 +161,7 @@ def test_redis_strategy_live_candle_stream_reads_and_parses_payload() -> None:
     assert rows[0].candle.meta.instrument_key == instrument_key
     assert rows[0].candle.meta.trades_count == 42
     assert redis_client.group_calls[0]["name"] == stream_name
+    assert redis_client.claim_calls[0]["name"] == stream_name
 
     adapter.ack(instrument_key=instrument_key, message_id="1000-0")
     assert redis_client.ack_calls == [(stream_name, "strategy.live_runner.v1", "1000-0")]
@@ -152,7 +175,7 @@ def test_redis_strategy_live_candle_stream_drops_invalid_payload_and_acks() -> N
     stream_name = f"md.candles.1m.{instrument_key}"
     invalid_payload = _build_valid_payload()
     invalid_payload.pop("open")
-    redis_client = _FakeRedis(read_batches=[[(stream_name, [("1001-0", invalid_payload)])]])
+    redis_client = _FakeRedis(read_batches=[[], [(stream_name, [("1001-0", invalid_payload)])]])
     adapter = RedisStrategyLiveCandleStream(
         config=_build_config(),
         environ={},
@@ -173,7 +196,7 @@ def test_redis_strategy_live_candle_stream_accepts_legacy_payload_without_trades
     stream_name = f"md.candles.1m.{instrument_key}"
     payload = _build_valid_payload()
     payload.pop("trades_count")
-    redis_client = _FakeRedis(read_batches=[[(stream_name, [("1002-0", payload)])]])
+    redis_client = _FakeRedis(read_batches=[[], [(stream_name, [("1002-0", payload)])]])
     adapter = RedisStrategyLiveCandleStream(
         config=_build_config(),
         environ={},
@@ -184,6 +207,30 @@ def test_redis_strategy_live_candle_stream_accepts_legacy_payload_without_trades
 
     assert len(rows) == 1
     assert rows[0].candle.meta.trades_count is None
+
+
+def test_redis_strategy_live_candle_stream_returns_claimed_pending_before_new() -> None:
+    """
+    Ensure pending entries are reclaimed before reading new Redis stream messages.
+    """
+    instrument_key = "binance:spot:BTCUSDT"
+    stream_name = f"md.candles.1m.{instrument_key}"
+    payload = _build_valid_payload()
+    redis_client = _FakeRedis(read_batches=[[(stream_name, [("1003-0", payload)])]])
+
+    def _claim_pending(*_args: Any, **_kwargs: Any) -> Any:
+        return ("0-0", [("1002-0", payload)])
+
+    redis_client.xautoclaim = _claim_pending  # type: ignore[method-assign]
+    adapter = RedisStrategyLiveCandleStream(
+        config=_build_config(),
+        environ={},
+        redis_client=redis_client,  # type: ignore[arg-type]
+    )
+
+    rows = adapter.read_closed_1m(instrument_key=instrument_key)
+
+    assert [row.message_id for row in rows] == ["1002-0"]
 
 
 def _build_config() -> RedisStrategyLiveCandleStreamConfig:
@@ -213,6 +260,7 @@ def _build_config() -> RedisStrategyLiveCandleStreamConfig:
         consumer_name="host-1",
         read_count=100,
         block_ms=100,
+        pending_claim_min_idle_ms=0,
     )
 
 

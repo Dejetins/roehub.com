@@ -20,6 +20,7 @@ strategy:
       consumer_group: "strategy.live_runner.v1"
       read_count: 500
       block_ms: 100
+      pending_claim_min_idle_ms: 0
 
     repair:
       retry_attempts: 5

@@ -70,6 +70,7 @@ class RedisStrategyLiveCandleStreamConfig:
     consumer_name: str
     read_count: int
     block_ms: int
+    pending_claim_min_idle_ms: int = 0
 
     def __post_init__(self) -> None:
         """
@@ -114,6 +115,10 @@ class RedisStrategyLiveCandleStreamConfig:
             raise ValueError("RedisStrategyLiveCandleStreamConfig.read_count must be > 0")
         if self.block_ms < 0:
             raise ValueError("RedisStrategyLiveCandleStreamConfig.block_ms must be >= 0")
+        if self.pending_claim_min_idle_ms < 0:
+            raise ValueError(
+                "RedisStrategyLiveCandleStreamConfig.pending_claim_min_idle_ms must be >= 0"
+            )
 
 
 class RedisStrategyLiveCandleStream(StrategyLiveCandleStream):
@@ -182,17 +187,71 @@ class RedisStrategyLiveCandleStream(StrategyLiveCandleStream):
         stream_name = self._stream_name(instrument_key=instrument_key)
         self._ensure_group(stream_name=stream_name)
 
+        claimed_entries = _claimed_entries(
+            self._redis.xautoclaim(
+                stream_name,
+                self._config.consumer_group,
+                self._config.consumer_name,
+                self._config.pending_claim_min_idle_ms,
+                start_id="0-0",
+                count=self._config.read_count,
+            )
+        )
+        claimed_messages = self._parse_events(
+            instrument_key=instrument_key,
+            stream_name=stream_name,
+            raw_events=[(stream_name, claimed_entries)] if claimed_entries else [],
+        )
+        if claimed_messages:
+            return claimed_messages
+
+        pending_messages = self._read_group_messages(
+            instrument_key=instrument_key,
+            stream_name=stream_name,
+            stream_id="0",
+            block_ms=0,
+        )
+        if pending_messages:
+            return pending_messages
+
+        return self._read_group_messages(
+            instrument_key=instrument_key,
+            stream_name=stream_name,
+            stream_id=">",
+            block_ms=self._config.block_ms,
+        )
+
+    def _read_group_messages(
+        self,
+        *,
+        instrument_key: str,
+        stream_name: str,
+        stream_id: str,
+        block_ms: int,
+    ) -> tuple[StrategyLiveCandleMessage, ...]:
         raw_events = cast(
             list[tuple[str, list[tuple[str, Mapping[str, Any]]]]],
             self._redis.xreadgroup(
                 groupname=self._config.consumer_group,
                 consumername=self._config.consumer_name,
-                streams={stream_name: ">"},
+                streams={stream_name: stream_id},
                 count=self._config.read_count,
-                block=self._config.block_ms,
+                block=block_ms,
             ),
         )
+        return self._parse_events(
+            instrument_key=instrument_key,
+            stream_name=stream_name,
+            raw_events=raw_events,
+        )
 
+    def _parse_events(
+        self,
+        *,
+        instrument_key: str,
+        stream_name: str,
+        raw_events: list[tuple[str, list[tuple[str, Mapping[str, Any]]]]],
+    ) -> tuple[StrategyLiveCandleMessage, ...]:
         out: list[StrategyLiveCandleMessage] = []
         for _, entries in raw_events:
             for message_id, fields in entries:
@@ -333,6 +392,18 @@ def _resolve_password(*, environ: Mapping[str, str], password_env: str | None) -
     if not value:
         return None
     return value
+
+
+def _claimed_entries(raw: Any) -> list[tuple[str, Mapping[str, Any]]]:
+    if not raw:
+        return []
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        entries = raw[1]
+        if isinstance(entries, list):
+            return cast(list[tuple[str, Mapping[str, Any]]], entries)
+    if isinstance(raw, list):
+        return cast(list[tuple[str, Mapping[str, Any]]], raw)
+    return []
 
 
 def _parse_candle_payload(*, fields: Mapping[str, Any]) -> CandleWithMeta:

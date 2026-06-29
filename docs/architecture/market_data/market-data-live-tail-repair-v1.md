@@ -160,11 +160,13 @@ window, and continues to REST tail before returning a miss/failure.
 | `ts_open > checkpoint + 1m` and repair fails temporarily | Do not mark candle processed. Runner must either leave message pending and reclaim/retry, or record a durable repair backlog proving the candle can be reconstructed from hot cache. The chosen implementation must be tested with a failed repair followed by successful retry. |
 | All sources exhausted | Run becomes controlled `blocked` or `failed` according to configured policy; audit/outbox records exact missing range and sources tried. |
 
+Stage `04` implementation selects pending reclaim: `StrategyLiveRunner` does not ACK the triggering Redis stream message until every relevant active run either treats it as stale/idempotent or advances `strategy_runs.checkpoint_ts_open` through that candle. `RedisStrategyLiveCandleStream` reclaims/replays pending entries before reading new `>` entries, using bounded `XAUTOCLAIM` plus current-consumer pending replay.
+
 Stage implementation must choose one concrete policy before code changes:
 
 | Option | Допустимость |
 |---|---|
-| Pending reclaim with no ACK until checkpoint accepts current candle | Preferred if implementable within current Redis consumer. |
+| Pending reclaim with no ACK until checkpoint accepts current candle | Selected in Stage `04`; implemented in runner ACK gating and Redis pending reclaim. |
 | Durable repair backlog plus ACK after hot-cache materialization | Allowed only if runtime proof shows no candle loss and retry can reconstruct all pending minutes without Redis stream message. |
 | Current behavior: ACK after `_process_candle` returns without checkpoint advance | Not allowed unless paired with durable backlog/hot-cache proof. |
 

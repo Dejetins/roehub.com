@@ -16,7 +16,7 @@
 - один процесс live-runner обслуживает множество активных run’ов (разных пользователей/стратегий);
 - вход — WS closed 1m candles через Redis Streams;
 - первичная истина прогресса — checkpoint в Postgres (`strategy_runs.checkpoint_ts_open`);
-- gaps закрываются чтением из ClickHouse canonical (read-only);
+- gaps закрываются через `ClosedCandleTailProvider` из Market Data: Redis hot cache -> ClickHouse canonical -> REST tail -> repair audit;
 - warmup вычисляется из `spec.indicators` и фиксируется в `run.metadata_json`.
 
 ## Контекст
@@ -31,7 +31,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 Нужно зафиксировать поведение live-runner так, чтобы:
 - не требовалась отдельная инфраструктура очередей для run’ов (в v1 — polling PG);
 - обеспечивалась идемпотентность и устойчивость к дублям/out-of-order;
-- gaps восстанавливались через canonical CH, без запуска ingestion.
+- gaps восстанавливались через Market Data boundary без прямого REST/ClickHouse ownership в Strategy.
 
 ## Scope
 
@@ -43,7 +43,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 - rollup из 1m в TF стратегии (включая TF=`1m`);
 - Stage 05 live signal evaluation for supported `MA(fast,slow)` specs after bucket close;
 - durable `strategy_signals` journal rows for `warmup`, `no_signal`, `signal` and `blocked` outcomes;
-- strict монотонность checkpoint + repair(read) из ClickHouse canonical;
+- strict монотонность checkpoint + repair(read) через `ClosedCandleTailProvider`;
 - переходы run state: `starting → warming_up → running → stopped` (и обработка stop/restart drain).
 
 ## Non-goals
@@ -51,7 +51,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 - Горизонтальное масштабирование live-runner (в v1 **только 1 инстанс**).
 - Гарантия “в Redis значит уже в canonical”: публикация best-effort и может опережать durable-хранилище.
 - UI-стримы/пейлоады для фронта (это STR-EPIC-04).
-- Запуск ingestion из Strategy (repair(read) только читает canonical CH, не инициирует ingestion).
+- Прямой REST/ClickHouse repair из Strategy; восстановлением live tail владеет Market Data.
 
 ## Ключевые решения
 
@@ -119,15 +119,23 @@ Primary truth о прогрессе обработки 1m:
 Правило обработки входной 1m свечи:
 - если `ts_open <= checkpoint_ts_open` → **ignore** (идемпотентность);
 - если `ts_open == checkpoint_ts_open + 1m` → нормальная обработка, продвижение checkpoint;
-- если `ts_open > checkpoint_ts_open + 1m` → **gap**, запускаем repair(read) из ClickHouse canonical, и **не продвигаем checkpoint**, пока не восстановим непрерывность.
+- если `ts_open > checkpoint_ts_open + 1m` → **gap**, запускаем `ClosedCandleTailProvider`, и **не продвигаем checkpoint**, пока не восстановим непрерывность.
 
 Последствия:
 - устойчивость к дублям и повторным доставкам;
-- gaps закрываются “истиной” из canonical, а не эвристиками из Redis.
+- gaps закрываются bounded source chain из Market Data, а не эвристиками из Redis stream.
 
-### 7) Repair(read): только read из ClickHouse canonical, derived bucket закрываем строго
+### 7) Repair(read): Market Data `ClosedCandleTailProvider`, derived bucket закрываем строго
 
-При gap по 1m live-runner дочитывает недостающие 1m из ClickHouse canonical (read-only).
+При gap по 1m live-runner запрашивает недостающий half-open range `[checkpoint+1m,current)` через Strategy-side порт `ClosedCandleTailProvider`. Реализация порта принадлежит Market Data и использует порядок источников Redis hot cache -> ClickHouse canonical -> REST tail -> repair audit.
+
+Strategy не вызывает Binance/Bybit REST adapters напрямую и не владеет provider secrets. `ClickHouse` остается historical truth, но не является единственным live repair source.
+
+ACK policy v1:
+- `ts_open <= checkpoint_ts_open` считается stale/idempotent; ACK разрешен;
+- `ts_open == checkpoint_ts_open + 1m` ACKается только после persistence checkpoint/result side effects;
+- `ts_open > checkpoint_ts_open + 1m` ACKается только после того, как provider вернул continuous range, repaired candles обработаны строго по `ts_open`, и checkpoint принял triggering candle;
+- если repair временно не восстановил непрерывность, stream message не ACKается; Redis pending list удерживает его для `XAUTOCLAIM`/pending replay в следующей итерации.
 Derived bucket (TF стратегии) считается закрытым, только когда **все 1m внутри бакета присутствуют**.
 
 Последствия:
@@ -185,8 +193,8 @@ runner не создает `ExecutionIntent`, не пишет execution Redis st
 Это означает: **Redis publish не является доказательством, что свеча уже попала в canonical** на момент получения стратегии.
 Live-runner:
 - использует payload из Redis для live-обработки;
-- использует ClickHouse canonical только для repair(read) при gap;
-- при repair(read) допускает, что canonical может “догонять” (риск описан ниже).
+- использует `ClosedCandleTailProvider` для repair(read) при gap;
+- при repair(read) допускает, что Redis hot cache, ClickHouse или REST tail могут временно не дать непрерывность; в этом случае message остается pending без checkpoint advance.
 
 ## Контракты и инварианты
 
@@ -198,7 +206,8 @@ Live-runner:
 - `instrument_key` стратегии обязан совпадать с canonical/ingestion ключом.
 - Primary checkpoint: `strategy_runs.checkpoint_ts_open` по базовой 1m.
 - Идемпотентность: `ts_open <= checkpoint_ts_open` → ignore.
-- Gap: `ts_open > checkpoint+1m` → repair(read) из ClickHouse canonical; checkpoint не продвигается до восстановления непрерывности.
+- Gap: `ts_open > checkpoint+1m` → repair(read) через `ClosedCandleTailProvider`; checkpoint не продвигается до восстановления непрерывности.
+- ACK policy: triggering Redis stream message ACKается только после того, как каждый relevant active run принял message как stale/idempotent или checkpoint дошел до `ts_open`; failed repair оставляет message в pending для retry.
 - Rollup: derived bucket закрывается только когда есть все 1m внутри бакета.
 - Warmup: вычисляется runner’ом из `spec.indicators` (numeric_max_param_v1) и сохраняется в `run.metadata_json.warmup`.
 - `StrategySignal`: закрытый evaluator bucket пишет durable row в
@@ -215,6 +224,8 @@ Live-runner:
 - `docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md` — контракт live feed (stream name, schema, best-effort, ID).
 - `src/trading/contexts/market_data/adapters/outbound/messaging/redis/redis_streams_live_candle_publisher.py` — publisher (детерминированный XADD id, дубли/out-of-order как no-op).
 - `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py` — чтение canonical 1m (read-only, дедуп хвоста 24h).
+- `src/trading/contexts/market_data/application/services/closed_candle_tail_provider.py` — Market Data source chain для Redis hot cache -> ClickHouse -> REST -> audit.
+- `src/trading/contexts/strategy/application/ports/closed_candle_tail_provider.py` — Strategy-side порт без прямого REST/ClickHouse ownership.
 - `src/trading/contexts/strategy/domain/entities/strategy_spec_v1.py` — `instrument_id`/`instrument_key`/`timeframe`, валидации spec.
 - `src/trading/contexts/strategy/adapters/outbound/persistence/postgres/strategy_run_repository.py` — хранение run’ов, инвариант “один активный run”.
 - `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — доменная спецификация runs/events/checkpoint.
@@ -232,11 +243,15 @@ pyright
 pytest -q
 ````
 
+Stage `04` validation note: ACK/reclaim behavior is not accepted by tests alone. Accepted proof used isolated synthetic Redis stream
+`md.candles.1m.stage04-proof.20260629231857-c0ada0c7.binance:spot:BTCUSDT`
+with consumer group `stage04.proof.20260629231857-c0ada0c7`: consumer A read one message without ACK, Redis pending became `1`, consumer B reclaimed the same message through adapter pending path, ACK cleared pending to `0`, and cleanup left `cleanup_remaining_keys=0`.
+
 ## Риски и открытые вопросы
 
-* Риск: canonical CH может “догонять” публикацию в Redis (publish идёт после enqueue в insert buffer, но до гарантированной flush/durability).
-  Влияние: repair(read) может временно не найти “только что опубликованную” свечу в canonical.
-  Митигатор: при repair(read) предусмотреть retry/backoff по хвосту, либо ограничить repair(read) только по реально подтверждённым gaps относительно checkpoint.
+* Риск: все repair sources временно не дают непрерывность для triggering candle.
+  Влияние: checkpoint не продвигается, а Redis stream message остается в pending до следующей итерации.
+  Митигатор: `ClosedCandleTailProvider` пишет redacted repair audit, runner не ACKает failed repair message, Redis adapter сначала reclaim/replays pending entries, затем читает новые entries.
 * Риск: один инстанс live-runner может стать CPU/IO bottleneck при росте числа инструментов/run’ов.
   Митигатор: оптимизация fan-out, батчинг, профилирование; v2 — шардинг по `instrument_key` и несколько инстансов.
 * Открытых вопросов по контракту v1: **нет** (все решения зафиксированы в секции “Ключевые решения”).

@@ -31,6 +31,7 @@ def test_load_strategy_live_runner_runtime_config_parses_shim_file() -> None:
     assert cfg.redis_streams.host == "localhost"
     assert cfg.redis_streams.stream_prefix == "md.candles.1m"
     assert cfg.redis_streams.consumer_group == "strategy.live_runner.v1"
+    assert cfg.redis_streams.pending_claim_min_idle_ms == 0
 
     assert cfg.realtime_output.enabled is True
     assert cfg.realtime_output.metrics_stream_prefix == "strategy.metrics.v1.user"
@@ -59,6 +60,7 @@ def test_load_strategy_live_runner_runtime_config_parses_direct_strategy_yaml() 
     assert cfg.metrics_port == 9207
     assert cfg.producer.enabled is False
     assert cfg.producer.allowed_modes == ("paper", "testnet")
+    assert cfg.redis_streams.pending_claim_min_idle_ms == 0
 
 
 def test_load_strategy_live_runner_runtime_config_supports_legacy_payload(
@@ -84,6 +86,7 @@ strategy_live_runner:
     consumer_group: strategy.live_runner.v1
     read_count: 200
     block_ms: 100
+    pending_claim_min_idle_ms: 150
   realtime_output:
     enabled: false
   telegram:
@@ -107,6 +110,7 @@ strategy_live_runner:
     assert cfg.poll_interval_seconds == 3
     assert cfg.metrics_port == 9207
     assert cfg.redis_streams.enabled is True
+    assert cfg.redis_streams.pending_claim_min_idle_ms == 150
     assert cfg.realtime_output.enabled is False
     assert cfg.telegram.enabled is False
     assert cfg.producer.enabled is False

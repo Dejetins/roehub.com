@@ -8,8 +8,8 @@ from typing import Any, Callable, Mapping
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
-from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.contexts.strategy.application.ports import (
+    ClosedCandleTailProvider,
     EventTypeV1,
     LiveStrategyProfileRepository,
     MetricTypeV1,
@@ -41,7 +41,7 @@ from trading.contexts.strategy.domain.entities import (
     StrategySignal,
     StrategySpecV1,
 )
-from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+from trading.shared_kernel.primitives import UtcTimestamp
 
 from .signal_evaluator import SignalEvaluatorDecision, evaluate_strategy_signal
 from .telegram_notification_policy import TelegramNotificationPolicy
@@ -116,7 +116,7 @@ class StrategyLiveRunner:
     - poll active runs from Postgres-backed repository;
     - consume Redis Streams `md.candles.1m.<instrument_key>`;
     - enforce strict checkpoint monotonicity on `strategy_runs.checkpoint_ts_open`;
-    - perform gap repair by read-only ClickHouse canonical reader;
+    - perform gap repair through the Market Data closed-tail provider;
     - compute/persist warmup metadata (`numeric_max_param_v1`);
     - apply run state transitions (`starting -> warming_up -> running`, stopping/failure).
 
@@ -135,7 +135,7 @@ class StrategyLiveRunner:
         strategy_repository: StrategyRepository,
         run_repository: StrategyRunRepository,
         live_candle_stream: StrategyLiveCandleStream,
-        canonical_candle_reader: CanonicalCandleReader,
+        closed_candle_tail_provider: ClosedCandleTailProvider,
         signal_repository: StrategySignalRepository,
         clock: StrategyClock,
         sleeper: StrategyRunnerSleeper,
@@ -160,10 +160,10 @@ class StrategyLiveRunner:
             strategy_repository: Strategy aggregate repository port.
             run_repository: Strategy run repository port.
             live_candle_stream: Live Redis stream consumer port.
-            canonical_candle_reader: Canonical ClickHouse candle reader port.
+            closed_candle_tail_provider: Market Data closed-tail provider port.
             clock: UTC clock port.
             sleeper: Sleep abstraction for retry backoff.
-            repair_retry_attempts: Maximum canonical repair retries per gap.
+            repair_retry_attempts: Maximum tail-provider repair retries per gap.
             repair_backoff_seconds: Base retry backoff in seconds.
             realtime_output_publisher: Optional realtime output publisher port.
             telegram_notifier: Optional Telegram notifier port.
@@ -185,8 +185,8 @@ class StrategyLiveRunner:
             raise ValueError("StrategyLiveRunner requires run_repository")
         if live_candle_stream is None:  # type: ignore[truthy-bool]
             raise ValueError("StrategyLiveRunner requires live_candle_stream")
-        if canonical_candle_reader is None:  # type: ignore[truthy-bool]
-            raise ValueError("StrategyLiveRunner requires canonical_candle_reader")
+        if closed_candle_tail_provider is None:  # type: ignore[truthy-bool]
+            raise ValueError("StrategyLiveRunner requires closed_candle_tail_provider")
         if signal_repository is None:  # type: ignore[truthy-bool]
             raise ValueError("StrategyLiveRunner requires signal_repository")
         if clock is None:  # type: ignore[truthy-bool]
@@ -201,7 +201,7 @@ class StrategyLiveRunner:
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
         self._live_candle_stream = live_candle_stream
-        self._canonical_candle_reader = canonical_candle_reader
+        self._closed_candle_tail_provider = closed_candle_tail_provider
         self._signal_repository = signal_repository
         self._live_profile_repository = live_profile_repository
         self._position_ownership_coordinator = position_ownership_coordinator
@@ -303,18 +303,21 @@ class StrategyLiveRunner:
             read_messages += len(messages)
 
             for message in messages:
+                message_ready_to_ack = True
                 for context in contexts:
                     if context.run.state == "stopping":
                         continue
                     if context.run.state not in {"warming_up", "running", "starting"}:
                         continue
                     try:
-                        context.run = self._process_candle(
+                        context.run, context_ready_to_ack = self._process_candle(
                             run=context.run,
                             spec=context.strategy.spec,
                             candle=message.candle,
                             source_message_id=message.message_id,
                         )
+                        if not context_ready_to_ack:
+                            message_ready_to_ack = False
                     except Exception as error:  # noqa: BLE001
                         context.run = self._mark_failed(
                             run=context.run,
@@ -323,11 +326,12 @@ class StrategyLiveRunner:
                         )
                         failed_runs += 1
 
-                self._live_candle_stream.ack(
-                    instrument_key=instrument_key,
-                    message_id=message.message_id,
-                )
-                acked_messages += 1
+                if message_ready_to_ack:
+                    self._live_candle_stream.ack(
+                        instrument_key=instrument_key,
+                        message_id=message.message_id,
+                    )
+                    acked_messages += 1
 
             for context in contexts:
                 if context.run.state == "stopping":
@@ -419,7 +423,7 @@ class StrategyLiveRunner:
         spec: StrategySpecV1,
         candle: CandleWithMeta,
         source_message_id: str,
-    ) -> StrategyRun:
+    ) -> tuple[StrategyRun, bool]:
         """
         Process one stream candle against strict checkpoint rules and repair policy.
 
@@ -428,13 +432,13 @@ class StrategyLiveRunner:
             spec: Immutable strategy specification.
             candle: Parsed live candle payload.
         Returns:
-            StrategyRun: Persisted run snapshot after processing.
+            tuple[StrategyRun, bool]: Persisted run snapshot and per-run ACK readiness.
         Assumptions:
             Input candle belongs to run instrument stream.
         Raises:
-            Exception: Storage/domain/canonical-reader errors.
+            Exception: Storage/domain/tail-provider errors.
         Side Effects:
-            May read canonical candles for gap repair.
+            May read Market Data repair sources for gap repair.
             May update checkpoint/metadata/state in run repository.
         """
         if run.state == "starting":
@@ -447,13 +451,13 @@ class StrategyLiveRunner:
                 metadata_json=run.metadata_json,
             )
         if run.state not in {"warming_up", "running"}:
-            return run
+            return run, True
 
         ts_open = candle.candle.ts_open.value
         checkpoint = run.checkpoint_ts_open
         if checkpoint is not None and ts_open <= checkpoint:
             self._increment_dropped_non_contiguous_total(run_id=run.run_id)
-            return run
+            return run, True
 
         if checkpoint is not None and ts_open > checkpoint + _ONE_MINUTE:
             run, is_continuous = self._repair_gap(
@@ -462,13 +466,17 @@ class StrategyLiveRunner:
                 target_ts_open=ts_open,
             )
             if not is_continuous:
-                return run
+                return run, False
 
-        return self._accept_contiguous_candle(
+        accepted_run = self._accept_contiguous_candle(
             run=run,
             spec=spec,
             candle=candle,
             source_message_id=source_message_id,
+        )
+        return accepted_run, _checkpoint_has_accepted(
+            checkpoint_ts_open=accepted_run.checkpoint_ts_open,
+            ts_open=ts_open,
         )
 
     def _accept_contiguous_candle(
@@ -643,7 +651,7 @@ class StrategyLiveRunner:
         target_ts_open: datetime,
     ) -> tuple[StrategyRun, bool]:
         """
-        Attempt to repair missing contiguous candles from canonical ClickHouse storage.
+        Attempt to repair missing contiguous candles through the Market Data tail provider.
 
         Args:
             run: Current active run snapshot.
@@ -654,9 +662,9 @@ class StrategyLiveRunner:
         Assumptions:
             Repair is read-only and does not trigger ingestion writes.
         Raises:
-            Exception: Canonical reader/storage errors.
+            Exception: Tail-provider/audit storage errors.
         Side Effects:
-            Reads canonical candles and may advance run checkpoint via repository updates.
+            Reads Market Data repair sources and may advance run checkpoint via repository updates.
             Sleeps between attempts using configured backoff policy.
         """
         if run.checkpoint_ts_open is None:
@@ -669,54 +677,49 @@ class StrategyLiveRunner:
         )
 
         for attempt in range(self._repair_retry_attempts + 1):
-            expected_start = run.checkpoint_ts_open + _ONE_MINUTE
+            checkpoint = run.checkpoint_ts_open
+            if checkpoint is None:
+                return run, False
+            expected_start = checkpoint + _ONE_MINUTE
             if expected_start >= target_ts_open:
                 return run, True
 
-            repaired_rows = tuple(
-                sorted(
-                    self._canonical_candle_reader.read_1m(
-                        spec.instrument_id,
-                        TimeRange(
-                            start=UtcTimestamp(expected_start),
-                            end=UtcTimestamp(target_ts_open),
-                        ),
-                    ),
-                    key=lambda row: row.candle.ts_open.value,
-                )
+            result = self._closed_candle_tail_provider.get_closed_1m_tail(
+                instrument_id=spec.instrument_id,
+                instrument_key=spec.instrument_key,
+                start_ts_open=UtcTimestamp(expected_start),
+                end_ts_open=UtcTimestamp(target_ts_open),
+                correlation_id=(
+                    f"strategy-live-runner:{run.run_id}:"
+                    f"{_isoformat_utc(expected_start)}:{_isoformat_utc(target_ts_open)}:"
+                    f"attempt-{attempt + 1}"
+                ),
             )
 
-            contiguous_rows: list[CandleWithMeta] = []
-            expected_cursor = expected_start
-            for repaired in repaired_rows:
-                row_ts_open = repaired.candle.ts_open.value
-                if row_ts_open < expected_cursor:
-                    continue
-                if row_ts_open != expected_cursor:
-                    break
-                contiguous_rows.append(repaired)
-                expected_cursor = expected_cursor + _ONE_MINUTE
-
-            if expected_cursor >= target_ts_open:
-                for repaired in contiguous_rows:
+            if result.continuous:
+                for repaired in result.candles:
                     run = self._accept_contiguous_candle(
                         run=run,
                         spec=spec,
-                        candle=repaired,
-                        source_message_id=f"repair:{_isoformat_utc(repaired.candle.ts_open.value)}",
+                        candle=repaired.candle,
+                        source_message_id=f"repair:{_isoformat_utc(repaired.ts_open.value)}",
                     )
-                self._publish_snapshot_metrics(
-                    run=run,
-                    spec=spec,
-                    ts=run.updated_at,
-                    extra_metrics=(
-                        ("gap_detected", "1"),
-                        ("repair_missing_bars", str(missing_bars)),
-                        ("repair_attempt", str(attempt + 1)),
-                        ("repair_continuous", "1"),
-                    ),
-                )
-                return run, True
+                if _checkpoint_has_accepted(
+                    checkpoint_ts_open=run.checkpoint_ts_open,
+                    ts_open=target_ts_open - _ONE_MINUTE,
+                ):
+                    self._publish_snapshot_metrics(
+                        run=run,
+                        spec=spec,
+                        ts=run.updated_at,
+                        extra_metrics=(
+                            ("gap_detected", "1"),
+                            ("repair_missing_bars", str(missing_bars)),
+                            ("repair_attempt", str(attempt + 1)),
+                            ("repair_continuous", "1"),
+                        ),
+                    )
+                    return run, True
 
             if attempt == self._repair_retry_attempts:
                 break
@@ -1741,6 +1744,16 @@ def _mode_reason_code(*, mode: str, reason_code: str) -> str:
     if mode == "testnet" and reason_code.startswith("ma_fast_crossed_"):
         return f"{reason_code}_testnet_no_order_stage05"
     return reason_code
+
+
+def _checkpoint_has_accepted(
+    *,
+    checkpoint_ts_open: datetime | None,
+    ts_open: datetime,
+) -> bool:
+    if checkpoint_ts_open is None:
+        return False
+    return checkpoint_ts_open >= ts_open
 
 
 def _isoformat_utc(value: datetime) -> str:

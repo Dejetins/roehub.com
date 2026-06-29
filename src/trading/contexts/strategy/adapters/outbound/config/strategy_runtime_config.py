@@ -115,6 +115,7 @@ class StrategyRedisStreamsRuntimeConfig:
     consumer_group: str
     read_count: int
     block_ms: int
+    pending_claim_min_idle_ms: int = 0
 
     def __post_init__(self) -> None:
         """
@@ -157,6 +158,10 @@ class StrategyRedisStreamsRuntimeConfig:
             raise ValueError("strategy.live_worker.redis_streams.read_count must be > 0")
         if self.block_ms < 0:
             raise ValueError("strategy.live_worker.redis_streams.block_ms must be >= 0")
+        if self.pending_claim_min_idle_ms < 0:
+            raise ValueError(
+                "strategy.live_worker.redis_streams.pending_claim_min_idle_ms must be >= 0"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -640,6 +645,11 @@ def load_strategy_runtime_config(
                 ),
                 read_count=_get_int_with_default(live_worker_redis_map, "read_count", default=200),
                 block_ms=_get_int_with_default(live_worker_redis_map, "block_ms", default=100),
+                pending_claim_min_idle_ms=_get_int_with_default(
+                    live_worker_redis_map,
+                    "pending_claim_min_idle_ms",
+                    default=0,
+                ),
             ),
             repair=StrategyRepairRuntimeConfig(
                 retry_attempts=_get_int_with_default(

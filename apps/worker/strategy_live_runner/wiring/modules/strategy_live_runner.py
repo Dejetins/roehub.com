@@ -13,6 +13,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Mapping
+from uuid import uuid4
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -40,10 +41,20 @@ from trading.contexts.live_execution.application import (
     ExecutionIngressService,
     StrategyPositionOwnershipService,
 )
+from trading.contexts.market_data.adapters.outbound.clients import RestCandleIngestSource
+from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
+from trading.contexts.market_data.adapters.outbound.config import load_market_data_runtime_config
+from trading.contexts.market_data.adapters.outbound.messaging.redis import RedisCandleHotCache
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    PostgresCandleRepairAuditRepository,
+    PsycopgMarketDataPostgresGateway,
+)
+from trading.contexts.market_data.application.dto import ClosedCandleTailRepairPolicy
+from trading.contexts.market_data.application.services import MarketDataClosedCandleTailProvider
 from trading.contexts.notifications.adapters import (
     PostgresNotificationRepository,
     PsycopgNotificationPostgresGateway,
@@ -86,6 +97,7 @@ from trading.contexts.strategy.application.ports import (
     StrategyExecutionProducer,
 )
 from trading.contexts.strategy.domain.entities import StrategySignal
+from trading.platform.time.system_clock import SystemClock
 
 log = logging.getLogger(__name__)
 
@@ -652,6 +664,37 @@ def build_strategy_live_runner_app(
         gateway=clickhouse_gateway,
         database=clickhouse_settings.database,
     )
+    market_data_config = load_market_data_runtime_config(
+        _resolve_market_data_config_path(strategy_config_path=Path(config_path))
+    )
+    market_data_clock = SystemClock()
+    hot_cache_config = market_data_config.live_feed.redis_hot_cache
+    if not hot_cache_config.enabled:
+        raise ValueError(
+            "market_data.live_feed.redis_hot_cache.enabled must be true for live-tail repair"
+        )
+    hot_cache = RedisCandleHotCache(
+        connection_config=market_data_config.live_feed.redis_streams,
+        config=hot_cache_config,
+        environ=environ,
+    )
+    rest_source = RestCandleIngestSource(
+        cfg=market_data_config,
+        clock=market_data_clock,
+        http=RequestsHttpClient(),
+        ingest_id=uuid4(),
+    )
+    candle_repair_audit_repository = PostgresCandleRepairAuditRepository(
+        gateway=PsycopgMarketDataPostgresGateway(dsn=strategy_pg_dsn)
+    )
+    closed_candle_tail_provider = MarketDataClosedCandleTailProvider(
+        hot_cache=hot_cache,
+        canonical_reader=canonical_reader,
+        rest_source=rest_source,
+        audit_repository=candle_repair_audit_repository,
+        clock=market_data_clock,
+        policy=ClosedCandleTailRepairPolicy(),
+    )
 
     redis_config = runtime_config.redis_streams
     live_candle_stream = RedisStrategyLiveCandleStream(
@@ -667,6 +710,7 @@ def build_strategy_live_runner_app(
             consumer_name=_build_consumer_name(),
             read_count=redis_config.read_count,
             block_ms=redis_config.block_ms,
+            pending_claim_min_idle_ms=redis_config.pending_claim_min_idle_ms,
         ),
         environ=environ,
     )
@@ -752,7 +796,7 @@ def build_strategy_live_runner_app(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
         live_candle_stream=live_candle_stream,
-        canonical_candle_reader=canonical_reader,
+        closed_candle_tail_provider=closed_candle_tail_provider,
         signal_repository=signal_repository,
         clock=SystemStrategyClock(),
         sleeper=SystemRunnerSleeper(),
@@ -794,6 +838,10 @@ def _build_consumer_name() -> str:
     """
     hostname = socket.gethostname().strip() or "unknown-host"
     return f"{hostname}-{os.getpid()}"
+
+
+def _resolve_market_data_config_path(*, strategy_config_path: Path) -> Path:
+    return strategy_config_path.with_name("market_data.yaml")
 
 
 def _resolve_notification_postgres_dsn(*, environ: Mapping[str, str]) -> str:

@@ -10,8 +10,11 @@ from trading.contexts.live_execution.adapters.outbound.persistence.in_memory imp
 )
 from trading.contexts.live_execution.application import StrategyPositionOwnershipService
 from trading.contexts.market_data.application.dto import (
+    CandleRepairSourceAttempt,
     CandleWithMeta,
     CanonicalCandleBatch1m,
+    ClosedCandleTailResult,
+    ClosedCandleTailRow,
 )
 from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.domain import NotificationRoute
@@ -162,6 +165,7 @@ class _StreamStub:
         """
         self._buffers = {key: list(value) for key, value in messages_by_instrument.items()}
         self.acks: list[tuple[str, str]] = []
+        self._acked_message_ids: set[tuple[str, str]] = set()
 
     def read_closed_1m(self, *, instrument_key: str) -> tuple[StrategyLiveCandleMessage, ...]:
         """
@@ -178,9 +182,11 @@ class _StreamStub:
         Side Effects:
             Empties internal buffer for requested instrument key.
         """
-        buffered = self._buffers.get(instrument_key, [])
-        self._buffers[instrument_key] = []
-        return tuple(buffered)
+        return tuple(
+            message
+            for message in self._buffers.get(instrument_key, [])
+            if (instrument_key, message.message_id) not in self._acked_message_ids
+        )
 
     def ack(self, *, instrument_key: str, message_id: str) -> None:
         """
@@ -199,6 +205,7 @@ class _StreamStub:
             Appends tuple into ack call log.
         """
         self.acks.append((instrument_key, message_id))
+        self._acked_message_ids.add((instrument_key, message_id))
 
 
 class _CanonicalReaderStub:
@@ -269,6 +276,45 @@ class _CanonicalReaderStub:
         _ = instrument_id
         self.calls.append(time_range)
         raise AssertionError("read_1m_arrays() is not used by StrategyLiveRunner tests")
+
+
+class _ClosedTailProviderFromCanonicalStub:
+    """
+    ClosedCandleTailProvider test double backed by the existing canonical-reader stub.
+    """
+
+    def __init__(self, canonical_reader: _CanonicalReaderStub) -> None:
+        self._canonical_reader = canonical_reader
+
+    def get_closed_1m_tail(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        instrument_key: str,
+        start_ts_open: UtcTimestamp,
+        end_ts_open: UtcTimestamp,
+        correlation_id: str,
+    ) -> ClosedCandleTailResult:
+        _ = correlation_id
+        time_range = TimeRange(start=start_ts_open, end=end_ts_open)
+        rows = tuple(
+            ClosedCandleTailRow(candle=row, source="clickhouse")
+            for row in self._canonical_reader.read_1m(instrument_id, time_range)
+            if row.meta.instrument_key == instrument_key
+        )
+        return ClosedCandleTailResult(
+            instrument_id=instrument_id,
+            instrument_key=instrument_key,
+            time_range=time_range,
+            candles=rows,
+            sources_attempted=(
+                CandleRepairSourceAttempt(
+                    source="clickhouse",
+                    status="succeeded" if rows else "miss",
+                ),
+            ),
+            error_code=None if rows else "missing_closed_tail",
+        )
 
 
 class _TrackingRunRepository(InMemoryStrategyRunRepository):
@@ -543,13 +589,15 @@ def test_live_runner_gap_repair_retries_and_advances_only_after_full_continuity(
         sleeper=sleeper,
     )
 
-    runner.run_once()
+    report = runner.run_once()
     persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
 
     assert persisted is not None
     assert persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc)
     assert len(canonical_reader.calls) == 2
     assert sleeper.calls == [1.0]
+    assert report.acked_messages == 1
+    assert stream.acks == [(strategy.spec.instrument_key, "m-gap")]
 
 
 def test_live_runner_gap_repair_keeps_checkpoint_when_continuity_not_restored() -> None:
@@ -589,11 +637,81 @@ def test_live_runner_gap_repair_keeps_checkpoint_when_continuity_not_restored() 
         retry_attempts=0,
     )
 
-    runner.run_once()
+    report = runner.run_once()
     persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
 
     assert persisted is not None
     assert persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
+    assert report.acked_messages == 0
+    assert stream.acks == []
+
+
+def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succeeds() -> None:
+    """
+    Ensure pending ACK policy does not lose the triggering candle when repair later succeeds.
+    """
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000933")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    signal_repository = InMemoryStrategySignalRepository()
+    strategy_repository.create(strategy=strategy)
+
+    run = _create_running_run(
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        checkpoint_ts_open=datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc),
+    )
+    run_repository.create(run=run)
+
+    stream = _StreamStub(
+        messages_by_instrument={
+            strategy.spec.instrument_key: (
+                _message("m-gap", _candle_at(datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc))),
+            ),
+        }
+    )
+    canonical_reader = _CanonicalReaderStub(
+        responses=(
+            (_candle_at(datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc)),),
+            (
+                _candle_at(datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc)),
+                _candle_at(datetime(2026, 2, 17, 10, 2, tzinfo=timezone.utc)),
+            ),
+        )
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=stream,
+        canonical_reader=canonical_reader,
+        retry_attempts=0,
+        signal_repository=signal_repository,
+        warmup_estimator=lambda **_kwargs: 1,
+    )
+
+    first_report = runner.run_once()
+    first_persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+
+    assert first_persisted is not None
+    assert first_persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
+    assert first_report.acked_messages == 0
+    assert stream.acks == []
+
+    second_report = runner.run_once()
+    second_persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    signals = signal_repository.list_latest_for_strategy(
+        owner_user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        limit=10,
+    )
+
+    assert second_persisted is not None
+    assert second_persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc)
+    assert second_report.acked_messages == 1
+    assert stream.acks == [(strategy.spec.instrument_key, "m-gap")]
+    assert len({signal.signal_id for signal in signals}) == len(signals)
+    assert len({(signal.strategy_run_id, signal.bar_ts_open) for signal in signals}) == len(signals)
 
 
 def test_live_runner_computes_warmup_and_transitions_to_running() -> None:
@@ -1300,7 +1418,7 @@ def _build_runner(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
         live_candle_stream=stream,
-        canonical_candle_reader=canonical_reader,
+        closed_candle_tail_provider=_ClosedTailProviderFromCanonicalStub(canonical_reader),
         signal_repository=signal_repository or InMemoryStrategySignalRepository(),
         clock=_FixedClock(now_value=datetime(2026, 2, 17, 23, 0, tzinfo=timezone.utc)),
         sleeper=sleeper or _SleeperProbe(),
