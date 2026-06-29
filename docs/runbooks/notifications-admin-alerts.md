@@ -95,9 +95,10 @@ Action:
 
 ## Stage 09 Production Canary
 
-Run log-only matrix on Mac Studio from `/opt/roehub/app` after the target revision is deployed:
+Run log-only matrix on Mac Studio from the authoritative checkout after the target revision is deployed. Use the production virtualenv and production config:
 
 ```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
 set -a
 source /Users/daniildegtyarev/.config/roehub/roehub.env
 set +a
@@ -111,6 +112,7 @@ export NOTIFICATIONS_PG_DSN="${NOTIFICATIONS_PG_DSN:-${STRATEGY_PG_DSN}}"
 Check real Telegram readiness without sending a message:
 
 ```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
 /opt/roehub/app/.venv/bin/python scripts/notifications/stage09_production_canary.py \
   --config /opt/roehub/app/configs/prod/notifications.yaml \
   --mode real-readiness

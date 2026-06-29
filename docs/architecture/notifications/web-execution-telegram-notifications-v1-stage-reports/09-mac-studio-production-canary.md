@@ -2,19 +2,19 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `09` adds production-safe Mac Studio notification dispatcher topology, a SQL-backed notification repository, launchd/Prometheus wiring and a bounded canary helper. The stage is not accepted until the implementation revision is published to `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, log-only production matrix passes, and real Telegram canary is either user-confirmed or explicitly blocked on recipient readiness.
+Acceptance boundary: Stage `09` adds production-safe Mac Studio notification dispatcher topology, a SQL-backed notification repository, launchd/Prometheus wiring and a bounded canary helper. Stage accepted after final implementation commit `88387e4b2f5983cf7a332a5df1fe51ec8de89a28` reached `main`, CI/deploy passed, Mac Studio checkout/runtime were synchronized, production smoke passed, log-only production matrix passed, worker metrics were observable, temporary proof routes were disabled, and real Telegram canary readiness was explicitly blocked on missing active admin route/user-confirmed recipient.
 
 ## User Required Before Start
 
 Required for final real Telegram message confirmation and approval of the canary recipient. Local implementation and log-only synthetic proof do not require user input.
 
-Host-local env presence was checked by key name only before implementation: fallback `TELEGRAM_BOT_TOKEN` and `ROEHUB_SMOKE_E2E_PASSWORD` were present; preferred `ROEHUB_NOTIFICATIONS_TELEGRAM_BOT_TOKEN` and persisted admin route were missing. No token, chat id, password, cookie, provider payload or raw Telegram response was printed.
+Host-local env presence was checked by key name only. Fallback `TELEGRAM_BOT_TOKEN`, Postgres DSN and `ROEHUB_SMOKE_E2E_PASSWORD` were present; preferred `ROEHUB_NOTIFICATIONS_TELEGRAM_BOT_TOKEN` and active admin Telegram route were missing. No token, chat id, password, cookie, provider payload or raw Telegram response was printed.
 
 ## Scope
 
-Implemented locally:
+Implemented:
 
 - SQL-backed `PostgresNotificationRepository` for existing `notification_*` tables;
 - `notification-dispatcher` production process entrypoint with Prometheus metrics;
@@ -23,9 +23,9 @@ Implemented locally:
 - production `notifications.yaml` enabling dispatcher only in `log_only` mode; Telegram provider remains disabled;
 - Stage `09` canary helper for DB-backed log-only synthetic matrix and separate real Telegram readiness check.
 
-Not implemented in this local pass:
+Not implemented in this stage:
 
-- real Telegram send;
+- real Telegram send, because recipient readiness was blocked;
 - automatic creation of real admin route;
 - Telegram polling worker launchd runtime;
 - report scheduler production worker.
@@ -52,11 +52,29 @@ Not implemented in this local pass:
 | `uv run python scripts/notifications/stage09_production_canary.py --help` | passed |
 | `uv run python -m apps.worker.notification_dispatcher.main.main --help` | passed |
 
+## Runtime Evidence
+
+| Evidence | Result |
+|---|---|
+| Final main revision | local `main`, `origin/main` and Mac Studio checkout resolved to `88387e4b2f5983cf7a332a5df1fe51ec8de89a28` |
+| GitHub CI | passed: `28402177609` |
+| Publish App Image | passed: `28402411089` |
+| Deploy Backend | passed: `28402411143` |
+| Deploy Web | passed: `28402411135`, `28402419473` |
+| Mac Studio smoke | passed: `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` |
+| Worker health | `com.roehub.notification-dispatcher` launchd state `running`, pid observed, `last exit code = (never exited)` |
+| Metrics endpoint | `http://127.0.0.1:9210/metrics` exposed dispatcher metric names |
+| Log-only matrix | passed on Mac Studio: `status=ok`, `event_rows=17`, `category_count=12`, `deliveries=17`, `claimed=17`, `sent=17`, `unknown=0`, `dead_letter=0`, `metric_names_present=true` |
+| Real Telegram readiness | blocked without send: `telegram_token_present=true`, `preferred_telegram_token_present=false`, `fallback_telegram_token_present=true`, `active_admin_telegram_route_count=0`, `user_confirmation_required=true` |
+| Cleanup | temporary Stage `09` log-only routes for run `stage09-88387e4b` disabled: `updated_routes=2`, status summary `disabled=2` |
+
+The canary helper was executed from the authoritative Mac Studio checkout `/Users/daniildegtyarev/Projects/roehub.com` with `/opt/roehub/app/.venv/bin/python` and production config `/opt/roehub/app/configs/prod/notifications.yaml`. Runtime service/config proof used `/opt/roehub/app`; no git commands were run in the runtime rsync path.
+
 ## Artifact Review
 
 Review mode: cold self-review fallback. Independent review was not available in the current environment.
 
-Verdict: local Stage `09` artifacts are ready for implementation commit and post-main runtime proof. Fixed blocker: the report now keeps status `completed-local` and does not present log-only proof as real Telegram delivery. Follow-up check: after deployment, update this report with CI/deploy, Mac Studio worker health, production log-only matrix and real Telegram readiness evidence before marking Stage `09` accepted. Residual risk: real Telegram remains blocked until user-approved recipient readiness is confirmed without exposing secrets.
+Verdict: Stage `09` is accepted. Fixed blocker: real Telegram canary was not attempted and is recorded as blocked on missing active admin route/user-confirmed recipient; log-only proof is recorded separately. Follow-up check: Stage `10` may start, but must keep direct Strategy Telegram migration behind the accepted `notifications` dispatcher boundary and must not enable real Telegram expansion without recipient approval. Residual risk: real Telegram remains blocked until user-approved recipient readiness is confirmed without exposing secrets.
 
 ## Contract Impact
 
@@ -102,6 +120,6 @@ Verdict: local Stage `09` artifacts are ready for implementation commit and post
 
 ## Residual Risks
 
-- Real Telegram canary is still blocked until the user confirms recipient scope and a persisted active admin Telegram route exists.
+- Real Telegram canary remains blocked until the user confirms recipient scope and a persisted active admin Telegram route exists.
 - Production dispatcher is intentionally limited to `log_only`/`fake` deliveries until the real provider canary is approved.
 - Telegram bot polling and report scheduler remain non-production workers in this pass; Stage `10` must not depend on them unless added later.
