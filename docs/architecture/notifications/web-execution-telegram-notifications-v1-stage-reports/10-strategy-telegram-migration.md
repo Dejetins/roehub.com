@@ -2,7 +2,7 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `blocked`
 
 Checkout path: `/Users/daniildegtyarev/Projects/roehub.com`
 
@@ -13,6 +13,8 @@ User required before start: `nothing`; Stage `09` was accepted in the ledger bef
 Unrelated dirty changes observed and excluded: foreign Market Data hunk in `docs/architecture/README.md`, live-execution ledger, market-data ledger and untracked market-data Stage `02` report.
 
 Acceptance boundary: Stage `10` migrates Strategy `failed` notification routing from direct Strategy Telegram delivery to the `notifications` context while keeping direct Strategy Telegram adapters as rollback-only modes. The stage is not accepted until the implementation revision is on `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, `smoke_prod.sh` passes and a post-main production runtime proof verifies the Strategy notifications mode without real Telegram send.
+
+Current blocker: post-main production runtime proof is blocked by current SSH authentication failure to `macstudio` after the host checkout/smoke had already been synchronized for commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa`. The failing proof attempt did not reach the remote shell and did not mutate provider state.
 
 ## Scope
 
@@ -47,7 +49,8 @@ Not implemented locally:
 | Check | Result |
 |---|---|
 | `uv run pytest -q tests/unit/contexts/strategy/application/test_strategy_live_runner.py::test_live_runner_queues_failed_notification_through_notifications_context tests/unit/contexts/strategy/adapters/test_notifications_telegram_notifier.py tests/unit/contexts/strategy/adapters/test_strategy_live_runner_runtime_config.py` | passed: `12 passed` |
-| `uv run pytest -q tests/unit/contexts/strategy tests/unit/contexts/notifications tests/unit/apps` | passed: `508 passed, 3 warnings` |
+| `uv run pytest -q tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py tests/unit/contexts/strategy/adapters/test_notifications_telegram_notifier.py tests/unit/contexts/strategy/application/test_strategy_live_runner.py::test_live_runner_queues_failed_notification_through_notifications_context` | passed: `5 passed` |
+| `uv run pytest -q tests/unit/contexts/strategy tests/unit/contexts/notifications tests/unit/apps` | passed: `509 passed, 3 warnings` |
 | `uv run ruff check src/trading/contexts/strategy src/trading/contexts/notifications apps/worker/strategy_live_runner tests/unit/contexts/strategy tests/unit/contexts/notifications` | passed |
 | `uv run pyright src/trading/contexts/strategy src/trading/contexts/notifications apps/worker/strategy_live_runner tests/unit/contexts/strategy tests/unit/contexts/notifications` | passed |
 
@@ -64,7 +67,25 @@ The proof runs a controlled Strategy live-runner failure through the real Strate
 - pending `NotificationDelivery` is created for the active route;
 - no direct Telegram provider call is used.
 
-Post-main production runtime proof remains pending for acceptance.
+Post-main production runtime proof remains blocked for acceptance.
+
+## Delivery Evidence
+
+| Surface | Evidence |
+|---|---|
+| Implementation commit | `fc16cf45535b25f8380843426fbc2f02fb4593b6` on `main` |
+| Runtime SQL fix commit | `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` on `main` |
+| CI | `28403603093` passed for implementation commit; `28404136929` passed for SQL fix commit |
+| Deploy | implementation deploys passed: app image `28403840215`, backend `28403840173`, web `28403840225` and `28403851307`; SQL fix deploys passed: app image `28404382172`, backend `28404382260`, web `28404382157` and `28404393463` |
+| Mac Studio sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` |
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app` after deploy |
+| Targeted runtime proof | blocked: follow-up `ssh macstudio` attempts returned `Permission denied (publickey,password,keyboard-interactive)` before the proof payload reached the host |
+
+## Runtime Issue Fixed Before Proof
+
+The first post-main runtime proof attempt surfaced a production PostgreSQL issue in `PostgresNotificationRepository.list_active_routes`: `owner_user_id` was used in `IS NULL` and equality predicates without an explicit UUID type, so PostgreSQL could not infer the bind parameter type.
+
+Fix commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` adds `%(owner_user_id)s::uuid` in that query and regression coverage in `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py`.
 
 ## Artifact Review
 
@@ -105,12 +126,14 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 | `tests/unit/contexts/strategy/adapters/test_notifications_telegram_notifier.py` | created | Cover adapter event/delivery queueing and skipped-route behavior. | `none` |
 | `tests/unit/contexts/strategy/application/test_strategy_live_runner.py` | modified | Add controlled live-runner failure proof through notifications. | `none` |
 | `tests/unit/contexts/strategy/adapters/test_strategy_live_runner_runtime_config.py` | modified | Update expected default mode. | `none` |
+| `src/trading/contexts/notifications/adapters/outbound/persistence/postgres/notification_repository.py` | modified | Fix PostgreSQL type inference for nullable route owner filter found during runtime proof. | `none` |
+| `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py` | modified | Cover typed owner filter in active route lookup. | `none` |
 | `docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md` | modified | Document Stage `10` migration/fallback state. | `none` |
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/10-strategy-telegram-migration.md` | created | Stage `10` local report. | `none` |
 | `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md` | modified | Record Stage `10` local implementation state. | `none` |
 
 ## Residual Risks
 
-- Stage `10` is `completed-local`, not accepted, until post-main production runtime proof is recorded.
+- Stage `10` is blocked, not accepted, until `macstudio` SSH access is available again and post-main production runtime proof is recorded.
 - Direct `telegram` rollback still exists and can send real Telegram messages if explicitly configured with token and active bindings.
 - Production dispatcher currently runs in `log_only` provider mode; pending `telegram_bot_api` deliveries are intentionally not claimed until final rollout approval.
