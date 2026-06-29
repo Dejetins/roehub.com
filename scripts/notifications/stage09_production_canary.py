@@ -65,6 +65,7 @@ def run_log_only_matrix(
     router = NotificationSourceRouter()
     categories: set[str] = set()
     delivery_ids: list[str] = []
+    event_rows = 0
 
     for route in routes:
         repository.upsert_route(route=route)
@@ -73,6 +74,7 @@ def run_log_only_matrix(
         unique_fact = replace(fact, fact_id=f"stage09:{run_id}:{fact.fact_id}")
         flow = router.route(fact=unique_fact, routes=routes, now=now)
         repository.record_event(event=flow.event)
+        event_rows += 1
         categories.add(flow.event.category)
         for delivery in flow.deliveries:
             stored = repository.record_delivery(delivery=delivery)
@@ -96,7 +98,8 @@ def run_log_only_matrix(
         "proof": "stage09_log_only_matrix",
         "run_id": run_id,
         "provider_mode": runtime_config.provider_mode,
-        "events": len(categories),
+        "event_rows": event_rows,
+        "category_count": len(categories),
         "deliveries": len(delivery_ids),
         "claimed": dispatch_result.claimed,
         "sent": dispatch_result.sent,
