@@ -7,6 +7,7 @@ from .capital_reservation import (
     StrategyPaperAccountingRecorder,
 )
 from .clock import StrategyClock
+from .closed_candle_tail_provider import ClosedCandleTailProvider
 from .compatibility_readiness import StrategyCompatibilityReadinessChecker
 from .current_user import CurrentUser, CurrentUserProvider
 from .exchange_connection_readiness import (
@@ -72,6 +73,7 @@ __all__ = [
     "MarketDataReadinessState",
     "StrategyPositionOwnershipCoordinator",
     "StrategyClock",
+    "ClosedCandleTailProvider",
     "StrategyBacktestVariantProvenanceRepository",
     "StrategyCompatibilityReadinessRepository",
     "StrategyEventRepository",

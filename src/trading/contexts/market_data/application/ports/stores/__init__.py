@@ -1,4 +1,5 @@
 from .btcusdt_market_readiness_reader import BTCUSDTMarketReadinessReferenceReader
+from .candle_repair_audit_repository import CandleRepairAuditRepository
 from .canonical_candle_index_reader import CanonicalCandleIndexReader, DailyTsOpenCount
 from .canonical_candle_reader import CanonicalCandleReader
 from .enabled_instrument_reader import EnabledInstrumentReader
@@ -21,6 +22,7 @@ from .raw_kline_writer import RawKlineWriter
 __all__ = [
     "CanonicalCandleReader",
     "CanonicalCandleIndexReader",
+    "CandleRepairAuditRepository",
     "BTCUSDTMarketReadinessReferenceReader",
     "DailyTsOpenCount",
     "EnabledInstrumentReader",
