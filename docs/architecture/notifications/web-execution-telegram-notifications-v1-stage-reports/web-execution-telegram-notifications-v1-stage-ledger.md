@@ -8,8 +8,8 @@
 |---|---|
 | `plan_doc` | `docs/architecture/notifications/web-execution-telegram-notifications-v1.md` |
 | `ledger_status` | `active` |
-| `current_stage` | `00` |
-| `updated_at` | `2026-06-27` |
+| `current_stage` | `01` |
+| `updated_at` | `2026-06-29` |
 | `owner` | `Roehub agents / notifications executors` |
 | `branch` | `main` |
 | `checkout_path` | `/Users/daniildegtyarev/Projects/roehub.com` |
@@ -41,8 +41,8 @@
 
 | Stage | Статус | Stage report | Validation depth | Ключевой результат | User required before start | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|---|
-| `00` Baseline and plan freeze | blocked | `00-baseline-and-plan-freeze.md` | docs/current-state/code-contract inventory + docs-only CI + host readiness audit | Target architecture, provider-neutral contracts, synthetic notification matrix, main-only execution contract and staged prompt pack are published on `main` at `5aad584d069d5020d19775ab24dce333cbeb7801`, but Stage `00` is not accepted because `macstudio` git-checkout sync is blocked by unrelated dirty RL files that overlap `origin/main`. | nothing before local planning; host-checkout owner action needed for sync | `macstudio` checkout at `/Users/daniildegtyarev/Projects/roehub.com` is behind `origin/main` and `git merge --ff-only --no-commit origin/main` aborts because dirty RL files would be overwritten | no |
-| `01` Notifications schema/domain/ports | pending | `01-notifications-schema-domain-ports.md` | migration/domain/unit tests | Add `notifications` bounded context tables, domain objects, repositories and ports without provider side effects. | nothing | Stage `00` delivery/review decision | no |
+| `00` Baseline and plan freeze | accepted | `00-baseline-and-plan-freeze.md` | docs/current-state/code-contract inventory + docs-only CI + host/runtime smoke audit | Target architecture, provider-neutral contracts, synthetic notification matrix, main-only execution contract and staged prompt pack are published on `main` at `bcb8bf9096c5349a392adab0f4a815abcc850792`; local checkout, `origin/main`, `macstudio` git checkout and production smoke are synchronized. | nothing | none | yes |
+| `01` Notifications schema/domain/ports | pending | `01-notifications-schema-domain-ports.md` | migration/domain/unit tests | Add `notifications` bounded context tables, domain objects, repositories and ports without provider side effects. | nothing | none | yes |
 | `02` Source router synthetic event coverage | pending | `02-source-router-synthetic-event-coverage.md` | unit/integration synthetic matrix | Map strategy/live_execution/admin/report source facts into generic notification events and delivery decisions using `log_only`. | nothing | Stage `01 accepted` | no |
 | `03` Dispatcher and provider plug-in contract | pending | `03-dispatcher-provider-plugin-contract.md` | dispatcher lease/retry/unknown tests + fake/log provider | Implement delivery dispatcher, provider adapter interface, attempts, retries, unknown/dead-letter and metrics. Telegram adapter stays feature-flagged. | nothing for fake/log provider; host-local Telegram token only for optional local canary | Stage `02 accepted` | no |
 | `04` Telegram binding and inbound bot commands | pending | `04-telegram-binding-inbound-commands.md` | bot update idempotency + command fixtures | Implement one-time binding code, durable Telegram updates, polling worker and `/stats`/settings commands behind safe config. | Telegram bot token in host-local env for real provider smoke; do not paste token in chat | Stage `03 accepted` | no |
@@ -108,7 +108,7 @@ Every implementation stage that changes event routing or delivery must update th
 
 | Stage | Local gates | Real-boundary / e2e evidence | Result | Evidence path |
 |---|---|---|---|---|
-| `00` | `uv run python -m tools.docs.generate_docs_index --check` passed in the original Stage `00` pass; GitHub CI docs-index drift check passed for `5aad584d069d5020d19775ab24dce333cbeb7801` in run `28288227251` | Docs-only CI passed; `Deploy Backend` run `28288236320` skipped the deploy job; `macstudio` git-checkout sync is blocked by unrelated dirty RL files overlapping `origin/main` | blocked | `00-baseline-and-plan-freeze.md` |
+| `00` | `uv run python -m tools.docs.generate_docs_index --check` passed in the original Stage `00` pass; GitHub CI passed for `bcb8bf9096c5349a392adab0f4a815abcc850792` in run `28289331189` | `origin/main`, local checkout and `macstudio` git checkout all resolved to `bcb8bf9096c5349a392adab0f4a815abcc850792`; `Deploy Backend` run `28289627030` succeeded; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed on `macstudio` | accepted | `00-baseline-and-plan-freeze.md` |
 | `01` | migration/domain/unit/focused ruff/pyright | DB migration apply/rollback or test DB proof | TBD | Stage report |
 | `02` | synthetic router tests for every category in matrix | DB rows for events/routes/deliveries through fake/log provider | TBD | Stage report |
 | `03` | dispatcher lease/retry/unknown/dead-letter tests | fake/log provider backlog drain and metrics proof | TBD | Stage report |
@@ -130,7 +130,7 @@ Every implementation stage that changes event routing or delivery must update th
 | Stats sources are incomplete for some modes. | medium | Stats service must report `partial`/`unavailable`; no inferred PnL. |
 | Provider secrets can leak through logs/evidence. | high | Redaction rules and stage checks forbid raw token/chat/provider payload output. |
 | Admin routing can accidentally notify users. | high | Separate admin recipient kind, route table and synthetic proof. |
-| `macstudio` git checkout is behind `origin/main` and dirty on unrelated RL files. | high | Do not fast-forward, reset, stash, or overwrite those files from this prompt pack. Stage `01` remains blocked until the checkout owner resolves/publishes/preserves the RL changes or explicitly accepts a narrower runtime-only sync boundary. |
+| Stage `01` introduces additive schema and repository contracts. | medium | Require migration/domain tests plus disposable DB or repository migration-harness evidence before acceptance. |
 
 ## Change Log
 
@@ -140,3 +140,4 @@ Every implementation stage that changes event routing or delivery must update th
 | 2026-06-22 | superseded branch contract | Historical note only: an earlier branch contract existed and is no longer valid. Use the 2026-06-27 `main` prompt pack contract instead. | superseded by `.codex/agents/generated/web-execution-telegram-notifications-v1/00-main-and-stage-execution-contract.md` |
 | 2026-06-27 | main prompt pack | User corrected execution policy: all Notifications v1 work must run on `main`. Updated plan/ledger/prompt contract, added user-presence/access matrix, and prepared full Stage `01`-`11` prompt pack. | `.codex/agents/generated/web-execution-telegram-notifications-v1/`; this ledger |
 | 2026-06-27 | `00` delivery audit | Reclassified Stage `00` from `completed-local` to `blocked`: `origin/main` is at `5aad584d069d5020d19775ab24dce333cbeb7801` and docs-only CI passed, but `macstudio` git-checkout sync cannot be safely completed because the remote checkout is behind `origin/main` and `git merge --ff-only --no-commit origin/main` aborts on dirty RL files overlapping `origin/main`. | `gh run view 28288227251`; `gh run view 28288236320`; `ssh macstudio git -C /Users/daniildegtyarev/Projects/roehub.com status --short --branch`; dirty/target path intersection |
+| 2026-06-29 | `00` delivery audit refresh | Accepted Stage `00` after the host sync blocker was no longer present: local checkout, `origin/main` and `macstudio` git checkout all resolved to `bcb8bf9096c5349a392adab0f4a815abcc850792`, GitHub CI/deploy were green, and `smoke_prod.sh` passed on `macstudio`. Stage `01` is now allowed. | `gh run view 28289331189`; `gh run view 28289627030`; `ssh macstudio git -C /Users/daniildegtyarev/Projects/roehub.com status --short --branch`; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` |
