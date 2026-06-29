@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `02` добавляет синтетический source router для перевода Strategy, Live Execution, report/stats и admin facts в provider-neutral `NotificationEvent`, route decisions и fake/log delivery candidates. Stage еще не `accepted`, пока нет commit/CI/host-sync evidence для этого изменения.
+Acceptance boundary: Stage `02` добавляет синтетический source router для перевода Strategy, Live Execution, report/stats и admin facts в provider-neutral `NotificationEvent`, route decisions и fake/log delivery candidates. Stage accepted после публикации в `main`: implementation commit `0934dee11c12c70abc52ee3fcfa427ca5d1cd204`, green CI/deploy evidence и `macstudio` checkout/smoke синхронизированы.
 
 ## User Required Before Start
 
@@ -83,6 +83,9 @@ Report-run and stats snapshot materialization remain later-stage responsibilitie
 | `uv run pyright src/trading/contexts/notifications tests/unit/contexts/notifications` | passed |
 | Real-boundary synthetic flow evidence on `macstudio` disposable schema | passed: user/admin event-route-delivery-attempt rows read back, then rolled back |
 | `uv run python -m tools.docs.generate_docs_index --check` | local check failed because the dirty checkout contains unrelated untracked market-data docs; in-memory diff confirmed only those unrelated market-data entries are missing after the scoped Stage `02` README entry |
+| GitHub CI `28391601667` for `0934dee11c12c70abc52ee3fcfa427ca5d1cd204` | passed; static, docs-index, migrations and all test shards green |
+| GitHub deploy runs for `0934dee11c12c70abc52ee3fcfa427ca5d1cd204` | `Deploy Backend` run `28391849966`, `Deploy Web` run `28391850036`, and `Publish App Image` run `28391850009` passed |
+| `macstudio` checkout sync and smoke | `git pull --ff-only origin main` reached `0934dee11c12c70abc52ee3fcfa427ca5d1cd204`; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 ## Contract Impact
 
