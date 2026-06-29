@@ -57,11 +57,45 @@ class InMemoryNotificationRepository:
         self.deliveries[delivery.delivery_id] = delivery
         return delivery
 
+    def list_due_deliveries(
+        self, *, now: datetime, limit: int
+    ) -> tuple[NotificationDelivery, ...]:
+        due: list[NotificationDelivery] = []
+        for delivery in sorted(self.deliveries.values(), key=lambda item: item.created_at):
+            if len(due) >= limit:
+                break
+            if delivery.status in {"pending", "retry"} and (
+                delivery.next_attempt_at is None or delivery.next_attempt_at <= now
+            ):
+                due.append(delivery)
+                continue
+            if (
+                delivery.status == "claimed"
+                and delivery.lease_until is not None
+                and delivery.lease_until <= now
+            ):
+                due.append(delivery)
+        return tuple(due)
+
+    def update_delivery(self, *, delivery: NotificationDelivery) -> NotificationDelivery:
+        self.deliveries[delivery.delivery_id] = delivery
+        return delivery
+
+    def count_deliveries_by_status(self, *, status: str) -> int:
+        return sum(1 for delivery in self.deliveries.values() if delivery.status == status)
+
     def claim_delivery(
         self, *, delivery_id: UUID, lease_until: datetime, now: datetime
     ) -> NotificationDelivery | None:
         delivery = self.deliveries.get(delivery_id)
-        if delivery is None or delivery.status not in {"pending", "retry"}:
+        if delivery is None:
+            return None
+        if delivery.status == "claimed":
+            if delivery.lease_until is None or delivery.lease_until > now:
+                return None
+        elif delivery.status not in {"pending", "retry"}:
+            return None
+        elif delivery.next_attempt_at is not None and delivery.next_attempt_at > now:
             return None
         claimed = NotificationDelivery(
             delivery_id=delivery.delivery_id,

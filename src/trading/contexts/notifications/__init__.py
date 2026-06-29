@@ -1,4 +1,7 @@
 from .application import (
+    NotificationDispatchBatchResult,
+    NotificationDispatcher,
+    NotificationDispatcherConfig,
     NotificationRepository,
     NotificationRouteDecision,
     NotificationSourceRouter,
@@ -21,6 +24,9 @@ from .domain import (
 __all__ = [
     "NotificationDelivery",
     "NotificationDeliveryAttempt",
+    "NotificationDispatchBatchResult",
+    "NotificationDispatcher",
+    "NotificationDispatcherConfig",
     "NotificationEvent",
     "NotificationReportRun",
     "NotificationRepository",

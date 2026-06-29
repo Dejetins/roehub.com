@@ -1,0 +1,1 @@
+"""Notification dispatcher worker package."""

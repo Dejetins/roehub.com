@@ -1,15 +1,12 @@
-from .persistence import InMemoryNotificationRepository
-from .providers import (
-    FakeNotificationProvider,
-    LogOnlyNotificationProvider,
+from .log_only_notification_provider import FakeNotificationProvider, LogOnlyNotificationProvider
+from .telegram_bot_api_notification_provider import (
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
 
 __all__ = [
-    "FakeNotificationProvider",
-    "InMemoryNotificationRepository",
     "LogOnlyNotificationProvider",
+    "FakeNotificationProvider",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
 ]

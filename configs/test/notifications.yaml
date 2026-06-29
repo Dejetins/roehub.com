@@ -1,0 +1,16 @@
+version: 1
+notifications:
+  dispatcher:
+    enabled: false
+    provider_mode: "log_only"
+    batch_size: 100
+    lease_seconds: 30
+    retry_backoff_seconds: 60
+    max_attempts: 3
+  providers:
+    telegram:
+      enabled: false
+      api_base_url: "https://api.telegram.org"
+      send_timeout_s: 2.0
+  metrics:
+    port: 9210

@@ -1,0 +1,1 @@
+"""Notification dispatcher wiring package."""
