@@ -14,7 +14,7 @@ Unrelated dirty changes observed and excluded: foreign Market Data hunk in `docs
 
 Acceptance boundary: Stage `10` migrates Strategy `failed` notification routing from direct Strategy Telegram delivery to the `notifications` context while keeping direct Strategy Telegram adapters as rollback-only modes. The stage is not accepted until the implementation revision is on `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, `smoke_prod.sh` passes and a post-main production runtime proof verifies the Strategy notifications mode without real Telegram send.
 
-Current blocker: post-main production runtime proof is blocked by current SSH authentication failure to `macstudio` after the host checkout/smoke had already been synchronized for commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa`. The failing proof attempt did not reach the remote shell and did not mutate provider state.
+Current blocker: post-main production runtime proof is blocked by current SSH authentication failure to `macstudio` after the host checkout/smoke had already been synchronized for commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa`. Follow-up proof attempts after the SQL fix did not reach the remote shell and did not mutate provider state.
 
 ## Scope
 
@@ -87,6 +87,8 @@ The first post-main runtime proof attempt surfaced a production PostgreSQL issue
 
 Fix commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` adds `%(owner_user_id)s::uuid` in that query and regression coverage in `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py`.
 
+Cleanup debt: the first runtime proof attempt ran before the SQL fix and may have upserted temporary proof route `00000000-0000-0000-0000-00000000c010` before failing at route lookup. The intended cleanup must run when `macstudio` SSH access is available again: disable that route and suppress any delivery tied to the Stage `10` proof run before rerunning the bounded proof. No real Telegram send was confirmed or claimed for Stage `10`.
+
 ## Artifact Review
 
 Review mode: cold self-review fallback. Independent review was not available in the current environment.
@@ -135,5 +137,6 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 ## Residual Risks
 
 - Stage `10` is blocked, not accepted, until `macstudio` SSH access is available again and post-main production runtime proof is recorded.
+- Possible temporary proof route `00000000-0000-0000-0000-00000000c010` may remain in production DB from the first failed proof attempt; cleanup is required before rerunning proof.
 - Direct `telegram` rollback still exists and can send real Telegram messages if explicitly configured with token and active bindings.
 - Production dispatcher currently runs in `log_only` provider mode; pending `telegram_bot_api` deliveries are intentionally not claimed until final rollout approval.
