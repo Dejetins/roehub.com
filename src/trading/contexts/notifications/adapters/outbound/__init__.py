@@ -1,3 +1,4 @@
+from .acl import InMemoryNotificationStatsSourceReader
 from .persistence import InMemoryNotificationRepository
 from .providers import (
     FakeNotificationProvider,
@@ -9,6 +10,7 @@ from .providers import (
 __all__ = [
     "FakeNotificationProvider",
     "InMemoryNotificationRepository",
+    "InMemoryNotificationStatsSourceReader",
     "LogOnlyNotificationProvider",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",

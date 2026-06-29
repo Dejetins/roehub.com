@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
 
-from trading.contexts.notifications.adapters import InMemoryNotificationRepository
+from trading.contexts.notifications.adapters import (
+    InMemoryNotificationRepository,
+    InMemoryNotificationStatsSourceReader,
+)
 from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
+    NotificationStatsQueryService,
+    NotificationStatsSourceRow,
     NotificationTelegramBindingService,
     TelegramCommandHandler,
     TelegramInboundCommand,
@@ -117,6 +123,35 @@ def test_strategy_and_exchange_scopes_fail_closed_when_unauthorized() -> None:
     assert allowed_exchange.status == "handled"
 
 
+def test_bound_stats_commands_render_stats_service_snapshot() -> None:
+    repository, binding_service = _bound_repository_and_service()
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+        scope_authorizer=_ScopeAuthorizer(
+            allowed_strategy_refs=frozenset({"owned-strategy"}),
+            allowed_exchange_refs=frozenset({"owned-exchange"}),
+        ),
+        stats_query_service=NotificationStatsQueryService(
+            source_reader=InMemoryNotificationStatsSourceReader(rows=_stats_rows())
+        ),
+    )
+
+    portfolio = handler.handle(command=_command(update_id=351, text="/stats today"))
+    strategy = handler.handle(
+        command=_command(update_id=352, text="/strategy owned-strategy today")
+    )
+    exchange = handler.handle(
+        command=_command(update_id=353, text="/exchange owned-exchange today")
+    )
+
+    assert portfolio.status == "handled"
+    assert "Portfolio stats for today: complete" in portfolio.response_text
+    assert "realized_pnl=12.50" in portfolio.response_text
+    assert "Strategy owned-strategy stats for today: complete" in strategy.response_text
+    assert "Exchange owned-exchange stats for today: complete" in exchange.response_text
+
+
 def test_expired_binding_code_fails_closed() -> None:
     repository = InMemoryNotificationRepository()
     binding_service = NotificationTelegramBindingService(
@@ -180,4 +215,42 @@ def _command(
         chat_id_ref="telegram_ref:test:1234",
         command_text=text,
         received_at=received_at or _now(),
+    )
+
+
+def _stats_rows() -> tuple[NotificationStatsSourceRow, ...]:
+    common = {
+        "owner_user_id": _user_id(),
+        "observed_at": _now(),
+        "strategy_ref": "owned-strategy",
+        "exchange_ref": "owned-exchange",
+    }
+    return (
+        NotificationStatsSourceRow(
+            **common,
+            source="strategy_signals",
+            signal_count=2,
+        ),
+        NotificationStatsSourceRow(
+            **common,
+            source="strategy_paper_accounting",
+            realized_pnl=Decimal("12.50"),
+            unrealized_pnl=Decimal("2.25"),
+            equity=Decimal("1012.50"),
+            pnl_complete=True,
+        ),
+        NotificationStatsSourceRow(
+            **common,
+            source="execution_fills",
+            fill_count=1,
+            order_count=1,
+            fee_total=Decimal("0.10"),
+            funding_total=Decimal("0"),
+        ),
+        NotificationStatsSourceRow(
+            **common,
+            source="exchange_account_projection",
+            balance_count=3,
+            position_count=1,
+        ),
     )

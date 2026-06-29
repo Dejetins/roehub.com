@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypeGuard
 from uuid import UUID, uuid4
 
 from trading.contexts.notifications.application.ports import NotificationRepository
+from trading.contexts.notifications.application.stats_query import (
+    NotificationStatsPeriod,
+    NotificationStatsQueryService,
+    render_notification_stats_snapshot,
+)
 from trading.contexts.notifications.application.telegram_binding import (
     NotificationTelegramBindingError,
     NotificationTelegramBindingService,
@@ -56,10 +61,12 @@ class TelegramCommandHandler:
         repository: NotificationRepository,
         binding_service: NotificationTelegramBindingService,
         scope_authorizer: TelegramCommandScopeAuthorizer | None = None,
+        stats_query_service: NotificationStatsQueryService | None = None,
     ) -> None:
         self._repository = repository
         self._binding_service = binding_service
         self._scope_authorizer = scope_authorizer or DenyAllTelegramCommandScopeAuthorizer()
+        self._stats_query_service = stats_query_service
 
     def handle(self, *, command: TelegramInboundCommand) -> TelegramCommandHandlingResult:
         existing = self._repository.get_telegram_update(
@@ -96,6 +103,7 @@ class TelegramCommandHandler:
             status, response_text = self._handle_bound_command(
                 parsed=parsed,
                 owner_user_id=owner_user_id,
+                received_at=command.received_at,
             )
 
         update = TelegramUpdate(
@@ -140,12 +148,19 @@ class TelegramCommandHandler:
         return "handled", status.owner_user_id, "Telegram binding confirmed."
 
     def _handle_bound_command(
-        self, *, parsed: _ParsedCommand, owner_user_id: UserId
+        self, *, parsed: _ParsedCommand, owner_user_id: UserId, received_at: datetime
     ) -> tuple[TelegramCommandStatus, str]:
         if parsed.name == "stats":
             period = parsed.args[0] if parsed.args else "today"
-            if period not in {"today", "week", "month"}:
+            if not _is_stats_period(value=period):
                 return "failed", "Supported stats periods: today, week, month."
+            if self._stats_query_service is not None:
+                snapshot = self._stats_query_service.get_portfolio_stats(
+                    owner_user_id=owner_user_id,
+                    period=period,
+                    generated_at=received_at,
+                )
+                return "handled", render_notification_stats_snapshot(snapshot=snapshot)
             return "handled", f"Stats for {period}: unavailable until stats service is enabled."
         if parsed.name == "strategy":
             if len(parsed.args) < 1:
@@ -155,6 +170,16 @@ class TelegramCommandHandler:
             ):
                 return "failed", "Strategy scope is unavailable."
             period = parsed.args[1] if len(parsed.args) > 1 else "week"
+            if not _is_stats_period(value=period):
+                return "failed", "Supported stats periods: today, week, month."
+            if self._stats_query_service is not None:
+                snapshot = self._stats_query_service.get_strategy_stats(
+                    owner_user_id=owner_user_id,
+                    strategy_ref=parsed.args[0],
+                    period=period,
+                    generated_at=received_at,
+                )
+                return "handled", render_notification_stats_snapshot(snapshot=snapshot)
             return (
                 "handled",
                 f"Strategy stats for {period}: unavailable until stats service is enabled.",
@@ -167,6 +192,16 @@ class TelegramCommandHandler:
             ):
                 return "failed", "Exchange scope is unavailable."
             period = parsed.args[1] if len(parsed.args) > 1 else "week"
+            if not _is_stats_period(value=period):
+                return "failed", "Supported stats periods: today, week, month."
+            if self._stats_query_service is not None:
+                snapshot = self._stats_query_service.get_exchange_stats(
+                    owner_user_id=owner_user_id,
+                    exchange_ref=parsed.args[0],
+                    period=period,
+                    generated_at=received_at,
+                )
+                return "handled", render_notification_stats_snapshot(snapshot=snapshot)
             return (
                 "handled",
                 f"Exchange stats for {period}: unavailable until stats service is enabled.",
@@ -205,6 +240,10 @@ def _parse_command(*, text: str) -> _ParsedCommand:
         return _ParsedCommand(name="unknown", args=())
     command_name = tokens[0].removeprefix("/").split("@", maxsplit=1)[0].casefold()
     return _ParsedCommand(name=command_name, args=tuple(token.strip() for token in tokens[1:]))
+
+
+def _is_stats_period(*, value: str) -> TypeGuard[NotificationStatsPeriod]:
+    return value in {"today", "week", "month"}
 
 
 def _command_args_json(*, args: tuple[str, ...]) -> dict[str, object]:

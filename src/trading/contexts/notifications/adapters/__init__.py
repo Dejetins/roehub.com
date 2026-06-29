@@ -1,6 +1,7 @@
 from .outbound import (
     FakeNotificationProvider,
     InMemoryNotificationRepository,
+    InMemoryNotificationStatsSourceReader,
     LogOnlyNotificationProvider,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
@@ -9,6 +10,7 @@ from .outbound import (
 __all__ = [
     "FakeNotificationProvider",
     "InMemoryNotificationRepository",
+    "InMemoryNotificationStatsSourceReader",
     "LogOnlyNotificationProvider",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
