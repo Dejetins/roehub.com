@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `07` adds provider-neutral admin critical/alert/report routing, bounded metrics, Prometheus alert rules and an operational runbook. Stage remains `completed-local` until implementation commit is published to `main`, GitHub CI/deploy passes, `macstudio` checkout is synchronized and production smoke passes.
+Acceptance boundary: Stage `07` adds provider-neutral admin critical/alert/report routing, bounded metrics, Prometheus alert rules and an operational runbook. Implementation commit `43444b2fdf1de86dcec7d7e939e32f4be15b3097` is published to `main`; GitHub CI/deploy passed; `macstudio` checkout is synchronized to the same commit and production smoke passed.
 
 ## User Required Before Start
 
@@ -73,7 +73,10 @@ Synthetic admin drill executed with in-memory repository adapter and `LogOnlyNot
 | `uv run ruff check src/trading/contexts/notifications tests/unit/contexts/notifications tests/unit/infra tests/unit/apps/api/test_notification_admin_monitoring.py apps/api/monitoring.py` | passed |
 | `uv run pyright src/trading/contexts/notifications tests/unit/contexts/notifications tests/unit/infra tests/unit/apps/api/test_notification_admin_monitoring.py apps/api/monitoring.py` | passed |
 | Synthetic admin drill smoke | passed: `stage07_admin_drill_smoke=ok ... route_kinds=admin` |
-| `uv run python -m tools.docs.generate_docs_index --check` | local check expected to fail until unrelated untracked `market-data-live-tail-repair-v1` docs are either indexed or removed from the dirty checkout; Stage `07` report/runbook entries were added to `docs/architecture/README.md` manually |
+| `uv run python -m tools.docs.generate_docs_index --check` | clean CI passed in run `28397126835`; local dirty checkout still contains unrelated untracked `market-data-live-tail-repair-v1` docs |
+| GitHub CI | passed: run `28397126835` for `43444b2fdf1de86dcec7d7e939e32f4be15b3097` |
+| GitHub deploy | passed: Backend `28397233003`, Web `28397233010`, App Image `28397233012` |
+| `macstudio` sync/smoke | passed: `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `43444b2fdf1de86dcec7d7e939e32f4be15b3097`; `/opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 ## Contract Impact
 
@@ -113,4 +116,4 @@ Synthetic admin drill executed with in-memory repository adapter and `LogOnlyNot
 
 - Real admin Telegram recipient confirmation remains deferred to Stage `09` canary or explicit host-local setup.
 - Metrics helpers are bounded and tested, but production worker integration for all gauges/counters remains future wiring.
-- Prometheus rule deployment is repo-managed; runtime reload proof comes after commit/deploy/`macstudio` sync.
+- Prometheus rule deployment is repo-managed; runtime reload proof is limited to CI/deploy plus `macstudio` production smoke, not a live alert firing drill.
