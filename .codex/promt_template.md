@@ -89,6 +89,30 @@ branch_policy:
   stash_allowed: <true|false>
   approval_required_for_branch_or_worktree: true
 
+change_ownership:
+  parallel_main_expected: true
+  owned_change_scope:
+    - "<files_or_hunks_this_prompt_is_allowed_to_change>"
+  foreign_changes_policy: "ignore and preserve unrelated changes from other chats"
+  mixed_file_policy: "stage only owned hunks; block that file if safe hunk separation is impossible"
+  forbidden_git_commands:
+    - "git add ."
+    - "git add -A"
+    - "git add --all"
+    - "git add :/"
+    - "git add -- ."
+    - "git add *"
+    - "git restore --staged ."
+    - "git restore --staged :/"
+    - "git restore --staged *"
+    - "git reset HEAD ."
+    - "git reset ."
+    - "git commit -a"
+    - "git commit --all"
+    - "git commit -am"
+  required_pre_commit_check: "git diff --cached --name-status"
+  required_commit_push_marker: "ROEHUB_SCOPED_STAGING_REVIEWED=1"
+
 final_report_format:
   language: <ru|en|...>
   sections:
@@ -143,6 +167,14 @@ stage_execution_ledger:
   required_update: <true|false>
   template: .codex/agents/stage_execution_ledger_template.md
 
+prompt_pack_execution:
+  mode: <manual_sequential|goal_driven>
+  plan_doc: <architecture_or_implementation_plan_path>
+  prompt_pack_dir: .codex/agents/generated/<pack_folder>/
+  stage_ledger: <stage_ledger_path_if_plan_or_prompt_pack>
+  goal_mode_optional: true
+  goal_artifact_required: false
+
 file_manifest:
   required_for_stage_prompts: <true|false>
   expected_groups:
@@ -162,6 +194,8 @@ file_manifest:
     - deleted
     - outside_expected_paths
     - outside_expected_paths_justification
+    - foreign_changes_excluded
+    - mixed_files
 
 expected_primary_touches:
   - "<path_directly_likely_to_change_1>"
@@ -232,8 +266,12 @@ Additional context:
 - Keep the implementation deterministic and reviewable.
 - For non-trivial implementation, run local gates plus the nearest meaningful real-boundary or end-to-end validation surface. Tests-only acceptance requires an explicit safe reason.
 - If this prompt implements a plan stage, read the stage execution ledger before implementation and update it after validation and before the final report.
+- If this prompt is part of a prompt pack, follow `prompt_pack_execution`: use the linked `plan_doc`, `prompt_pack_dir`, and `stage_ledger`; do not require or create `GOAL.md` unless the user explicitly asks for it.
 - If a previous required stage is not accepted, stop unless this prompt explicitly repairs, supersedes, or unblocks that stage.
 - Follow the front-matter `branch_policy`: work from `main` by default, do not create branches/worktrees/stashes unless explicitly allowed there, and never create per-stage branches.
+- Follow the front-matter `change_ownership`: a dirty `main` checkout is expected, but only owned files/hunks for this prompt may be staged, committed, pushed, or reported as delivered.
+- Do not let unrelated dirty files from other chats block the task. Preserve them, exclude them from staging, and call them out only when they affect this prompt's files or gates.
+- Never use broad staging/unstaging/commit commands such as `git add .`, `git add -A`, `git add --all`, `git add :/`, `git add -- .`, `git add *`, `git restore --staged .`, `git restore --staged :/`, `git restore --staged *`, `git reset HEAD .`, `git reset .`, `git commit -a`, `git commit --all`, `git commit -am`, or `git commit .`; stage or unstage explicit owned paths/hunks only.
 - If Mac Studio, runtime, deploy, target-host, or production smoke evidence is in scope, use the front-matter `proof_boundary` label exactly and do not present pre-main evidence as changed-code production proof.
 - If SSH commands include SQL, JSON, multiline payloads, apostrophes, backticks, or dollar signs, use quoted heredoc/stdin per `remote_command_quoting`; do not use nested inline quoting or temporary files created only to dodge quoting.
 - If this is a stage prompt, maintain the front-matter `file_manifest` contract and include created/modified/deleted/outside-expected files in the final report.
@@ -364,6 +402,23 @@ Skill routing for this task:
 - Default to `main` unless the user explicitly approved one branch for the whole prompt pack.
 - Do not create stage-specific branches, branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary workflow files unless the exact artifact is explicitly allowed in `branch_policy`.
 
+## Staged plan execution policy
+
+- The execution source of truth is the linked `plan_doc`, `prompt_pack_dir`, and `stage_ledger`.
+- `stage_ledger` determines the current stage, whether the next stage is allowed, and whether the overall plan is blocked or complete.
+- `manual_sequential` means run only this stage and report the next allowed prompt.
+- `goal_driven` means continue only while the ledger explicitly allows the next stage.
+- Do not create or require `GOAL.md`; Codex Goal mode is an execution mode over the existing artifacts.
+
+## Parallel main and scoped staging policy
+
+- Multiple chats may share this `main` checkout; unrelated dirty files are expected and are not a blocker.
+- Own only the files/hunks required by this prompt. Treat every other visible change as foreign.
+- Before staging, compare the actual diff with `expected_primary_touches`, `possible_secondary_touches`, `file_manifest`, and the task scope.
+- Stage only owned paths or owned hunks. For mixed files, use patch staging or report that exact file as blocked if safe separation is impossible.
+- Before commit or push, inspect `git diff --cached --name-status`, verify that only owned paths are staged, then include `ROEHUB_SCOPED_STAGING_REVIEWED=1` in the commit/push command.
+- Final report must list owned files included and foreign changes excluded when publish/delivery happened.
+
 ## Proof boundary and remote command safety
 
 - Record `proof_boundary.label` in the stage ledger or final report whenever runtime, target-host, Mac Studio, deploy, or production smoke evidence is used.
@@ -396,6 +451,10 @@ Final report file manifest:
   - `<path or none>`
 - outside_expected_paths:
   - `<path or none>` — `<justification>`
+- foreign_changes_excluded:
+  - `<path or none>` — `<why it was not part of this prompt>`
+- mixed_files:
+  - `<path or none>` — `<owned hunks staged | blocked because safe separation was impossible>`
 
 # Non-goals
 

@@ -87,10 +87,12 @@ The generated executor prompt MUST use the following front-matter keys when appl
 - `quality_gates`
 - `validation_strategy` (required for implementation prompts and prompt-pack stages)
 - `branch_policy` (required for prompt packs and staged plan implementation)
+- `change_ownership` (required for implementation prompts, publishable prompts, and prompt-pack stages)
 - `proof_boundary` (required when Mac Studio, target-host, runtime, deploy, or production smoke evidence is in scope)
 - `runtime_env_sources` (required when env files, target hosts, Mac Studio, deploy, benchmarks, or browser auth are in scope)
 - `remote_command_quoting` (required when SSH commands may contain SQL, JSON, or multiline payloads)
 - `stage_execution_ledger` (required for prompt packs or staged plan implementation)
+- `prompt_pack_execution` (required for prompt packs or staged plan implementation)
 - `file_manifest` (required for staged prompt packs)
 - `expected_primary_touches`
 - `possible_secondary_touches` (omit only when genuinely unnecessary)
@@ -140,6 +142,10 @@ You MUST revise before output if any of the following are true:
 11. Output duplicates the same file set in multiple sections without a semantic reason.
 12. Output lists more than 4 task entrypoints for a normal implementation task.
 13. Output uses previous prompts as a formatting scaffold.
+14. Implementation, publishable, or prompt-pack stage output omits `change_ownership`.
+15. Prompt-pack or staged-plan output omits `prompt_pack_execution`.
+16. Prompt-pack or staged-plan output fails to link `plan_doc`, `prompt_pack_dir`, and `stage_ledger`.
+17. Prompt-pack or staged-plan output requires `GOAL.md` without an explicit user request.
 
 Layered context policy (mandatory, token-efficient)
 - Never generate a broad flat “read all these files first” list unless the task is explicitly a documentation audit or full-architecture review.
@@ -216,6 +222,7 @@ Current Roehub skill routing to encode when relevant:
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks -> `pre-ship-gate`
 - full Roehub Git/GitHub/CI/deploy/post-deploy verification -> `publish-ci-deploy`
 - prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design -> `prompt-manager`
+- existing staged plan or prompt-pack execution from `plan_doc` + `prompt_pack_dir` + `stage_ledger`, including optional Codex Goal mode -> `staged-plan-runner`
 
 Executor context acquisition policy (mandatory)
 The prompt you generate MUST explicitly instruct the executor to read context in this order and stop early once sufficient:
@@ -308,16 +315,30 @@ Stage execution ledger policy (mandatory for prompt packs and staged plans)
 - Default placement is `docs/architecture/<area>/<plan-slug>-stage-reports/<plan-slug>-stage-ledger.md`.
 - If an equivalent `iteration-ledger` already exists for the plan, reuse it instead of creating a duplicate.
 - Prompt artifacts remain English unless explicitly requested otherwise; architecture-stage ledgers follow repository documentation language rules and default to Russian.
+- Link the prompt pack to exactly three execution artifacts: `plan_doc`, `prompt_pack_dir`, and `stage_ledger`.
+- Set execution mode to `manual_sequential` by default; use `goal_driven` only when the user explicitly asks Codex to continue the prompt pack as a goal or autocontinuation flow.
+- State that Codex Goal mode is an optional runner mode over the same three artifacts, not a requirement to create `GOAL.md`.
 - Include the ledger in `stage_execution_ledger` front matter and in `context_sources.always_read` or the narrowest task entrypoint.
 - Require every stage executor to update the ledger after validation and before the final report.
 - Accepted stages must record concise result, evidence, touched contracts/files, publish/deploy handoff when applicable, and what the next stage must know.
 - Blocked stages must record blocker, severity, evidence, next action or owner, and whether later stages are allowed.
 - Each stage ledger update must record proof boundary when runtime, Mac Studio, target-host, deploy, or production smoke evidence is used.
 - Each stage ledger update must record a file manifest summary: created, modified, deleted, outside expected paths, and outside-path justification.
+- Each stage ledger update must record foreign changes excluded and mixed-file hunk status when the shared `main` checkout contains unrelated dirty changes.
 - Each stage ledger update must record branch/worktree/stash status; default is `main` with no branch/worktree/stash unless explicitly approved by the user.
+- Each publishable stage ledger update must record scoped staging evidence, normally `git diff --cached --name-status`, before commit or push.
 - If Markdown docs changed, each stage ledger update must record docs-index evidence or the reason the docs-index gate is not applicable.
 - Later dependent stages must not proceed when the prior required stage is not accepted unless the prompt explicitly repairs, supersedes, or unblocks that stage.
 - Never put secrets, tokens, cookies, passphrases, ciphertext, raw provider error bodies, or credentials into the ledger.
+
+Prompt-pack execution policy (mandatory for prompt packs and staged plans)
+- A runnable prompt pack is described by `plan_doc`, `prompt_pack_dir`, and `stage_ledger`.
+- `plan_doc` explains what and why; `prompt_pack_dir` explains how to execute stages; `stage_ledger` is the source of truth for current stage, status, blockers, evidence, and next-stage handoff.
+- Do not create or require `GOAL.md` unless the user explicitly asks for that artifact.
+- `manual_sequential` means the executor runs one requested or next allowed stage, updates the ledger, reports the next prompt, and stops.
+- `goal_driven` means the executor may continue stage by stage only while the ledger explicitly permits progress, and stops on `blocked`, `completed`, missing evidence, missing linked artifact, or required user approval.
+- Generated stage prompts MUST include front matter `prompt_pack_execution` with `mode`, `plan_doc`, `prompt_pack_dir`, `stage_ledger`, `goal_mode_optional=true`, and `goal_artifact_required=false`.
+- Execution/continuation tasks should route to `staged-plan-runner`; prompt creation, revision, audit, and migration tasks remain under `prompt-manager`.
 
 Validation depth policy (mandatory for implementation prompts)
 - Local lint/type/unit tests are local gates, not sufficient acceptance evidence for non-trivial implementation stages.
@@ -403,6 +424,7 @@ Defaults when values are missing
 - `repo`: infer from current repository.
 - `branch`: use current branch, otherwise `main`.
 - prompt-pack `branch_policy`: default to `main`; create a separate branch only if the user explicitly requested one branch for the whole prompt pack; do not create branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary files unless the user explicitly requested that exact artifact or workflow.
+- `change_ownership`: default to parallel `main` being expected; owned changes are only this prompt's files/hunks, foreign dirty changes are preserved and excluded, mixed files require hunk-level staging or an explicit blocker.
 - `language.implementation`: infer from the touched subsystem; default `python`.
 - `language.agent_report`: default `ru` unless the user requests another report language.
 - `context_sources.always_read`: include `.codex/AGENTS.md`, state snapshot, and latest executor report when available.
@@ -416,6 +438,7 @@ Defaults when values are missing
 - `runtime_env_sources`: include for env-dependent target-host, deploy, benchmark, browser-auth, or Mac Studio prompts; report key/path presence only.
 - `remote_command_quoting`: include for SSH SQL/JSON/multiline prompts.
 - `stage_execution_ledger`: include for prompt packs and staged plan implementation; set `required_update=true` for stage prompts.
+- `prompt_pack_execution`: include for prompt packs and staged plan implementation; default `mode=manual_sequential`, link `plan_doc`, `prompt_pack_dir`, and `stage_ledger`, set `goal_mode_optional=true`, and set `goal_artifact_required=false`.
 - `file_manifest`: include for every staged prompt pack; require created/modified/deleted/outside-expected reporting.
 - For browser-visible tasks, default to including runtime browser verification requirements unless the user explicitly restricts the task to static analysis.
 
@@ -430,7 +453,11 @@ Hard requirements to encode in generated prompts
 - Skill routing must be compact and conditional, with exact skill names and workflow timing.
 - Non-trivial implementation prompts must require real-boundary or end-to-end validation in addition to local tests.
 - Prompt packs and staged-plan prompts must create or update the stage execution ledger.
+- Prompt packs and staged-plan prompts must include `prompt_pack_execution`, link `plan_doc`, `prompt_pack_dir`, and `stage_ledger`, and must not require `GOAL.md` unless the user explicitly requested it.
 - Prompt packs must include branch policy: default `main`, no branch unless explicitly requested, at most one branch per prompt pack, no stage-specific branch names, and no unrequested branch-specific worktrees, temporary checkouts, local folders, stashes, or auxiliary files.
+- Implementation and publishable prompts must include change ownership policy: dirty `main` is allowed, only owned files/hunks may be staged or committed, foreign changes must be preserved and excluded, and mixed files require hunk-level staging or a file-specific blocker.
+- Generated prompts must forbid broad staging/unstaging/commit commands: `git add .`, `git add -A`, `git add --all`, `git add :/`, `git add -- .`, `git add *`, `git restore --staged .`, `git restore --staged :/`, `git restore --staged *`, `git reset HEAD .`, `git reset .`, `git commit -a`, `git commit --all`, `git commit -am`, and `git commit .`.
+- Generated publish prompts must require `git diff --cached --name-status` inspection before commit or push and require `ROEHUB_SCOPED_STAGING_REVIEWED=1` in the commit/push command after that inspection.
 - Prompt packs must include file manifest reporting: created, modified, deleted, outside expected paths, and justification for every outside-expected path.
 - Mac Studio/runtime/deploy prompts must include explicit proof-boundary labels and must not present pre-main evidence as changed-code production proof.
 - SSH + SQL/JSON/multiline prompts must require quoted heredoc/stdin and forbid nested inline payload quoting.
@@ -516,32 +543,33 @@ Schema checks
 8. Did I include `possible_secondary_touches` when needed?
 9. Did I include `# Context acquisition protocol`?
 10. Did I include `# Reading manifest`?
+11. For prompt packs or staged plans, did I include `prompt_pack_execution` with `plan_doc`, `prompt_pack_dir`, `stage_ledger`, and execution mode?
 
 Context-discipline checks
-11. Did I separate `always_read`, `task_entrypoints`, `conditional_bundles`, and `consult_if_needed`?
-12. Did I keep task entrypoints to 2-4 for a normal implementation task?
-13. Did I include explicit reading budget?
-14. Did I include explicit stop conditions?
-15. Did I forbid eager-loading all listed documents?
+12. Did I separate `always_read`, `task_entrypoints`, `conditional_bundles`, and `consult_if_needed`?
+13. Did I keep task entrypoints to 2-4 for a normal implementation task?
+14. Did I include explicit reading budget?
+15. Did I include explicit stop conditions?
+16. Did I forbid eager-loading all listed documents?
 
 Compression checks
-16. Did I avoid duplicating the same file set across sections?
-17. Did I avoid using old prompts as formatting scaffolds?
-18. Did I keep primary touches small and realistic?
-19. Did I keep secondary touches additive and lower-confidence?
+17. Did I avoid duplicating the same file set across sections?
+18. Did I avoid using old prompts as formatting scaffolds?
+19. Did I keep primary touches small and realistic?
+20. Did I keep secondary touches additive and lower-confidence?
 
 Delivery checks
-20. Are Must / Should / Nice-to-have clear?
-21. Are non-goals explicit?
-22. Are acceptance criteria measurable?
-23. Are quality gates appropriate to the task?
+21. Are Must / Should / Nice-to-have clear?
+22. Are non-goals explicit?
+23. Are acceptance criteria measurable?
+24. Are quality gates appropriate to the task?
 
 Browser verification checks
-24. Is this task browser-visible or web/UI-relevant?
-25. If yes, did I explicitly require runtime browser verification?
-26. If yes, did I include a concrete browser/runtime verification target?
-27. If yes, did I distinguish browser runtime verification from static reasoning and tests?
-28. If no, did I avoid unnecessary browser automation mention?
+25. Is this task browser-visible or web/UI-relevant?
+26. If yes, did I explicitly require runtime browser verification?
+27. If yes, did I include a concrete browser/runtime verification target?
+28. If yes, did I distinguish browser runtime verification from static reasoning and tests?
+29. If no, did I avoid unnecessary browser automation mention?
 
 If any answer is “no”, you MUST revise before output.
 

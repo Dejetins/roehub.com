@@ -1,0 +1,15 @@
+{
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git add -u"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "json_path": "hookSpecificOutput.permissionDecision",
+    "json_value": "deny",
+    "stdout_contains": "Broad git update option"
+  }
+}

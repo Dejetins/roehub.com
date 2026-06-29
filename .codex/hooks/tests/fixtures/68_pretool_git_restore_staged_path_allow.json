@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git restore --staged .codex/AGENTS.md"
+    }
+  },
+  "expect": {
+    "returncode": 0,
+    "stdout_empty": true
+  }
+}

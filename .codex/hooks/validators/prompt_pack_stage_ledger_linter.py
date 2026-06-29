@@ -38,13 +38,35 @@ def _missing_browser_auth_anchors(text: str) -> list[str]:
 
 def _missing_prompt_anchors(text: str) -> list[str]:
     missing: list[str] = []
+    lowered = text.lower()
     if "ledger" not in text.lower():
         missing.append("stage ledger path/update rule")
     if (
         "expected_primary_touches" in text
-        and "ledger" not in text.lower().split("expected_primary_touches", 1)[-1][:1000]
+        and "ledger" not in lowered.split("expected_primary_touches", 1)[-1][:1000]
     ):
         missing.append("ledger in expected_primary_touches")
+    if "prompt_pack_execution" not in text:
+        missing.append("prompt_pack_execution front matter")
+    if not has_any(text, ["plan_doc", "plan doc"]):
+        missing.append("linked plan_doc")
+    if "prompt_pack_dir" not in text:
+        missing.append("linked prompt_pack_dir")
+    if "stage_ledger" not in text:
+        missing.append("linked stage_ledger")
+    if not has_any(text, ["manual_sequential", "goal_driven"]):
+        missing.append("execution mode manual_sequential or goal_driven")
+    if "GOAL.md" in text and not has_any(
+        text,
+        [
+            "do not require or create `GOAL.md`",
+            "do not create or require `GOAL.md`",
+            "goal_artifact_required: false",
+            "unless the user explicitly asks",
+            "unless explicitly requested",
+        ],
+    ):
+        missing.append("GOAL.md is optional, not required by default")
     if not has_any(
         text,
         [
@@ -81,7 +103,8 @@ def validate(payload: dict[str, Any]) -> list[Finding]:
             message = (
                 "Generated executor prompt is missing: "
                 + ", ".join(missing)
-                + ". Add explicit ledger, manifest, and stage-gate instructions "
+                + ". Add explicit plan_doc/prompt_pack_dir/stage_ledger, execution mode, "
+                "ledger, manifest, and stage-gate instructions "
                 "or mark why they are not applicable."
             )
             findings.append(

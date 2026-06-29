@@ -121,6 +121,7 @@ Expected global skill pack:
 - `publish-ci-deploy`
 - `playwright` when browser automation is needed
 - `prompt-manager`
+- `staged-plan-runner`
 
 Current intended routing:
 
@@ -137,6 +138,7 @@ Current intended routing:
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks → `pre-ship-gate`
 - full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
 - prompt creation, prompt rewrite, prompt migration, prompt audit, prompt review, prompt extension, prompt fixing, prompt finalization, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
+- executing, continuing, or auditing execution state for an existing staged plan or prompt pack from `plan_doc` + `prompt_pack_dir` + `stage_ledger`, including optional Codex Goal mode execution → `staged-plan-runner`
 
 Architecture documents created or materially rewritten by `architecture-design` MUST default to Russian narrative, clear explanations, and a business-readable layer in addition to engineering detail. Prompt artifacts produced by `prompt-manager` MUST keep their own language contract and remain English unless a higher-priority user instruction explicitly says otherwise.
 
@@ -182,6 +184,24 @@ Prompt-pack branch policy:
 - If no branch was explicitly requested, generated prompts MUST instruct executors to work from `main` and deliver according to the repository publish/deploy workflow, not to create `codex/...` branches speculatively.
 - Any branch creation command must be deliberate and auditable. The hook layer blocks branch creation unless the command includes `ROEHUB_PROMPT_PACK_BRANCH_APPROVED=1`, and this marker may be used only when the user explicitly requested a separate branch for the prompt pack.
 - Any `git worktree add` command must be even more explicit and include `ROEHUB_WORKTREE_APPROVED=1`; this marker may be used only when the user specifically requested a separate worktree/folder workflow.
+
+Parallel-main scoped change policy:
+- Multiple Codex chats may work in the same local `main` checkout at the same time. A dirty worktree is expected and is NOT by itself a blocker.
+- Each chat owns only the files and hunks it created or intentionally modified for the current user request. Treat all other unstaged, staged, or working-tree changes as foreign changes, even when they are visible in the same checkout.
+- Do not stop, create branches, create worktrees, create stashes, or create auxiliary folders merely because unrelated foreign changes exist. Continue with the current task by keeping the change scope explicit.
+- Before staging or publishing, identify the owned file list from the current task, prompt, stage ledger, file manifest, and actual diff. If a file contains both owned and foreign hunks, inspect the diff and stage only owned hunks; if safe hunk separation is impossible, report that specific file as a blocker instead of staging the whole file.
+- Never use broad staging, unstaging, reset, or commit commands that can include foreign changes: `git add .`, `git add -A`, `git add --all`, `git add :/`, `git add -- .`, `git add *`, `git restore --staged .`, `git restore --staged :/`, `git restore --staged *`, `git reset HEAD .`, `git reset .`, `git commit -a`, `git commit --all`, `git commit -am`, or `git commit .` unless the user explicitly asks for repository-wide staging and the staged diff is reviewed before commit.
+- Use explicit path staging for owned files, and use patch staging for mixed files when needed. Before every commit or push, run and inspect `git diff --cached --name-status` and ensure only owned paths are staged; commit/push commands must include `ROEHUB_SCOPED_STAGING_REVIEWED=1` after that inspection.
+- If unrelated changes are already staged, unstage only those foreign paths with a narrow command such as `git restore --staged <path>`; do not use broad unstage/reset commands and do not revert their working-tree content.
+- Final reports for publish/delivery work MUST list owned files included, foreign changes intentionally excluded, and any mixed-file hunk limitations.
+
+Staged prompt-pack execution contract:
+- A staged plan is runnable when three artifacts are linked and current: `plan_doc`, `prompt_pack_dir`, and `stage_ledger`.
+- `plan_doc` explains what and why, `prompt_pack_dir` explains how to execute stages, and `stage_ledger` is the source of truth for current stage, status, blockers, evidence, and next-stage handoff.
+- Codex Goal mode is an optional execution mode over those same three artifacts. Agents MUST NOT create or require a separate `GOAL.md` unless the user explicitly asks for that artifact.
+- Execution modes are `manual_sequential` and `goal_driven`. In `manual_sequential`, run one requested or next allowed stage and stop. In `goal_driven`, continue only while the ledger marks the next stage allowed, and stop on `blocked`, `completed`, missing evidence, missing linked artifact, or required user approval.
+- Prompt packs and stage ledgers MUST name the linked `plan_doc`, `prompt_pack_dir`, `stage_ledger`, and execution mode. If any link is missing or ambiguous, stop and report a blocker instead of inferring from chat history.
+- Use `staged-plan-runner` to execute or continue an existing staged plan. Use `prompt-manager` to create or revise prompt packs, and `architecture-design` to create or revise staged plans.
 
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
 

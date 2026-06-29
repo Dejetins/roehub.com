@@ -33,6 +33,7 @@ VALIDATOR_MODULES = [
     "validators.secret_redaction_guard",
     "validators.command_safety_guard",
     "validators.branch_workflow_guard",
+    "validators.scoped_git_staging_guard",
     "validators.macstudio_path_guard",
     "validators.remote_payload_quoting_guard",
     "validators.playwright_wrapper_guard",

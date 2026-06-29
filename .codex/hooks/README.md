@@ -33,7 +33,8 @@ Responsibility split:
 | `OBSERVE` | Diagnostic signal | No persistence unless explicitly enabled |
 
 Hard blocks are reserved for deterministic violations such as raw secrets,
-wrong Mac Studio git path, destructive commands, and floating Playwright CLI.
+wrong Mac Studio git path, destructive commands, broad Git staging/commit
+commands in the shared `main` checkout, and floating Playwright CLI.
 Command-execution hard blocks apply only to real `Bash` tool events. File edits
 may contain negative examples in docs, fixtures, and rules without being treated
 as attempted shell execution.
@@ -43,10 +44,11 @@ as attempted shell execution.
 - `secret_redaction_guard.py`: blocks raw secret-like values.
 - `command_safety_guard.py`: blocks obvious destructive commands.
 - `branch_workflow_guard.py`: blocks unapproved branch creation, stage-specific prompt-pack branches, and unapproved `git worktree add` folder creation.
+- `scoped_git_staging_guard.py`: blocks broad `git add`, broad unstage/reset, implicit-staging commit, and commit/push without `ROEHUB_SCOPED_STAGING_REVIEWED=1` so parallel-chat changes are not shipped together.
 - `macstudio_path_guard.py`: blocks git operations inside `/opt/roehub/app`.
 - `remote_payload_quoting_guard.py`: blocks inline SSH + ClickHouse SQL quoting and warns on inline SSH JSON payloads.
 - `playwright_wrapper_guard.py`: blocks floating Playwright CLI invocations.
-- `prompt_pack_stage_ledger_linter.py`: requires generated prompts to carry ledger and manifest anchors.
+- `prompt_pack_stage_ledger_linter.py`: requires generated prompts to carry `plan_doc` + `prompt_pack_dir` + `stage_ledger`, execution mode, ledger, and manifest anchors; it does not require `GOAL.md`.
 - `prompt_pack_branch_policy_guard.py`: requires generated prompt packs that mention branch work to use one shared branch policy and rejects unrequested worktree/folder instructions.
 - `docs_index_drift_guard.py`: reminds agents to refresh/check generated docs indexes after docs edits.
 - `architecture_doc_linter.py`: warns about missing architecture documentation anchors.
