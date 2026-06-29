@@ -46,6 +46,7 @@ DEFAULT_OUTPUT_ROOT = (
     / STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1
 )
 DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+DEFAULT_MIN_CALIBRATION_CLOSED_TRADES = 100
 
 BranchName = str
 
@@ -101,7 +102,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     trials_root.mkdir(parents=True, exist_ok=True)
     study_storage = f"sqlite:///{run_dir / 'optuna.db'}"
     study = optuna.create_study(
-        directions=["maximize", "maximize", "maximize"],
+        directions=["maximize", "maximize"],
         sampler=optuna.samplers.TPESampler(
             multivariate=True,
             warn_independent_sampling=False,
@@ -114,7 +115,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     )
     trial_records: list[dict[str, Any]] = []
 
-    def objective(trial: Any) -> tuple[float, float, float]:
+    def objective(trial: Any) -> tuple[float, float]:
         alpha = _trial_alpha(args=args, trial=trial)
         trial_run_id = f"trial_{trial.number:05d}_{alpha.config_hash()[:12]}"
         manifest = _run_branch_evaluation(
@@ -132,6 +133,8 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         )
         scorecard = _candidate_scorecard(manifest, branch=branch)
         values = _objective_values(scorecard)
+        best_baseline_pnl = _best_baseline_net_pnl(manifest)
+        candidate_pnl = float(scorecard.get("net_pnl_after_costs_quote", 0.0))
         record = {
             "alpha_config_hash": alpha.config_hash(),
             "evaluation_hash": manifest["evaluation_hash"],
@@ -144,8 +147,13 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
             "run_id": trial_run_id,
             "scorecard": {
                 "closed_trades": scorecard.get("closed_trades"),
+                "candidate_beats_best_sanity_baseline": candidate_pnl > best_baseline_pnl,
+                "max_drawdown_pct": scorecard.get("max_drawdown_pct"),
                 "net_pnl_after_costs_quote": scorecard.get("net_pnl_after_costs_quote"),
                 "return_pct_after_costs": scorecard.get("return_pct_after_costs"),
+                "best_baseline_net_pnl_after_costs_quote": best_baseline_pnl,
+                "baseline_delta_net_pnl_after_costs_quote": candidate_pnl
+                - best_baseline_pnl,
                 "win_rate": scorecard.get("win_rate"),
             },
             "trial_number": trial.number,
@@ -157,10 +165,21 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         return values
 
     study.optimize(objective, n_trials=args.trials, n_jobs=args.jobs, show_progress_bar=False)
-    completed = [trial for trial in study.best_trials if trial.values is not None]
+    completed = [
+        trial
+        for trial in study.get_trials(
+            deepcopy=False,
+            states=(optuna.trial.TrialState.COMPLETE,),
+        )
+        if trial.values is not None
+    ]
     if not completed:
         raise Stage08GOptunaError(reason="optuna_no_completed_trials")
-    best_trial = completed[0]
+    best_trial = _select_best_trial(
+        completed_trials=completed,
+        trial_records=trial_records,
+        min_closed_trades=args.min_calibration_closed_trades,
+    )
     best_alpha = _alpha_from_params(args=args, params=dict(best_trial.params))
     final_manifest = _run_branch_evaluation(
         branch=branch,
@@ -416,11 +435,71 @@ def _candidate_scorecard(manifest: Mapping[str, Any], *, branch: BranchName) -> 
     raise Stage08GOptunaError(reason="candidate_scorecard_missing", field=expected)
 
 
-def _objective_values(scorecard: Mapping[str, Any]) -> tuple[float, float, float]:
+def _objective_values(scorecard: Mapping[str, Any]) -> tuple[float, float]:
     return_pct = float(scorecard.get("return_pct_after_costs", 0.0))
     win_rate = float(scorecard.get("win_rate", 0.0))
-    closed_trades = float(scorecard.get("closed_trades", 0.0))
-    return return_pct, win_rate, -closed_trades
+    return return_pct, win_rate
+
+
+def _best_baseline_net_pnl(manifest: Mapping[str, Any]) -> float:
+    best = 0.0
+    scorecards = manifest.get("scorecards")
+    if not isinstance(scorecards, list):
+        return best
+    for item in scorecards:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("policy_kind") != "baseline":
+            continue
+        best = max(best, float(item.get("net_pnl_after_costs_quote", 0.0)))
+    return best
+
+
+def _select_best_trial(
+    *,
+    completed_trials: list[Any],
+    trial_records: list[dict[str, Any]],
+    min_closed_trades: int,
+) -> Any:
+    records_by_number = {
+        int(record["trial_number"]): record for record in trial_records if "trial_number" in record
+    }
+    candidates: list[tuple[tuple[float, float, float, float, float, float], Any]] = []
+    for trial in completed_trials:
+        record = records_by_number.get(int(trial.number))
+        if record is None:
+            continue
+        scorecard = record.get("scorecard")
+        if not isinstance(scorecard, Mapping):
+            continue
+        closed_trades = float(scorecard.get("closed_trades", 0.0))
+        if closed_trades < float(min_closed_trades):
+            continue
+        return_pct = float(scorecard.get("return_pct_after_costs", 0.0))
+        win_rate = float(scorecard.get("win_rate", 0.0))
+        max_drawdown_pct = float(scorecard.get("max_drawdown_pct", 0.0))
+        baseline_delta = float(
+            scorecard.get("baseline_delta_net_pnl_after_costs_quote", 0.0)
+        )
+        candidate_beats_baseline = (
+            1.0 if bool(scorecard.get("candidate_beats_best_sanity_baseline")) else 0.0
+        )
+        key = (
+            return_pct,
+            win_rate,
+            -max_drawdown_pct,
+            candidate_beats_baseline,
+            baseline_delta,
+            closed_trades,
+        )
+        candidates.append((key, trial))
+    if not candidates:
+        raise Stage08GOptunaError(
+            reason="optuna_no_trade_sufficient_trials",
+            field=f"min_closed_trades={min_closed_trades}",
+        )
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
 
 
 def _summary_payload(
@@ -476,7 +555,16 @@ def _summary_payload(
             "calibration_split_used_for_optuna": True,
             "device_policy": "cpu_only_deterministic",
             "final_split_optimized_by_optuna": False,
+            "min_calibration_closed_trades": args.min_calibration_closed_trades,
             "position_fraction_optimized_in_this_stage": False,
+            "selection_rule": [
+                "closed_trades >= min_calibration_closed_trades",
+                "max return_pct_after_costs",
+                "max win_rate",
+                "min max_drawdown_pct",
+                "candidate beats best sanity baseline",
+                "max baseline_delta_net_pnl_after_costs_quote",
+            ],
             "search_space": [
                 "long_thr",
                 "short_thr",
@@ -586,6 +674,13 @@ def _optional_positive_int(value: str) -> int | None:
     return parsed
 
 
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be non-negative")
+    return parsed
+
+
 def _render_status(payload: Mapping[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=True, sort_keys=True)
 
@@ -602,6 +697,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trials", type=int, default=100)
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--optuna-seed", type=int, default=1708)
+    parser.add_argument(
+        "--min-calibration-closed-trades",
+        type=_non_negative_int,
+        default=DEFAULT_MIN_CALIBRATION_CLOSED_TRADES,
+    )
     parser.add_argument("--agent-history-len", type=int, default=30)
     parser.add_argument("--agent-session-len", type=int, default=10)
     parser.add_argument("--checkpoint-name", choices=("best", "final"), default="best")
