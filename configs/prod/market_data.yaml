@@ -97,6 +97,10 @@ market_data:
       stream_mode: "per_instrument"
       stream_prefix: "md.candles.1m"
       retention_days: 7
+    redis_hot_cache:
+      enabled: true
+      key_prefix: "md:hot:1m"
+      retention_hours: 24
 
   scheduler:
     jobs:

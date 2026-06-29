@@ -31,7 +31,11 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
     load_market_data_runtime_config,
 )
 from trading.contexts.market_data.adapters.outbound.messaging.redis import (
+    FanoutLiveCandlePublisher,
     NoopLiveCandlePublisher,
+    RedisCandleHotCache,
+    RedisCandleHotCacheHooks,
+    RedisHotCacheLiveCandlePublisher,
     RedisLiveCandlePublisherHooks,
     RedisStreamsLiveCandlePublisher,
 )
@@ -153,6 +157,36 @@ class MarketDataWsMetrics:
         self.redis_publish_duration_seconds = Histogram(
             "redis_publish_duration_seconds",
             "Redis publish call duration in seconds",
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+        )
+        self.redis_hot_cache_writes_total = Counter(
+            "redis_hot_cache_writes_total",
+            "Successful Redis hot-cache write operations",
+        )
+        self.redis_hot_cache_write_errors_total = Counter(
+            "redis_hot_cache_write_errors_total",
+            "Redis hot-cache write failures",
+        )
+        self.redis_hot_cache_read_hits_total = Counter(
+            "redis_hot_cache_read_hits_total",
+            "Redis hot-cache range reads that returned at least one candle",
+        )
+        self.redis_hot_cache_read_misses_total = Counter(
+            "redis_hot_cache_read_misses_total",
+            "Redis hot-cache range reads that returned no candles",
+        )
+        self.redis_hot_cache_read_errors_total = Counter(
+            "redis_hot_cache_read_errors_total",
+            "Redis hot-cache range read failures",
+        )
+        self.redis_hot_cache_write_duration_seconds = Histogram(
+            "redis_hot_cache_write_duration_seconds",
+            "Redis hot-cache write call duration in seconds",
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+        )
+        self.redis_hot_cache_read_duration_seconds = Histogram(
+            "redis_hot_cache_read_duration_seconds",
+            "Redis hot-cache range read call duration in seconds",
             buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
         )
 
@@ -629,21 +663,47 @@ def build_market_data_ws_app(
     clock = SystemClock()
     ingest_id = uuid4()
     redis_cfg = config.live_feed.redis_streams
-    if redis_cfg.enabled:
-        live_candle_publisher: LiveCandlePublisher = RedisStreamsLiveCandlePublisher(
-            config=redis_cfg,
-            runtime_config=config,
-            process_ingest_id=ingest_id,
+    publishers: list[LiveCandlePublisher] = []
+
+    hot_cache_cfg = config.live_feed.redis_hot_cache
+    if hot_cache_cfg.enabled:
+        hot_cache = RedisCandleHotCache(
+            connection_config=redis_cfg,
+            config=hot_cache_cfg,
             environ=environ,
-            hooks=RedisLiveCandlePublisherHooks(
-                on_publish_success=metrics.redis_publish_total.inc,
-                on_publish_error=metrics.redis_publish_errors_total.inc,
-                on_publish_duplicate=metrics.redis_publish_duplicates_total.inc,
-                on_publish_duration=metrics.redis_publish_duration_seconds.observe,
+            hooks=RedisCandleHotCacheHooks(
+                on_write_success=metrics.redis_hot_cache_writes_total.inc,
+                on_write_error=metrics.redis_hot_cache_write_errors_total.inc,
+                on_write_duration=metrics.redis_hot_cache_write_duration_seconds.observe,
+                on_read_hit=metrics.redis_hot_cache_read_hits_total.inc,
+                on_read_miss=metrics.redis_hot_cache_read_misses_total.inc,
+                on_read_error=metrics.redis_hot_cache_read_errors_total.inc,
+                on_read_duration=metrics.redis_hot_cache_read_duration_seconds.observe,
             ),
         )
-    else:
+        publishers.append(RedisHotCacheLiveCandlePublisher(hot_cache))
+
+    if redis_cfg.enabled:
+        publishers.append(
+            RedisStreamsLiveCandlePublisher(
+                config=redis_cfg,
+                runtime_config=config,
+                process_ingest_id=ingest_id,
+                environ=environ,
+                hooks=RedisLiveCandlePublisherHooks(
+                    on_publish_success=metrics.redis_publish_total.inc,
+                    on_publish_error=metrics.redis_publish_errors_total.inc,
+                    on_publish_duplicate=metrics.redis_publish_duplicates_total.inc,
+                    on_publish_duration=metrics.redis_publish_duration_seconds.observe,
+                ),
+            ),
+        )
+    if not publishers:
         live_candle_publisher = NoopLiveCandlePublisher()
+    elif len(publishers) == 1:
+        live_candle_publisher = publishers[0]
+    else:
+        live_candle_publisher = FanoutLiveCandlePublisher(publishers)
 
     rest_source = RestCandleIngestSource(
         cfg=config,

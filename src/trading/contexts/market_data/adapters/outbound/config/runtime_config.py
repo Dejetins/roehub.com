@@ -335,8 +335,46 @@ class RedisStreamsConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class RedisHotCacheConfig:
+    enabled: bool
+    key_prefix: str
+    retention_hours: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate runtime Redis hot-cache configuration.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Hot cache uses one zset/hash key pair per instrument key.
+        - Default retention must be production-safe for short live-tail repair.
+
+        Errors/Exceptions:
+        - Raises `ValueError` on invalid key prefix or retention.
+
+        Side effects:
+        - None.
+        """
+        _require_non_empty("live_feed.redis_hot_cache.key_prefix", self.key_prefix)
+        _require_positive_int(
+            "live_feed.redis_hot_cache.retention_hours",
+            self.retention_hours,
+        )
+
+    @property
+    def retention_ms(self) -> int:
+        return self.retention_hours * 60 * 60 * 1000
+
+
+@dataclass(frozen=True, slots=True)
 class LiveFeedConfig:
     redis_streams: RedisStreamsConfig
+    redis_hot_cache: RedisHotCacheConfig
 
     def __post_init__(self) -> None:
         """
@@ -359,6 +397,8 @@ class LiveFeedConfig:
         """
         if self.redis_streams is None:  # type: ignore[truthy-bool]
             raise ValueError("live_feed.redis_streams must be provided")
+        if self.redis_hot_cache is None:  # type: ignore[truthy-bool]
+            raise ValueError("live_feed.redis_hot_cache must be provided")
 
 
 @dataclass(frozen=True, slots=True)
@@ -512,6 +552,7 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
     )
     live_feed_map = _get_mapping(md, "live_feed", required=False)
     redis_streams_map = _get_mapping(live_feed_map, "redis_streams", required=False)
+    redis_hot_cache_map = _get_mapping(live_feed_map, "redis_hot_cache", required=False)
     live_feed = LiveFeedConfig(
         redis_streams=RedisStreamsConfig(
             enabled=_get_bool_with_default(redis_streams_map, "enabled", default=False),
@@ -545,7 +586,20 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
             ),
             retention_days=_get_int_with_default(redis_streams_map, "retention_days", default=7),
             maxlen_approx=_get_optional_int(redis_streams_map, "maxlen_approx"),
-        )
+        ),
+        redis_hot_cache=RedisHotCacheConfig(
+            enabled=_get_bool_with_default(redis_hot_cache_map, "enabled", default=False),
+            key_prefix=_get_str_with_default(
+                redis_hot_cache_map,
+                "key_prefix",
+                default="md:hot:1m",
+            ),
+            retention_hours=_get_int_with_default(
+                redis_hot_cache_map,
+                "retention_hours",
+                default=24,
+            ),
+        ),
     )
 
     return MarketDataRuntimeConfig(

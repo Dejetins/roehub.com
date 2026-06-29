@@ -9,7 +9,7 @@
 | `plan_doc` | `docs/architecture/market_data/market-data-live-tail-repair-v1.md` |
 | `prompt_pack` | `.codex/agents/generated/market-data-live-tail-repair-v1/` |
 | `ledger_status` | `active` |
-| `current_stage` | `02` |
+| `current_stage` | `03` |
 | `created_at` | `2026-06-29` |
 | `owner` | `Roehub agents / implementation executors` |
 
@@ -33,8 +33,8 @@
 | Stage | Статус | Prompt / task | Stage report | Validation depth | Ключевой результат | Blocker | Next stage allowed |
 |---|---|---|---|---|---|---|---|
 | `01` Contract foundation and audit schema | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/01-contract-foundation-audit-schema.md` | `01-contract-foundation-audit-schema.md` | DB migration + port contract tests + repository-boundary audit proof + full publish gates | Contract foundation/audit schema implemented, locally validated, scoped publish contents approved, and ready for direct-main delivery evidence in the accepted Stage `01` commit. | none | yes |
-| `02` Redis hot cache | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/02-redis-hot-cache.md` | `02-redis-hot-cache.md` | Redis integration + metrics | TBD | none until Stage `02` execution starts | yes |
-| `03` Tail provider source chain | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/03-tail-provider-source-chain.md` | `03-tail-provider-source-chain.md` | provider integration + audit DB + REST adapter boundary | TBD | blocked until `02 accepted` | no |
+| `02` Redis hot cache | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/02-redis-hot-cache.md` | `02-redis-hot-cache.md` | Redis integration + metrics + real Redis proof | Redis hot cache writer/reader, retention config, worker fan-out wiring, metrics hooks, tests, and isolated `macstudio` Redis duplicate/range proof are complete and ready for direct-main delivery evidence in the accepted Stage `02` commit. | none | yes |
+| `03` Tail provider source chain | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/03-tail-provider-source-chain.md` | `03-tail-provider-source-chain.md` | provider integration + audit DB + REST adapter boundary | TBD | none until Stage `03` execution starts | yes |
 | `04` Strategy runner integration and ACK policy | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/04-strategy-runner-integration-ack-policy.md` | `04-strategy-runner-integration-ack-policy.md` | runner integration + Redis pending/backlog proof | TBD | blocked until `03 accepted` | no |
 | `05` Metrics alerts runbook | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/05-metrics-alerts-runbook.md` | `05-metrics-alerts-runbook.md` | metrics endpoint + alert rule/runbook proof | TBD | blocked until `04 accepted` | no |
 | `06` Mac Studio repair proof | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/06-macstudio-repair-proof.md` | `06-macstudio-repair-proof.md` | post_main_production_runtime_proof | TBD | blocked until `05 accepted` | no |
@@ -52,6 +52,9 @@
 | plan | `12.5` remains blocked until `12.4 accepted`. | Stage `07` may rerun/open `12.4`, but cannot open `12.5` without accepted 6h evidence. | strategy-producer ledger |
 | `01` | `ClosedCandleTailProvider`, repair DTOs, `CandleRepairAuditRepository`, and additive migration `20260629_0038` are implemented and pass focused/full gates. | Stage `02` can build Redis hot cache against these contracts after scoped direct-main delivery remains green. | `01-contract-foundation-audit-schema.md`; local gates listed there |
 | `01` | No runtime repair behavior is wired in Stage `01`; `_repair_gap`, Redis hot cache, REST fallback, ACK policy, metrics, and production proof are later stages. | Prevents treating contract/audit foundation as proof that live-tail repair works in runtime. | `01-contract-foundation-audit-schema.md` |
+| `02` | `RedisCandleHotCache` writes normalized closed 1m candles to `md:hot:1m:<instrument_key>:h` and `md:hot:1m:<instrument_key>:z`, both keyed by `ts_open_epoch_ms`; duplicate writes overwrite the same hash field and zset member. | Stage `03` can use this adapter as the first source in the provider chain and can rely on deterministic no-ambiguity cache rows. | `02-redis-hot-cache.md`; focused tests |
+| `02` | Real Redis proof used approved isolated synthetic keys on `macstudio` via SSH tunnel: `zcard=3`, `hlen=3`, range timestamps `12:00`, `12:01`, `12:02`, duplicate write count `4`, cleanup `cleanup_remaining_keys=0`. | Stage `03` can treat Redis hot cache range read behavior as accepted adapter evidence, but not as production changed-code runtime proof. | `02-redis-hot-cache.md` |
+| `02` | Prompt pytest gate was adapted because `tests/integration` is absent in this repo snapshot. Equivalent evidence is `tests/unit/contexts/market_data` plus the real Redis proof. | Future stages should not claim `tests/integration` ran unless the directory exists or the prompt is updated. | `02-redis-hot-cache.md` |
 
 ## Contract Impact Matrix
 
@@ -78,7 +81,7 @@
 | Stage | Required gates | Real-boundary acceptance | Result | Evidence path | Residual risk | Next action |
 |---|---|---|---|---|---|---|
 | `01` | focused tests, migration check, docs index, repo-wide publish gates | Repository-boundary audit insert/read proof through `MarketDataPostgresGateway` fake; fake provider contract call for continuous/missing results; Alembic head check. Live Postgres/runtime proof is `N/A` for dormant Stage `01`. | accepted | `01-contract-foundation-audit-schema.md` | Runtime repair behavior is still not implemented; Redis hot cache, provider chain, ACK policy, metrics, and production proof remain later stages. | Run Stage `02` Redis hot cache after direct-main delivery/CI stays green. |
-| `02` | focused tests, Redis integration call, docs index | real Redis duplicate write/range read/retention/metrics | TBD | Stage report | TBD | TBD |
+| `02` | focused tests, Redis integration call, docs index | real Redis duplicate write/range read/retention/metrics | accepted | `02-redis-hot-cache.md` | Strategy provider chain is not implemented yet; Redis hot cache is not proof of end-to-end live-tail repair. `post_main_production_runtime_proof` remains Stage `06`. | Run Stage `03` Tail provider source chain after direct-main delivery/CI stays green. |
 | `03` | focused tests, provider integration call, docs index | provider returns continuous range with ClickHouse failure and REST tail fallback; audit row exists | TBD | Stage report | TBD | TBD |
 | `04` | focused runner tests, Redis pending/backlog integration, docs index | failed repair does not lose future candle; later retry advances checkpoint and creates no duplicate signals | TBD | Stage report | TBD | TBD |
 | `05` | metrics tests, alert rule parse, docs index | metrics endpoint exposes repair/cache/circuit/checkpoint-stall signals after synthetic repair call | TBD | Stage report | TBD | TBD |
@@ -91,6 +94,7 @@
 |---|---|---|---|---|---|
 | all | `main`, no speculative branch | successful stages publish via `publish-ci-deploy` direct-main discipline | required when code/config changes | required for runtime/code stages | docs-only blocked stages may record publish `N/A` only with reason |
 | `01` | `main`, no speculative branch | scoped direct-main publish of Stage `01` code/tests/report plus approved prompt-pack/plan/ledger artifacts | required for direct-main delivery | runtime host sync `N/A` for dormant contract/schema stage | User explicitly approved including pre-existing untracked `.codex/agents/generated/market-data-live-tail-repair-v1/`, `market-data-live-tail-repair-v1.md`, and market-data stage ledger/report docs in the scoped publish set. |
+| `02` | `main`, no speculative branch | scoped direct-main publish of Stage `02` code/config/tests/report/docs | required for direct-main delivery | host sync/prod runtime proof deferred to Stage `06`; Stage `02` collected only isolated pre-main Redis proof | User explicitly approved isolated synthetic-key Redis proof against `macstudio`; proof keys were cleaned up. |
 
 ## Blockers / Handoff
 
@@ -103,10 +107,10 @@
 Next prompt to run:
 
 ```text
-.codex/agents/generated/market-data-live-tail-repair-v1/02-redis-hot-cache.md
+.codex/agents/generated/market-data-live-tail-repair-v1/03-tail-provider-source-chain.md
 ```
 
-Reason: Stage `01` contract foundation/audit schema is accepted after scoped direct-main delivery approval and required local validation. Stage `02` is the next pending stage and is explicitly allowed by this ledger once publish/CI remains green.
+Reason: Stage `02` Redis hot cache is accepted after focused tests and approved isolated real Redis proof. Stage `03` is the next pending stage and is explicitly allowed once Stage `02` scoped delivery/CI remains green.
 
 ## Change Log
 
@@ -114,3 +118,4 @@ Reason: Stage `01` contract foundation/audit schema is accepted after scoped dir
 |---|---|---|---|
 | 2026-06-29 | plan | Created repair-cycle plan and ledger for Market Data live tail repair after strategy-producer Stage `12.4` blocker. | `market-data-live-tail-repair-v1.md`; this ledger |
 | 2026-06-29 | `01` | Implemented and locally validated contract foundation/audit schema, included user-approved pre-existing market-data prompt-pack/plan/ledger artifacts in scoped direct-main publish scope, and opened Stage `02`. | `01-contract-foundation-audit-schema.md`; focused/full gates listed there |
+| 2026-06-30 | `02` | Implemented Redis hot cache writer/reader, production config, worker fan-out wiring, metrics hooks, tests, docs sync, and approved isolated `macstudio` Redis duplicate/range proof with cleanup. | `02-redis-hot-cache.md` |

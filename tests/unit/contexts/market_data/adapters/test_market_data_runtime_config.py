@@ -219,11 +219,16 @@ market_data:
     assert redis_streams.stream_mode == "per_instrument"
     assert redis_streams.stream_prefix == "md.candles.1m"
     assert redis_streams.maxlen_approx == 7 * 1440
+    redis_hot_cache = cfg.live_feed.redis_hot_cache
+    assert redis_hot_cache.enabled is False
+    assert redis_hot_cache.key_prefix == "md:hot:1m"
+    assert redis_hot_cache.retention_hours == 24
+    assert redis_hot_cache.retention_ms == 24 * 60 * 60 * 1000
 
 
-def test_live_feed_redis_streams_section_is_parsed_with_computed_maxlen(tmp_path: Path) -> None:
+def test_live_feed_redis_sections_are_parsed_with_computed_defaults(tmp_path: Path) -> None:
     """
-    Ensure parser reads live feed redis section and computes maxlen when omitted.
+    Ensure parser reads live feed redis sections and computes defaults when omitted.
 
     Parameters:
     - tmp_path: pytest temporary directory fixture.
@@ -250,6 +255,10 @@ market_data:
       stream_mode: per_instrument
       stream_prefix: md.candles.1m
       retention_days: 3
+    redis_hot_cache:
+      enabled: true
+      key_prefix: md:hot:1m
+      retention_hours: 12
   backfill: { max_days_per_insert: 7, chunk_align: utc_day }
 """.strip(),
         encoding="utf-8",
@@ -268,6 +277,11 @@ market_data:
     assert redis_streams.stream_prefix == "md.candles.1m"
     assert redis_streams.retention_days == 3
     assert redis_streams.maxlen_approx == 3 * 1440
+    redis_hot_cache = cfg.live_feed.redis_hot_cache
+    assert redis_hot_cache.enabled is True
+    assert redis_hot_cache.key_prefix == "md:hot:1m"
+    assert redis_hot_cache.retention_hours == 12
+    assert redis_hot_cache.retention_ms == 12 * 60 * 60 * 1000
 
 
 def test_market_earliest_available_timestamp_must_not_be_in_future(tmp_path: Path) -> None:
