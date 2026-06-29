@@ -75,6 +75,7 @@ def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
         "/opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml",
         "/opt/roehub/config/prometheus.rules/strategy-producer.rules.yml",
         "/opt/roehub/config/prometheus.rules/market-data-funding.rules.yml",
+        "/opt/roehub/config/prometheus.rules/notifications-admin.rules.yml",
     ]
     jobs_by_name = {job["job_name"]: job for job in payload["scrape_configs"]}
     assert jobs_by_name["exchange-execution"]["static_configs"] == [
@@ -120,6 +121,32 @@ def test_macos_bootstrap_installs_stage17_prometheus_rules() -> None:
     assert "live-execution-stage17.rules.yml" in script
     assert "strategy-producer.rules.yml" in script
     assert "market-data-funding.rules.yml" in script
+    assert "notifications-admin.rules.yml" in script
+
+
+def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
+    rules_payload = _load_yaml(
+        relative_path="infra/macos/prometheus/rules/notifications-admin.rules.yml"
+    )
+    groups = rules_payload["groups"]
+    assert [group["name"] for group in groups] == ["notifications-admin"]
+    rules = groups[0]["rules"]
+    alerts = {rule["alert"]: rule for rule in rules}
+    assert set(alerts) == {
+        "NotificationsCriticalUnknownDelivery",
+        "NotificationsDispatcherPendingOld",
+        "NotificationsWorkerDown",
+        "NotificationsRetry429High",
+        "NotificationsMissedReportSchedule",
+    }
+    for rule in alerts.values():
+        assert rule["labels"]["owner"] == "notifications"
+        assert rule["labels"]["severity"] in {"warning", "critical"}
+        assert rule["annotations"]["runbook"].startswith(
+            "docs/runbooks/notifications-admin-alerts.md#"
+        )
+        assert rule["annotations"]["escalation"]
+        assert rule["annotations"]["action"]
 
 
 def test_macos_prometheus_funding_rules_are_repo_managed() -> None:

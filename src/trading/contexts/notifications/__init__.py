@@ -1,4 +1,6 @@
 from .application import (
+    NotificationAdminDrillResult,
+    NotificationAdminDrillService,
     NotificationDispatchBatchResult,
     NotificationDispatcher,
     NotificationDispatcherConfig,
@@ -22,6 +24,7 @@ from .application import (
     TelegramInboundCommand,
     render_notification_stats_snapshot,
     render_portfolio_report,
+    synthetic_admin_notification_facts,
     synthetic_notification_matrix,
 )
 from .application.telegram_binding import InMemoryNotificationTelegramBindingStore
@@ -38,6 +41,8 @@ from .domain import (
 )
 
 __all__ = [
+    "NotificationAdminDrillResult",
+    "NotificationAdminDrillService",
     "NotificationDelivery",
     "NotificationDeliveryAttempt",
     "NotificationDispatchBatchResult",
@@ -70,6 +75,7 @@ __all__ = [
     "build_notification_dedupe_key",
     "render_notification_stats_snapshot",
     "render_portfolio_report",
+    "synthetic_admin_notification_facts",
     "sanitize_notification_mapping",
     "synthetic_notification_matrix",
 ]

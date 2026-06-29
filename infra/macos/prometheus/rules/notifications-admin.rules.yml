@@ -1,0 +1,67 @@
+groups:
+  - name: notifications-admin
+    rules:
+      - alert: NotificationsCriticalUnknownDelivery
+        expr: increase(notifications_delivery_unknown_total{category=~"execution_unknown|kill_switch|admin_critical"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: notifications
+        annotations:
+          summary: Critical notification delivery entered unknown provider state
+          description: A critical user or admin notification reached an ambiguous provider result and must not be blindly retried.
+          escalation: Inspect delivery and attempt rows, keep raw provider payloads redacted, and replay only by explicit operator action.
+          runbook: docs/runbooks/notifications-admin-alerts.md#critical-unknown-delivery
+          action: Locate the delivery by sanitized ids, inspect last_error_code, and decide whether manual replay is safe.
+
+      - alert: NotificationsDispatcherPendingOld
+        expr: notifications_pending_oldest_age_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          owner: notifications
+        annotations:
+          summary: Notification dispatcher pending queue is stale
+          description: The oldest pending notification delivery has exceeded the allowed age window.
+          escalation: Check dispatcher worker health, provider errors, retry volume, and route status before replaying messages.
+          runbook: docs/runbooks/notifications-admin-alerts.md#stale-pending-deliveries
+          action: Inspect pending deliveries by provider/channel/severity and drain only through the dispatcher.
+
+      - alert: NotificationsWorkerDown
+        expr: notifications_worker_up{worker=~"notification_dispatcher|telegram_bot_worker|notification_report_scheduler"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: notifications
+        annotations:
+          summary: Notification worker is down
+          description: A required notifications worker health gauge is zero.
+          escalation: Check launchd/Monit state and logs before enabling real Telegram canary.
+          runbook: docs/runbooks/notifications-admin-alerts.md#worker-down
+          action: Restart the affected worker through the managed Mac Studio service path and verify metrics.
+
+      - alert: NotificationsRetry429High
+        expr: increase(notifications_deliveries_retry_total{reason="rate_limited"}[10m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+          owner: notifications
+        annotations:
+          summary: Notification provider rate limiting is elevated
+          description: Notification deliveries are retrying due to provider 429/rate-limit responses.
+          escalation: Keep retry policy bounded and avoid manual replay until provider pressure falls.
+          runbook: docs/runbooks/notifications-admin-alerts.md#high-retry-rate
+          action: Inspect retry_after values, route volume, and provider-specific backoff.
+
+      - alert: NotificationsMissedReportSchedule
+        expr: increase(notifications_report_schedule_missed_total[30m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          owner: notifications
+        annotations:
+          summary: Scheduled notification report was missed
+          description: Weekly or monthly notification report scheduling observed a late period.
+          escalation: Inspect scheduler clock, route schedule_json, and report-run dedupe before replaying the period.
+          runbook: docs/runbooks/notifications-admin-alerts.md#missed-report-schedule
+          action: Re-run the scheduler for the affected period and verify no duplicate report_run dedupe key is created.

@@ -1,3 +1,8 @@
+from .admin_notifications import (
+    NotificationAdminDrillResult,
+    NotificationAdminDrillService,
+    synthetic_admin_notification_facts,
+)
 from .dispatcher import (
     NotificationDispatchBatchResult,
     NotificationDispatcher,
@@ -38,6 +43,8 @@ from .telegram_commands import (
 
 __all__ = [
     "NotificationRepository",
+    "NotificationAdminDrillResult",
+    "NotificationAdminDrillService",
     "NotificationDispatchBatchResult",
     "NotificationDispatcher",
     "NotificationDispatcherConfig",
@@ -61,5 +68,6 @@ __all__ = [
     "TelegramInboundCommand",
     "render_notification_stats_snapshot",
     "render_portfolio_report",
+    "synthetic_admin_notification_facts",
     "synthetic_notification_matrix",
 ]

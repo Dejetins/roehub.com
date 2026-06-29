@@ -6,6 +6,7 @@ rule_files:
   - /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
   - /opt/roehub/config/prometheus.rules/strategy-producer.rules.yml
   - /opt/roehub/config/prometheus.rules/market-data-funding.rules.yml
+  - /opt/roehub/config/prometheus.rules/notifications-admin.rules.yml
 
 scrape_configs:
   - job_name: prometheus

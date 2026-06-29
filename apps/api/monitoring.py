@@ -137,6 +137,36 @@ _EXECUTION_NOTIFICATION_OUTBOX_TOTAL = Counter(
     "Execution notification outbox events by type and producer source.",
     ("event_type", "source_type", "severity"),
 )
+_ADMIN_NOTIFICATIONS_TOTAL = Counter(
+    "admin_notifications_total",
+    "Admin notification events and deliveries by bounded category, severity, and status.",
+    ("category", "severity", "status"),
+)
+_NOTIFICATIONS_DELIVERY_UNKNOWN_TOTAL = Counter(
+    "notifications_delivery_unknown_total",
+    "Notification deliveries that entered unknown provider state.",
+    ("provider", "channel", "category"),
+)
+_NOTIFICATIONS_PENDING_OLDEST_AGE_SECONDS = Gauge(
+    "notifications_pending_oldest_age_seconds",
+    "Oldest pending notification delivery age by bounded provider, channel, and severity.",
+    ("provider", "channel", "severity"),
+)
+_NOTIFICATIONS_DELIVERIES_RETRY_TOTAL = Counter(
+    "notifications_deliveries_retry_total",
+    "Notification delivery retry outcomes by bounded provider, channel, and reason.",
+    ("provider", "channel", "reason"),
+)
+_NOTIFICATIONS_WORKER_UP = Gauge(
+    "notifications_worker_up",
+    "Notification worker health gauge where 1 is up and 0 is down.",
+    ("worker",),
+)
+_NOTIFICATIONS_REPORT_SCHEDULE_MISSED_TOTAL = Counter(
+    "notifications_report_schedule_missed_total",
+    "Missed scheduled notification reports by report type and timezone.",
+    ("report_type", "timezone"),
+)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:
@@ -378,6 +408,57 @@ def record_execution_notification_outbox(
     ).inc()
 
 
+def record_admin_notification(*, category: str, severity: str, status: str) -> None:
+    _ADMIN_NOTIFICATIONS_TOTAL.labels(
+        category=(category or "unknown")[:80],
+        severity=(severity or "unknown")[:80],
+        status=(status or "unknown")[:80],
+    ).inc()
+
+
+def record_notification_delivery_unknown(
+    *, provider: str, channel: str, category: str
+) -> None:
+    _NOTIFICATIONS_DELIVERY_UNKNOWN_TOTAL.labels(
+        provider=(provider or "unknown")[:80],
+        channel=(channel or "unknown")[:80],
+        category=(category or "unknown")[:80],
+    ).inc()
+
+
+def set_notifications_pending_oldest_age_seconds(
+    *, provider: str, channel: str, severity: str, seconds: float
+) -> None:
+    _NOTIFICATIONS_PENDING_OLDEST_AGE_SECONDS.labels(
+        provider=(provider or "unknown")[:80],
+        channel=(channel or "unknown")[:80],
+        severity=(severity or "unknown")[:80],
+    ).set(max(0.0, seconds))
+
+
+def record_notifications_delivery_retry(
+    *, provider: str, channel: str, reason: str
+) -> None:
+    _NOTIFICATIONS_DELIVERIES_RETRY_TOTAL.labels(
+        provider=(provider or "unknown")[:80],
+        channel=(channel or "unknown")[:80],
+        reason=(reason or "unknown")[:80],
+    ).inc()
+
+
+def set_notification_worker_up(*, worker: str, up: bool) -> None:
+    _NOTIFICATIONS_WORKER_UP.labels(worker=(worker or "unknown")[:80]).set(1 if up else 0)
+
+
+def record_notifications_report_schedule_missed(
+    *, report_type: str, timezone: str
+) -> None:
+    _NOTIFICATIONS_REPORT_SCHEDULE_MISSED_TOTAL.labels(
+        report_type=(report_type or "unknown")[:80],
+        timezone=(timezone or "unknown")[:80],
+    ).inc()
+
+
 def _resolve_path_label(*, request: Request) -> str:
     """
     Resolve deterministic path label for one HTTP request.
@@ -427,4 +508,10 @@ __all__ = [
     "record_execution_notification_outbox",
     "record_execution_risk_gate",
     "record_execution_source_event",
+    "record_admin_notification",
+    "record_notification_delivery_unknown",
+    "record_notifications_delivery_retry",
+    "record_notifications_report_schedule_missed",
+    "set_notification_worker_up",
+    "set_notifications_pending_oldest_age_seconds",
 ]
