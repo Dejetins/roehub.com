@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Protocol
+from uuid import UUID
+
+from trading.contexts.notifications.domain import (
+    NotificationDelivery,
+    NotificationDeliveryAttempt,
+    NotificationEvent,
+    NotificationReportRun,
+    NotificationRoute,
+    TelegramUpdate,
+)
+from trading.shared_kernel.primitives import UserId
+
+
+class NotificationRepository(Protocol):
+    def record_event(self, *, event: NotificationEvent) -> NotificationEvent: ...
+
+    def get_event_by_dedupe_key(self, *, dedupe_key: str) -> NotificationEvent | None: ...
+
+    def upsert_route(self, *, route: NotificationRoute) -> NotificationRoute: ...
+
+    def list_active_routes(
+        self, *, owner_user_id: UserId | None, recipient_kind: str, category: str
+    ) -> tuple[NotificationRoute, ...]: ...
+
+    def record_delivery(self, *, delivery: NotificationDelivery) -> NotificationDelivery: ...
+
+    def claim_delivery(
+        self, *, delivery_id: UUID, lease_until: datetime, now: datetime
+    ) -> NotificationDelivery | None: ...
+
+    def record_delivery_attempt(
+        self, *, attempt: NotificationDeliveryAttempt
+    ) -> NotificationDeliveryAttempt: ...
+
+    def record_telegram_update(self, *, update: TelegramUpdate) -> TelegramUpdate: ...
+
+    def record_report_run(self, *, report_run: NotificationReportRun) -> NotificationReportRun: ...
