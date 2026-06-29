@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `05` добавляет provider-neutral `NotificationStatsQueryService` для portfolio, strategy и exchange stats snapshots за periods `today`, `week`, `month`. Stage remains `completed-local` until implementation commit is published to `main`, GitHub CI/deploy passes, `macstudio` checkout is synchronized and production smoke passes.
+Acceptance boundary: Stage `05` добавляет provider-neutral `NotificationStatsQueryService` для portfolio, strategy и exchange stats snapshots за periods `today`, `week`, `month`. Stage accepted after implementation commit `275be8702f19b06fe03e057cd719eafff25cbaf3` was published to `main`, GitHub CI/deploy passed, `macstudio` checkout synchronized to the same commit and production smoke passed.
 
 ## User Required Before Start
 
@@ -73,6 +73,10 @@ Local seeded ACL-reader smoke executed with no external provider:
 | `uv run pyright src/trading/contexts/notifications tests/unit/contexts/notifications` | passed |
 | Seeded stats ACL smoke | passed: `stage05_stats_smoke=ok ... owner_filtered=True` |
 | `uv run python -m tools.docs.generate_docs_index --check` | local check failed because the dirty checkout contains unrelated untracked `market-data-live-tail-repair-v1` docs; generated diff inspection showed the Stage `05` README entry matches the generator and only those unrelated market-data entries remain missing |
+| GitHub CI for implementation commit `275be8702f19b06fe03e057cd719eafff25cbaf3` | passed: run `28395374117` |
+| GitHub deploy/image for implementation commit `275be8702f19b06fe03e057cd719eafff25cbaf3` | passed: Backend `28395593695`, Web `28395593653`, App Image `28395593623` |
+| `macstudio` checkout sync | passed: `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `275be8702f19b06fe03e057cd719eafff25cbaf3` |
+| `macstudio` production smoke | passed: `cd /opt/roehub/app && bash scripts/macos/smoke_prod.sh` exited `0` |
 
 ## Contract Impact
 
