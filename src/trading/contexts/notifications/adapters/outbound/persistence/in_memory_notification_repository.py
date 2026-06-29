@@ -53,6 +53,17 @@ class InMemoryNotificationRepository:
             and (not route.category_filter or category in route.category_filter)
         )
 
+    def list_active_report_routes(self) -> tuple[NotificationRoute, ...]:
+        return tuple(
+            route
+            for route in self.routes.values()
+            if route.status == "active"
+            and route.recipient_kind == "user"
+            and route.owner_user_id is not None
+            and route.mode in {"reports", "all"}
+            and (not route.category_filter or "portfolio_report" in route.category_filter)
+        )
+
     def record_delivery(self, *, delivery: NotificationDelivery) -> NotificationDelivery:
         self.deliveries[delivery.delivery_id] = delivery
         return delivery
@@ -140,5 +151,16 @@ class InMemoryNotificationRepository:
         return self.telegram_updates.get(telegram_update_id)
 
     def record_report_run(self, *, report_run: NotificationReportRun) -> NotificationReportRun:
+        existing = self.get_report_run_by_dedupe_key(dedupe_key=report_run.dedupe_key)
+        if existing is not None:
+            return existing
         self.report_runs[report_run.report_run_id] = report_run
         return report_run
+
+    def get_report_run_by_dedupe_key(
+        self, *, dedupe_key: str
+    ) -> NotificationReportRun | None:
+        for report_run in self.report_runs.values():
+            if report_run.dedupe_key == dedupe_key:
+                return report_run
+        return None

@@ -2,6 +2,9 @@ from .application import (
     NotificationDispatchBatchResult,
     NotificationDispatcher,
     NotificationDispatcherConfig,
+    NotificationReportScheduler,
+    NotificationReportSchedulerConfig,
+    NotificationReportSchedulerResult,
     NotificationRepository,
     NotificationRouteDecision,
     NotificationSourceRouter,
@@ -18,6 +21,7 @@ from .application import (
     TelegramCommandHandlingResult,
     TelegramInboundCommand,
     render_notification_stats_snapshot,
+    render_portfolio_report,
     synthetic_notification_matrix,
 )
 from .application.telegram_binding import InMemoryNotificationTelegramBindingStore
@@ -40,6 +44,9 @@ __all__ = [
     "NotificationDispatcher",
     "NotificationDispatcherConfig",
     "NotificationEvent",
+    "NotificationReportScheduler",
+    "NotificationReportSchedulerConfig",
+    "NotificationReportSchedulerResult",
     "NotificationReportRun",
     "NotificationRepository",
     "NotificationRoute",
@@ -62,6 +69,7 @@ __all__ = [
     "TelegramUpdate",
     "build_notification_dedupe_key",
     "render_notification_stats_snapshot",
+    "render_portfolio_report",
     "sanitize_notification_mapping",
     "synthetic_notification_matrix",
 ]

@@ -4,6 +4,12 @@ from .dispatcher import (
     NotificationDispatcherConfig,
 )
 from .ports import NotificationRepository
+from .report_scheduler import (
+    NotificationReportScheduler,
+    NotificationReportSchedulerConfig,
+    NotificationReportSchedulerResult,
+    render_portfolio_report,
+)
 from .source_router import (
     NotificationRouteDecision,
     NotificationSourceRouter,
@@ -35,6 +41,9 @@ __all__ = [
     "NotificationDispatchBatchResult",
     "NotificationDispatcher",
     "NotificationDispatcherConfig",
+    "NotificationReportScheduler",
+    "NotificationReportSchedulerConfig",
+    "NotificationReportSchedulerResult",
     "NotificationRouteDecision",
     "NotificationSourceRouter",
     "NotificationStatsQueryService",
@@ -51,5 +60,6 @@ __all__ = [
     "TelegramCommandHandlingResult",
     "TelegramInboundCommand",
     "render_notification_stats_snapshot",
+    "render_portfolio_report",
     "synthetic_notification_matrix",
 ]

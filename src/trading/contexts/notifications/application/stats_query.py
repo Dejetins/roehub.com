@@ -122,6 +122,33 @@ class NotificationStatsQueryService:
             generated_at=generated_at,
         )
 
+    def get_portfolio_stats_for_window(
+        self,
+        *,
+        owner_user_id: UserId,
+        period: NotificationStatsPeriod,
+        period_start: datetime,
+        period_end: datetime,
+        generated_at: datetime,
+        timezone: str = "UTC",
+    ) -> NotificationStatsSnapshot:
+        if period_start >= period_end:
+            raise ValueError("stats report window must be non-empty")
+        return self._build_snapshot(
+            owner_user_id=owner_user_id,
+            scope_kind="portfolio",
+            scope_ref=None,
+            strategy_ref=None,
+            exchange_ref=None,
+            window=NotificationStatsPeriodWindow(
+                period=period,
+                timezone=timezone,
+                start_at=period_start,
+                end_at=period_end,
+            ),
+            generated_at=generated_at,
+        )
+
     def get_strategy_stats(
         self,
         *,
