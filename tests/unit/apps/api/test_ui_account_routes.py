@@ -37,6 +37,10 @@ from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.notifications.application import (
+    InMemoryNotificationTelegramBindingStore,
+    NotificationTelegramBindingService,
+)
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyEventRepository,
     InMemoryStrategyExchangeBindingRepository,
@@ -1150,6 +1154,35 @@ def test_ui_account_integrations_and_notifications_mutations_mask_webhook_and_au
     assert event_types == ["notifications_updated", "integration_updated"]
 
 
+def test_ui_account_telegram_binding_code_and_status_are_secret_safe() -> None:
+    binding_store = InMemoryNotificationTelegramBindingStore()
+    binding_service = NotificationTelegramBindingService(store=binding_store)
+    client, _account_repository, _session_ids = _build_test_client(
+        telegram_binding_service=binding_service
+    )
+
+    initial = client.get("/ui/account/telegram/binding")
+    create_response = client.post(
+        "/ui/account/telegram/binding-code",
+        headers={"origin": "http://testserver"},
+    )
+
+    assert initial.status_code == 200
+    assert initial.json() == {
+        "is_confirmed": False,
+        "chat_id_ref_masked": None,
+        "confirmed_at": None,
+    }
+    assert create_response.status_code == 200
+    payload = create_response.json()
+    assert len(payload["code"]) == 8
+    assert "expires_at" in payload
+    stored_codes = list(binding_store.binding_codes.values())
+    assert len(stored_codes) == 1
+    assert stored_codes[0].code_hash != payload["code"]
+    assert payload["code"] not in repr(stored_codes[0])
+
+
 def test_ui_account_sessions_and_audit_are_owner_scoped_and_cursor_paginated() -> None:
     client, account_repository, session_ids = _build_test_client()
     account_repository.append_audit_event(
@@ -1392,6 +1425,7 @@ def _build_test_client(
     *,
     exchange_control_client: ExchangeControlClient | None = None,
     strategy_binding_service: StrategyExchangeBindingService | None = None,
+    telegram_binding_service: NotificationTelegramBindingService | None = None,
 ) -> tuple[
     TestClient,
     InMemoryAccountSettingsRepository,
@@ -1490,6 +1524,7 @@ def _build_test_client(
             clock=clock,
             exchange_control_client=exchange_control_client or InMemoryExchangeControlClient(),
             strategy_binding_service=strategy_binding_service,
+            telegram_binding_service=telegram_binding_service,
         )
     )
     client = TestClient(app)

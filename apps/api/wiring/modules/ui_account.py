@@ -17,6 +17,10 @@ from trading.contexts.identity.application import AccountSettingsRepository
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.notifications.application import (
+    InMemoryNotificationTelegramBindingStore,
+    NotificationTelegramBindingService,
+)
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
@@ -46,6 +50,7 @@ def build_ui_account_router(
         clock=clock,
         exchange_control_client=build_exchange_control_client_from_environ(environ=environ),
         strategy_binding_service=build_strategy_exchange_binding_service(environ=environ),
+        telegram_binding_service=build_notification_telegram_binding_service(),
     )
 
 
@@ -84,4 +89,10 @@ def build_strategy_exchange_binding_service(
     return StrategyExchangeBindingService(
         strategy_repository=InMemoryStrategyRepository(),
         binding_repository=InMemoryStrategyExchangeBindingRepository(),
+    )
+
+
+def build_notification_telegram_binding_service() -> NotificationTelegramBindingService:
+    return NotificationTelegramBindingService(
+        store=InMemoryNotificationTelegramBindingStore()
     )

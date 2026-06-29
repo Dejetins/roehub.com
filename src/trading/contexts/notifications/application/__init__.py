@@ -11,6 +11,16 @@ from .source_router import (
     SyntheticNotificationSourceFact,
     synthetic_notification_matrix,
 )
+from .telegram_binding import (
+    InMemoryNotificationTelegramBindingStore,
+    NotificationTelegramBindingService,
+    NotificationTelegramBindingStatus,
+)
+from .telegram_commands import (
+    TelegramCommandHandler,
+    TelegramCommandHandlingResult,
+    TelegramInboundCommand,
+)
 
 __all__ = [
     "NotificationRepository",
@@ -20,6 +30,12 @@ __all__ = [
     "NotificationRouteDecision",
     "NotificationSourceRouter",
     "NotificationSyntheticFlowResult",
+    "NotificationTelegramBindingService",
+    "NotificationTelegramBindingStatus",
     "SyntheticNotificationSourceFact",
+    "InMemoryNotificationTelegramBindingStore",
+    "TelegramCommandHandler",
+    "TelegramCommandHandlingResult",
+    "TelegramInboundCommand",
     "synthetic_notification_matrix",
 ]

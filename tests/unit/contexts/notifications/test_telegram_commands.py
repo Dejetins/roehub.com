@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+import pytest
+
+from trading.contexts.notifications.adapters import InMemoryNotificationRepository
+from trading.contexts.notifications.application import (
+    InMemoryNotificationTelegramBindingStore,
+    NotificationTelegramBindingService,
+    TelegramCommandHandler,
+    TelegramInboundCommand,
+)
+from trading.contexts.notifications.application.telegram_commands import (
+    TelegramCommandScopeAuthorizer,
+)
+from trading.shared_kernel.primitives import UserId
+
+
+def _now() -> datetime:
+    return datetime(2026, 6, 29, 15, 0, tzinfo=timezone.utc)
+
+
+def _user_id() -> UserId:
+    return UserId(UUID("11111111-1111-4111-8111-111111111111"))
+
+
+def test_start_binding_uses_hashed_one_time_code_and_idempotent_updates() -> None:
+    repository = InMemoryNotificationRepository()
+    binding_store = InMemoryNotificationTelegramBindingStore()
+    binding_service = NotificationTelegramBindingService(store=binding_store)
+    code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+    )
+    command = _command(update_id=101, text=f"/start {code_view.code}")
+
+    first = handler.handle(command=command)
+    repeated = handler.handle(command=command)
+    reuse = handler.handle(command=_command(update_id=102, text=f"/start {code_view.code}"))
+
+    assert first.status == "handled"
+    assert first.telegram_update.owner_user_id == _user_id()
+    assert first.delivery is not None
+    assert repeated.idempotent_replay is True
+    assert repeated.delivery is None
+    assert reuse.status == "failed"
+    assert len(repository.telegram_updates) == 2
+    assert len(repository.deliveries) == 2
+    assert code_view.code not in repr(binding_store.binding_codes)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    (
+        ("/stats today", "Stats for today"),
+        ("/stats week", "Stats for week"),
+        ("/stats month", "Stats for month"),
+        ("/settings", "Telegram settings"),
+        ("/critical_only", "critical_only"),
+        ("/signals_on", "Signal notifications enabled"),
+        ("/signals_off", "Signal notifications disabled"),
+        ("/reports weekly on", "Weekly reports turned on"),
+        ("/reports monthly off", "Monthly reports turned off"),
+    ),
+)
+def test_bound_command_coverage_creates_command_response_delivery(
+    text: str, expected: str
+) -> None:
+    repository, binding_service = _bound_repository_and_service()
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+    )
+
+    result = handler.handle(command=_command(update_id=201, text=text))
+
+    assert result.status == "handled"
+    assert expected in result.response_text
+    assert result.delivery is not None
+    assert result.delivery.status == "pending"
+    assert result.delivery.rendered_payload_json["command"] == text.split()[0].removeprefix("/")
+
+
+def test_strategy_and_exchange_scopes_fail_closed_when_unauthorized() -> None:
+    repository, binding_service = _bound_repository_and_service()
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+        scope_authorizer=_ScopeAuthorizer(
+            allowed_strategy_refs=frozenset({"owned-strategy"}),
+            allowed_exchange_refs=frozenset({"owned-exchange"}),
+        ),
+    )
+
+    denied_strategy = handler.handle(
+        command=_command(update_id=301, text="/strategy foreign-strategy week")
+    )
+    allowed_strategy = handler.handle(
+        command=_command(update_id=302, text="/strategy owned-strategy month")
+    )
+    denied_exchange = handler.handle(
+        command=_command(update_id=303, text="/exchange foreign-exchange today")
+    )
+    allowed_exchange = handler.handle(
+        command=_command(update_id=304, text="/exchange owned-exchange week")
+    )
+
+    assert denied_strategy.status == "failed"
+    assert "unavailable" in denied_strategy.response_text
+    assert allowed_strategy.status == "handled"
+    assert denied_exchange.status == "failed"
+    assert "unavailable" in denied_exchange.response_text
+    assert allowed_exchange.status == "handled"
+
+
+def test_expired_binding_code_fails_closed() -> None:
+    repository = InMemoryNotificationRepository()
+    binding_service = NotificationTelegramBindingService(
+        store=InMemoryNotificationTelegramBindingStore(),
+        ttl_seconds=1,
+    )
+    code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+    )
+
+    result = handler.handle(
+        command=_command(
+            update_id=401,
+            text=f"/start {code_view.code}",
+            received_at=_now() + timedelta(seconds=2),
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.telegram_update.owner_user_id is None
+    assert "invalid or expired" in result.response_text
+
+
+@dataclass(frozen=True, slots=True)
+class _ScopeAuthorizer(TelegramCommandScopeAuthorizer):
+    allowed_strategy_refs: frozenset[str]
+    allowed_exchange_refs: frozenset[str]
+
+    def can_read_strategy(self, *, owner_user_id: UserId, strategy_ref: str) -> bool:
+        _ = owner_user_id
+        return strategy_ref in self.allowed_strategy_refs
+
+    def can_read_exchange(self, *, owner_user_id: UserId, exchange_ref: str) -> bool:
+        _ = owner_user_id
+        return exchange_ref in self.allowed_exchange_refs
+
+
+def _bound_repository_and_service() -> tuple[
+    InMemoryNotificationRepository, NotificationTelegramBindingService
+]:
+    repository = InMemoryNotificationRepository()
+    binding_service = NotificationTelegramBindingService(
+        store=InMemoryNotificationTelegramBindingStore()
+    )
+    code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
+    binding_service.confirm_binding_code(
+        code=code_view.code,
+        chat_id_ref="telegram_ref:test:1234",
+        now=_now(),
+    )
+    return repository, binding_service
+
+
+def _command(
+    *, update_id: int, text: str, received_at: datetime | None = None
+) -> TelegramInboundCommand:
+    return TelegramInboundCommand(
+        telegram_update_id=update_id,
+        chat_id_ref="telegram_ref:test:1234",
+        command_text=text,
+        received_at=received_at or _now(),
+    )

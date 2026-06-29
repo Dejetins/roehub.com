@@ -31,6 +31,8 @@ from apps.api.dto.ui_account import (
     RotateExchangeConnectionRequest,
     StrategyExchangeBindingResponse,
     StrategyExchangeBindingsResponse,
+    TelegramBindingCodeResponse,
+    TelegramBindingStatusResponse,
     UpdateAccountIntegrationRequest,
     UpdateAccountNotificationRequest,
     UpdateAccountPreferencesRequest,
@@ -59,6 +61,10 @@ from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
     AccountSettingsValidationError,
 )
+from trading.contexts.notifications.application import (
+    InMemoryNotificationTelegramBindingStore,
+    NotificationTelegramBindingService,
+)
 from trading.contexts.strategy.application.use_cases.exchange_bindings import (
     StrategyExchangeBindingService,
     StrategyExchangeBindingView,
@@ -78,6 +84,7 @@ def build_ui_account_router(
     clock: IdentityClock,
     exchange_control_client: ExchangeControlClient | None = None,
     strategy_binding_service: StrategyExchangeBindingService | None = None,
+    telegram_binding_service: NotificationTelegramBindingService | None = None,
 ) -> APIRouter:
     if account_settings is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires account_settings")
@@ -85,6 +92,13 @@ def build_ui_account_router(
         raise ValueError("build_ui_account_router requires current_user_dependency")
     if clock is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires clock")
+    effective_telegram_binding_service = (
+        telegram_binding_service
+        if telegram_binding_service is not None
+        else NotificationTelegramBindingService(
+            store=InMemoryNotificationTelegramBindingStore()
+        )
+    )
 
     router = APIRouter(tags=["ui-account"])
 
@@ -649,6 +663,40 @@ def build_ui_account_router(
             raise _validation_error(error=error) from error
         return _notification_response(notification=notification)
 
+    @router.post(
+        "/ui/account/telegram/binding-code",
+        response_model=TelegramBindingCodeResponse,
+    )
+    def post_telegram_binding_code(
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> TelegramBindingCodeResponse:
+        _enforce_same_origin_mutation(request=request)
+        binding_code = effective_telegram_binding_service.create_binding_code(
+            owner_user_id=principal.user_id,
+            now=clock.now(),
+        )
+        return TelegramBindingCodeResponse(
+            code=binding_code.code,
+            expires_at=binding_code.expires_at,
+        )
+
+    @router.get(
+        "/ui/account/telegram/binding",
+        response_model=TelegramBindingStatusResponse,
+    )
+    def get_telegram_binding(
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> TelegramBindingStatusResponse:
+        status = effective_telegram_binding_service.get_binding_status(
+            owner_user_id=principal.user_id
+        )
+        return TelegramBindingStatusResponse(
+            is_confirmed=status.is_confirmed,
+            chat_id_ref_masked=_masked_chat_ref(chat_id_ref=status.chat_id_ref),
+            confirmed_at=status.confirmed_at,
+        )
+
     @router.get("/ui/account/preferences", response_model=AccountPreferencesResponse)
     def get_preferences(
         principal: CurrentUserPrincipal = Depends(require_account_user),
@@ -1116,6 +1164,15 @@ def _notification_response(
         mode=notification.mode,
         updated_at=notification.updated_at,
     )
+
+
+def _masked_chat_ref(*, chat_id_ref: str | None) -> str | None:
+    if chat_id_ref is None:
+        return None
+    parts = chat_id_ref.split(":")
+    if len(parts) < 3:
+        return "telegram_ref:masked"
+    return f"{parts[0]}:{parts[1][:6]}...:{parts[-1]}"
 
 
 def _session_response(*, session: AccountSessionView) -> AccountSessionResponse:

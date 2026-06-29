@@ -128,8 +128,16 @@ class InMemoryNotificationRepository:
         return attempt
 
     def record_telegram_update(self, *, update: TelegramUpdate) -> TelegramUpdate:
+        existing = self.get_telegram_update(telegram_update_id=update.telegram_update_id)
+        if existing is not None:
+            return existing
         self.telegram_updates[update.telegram_update_id] = update
         return update
+
+    def get_telegram_update(
+        self, *, telegram_update_id: int
+    ) -> TelegramUpdate | None:
+        return self.telegram_updates.get(telegram_update_id)
 
     def record_report_run(self, *, report_run: NotificationReportRun) -> NotificationReportRun:
         self.report_runs[report_run.report_run_id] = report_run

@@ -272,6 +272,21 @@ class AccountNotificationsResponse(BaseModel):
     items: list[AccountNotificationResponse]
 
 
+class TelegramBindingCodeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    expires_at: datetime
+
+
+class TelegramBindingStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_confirmed: bool
+    chat_id_ref_masked: str | None
+    confirmed_at: datetime | None
+
+
 class AccountAutorefreshPreferenceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

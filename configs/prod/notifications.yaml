@@ -12,5 +12,9 @@ notifications:
       enabled: false
       api_base_url: "https://api.telegram.org"
       send_timeout_s: 2.0
+  telegram_bot:
+    enabled: false
+    poll_interval_seconds: 5
+    long_poll_timeout_seconds: 30
   metrics:
     port: 9210
