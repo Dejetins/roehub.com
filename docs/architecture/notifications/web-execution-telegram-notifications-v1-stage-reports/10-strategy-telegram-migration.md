@@ -1,8 +1,8 @@
 # Stage 10: Strategy Telegram Migration
 
-Дата: `2026-06-29`
+Дата: `2026-06-30`
 
-Статус: `blocked`
+Статус: `accepted`
 
 Checkout path: `/Users/daniildegtyarev/Projects/roehub.com`
 
@@ -14,7 +14,7 @@ Unrelated dirty changes observed and excluded: foreign Market Data hunk in `docs
 
 Acceptance boundary: Stage `10` migrates Strategy `failed` notification routing from direct Strategy Telegram delivery to the `notifications` context while keeping direct Strategy Telegram adapters as rollback-only modes. The stage is not accepted until the implementation revision is on `main`, CI/deploy pass, Mac Studio checkout/runtime are synchronized, `smoke_prod.sh` passes and a post-main production runtime proof verifies the Strategy notifications mode without real Telegram send.
 
-Current blocker: post-main production runtime proof is blocked by current SSH authentication failure to `macstudio` after the host checkout/smoke had already been synchronized for commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa`. Follow-up proof attempts after the SQL fix did not reach the remote shell and did not mutate provider state.
+Current blocker: `none`. The previous `macstudio` SSH authentication blocker is resolved. Post-main production runtime proof passed after cleanup.
 
 ## Scope
 
@@ -67,7 +67,7 @@ The proof runs a controlled Strategy live-runner failure through the real Strate
 - pending `NotificationDelivery` is created for the active route;
 - no direct Telegram provider call is used.
 
-Post-main production runtime proof remains blocked for acceptance.
+Post-main production runtime proof passed for acceptance.
 
 ## Delivery Evidence
 
@@ -75,11 +75,12 @@ Post-main production runtime proof remains blocked for acceptance.
 |---|---|
 | Implementation commit | `fc16cf45535b25f8380843426fbc2f02fb4593b6` on `main` |
 | Runtime SQL fix commit | `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` on `main` |
-| CI | `28403603093` passed for implementation commit; `28404136929` passed for SQL fix commit |
-| Deploy | implementation deploys passed: app image `28403840215`, backend `28403840173`, web `28403840225` and `28403851307`; SQL fix deploys passed: app image `28404382172`, backend `28404382260`, web `28404382157` and `28404393463` |
-| Mac Studio sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` |
-| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app` after deploy |
-| Targeted runtime proof | blocked: follow-up `ssh macstudio` attempts returned `Permission denied (publickey,password,keyboard-interactive)` before the proof payload reached the host |
+| Blocker handoff commits | `cd40967111ba884dc804a601fef2b7fc10a34b25`, `a96375e37ee3102233deb56978ff96f560cc25ce` on `main` |
+| CI | `28403603093` passed for implementation commit; `28404136929` passed for SQL fix commit; `28404891770` passed for final blocker-handoff cleanup commit |
+| Deploy | implementation deploys passed: app image `28403840215`, backend `28403840173`, web `28403840225` and `28403851307`; SQL fix deploys passed: app image `28404382172`, backend `28404382260`, web `28404382157` and `28404393463`; final blocker-handoff deploys passed: app image `28404911402`, backend `28404911449`, web `28404911500` and `28404918607` |
+| Mac Studio sync | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `a96375e37ee3102233deb56978ff96f560cc25ce` |
+| Mac Studio smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app` after sync |
+| Targeted runtime proof | passed: `stage10_strategy_notifications_mode` created `source_context=strategy`, `source_event_type=failed`, `category=strategy_run_failed`, `severity=warning`, `provider_key=log_only`, `template_key=strategy_run_failed.v1`, `delivery_status_before_cleanup=pending`, `delivery_status_after_cleanup=suppressed`, `route_status_after_cleanup=disabled`, `real_telegram_send=false` |
 
 ## Runtime Issue Fixed Before Proof
 
@@ -87,7 +88,7 @@ The first post-main runtime proof attempt surfaced a production PostgreSQL issue
 
 Fix commit `3562fb20cfe9ac69b3bb55d49ea6b500685c3ffa` adds `%(owner_user_id)s::uuid` in that query and regression coverage in `tests/unit/contexts/notifications/adapters/test_postgres_notification_repository.py`.
 
-Cleanup debt: the first runtime proof attempt ran before the SQL fix and may have upserted temporary proof route `00000000-0000-0000-0000-00000000c010` before failing at route lookup. The intended cleanup must run when `macstudio` SSH access is available again: disable that route and suppress any delivery tied to the Stage `10` proof run before rerunning the bounded proof. No real Telegram send was confirmed or claimed for Stage `10`.
+Cleanup result: before the accepted runtime proof, the possible temporary proof route `00000000-0000-0000-0000-00000000c010` was disabled. The cleanup updated `cleanup_route_rows_before_proof=1` and `cleanup_delivery_rows_before_proof=0`. No real Telegram send was performed.
 
 ## Artifact Review
 
@@ -136,7 +137,7 @@ Verdict: local Stage `10` artifacts are ready for implementation commit and post
 
 ## Residual Risks
 
-- Stage `10` is blocked, not accepted, until `macstudio` SSH access is available again and post-main production runtime proof is recorded.
-- Possible temporary proof route `00000000-0000-0000-0000-00000000c010` may remain in production DB from the first failed proof attempt; cleanup is required before rerunning proof.
+- Stage `10` is accepted after post-main production runtime proof on `macstudio`.
+- Temporary proof route cleanup was performed before the accepted proof; the accepted proof route was disabled and its delivery was suppressed after verification.
 - Direct `telegram` rollback still exists and can send real Telegram messages if explicitly configured with token and active bindings.
 - Production dispatcher currently runs in `log_only` provider mode; pending `telegram_bot_api` deliveries are intentionally not claimed until final rollout approval.
