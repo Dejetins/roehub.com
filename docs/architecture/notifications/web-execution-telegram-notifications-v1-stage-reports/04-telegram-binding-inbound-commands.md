@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `04` добавляет безопасный web-generated Telegram binding code flow, redacted inbound Telegram update mapper, idempotent command handler and worker shell. Stage remains `completed-local` until implementation commit is published to `main`, GitHub CI/deploy passes, `macstudio` checkout is synchronized and production smoke passes.
+Acceptance boundary: Stage `04` добавляет безопасный web-generated Telegram binding code flow, redacted inbound Telegram update mapper, idempotent command handler and worker shell. Stage accepted after implementation commit `e98b26d32efa21bf48694d6e7d6911e9822a43fb` was published to `main`, GitHub CI/deploy passed, `macstudio` checkout synchronized to the commit and production smoke passed.
 
 ## User Required Before Start
 
@@ -95,6 +95,9 @@ Real Telegram binding smoke: skipped.
 | `uv run pyright src/trading/contexts/notifications apps/api apps/worker tests/unit/contexts/notifications tests/unit/apps` | passed |
 | Synthetic command/binding smoke | passed: `stage04_telegram_smoke=ok ... code_stored_as_hash=True` |
 | `uv run python -m tools.docs.generate_docs_index --check` | local check failed because the dirty checkout contains unrelated untracked `market-data-live-tail-repair-v1` docs; generated diff inspection showed the Stage `04` README entry matches the generator and only those unrelated market-data entries remain missing |
+| GitHub CI `28394484608` for `e98b26d32efa21bf48694d6e7d6911e9822a43fb` | passed; static, docs-index, migrations and all test shards green |
+| GitHub deploy runs for `e98b26d32efa21bf48694d6e7d6911e9822a43fb` | `Deploy Backend` run `28394731330`, `Deploy Web` run `28394731324`, and `Publish App Image` run `28394731348` passed |
+| `macstudio` checkout sync and smoke | checkout fast-forwarded to `e98b26d32efa21bf48694d6e7d6911e9822a43fb`; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 ## Contract Impact
 
