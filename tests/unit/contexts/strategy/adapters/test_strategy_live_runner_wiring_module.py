@@ -213,6 +213,60 @@ def test_strategy_producer_metrics_do_not_use_user_or_strategy_labels() -> None:
     assert str(signal.strategy_id) not in payload
 
 
+def test_live_tail_metrics_are_bounded_and_scrapable() -> None:
+    """
+    Ensure Stage 05 live-tail repair metrics expose bounded labels only.
+    """
+    registry = CollectorRegistry()
+    metrics = StrategyLiveRunnerMetrics(registry=registry)
+    repair_hooks = metrics.repair_hooks()
+    provider_hooks = metrics.closed_tail_provider_hooks()
+    hot_cache_hooks = metrics.hot_cache_hooks()
+
+    assert repair_hooks.on_gap_detected is not None
+    assert repair_hooks.on_checkpoint_stall is not None
+    assert repair_hooks.on_deferred_ack is not None
+    repair_hooks.on_gap_detected("strategy_runner")
+    repair_hooks.on_gap_detected("run-00000000-0000-0000-0000-000000000001")
+    repair_hooks.on_checkpoint_stall("repair_incomplete")
+    repair_hooks.on_deferred_ack("repair_incomplete")
+
+    assert provider_hooks.on_repair_attempt is not None
+    assert provider_hooks.on_repair_latency is not None
+    assert provider_hooks.on_clickhouse_circuit_state is not None
+    provider_hooks.on_repair_attempt("redis_hot_cache", "miss")
+    provider_hooks.on_repair_attempt("clickhouse", "failed")
+    provider_hooks.on_repair_attempt("rest", "succeeded")
+    provider_hooks.on_repair_latency("rest", "succeeded", 0.25)
+    provider_hooks.on_clickhouse_circuit_state(1)
+
+    assert hot_cache_hooks.on_write_success is not None
+    assert hot_cache_hooks.on_read_hit is not None
+    assert hot_cache_hooks.on_read_miss is not None
+    assert hot_cache_hooks.on_read_error is not None
+    hot_cache_hooks.on_write_success()
+    hot_cache_hooks.on_read_hit()
+    hot_cache_hooks.on_read_miss()
+    hot_cache_hooks.on_read_error()
+
+    payload = generate_latest(registry).decode("utf-8")
+
+    assert "market_data_live_tail_gap_total" in payload
+    assert 'source_stage="strategy_runner"' in payload
+    assert 'source_stage="unknown"' in payload
+    assert "market_data_live_tail_repair_total" in payload
+    assert 'source="clickhouse",status="failed"' in payload
+    assert "market_data_live_tail_repair_latency_seconds" in payload
+    assert "market_data_hot_cache_hit_total" in payload
+    assert "market_data_hot_cache_miss_total" in payload
+    assert "market_data_hot_cache_write_total" in payload
+    assert "market_data_hot_cache_error_total" in payload
+    assert "market_data_clickhouse_repair_circuit_state 1.0" in payload
+    assert "strategy_live_runner_checkpoint_stall_total" in payload
+    assert "strategy_live_runner_deferred_ack_total" in payload
+    assert "run-00000000-0000-0000-0000-000000000001" not in payload
+
+
 def _signal(
     *, mode: str, expected_order_json: dict[str, object] | None = None
 ) -> StrategySignal:

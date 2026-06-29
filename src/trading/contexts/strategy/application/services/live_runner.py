@@ -73,6 +73,15 @@ class StrategyLiveRunnerIterationReport:
     failed_runs: int
 
 
+@dataclass(frozen=True, slots=True)
+class StrategyLiveRunnerRepairHooks:
+    """Optional callbacks for bounded live-tail repair and ACK metrics."""
+
+    on_gap_detected: Callable[[str], None] | None = None
+    on_checkpoint_stall: Callable[[str], None] | None = None
+    on_deferred_ack: Callable[[str], None] | None = None
+
+
 @dataclass(slots=True)
 class _RunContext:
     """
@@ -141,6 +150,7 @@ class StrategyLiveRunner:
         sleeper: StrategyRunnerSleeper,
         repair_retry_attempts: int,
         repair_backoff_seconds: float,
+        repair_hooks: StrategyLiveRunnerRepairHooks | None = None,
         realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
         live_profile_repository: LiveStrategyProfileRepository | None = None,
         position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
@@ -165,6 +175,7 @@ class StrategyLiveRunner:
             sleeper: Sleep abstraction for retry backoff.
             repair_retry_attempts: Maximum tail-provider repair retries per gap.
             repair_backoff_seconds: Base retry backoff in seconds.
+            repair_hooks: Optional metrics callbacks for repair and ACK visibility.
             realtime_output_publisher: Optional realtime output publisher port.
             telegram_notifier: Optional Telegram notifier port.
             telegram_notification_policy: Optional Telegram notification policy.
@@ -217,6 +228,9 @@ class StrategyLiveRunner:
         self._sleeper = sleeper
         self._repair_retry_attempts = repair_retry_attempts
         self._repair_backoff_seconds = repair_backoff_seconds
+        self._repair_hooks = (
+            repair_hooks if repair_hooks is not None else StrategyLiveRunnerRepairHooks()
+        )
         self._realtime_output_publisher = (
             realtime_output_publisher
             if realtime_output_publisher is not None
@@ -460,12 +474,21 @@ class StrategyLiveRunner:
             return run, True
 
         if checkpoint is not None and ts_open > checkpoint + _ONE_MINUTE:
+            _emit_repair_hook(self._repair_hooks.on_gap_detected, "strategy_runner")
             run, is_continuous = self._repair_gap(
                 run=run,
                 spec=spec,
                 target_ts_open=ts_open,
             )
             if not is_continuous:
+                _emit_repair_hook(
+                    self._repair_hooks.on_checkpoint_stall,
+                    "repair_incomplete",
+                )
+                _emit_repair_hook(
+                    self._repair_hooks.on_deferred_ack,
+                    "repair_incomplete",
+                )
                 return run, False
 
         accepted_run = self._accept_contiguous_candle(
@@ -1754,6 +1777,11 @@ def _checkpoint_has_accepted(
     if checkpoint_ts_open is None:
         return False
     return checkpoint_ts_open >= ts_open
+
+
+def _emit_repair_hook(callback: Callable[[str], None] | None, value: str) -> None:
+    if callback is not None:
+        callback(value)
 
 
 def _isoformat_utc(value: datetime) -> str:

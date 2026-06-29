@@ -28,6 +28,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
 from trading.contexts.strategy.application import (
     StrategyLiveCandleMessage,
     StrategyLiveRunner,
+    StrategyLiveRunnerRepairHooks,
     StrategyPositionOwnershipCoordinator,
     StrategyRealtimeEventV1,
     StrategyRealtimeMetricV1,
@@ -680,6 +681,9 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
             ),
         )
     )
+    gap_events: list[str] = []
+    checkpoint_stalls: list[str] = []
+    deferred_acks: list[str] = []
     runner = _build_runner(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
@@ -687,6 +691,11 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
         canonical_reader=canonical_reader,
         retry_attempts=0,
         signal_repository=signal_repository,
+        repair_hooks=StrategyLiveRunnerRepairHooks(
+            on_gap_detected=gap_events.append,
+            on_checkpoint_stall=checkpoint_stalls.append,
+            on_deferred_ack=deferred_acks.append,
+        ),
         warmup_estimator=lambda **_kwargs: 1,
     )
 
@@ -697,6 +706,9 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
     assert first_persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
     assert first_report.acked_messages == 0
     assert stream.acks == []
+    assert gap_events == ["strategy_runner"]
+    assert checkpoint_stalls == ["repair_incomplete"]
+    assert deferred_acks == ["repair_incomplete"]
 
     second_report = runner.run_once()
     second_persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
@@ -710,6 +722,9 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
     assert second_persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc)
     assert second_report.acked_messages == 1
     assert stream.acks == [(strategy.spec.instrument_key, "m-gap")]
+    assert gap_events == ["strategy_runner", "strategy_runner"]
+    assert checkpoint_stalls == ["repair_incomplete"]
+    assert deferred_acks == ["repair_incomplete"]
     assert len({signal.signal_id for signal in signals}) == len(signals)
     assert len({(signal.strategy_run_id, signal.bar_ts_open) for signal in signals}) == len(signals)
 
@@ -1387,6 +1402,7 @@ def _build_runner(
     signal_repository: InMemoryStrategySignalRepository | None = None,
     live_profile_repository: InMemoryLiveStrategyProfileRepository | None = None,
     position_ownership_coordinator: StrategyPositionOwnershipCoordinator | None = None,
+    repair_hooks: StrategyLiveRunnerRepairHooks | None = None,
     warmup_estimator: Callable[..., int] | None = None,
     rollup_policy: TimeframeRollupPolicy | None = None,
 ) -> StrategyLiveRunner:
@@ -1424,6 +1440,7 @@ def _build_runner(
         sleeper=sleeper or _SleeperProbe(),
         repair_retry_attempts=retry_attempts,
         repair_backoff_seconds=1.0,
+        repair_hooks=repair_hooks,
         realtime_output_publisher=realtime_output_probe,
         live_profile_repository=live_profile_repository,
         position_ownership_coordinator=position_ownership_coordinator,

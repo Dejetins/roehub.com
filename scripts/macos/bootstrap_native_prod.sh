@@ -22,6 +22,7 @@ install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roe
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/live-execution-stage17.rules.yml" /opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/strategy-producer.rules.yml" /opt/roehub/config/prometheus.rules/strategy-producer.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/market-data-funding.rules.yml" /opt/roehub/config/prometheus.rules/market-data-funding.rules.yml
+install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/market-data-live-tail-repair.rules.yml" /opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/notifications-admin.rules.yml" /opt/roehub/config/prometheus.rules/notifications-admin.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl

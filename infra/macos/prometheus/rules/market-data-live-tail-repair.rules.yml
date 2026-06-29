@@ -1,0 +1,62 @@
+groups:
+  - name: market-data-live-tail-repair
+    rules:
+      - alert: MarketDataLiveTailUnrepairedGapBeyondPolicy
+        expr: increase(strategy_live_runner_deferred_ack_total{job="strategy-producer",reason="repair_incomplete"}[15m]) > 0
+        for: 15m
+        labels:
+          severity: critical
+          owner: market-data
+        annotations:
+          summary: Market Data live-tail gap is still unrepaired after policy window
+          description: Strategy live-runner deferred Redis ACK because a closed 1m gap was not repaired.
+          runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
+          action: Check strategy checkpoint, Redis pending messages, repair audit rows, hot cache, ClickHouse circuit, and REST tail errors.
+
+      - alert: MarketDataClickHouseRepairCircuitOpenTooLong
+        expr: market_data_clickhouse_repair_circuit_state{job="strategy-producer"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: ClickHouse repair circuit is open
+          description: Live-tail provider is bypassing ClickHouse repair reads and relying on Redis hot cache or REST tail.
+          runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
+          action: Check ClickHouse HTTP/native health and recent `market_data_candle_repair_events` source attempts.
+
+      - alert: MarketDataRestTailRepairErrors
+        expr: increase(market_data_live_tail_repair_total{job="strategy-producer",source="rest",status=~"failed|rate_limited"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: REST tail repair is failing or rate-limited
+          description: Short live-tail repair reached REST fallback and the provider reported failed/rate-limited attempts.
+          runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
+          action: Inspect provider health and rate limits without printing API credentials or raw provider payloads.
+
+      - alert: MarketDataHotCacheShortTailMiss
+        expr: increase(market_data_hot_cache_miss_total{job=~"strategy-producer|market-data-ws-worker"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          owner: market-data
+        annotations:
+          summary: Redis hot cache missed short-tail candles
+          description: Live-tail repair or WS worker observed short-tail cache misses.
+          runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
+          action: Check `md:hot:1m:*` zset/hash key presence, retention, WS worker logs, and hot-cache write counters.
+
+      - alert: StrategyProducerNoSignalGrowth
+        expr: (max(strategy_producer_active_instruments{job="strategy-producer"}) > 0) and ((sum(increase(strategy_signal_total{job="strategy-producer",outcome="signal"}[30m])) or vector(0)) == 0)
+        for: 30m
+        labels:
+          severity: critical
+          owner: strategy-producer
+        annotations:
+          summary: Active strategy producer has no signal growth
+          description: Strategy producer reports active instruments but `strategy_signal_total{outcome="signal"}` did not grow.
+          runbook: docs/runbooks/market-data-live-tail-repair.md#stage-05-alert-actions
+          action: Check checkpoint progress, deferred ACK counters, repair audit, and strategy-live-runner logs before changing allowlists.

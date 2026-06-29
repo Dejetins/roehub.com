@@ -16,6 +16,7 @@ Source of truth scrape-конфига:
 - `market-data-ws-worker` -> `127.0.0.1:9201/metrics`
 - `market-data-scheduler` -> `127.0.0.1:9202/metrics`
 - `backtest-artifact-publisher` -> `127.0.0.1:9203/metrics`
+- `strategy-producer` -> `127.0.0.1:9207/metrics`
 - `clickhouse-exporter` -> `127.0.0.1:9116/metrics`
 - `postgres-exporter` -> `127.0.0.1:9187/metrics`
 - `redis-exporter` -> `127.0.0.1:9121/metrics`
@@ -31,7 +32,21 @@ Source of truth scrape-конфига:
 - `ws_messages_total`
 - `insert_errors_total`
 - `redis_publish_errors_total`
+- `market_data_hot_cache_write_total`
+- `market_data_hot_cache_error_total`
 - `ws_closed_to_insert_done_seconds`
+
+### Strategy Producer (`strategy-producer`)
+
+- `market_data_live_tail_gap_total`
+- `market_data_live_tail_repair_total`
+- `market_data_live_tail_repair_latency_seconds`
+- `market_data_hot_cache_hit_total`
+- `market_data_hot_cache_miss_total`
+- `market_data_clickhouse_repair_circuit_state`
+- `strategy_live_runner_checkpoint_stall_total`
+- `strategy_live_runner_deferred_ack_total`
+- `strategy_signal_total`
 
 ### Scheduler (`market-data-scheduler`)
 
@@ -96,12 +111,33 @@ Intra-run progress is intentionally split out of Prometheus and lives in structu
 | `redis_publish_errors_total` | Ошибки публикации в Redis |
 | `redis_publish_duplicates_total` | Дубли/нарушение порядка stream id |
 | `redis_publish_duration_seconds` | Гистограмма длительности publish |
+| `market_data_hot_cache_write_total` | Успешные write операции live-tail hot cache |
+| `market_data_hot_cache_error_total` | Ошибки read/write live-tail hot cache |
+| `market_data_hot_cache_hit_total` | Hot-cache range read вернул хотя бы одну свечу |
+| `market_data_hot_cache_miss_total` | Hot-cache range read не вернул свечей |
 | `rest_fill_tasks_total` | Принятые fill-задачи |
 | `rest_fill_active` | Активные fill-задачи |
 | `rest_fill_errors_total` | Ошибки fill-задач |
 | `rest_fill_duration_seconds` | Гистограмма длительности fill-задач |
 
-### 2) `market-data-scheduler`
+### 2) `strategy-producer` live-tail repair
+
+| Метрика | Краткий смысл |
+|---|---|
+| `market_data_live_tail_gap_total` | Найден closed 1m gap в live-tail пути |
+| `market_data_live_tail_repair_total` | Попытки repair по source/status |
+| `market_data_live_tail_repair_latency_seconds` | Гистограмма длительности provider repair call |
+| `market_data_hot_cache_hit_total` | Hot-cache read вернул свечи |
+| `market_data_hot_cache_miss_total` | Hot-cache read не вернул свечи |
+| `market_data_hot_cache_write_total` | Успешные write операции live-tail hot cache |
+| `market_data_hot_cache_error_total` | Ошибки hot cache read/write |
+| `market_data_clickhouse_repair_circuit_state` | `1` = ClickHouse repair circuit открыт, `0` = закрыт |
+| `strategy_live_runner_checkpoint_stall_total` | Checkpoint не продвинулся из-за repair gap |
+| `strategy_live_runner_deferred_ack_total` | Redis ACK отложен до успешного repair/retry |
+
+Подробные действия дежурного: `docs/runbooks/market-data-live-tail-repair.md`.
+
+### 3) `market-data-scheduler`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -143,7 +179,7 @@ settlement окнами является нормой.
 - Prometheus labels намеренно агрегированы по `exchange`, `market_type`,
   `status`; `symbol` не используется как label.
 
-### 3) `backtest-artifact-publisher`
+### 4) `backtest-artifact-publisher`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -165,7 +201,7 @@ read them from logs:
 - `completed_chunks_total` / `completed_indicators_total` show real end-to-end progress inside the
   current timeframe-local session.
 
-### 4) `clickhouse-exporter`
+### 5) `clickhouse-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -175,7 +211,7 @@ read them from logs:
 | `clickhouse_system_metric_value` | Текущие значения выбранных system.metrics |
 | `clickhouse_system_event_total` | Кумулятивные значения выбранных system.events |
 
-### 5) `postgres-exporter`
+### 6) `postgres-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -195,7 +231,7 @@ read them from logs:
 | `pg_replication_is_replica` | Признак replica/primary |
 | `pg_replication_lag_seconds` | Lag репликации |
 
-### 6) `redis-exporter`
+### 7) `redis-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -220,7 +256,7 @@ read them from logs:
 | `redis_total_writes_processed` | Write-операции |
 | `redis_instance_info` | Тех.информация об инстансе |
 
-### 7) `node-exporter`
+### 8) `node-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -242,7 +278,7 @@ read them from logs:
 | `node_time_seconds` | Текущее время хоста |
 | `node_uname_info` | Информация об ОС/ядре |
 
-### 8) `blackbox-exporter`
+### 9) `blackbox-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -252,7 +288,7 @@ read them from logs:
 | `probe_http_duration_seconds` | Фазовая HTTP-латентность |
 | `probe_tcp_connect_duration_seconds` | Время TCP connect |
 
-### 9) `prometheus` self metrics
+### 10) `prometheus` self metrics
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -274,6 +310,7 @@ read them from logs:
 ```bash
 curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.health)\t\(.scrapeUrl)"' | sort
 curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
+curl -fsS http://127.0.0.1:9207/metrics | rg '^(market_data_live_tail_|market_data_hot_cache_|market_data_clickhouse_repair_circuit_state|strategy_live_runner_(checkpoint_stall|deferred_ack)_total)'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_funding_catchup_'
 curl -fsS http://127.0.0.1:9203/metrics | rg '^backtest_artifact_'

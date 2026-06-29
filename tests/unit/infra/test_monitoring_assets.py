@@ -75,6 +75,7 @@ def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
         "/opt/roehub/config/prometheus.rules/live-execution-stage17.rules.yml",
         "/opt/roehub/config/prometheus.rules/strategy-producer.rules.yml",
         "/opt/roehub/config/prometheus.rules/market-data-funding.rules.yml",
+        "/opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml",
         "/opt/roehub/config/prometheus.rules/notifications-admin.rules.yml",
     ]
     jobs_by_name = {job["job_name"]: job for job in payload["scrape_configs"]}
@@ -121,6 +122,7 @@ def test_macos_bootstrap_installs_stage17_prometheus_rules() -> None:
     assert "live-execution-stage17.rules.yml" in script
     assert "strategy-producer.rules.yml" in script
     assert "market-data-funding.rules.yml" in script
+    assert "market-data-live-tail-repair.rules.yml" in script
     assert "notifications-admin.rules.yml" in script
 
 
@@ -166,6 +168,36 @@ def test_macos_prometheus_funding_rules_are_repo_managed() -> None:
     for rule in rules:
         assert "symbol" not in rule.get("labels", {})
     assert "scheduler_funding_catchup_" in json.dumps(rules_payload)
+
+
+def test_macos_prometheus_live_tail_repair_rules_are_repo_managed() -> None:
+    rules_payload = _load_yaml(
+        relative_path="infra/macos/prometheus/rules/market-data-live-tail-repair.rules.yml"
+    )
+    groups = rules_payload["groups"]
+    assert [group["name"] for group in groups] == ["market-data-live-tail-repair"]
+    rules = groups[0]["rules"]
+    alerts = {rule["alert"]: rule for rule in rules}
+    assert set(alerts) == {
+        "MarketDataLiveTailUnrepairedGapBeyondPolicy",
+        "MarketDataClickHouseRepairCircuitOpenTooLong",
+        "MarketDataRestTailRepairErrors",
+        "MarketDataHotCacheShortTailMiss",
+        "StrategyProducerNoSignalGrowth",
+    }
+    forbidden_labels = {"user_id", "run_id", "order_id", "symbol", "instrument_key"}
+    for rule in rules:
+        labels = rule["labels"]
+        annotations = rule["annotations"]
+        assert labels["severity"] in {"warning", "critical"}
+        assert labels["owner"] in {"market-data", "strategy-producer"}
+        assert not forbidden_labels.intersection(labels)
+        assert annotations["runbook"].startswith(
+            "docs/runbooks/market-data-live-tail-repair.md#"
+        )
+        assert annotations["action"]
+    assert "market_data_live_tail_repair_total" in json.dumps(rules_payload)
+    assert "strategy_live_runner_deferred_ack_total" in json.dumps(rules_payload)
 
 
 def test_blackbox_and_grafana_provisioning_assets_are_repo_managed() -> None:

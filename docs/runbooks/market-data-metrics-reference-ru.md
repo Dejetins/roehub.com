@@ -16,6 +16,7 @@ Source of truth scrape-конфига:
 - `market-data-ws-worker` (`127.0.0.1:9201`)
 - `market-data-scheduler` (`127.0.0.1:9202`)
 - `backtest-artifact-publisher` (`127.0.0.1:9203`)
+- `strategy-producer` (`127.0.0.1:9207`)
 - `clickhouse-exporter` (`127.0.0.1:9116`)
 - `postgres-exporter` (`127.0.0.1:9187`)
 - `redis-exporter` (`127.0.0.1:9121`)
@@ -28,6 +29,7 @@ Source of truth scrape-конфига:
 | Сервис | Критичные метрики | Что значит норма |
 |---|---|---|
 | `market-data-ws-worker` | `ws_connected`, `ws_messages_total`, `insert_errors_total`, `redis_publish_errors_total`, `ws_closed_to_insert_done_seconds` | Соединения есть, сообщения/вставки растут, ошибок за окно нет, p95 latency стабильна |
+| `strategy-producer` | `market_data_live_tail_gap_total`, `market_data_live_tail_repair_total`, `market_data_hot_cache_miss_total`, `market_data_clickhouse_repair_circuit_state`, `strategy_live_runner_deferred_ack_total`, `strategy_signal_total` | Gap/repair counters не растут без причины, ClickHouse circuit закрыт или кратковременно открыт, deferred ACK не копится, сигналы растут при активных инструментах |
 | `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`, `scheduler_funding_catchup_last_success_timestamp_seconds`, `scheduler_funding_catchup_lag_seconds`, `scheduler_funding_catchup_universe_instruments` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup, funding freshness интерпретируется с учетом funding interval и settlement lag |
 | `backtest-artifact-publisher` | `backtest_artifact_publish_runs_total`, `backtest_artifact_publish_symbols_total`, `backtest_artifact_publish_blocked_total`, `backtest_artifact_publish_last_success_unixtime`, `backtest_artifact_tail_rebuild_bars_total` | Daily publish-cycle завершается success, blocked/error серии не растут, freshness обновляется после окна `03:05 Europe/Moscow`, tail bars остаются bounded, а stage/timeframe/chunk progress читается из structured logs |
 | `clickhouse-exporter` | `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}` | `scrape_success=1`, uptime растет, вставки есть при живом потоке |
@@ -63,12 +65,33 @@ Source of truth scrape-конфига:
 | `redis_publish_errors_total` | Counter | - | Ошибки публикации в Redis | Рост за окно = проблема live feed |
 | `redis_publish_duplicates_total` | Counter | - | Дубли/нарушение монотонности stream id | Редкий рост допустим |
 | `redis_publish_duration_seconds` | Histogram | - | Длительность вызова publish | Контроль латентности live feed |
+| `market_data_hot_cache_write_total` | Counter | - | Успешные write операции live-tail hot cache | Растет вместе с закрытыми 1m свечами |
+| `market_data_hot_cache_error_total` | Counter | - | Ошибки read/write live-tail hot cache | Рост за окно = деградация Redis/cache |
+| `market_data_hot_cache_hit_total` | Counter | - | Hot-cache range read вернул хотя бы одну свечу | Растет при repair/cache reads |
+| `market_data_hot_cache_miss_total` | Counter | - | Hot-cache range read не вернул свечей | Рост за окно = short-tail miss |
 | `rest_fill_tasks_total` | Counter | - | Принятые rest fill задачи | Растет при bootstrap/gap/tail |
 | `rest_fill_active` | Gauge | - | Текущее число активных fill задач | Колеблется в пределах concurrency |
 | `rest_fill_errors_total` | Counter | - | Ошибки rest fill задач | Рост за окно = деградация fill |
 | `rest_fill_duration_seconds` | Histogram | - | Длительность rest fill задачи | p95/p99 контролируют скорость catchup |
 
-### 2) `market-data-scheduler`
+### 2) `strategy-producer` live-tail repair
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `market_data_live_tail_gap_total` | Counter | `source_stage` | Найден closed 1m gap в live-tail пути | Рост требует проверки repair |
+| `market_data_live_tail_repair_total` | Counter | `source`,`status` | Попытки repair по source/status | `failed`, `circuit_open`, `rate_limited` за окно = деградация |
+| `market_data_live_tail_repair_latency_seconds` | Histogram | `source`,`status` | Длительность provider repair call | p95/p99 без резких скачков |
+| `market_data_hot_cache_hit_total` | Counter | - | Hot-cache read вернул свечи | Растет при успешных Redis reads |
+| `market_data_hot_cache_miss_total` | Counter | - | Hot-cache read не вернул свечи | Рост за окно = проверить WS writes/retention |
+| `market_data_hot_cache_write_total` | Counter | - | Успешные writes в hot cache | Растет при WS ingestion или REST restore |
+| `market_data_hot_cache_error_total` | Counter | - | Ошибки hot cache read/write | Рост за окно = Redis/cache incident |
+| `market_data_clickhouse_repair_circuit_state` | Gauge | - | `1` = ClickHouse repair circuit открыт, `0` = закрыт | Долгое `1` = проверить ClickHouse |
+| `strategy_live_runner_checkpoint_stall_total` | Counter | `reason` | Checkpoint не продвинулся из-за repair gap | Рост = проверить audit/cache/provider |
+| `strategy_live_runner_deferred_ack_total` | Counter | `reason` | Redis ACK отложен до успешного repair/retry | Рост = проверить pending/reclaim |
+
+Подробные действия дежурного: `docs/runbooks/market-data-live-tail-repair.md`.
+
+### 3) `market-data-scheduler`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -97,7 +120,7 @@ cadence: история скачивается только когда симв�
 `funding_interval_minutes`. Prometheus labels не включают `symbol`; per-symbol
 диагностика должна идти через structured logs или ClickHouse queries.
 
-### 3) `backtest-artifact-publisher`
+### 4) `backtest-artifact-publisher`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -135,7 +158,7 @@ cadence: история скачивается только когда симв�
 - для daily rebuild ожидаемо `reused_prefix_bars >> rewritten_tail_bars`;
 - для bootstrap допустим `reused_prefix_bars = 0` и большой `rewritten_tail_bars`.
 
-### 4) `clickhouse-exporter`
+### 5) `clickhouse-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -159,7 +182,7 @@ cadence: история скачивается только когда симв�
 - `SelectedBytes`
 - `SelectedRows`
 
-### 5) `postgres-exporter`
+### 6) `postgres-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -179,7 +202,7 @@ cadence: история скачивается только когда симв�
 | `pg_replication_is_replica` | Gauge | - | Признак replica (`1`) или primary (`0`) | Для текущего контура ожидается `0` |
 | `pg_replication_lag_seconds` | Gauge | - | Lag репликации в секундах | Для single-node/primary обычно `0` |
 
-### 6) `redis-exporter`
+### 7) `redis-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -204,7 +227,7 @@ cadence: история скачивается только когда симв�
 | `redis_total_writes_processed` | Counter | - | Количество write-операций | Нагрузка записи |
 | `redis_instance_info` | Gauge | `redis_version`,`role`,... | Техническая информация об инстансе | Для валидации роли/версии |
 
-### 7) `node-exporter`
+### 8) `node-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -226,7 +249,7 @@ cadence: история скачивается только когда симв�
 | `node_time_seconds` | Gauge | - | Текущее время хоста | Тех.проверка времени |
 | `node_uname_info` | Gauge | `sysname`,`release`,... | Информация об ОС/ядре | Диагностика окружения |
 
-### 8) `blackbox-exporter` (`blackbox-http`, `blackbox-tcp`)
+### 9) `blackbox-exporter` (`blackbox-http`, `blackbox-tcp`)
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -236,7 +259,7 @@ cadence: история скачивается только когда симв�
 | `probe_http_duration_seconds` | Gauge | `phase`,`instance`,`job` | HTTP latency по фазам | Рост фаз = деградация сети/цели |
 | `probe_tcp_connect_duration_seconds` | Gauge | `instance`,`job` | Время TCP connect | Рост = сеть/порт/нагрузка |
 
-### 9) `prometheus` (self metrics)
+### 10) `prometheus` (self metrics)
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -328,6 +351,7 @@ curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | 
 
 ```bash
 curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
+curl -fsS http://127.0.0.1:9207/metrics | rg '^(market_data_live_tail_|market_data_hot_cache_|market_data_clickhouse_repair_circuit_state|strategy_live_runner_(checkpoint_stall|deferred_ack)_total)'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
 curl -fsS http://127.0.0.1:9203/metrics | rg '^backtest_artifact_'
 curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'

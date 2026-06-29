@@ -1,4 +1,8 @@
-from .live_runner import StrategyLiveRunner, StrategyLiveRunnerIterationReport
+from .live_runner import (
+    StrategyLiveRunner,
+    StrategyLiveRunnerIterationReport,
+    StrategyLiveRunnerRepairHooks,
+)
 from .signal_evaluator import (
     EVALUATOR_VERSION_V1,
     SignalEvaluatorDecision,
@@ -11,6 +15,7 @@ from .warmup_estimator import estimate_strategy_warmup_bars
 __all__ = [
     "StrategyLiveRunner",
     "StrategyLiveRunnerIterationReport",
+    "StrategyLiveRunnerRepairHooks",
     "EVALUATOR_VERSION_V1",
     "SignalEvaluatorDecision",
     "evaluate_strategy_signal",

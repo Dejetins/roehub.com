@@ -1,5 +1,6 @@
 from .closed_candle_tail_provider import (
     ClosedCandleHotCache,
+    ClosedCandleTailProviderHooks,
     MarketDataClosedCandleTailProvider,
 )
 from .gap_tracker import WsMinuteGapTracker
@@ -12,6 +13,7 @@ from .scheduler_backfill_planner import SchedulerBackfillPlanner
 __all__ = [
     "AsyncRawInsertBuffer",
     "ClosedCandleHotCache",
+    "ClosedCandleTailProviderHooks",
     "InsertBufferHooks",
     "MarketDataClosedCandleTailProvider",
     "WsMinuteGapTracker",

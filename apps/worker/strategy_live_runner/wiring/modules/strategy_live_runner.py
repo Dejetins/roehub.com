@@ -44,7 +44,10 @@ from trading.contexts.live_execution.application import (
 from trading.contexts.market_data.adapters.outbound.clients import RestCandleIngestSource
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.config import load_market_data_runtime_config
-from trading.contexts.market_data.adapters.outbound.messaging.redis import RedisCandleHotCache
+from trading.contexts.market_data.adapters.outbound.messaging.redis import (
+    RedisCandleHotCache,
+    RedisCandleHotCacheHooks,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
@@ -54,7 +57,10 @@ from trading.contexts.market_data.adapters.outbound.persistence.postgres import 
     PsycopgMarketDataPostgresGateway,
 )
 from trading.contexts.market_data.application.dto import ClosedCandleTailRepairPolicy
-from trading.contexts.market_data.application.services import MarketDataClosedCandleTailProvider
+from trading.contexts.market_data.application.services import (
+    ClosedCandleTailProviderHooks,
+    MarketDataClosedCandleTailProvider,
+)
 from trading.contexts.notifications.adapters import (
     PostgresNotificationRepository,
     PsycopgNotificationPostgresGateway,
@@ -90,6 +96,7 @@ from trading.contexts.strategy.application import (
     NoOpTelegramNotifier,
     StrategyLiveRunner,
     StrategyLiveRunnerIterationReport,
+    StrategyLiveRunnerRepairHooks,
     TelegramNotificationPolicy,
 )
 from trading.contexts.strategy.application.ports import (
@@ -110,6 +117,17 @@ _PRODUCER_BLOCKED_REASONS = (
     "producer_mode_not_allowed",
     "producer_allowlist_missing",
 )
+_LIVE_TAIL_REPAIR_SOURCES = ("redis_hot_cache", "clickhouse", "rest")
+_LIVE_TAIL_REPAIR_STATUSES = (
+    "attempted",
+    "succeeded",
+    "miss",
+    "failed",
+    "circuit_open",
+    "rate_limited",
+)
+_LIVE_TAIL_GAP_STAGES = ("strategy_runner",)
+_LIVE_TAIL_ACK_REASONS = ("repair_incomplete",)
 
 
 class StrategyLiveRunnerMetrics:
@@ -319,6 +337,62 @@ class StrategyLiveRunnerMetrics:
             ("result", "reason"),
             registry=self.registry,
         )
+        self.live_tail_gap_total = Counter(
+            "market_data_live_tail_gap_total",
+            "Market Data live-tail gaps detected by bounded stage.",
+            ("source_stage",),
+            registry=self.registry,
+        )
+        self.live_tail_repair_total = Counter(
+            "market_data_live_tail_repair_total",
+            "Market Data live-tail repair source attempts by bounded source/status.",
+            ("source", "status"),
+            registry=self.registry,
+        )
+        self.live_tail_repair_latency_seconds = Histogram(
+            "market_data_live_tail_repair_latency_seconds",
+            "Market Data live-tail repair provider latency in seconds.",
+            ("source", "status"),
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+            registry=self.registry,
+        )
+        self.hot_cache_hit_total = Counter(
+            "market_data_hot_cache_hit_total",
+            "Market Data live-tail hot-cache reads with at least one candle.",
+            registry=self.registry,
+        )
+        self.hot_cache_miss_total = Counter(
+            "market_data_hot_cache_miss_total",
+            "Market Data live-tail hot-cache reads without candles.",
+            registry=self.registry,
+        )
+        self.hot_cache_write_total = Counter(
+            "market_data_hot_cache_write_total",
+            "Successful Market Data live-tail hot-cache writes.",
+            registry=self.registry,
+        )
+        self.hot_cache_error_total = Counter(
+            "market_data_hot_cache_error_total",
+            "Market Data live-tail hot-cache read/write errors.",
+            registry=self.registry,
+        )
+        self.clickhouse_repair_circuit_state = Gauge(
+            "market_data_clickhouse_repair_circuit_state",
+            "Market Data live-tail ClickHouse repair circuit state, 1=open and 0=closed.",
+            registry=self.registry,
+        )
+        self.checkpoint_stall_total = Counter(
+            "strategy_live_runner_checkpoint_stall_total",
+            "Strategy live-runner checkpoint stalls by bounded reason.",
+            ("reason",),
+            registry=self.registry,
+        )
+        self.deferred_ack_total = Counter(
+            "strategy_live_runner_deferred_ack_total",
+            "Strategy live-runner Redis message ACK deferrals by bounded reason.",
+            ("reason",),
+            registry=self.registry,
+        )
 
     def mark_started(self, *, producer_config: StrategyProducerRuntimeConfig) -> None:
         now = time.time()
@@ -513,6 +587,60 @@ class StrategyLiveRunnerMetrics:
             reason=(reason or "unknown")[:80],
         ).inc()
 
+    def repair_hooks(self) -> StrategyLiveRunnerRepairHooks:
+        return StrategyLiveRunnerRepairHooks(
+            on_gap_detected=self.observe_live_tail_gap,
+            on_checkpoint_stall=self.observe_checkpoint_stall,
+            on_deferred_ack=self.observe_deferred_ack,
+        )
+
+    def closed_tail_provider_hooks(self) -> ClosedCandleTailProviderHooks:
+        return ClosedCandleTailProviderHooks(
+            on_repair_attempt=self.observe_live_tail_repair_attempt,
+            on_repair_latency=self.observe_live_tail_repair_latency,
+            on_clickhouse_circuit_state=self.observe_clickhouse_repair_circuit_state,
+        )
+
+    def hot_cache_hooks(self) -> RedisCandleHotCacheHooks:
+        return RedisCandleHotCacheHooks(
+            on_write_success=self.hot_cache_write_total.inc,
+            on_write_error=self.hot_cache_error_total.inc,
+            on_read_hit=self.hot_cache_hit_total.inc,
+            on_read_miss=self.hot_cache_miss_total.inc,
+            on_read_error=self.hot_cache_error_total.inc,
+        )
+
+    def observe_live_tail_gap(self, source_stage: str) -> None:
+        self.live_tail_gap_total.labels(
+            source_stage=_bounded_live_tail_gap_stage(source_stage)
+        ).inc()
+
+    def observe_checkpoint_stall(self, reason: str) -> None:
+        self.checkpoint_stall_total.labels(reason=_bounded_live_tail_ack_reason(reason)).inc()
+
+    def observe_deferred_ack(self, reason: str) -> None:
+        self.deferred_ack_total.labels(reason=_bounded_live_tail_ack_reason(reason)).inc()
+
+    def observe_live_tail_repair_attempt(self, source: str, status: str) -> None:
+        self.live_tail_repair_total.labels(
+            source=_bounded_live_tail_source(source),
+            status=_bounded_live_tail_status(status),
+        ).inc()
+
+    def observe_live_tail_repair_latency(
+        self,
+        source: str,
+        status: str,
+        duration_seconds: float,
+    ) -> None:
+        self.live_tail_repair_latency_seconds.labels(
+            source=_bounded_live_tail_source(source),
+            status=_bounded_live_tail_status(status),
+        ).observe(max(duration_seconds, 0.0))
+
+    def observe_clickhouse_repair_circuit_state(self, state: int) -> None:
+        self.clickhouse_repair_circuit_state.set(1 if state else 0)
+
 
 @dataclass(frozen=True, slots=True)
 class StrategyLiveRunnerApp:
@@ -677,6 +805,7 @@ def build_strategy_live_runner_app(
         connection_config=market_data_config.live_feed.redis_streams,
         config=hot_cache_config,
         environ=environ,
+        hooks=metrics.hot_cache_hooks(),
     )
     rest_source = RestCandleIngestSource(
         cfg=market_data_config,
@@ -694,6 +823,7 @@ def build_strategy_live_runner_app(
         audit_repository=candle_repair_audit_repository,
         clock=market_data_clock,
         policy=ClosedCandleTailRepairPolicy(),
+        hooks=metrics.closed_tail_provider_hooks(),
     )
 
     redis_config = runtime_config.redis_streams
@@ -802,6 +932,7 @@ def build_strategy_live_runner_app(
         sleeper=SystemRunnerSleeper(),
         repair_retry_attempts=runtime_config.repair.retry_attempts,
         repair_backoff_seconds=runtime_config.repair.retry_backoff_seconds,
+        repair_hooks=metrics.repair_hooks(),
         realtime_output_publisher=realtime_output_publisher,
         live_profile_repository=live_profile_repository,
         position_ownership_coordinator=position_ownership_coordinator,
@@ -1021,5 +1152,29 @@ def _bounded_signal_outcome(outcome: str) -> str:
 
 def _bounded_producer_block_reason(reason: str) -> str:
     if reason in _PRODUCER_BLOCKED_REASONS:
+        return reason
+    return "unknown"
+
+
+def _bounded_live_tail_source(source: str) -> str:
+    if source in _LIVE_TAIL_REPAIR_SOURCES:
+        return source
+    return "unknown"
+
+
+def _bounded_live_tail_status(status: str) -> str:
+    if status in _LIVE_TAIL_REPAIR_STATUSES:
+        return status
+    return "unknown"
+
+
+def _bounded_live_tail_gap_stage(source_stage: str) -> str:
+    if source_stage in _LIVE_TAIL_GAP_STAGES:
+        return source_stage
+    return "unknown"
+
+
+def _bounded_live_tail_ack_reason(reason: str) -> str:
+    if reason in _LIVE_TAIL_ACK_REASONS:
         return reason
     return "unknown"

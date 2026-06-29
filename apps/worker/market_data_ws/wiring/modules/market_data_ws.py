@@ -189,6 +189,22 @@ class MarketDataWsMetrics:
             "Redis hot-cache range read call duration in seconds",
             buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
         )
+        self.market_data_hot_cache_write_total = Counter(
+            "market_data_hot_cache_write_total",
+            "Successful Market Data live-tail hot-cache writes",
+        )
+        self.market_data_hot_cache_error_total = Counter(
+            "market_data_hot_cache_error_total",
+            "Market Data live-tail hot-cache read/write errors",
+        )
+        self.market_data_hot_cache_hit_total = Counter(
+            "market_data_hot_cache_hit_total",
+            "Market Data live-tail hot-cache reads with at least one candle",
+        )
+        self.market_data_hot_cache_miss_total = Counter(
+            "market_data_hot_cache_miss_total",
+            "Market Data live-tail hot-cache reads without candles",
+        )
 
         self.rest_fill_tasks_total = Counter("rest_fill_tasks_total", "Scheduled rest fill tasks")
         self.rest_fill_active = Gauge("rest_fill_active", "Number of active rest fill tasks")
@@ -329,6 +345,26 @@ class MarketDataWsMetrics:
         self.rest_fill_active.dec()
         self.rest_fill_errors_total.inc()
         self.rest_fill_duration_seconds.observe(duration_seconds)
+
+    def on_hot_cache_write_success(self) -> None:
+        self.redis_hot_cache_writes_total.inc()
+        self.market_data_hot_cache_write_total.inc()
+
+    def on_hot_cache_write_error(self) -> None:
+        self.redis_hot_cache_write_errors_total.inc()
+        self.market_data_hot_cache_error_total.inc()
+
+    def on_hot_cache_read_hit(self) -> None:
+        self.redis_hot_cache_read_hits_total.inc()
+        self.market_data_hot_cache_hit_total.inc()
+
+    def on_hot_cache_read_miss(self) -> None:
+        self.redis_hot_cache_read_misses_total.inc()
+        self.market_data_hot_cache_miss_total.inc()
+
+    def on_hot_cache_read_error(self) -> None:
+        self.redis_hot_cache_read_errors_total.inc()
+        self.market_data_hot_cache_error_total.inc()
 
 
 class MarketDataWsApp:
@@ -672,12 +708,12 @@ def build_market_data_ws_app(
             config=hot_cache_cfg,
             environ=environ,
             hooks=RedisCandleHotCacheHooks(
-                on_write_success=metrics.redis_hot_cache_writes_total.inc,
-                on_write_error=metrics.redis_hot_cache_write_errors_total.inc,
+                on_write_success=metrics.on_hot_cache_write_success,
+                on_write_error=metrics.on_hot_cache_write_error,
                 on_write_duration=metrics.redis_hot_cache_write_duration_seconds.observe,
-                on_read_hit=metrics.redis_hot_cache_read_hits_total.inc,
-                on_read_miss=metrics.redis_hot_cache_read_misses_total.inc,
-                on_read_error=metrics.redis_hot_cache_read_errors_total.inc,
+                on_read_hit=metrics.on_hot_cache_read_hit,
+                on_read_miss=metrics.on_hot_cache_read_miss,
+                on_read_error=metrics.on_hot_cache_read_error,
                 on_read_duration=metrics.redis_hot_cache_read_duration_seconds.observe,
             ),
         )

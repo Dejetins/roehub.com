@@ -212,10 +212,11 @@ The table is audit/outbox-equivalent for v1. A separate delivery outbox is not r
 
 | Metric / evidence | Labels | Meaning |
 |---|---|---|
-| `market_data_live_tail_gap_total` | `instrument_key`, `source_stage` bounded/cardinality-reviewed | Gap detected by Strategy repair path. |
+| `market_data_live_tail_gap_total` | `source_stage` bounded/cardinality-reviewed | Gap detected by Strategy repair path. |
 | `market_data_live_tail_repair_total` | `source`, `status` | Repair attempts and outcomes. |
 | `market_data_live_tail_repair_latency_seconds` | `source`, `status` | Provider latency. |
-| `market_data_hot_cache_hit_total` / `market_data_hot_cache_miss_total` | `instrument_key` bounded to configured instruments | Redis cache effectiveness. |
+| `market_data_hot_cache_hit_total` / `market_data_hot_cache_miss_total` | none | Redis cache effectiveness. |
+| `market_data_hot_cache_write_total` / `market_data_hot_cache_error_total` | none | Redis hot-cache write/read error visibility. |
 | `market_data_clickhouse_repair_circuit_state` | none or bounded host label | Circuit breaker open/closed. |
 | `strategy_live_runner_checkpoint_stall_total` | `reason` | Checkpoint could not advance due gap/repair. |
 | `strategy_live_runner_deferred_ack_total` | `reason` | Messages not ACKed or deferred by backlog policy. |
@@ -224,11 +225,13 @@ Alerts:
 
 | Alert | Severity | Owner | Runbook action |
 |---|---|---|---|
-| Gap not repaired within policy | warning/critical | operator | Check Redis hot cache, REST tail, ClickHouse circuit, selected run checkpoint. |
-| ClickHouse repair circuit open too long | warning | operator | Verify ClickHouse health; live path should continue via REST for short tail. |
-| REST tail repair errors/rate-limit | warning | operator | Verify adapter endpoint/rate limits; reduce repair rate if needed. |
-| Hot cache miss on short tail | warning | operator | Verify WS publisher cache writes and retention. |
-| Active run has no new `StrategySignal` | critical after threshold | operator | Check checkpoint, gap repair audit, producer health. |
+| `MarketDataLiveTailUnrepairedGapBeyondPolicy` | critical | `market-data` | Check Redis hot cache, REST tail, ClickHouse circuit, selected run checkpoint. |
+| `MarketDataClickHouseRepairCircuitOpenTooLong` | warning | `market-data` | Verify ClickHouse health; live path should continue via REST for short tail. |
+| `MarketDataRestTailRepairErrors` | warning | `market-data` | Verify adapter endpoint/rate limits; reduce repair rate if needed. |
+| `MarketDataHotCacheShortTailMiss` | warning | `market-data` | Verify WS publisher cache writes and retention. |
+| `StrategyProducerNoSignalGrowth` | critical after threshold | `strategy-producer` | Check checkpoint, gap repair audit, producer health. |
+
+Operator steps live in `docs/runbooks/market-data-live-tail-repair.md`.
 
 ## Redaction
 

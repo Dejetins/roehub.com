@@ -16,7 +16,10 @@ from trading.contexts.market_data.application.dto import (
     MarketDataCandleRepairAuditEvent,
 )
 from trading.contexts.market_data.application.ports.stores import CandleRepairAuditRepository
-from trading.contexts.market_data.application.services import MarketDataClosedCandleTailProvider
+from trading.contexts.market_data.application.services import (
+    ClosedCandleTailProviderHooks,
+    MarketDataClosedCandleTailProvider,
+)
 from trading.shared_kernel.primitives import (
     Candle,
     CandleMeta,
@@ -223,6 +226,7 @@ def _provider(
     audit_repository: CandleRepairAuditRepository,
     now: datetime,
     rest_tail_limit_minutes: int = 15,
+    hooks: ClosedCandleTailProviderHooks | None = None,
 ) -> MarketDataClosedCandleTailProvider:
     return MarketDataClosedCandleTailProvider(
         hot_cache=hot_cache,
@@ -234,6 +238,7 @@ def _provider(
             rest_tail_limit_minutes=rest_tail_limit_minutes,
         ),
         clickhouse_circuit_open_seconds=30.0,
+        hooks=hooks,
     )
 
 
@@ -291,6 +296,45 @@ def test_provider_falls_back_from_clickhouse_failure_to_rest_and_writes_hot_cach
     assert canonical_reader.read_calls == 1
     assert len(rest_source.calls) == 1
     assert len(audit_repository.records) == 2
+
+
+def test_provider_emits_bounded_repair_metrics_hooks() -> None:
+    base = datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc)
+    attempts: list[tuple[str, str]] = []
+    latencies: list[tuple[str, str, float]] = []
+    circuit_states: list[int] = []
+    provider = _provider(
+        hot_cache=_HotCache(),
+        canonical_reader=_CanonicalReader(error=RuntimeError("clickhouse unavailable")),
+        rest_source=_RestSource((_row(base),)),
+        audit_repository=_AuditRepository(),
+        now=base + timedelta(minutes=5, seconds=30),
+        hooks=ClosedCandleTailProviderHooks(
+            on_repair_attempt=lambda source, status: attempts.append((source, status)),
+            on_repair_latency=lambda source, status, duration: latencies.append(
+                (source, status, duration)
+            ),
+            on_clickhouse_circuit_state=circuit_states.append,
+        ),
+    )
+
+    result = provider.get_closed_1m_tail(
+        instrument_id=_instrument_id(),
+        instrument_key="binance:spot:BTCUSDT",
+        start_ts_open=UtcTimestamp(base),
+        end_ts_open=UtcTimestamp(base + timedelta(minutes=1)),
+        correlation_id="stage05-provider-metrics-proof",
+    )
+
+    assert result.continuous is True
+    assert attempts == [
+        ("redis_hot_cache", "miss"),
+        ("clickhouse", "failed"),
+        ("rest", "succeeded"),
+    ]
+    assert [(source, status) for source, status, _duration in latencies] == attempts
+    assert all(duration >= 0.0 for _source, _status, duration in latencies)
+    assert circuit_states == [1]
 
 
 def test_provider_returns_sorted_rows_when_sources_restore_out_of_order() -> None:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Protocol
+from typing import Callable, Protocol
 from uuid import uuid4
 
 from trading.contexts.market_data.application.dto import (
@@ -41,6 +43,15 @@ class ClosedCandleHotCache(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ClosedCandleTailProviderHooks:
+    """Optional callbacks for bounded live-tail repair metrics."""
+
+    on_repair_attempt: Callable[[str, str], None] | None = None
+    on_repair_latency: Callable[[str, str, float], None] | None = None
+    on_clickhouse_circuit_state: Callable[[int], None] | None = None
+
+
 class MarketDataClosedCandleTailProvider:
     """
     Market Data-owned source chain for short closed-candle tail repair.
@@ -56,6 +67,7 @@ class MarketDataClosedCandleTailProvider:
         clock: Clock,
         policy: ClosedCandleTailRepairPolicy | None = None,
         clickhouse_circuit_open_seconds: float = 30.0,
+        hooks: ClosedCandleTailProviderHooks | None = None,
     ) -> None:
         if hot_cache is None:  # type: ignore[truthy-bool]
             raise ValueError("MarketDataClosedCandleTailProvider requires hot_cache")
@@ -78,6 +90,7 @@ class MarketDataClosedCandleTailProvider:
         self._policy = policy if policy is not None else ClosedCandleTailRepairPolicy()
         self._clickhouse_circuit_open_seconds = clickhouse_circuit_open_seconds
         self._clickhouse_circuit_open_until: datetime | None = None
+        self._hooks = hooks if hooks is not None else ClosedCandleTailProviderHooks()
 
     def get_closed_1m_tail(
         self,
@@ -91,6 +104,7 @@ class MarketDataClosedCandleTailProvider:
         """
         Return closed 1m candles from Redis hot cache, ClickHouse, and REST tail.
         """
+        started_at = time.perf_counter()
         time_range = TimeRange(start=start_ts_open, end=end_ts_open)
         now_floor = UtcTimestamp(floor_to_minute_utc(self._clock.now().value))
         if end_ts_open.value > now_floor.value:
@@ -115,6 +129,10 @@ class MarketDataClosedCandleTailProvider:
                 error_code="non_closed_range",
                 error_summary="requested range includes current open candle",
             )
+            self._emit_result_hooks(
+                result=result,
+                duration_seconds=time.perf_counter() - started_at,
+            )
             return result
 
         rows_by_ts: dict[datetime, ClosedCandleTailRow] = {}
@@ -130,7 +148,7 @@ class MarketDataClosedCandleTailProvider:
             ),
         )
         if _continuous(rows_by_ts, time_range):
-            return self._finalize(
+            result = self._finalize(
                 correlation_id=correlation_id,
                 instrument_id=instrument_id,
                 instrument_key=instrument_key,
@@ -138,6 +156,11 @@ class MarketDataClosedCandleTailProvider:
                 rows_by_ts=rows_by_ts,
                 attempts=attempts,
             )
+            self._emit_result_hooks(
+                result=result,
+                duration_seconds=time.perf_counter() - started_at,
+            )
+            return result
 
         self._merge_rows(
             rows_by_ts,
@@ -148,7 +171,7 @@ class MarketDataClosedCandleTailProvider:
             ),
         )
         if _continuous(rows_by_ts, time_range):
-            return self._finalize(
+            result = self._finalize(
                 correlation_id=correlation_id,
                 instrument_id=instrument_id,
                 instrument_key=instrument_key,
@@ -156,6 +179,11 @@ class MarketDataClosedCandleTailProvider:
                 rows_by_ts=rows_by_ts,
                 attempts=attempts,
             )
+            self._emit_result_hooks(
+                result=result,
+                duration_seconds=time.perf_counter() - started_at,
+            )
+            return result
 
         self._merge_rows(
             rows_by_ts,
@@ -168,7 +196,7 @@ class MarketDataClosedCandleTailProvider:
                 attempts=attempts,
             ),
         )
-        return self._finalize(
+        result = self._finalize(
             correlation_id=correlation_id,
             instrument_id=instrument_id,
             instrument_key=instrument_key,
@@ -176,6 +204,11 @@ class MarketDataClosedCandleTailProvider:
             rows_by_ts=rows_by_ts,
             attempts=attempts,
         )
+        self._emit_result_hooks(
+            result=result,
+            duration_seconds=time.perf_counter() - started_at,
+        )
+        return result
 
     def _read_redis(
         self,
@@ -387,6 +420,32 @@ class MarketDataClosedCandleTailProvider:
         for row in rows:
             rows_by_ts.setdefault(row.ts_open.value, row)
 
+    def _emit_result_hooks(
+        self,
+        *,
+        result: ClosedCandleTailResult,
+        duration_seconds: float,
+    ) -> None:
+        for attempt in result.sources_attempted:
+            _emit_attempt(self._hooks.on_repair_attempt, attempt.source, attempt.status)
+            _emit_latency(
+                self._hooks.on_repair_latency,
+                attempt.source,
+                attempt.status,
+                duration_seconds,
+            )
+
+        clickhouse_attempts = [
+            attempt for attempt in result.sources_attempted if attempt.source == "clickhouse"
+        ]
+        if not clickhouse_attempts:
+            return
+        last_status = clickhouse_attempts[-1].status
+        if last_status in {"failed", "circuit_open"}:
+            _emit_circuit_state(self._hooks.on_clickhouse_circuit_state, 1)
+        elif last_status in {"succeeded", "miss"}:
+            _emit_circuit_state(self._hooks.on_clickhouse_circuit_state, 0)
+
 
 def _continuous(rows_by_ts: dict[datetime, ClosedCandleTailRow], time_range: TimeRange) -> bool:
     expected = _expected_minute_values(time_range)
@@ -427,3 +486,30 @@ def _missing_ranges(
         previous = value
     ranges.append(TimeRange(UtcTimestamp(start), UtcTimestamp(previous + _ONE_MINUTE)))
     return tuple(ranges)
+
+
+def _emit_attempt(
+    callback: Callable[[str, str], None] | None,
+    source: str,
+    status: str,
+) -> None:
+    if callback is None:
+        return
+    callback(source, status)
+
+
+def _emit_latency(
+    callback: Callable[[str, str, float], None] | None,
+    source: str,
+    status: str,
+    duration_seconds: float,
+) -> None:
+    if callback is None:
+        return
+    callback(source, status, max(duration_seconds, 0.0))
+
+
+def _emit_circuit_state(callback: Callable[[int], None] | None, state: int) -> None:
+    if callback is None:
+        return
+    callback(state)

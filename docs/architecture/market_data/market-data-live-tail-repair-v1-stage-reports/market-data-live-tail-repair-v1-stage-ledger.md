@@ -9,7 +9,7 @@
 | `plan_doc` | `docs/architecture/market_data/market-data-live-tail-repair-v1.md` |
 | `prompt_pack` | `.codex/agents/generated/market-data-live-tail-repair-v1/` |
 | `ledger_status` | `active` |
-| `current_stage` | `05` |
+| `current_stage` | `06` |
 | `created_at` | `2026-06-29` |
 | `owner` | `Roehub agents / implementation executors` |
 
@@ -36,8 +36,8 @@
 | `02` Redis hot cache | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/02-redis-hot-cache.md` | `02-redis-hot-cache.md` | Redis integration + metrics + real Redis proof | Redis hot cache writer/reader, retention config, worker fan-out wiring, metrics hooks, tests, and isolated `macstudio` Redis duplicate/range proof are complete and ready for direct-main delivery evidence in the accepted Stage `02` commit. | none | yes |
 | `03` Tail provider source chain | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/03-tail-provider-source-chain.md` | `03-tail-provider-source-chain.md` | provider integration + audit DB + REST adapter boundary | `MarketDataClosedCandleTailProvider` implements Redis -> ClickHouse -> REST -> audit chain; focused integration tests prove ClickHouse failure fallback, REST hot-cache write, Redis second-call hit, audit write, and miss guards. | none | yes |
 | `04` Strategy runner integration and ACK policy | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/04-strategy-runner-integration-ack-policy.md` | `04-strategy-runner-integration-ack-policy.md` | runner integration + Redis pending/backlog proof | `StrategyLiveRunner` now uses `ClosedCandleTailProvider`; failed repair leaves Redis message pending, later retry reclaims/replays it and advances checkpoint without duplicate signals. | none | yes |
-| `05` Metrics alerts runbook | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/05-metrics-alerts-runbook.md` | `05-metrics-alerts-runbook.md` | metrics endpoint + alert rule/runbook proof | TBD | none until Stage `05` execution starts | yes |
-| `06` Mac Studio repair proof | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/06-macstudio-repair-proof.md` | `06-macstudio-repair-proof.md` | post_main_production_runtime_proof | TBD | blocked until `05 accepted` | no |
+| `05` Metrics alerts runbook | accepted | `.codex/agents/generated/market-data-live-tail-repair-v1/05-metrics-alerts-runbook.md` | `05-metrics-alerts-runbook.md` | metrics registry scrape + alert rules/runbook proof | Live-tail repair/cache/circuit/checkpoint metrics, Prometheus alert rules, bootstrap install, Russian operator runbook, and monitoring docs sync are complete. | none | yes |
+| `06` Mac Studio repair proof | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/06-macstudio-repair-proof.md` | `06-macstudio-repair-proof.md` | post_main_production_runtime_proof | TBD | none until Stage `06` execution starts after Stage `05` scoped delivery/CI remains green | yes |
 | `07` Stage 12.4 rerun handoff | pending | `.codex/agents/generated/market-data-live-tail-repair-v1/07-stage-12-4-rerun-handoff.md` | `07-stage-12-4-rerun-handoff.md` | sustained soak rerun or explicit handoff | TBD | blocked until `06 accepted` | no |
 
 ## Что Обязательно Знать Дальше
@@ -61,6 +61,10 @@
 | `04` | Selected ACK policy is pending reclaim: no ACK until all relevant active run contexts accept the triggering candle or treat it as stale/idempotent. | Stage `05` metrics should count deferred ACK/checkpoint stall events around this policy, not assume immediate ACK after `_process_candle`. | `04-strategy-runner-integration-ack-policy.md`; real Redis proof |
 | `04` | Real Redis proof used isolated synthetic stream `md.candles.1m.stage04-proof.20260629231857-c0ada0c7.binance:spot:BTCUSDT`: pending became `1` after no ACK, reclaim returned the same message, ACK cleared pending to `0`, cleanup left `0` keys. | Stage `05` can add metrics/alerts around pending reclaim and repair outcomes without re-proving Redis PEL semantics. | `04-strategy-runner-integration-ack-policy.md` |
 | `04` | Runner proof showed failed repair leaves message pending and later retry processes repaired candles plus triggering candle with duplicate `signal_id` and duplicate `(strategy_run_id, bar_ts_open)` counts still `0`. | Stage `06` can later prove changed-code runtime behavior on Mac Studio; Stage `04` itself does not claim production runtime repair proof. | `04-strategy-runner-integration-ack-policy.md` |
+| `05` | `strategy-producer` now emits `market_data_live_tail_gap_total`, `market_data_live_tail_repair_total`, `market_data_live_tail_repair_latency_seconds`, `market_data_hot_cache_*`, `market_data_clickhouse_repair_circuit_state`, `strategy_live_runner_checkpoint_stall_total`, and `strategy_live_runner_deferred_ack_total` through bounded labels. | Stage `06` can use runtime metrics endpoint proof for the deployed revision instead of adding new metric names. | `05-metrics-alerts-runbook.md`; synthetic registry scrape proof |
+| `05` | `market-data-ws-worker` now emits canonical `market_data_hot_cache_*` counters in addition to existing `redis_hot_cache_*` counters. | Stage `06` should check both `strategy-producer` and WS worker metrics when proving hot-cache behavior in deployed runtime. | `05-metrics-alerts-runbook.md` |
+| `05` | Production Prometheus config loads `/opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml`; bootstrap installs it from `infra/macos/prometheus/rules/market-data-live-tail-repair.rules.yml`. | Stage `06` deployment proof should include monitoring config/rules installation and Prometheus reload/restart evidence when deploy workflow applies these files. | `05-metrics-alerts-runbook.md`; `infra/macos/prometheus/prometheus.prod.yml`; `scripts/macos/bootstrap_native_prod.sh` |
+| `05` | Operator runbook is `docs/runbooks/market-data-live-tail-repair.md`; it lists safe checks and forbids env/DSN/tokens/API keys/Redis password/raw provider payload output. | Stage `06` should keep proof redacted and cite runbook actions if an alert fires. | `05-metrics-alerts-runbook.md`; runbook |
 
 ## Contract Impact Matrix
 
@@ -90,7 +94,7 @@
 | `02` | focused tests, Redis integration call, docs index | real Redis duplicate write/range read/retention/metrics | accepted | `02-redis-hot-cache.md` | Strategy provider chain is not implemented yet; Redis hot cache is not proof of end-to-end live-tail repair. `post_main_production_runtime_proof` remains Stage `06`. | Run Stage `03` Tail provider source chain after direct-main delivery/CI stays green. |
 | `03` | focused tests, provider integration call, docs index | provider returns continuous range with ClickHouse failure and REST tail fallback; audit row exists | accepted | `03-tail-provider-source-chain.md` | Strategy runner is not wired yet; ACK/checkpoint behavior remains unchanged until Stage `04`. | Run Stage `04` Strategy runner integration and ACK policy after direct-main delivery/CI stays green. |
 | `04` | focused runner tests, Redis pending/backlog integration, docs index | failed repair does not lose future candle; later retry advances checkpoint and creates no duplicate signals | accepted | `04-strategy-runner-integration-ack-policy.md` | Metrics/alerts/runbook are still missing until Stage `05`; production changed-code proof remains Stage `06`. | Run Stage `05` Metrics alerts runbook after direct-main delivery/CI stays green. |
-| `05` | metrics tests, alert rule parse, docs index | metrics endpoint exposes repair/cache/circuit/checkpoint-stall signals after synthetic repair call | TBD | Stage report | TBD | TBD |
+| `05` | metrics tests, alert rule parse, docs index | direct registry scrape exposes repair/cache/circuit/checkpoint-stall/deferred-ACK signals after synthetic hook calls; repository monitoring tests parse alert YAML and validate bounded labels/runbook anchors | accepted | `05-metrics-alerts-runbook.md` | Runtime endpoint proof is deferred to Stage `06`; local `promtool` is unavailable, so alert validation uses repository YAML/unit-test path. | Run Stage `06` Mac Studio repair proof after direct-main delivery/CI stays green. |
 | `06` | local gates, green GitHub Actions/CI, deploy/sync, Mac Studio runtime smoke | `post_main_production_runtime_proof` only: changed revision is on `main`, CI is green, deploy/sync into `/opt/roehub/app` is complete, then controlled missing minute + ClickHouse unavailable + REST tail recovery is proven in deployed runtime. | TBD | Stage report | TBD | TBD |
 | `07` | docs index, runtime collector | `12.4` accepted rerun or explicit unrelated blocker | TBD | Stage report + strategy-producer ledger | TBD | TBD |
 
@@ -103,6 +107,7 @@
 | `02` | `main`, no speculative branch | scoped direct-main publish of Stage `02` code/config/tests/report/docs | required for direct-main delivery | host sync/prod runtime proof deferred to Stage `06`; Stage `02` collected only isolated pre-main Redis proof | User explicitly approved isolated synthetic-key Redis proof against `macstudio`; proof keys were cleaned up. |
 | `03` | `main`, no speculative branch | scoped direct-main publish of Stage `03` provider/tests/report/docs | required for direct-main delivery | host sync/prod runtime proof deferred to Stage `06`; Stage `03` uses fake/safe REST and fake Postgres gateway proof | Strategy runner is intentionally not wired until Stage `04`. |
 | `04` | `main`, no speculative branch | scoped direct-main publish of Stage `04` runner/Redis adapter/config/tests/report/docs | required for direct-main delivery | host sync/prod runtime proof deferred to Stage `06`; Stage `04` collected isolated Redis pending proof only | Selected policy is pending reclaim, not durable backlog. |
+| `05` | `main`, no speculative branch | scoped direct-main publish of Stage `05` metrics/config/tests/report/docs | required for direct-main delivery | host sync/prod runtime proof deferred to Stage `06`; Stage `05` collected direct registry scrape and alert/runbook proof only | Monitoring files changed; post-main deploy path should apply bootstrap/rules and reload/restart Prometheus as needed. |
 
 ## Blockers / Handoff
 
@@ -115,10 +120,10 @@
 Next prompt to run:
 
 ```text
-.codex/agents/generated/market-data-live-tail-repair-v1/05-metrics-alerts-runbook.md
+.codex/agents/generated/market-data-live-tail-repair-v1/06-macstudio-repair-proof.md
 ```
 
-Reason: Stage `04` Strategy runner integration and ACK policy is accepted after focused runner tests, dedupe proof, and isolated real Redis pending reclaim proof. Stage `05` is the next pending stage and is explicitly allowed once Stage `04` scoped delivery/CI remains green.
+Reason: Stage `05` Metrics alerts runbook is accepted after focused metrics/rules tests, direct registry scrape proof, docs/runbook update, and local prompt gates. Stage `06` is the next pending stage and is explicitly allowed once Stage `05` scoped delivery/CI remains green.
 
 ## Change Log
 
@@ -129,3 +134,4 @@ Reason: Stage `04` Strategy runner integration and ACK policy is accepted after 
 | 2026-06-30 | `02` | Implemented Redis hot cache writer/reader, production config, worker fan-out wiring, metrics hooks, tests, docs sync, and approved isolated `macstudio` Redis duplicate/range proof with cleanup. | `02-redis-hot-cache.md` |
 | 2026-06-30 | `03` | Implemented provider source chain, ClickHouse failure circuit fallback to REST, REST hot-cache write before success, redacted repair audit writes, closed-tail guards, tests, and docs sync. | `03-tail-provider-source-chain.md` |
 | 2026-06-30 | `04` | Integrated Strategy runner with `ClosedCandleTailProvider`, selected pending reclaim ACK policy, added Redis pending reclaim before new reads, wired Market Data provider into strategy worker, proved failed-repair no-loss retry and real Redis pending reclaim cleanup. | `04-strategy-runner-integration-ack-policy.md` |
+| 2026-06-30 | `05` | Added live-tail repair/cache/circuit/checkpoint metrics, Prometheus alert rules, bootstrap install, Russian operator runbook, monitoring docs sync, and direct registry scrape proof with bounded labels. | `05-metrics-alerts-runbook.md` |
