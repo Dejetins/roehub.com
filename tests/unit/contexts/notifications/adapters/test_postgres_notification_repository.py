@@ -13,6 +13,7 @@ class _Gateway:
     def __init__(self) -> None:
         self.routes: dict[str, Mapping[str, Any]] = {}
         self.deliveries: dict[str, Mapping[str, Any]] = {}
+        self.fetch_all_queries: list[str] = []
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
         if "INSERT INTO notification_routes" in query:
@@ -43,6 +44,22 @@ class _Gateway:
         query: str,
         parameters: Mapping[str, Any],
     ) -> tuple[Mapping[str, Any], ...]:
+        self.fetch_all_queries.append(query)
+        if "FROM notification_routes" in query:
+            owner_user_id = parameters["owner_user_id"]
+            recipient_kind = parameters["recipient_kind"]
+            category = parameters["category"]
+            return tuple(
+                route
+                for route in self.routes.values()
+                if route["status"] == "active"
+                and route["recipient_kind"] == recipient_kind
+                and route["owner_user_id"] == owner_user_id
+                and (
+                    not route["category_filter"]
+                    or category in route["category_filter"]
+                )
+            )
         raise AssertionError(query)
 
     def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
@@ -67,6 +84,23 @@ def test_postgres_notification_repository_maps_route_and_claims_delivery() -> No
     assert claimed is not None
     assert claimed.status == "claimed"
     assert claimed.attempt_count == 1
+
+
+def test_postgres_notification_repository_lists_active_routes_with_typed_owner_filter() -> None:
+    gateway = _Gateway()
+    repository = PostgresNotificationRepository(gateway=gateway)
+    now = datetime(2026, 6, 29, 16, 0, tzinfo=timezone.utc)
+    route = repository.upsert_route(route=_route(now=now))
+
+    routes = repository.list_active_routes(
+        owner_user_id=route.owner_user_id,
+        recipient_kind="user",
+        category="strategy_signal",
+    )
+
+    assert routes == (route,)
+    assert gateway.fetch_all_queries
+    assert "%(owner_user_id)s::uuid" in gateway.fetch_all_queries[-1]
 
 
 def _route(*, now: datetime) -> NotificationRoute:

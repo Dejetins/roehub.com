@@ -132,8 +132,8 @@ class PostgresNotificationRepository:
             WHERE status = 'active'
               AND recipient_kind = %(recipient_kind)s
               AND (
-                    (%(owner_user_id)s IS NULL AND owner_user_id IS NULL)
-                    OR owner_user_id = %(owner_user_id)s
+                    (%(owner_user_id)s::uuid IS NULL AND owner_user_id IS NULL)
+                    OR owner_user_id = %(owner_user_id)s::uuid
                   )
               AND (cardinality(category_filter) = 0 OR %(category)s = ANY(category_filter))
             ORDER BY updated_at DESC, route_id ASC
