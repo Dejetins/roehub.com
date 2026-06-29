@@ -1,4 +1,11 @@
-from .application import NotificationRepository
+from .application import (
+    NotificationRepository,
+    NotificationRouteDecision,
+    NotificationSourceRouter,
+    NotificationSyntheticFlowResult,
+    SyntheticNotificationSourceFact,
+    synthetic_notification_matrix,
+)
 from .domain import (
     NotificationDelivery,
     NotificationDeliveryAttempt,
@@ -18,8 +25,13 @@ __all__ = [
     "NotificationReportRun",
     "NotificationRepository",
     "NotificationRoute",
+    "NotificationRouteDecision",
+    "NotificationSourceRouter",
+    "NotificationSyntheticFlowResult",
     "NotificationValidationError",
+    "SyntheticNotificationSourceFact",
     "TelegramUpdate",
     "build_notification_dedupe_key",
     "sanitize_notification_mapping",
+    "synthetic_notification_matrix",
 ]
