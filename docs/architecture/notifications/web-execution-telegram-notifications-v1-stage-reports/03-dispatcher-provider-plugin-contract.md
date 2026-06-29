@@ -2,9 +2,9 @@
 
 Дата: `2026-06-29`
 
-Статус: `completed-local`
+Статус: `accepted`
 
-Acceptance boundary: Stage `03` добавляет provider-neutral dispatcher для `NotificationDelivery`: claim/lease, попытки отправки, retry/backoff, `unknown`, `dead_letter`, `suppressed`, fake/log provider и Telegram Bot API provider за безопасной конфигурацией. Stage остается `completed-local` до публикации в `main`, green CI/deploy и синхронизации `macstudio`.
+Acceptance boundary: Stage `03` добавляет provider-neutral dispatcher для `NotificationDelivery`: claim/lease, попытки отправки, retry/backoff, `unknown`, `dead_letter`, `suppressed`, fake/log provider и Telegram Bot API provider за безопасной конфигурацией. Stage accepted после публикации implementation commit `ad7cd18b140bb4f7cd40436dc6994779bc322591` в `main`, green CI/deploy evidence и синхронизации `macstudio`.
 
 ## User Required Before Start
 
@@ -78,7 +78,9 @@ Local composition-root smoke executed against the in-memory repository integrati
 | `uv run pytest -q tests/unit/contexts/notifications tests/unit/apps` | passed: `374 passed, 3 warnings` |
 | Real-boundary composition-root smoke | passed: `stage03_dispatcher_smoke=ok claimed=3 sent=1 unknown=1 dead_letter=1 attempts=3` |
 | `uv run python -m tools.docs.generate_docs_index --check` | local check failed because the dirty checkout contains unrelated untracked `market-data-live-tail-repair-v1` docs; generated diff inspection showed the Stage `03` README entry matches the generator and only those unrelated market-data entries remain missing |
-| GitHub CI/deploy/host sync | pending |
+| GitHub CI `28392951099` for `ad7cd18b140bb4f7cd40436dc6994779bc322591` | passed; static, docs-index, migrations and all test shards green |
+| GitHub deploy runs for `ad7cd18b140bb4f7cd40436dc6994779bc322591` | `Deploy Backend` run `28393209157`, `Deploy Web` runs `28393209162` and `28393220376`, and `Publish App Image` run `28393209150` passed |
+| `macstudio` checkout sync and smoke | checkout fast-forwarded to `ad7cd18b140bb4f7cd40436dc6994779bc322591`; `bash /opt/roehub/app/scripts/macos/smoke_prod.sh` passed |
 
 ## Contract Impact
 
