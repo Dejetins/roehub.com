@@ -1,33 +1,34 @@
-# Strategy Telegram notifier v1: best-effort adapter + notification policy
+# Strategy Telegram notifier v1: notifications migration + rollback policy
 
-Документ фиксирует контракт STR-EPIC-05: как Strategy live-runner отправляет Telegram-уведомления по ключевым событиям без влияния на устойчивость pipeline.
+Документ фиксирует контракт STR-EPIC-05 после Notifications v1 Stage `10`: Strategy live-runner больше не должен использовать прямую Telegram delivery как основной путь. Основной режим `strategy.telegram.mode=notifications` ставит события в bounded context `notifications`; старые `log_only` и `telegram` адаптеры сохранены только как rollback.
 
 ## Цель
 
-Обеспечить пользователю Telegram-уведомления по ключевым событиям стратегии (`signal`, `trade_open`, `trade_close`, `failed`) с best-effort семантикой: ошибки канала уведомлений не ломают обработку run и не роняют worker.
+Обеспечить пользователю Telegram-уведомления по ключевым событиям стратегии (`signal`, `trade_open`, `trade_close`, `failed`) через `notifications` lifecycle с best-effort семантикой на Strategy handoff boundary: ошибки постановки события/доставки в очередь не ломают обработку run и не роняют worker.
 
 ## Контекст
 
 - В Strategy уже есть live-runner и realtime output в Redis Streams: `src/trading/contexts/strategy/application/services/live_runner.py`, `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`, `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md`.
 - В Identity уже есть модель Telegram binding: `identity_telegram_channels(user_id, chat_id, is_confirmed, confirmed_at)` в `migrations/postgres/0001_identity_v1.sql`.
-- User-auth в API после Keycloak cutover не зависит от Telegram; `TELEGRAM_BOT_TOKEN` используется только
-  для notifier path в strategy live-runner.
-- Для STR-EPIC-05 v1 нужно:
-  - best-effort отправка;
-  - `log-only` адаптер в dev/test;
-  - реальная отправка в prod только при подтвержденном chat binding.
+- User-auth в API после Keycloak cutover не зависит от Telegram; `TELEGRAM_BOT_TOKEN` используется только при явном rollback в direct `strategy.telegram.mode=telegram`.
+- Для STR-EPIC-05 после Stage `10` нужно:
+  - best-effort handoff в `notifications`;
+  - rollback `log_only` adapter для diagnostics;
+  - rollback direct `telegram` adapter только при подтвержденном chat binding и явном config switch.
 - Для anti-spam на этапе v1 достаточно debounce одинаковых ошибок.
 
 ## Scope
 
-- Port `TelegramNotifier` в strategy context.
+- Port `TelegramNotifier` в strategy context остается compatibility boundary для live-runner.
+- Основной adapter: `NotificationsTelegramNotifier`, который пишет `NotificationEvent` и pending `NotificationDelivery` через `notifications`.
 - ACL/port в identity для резолва подтвержденного `chat_id` по `user_id` (это data-binding dependency, не auth dependency).
 - Notification policy:
   - какие `event_type` идут в Telegram (`signal`, `trade_open`, `trade_close`, `failed`);
   - debounce одинаковых ошибок `failed`.
-- Два режима адаптера:
-  - `log_only` (dev/test),
-  - `telegram` (prod).
+- Режимы адаптера:
+  - `notifications` (основной режим dev/test/prod после Stage `10`);
+  - `log_only` (rollback/local diagnostics);
+  - `telegram` (rollback direct Bot API path).
 - Интеграция в live-runner как best-effort side effect после успешной доменной обработки события.
 - Runtime config в `strategy_live_runner.yaml` для telegram notifier.
 - Метрики, логи и unit-тесты на policy/adapters/wiring.
@@ -42,9 +43,24 @@
 
 ## Ключевые решения
 
+### Stage 10 Migration State
+
+| Контракт | Состояние |
+|---|---|
+| Основной режим | `strategy.telegram.mode=notifications` |
+| Runtime side effect | запись `NotificationEvent` + pending `NotificationDelivery`; provider send выполняет dispatcher |
+| Direct Telegram | rollback-only через `mode=telegram`; требует `TELEGRAM_BOT_TOKEN` и старый confirmed chat resolver |
+| Log-only | rollback/local diagnostics через `mode=log_only` |
+| Метрики Strategy | `strategy_telegram_notify_*` сохранены; в `notifications` mode означают queued/skipped/error на handoff boundary |
+| Real Telegram send | не выполняется Strategy worker в `notifications` mode |
+
+### Validation Status
+
+Текущий документ описывает runtime migration contract, но локальные unit/integration tests не являются acceptance для Stage `10`. Stage `10` может быть только `completed-local` до post-main production runtime proof: target revision на `main`, green CI/deploy, синхронизация Mac Studio checkout/runtime, `smoke_prod.sh`, и bounded Strategy notifications-mode smoke без реальной Telegram отправки. До этого прямой `telegram` mode считается rollback-only, а не основным production-доказательством.
+
 ### 1) Точка интеграции: Strategy live-runner
 
-Telegram notify вызывается из live-runner в момент формирования Strategy event, как дополнительный best-effort side effect.
+Telegram notify compatibility-port вызывается из live-runner в момент формирования Strategy event, как дополнительный best-effort side effect. После Stage `10` основной adapter не вызывает Telegram Bot API, а ставит событие в `notifications`.
 
 Последствия:
 - Минимальная задержка и простой operational-контур без отдельного процесса.
@@ -76,14 +92,15 @@ Strategy не читает identity-таблицы напрямую и не хр
 - Сохраняется граница bounded contexts.
 - Без подтвержденного binding отправки нет (skip + warning + метрика).
 
-### 4) Адаптеры v1: `log_only` и `telegram`
+### 4) Адаптеры v1 после Stage 10: `notifications`, `log_only` и `telegram`
 
-- `log_only` адаптер (dev/test): пишет структурированное сообщение в лог и считает метрики.
-- `telegram` адаптер (prod): отправляет сообщение в Telegram Bot API (`sendMessage`).
+- `notifications` адаптер (основной): пишет `NotificationEvent` и pending `NotificationDelivery`.
+- `log_only` адаптер (rollback/local diagnostics): пишет структурированное сообщение в лог и считает метрики.
+- `telegram` адаптер (rollback direct path): отправляет сообщение в Telegram Bot API (`sendMessage`).
 
 Последствия:
-- Выполняется DoD: рабочий safe mode для dev/test.
-- Prod получает реальную доставку при наличии подтвержденного binding.
+- Strategy больше не владеет provider send в основном режиме.
+- Prod получает реальную доставку только когда notification dispatcher/provider rollout разрешит соответствующий provider.
 
 ### 5) Best-effort runtime + fail-fast конфигурация для prod
 
@@ -131,20 +148,21 @@ V1 не использует Markdown/HTML и локализацию; форма
 - Легкая поддержка и предсказуемый output.
 - Миграция на templating/l10n возможна отдельным контрактом v2.
 
-### 9) Runtime config: секция `strategy_live_runner.telegram`
+### 9) Runtime config: секция `strategy.telegram`
 
 Добавляется минимальный конфигурационный блок:
 
 - `enabled: bool`
-- `mode: "log_only" | "telegram"`
+- `mode: "notifications" | "log_only" | "telegram"`
 - `bot_token_env: "TELEGRAM_BOT_TOKEN"`
 - `api_base_url: "https://api.telegram.org"`
 - `send_timeout_s: float`
 - `debounce_failed_seconds: int`
 
-Политика по средам:
-- dev/test: `mode=log_only`
-- prod: `mode=telegram`
+Политика по средам после Stage `10`:
+- dev/test/prod: `mode=notifications`
+- rollback direct send: `mode=telegram`
+- rollback log-only diagnostics: `mode=log_only`
 
 Последствия:
 - Единая точка управления notifier-поведением.
@@ -162,6 +180,7 @@ V1 не использует Markdown/HTML и локализацию; форма
 - В dev/test должен быть доступен `log_only` адаптер.
 - В prod при `mode=telegram` и невалидной обязательной конфигурации включается fail-fast startup.
 - Секреты (`TELEGRAM_BOT_TOKEN`) не логируются.
+- В основном режиме notify side effect создает `notifications` event/delivery rows и не вызывает Bot API напрямую.
 - Notify side effect не меняет состояние run и не влияет на правило `ack after processing`.
 
 ## Связанные файлы

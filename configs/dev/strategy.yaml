@@ -39,7 +39,7 @@ strategy:
 
   telegram:
     enabled: true
-    mode: "log_only"
+    mode: "notifications"
     bot_token_env: "TELEGRAM_BOT_TOKEN"
     api_base_url: "https://api.telegram.org"
     send_timeout_s: 2.0

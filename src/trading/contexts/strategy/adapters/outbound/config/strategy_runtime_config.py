@@ -320,9 +320,9 @@ class StrategyTelegramRuntimeConfig:
             Normalizes mode/base URL/token-env values in place.
         """
         normalized_mode = self.mode.strip()
-        if normalized_mode not in {"log_only", "telegram"}:
+        if normalized_mode not in {"notifications", "log_only", "telegram"}:
             raise ValueError(
-                "strategy.telegram.mode must be one of: log_only, telegram"
+                "strategy.telegram.mode must be one of: notifications, log_only, telegram"
             )
         if self.send_timeout_s <= 0:
             raise ValueError("strategy.telegram.send_timeout_s must be > 0")

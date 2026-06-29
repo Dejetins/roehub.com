@@ -37,7 +37,7 @@ def test_load_strategy_live_runner_runtime_config_parses_shim_file() -> None:
     assert cfg.realtime_output.events_stream_prefix == "strategy.events.v1.user"
 
     assert cfg.telegram.enabled is True
-    assert cfg.telegram.mode == "log_only"
+    assert cfg.telegram.mode == "notifications"
     assert cfg.telegram.bot_token_env == "TELEGRAM_BOT_TOKEN"
     assert cfg.telegram.api_base_url == "https://api.telegram.org"
     assert cfg.telegram.send_timeout_s == 1.0

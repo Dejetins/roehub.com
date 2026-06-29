@@ -13,6 +13,9 @@ from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
     CanonicalCandleBatch1m,
 )
+from trading.contexts.notifications.adapters import InMemoryNotificationRepository
+from trading.contexts.notifications.domain import NotificationRoute
+from trading.contexts.strategy.adapters.outbound import NotificationsTelegramNotifier
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyRepository,
@@ -28,6 +31,7 @@ from trading.contexts.strategy.application import (
     StrategyRealtimeOutputRecordV1,
     StrategyTelegramNotificationV1,
     TelegramNotificationPolicy,
+    TelegramNotifier,
 )
 from trading.contexts.strategy.application.services import (
     TimeframeRollupPolicy,
@@ -845,6 +849,63 @@ def test_live_runner_emits_failed_telegram_notification_on_failed_run() -> None:
     )
 
 
+def test_live_runner_queues_failed_notification_through_notifications_context() -> None:
+    """
+    Ensure Stage 10 migration path creates notifications event/delivery without Telegram send.
+    """
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000917")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    strategy_repository.create(strategy=strategy)
+    notification_repository = InMemoryNotificationRepository()
+    notification_repository.upsert_route(route=_notification_route(owner_user_id=user_id))
+
+    started_run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000E917"),
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 2, 17, 17, 30, tzinfo=timezone.utc),
+        metadata_json={},
+    )
+    run_repository.create(run=started_run)
+
+    stream = _StreamStub(
+        messages_by_instrument={
+            strategy.spec.instrument_key: (
+                _message(
+                    "m-fail",
+                    _candle_at(datetime(2026, 2, 17, 17, 30, tzinfo=timezone.utc)),
+                ),
+            ),
+        }
+    )
+    notifier = NotificationsTelegramNotifier(
+        repository=notification_repository,
+        now_factory=lambda: datetime(2026, 2, 17, 17, 31, tzinfo=timezone.utc),
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=stream,
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        telegram_notifier_probe=notifier,
+        rollup_policy=_FailingRollupPolicy(),
+    )
+
+    runner.run_once()
+
+    event = next(iter(notification_repository.events.values()))
+    delivery = next(iter(notification_repository.deliveries.values()))
+    assert event.source_context == "strategy"
+    assert event.category == "strategy_run_failed"
+    assert event.source_event_type == "failed"
+    assert delivery.event_id == event.event_id
+    assert delivery.provider_key == "telegram_bot_api"
+    assert delivery.status == "pending"
+
+
 def test_live_runner_keeps_best_effort_when_telegram_notifier_raises() -> None:
     """
     Ensure Telegram notifier exceptions never break live-runner iteration processing.
@@ -1203,7 +1264,7 @@ def _build_runner(
     retry_attempts: int,
     sleeper: _SleeperProbe | None = None,
     realtime_output_probe: _RealtimeOutputProbe | None = None,
-    telegram_notifier_probe: _TelegramNotifierProbe | None = None,
+    telegram_notifier_probe: TelegramNotifier | None = None,
     telegram_policy: TelegramNotificationPolicy | None = None,
     signal_repository: InMemoryStrategySignalRepository | None = None,
     live_profile_repository: InMemoryLiveStrategyProfileRepository | None = None,
@@ -1252,6 +1313,25 @@ def _build_runner(
         telegram_notification_policy=telegram_policy,
         warmup_estimator=warmup_estimator,
         rollup_policy=rollup_policy,
+    )
+
+
+def _notification_route(*, owner_user_id: UserId) -> NotificationRoute:
+    now = datetime(2026, 2, 17, 17, 30, tzinfo=timezone.utc)
+    return NotificationRoute(
+        route_id=UUID("00000000-0000-0000-0000-00000000F917"),
+        recipient_kind="user",
+        owner_user_id=owner_user_id,
+        channel_key="telegram",
+        provider_key="telegram_bot_api",
+        mode="critical_only",
+        category_filter=(),
+        scope_filter_json={},
+        schedule_json={},
+        recipient_address_ref="telegram_ref:test",
+        status="active",
+        created_at=now,
+        updated_at=now,
     )
 
 

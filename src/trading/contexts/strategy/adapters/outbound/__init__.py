@@ -21,6 +21,7 @@ from .config import (
 )
 from .messaging import (
     LogOnlyTelegramNotifier,
+    NotificationsTelegramNotifier,
     RedisMarketDataReadinessReader,
     RedisStrategyLiveCandleStream,
     RedisStrategyLiveCandleStreamConfig,
@@ -103,6 +104,7 @@ __all__ = [
     "TelegramBotApiNotifierConfig",
     "TelegramNotifierHooks",
     "LogOnlyTelegramNotifier",
+    "NotificationsTelegramNotifier",
     "TelegramBotApiNotifier",
     "SystemRunnerSleeper",
     "SystemStrategyClock",

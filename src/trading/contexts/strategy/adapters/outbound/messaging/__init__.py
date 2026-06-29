@@ -8,6 +8,7 @@ from .redis import (
 )
 from .telegram import (
     LogOnlyTelegramNotifier,
+    NotificationsTelegramNotifier,
     TelegramBotApiNotifier,
     TelegramBotApiNotifierConfig,
     TelegramNotifierHooks,
@@ -23,5 +24,6 @@ __all__ = [
     "TelegramBotApiNotifierConfig",
     "TelegramNotifierHooks",
     "LogOnlyTelegramNotifier",
+    "NotificationsTelegramNotifier",
     "TelegramBotApiNotifier",
 ]

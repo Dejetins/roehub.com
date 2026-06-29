@@ -44,8 +44,14 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.notifications.adapters import (
+    PostgresNotificationRepository,
+    PsycopgNotificationPostgresGateway,
+)
+from trading.contexts.notifications.application import NotificationSourceRouter
 from trading.contexts.strategy.adapters.outbound import (
     LogOnlyTelegramNotifier,
+    NotificationsTelegramNotifier,
     PostgresConfirmedTelegramChatBindingResolver,
     PostgresLiveStrategyProfileRepository,
     PostgresStrategyRepository,
@@ -84,6 +90,8 @@ from trading.contexts.strategy.domain.entities import StrategySignal
 log = logging.getLogger(__name__)
 
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
+_NOTIFICATIONS_PG_DSN_KEY = "NOTIFICATIONS_PG_DSN"
+_POSTGRES_DSN_KEY = "POSTGRES_DSN"
 _PRODUCER_ALLOWED_MODES = ("paper", "testnet")
 _PRODUCER_BLOCKED_REASONS = (
     "producer_disabled",
@@ -686,15 +694,27 @@ def build_strategy_live_runner_app(
         failed_debounce_seconds=telegram_config.debounce_failed_seconds
     )
     if telegram_config.enabled:
-        chat_binding_resolver = PostgresConfirmedTelegramChatBindingResolver(
-            gateway=postgres_gateway
-        )
-        if telegram_config.mode == "log_only":
+        if telegram_config.mode == "notifications":
+            notifications_gateway = PsycopgNotificationPostgresGateway(
+                dsn=_resolve_notification_postgres_dsn(environ=environ)
+            )
+            telegram_notifier = NotificationsTelegramNotifier(
+                repository=PostgresNotificationRepository(gateway=notifications_gateway),
+                router=NotificationSourceRouter(),
+                hooks=metrics.telegram_notifier_hooks(),
+            )
+        elif telegram_config.mode == "log_only":
+            chat_binding_resolver = PostgresConfirmedTelegramChatBindingResolver(
+                gateway=postgres_gateway
+            )
             telegram_notifier = LogOnlyTelegramNotifier(
                 chat_binding_resolver=chat_binding_resolver,
                 hooks=metrics.telegram_notifier_hooks(),
             )
         elif telegram_config.mode == "telegram":
+            chat_binding_resolver = PostgresConfirmedTelegramChatBindingResolver(
+                gateway=postgres_gateway
+            )
             bot_token = _require_non_empty_env_value(
                 environ=environ,
                 key=telegram_config.bot_token_env,
@@ -774,6 +794,14 @@ def _build_consumer_name() -> str:
     """
     hostname = socket.gethostname().strip() or "unknown-host"
     return f"{hostname}-{os.getpid()}"
+
+
+def _resolve_notification_postgres_dsn(*, environ: Mapping[str, str]) -> str:
+    for key in (_NOTIFICATIONS_PG_DSN_KEY, _STRATEGY_PG_DSN_KEY, _POSTGRES_DSN_KEY):
+        value = environ.get(key, "").strip()
+        if value:
+            return value
+    raise ValueError("strategy notifications mode requires NOTIFICATIONS_PG_DSN or fallback DSN")
 
 
 def _require_non_empty_env_value(

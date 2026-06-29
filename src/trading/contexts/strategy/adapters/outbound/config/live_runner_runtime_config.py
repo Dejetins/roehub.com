@@ -228,16 +228,17 @@ class StrategyLiveRunnerTelegramConfig:
         Returns:
             None.
         Assumptions:
-            `mode` is fixed to `log_only` or `telegram` in Strategy notifier v1.
+            `mode` is fixed to `notifications`, `log_only` or `telegram`.
         Raises:
             ValueError: If one of config values is invalid.
         Side Effects:
             None.
         """
         normalized_mode = self.mode.strip()
-        if normalized_mode not in {"log_only", "telegram"}:
+        if normalized_mode not in {"notifications", "log_only", "telegram"}:
             raise ValueError(
-                "strategy_live_runner.telegram.mode must be one of: log_only, telegram"
+                "strategy_live_runner.telegram.mode must be one of: "
+                "notifications, log_only, telegram"
             )
         if self.send_timeout_s <= 0:
             raise ValueError("strategy_live_runner.telegram.send_timeout_s must be > 0")
