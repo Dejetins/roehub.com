@@ -3,6 +3,8 @@ from .outbound import (
     InMemoryNotificationRepository,
     InMemoryNotificationStatsSourceReader,
     LogOnlyNotificationProvider,
+    PostgresNotificationRepository,
+    PsycopgNotificationPostgresGateway,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
@@ -12,6 +14,8 @@ __all__ = [
     "InMemoryNotificationRepository",
     "InMemoryNotificationStatsSourceReader",
     "LogOnlyNotificationProvider",
+    "PostgresNotificationRepository",
+    "PsycopgNotificationPostgresGateway",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
 ]

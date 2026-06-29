@@ -90,4 +90,30 @@ Action:
 ## Stage Evidence
 
 - Stage report: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/07-admin-notifications-runbooks.md`.
+- Stage `09` canary report: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/09-mac-studio-production-canary.md`.
 - Ledger: `docs/architecture/notifications/web-execution-telegram-notifications-v1-stage-reports/web-execution-telegram-notifications-v1-stage-ledger.md`.
+
+## Stage 09 Production Canary
+
+Run log-only matrix on Mac Studio from `/opt/roehub/app` after the target revision is deployed:
+
+```bash
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+export STRATEGY_PG_DSN="${STRATEGY_PG_DSN:-${POSTGRES_DSN}}"
+export NOTIFICATIONS_PG_DSN="${NOTIFICATIONS_PG_DSN:-${STRATEGY_PG_DSN}}"
+/opt/roehub/app/.venv/bin/python scripts/notifications/stage09_production_canary.py \
+  --config /opt/roehub/app/configs/prod/notifications.yaml \
+  --mode log-only-matrix
+```
+
+Check real Telegram readiness without sending a message:
+
+```bash
+/opt/roehub/app/.venv/bin/python scripts/notifications/stage09_production_canary.py \
+  --config /opt/roehub/app/configs/prod/notifications.yaml \
+  --mode real-readiness
+```
+
+The readiness output may report only booleans and counts. Do not print or paste token values, raw chat ids or provider payloads. A real Telegram canary is allowed only after the user approves the test/admin recipient and confirms receipt.

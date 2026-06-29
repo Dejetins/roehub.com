@@ -1,5 +1,9 @@
 from .acl import InMemoryNotificationStatsSourceReader
-from .persistence import InMemoryNotificationRepository
+from .persistence import (
+    InMemoryNotificationRepository,
+    PostgresNotificationRepository,
+    PsycopgNotificationPostgresGateway,
+)
 from .providers import (
     FakeNotificationProvider,
     LogOnlyNotificationProvider,
@@ -12,6 +16,8 @@ __all__ = [
     "InMemoryNotificationRepository",
     "InMemoryNotificationStatsSourceReader",
     "LogOnlyNotificationProvider",
+    "PostgresNotificationRepository",
+    "PsycopgNotificationPostgresGateway",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
 ]

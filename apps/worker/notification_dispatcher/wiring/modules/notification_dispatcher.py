@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -7,11 +9,13 @@ from pathlib import Path
 from typing import Mapping
 
 import yaml
-from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, start_http_server
 
 from trading.contexts.notifications.adapters import (
     FakeNotificationProvider,
     LogOnlyNotificationProvider,
+    PostgresNotificationRepository,
+    PsycopgNotificationPostgresGateway,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
@@ -26,6 +30,10 @@ from trading.contexts.notifications.application.ports import (
 
 _PREFERRED_TELEGRAM_CREDENTIAL_KEY = "ROEHUB_NOTIFICATIONS_TELEGRAM_BOT_TOKEN"
 _FALLBACK_TELEGRAM_CREDENTIAL_KEY = "TELEGRAM_BOT_TOKEN"
+_PREFERRED_POSTGRES_DSN_KEY = "NOTIFICATIONS_PG_DSN"
+_FALLBACK_POSTGRES_DSN_KEYS = ("STRATEGY_PG_DSN", "POSTGRES_DSN")
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +44,8 @@ class NotificationDispatcherRuntimeConfig:
     lease_seconds: int
     retry_backoff_seconds: int
     max_attempts: int
+    poll_interval_seconds: float
+    empty_backoff_seconds: float
     metrics_port: int
     telegram_enabled: bool
     telegram_api_base_url: str
@@ -47,6 +57,7 @@ class NotificationDispatcherRuntimeConfig:
             lease_seconds=self.lease_seconds,
             retry_backoff_seconds=self.retry_backoff_seconds,
             max_attempts=self.max_attempts,
+            allowed_provider_keys=_allowed_provider_keys(provider_mode=self.provider_mode),
         )
 
 
@@ -130,6 +141,8 @@ def notification_dispatcher_runtime_config_from_mapping(
         lease_seconds=_int(dispatcher.get("lease_seconds"), default=30),
         retry_backoff_seconds=_int(dispatcher.get("retry_backoff_seconds"), default=60),
         max_attempts=_int(dispatcher.get("max_attempts"), default=3),
+        poll_interval_seconds=_float(dispatcher.get("poll_interval_seconds"), default=2.0),
+        empty_backoff_seconds=_float(dispatcher.get("empty_backoff_seconds"), default=5.0),
         metrics_port=_int(metrics.get("port"), default=9210),
         telegram_enabled=_bool(telegram.get("enabled"), default=False),
         telegram_api_base_url=_text(
@@ -171,6 +184,56 @@ def build_notification_dispatcher(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class NotificationDispatcherApp:
+    dispatcher: NotificationDispatcher
+    runtime_config: NotificationDispatcherRuntimeConfig
+    metrics: NotificationDispatcherPrometheusMetrics
+
+    async def run(self, stop_event: asyncio.Event) -> None:
+        start_http_server(self.runtime_config.metrics_port, registry=self.metrics.registry)
+        log.info(
+            "notification-dispatcher metrics server started on port %s",
+            self.runtime_config.metrics_port,
+        )
+        while not stop_event.is_set():
+            result = self.dispatcher.drain_once()
+            wait_seconds = (
+                self.runtime_config.poll_interval_seconds
+                if result.claimed
+                else self.runtime_config.empty_backoff_seconds
+            )
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+            except TimeoutError:
+                continue
+
+
+def build_notification_dispatcher_app(
+    *,
+    config_path: Path,
+    environ: Mapping[str, str] | None = None,
+) -> NotificationDispatcherApp:
+    env = os.environ if environ is None else environ
+    runtime_config = load_notification_dispatcher_runtime_config(config_path=config_path)
+    gateway = PsycopgNotificationPostgresGateway(
+        dsn=resolve_notification_postgres_dsn(environ=env)
+    )
+    repository = PostgresNotificationRepository(gateway=gateway)
+    metrics = NotificationDispatcherPrometheusMetrics()
+    dispatcher = build_notification_dispatcher(
+        repository=repository,
+        runtime_config=runtime_config,
+        environ=env,
+        metrics=metrics,
+    )
+    return NotificationDispatcherApp(
+        dispatcher=dispatcher,
+        runtime_config=runtime_config,
+        metrics=metrics,
+    )
+
+
 def telegram_credential_presence(*, environ: Mapping[str, str]) -> dict[str, bool]:
     return {
         _PREFERRED_TELEGRAM_CREDENTIAL_KEY: bool(
@@ -182,6 +245,21 @@ def telegram_credential_presence(*, environ: Mapping[str, str]) -> dict[str, boo
     }
 
 
+def postgres_dsn_presence(*, environ: Mapping[str, str]) -> dict[str, bool]:
+    return {
+        key: bool(environ.get(key, "").strip())
+        for key in (_PREFERRED_POSTGRES_DSN_KEY, *_FALLBACK_POSTGRES_DSN_KEYS)
+    }
+
+
+def resolve_notification_postgres_dsn(*, environ: Mapping[str, str]) -> str:
+    for key in (_PREFERRED_POSTGRES_DSN_KEY, *_FALLBACK_POSTGRES_DSN_KEYS):
+        value = environ.get(key, "").strip()
+        if value:
+            return value
+    raise ValueError("notification dispatcher requires NOTIFICATIONS_PG_DSN or fallback DSN")
+
+
 def _resolve_telegram_credential(*, environ: Mapping[str, str]) -> str | None:
     preferred = environ.get(_PREFERRED_TELEGRAM_CREDENTIAL_KEY, "").strip()
     if preferred:
@@ -190,6 +268,19 @@ def _resolve_telegram_credential(*, environ: Mapping[str, str]) -> str | None:
     if fallback:
         return fallback
     return None
+
+
+def _allowed_provider_keys(*, provider_mode: str) -> frozenset[str] | None:
+    normalized = provider_mode.strip()
+    if normalized == "log_only":
+        return frozenset({"log_only", "fake"})
+    if normalized == "fake":
+        return frozenset({"fake"})
+    if normalized == "telegram_bot_api":
+        return frozenset({"telegram_bot_api"})
+    if normalized == "all":
+        return None
+    raise ValueError("unsupported notification dispatcher provider_mode")
 
 
 def _mapping(value: object, field: str) -> Mapping[str, object]:

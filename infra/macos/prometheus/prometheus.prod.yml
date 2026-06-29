@@ -90,6 +90,10 @@ scrape_configs:
     static_configs:
       - targets: ["127.0.0.1:9207"]
 
+  - job_name: notification-dispatcher
+    static_configs:
+      - targets: ["127.0.0.1:9210"]
+
   - job_name: openbao
     metrics_path: /v1/sys/metrics
     params:

@@ -40,6 +40,7 @@ class NotificationDispatcherConfig:
     lease_seconds: int = 30
     retry_backoff_seconds: int = 60
     max_attempts: int = 3
+    allowed_provider_keys: frozenset[str] | None = None
 
     def __post_init__(self) -> None:
         if self.batch_size <= 0:
@@ -91,6 +92,11 @@ class NotificationDispatcher:
         self._update_pending_age_metric(deliveries=due, now=now)
 
         for delivery in due:
+            if (
+                self._config.allowed_provider_keys is not None
+                and delivery.provider_key not in self._config.allowed_provider_keys
+            ):
+                continue
             claimed = self._repository.claim_delivery(
                 delivery_id=delivery.delivery_id,
                 lease_until=now + timedelta(seconds=self._config.lease_seconds),

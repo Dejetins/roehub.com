@@ -1,12 +1,14 @@
 version: 1
 notifications:
   dispatcher:
-    enabled: false
+    enabled: true
     provider_mode: "log_only"
     batch_size: 100
     lease_seconds: 30
     retry_backoff_seconds: 60
     max_attempts: 3
+    poll_interval_seconds: 2.0
+    empty_backoff_seconds: 5.0
   providers:
     telegram:
       enabled: false

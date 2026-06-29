@@ -48,6 +48,7 @@ for plist in \
   com.roehub.exchange-control.plist \
   com.roehub.exchange-execution.plist \
   com.roehub.strategy-live-runner.plist \
+  com.roehub.notification-dispatcher.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \
