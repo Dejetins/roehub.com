@@ -68,6 +68,26 @@ class _HotCache:
         return True
 
 
+class _LeakyHotCache(_HotCache):
+    def read_range(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        instrument_key: str,
+        start: UtcTimestamp,
+        end: UtcTimestamp,
+    ) -> tuple[ClosedCandleTailRow, ...]:
+        self.read_calls += 1
+        _ = start
+        _ = end
+        rows = []
+        for _ts_open, row in sorted(self.rows.items()):
+            assert row.candle.instrument_id == instrument_id
+            assert row.meta.instrument_key == instrument_key
+            rows.append(ClosedCandleTailRow(candle=row, source="redis_hot_cache"))
+        return tuple(rows)
+
+
 class _CanonicalReader:
     def __init__(
         self,
@@ -296,6 +316,45 @@ def test_provider_falls_back_from_clickhouse_failure_to_rest_and_writes_hot_cach
     assert canonical_reader.read_calls == 1
     assert len(rest_source.calls) == 1
     assert len(audit_repository.records) == 2
+
+
+def test_provider_ignores_source_rows_outside_requested_range() -> None:
+    base = datetime(2026, 6, 30, 12, 0, tzinfo=timezone.utc)
+    hot_cache = _LeakyHotCache()
+    hot_cache.rows[base - timedelta(minutes=1)] = _row(base - timedelta(minutes=1))
+    hot_cache.rows[base] = _row(base)
+    hot_cache.rows[base + timedelta(minutes=1)] = _row(base + timedelta(minutes=1))
+    hot_cache.rows[base + timedelta(minutes=2)] = _row(base + timedelta(minutes=2))
+    canonical_reader = _CanonicalReader(error=RuntimeError("clickhouse should not be called"))
+    rest_source = _RestSource(())
+    audit_repository = _AuditRepository()
+    provider = _provider(
+        hot_cache=hot_cache,
+        canonical_reader=canonical_reader,
+        rest_source=rest_source,
+        audit_repository=audit_repository,
+        now=base + timedelta(minutes=5),
+    )
+
+    result = provider.get_closed_1m_tail(
+        instrument_id=_instrument_id(),
+        instrument_key="binance:spot:BTCUSDT",
+        start_ts_open=UtcTimestamp(base),
+        end_ts_open=UtcTimestamp(base + timedelta(minutes=2)),
+        correlation_id="stage07-ignore-out-of-range-source-rows",
+    )
+
+    assert result.continuous is True
+    assert [row.ts_open.value for row in result.candles] == [
+        base,
+        base + timedelta(minutes=1),
+    ]
+    assert [(item.source, item.status) for item in result.sources_attempted] == [
+        ("redis_hot_cache", "succeeded")
+    ]
+    assert hot_cache.read_calls == 1
+    assert canonical_reader.read_calls == 0
+    assert rest_source.calls == []
 
 
 def test_provider_emits_bounded_repair_metrics_hooks() -> None:

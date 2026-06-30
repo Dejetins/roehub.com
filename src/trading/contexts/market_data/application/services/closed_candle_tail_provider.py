@@ -146,6 +146,7 @@ class MarketDataClosedCandleTailProvider:
                 time_range=time_range,
                 attempts=attempts,
             ),
+            time_range=time_range,
         )
         if _continuous(rows_by_ts, time_range):
             result = self._finalize(
@@ -169,6 +170,7 @@ class MarketDataClosedCandleTailProvider:
                 time_range=time_range,
                 attempts=attempts,
             ),
+            time_range=time_range,
         )
         if _continuous(rows_by_ts, time_range):
             result = self._finalize(
@@ -195,6 +197,7 @@ class MarketDataClosedCandleTailProvider:
                 rows_by_ts=rows_by_ts,
                 attempts=attempts,
             ),
+            time_range=time_range,
         )
         result = self._finalize(
             correlation_id=correlation_id,
@@ -416,8 +419,12 @@ class MarketDataClosedCandleTailProvider:
         self,
         rows_by_ts: dict[datetime, ClosedCandleTailRow],
         rows: tuple[ClosedCandleTailRow, ...],
+        *,
+        time_range: TimeRange,
     ) -> None:
         for row in rows:
+            if not time_range.contains(row.ts_open):
+                continue
             rows_by_ts.setdefault(row.ts_open.value, row)
 
     def _emit_result_hooks(
