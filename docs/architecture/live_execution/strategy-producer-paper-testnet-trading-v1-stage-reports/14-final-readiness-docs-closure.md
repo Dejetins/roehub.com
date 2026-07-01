@@ -1,6 +1,6 @@
 # Stage 14: Final Readiness And Docs Closure
 
-Статус: `in_progress` до direct-main delivery evidence.
+Статус: `accepted`.
 
 Дата проверки: `2026-07-02`.
 
@@ -81,13 +81,13 @@ Future mainnet real-money trading must be a separate plan with its own risk cont
 | `12.4` | `accepted` | Fixed 6h soak completed with signal-path latency/dedup, process resource rows, browser/API proof. |
 | `12.5` | `accepted` | Runtime repair/rerun closure produced fresh selected strategy state and cleanup evidence. |
 | `13` | `accepted` | Delivery-neutral notification event taxonomy, alerts, runbook, runtime dry-run outbox proof. |
-| `14` | `in_progress` | Final docs/prompt/ledger closure; pending direct-main delivery evidence before `accepted`. |
+| `14` | `accepted` | Final docs/prompt/ledger closure delivered to `origin/main` as `611b27e40a6386ebd49a703ce53343cb805a27bb`; CI `28553960129`, Publish App Image `28553977186`, Deploy Backend `28553977159`, and Deploy Web `28553977192`/`28553984784` all succeeded. |
 
 ## Audit Results
 
 | Area | Result | Notes |
 |---|---|---|
-| Stage ledger continuity | `passed` | Ledger links `plan_doc`, prompt pack, current stage `14`, all statuses, blockers, checks, publish/deploy handoff, and next prompt state. |
+| Stage ledger continuity | `passed` | Ledger links `plan_doc`, prompt pack, completed Stage `14`, all statuses, blockers, checks, publish/deploy handoff, and final no-next-prompt state. |
 | Previous stage gate | `passed` | `12.1`-`12.5` and `13` are `accepted`; monolithic `12` is `superseded`, not counted as acceptance. |
 | Stage reports | `passed after docs-sync` | All expected reports exist. Stage `02` and `03` were normalized with explicit top-level `Статус: accepted`; Stage `09` received a formal manifest table. |
 | Prompt pack | `passed` | Active prompts `01`-`14` exist; deleted monolithic `12` prompt is intentionally superseded; every active prompt carries branch policy, ledger path, plan path, report path, and non-trivial validation depth. |
@@ -114,7 +114,7 @@ Future mainnet real-money trading must be a separate plan with its own risk cont
 | Caller / callee | Stage `14` coverage | Decision |
 |---|---|---|
 | Local docs tooling / repository files | Reads and updates Markdown docs, prompt-pack audit results, ledger, and generated docs index. | Applicable; no external side effects beyond repo documentation changes. |
-| GitHub / CI | Direct-main delivery evidence is required after scoped commit/push. | Applicable for delivery status; no PR branch workflow is used. |
+| GitHub / CI | Direct-main delivery evidence was collected after scoped commit/push. | Applicable and completed for delivery status; no PR branch workflow was used. |
 | Target-host git checkout | `N/A` for Stage `14` proof before delivery. | No remote git command or host sync is required for changed-code proof because Stage `14` changes docs only. If delivery workflow later reads host git state, it must be labeled separately and not used as changed-code production proof. |
 | Runtime tree | `N/A`. | No changed-code production runtime proof is applicable because no code/config/runtime asset changed. |
 | Browser / Keycloak | `N/A`. | No browser-visible behavior changed; authenticated browser verification is not required for docs-only closure. |
@@ -169,7 +169,7 @@ Files outside expected paths: none. Foreign changes intentionally excluded from 
 | Broad publish gates | passed | `uv run ruff check .` passed; `uv run pyright` passed with `0` errors; `uv run pytest -q -ra` passed with `1488 passed, 3 warnings`. |
 | Focused code/runtime tests | `N/A` | No code, runtime config, migration, or executable script changed. |
 | Changed-code production runtime proof | `N/A` | Docs-only closure; no changed-code `post_main_production_runtime_proof` is applicable. |
-| Direct-main delivery / CI | pending | Must be recorded after scoped commit/push and GitHub check evidence. |
+| Direct-main delivery / CI | passed | Commit `611b27e40a6386ebd49a703ce53343cb805a27bb` was pushed to `origin/main`; CI `28553960129`, Publish App Image `28553977186`, Deploy Backend `28553977159`, and Deploy Web `28553977192`/`28553984784` succeeded. |
 
 ## Delivery Status
 
@@ -177,9 +177,9 @@ Files outside expected paths: none. Foreign changes intentionally excluded from 
 |---|---|---|
 | Branch | `main` | No branch, PR, worktree, local folder, stash, or auxiliary workflow artifact created. |
 | Local pre-delivery base | `82b2f023ea2585462d07258f16b6f9ffbb7144ae` | `HEAD`, `origin/main`, and `origin/HEAD` matched before Stage `14` edits. |
-| Commit / origin main | pending | To be filled after scoped direct-main delivery. |
-| CI / deploy | pending | Docs-only change still requires GitHub checks evidence after push; changed-code runtime deploy verification is `N/A` unless CI/deploy workflow runs automatically. |
-| Runtime sync / `post_main_production_runtime_proof` | `N/A` | No code/runtime files changed; docs-only closure does not require changed-code runtime verification. Stage `14` does not claim pre-main or read-only target-host evidence as changed-code production proof. |
+| Commit / origin main | delivered | Scoped docs closure commit `611b27e40a6386ebd49a703ce53343cb805a27bb` (`Add strategy producer final readiness closure`) was pushed to `origin/main`. This final evidence update is reported by executor final handoff because a commit cannot contain its own future SHA. |
+| CI / deploy | passed | CI `28553960129` succeeded; docs-only static job ran `Docs index drift check (docs-only)`; test/perf/migration shards were skipped by path classification. Workflow-run delivery also succeeded: Publish App Image `28553977186`, Deploy Backend `28553977159`, Deploy Web `28553977192` and `28553984784`. |
+| Runtime sync / `post_main_production_runtime_proof` | `N/A` | No code/runtime files changed; docs-only closure does not require changed-code runtime verification. Automated deploy workflows succeeded, but Stage `14` still does not claim pre-main or read-only target-host evidence as changed-code production proof. |
 
 ## Runtime Proof Boundary
 
@@ -195,7 +195,7 @@ Stage `14` proof-boundary rule: no pre-main host check and no read-only observat
 
 | Blocker | Severity | Decision |
 |---|---|---|
-| none for paper/testnet cycle closure | none | Stage `14` may be accepted after docs check, cold-head review, and direct-main delivery evidence. |
+| none for paper/testnet cycle closure | none | Stage `14` is accepted after docs check, cold-head review, scoped direct-main delivery, and green GitHub workflow evidence. |
 | Real-money mainnet trading | out of scope / blocked for this cycle | Requires a separate future mainnet plan and explicit approval gates. |
 | Telegram/email notification delivery | out of scope | Stage `13` proved delivery-neutral outbox/runbook compatibility only; real channel delivery remains a separate canary. |
 
@@ -234,12 +234,12 @@ Fixed blockers:
 | Service-call coverage for Stage `14` needed explicit `N/A` decisions. | Added service-call coverage and explicit N/A section covering API/browser/Keycloak/exchange/OpenBao/Telegram/email/Redis/Postgres/Prometheus/Monit/runtime calls. |
 | Generated docs index needed to be synchronized after report/status changes. | Regenerated `docs/architecture/README.md` and verified it with `python -m tools.docs.generate_docs_index --check`. |
 
-Local follow-up check: completed for docs index; whitespace/staged-diff and CI delivery remain required before final acceptance.
+Local follow-up check: completed for docs index, whitespace/staged-diff, scoped direct-main delivery, and CI/workflow evidence.
 
 Residual risks:
 
 | Risk | Decision |
 |---|---|
-| Final direct-main delivery evidence is not available until the scoped docs commit is pushed and GitHub checks are inspected. | Stage `14` remains `in_progress` until commit/push/CI evidence is recorded. |
+| A final evidence-update commit cannot record its own future SHA inside the same commit. | The scoped delivery commit and workflow run IDs are recorded above; the final evidence-update SHA is reported in executor final handoff after push/CI. |
 | Runtime/code deploy proof could be overclaimed for a docs-only change. | Keep `post_main_production_runtime_proof` as `N/A`; do not run or claim changed-code production proof unless a future code/runtime artifact changes. |
 | Mainnet money-moving work could be accidentally inferred from paper/testnet closure. | Keep mainnet real-money trading out of scope and require a separate future plan with its own gates. |
