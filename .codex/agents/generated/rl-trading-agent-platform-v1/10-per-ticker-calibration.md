@@ -6,6 +6,18 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
+prompt_pack_execution:
+  plan_doc: docs/architecture/ml/rl-trading-agent-platform-v1.md
+  prompt_pack_dir: .codex/agents/generated/rl-trading-agent-platform-v1
+  stage_ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+  mode: manual_sequential
+  execution_mode: manual_sequential
+  goal_md_policy: "GOAL.md is optional, not required by default"
+  goal_driven_mode: "optional only over the same plan_doc/prompt_pack_dir/stage_ledger; no separate GOAL.md required"
+  stage_gate: "read ledger before edits; run only when current_stage is 10 and prerequisites match"
+  file_manifest_required: true
+goal_mode_optional: true
+goal_artifact_required: false
 scope: "Implement per-ticker/per-market calibration thresholds, weights, normalization stats, or heads."
 language:
   implementation: python
@@ -21,8 +33,8 @@ context_sources:
     - path: .codex/agents/.context/promt_manager_state.yaml
       why: "optional compact state; ignore if unrelated"
   task_entrypoints:
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08f-roehub-native-backtest-evaluation.md
-      why: "accepted Roehub-native evaluation and candidate metrics"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08k-article-demo-profile-training-evaluation.md
+      why: "accepted corrective Roehub-native evaluation and candidate metrics"
       inspect_symbols:
         - "scorecard"
         - "research candidate decision"
@@ -156,6 +168,16 @@ safety_notes:
 
 Implement Stage 10 per-ticker/per-market calibration. Create calibration thresholds, weights, normalization/calibration stats, or optional ticker heads only where supported by evidence and registry lineage.
 
+## Prompt-Pack Execution Anchor
+
+- `plan_doc`: `docs/architecture/ml/rl-trading-agent-platform-v1.md`
+- `prompt_pack_dir`: `.codex/agents/generated/rl-trading-agent-platform-v1`
+- `stage_ledger`: `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md`
+- `execution_mode`: `manual_sequential`
+- GOAL.md is optional, not required by default.
+- Stage gate: read the ledger before edits; run only when `current_stage=10`.
+- Manifest gate: every created/modified/deleted file and every runtime artifact path must be recorded in the stage report and ledger.
+
 Done means:
 
 - Calibration artifacts are versioned, hashed, registry-linked, and ticker/market scoped.
@@ -200,7 +222,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `08F`, Stage `09B`. Historical Stage `08` is rejected evidence and is not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `09B` and an accepted corrective research candidate from Stage `08K` or a later explicitly accepted stage with `stage09_allowed=true` in the ledger. Historical Stage `08` and blocked `08F`/`08G`/`08H` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for Stage `10` unless this prompt is explicitly expanded into browser-visible calibration UI work. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/10-per-ticker-calibration.md` and record the prompt path and hash in the stage report.

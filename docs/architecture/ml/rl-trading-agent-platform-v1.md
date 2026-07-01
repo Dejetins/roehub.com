@@ -79,7 +79,7 @@ Current identity source of truth is not these product labels. Existing code expo
 - backend entitlement limits без billing/payment integration;
 - staged rollout до mainnet live с отдельным approval gate.
 
-Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, historical Stage `07A`/`07B`/`08` evidence, and the Stage `08A`-`08H` methodology/research repair chain are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
+Training-source v1: обучение, Roehub-native dataset acceptance, Stage `05` raw slabs, Stage `06` sessionized datasets, historical Stage `07A`/`07B`/`08` evidence, and the Stage `08A`-`08L` methodology/research repair chain are scoped to `binance:futures` only. Binance spot, Bybit spot, and Bybit futures remain product/execution inventory branches for later accepted plans, but are `blocked_not_training_source_v1` for training until a separate stage changes this contract.
 
 Не входит:
 
@@ -301,7 +301,7 @@ Stage `06` должен сначала воспроизвести подход �
 |---|---|
 | Initial universe | Начинаем с `binance:futures` only, but the production/Roehub-native universe is now all current Binance USD-M Futures symbols where `status=TRADING`, `contractType=PERPETUAL`, and `quoteAsset=USDT`. Stage `02A` full NPZ inspection found `309` unique HF train-split symbols and `478` symbols across all HF splits; those counts are external-baseline evidence, not the ceiling for Roehub training. Current Roehub Binance Futures reference universe originally had only `6` tradable symbols, and Stage `04A` accepted an HF-intersection subset of `215`; Stage `04B` must repair/supplement that partial universe to the full current USDT perpetual universe before `04C/05/06`. |
 | Window shape | Article-compatible default: `full_seq_len=150`, `pre_signal_len=90`, `post_signal_len=60`, `agent_history_len=30`, `agent_session_len=10`; demo config может использовать shorter path только как explicit research mode. |
-| High-volatility rule | Сначала повторить repo/article extractor criteria максимально близко; если точный алгоритм не восстановлен из article/HF artifacts, Stage `06` фиксирует observed proxy и сравнение распределений с HF dataset. |
+| High-volatility rule | Исторический Stage `06` accepted `pre_signal_realized_volatility_plus_range_v1`, но после `08F`/`08G`/`08H` это считается current-selector failed evidence, а не article-equivalent extractor. Stage `08J` добавляет отдельный selector `article_future_10m_5pct_contrast_v1`: найти future/event window с движением цены минимум `5%` за `10m`, исключить события, где предыдущие `90m` уже содержали похожий импульс, зафиксировать `event_end_t` как `signal_ts_open`, затем строить `pre_window=[signal_ts_open-90m, signal_ts_open)` и `post_window=[signal_ts_open, signal_ts_open+60m)`. |
 | Overlap | Overlapping sessions разрешены внутри одного split для увеличения sample count. Между train/val/test/backtest запрещен leakage: time-based split, instrument lifecycle bounds и embargo не меньше максимального `full_seq_len` вокруг split boundary. |
 | Listing/delisting | Session extractor не строит окна вне instrument lifecycle. Missing lifecycle metadata блокирует market branch или помечает его `feature-mask/blocked` в activation matrix. |
 | Keys | Session key включает `exchange_name`, `market_type`, `symbol`, `instrument_key`, `signal_ts_open`, `split`, `feature_contract_hash`. |
@@ -464,6 +464,8 @@ Stage `08G` final result on 2026-06-26: the full CPU-only dual-branch run comple
 
 Stage `08H` final result on 2026-06-29: the full `90/60` `MPS` dual-branch run completed, but did not reopen Stage `09`. HF-original failed final holdout with PnL `-201598.796937`. Roehub-native exposed a real selection bug: old multi-objective `Optuna` selection could choose zero-trade `trial 1` from `study.best_trials`. After removing the `-closed_trades` objective, selecting from all completed trials with `closed_trades >= min_calibration_closed_trades`, and manually rechecking trade-sufficient calibration winners `82`, `63`, and `11`, the best rechecked native trial still failed final Stage `06` holdout: `trial 82` PnL `-229005.38413725` vs best sanity baseline `481012.90631972`. Therefore `08H` is blocked and Stage `09` remains closed.
 
+Correction decision on 2026-07-01: the chain `Stage 06 current selector + current features + realized-only sparse reward + DQN + action filter + Optuna` is retained as non-working evidence for Roehub-native quality. It must not be retried as the active path without a new accepted research decision. The next executable stage is `08I`, not `09` and not another full training run. `08I` must first prove or disprove step-level parity between the original `backtest_engine.py` and Roehub evaluator on the same HF checkpoint/config/data. `08J` then adds the article-style session extractor as a separate dataset policy beside Stage `06`, and `08K` returns to the source/demo `30/10` profile for HF-original control plus Roehub-native article-selector training/evaluation. `90/60` remains failed/future research evidence, not the current article-reproduction path.
+
 Минимальный v1 lifecycle:
 
 1. `dataset_version` создается из ClickHouse/artifacts с deterministic manifest, hashes, split policy и feature availability mask.
@@ -477,19 +479,23 @@ Stage `08H` final result on 2026-06-29: the full `90/60` `MPS` dual-branch run c
 9. Stage `08F` evaluates `roehub_native_candidate` and records the fixed-threshold native verdict. The current `08F` verdict is blocked and cannot move to Stage `09`.
 10. Stage `08G` repeats the HF-original and Roehub-native research branches with sequential CPU-only deterministic execution, upstream-search-space `Optuna` calibration, and final holdout reporting. The operator entrypoint is `scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py`; it calls `08C`/`08E` training CLIs and then `stage08g_cpu_optuna_calibration.py` for each branch. `08G` is now blocked evidence, not a registry opener.
 11. Stage `08H` ran oracle, supervised sanity, selector and reward-sparsity diagnostics for HF-original and Roehub-native splits, then ran the required `90/60` dual-branch training/evaluation profile on `MPS`. It is blocked evidence: it fixed the zero-trade `Optuna` selection issue, but corrected trade-sufficient native candidates still failed final holdout.
-12. `training_run` создает candidate model от frozen config. Для дообучения допустимы два режима:
+12. Stage `08I` performs upstream evaluator/session forensic parity before any new training. It writes step-level traces for original vs Roehub evaluation and identifies the first material diff, if any.
+13. Stage `08J` materializes `article_future_10m_5pct_contrast_v1` as a separate Roehub-native dataset variant. It does not replace historical Stage `06` artifacts and does not train a model.
+14. Stage `08K` runs the next full article/demo-profile candidate path on `30/10`: HF-original control plus Roehub-native article-selector training, `Optuna`, final holdout, strict baseline-beating and stability gates.
+15. Stage `08L` is a fail-closed research branch only after `08I`/`08J` are accepted and `08K` is blocked. It may investigate reward shaping, supervised warm-start/behavior cloning, or contextual-bandit sanity, but it cannot silently replace the frozen reward/action contract or open Stage `09` without an accepted candidate scorecard.
+16. `training_run` создает candidate model от frozen config. Для дообучения допустимы два режима:
    - `full_retrain`: полный replay на новом dataset_version;
    - `fine_tune`: продолжение от accepted champion checkpoint только если config/hash compatibility явно подтверждена.
-13. `candidate` никогда не активируется автоматически. Promotion требует:
+17. `candidate` никогда не активируется автоматически. Promotion требует:
    - положительный Roehub backtest после fees/slippage/funding policy;
    - per-ticker/per-market calibration report;
    - latency/resource evidence на Mac Studio;
    - rollback_manifest;
    - stage report + ledger update.
-13. `champion` модель platform-wide. Per-ticker поведение задается calibration/weights/thresholds/head metadata, но не пользовательскими training jobs.
-14. `challenger` может работать только в `monitor_only` shadow mode, пока Stage `13+` не подтвердит signal parity, latency и drift evidence.
-15. Drift monitoring сравнивает live feature distribution, action distribution, skipped-action reasons и paper/testnet/live outcomes с promotion baseline. Drift сам по себе не обновляет модель; он создает retraining candidate task.
-16. Rollback всегда переводит активную модель/калибровку на предыдущий accepted champion без удаления audit trail.
+18. `champion` модель platform-wide. Per-ticker поведение задается calibration/weights/thresholds/head metadata, но не пользовательскими training jobs.
+19. `challenger` может работать только в `monitor_only` shadow mode, пока Stage `13+` не подтвердит signal parity, latency и drift evidence.
+20. Drift monitoring сравнивает live feature distribution, action distribution, skipped-action reasons и paper/testnet/live outcomes с promotion baseline. Drift сам по себе не обновляет модель; он создает retraining candidate task.
+21. Rollback всегда переводит активную модель/калибровку на предыдущий accepted champion без удаления audit trail.
 
 Retraining triggers/cadence v1:
 
@@ -514,13 +520,13 @@ Operator authority v1:
 
 ### Promotion scorecard
 
-Stage `08H`/`10A` не принимает candidate только по одному числу PnL. Historical Stage `08` is rejection evidence only, and blocked Stage `08F`/`08G` are corrective rejection evidence only.
+Stage `08K`/`10A` не принимает candidate только по одному числу PnL. Historical Stage `08` is rejection evidence only, and blocked Stage `08F`/`08G`/`08H` are corrective rejection evidence only.
 
 V1 разделяет уровни допуска:
 
 | Level | Meaning | Gate |
 |---|---|---|
-| `research_candidate` | Модель может быть сохранена и анализироваться offline. | Next corrective research stage after blocked `08H`: positive final holdout PnL after costs, sufficient trade count, full scorecard, sanity baselines, no zero-trade `Optuna` selection, and no calibration-only overfit. Stage `08D`/`08F`/`08G`/`08H` remain evidence and diagnostics, not enough for Stage `09`. |
+| `research_candidate` | Модель может быть сохранена и анализироваться offline. | Stage `08K` or a later explicitly accepted corrective stage: positive final holdout PnL after costs, final PnL greater than best sanity baseline on the same surface, sufficient trade count, full scorecard, no zero-trade `Optuna` selection, no calibration-only overfit, no single-symbol/month domination, no pathological action bias, and accepted evaluator/session parity from `08I`/`08J`. Stage `08D`/`08F`/`08G`/`08H` remain evidence and diagnostics, not enough for Stage `09`. |
 | `promotion_grade_candidate` | Модель может идти в `monitor_only`/`paper`/`testnet` pipeline. | Stage `10A`: versioned numeric threshold profile approved by operator/admin confirmation. |
 | `live_candidate` | Модель может попасть в bounded mainnet canary. | Stage `19`: отдельный go/no-go review, incident drills, legal/product checklist and explicit approval. |
 
@@ -553,14 +559,14 @@ Mandatory scorecard fields:
 
 Sanity baselines не являются пользовательским benchmark и не меняют RL policy. Они нужны, чтобы поймать ошибки симулятора, reward shaping, feature leakage или backtest accounting.
 
-Stage `08D`/`08F` должны сохранять рядом с candidate evaluation:
+Stage `08D`/`08F`/`08K` должны сохранять рядом с candidate evaluation:
 
 - `no_trade/hold` baseline;
 - random valid-action baseline with fixed seed;
 - simple threshold heuristic baseline from price/volatility movement;
 - optional external repo CNN classifier baseline только если Stage `04` воспроизвел его без scope creep.
 
-Baseline outputs хранятся в model registry/evaluation artifact как diagnostic metadata. Candidate promotion не требует “обыграть baseline” как business rule на первом этапе. In Stage `08D`, weak profitability, a stronger simple baseline, low positive-session ratio, missing Optuna/tuning, and the `30/10` demo profile are warnings when execution/parity is otherwise coherent. In Stage `08H`/`10A`, baseline dominance may block promotion-grade decisions if it indicates simulator/accounting leakage, reward-shaping failure, or no actionable native research signal.
+Baseline outputs хранятся в model registry/evaluation artifact как diagnostic metadata. Candidate promotion не требует “обыграть baseline” как business rule для historical `08D` HF methodology evidence. After blocked `08F`/`08G`/`08H`, baseline dominance is a hard blocker for the next native research candidate: Stage `08K` cannot accept a Roehub-native candidate unless final holdout PnL after costs is positive and greater than the best sanity baseline on the same evaluation surface. In Stage `10A`, baseline dominance remains promotion-grade blocker unless an operator/admin accepts a documented exception with evidence that the baseline is not executable under the same risk/cost constraints.
 
 ### Simulator/accounting parity
 
@@ -568,10 +574,10 @@ RL backtest должен доказывать совместимость не т
 
 Required parity ladder:
 
-1. Stage `08D`/`08F` create deterministic decision-sequence fixtures: same candle window, same feature vectors, same model/action sequence for their candidate branch.
+1. Stage `08D`/`08F`/`08K` create deterministic decision-sequence fixtures: same candle window, same feature vectors, same model/action sequence for their candidate branch.
 2. Offline simulator computes realized PnL, fees, slippage/funding and position transitions from that sequence.
 3. Roehub paper/execution accounting model replays the same accepted intents without exchange submit and reconciles within documented tolerance.
-4. Stage `15` completes paper parity by running the same or equivalent decision sequence through paper execution ledgers and comparing outcome to the accepted Stage `08F` simulator/accounting artifact.
+4. Stage `15` completes paper parity by running the same or equivalent decision sequence through paper execution ledgers and comparing outcome to the latest accepted corrective candidate simulator/accounting artifact, expected from Stage `08K` or a later explicitly accepted stage. Blocked `08F`/`08G`/`08H` artifacts are diagnostic only.
 
 If offline simulator outcome and paper/execution ledger accounting diverge beyond tolerance, the model cannot advance beyond research candidate regardless of PnL.
 
@@ -751,10 +757,14 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `08F` | Roehub-native evaluation/backtest | Evaluate `roehub_native_candidate` with the same filtered backtest lifecycle, Roehub costs/scorecard, and sanity baselines. | `08E` | research candidate may be accepted only with positive PnL after costs, scorecard, sanity baseline artifacts, drawdown/stability/action-filter report, simulator/accounting parity fixture, and methodology-execution evidence; promotion-grade not granted here. |
 | `08G` | Dual-branch CPU Optuna training/evaluation | Correct the post-`08F` quality gate by rerunning both HF-original and Roehub-native branches under sequential CPU-only deterministic policy, applying upstream-search-space `Optuna` calibration, and separating calibration evidence from final holdout evidence. | blocked `08F`, accepted `08D`, accepted `08E`, accepted Stage `06`, accepted HF dataset Stage `04` | completed CPU-only HF-original and Roehub-native artifacts, dual-branch orchestration summary, Optuna study artifacts, fixed `max_parallel_sessions=2` source-default decision or an explicit calibrated override decision, final holdout scorecards, leakage/split proof, baseline comparison, and clear Stage `09` allow/block verdict. |
 | `08H` | Oracle/supervised/selector/reward and 90/60 research repair | Diagnose whether HF-original and Roehub-native sessions contain predictable trade opportunities, then rerun dual-branch training/evaluation with `agent_history_len=90` and `agent_session_len=60`. | blocked `08G`, accepted Stage `04`, accepted Stage `06` | blocked evidence: diagnostics completed, full `MPS` run completed, corrected trade-sufficient native `Optuna` candidates failed final holdout. |
-| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | accepted research candidate from a future corrective stage after blocked `08H` | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
+| `08I` | Upstream evaluator/session parity forensic | Compare original upstream `backtest_engine.py` and Roehub evaluator on the same HF checkpoint/config/data without new training; write step-level traces and first-diff evidence. | blocked `08H`, accepted `08A`-`08D`, accepted HF dataset Stage `04` | original-vs-Roehub trace for 20-50 identical sessions, state/hash/Q/action/reward/balance diff report, accepted parity or exact blocker before any new training. |
+| `08J` | Article session extractor dataset | Add article-style `article_future_10m_5pct_contrast_v1` session policy beside Stage `06` and materialize a Roehub-native article-selector dataset variant. | `08I` | session manifest, split/leakage/lifecycle proof, distribution comparison for HF-original vs Stage `06` current selector vs article selector, no overwrite of Stage `06` artifacts. |
+| `08K` | Article demo-profile training/evaluation | Rerun the source/demo `30/10` full workflow on HF-original control and Roehub-native article-selector dataset with `Optuna` and untouched final holdout. | `08I`, `08J` | HF control plus native article-selector candidate manifests, progress/resource evidence, final holdout scorecards, strict baseline-beating gate, no pathological action bias, explicit Stage `09` allow/block verdict. |
+| `08L` | Reward and warm-start research fallback | If `08K` is blocked after accepted parity/extractor work, investigate reward shaping, supervised warm-start, behavior cloning, or contextual-bandit sanity as separate research. | blocked `08K`, accepted `08I`, accepted `08J` | research comparison report and next-candidate decision; cannot silently replace reward/action contract or open `09` without an accepted research scorecard. |
+| `09` | Model registry and activation gates | Persist datasets/models/calibrations with hashes, registry state machine, artifact lifecycle, checkpoint security and candidate/champion activation lifecycle. | accepted research candidate from `08K` or a later explicitly accepted corrective stage after `08I`/`08J` | registry state-machine invariant tests, API/use-case tests, corrupt/missing hash block, safe checkpoint load evidence, retention/quota config, activation/deactivation audit. |
 | `09B` | Local artifact backup and restore drill | Backup accepted champion/calibration/source manifests/registry metadata locally and prove restore/rollback drill before runtime activation. | `09` | backup manifest, registry metadata dump, restore to separate path, hash validation after restore, rollback to previous accepted champion; residual single-host disk risk recorded. |
-| `10` | Per-ticker calibration | Create per-ticker/per-market calibration thresholds, weights, or heads. | `08H`,`09B` | calibration report per ticker, no global-only threshold activation unless accepted. |
-| `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | `08H`,`09B`,`10` | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
+| `10` | Per-ticker calibration | Create per-ticker/per-market calibration thresholds, weights, or heads. | accepted `09B` plus accepted research candidate from `08K` or later | calibration report per ticker, no global-only threshold activation unless accepted. |
+| `10A` | Retraining and promotion lifecycle | Add full-retrain/fine-tune command path, manual + scheduled triggers, hard promotion approval contract, candidate/champion gates, drift trigger, rollback manifest, host-local operator command/runbook and internal application/API contract. | accepted `09B`, accepted `10`, and accepted research candidate from `08K` or later | deterministic rerun, schedule disabled-by-default proof, numeric threshold profile, candidate no-auto-activation proof, host-local rollback command/internal API test, promotion-grade report. |
 | `11` | RL tab UI skeleton | Add `/strategies` RL/ML tab for model status, ticker slots, modes, risk config and authorized operator controls for retraining/rollback actions; extend the reusable strategy signal/outcome read model instead of creating an RL-only signal panel. | `09B`,`10A` | browser QA, API read models, authorized rollback UI control test, delivery-neutral signal/outcome read model, no live side effects. |
 | `12` | Backend entitlements | Enforce active live ticker quotas from current `paid_level` (`base/free/pro/ultra`) plus optional RL override for Enterprise/custom. | `11` | transactional quota tests, UI blocked reason, audit rows, unknown/ambiguous level fail-closed tests. |
 | `13` | Monitor-only inference producer | Supervised inference producer emits `ml_agent_decision` source events with `no_intent` and proves train/live feature parity. | `10`,`10A`,`11`,`12` | Monit/Prometheus, Redis/canonical feed with ClickHouse repair only on gaps, DB source events, Redis/live vs offline golden feature parity, common UI signal/outcome journal for `source_type=ml_agent_decision`. |
@@ -794,6 +804,10 @@ Stages are grouped so data/model work can proceed before classic strategy produc
 | `08F` | Roehub-native evaluation/backtest report, Roehub cost/funding policy notes, sanity baselines, simulator/accounting parity fixture, stability/action-filter scorecard and research candidate decision for Stage `09`. |
 | `08G` | CPU-only dual-branch orchestration command, HF-original and Roehub-native candidate manifests, Optuna study databases/JSON summaries, calibrated backtest configs, calibration/final holdout scorecards, source-default `max_parallel_sessions=2` decision record, dual-branch summary, and Stage `09` allow/block decision. |
 | `08H` | Oracle/supervised/selector/reward diagnostics summary, `90/60` dual-branch orchestration command, HF-original and Roehub-native `90/60` candidate manifests, Optuna summaries, corrected trade-count sufficiency rechecks, final holdout scorecards, and blocked Stage `09` decision. |
+| `08I` | Upstream original-vs-Roehub forensic evaluator traces, first-diff report, parity fixture inventory, accepted/blocker report for `backtest_engine.py` semantics, and updated handoff for `08J`/`08K`. |
+| `08J` | Article-style session extractor implementation/tests, `article_future_10m_5pct_contrast_v1` dataset manifests under `/opt/roehub/state/rl_trading/`, leakage/lifecycle reports, and selector distribution comparison. |
+| `08K` | Full `30/10` article-demo training/evaluation artifacts for HF-original control and Roehub-native article-selector branch, `Optuna` summaries, final holdout scorecards, strict baseline-beating decision, and Stage `09` allow/block handoff. |
+| `08L` | Reward/warm-start/contextual-bandit research report, controlled comparison artifacts, and explicit decision on whether a new candidate prompt is needed; no silent Stage `09` unlock. |
 | `09`-`10A` | Registry state machine/metadata, artifact retention/quota controls, checkpoint security, calibration/promotion artifacts, host-local rollback command/runbook, tests, metrics reports. |
 | `09B` | Local backup path, backup manifest, registry metadata dump, restore drill report and rollback evidence. |
 | `11`-`12` | API DTO/routes/read models, UI tab assets/locales, server-side operator/admin guard for model action controls, entitlement use cases/migrations/tests. |
@@ -869,10 +883,10 @@ Prompt-pack readiness on 2026-06-17: `.codex/agents/generated/rl-trading-agent-p
 | Bybit lacks `trades_count` in current canonical rows | Bybit is `blocked_not_training_source_v1`; no Bybit enrich/feature-mask training branch is planned in the current cycle. A later accepted plan may reopen this. |
 | Classic strategy producer Stage `05` is blocked | RL data/model/UI/monitor-only work may proceed, but RL paper/testnet/live stages depend on classic Stage `05` repair and accepted classic Stage `07`/`09`. |
 | External repo is demo, not production module | Treat as research input with attribution, but fully port the methodology before claiming candidate quality. Generic D3QN/PER is insufficient after Stage `08`; the required parity surface is pinned in Stage `08A` and includes `config.py`/`configs/alpha.py` profile values, `utils.py` train-only normalization and grouped signals, CNN dueling architecture with dropout, environment rollout, epsilon/PER training, validation-selected `best` plus `final` checkpoints, Q-value cache and filtered grouped backtest. |
-| Historical Stage `07B` candidate failed Stage `08` | Keep the candidate as rejected/superseded evidence. Do not register, promote, activate, paper/testnet/live trade, or use it as the baseline for Stage `09`; run `08A`-`08F` first. |
-| Article result depends on optimized backtest configuration | The Habr article shows final backtest results in the workflow that includes `Optuna`; it does not publish a clean pre-`Optuna` final backtest table. Stage `08G` tested the source-compatible optimization workflow; Stage `08H` now tests whether data/session/reward/profile choices explain the native failure. |
+| Historical Stage `07B` candidate failed Stage `08`; corrective `08F`/`08G`/`08H` also failed native quality gates | Keep all failed candidates as rejected/superseded evidence. Do not register, promote, activate, paper/testnet/live trade, or use them as the baseline for Stage `09`; run the new `08I` -> `08J` -> `08K` correction chain first. |
+| Article result depends on optimized backtest configuration and article-style session selection | The Habr article shows final backtest results in the workflow that includes `Optuna`; it does not publish a clean pre-`Optuna` final backtest table. Stage `08G` tested source-compatible `Optuna`, and `08H` tested `90/60`, but both failed native quality. Stage `08I` now checks evaluator parity, `08J` adds the article session extractor, and `08K` reruns the demo `30/10` article path. |
 | `max_parallel_sessions=2` may be a source default, not an optimum | Stage `08G` treated `max_parallel_sessions=2` as copied from upstream `configs/alpha.py`. It is not a proven Roehub optimum. Because upstream `optimize_cfg.py` leaves `max_sessions` search commented out, changing it requires a separate explicit calibration decision and cannot be silently mixed into a source-faithful Optuna run. |
-| Positive backtest alone is not production promotion | Stage `08H` can accept only research candidates; Stage `10A` requires numeric promotion-grade threshold profile before paper/testnet/live progression. |
+| Positive backtest alone is not production promotion | Stage `08K` can accept only a research candidate, and only if it also beats sanity baselines and stability/action gates. Stage `10A` requires numeric promotion-grade threshold profile before paper/testnet/live progression. |
 | MPS support may be incomplete for chosen ops | Stage `03`/`07A`/`08B`/`08C`/`08E` benchmark CPU vs MPS where relevant and define accepted fallback. |
 | Futures funding/contract metadata may be incomplete | Stage `02B` must define Binance Futures funding, mark/index, filters, leverage tiers and explicitly block or mark the `binance:futures` training/evaluation branch as `research_only_approximation` before Stage `05`/`08F`. |
 | Retraining can silently change live behavior | Stage `10A` requires candidate/champion gates, no auto-activation, rollback manifest and drift-triggered retraining task instead of in-place live mutation. |
