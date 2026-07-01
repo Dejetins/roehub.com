@@ -136,6 +136,15 @@ Visual inspection showed the selected paper strategy stopped cleanly, `ready: pa
 
 ## File Manifest
 
+Formal manifest shape normalized during Stage `14` audit; historical evidence and acceptance are unchanged.
+
+| Created | Modified | Deleted | Reason | Contract impact |
+|---|---|---|---|---|
+| `src/trading/contexts/live_execution/domain/paper_coverage.py`, `src/trading/contexts/live_execution/application/ports/paper_coverage_repository.py`, `src/trading/contexts/live_execution/application/use_cases/paper_coverage.py`, in-memory/Postgres paper coverage repositories, migrations `20260617_0033`-`0035`, focused tests | none | none | Add durable paper coverage, provenance launch-hash uniqueness, and bounded expected paper-order storage/tests. | `compatible-change`: additive paper-only coverage/persistence and bounded schema relaxation. |
+| none | live-execution paper/risk/accounting/domain exports, strategy run/live-runner/provenance/ACL paths, focused tests, this report, stage ledger, docs index | none | Prove paper no-exchange branch coverage, rejected no-dispatch intents, paper accounting, and docs/handoff. | `compatible-change`: paper-only behavior and documentation lifecycle. |
+
+Historical detailed manifest:
+
 | Action | File | Reason | Contract impact |
 |---|---|---|---|
 | Modified | `apps/api/dto/ui_execution.py` | Add optional paper no-dispatch risk-context flag. | `compatible-change` DTO additive field |

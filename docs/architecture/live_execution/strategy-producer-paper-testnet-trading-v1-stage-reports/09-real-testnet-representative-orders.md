@@ -32,6 +32,19 @@ Spot short remains an accepted unsupported v1 branch (`spot_short_not_supported`
 | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/09-real-testnet-representative-orders.md` | modified | Records final runtime order evidence, cleanup, contract impact, and acceptance. |
 | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | modified | Updates Stage `09` ledger state and handoff. |
 
+## File Manifest
+
+This manifest was normalized during Stage `14` final-readiness audit. It restates the existing Stage `09` concrete file list without changing historical acceptance evidence.
+
+| Created | Modified | Deleted | Reason | Contract impact |
+|---|---|---|---|---|
+| none | `src/trading/contexts/exchange_control/adapters/outbound/exchange_account_state.py`, `src/trading/contexts/exchange_control/application/account_state.py`, `src/trading/contexts/exchange_control/adapters/inbound/http/app.py` | none | Add explicit testnet futures account-config command, guard checks, and Binance/Bybit futures account-state read-back needed before real short proof. | `compatible-change`: explicit testnet-only account-config service call; no hidden order-submit mutation. |
+| none | `apps/api/routes/ui_account.py`, `apps/api/dto/ui_account.py`, `apps/api/exchange_control_client.py` | none | Expose the account-config action through existing owned exchange-connection UI/API boundary. | `compatible-change`: additive route/DTO behavior for eligible testnet futures rows. |
+| none | `apps/web/dist/js/pages/settings.js`, `apps/web/locales/en.json`, `apps/web/locales/ru.json` | none | Show market-level readiness and `Iso 1x` operator action for testnet futures connections. | `compatible-change`: additive browser-visible readiness/action. |
+| none | `apps/exchange_execution/adapters/native_http.py` | none | Serialize order decimals safely and treat Binance Spot Demo listenKey REST `410` as degraded preflight evidence, not a submit blocker. | `compatible-change`: safer native adapter formatting and preflight classification. |
+| none | `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/05-safe-testnet-exchange-binding.md`, `.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/09-real-testnet-representative-orders.md` | none | Keep prompts aligned with explicit platform-managed testnet futures account config and required read-back proof. | `none`: prompt artifact alignment. |
+| none | `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md`, `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/09-real-testnet-representative-orders.md`, `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md` | none | Record architecture decision, real testnet order evidence, cleanup, acceptance, and handoff. | `none`: documentation/handoff. |
+
 ## Contract Impact
 
 | Dimension | Classification | Note |

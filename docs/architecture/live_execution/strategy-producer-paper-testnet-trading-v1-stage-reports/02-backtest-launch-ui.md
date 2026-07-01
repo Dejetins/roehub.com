@@ -1,5 +1,7 @@
 # Stage 02 — Backtest-to-strategy launch UI
 
+Статус: `accepted`.
+
 Дата: 2026-06-17
 
 ## Pre-Start

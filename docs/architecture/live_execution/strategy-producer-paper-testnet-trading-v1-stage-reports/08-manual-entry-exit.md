@@ -143,6 +143,15 @@ Runtime proof used synthetic subject `codex:stage08-manual-entry-exit-final:2026
 
 ## File Manifest
 
+Formal manifest shape normalized during Stage `14` audit; historical evidence and acceptance are unchanged.
+
+| Created | Modified | Deleted | Reason | Contract impact |
+|---|---|---|---|---|
+| `alembic/versions/20260618_0036_manual_paper_orders_source_event_v1.py`, `tests/unit/apps/migrations/test_manual_paper_orders_source_event_sql.py`, `docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/08-manual-entry-exit.md` | none | none | Add manual paper idempotency schema coverage, migration test, and Stage `08` report. | `compatible-change`: additive manual paper persistence and docs/handoff. |
+| none | API error/router/wiring files, strategy UI assets/locales/template, live-execution paper/risk/accounting paths, focused tests, stage ledger, docs index | none | Add manual entry/exit controls and prove idempotent paper no-dispatch accounting plus fail-closed testnet manual behavior. | `compatible-change`: additive API/DTO, browser-visible controls, and paper execution behavior. |
+
+Historical detailed manifest:
+
 | Action | File | Reason | Contract impact |
 |---|---|---|---|
 | Modified | `apps/api/common/errors.py` | Map `strategy_manual_execution.*` domain errors to stable HTTP statuses after runtime proof found a `500` leak. | `compatible-change` API error status correction |

@@ -1,6 +1,8 @@
 # Strategy Producer Paper/Testnet Trading v1
 
-Статус: architecture plan для нового цикла реализации. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает следующий самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 6h acceptance с controlled burst/load и CPU/RAM evidence.
+Статус: `Stage 14 in progress` — final docs closure запущен 2026-07-02. Это не Stage `18` старого плана `live-execution-universal-order-gateway-v1`; старый план считается foundation, а этот документ описывает самостоятельный цикл: пользовательский запуск стратегий из доступных backtest variants в `paper` и `testnet`, supervised strategy producer, реальные testnet orders и 6h acceptance с controlled burst/load и CPU/RAM evidence.
+
+Stage `14` closure decision: paper/testnet cycle can close after final docs/ledger delivery evidence; mainnet real-money trading остается вне scope этого цикла и требует отдельного будущего плана с собственным ledger, prompt pack, risk controls, CI/deploy/runtime proof и explicit money-moving approval gates.
 
 Актуализация 2026-06-23: этот live-execution план остается активным по
 собственному ledger, но должен учитывать уже принятый

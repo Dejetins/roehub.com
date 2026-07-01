@@ -1,5 +1,7 @@
 # Stage 03 — Scenario matrix and compatibility
 
+Статус: `accepted`.
+
 Дата: 2026-06-17
 
 ## Pre-Start
