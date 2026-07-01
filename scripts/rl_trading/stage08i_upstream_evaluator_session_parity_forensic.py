@@ -13,7 +13,8 @@ from typing import Any, cast
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2] if "__file__" in globals() else Path.cwd()
+_SCRIPT_PATH = Path(globals().get("__file__", ""))
+REPO_ROOT = Path.cwd() if _SCRIPT_PATH.name == "<stdin>" else _SCRIPT_PATH.resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -41,9 +42,9 @@ from trading.contexts.rl_trading.domain.action_state_reward_contract import (  #
     apply_training_reward_step_v1,
 )
 from trading.contexts.rl_trading.domain.hf_original_evaluation import (  # noqa: E402
-    _BacktestRiskManagementState,
     _alpha_config_from_training_config_payload,
     _artifact_path,
+    _BacktestRiskManagementState,
     _load_checkpoint_agent,
     _load_normalization_stats,
     _mask_q_values,
@@ -76,7 +77,7 @@ DEFAULT_CANDIDATE_MANIFEST = (
     / "hf_original_candidate_manifest.json"
 )
 DEFAULT_CANDIDATE_MANIFEST_SHA256 = (
-    "4382389a45abff070681bf0bb07c2d3aee601d7813777675ad909d3258a9d5e8"
+    "189370a40c874481a52262902884c1be3bd58b1faa0f7a581d6d04a6ae9e80d4"
 )
 DEFAULT_OUTPUT_ROOT = (
     Path(STAGE07A_RUNTIME_ARTIFACT_ROOT_V1)
@@ -85,17 +86,26 @@ DEFAULT_OUTPUT_ROOT = (
 )
 UPSTREAM_COMMIT = "f71130903f8237351164f4b875494185465bf1ea"
 UPSTREAM_SOURCE_HASHES = {
-    "agent.py": {"bytes": 9236, "sha256": "49ef8faaba845eb31207704fae23a73a9f784af0a4b6aef9323fd8be769e2fab"},
+    "agent.py": {
+        "bytes": 9236,
+        "sha256": "49ef8faaba845eb31207704fae23a73a9f784af0a4b6aef9323fd8be769e2fab",
+    },
     "backtest_engine.py": {
         "bytes": 16710,
         "sha256": "d05e426fdad3acb24df4c74fce17536d584e56a0b9e528160c5cb9762e179892",
     },
-    "config.py": {"bytes": 7191, "sha256": "65bfc4b8fa0722defe75ecf38dbb0ce92c53d5edc2e96b8b5fe0d849fc6219d6"},
+    "config.py": {
+        "bytes": 7191,
+        "sha256": "65bfc4b8fa0722defe75ecf38dbb0ce92c53d5edc2e96b8b5fe0d849fc6219d6",
+    },
     "configs/alpha.py": {
         "bytes": 2600,
         "sha256": "c8f0348379ed4deaf7dc306bbab039203e22e4039321ab294caedd2f5f698f9e",
     },
-    "model.py": {"bytes": 2942, "sha256": "042f406b0c35222bb79d659883d935454b12f42f4551daa06dc95e3a08a396cc"},
+    "model.py": {
+        "bytes": 2942,
+        "sha256": "042f406b0c35222bb79d659883d935454b12f42f4551daa06dc95e3a08a396cc",
+    },
     "optimize_cfg.py": {
         "bytes": 5266,
         "sha256": "f6b2c542958cdce4c1cec6096cdae619304f67740b79098e136bf8dbfbe646dd",
@@ -104,7 +114,10 @@ UPSTREAM_SOURCE_HASHES = {
         "bytes": 16247,
         "sha256": "c38154ee416f1fb3de59c2f7085092d0237216c7854e70ba89863d9676920c8c",
     },
-    "utils.py": {"bytes": 11982, "sha256": "38d00c1bbdafa0201f219e530544c70ac47dc0d143b503b158d52c8c96db2f25"},
+    "utils.py": {
+        "bytes": 11982,
+        "sha256": "38d00c1bbdafa0201f219e530544c70ac47dc0d143b503b158d52c8c96db2f25",
+    },
 }
 TRACE_COMPARE_FIELDS = (
     "state_hash",
@@ -252,13 +265,17 @@ def run_forensic(args: argparse.Namespace) -> dict[str, Any]:
         "dataset": dict(split.source_payload),
         "duration_seconds": _round(time.perf_counter() - started),
         "first_material_diff": material_diff,
-        "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": (
+            datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        ),
         "normalization_stats_hash": normalization_stats.stats_hash(),
         "proof_boundary": "target_host_non_production_forensic_pre_main",
         "run_dir": str(run_dir),
         "run_id": run_id,
         "schema_version": 1,
-        "source_execution_mode": "source_derived_from_pinned_backtest_engine_without_external_repo_checkout",
+        "source_execution_mode": (
+            "source_derived_from_pinned_backtest_engine_without_external_repo_checkout"
+        ),
         "stage": "08I",
         "status": status,
         "trace_session_count": len(trace_indices),
@@ -363,7 +380,9 @@ def first_schedule_diff_v1(
             return {
                 "diff_type": "session_selection_order",
                 "material": True,
-                "reason": "upstream_uses_rolling_open_sessions_but_roehub_caps_only_exact_signal_time_groups",
+                "reason": (
+                    "upstream_uses_rolling_open_sessions_but_roehub_caps_only_exact_signal_time_groups"
+                ),
                 "selected_order": idx,
                 "source": dict(source_schedule[idx]),
                 "roehub": dict(roehub_schedule[idx]),
@@ -422,7 +441,10 @@ def build_source_backtest_trace_v1(
     for selected_order, session_idx in enumerate(session_indices):
         session = split.sequences[session_idx]
         symbol = split.symbols[session_idx]
-        signal_dt = _parse_signal_time(split.signal_times_utc[session_idx], fallback_idx=session_idx)
+        signal_dt = _parse_signal_time(
+            split.signal_times_utc[session_idx],
+            fallback_idx=session_idx,
+        )
         position_size = global_balance * alpha.position_fraction
         session_alpha = replace(alpha, initial_balance=position_size)
         state = RlTrainingState(balance=position_size)
@@ -569,7 +591,9 @@ def build_roehub_backtest_trace_v1(
                 config=backtest_alpha,
             )
             next_state, reward, done, _, info = environment.step(action_for_environment)
-            pnl_change = float(info["pnl_change"])
+            pnl_change_value = info["pnl_change"]
+            effective_action_value = info["effective_action_id"]
+            pnl_change = float(cast(float, pnl_change_value))
             equity += pnl_change
             _update_risk_management_state_after_step_v1(
                 risk_state=risk_state,
@@ -592,7 +616,7 @@ def build_roehub_backtest_trace_v1(
                     raw_argmax_action=raw_argmax_action,
                     masked_q_values_hash=_hash_array(masked_q_values),
                     selected_action=decision.effective_action_id,
-                    effective_action=int(info["effective_action_id"]),
+                    effective_action=int(cast(int, effective_action_value)),
                     position_side=environment.state.position_side,
                     entry_price=environment.state.entry_price,
                     pnl_change=pnl_change,

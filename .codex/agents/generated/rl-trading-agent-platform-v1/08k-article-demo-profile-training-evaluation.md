@@ -55,7 +55,9 @@ context_sources:
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger and current stage"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i-upstream-evaluator-session-parity-forensic.md
-      why: "evaluator parity prerequisite"
+      why: "blocked first-diff evidence retained as history"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i2-exhaustive-methodology-discrepancy-audit.md
+      why: "accepted exhaustive methodology discrepancy audit prerequisite"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08j-article-session-extractor-dataset.md
       why: "article-selector dataset manifest"
   task_entrypoints:
@@ -146,7 +148,7 @@ safety_notes:
 
 Implement Stage `08K` article demo-profile training/evaluation.
 
-Run the source/demo `30/10` workflow after accepted evaluator parity and article-selector dataset materialization. This stage is the next planned path that can reopen Stage `09`; if it fails, preserve the failure and hand off to `08L`.
+Run the source/demo `30/10` workflow after accepted exhaustive methodology discrepancy audit and article-selector dataset materialization. This stage is the next planned path that can reopen Stage `09`; if it fails, preserve the failure and hand off to `08L`.
 
 ## Prompt-Pack Execution Anchor
 
@@ -162,13 +164,13 @@ Run the source/demo `30/10` workflow after accepted evaluator parity and article
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: verify `08I` and `08J` are `accepted`, `current_stage=08K`, and `09` is blocked. If not true, write/update `08K` as blocked, update the ledger, and stop.
+- Previous-stage ledger gate: verify `08I2` and `08J` are `accepted`, `current_stage=08K`, and `09` is blocked. If not true, write/update `08K` as blocked, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for `08K`. Do not use username `smoke_e2e_keycloak` and do not read `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Compute and record this prompt hash: `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/08k-article-demo-profile-training-evaluation.md`.
 - Train/evaluate two branches:
   - `hf_original_control_30_10`: original HF splits, source/demo `agent_history_len=30`, `agent_session_len=10`;
   - `roehub_native_article_selector_30_10`: accepted `08J` article-selector dataset.
-- Use accepted `08I` evaluator parity fixtures. If parity is later found broken, stop and block instead of continuing.
+- Use accepted `08I2` discrepancy matrix and accepted evaluator/session parity fixtures. If parity is later found broken or any mandatory matrix row is missing, stop and block instead of continuing.
 - Run `Optuna` only on calibration split; final holdout must remain untouched by tuning.
 - Persist progress and resource evidence for Mac Studio CPU/MPS. Use measured device policy; do not claim MPS/CPU speed without comparable evidence.
 - Native branch acceptance is strict:

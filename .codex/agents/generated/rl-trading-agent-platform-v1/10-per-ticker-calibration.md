@@ -18,6 +18,9 @@ prompt_pack_execution:
   file_manifest_required: true
 goal_mode_optional: true
 goal_artifact_required: false
+proof_boundary:
+  label: target_host_readiness_pre_main
+  changed_code_production_claim_allowed: false
 scope: "Implement per-ticker/per-market calibration thresholds, weights, normalization stats, or heads."
 language:
   implementation: python
@@ -133,6 +136,8 @@ quality_gates:
 validation_strategy:
   depth: integration
   e2e_required: true
+  proof_boundary: target_host_readiness_pre_main
+  post_main_production_proof_required_for_changed_runtime_claims: true
   acceptance_surfaces:
     - "calibration report"
     - "registry metadata"
@@ -222,7 +227,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `09B` and an accepted corrective research candidate from Stage `08K` or a later explicitly accepted stage with `stage09_allowed=true` in the ledger. Historical Stage `08` and blocked `08F`/`08G`/`08H` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `09B`, accepted Stage `08I2`, and an accepted corrective research candidate from Stage `08K` or a later explicitly accepted stage with `stage09_allowed=true` in the ledger. Historical Stage `08`, blocked `08F`/`08G`/`08H`, and blocked first-diff-only `08I` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for Stage `10` unless this prompt is explicitly expanded into browser-visible calibration UI work. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/10-per-ticker-calibration.md` and record the prompt path and hash in the stage report.

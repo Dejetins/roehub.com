@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-
+from typing import Any, cast
 
 MODULE_PATH = (
     Path(__file__).resolve().parents[4]
@@ -41,7 +41,9 @@ def test_source_schedule_uses_rolling_open_sessions_not_exact_groups() -> None:
     assert stage08i.first_schedule_diff_v1(source, roehub, compare_limit=5) == {
         "diff_type": "session_selection_order",
         "material": True,
-        "reason": "upstream_uses_rolling_open_sessions_but_roehub_caps_only_exact_signal_time_groups",
+        "reason": (
+            "upstream_uses_rolling_open_sessions_but_roehub_caps_only_exact_signal_time_groups"
+        ),
         "selected_order": 2,
         "source": {
             "selected_order": 2,
@@ -73,7 +75,7 @@ def test_first_trace_diff_reports_field_identity() -> None:
     ]
     roehub = [{**source[0], "implementation": "roehub_current", "state_hash": "b"}]
 
-    diff = stage08i.first_trace_diff_v1(source, roehub)
+    diff = cast(dict[str, Any], stage08i.first_trace_diff_v1(source, roehub))
 
     assert diff["diff_type"] == "step_trace_field"
     assert diff["field"] == "state_hash"

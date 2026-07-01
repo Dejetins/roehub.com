@@ -2,6 +2,10 @@
 prompt_name: 08i-upstream-evaluator-session-parity-forensic
 repo: roehub.com
 branch: main
+superseded_after_blocked_run:
+  status: "blocked evidence retained"
+  next_prompt: ".codex/agents/generated/rl-trading-agent-platform-v1/08i2-exhaustive-methodology-discrepancy-audit.md"
+  rule: "If the ledger current_stage is 08I2, do not rerun this prompt; use the 08I2 exhaustive discrepancy audit."
 branch_policy:
   default_branch: main
   separate_branch_allowed: false
@@ -14,7 +18,7 @@ prompt_pack_execution:
   execution_mode: manual_sequential
   goal_md_policy: "GOAL.md is optional, not required by default"
   goal_driven_mode: "optional only over the same plan_doc/prompt_pack_dir/stage_ledger; no separate GOAL.md required"
-  stage_gate: "read ledger before edits; run only when current_stage is 08I and prerequisites match"
+  stage_gate: "read ledger before edits; run only when current_stage is 08I and prerequisites match; if current_stage is 08I2, stop and use 08i2-exhaustive-methodology-discrepancy-audit.md"
   file_manifest_required: true
 goal_mode_optional: true
 goal_artifact_required: false
@@ -116,6 +120,7 @@ required_literals:
 non_goals:
   - "Do not train, tune, register, promote, activate, paper trade, testnet trade, live trade, or mainnet submit."
   - "Do not replace Stage 06 selector."
+  - "Historical note: the first 08I run stopped at the first material diff and is retained as blocked evidence. New discrepancy work must use 08I2."
   - "Do not change reward/action semantics except to fix proven parity bugs."
   - "Do not create branches, worktrees, stashes, temporary repo checkouts, or auxiliary workflow folders."
 quality_gates:
@@ -171,7 +176,7 @@ The current native path is blocked by `08F`, `08G`, and `08H`. Do not launch new
 - `execution_mode`: `manual_sequential`
 - `GOAL.md`: optional, not required by default.
 - GOAL.md is optional, not required by default.
-- Stage gate: read the ledger before edits; run only when `current_stage=08I`.
+- Stage gate: read the ledger before edits; run only when `current_stage=08I`. If the ledger says `current_stage=08I2`, do not run this prompt; use `08i2-exhaustive-methodology-discrepancy-audit.md`.
 - Manifest gate: every created/modified/deleted file and every runtime artifact path must be recorded in the stage report and ledger.
 
 ## Requirements (Must)

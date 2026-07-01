@@ -54,7 +54,9 @@ context_sources:
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
       why: "stage ledger and current stage"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i-upstream-evaluator-session-parity-forensic.md
-      why: "accepted parity prerequisite"
+      why: "blocked first-diff evidence retained as history"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i2-exhaustive-methodology-discrepancy-audit.md
+      why: "accepted exhaustive methodology discrepancy audit prerequisite"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08j-article-session-extractor-dataset.md
       why: "accepted article-selector dataset"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08k-article-demo-profile-training-evaluation.md
@@ -130,7 +132,7 @@ safety_notes:
 
 # Task
 
-Implement Stage `08L` reward and warm-start research fallback only if `08K` is blocked after accepted `08I`/`08J`.
+Implement Stage `08L` reward and warm-start research fallback only if `08K` is blocked after accepted `08I2`/`08J`.
 
 This stage is for controlled research, not registry activation. It should determine whether a new candidate path is justified, using bounded experiments such as dense mark-to-market reward, realized plus unrealized delta, transaction-cost-aware shaping, supervised warm-start/behavior cloning from oracle labels, or contextual-bandit sanity.
 
@@ -148,7 +150,8 @@ This stage is for controlled research, not registry activation. It should determ
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: verify `08I` and `08J` are `accepted`, `08K` is `blocked`, `current_stage=08L`, and `09` is blocked. If not true, write/update `08L` as blocked, update the ledger, and stop.
+- Previous-stage ledger gate: verify `08I2` and `08J` are `accepted`, `08K` is `blocked`, `current_stage=08L`, and `09` is blocked. If not true, write/update `08L` as blocked, update the ledger, and stop.
+- Before any reward/warm-start experiment, read the accepted `08I2` methodology discrepancy matrix. If any mandatory row is missing or any reward/action/evaluator/session row is unresolved without an explicit accepted repair/recheck path, block `08L` instead of running new research.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for `08L`. Do not use username `smoke_e2e_keycloak` and do not read `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Compute and record this prompt hash: `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/08l-reward-warm-start-research.md`.
 - Define a bounded experiment matrix before running anything: hypotheses, dataset branch, profile, max runtime, metrics, stop conditions, and expected artifact paths.

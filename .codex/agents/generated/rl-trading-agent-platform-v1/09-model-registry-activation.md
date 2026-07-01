@@ -18,6 +18,9 @@ prompt_pack_execution:
   file_manifest_required: true
 goal_mode_optional: true
 goal_artifact_required: false
+proof_boundary:
+  label: target_host_readiness_pre_main
+  changed_code_production_claim_allowed: false
 scope: "Persist datasets, models, calibrations, registry state machine, lifecycle, activation gates, and checkpoint security."
 language:
   implementation: python
@@ -38,8 +41,8 @@ context_sources:
       inspect_symbols:
         - "research candidate decision"
         - "candidate manifest"
-    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i-upstream-evaluator-session-parity-forensic.md
-      why: "accepted evaluator/session parity prerequisite"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i2-exhaustive-methodology-discrepancy-audit.md
+      why: "accepted exhaustive methodology discrepancy audit prerequisite"
       inspect_symbols:
         - "first material diff"
         - "parity verdict"
@@ -149,6 +152,8 @@ quality_gates:
 validation_strategy:
   depth: integration
   e2e_required: true
+  proof_boundary: target_host_readiness_pre_main
+  post_main_production_proof_required_for_changed_runtime_claims: true
   acceptance_surfaces:
     - "database migrations"
     - "registry state-machine tests"
@@ -240,7 +245,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `08I`, Stage `08J`, and Stage `08K` with an accepted Roehub-native corrective research candidate and `stage09_allowed=true` in the ledger. If a later explicitly accepted corrective stage supersedes `08K`, the ledger must name it and record `stage09_allowed=true`. Historical Stage `07B`/`08` and blocked `08F`/`08G`/`08H` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `08I2`, Stage `08J`, and Stage `08K` with an accepted Roehub-native corrective research candidate and `stage09_allowed=true` in the ledger. If a later explicitly accepted corrective stage supersedes `08K`, the ledger must name it and record `stage09_allowed=true`. Historical Stage `07B`/`08`, blocked `08F`/`08G`/`08H`, and blocked first-diff-only `08I` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for Stage `09` unless this prompt is explicitly expanded into browser-visible registry UI work. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/09-model-registry-activation.md` and record the prompt path and hash in the stage report.
