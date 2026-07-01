@@ -185,8 +185,8 @@ Files outside expected prompt paths: local `output/playwright/stage12-5-closure/
 | Cleanup proof | blocked | Selected run stale; no signal/source-event rows in last 30m; candle group `pending=1`, `lag=564`. |
 | Mainnet/unknown safety | passed | Mainnet orders in last 24h `0`; unknown orders total `0`; execution orders in last 24h `0`. |
 | Secret/redaction inspection | passed | Report and generated JSON/body/request/console artifacts contain no password, cookie, token, DSN, exchange key, raw credential, session value, or provider payload. |
-| `python -m tools.docs.generate_docs_index --check` | passed | Initial check found `docs/architecture/README.md` out of date; `python -m tools.docs.generate_docs_index` regenerated it; repeat `--check` passed. |
-| Direct-main delivery | pending | Blocked report/ledger must still be published as scoped docs handoff if local gates pass. |
+| `python -m tools.docs.generate_docs_index --check` | passed | Checked after the rerun update; `docs/architecture/README.md` is up to date. |
+| Direct-main delivery | executor final handoff | Blocked report/ledger must be published as scoped docs handoff after local gates pass; final commit/push/CI/Mac Studio evidence is recorded by the executor final response because the artifact cannot contain its own final commit SHA before commit. |
 
 ## Cold-Head Review
 
