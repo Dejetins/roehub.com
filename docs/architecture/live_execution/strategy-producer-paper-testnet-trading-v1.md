@@ -247,7 +247,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `12.1` | Readiness gate | Доказать, что runtime готов до любого soak: producer включен, allowlists заданы, выбранные strategy runs реально running, telemetry доступна. | API/DB/Redis/Monit/Prometheus/browser proof; `running_strategy_runs > 0`; active paper/testnet strategy runs selected; producer enabled; allowlists non-empty; no active stale collector. |
 | `12.2` | Functional canary | Доказать, что реальная стратегия работает до нагрузки: producer poll'ит active runs и создает source events/signals. | 30-60 минут runtime evidence: producer polls grow, source events/signals appear, paper/testnet paths write expected rows, no mainnet, no new unknown/DLQ/retry debt. |
 | `12.3` | Burst/resource gate | Доказать, что controlled burst не ломает систему и не маскирует functional canary. | Stage `11`/existing harness burst evidence; CPU/RAM/Redis/DB baseline/during/post deltas; queues return to accepted band; no provider/mainnet load path. |
-| `12.4` | Sustained 6h soak | Доказать длительную стабильность active paper/testnet strategies без подмены одним burst и зафиксировать базовую observability для скорости обработки сигналов. | 6h periodic snapshots with active strategies, no new unknown/DLQ/retry growth beyond thresholds, Monit uptime, Prometheus resource evidence, Redis/DB deltas, final runtime state, signal-path p50/p95/p99/max latency, processed candles, unique signals/source events, and dedupe proof. |
+| `12.4` | Sustained 6h soak | Доказать длительную стабильность active paper/testnet strategies без подмены одним burst и зафиксировать базовую observability для скорости обработки сигналов. | 6h periodic snapshots with active strategies, no new unknown/DLQ/retry growth beyond thresholds, Monit uptime, Prometheus resource evidence, non-empty process CPU/RSS or equivalent same-window historical evidence, Redis/DB deltas, repair metrics/audit surface availability after `market-data-live-tail-repair-v1`, final runtime/browser/API state, signal-path p50/p95/p99/max latency, processed candles, unique signals/source events, and dedupe proof. |
 | `12.5` | Closure | Собрать финальные доказательства и принять/заблокировать Stage `12` как целое. | Browser proof, report/ledger/docs index, cleanup, pass/fail decision, publish/delivery evidence where files changed. Stage `13` opens only after `12.5 accepted`. |
 | `13` | Notifications and operator runbooks | Outbox/event contract for future delivery, alert severity/owner/escalation, runbooks. | Outbox rows for rejected/fill/exit/kill/unknown, Prometheus rules, runbook drill evidence. |
 | `14` | Final readiness and docs closure | Stage reports, ledger, docs index, prompt pack closure, delivery readiness. | All stage reports accepted, docs index check, `github:yeet` publish evidence, main-branch delivery evidence, CI/deploy/host-sync evidence where applicable, final go/no-go for separate mainnet plan. |
@@ -270,7 +270,7 @@ Service shape v1: переиспользуем существующий runtime 
 | `12.1` | readiness report only unless blocker requires narrow repair | `12-1-readiness-gate.md` |
 | `12.2` | functional canary report, active strategy evidence | `12-2-functional-canary.md` |
 | `12.3` | controlled burst/resource report, Stage `11` harness evidence | `12-3-burst-resource-gate.md` |
-| `12.4` | sustained 6h soak report, periodic Mac Studio logs/evidence summaries, signal-path latency/dedup SQL and Prometheus evidence for future Grafana | `12-4-sustained-6h-soak.md` |
+| `12.4` | sustained 6h soak report, periodic Mac Studio logs/evidence summaries, signal-path latency/dedup SQL and Prometheus evidence for future Grafana, repair-metrics availability, process CPU/RSS resource evidence, final browser/API proof | `12-4-sustained-6h-soak.md` |
 | `12.5` | closure report, docs/ledger/index, delivery evidence | `12-5-closure.md` |
 | `13` | notification outbox compatibility, alert rules, runbooks | `13-notifications-runbooks.md` |
 | `14` | final docs, index, stage ledger closure, prompt pack audit | `14-final-readiness-docs-closure.md` |
@@ -352,6 +352,17 @@ docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stag
 | Dependent stages blocked | Следующий зависимый stage не стартует, пока предыдущий не accepted или не superseded repair stage. |
 | Mac Studio runtime | Git на `macstudio` только в `/Users/daniildegtyarev/Projects/roehub.com`; runtime checks в `/opt/roehub/app` только для deploy/smoke. |
 | Stage `12` gates | Stage `12` нельзя заменить одним collector или коротким smoke. `12.1` и `12.2` должны доказать active strategy runtime до burst/soak; `12.3` доказывает resource/load; `12.4` доказывает фактические 6h и обязательные signal-path latency/dedup metrics; `12.5` закрывает evidence/publish/cleanup. |
+
+### Stage `12.4` Evidence Closure Rule
+
+Если после repair-cycle уже существует 6h artifact directory, executor сначала валидирует его против полного acceptance-контракта `12.4`, а не запускает новый 6h таймер автоматически.
+
+| Ситуация | Решение |
+|---|---|
+| `latest_status.json.status=passed`, но отсутствует browser/API proof, repair-metrics/audit proof или process CPU/RSS evidence | Не открывать `12.5`; выполнить evidence-closure или записать blocker. |
+| `processes=[]` в snapshots из-за ошибки collector/parsing | Не считать это resource proof. Восстановить same-window process evidence из надежного исторического источника или rerun `12.4` с исправленным collector. |
+| Signal-path 6h proof полный, но resource/browser/repair proof неполный | Сохранять signal-path доказательство как candidate evidence; повторять 6h только если недостающую часть нельзя честно дозакрыть отдельно. |
+| Все required surfaces закрыты | Обновить `12-4-sustained-6h-soak.md`, оба ledgers при repair handoff, доставить docs в `main`, затем открыть `12.5`. |
 
 ## Следующее Покрытие После Signal Path
 

@@ -6,6 +6,13 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
+prompt_pack_execution:
+  mode: manual_sequential
+  plan_doc: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md
+  prompt_pack_dir: .codex/agents/generated/strategy-producer-paper-testnet-trading-v1/
+  stage_ledger: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md
+  goal_mode_optional: true
+  goal_artifact_required: false
 scope: "Run the actual 6-hour sustained soak with active strategies after readiness, canary, and burst gates pass, and prove baseline signal-path latency/dedup monitoring."
 language:
   implementation: python/shell/markdown
@@ -18,6 +25,8 @@ context_sources:
       why: "plan"
     - path: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md
       why: "stage handoff"
+    - path: docs/architecture/market_data/market-data-live-tail-repair-v1-stage-reports/market-data-live-tail-repair-v1-stage-ledger.md
+      why: "live-tail repair handoff when 12.4 is rerun after the Market Data repair cycle"
   task_entrypoints:
     - path: apps/worker/strategy_live_runner
       why: "active strategy producer"
@@ -47,7 +56,7 @@ skill_routing:
 validation_strategy:
   depth: target_runtime
   e2e_required: true
-  acceptance_surfaces: ["6h-runtime", "active-strategies", "signal-latency", "signal-dedup", "prometheus", "monit", "database", "redis", "browser"]
+  acceptance_surfaces: ["6h-runtime", "active-strategies", "signal-latency", "signal-dedup", "repair-metrics", "prometheus", "monit", "database", "redis", "browser"]
   tests_only_allowed_reason: ""
   evidence_target: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/12-4-sustained-6h-soak.md
 stage_execution_ledger:
@@ -85,9 +94,12 @@ Run Stage `12.4` sustained 6-hour soak.
 - Credential redaction rule: never write secrets, passwords, cookies, tokens, DSNs, exchange keys, raw credentials, or session values to reports, logs, screenshots, ledger, commits, or final output.
 - If authenticated browser/API proof is collected in this gate, use Keycloak username `smoke_e2e_keycloak`. On `macstudio`, read the password only from `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; outside `macstudio`, use securely exported local `ROEHUB_SMOKE_E2E_PASSWORD`. Do not ask for or print the password.
 - Reconfirm the Stage `12.1` readiness invariants immediately before starting: producer enabled, allowlists non-empty, selected active strategy runs still running, and telemetry available.
+- If a previous executor/user provides an existing Stage `12.4` artifact directory, first validate that artifact against this prompt before starting a new 6h timer. Reuse the elapsed 6h signal-path evidence only if the artifact is complete enough for the required acceptance surfaces; otherwise record a precise evidence gap and rerun only the missing proof when it can be recovered without weakening the contract. If the missing proof is time-window resource evidence that cannot be reconstructed, block and rerun the 6h collector with a fixed collector.
 - Before starting the 6h timer, declare the signal-path measurement method in the report: SQL timestamp sources, Prometheus metrics/PromQL, snapshot cadence, and p50/p95/p99/max calculation. If this cannot be declared from current telemetry, block before starting the timer.
+- When this stage runs after `market-data-live-tail-repair-v1`, prove the repair metrics/audit surfaces before the timer or artifact acceptance decision: `market_data_live_tail_gap_total`, `market_data_live_tail_repair_total`, `market_data_live_tail_repair_latency_seconds`, `market_data_hot_cache_*`, `market_data_clickhouse_repair_circuit_state`, `strategy_live_runner_checkpoint_stall_total`, `strategy_live_runner_deferred_ack_total`, and the repair audit table/query path. Metric-name presence with zero current events is acceptable only if the endpoint/rules expose the metric family and the report explains that no repair event happened during the soak.
 - Run for 6 elapsed hours with active paper/testnet strategies. Do not count idle time with `running_strategy_runs = 0` toward acceptance.
 - Collect periodic snapshots at start, at least hourly, and final. Each snapshot must include Monit, Prometheus, CPU/RAM/process RSS, producer/execution metrics, Redis pending/retry/DLQ, DB source-event/intent/order/reconciliation/outbox deltas, and active strategy state.
+- Process RSS/CPU evidence must be non-empty for at least `strategy_live_runner`, `exchange_execution`, Redis, Postgres, and Prometheus, or the report must provide an equivalent historical source with the same window. Do not parse process evidence from a truncated broad `ps` output. Prefer exact `pgrep -f`/`ps -p` or equivalent per-process collection. `processes=[]` is a blocker unless the missing process data is reconstructed from a reliable historical metric source for the same snapshots.
 - Every periodic snapshot and the final summary must include signal-path latency/dedup evidence for the same measurement window:
   - p50/p95/p99/max for `candle.bar_ts_close -> StrategySignal.created_at`;
   - p50/p95/p99/max for `StrategySignal.created_at -> ExecutionSourceEvent.received_at`;
@@ -112,6 +124,9 @@ Run Stage `12.4` sustained 6-hour soak.
 - Processed candle count, unique `StrategySignal` count, and unique `ExecutionSourceEvent` count are reported for the selected active runs and explain any expected mismatch.
 - Dedupe evidence proves duplicate `signal_id` rows are `0`, duplicate `(strategy_run_id, bar_ts_open)` rows are `0`, and idempotency duplicate replays do not create new source-event rows.
 - Redis/DB/Prometheus/Monit show no hidden backlog, unknown state growth, or sustained resource pressure.
+- Repair metrics/audit surfaces from the accepted Market Data repair cycle are available and any repair events during the soak are summarized with bounded, redacted evidence.
+- CPU/RAM/process RSS evidence is present for the 6h window; empty process snapshots are not accepted as resource evidence.
+- Final browser/API proof is collected, or a documented `12.4` deferral to `12.5` includes complete API evidence and an explicit reason.
 - Ledger marks `12.4 accepted`; `12.5` may start only after this.
 
 ## Quality Gates
