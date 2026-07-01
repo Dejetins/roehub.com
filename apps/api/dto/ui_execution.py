@@ -118,10 +118,19 @@ class ExecutionNotificationRequest(BaseModel):
     source_type: Literal["strategy_signal", "manual_request", "ml_agent_decision", "ops_test"]
     event_type: Literal[
         "producer_rejected",
+        "producer_signal_rejected",
+        "producer_order_rejected",
         "producer_fill",
+        "producer_manual_exit",
         "producer_unknown",
+        "producer_reconciliation_pending",
         "producer_kill_switch",
         "producer_terminal",
+        "producer_strategy_stopped",
+        "producer_strategy_restarted",
+        "producer_soak_failed",
+        "producer_soak_succeeded",
+        "producer_resource_threshold_breached",
     ]
     severity: Literal["info", "warning", "critical"]
     reason: str = Field(min_length=1, max_length=160)

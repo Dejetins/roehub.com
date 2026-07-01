@@ -39,3 +39,42 @@ groups:
           escalation: Verify no mainnet/live producer path is being attempted before enabling more strategies.
           runbook: docs/runbooks/strategy-live-worker.md#stage-06-alert-actions
           action: Inspect strategy profile mode and producer allowlist configuration; do not add live mode to producer allowed_modes.
+
+      - alert: StrategyProducerExecutionRejected
+        expr: increase(execution_notification_outbox_total{event_type=~"producer_rejected|producer_signal_rejected|producer_order_rejected"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer emitted rejected signal or order notification
+          description: A delivery-neutral execution outbox event recorded a rejected signal, rejected order, or legacy generic rejection.
+          escalation: Keep paper/testnet allowlists scoped, inspect source event, risk audit, order guard, and recent config changes before replay.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-13-notification-and-runbook-alert-actions
+          action: Query execution_notification_outbox, execution_source_events, execution_intents, and execution_risk_audit_events for the sanitized event ids.
+
+      - alert: StrategyProducerCriticalIncidentNotification
+        expr: increase(execution_notification_outbox_total{event_type=~"producer_kill_switch|producer_unknown|producer_reconciliation_pending|producer_soak_failed|producer_resource_threshold_breached"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer emitted critical incident notification
+          description: A kill switch, unknown/reconciliation-pending state, soak failure, or resource threshold breach was recorded in the execution outbox.
+          escalation: Stop broader fan-out, keep mainnet disabled, inspect reconciliation and resource evidence, and do not blindly retry unknown order states.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-13-notification-and-runbook-alert-actions
+          action: Identify the outbox event type, check matching order/reconciliation/soak evidence, and record an operator decision before restart or replay.
+
+      - alert: StrategyProducerRunStateNotification
+        expr: increase(execution_notification_outbox_total{event_type=~"producer_manual_exit|producer_strategy_stopped|producer_strategy_restarted|producer_soak_succeeded|producer_terminal|producer_fill"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          owner: strategy-producer
+        annotations:
+          summary: Strategy producer emitted terminal or run-state notification
+          description: A fill, manual exit, strategy stop/restart, soak success, or legacy terminal event was recorded in the execution outbox.
+          escalation: Verify the event is expected for the current operator action or test window; investigate duplicates or unexpected stop/restart loops.
+          runbook: docs/runbooks/strategy-live-worker.md#stage-13-notification-and-runbook-alert-actions
+          action: Check the source event/outbox row, strategy run state, and latest producer metrics for duplicate or unexpected transitions.

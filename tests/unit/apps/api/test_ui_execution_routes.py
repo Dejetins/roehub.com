@@ -252,6 +252,52 @@ def test_ui_execution_notifications_create_dedupe_and_list() -> None:
     assert listed.json()["items"][0]["event_type"] == "producer_terminal"
 
 
+def test_ui_execution_notifications_accept_stage13_event_types() -> None:
+    client = _build_client()
+
+    event_types = (
+        "producer_signal_rejected",
+        "producer_order_rejected",
+        "producer_manual_exit",
+        "producer_reconciliation_pending",
+        "producer_strategy_stopped",
+        "producer_strategy_restarted",
+        "producer_soak_failed",
+        "producer_soak_succeeded",
+        "producer_resource_threshold_breached",
+    )
+
+    for index, event_type in enumerate(event_types, start=1):
+        response = client.post(
+            "/ui/execution/notifications",
+            headers={"x-user-id": _USER_ID},
+            json={
+                "source_type": "ops_test",
+                "event_type": event_type,
+                "severity": (
+                    "critical"
+                    if event_type in {
+                        "producer_reconciliation_pending",
+                        "producer_soak_failed",
+                        "producer_resource_threshold_breached",
+                    }
+                    else "info"
+                ),
+                "reason": f"{event_type}_api_dry_run",
+                "labels": {"stage": "13", "row": str(index)},
+            },
+        )
+
+        assert response.status_code == 201
+        assert response.json()["event_type"] == event_type
+        assert response.json()["labels"] == {"stage": "13", "row": str(index)}
+
+    listed = client.get("/ui/execution/notifications", headers={"x-user-id": _USER_ID})
+
+    assert listed.status_code == 200
+    assert {item["event_type"] for item in listed.json()["items"]} >= set(event_types)
+
+
 def test_ui_execution_notifications_reject_sensitive_labels() -> None:
     client = _build_client()
 

@@ -57,6 +57,27 @@ Controlled restart:
 | `producer_mode_not_allowed` increases | Verify no `live`/mainnet profile is being routed through Stage `06`; keep allowed modes to `paper,testnet`. |
 | `producer_allowlist_missing` increases | This is expected until a specific smoke user or strategy is allowlisted; add only scoped UUIDs through host env or config. |
 
+## Stage 13 Notification And Runbook Alert Actions
+
+Stage `13` uses `execution_notification_outbox` as a delivery-neutral fact ledger. Telegram/email delivery is outside this runbook: operators must inspect outbox rows, source events, intents, order ledgers, reconciliation rows, and producer metrics without copying secrets, cookies, DSNs, tokens, exchange keys, raw provider payloads, or session values.
+
+| Alert / outbox event | Severity | Owner | Escalation | Operator action |
+|---|---|---|---|---|
+| `StrategyProducerExecutionRejected`; `producer_signal_rejected`, `producer_order_rejected`, legacy `producer_rejected` | warning | `strategy-producer` | Keep `paper,testnet` allowlists scoped and do not replay until the source event, risk audit, order guard, and config change are understood. | Query the matching `execution_notification_outbox` row by sanitized ids; inspect `execution_source_events`, `execution_intents`, `execution_risk_audit_events`, and `execution_orders` if an order row exists. |
+| `StrategyProducerCriticalIncidentNotification`; `producer_kill_switch` | critical | `strategy-producer` | Stop broader fan-out and keep mainnet disabled until the kill-switch source and latest producer config are confirmed. | Check `/health/ready`, host env allowlists, recent manual/admin actions, and risk audit rows; restart only through managed `launchd`/`Monit` after an operator decision. |
+| `StrategyProducerCriticalIncidentNotification`; `producer_unknown`, `producer_reconciliation_pending` | critical | `strategy-producer` | Do not blindly retry unknown order states. Reconcile durable order state and provider/testnet state first. | Inspect `execution_orders`, `execution_order_events`, `execution_reconciliation_runs`, Redis pending/DLQ, and exchange-execution logs before any replay. |
+| `StrategyProducerRunStateNotification`; `producer_manual_exit`, `producer_strategy_stopped`, `producer_strategy_restarted` | warning | `strategy-producer` | Treat unexpected stop/restart loops as an incident; expected operator actions require no replay. | Confirm the strategy id/run id, action source, and current run state; compare with producer metrics and browser/API status. |
+| `StrategyProducerRunStateNotification`; `producer_fill`, `producer_terminal`, `producer_soak_succeeded` | warning | `strategy-producer` | Verify the event belongs to the current test window and is not a duplicate. | Check source event/outbox dedupe keys, latest fills/reconciliation rows, and Stage `12`/`13` evidence before closing the action. |
+| `StrategyProducerCriticalIncidentNotification`; `producer_soak_failed`, `producer_resource_threshold_breached` | critical | `strategy-producer` | Stop load expansion, preserve collector artifacts, and do not mark soak/load gates accepted until resource evidence is explained. | Inspect Stage `11`/`12` harness artifacts, Prometheus resource snapshots, Redis lag, retry/DLQ, Monit status, and process RSS/CPU rows. |
+
+Non-destructive dry-run:
+
+1. Use `/api/ui/execution/notifications` or an in-memory/local test client with `source_type=ops_test`.
+2. Emit one dry-run event with a reason such as `stage13_runbook_dry_run` and labels limited to `stage`, `surface`, and `drill`.
+3. Verify the outbox/API response contains the expected `event_type`, `severity`, redacted labels, `status=pending`, and no delivery-channel side effect.
+4. Run Prometheus rule validation before deployment and record the rule names/severities in the stage report.
+5. Do not send Telegram/email or mutate production exchange state as part of this dry-run.
+
 ## Acceptance Evidence Checklist
 
 | Evidence | Command / source |

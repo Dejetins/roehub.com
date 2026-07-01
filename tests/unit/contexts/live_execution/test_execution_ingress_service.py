@@ -267,6 +267,10 @@ def test_risk_gate_rejects_source_aware_safety_cases(
     assert repository.source_events[0].outcome_reason == reason
     if reason == "kill_switch_closed":
         assert repository.notifications[0].event_type == "producer_kill_switch"
+    elif source_type == "strategy_signal":
+        assert repository.notifications[0].event_type == "producer_signal_rejected"
+    else:
+        assert repository.notifications[0].event_type == "producer_rejected"
 
 
 def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> None:
@@ -296,6 +300,8 @@ def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> Non
     assert repository.source_events[0].outcome == "order_model_rejected"
     assert repository.source_events[0].outcome_reason == "oco_not_supported"
     assert repository.intents == []
+    assert repository.notifications[0].event_type == "producer_order_rejected"
+    assert repository.notifications[0].reason == "oco_not_supported"
 
 
 def test_manual_request_paper_no_exchange_submit_uses_no_dispatch_risk_branch() -> None:
@@ -328,6 +334,46 @@ def test_manual_request_paper_no_exchange_submit_uses_no_dispatch_risk_branch() 
     assert intent.intent.risk_reason == "paper_no_exchange_submit"
     assert repository.source_events[0].outcome == "risk_rejected"
     assert repository.source_events[0].outcome_reason == "paper_no_exchange_submit"
+    assert repository.notifications[0].event_type == "producer_rejected"
+
+
+def test_manual_exit_paper_no_exchange_submit_emits_manual_exit_notification() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="manual_request",
+            source_event_ref="manual:exit:00000000-0000-0000-0000-000000010303",
+            source_ref_json={
+                "strategy_id": "00000000-0000-0000-0000-000000010301",
+                "strategy_run_id": "00000000-0000-0000-0000-000000010303",
+                "action": "exit",
+                "mode": "paper",
+                "instrument_key": "binance:spot:BTCUSDT",
+            },
+            strategy_signal_id=None,
+            idempotency_key="manual-paper-exit-source-key",
+        )
+    )
+
+    intent = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key="manual-paper-exit-intent-key",
+            risk_context=_accepted_context(
+                exchange_config_verified=False,
+                account_state_fresh=False,
+                paper_no_exchange_submit=True,
+            ),
+        )
+    )
+
+    assert intent.intent.status == "rejected"
+    assert repository.notifications[0].event_type == "producer_manual_exit"
+    assert repository.notifications[0].severity == "info"
+    assert repository.notifications[0].labels_json["action"] == "exit"
+    assert repository.notifications[0].labels_json["mode"] == "paper"
 
 
 def test_rejects_invalid_source_policy() -> None:
@@ -395,6 +441,39 @@ def test_emits_redacted_notification_outbox_event_idempotently() -> None:
         "exchange": "bybit",
         "status": "cancelled",
     }
+
+
+@pytest.mark.parametrize(
+    "event_type",
+    (
+        "producer_signal_rejected",
+        "producer_order_rejected",
+        "producer_manual_exit",
+        "producer_reconciliation_pending",
+        "producer_strategy_stopped",
+        "producer_strategy_restarted",
+        "producer_soak_failed",
+        "producer_soak_succeeded",
+        "producer_resource_threshold_breached",
+    ),
+)
+def test_stage13_notification_event_types_are_supported(event_type: str) -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+
+    result = service.emit_notification(
+        command=EmitExecutionNotificationCommand(
+            owner_user_id=_USER_ID,
+            source_type="ops_test",
+            event_type=event_type,
+            severity="critical" if event_type.endswith(("failed", "breached")) else "info",
+            reason=f"{event_type}_dry_run",
+            labels={"stage": "13", "surface": "outbox"},
+        )
+    )
+
+    assert result.notification.event_type == event_type
+    assert result.notification.labels_json == {"stage": "13", "surface": "outbox"}
 
 
 def test_rejects_sensitive_notification_labels() -> None:

@@ -126,6 +126,34 @@ def test_macos_bootstrap_installs_stage17_prometheus_rules() -> None:
     assert "notifications-admin.rules.yml" in script
 
 
+def test_macos_prometheus_strategy_producer_rules_are_repo_managed() -> None:
+    rules_payload = _load_yaml(
+        relative_path="infra/macos/prometheus/rules/strategy-producer.rules.yml"
+    )
+    groups = rules_payload["groups"]
+    assert [group["name"] for group in groups] == ["strategy-producer-supervision"]
+    rules = groups[0]["rules"]
+    alerts = {rule["alert"]: rule for rule in rules}
+    assert set(alerts) == {
+        "StrategyProducerDown",
+        "StrategyProducerIterationErrors",
+        "StrategyProducerModeBlocked",
+        "StrategyProducerExecutionRejected",
+        "StrategyProducerCriticalIncidentNotification",
+        "StrategyProducerRunStateNotification",
+    }
+    for rule in alerts.values():
+        assert rule["labels"]["severity"] in {"warning", "critical"}
+        assert rule["labels"]["owner"] == "strategy-producer"
+        assert rule["annotations"]["runbook"].startswith(
+            "docs/runbooks/strategy-live-worker.md#"
+        )
+        assert rule["annotations"]["escalation"]
+        assert rule["annotations"]["action"]
+    assert "producer_signal_rejected" in json.dumps(rules_payload)
+    assert "producer_resource_threshold_breached" in json.dumps(rules_payload)
+
+
 def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
     rules_payload = _load_yaml(
         relative_path="infra/macos/prometheus/rules/notifications-admin.rules.yml"

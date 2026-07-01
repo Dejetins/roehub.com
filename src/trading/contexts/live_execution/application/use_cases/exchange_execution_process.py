@@ -526,7 +526,7 @@ class ExchangeExecutionProcessService:
             )
             self._record_order_notification(
                 order=order,
-                event_type="producer_rejected",
+                event_type="producer_order_rejected",
                 severity="warning",
                 reason="exchange_adapter_not_enabled",
             )
@@ -554,7 +554,7 @@ class ExchangeExecutionProcessService:
             )
             self._record_order_notification(
                 order=order,
-                event_type="producer_rejected",
+                event_type="producer_order_rejected",
                 severity="warning",
                 reason=error.reason,
             )
@@ -579,7 +579,7 @@ class ExchangeExecutionProcessService:
             )
             self._record_order_notification(
                 order=order,
-                event_type="producer_rejected",
+                event_type="producer_order_rejected",
                 severity="warning",
                 reason=guard_reason,
             )
@@ -607,7 +607,7 @@ class ExchangeExecutionProcessService:
             )
             self._record_order_notification(
                 order=order,
-                event_type="producer_rejected",
+                event_type="producer_order_rejected",
                 severity="warning",
                 reason=clock_reason,
             )

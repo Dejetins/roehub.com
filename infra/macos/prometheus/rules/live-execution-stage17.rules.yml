@@ -106,14 +106,14 @@ groups:
           action: Run target-host PITR restore drill, insert redacted execution_ledger_pitr_drills evidence, set ROEHUB_EXECUTION_PITR_VERIFIED=true, and reload.
 
       - alert: LiveExecutionUnknownState
-        expr: increase(execution_notification_outbox_total{job="exchange-execution",event_type="producer_unknown"}[15m]) > 0 or increase(execution_reconciliation_total{job="exchange-execution",reason="unknown_needs_reconciliation"}[15m]) > 0
+        expr: increase(execution_notification_outbox_total{job="exchange-execution",event_type=~"producer_unknown|producer_reconciliation_pending"}[15m]) > 0 or increase(execution_reconciliation_total{job="exchange-execution",reason="unknown_needs_reconciliation"}[15m]) > 0
         for: 0m
         labels:
           severity: critical
           owner: live-execution
         annotations:
           summary: Live execution entered an unknown provider state
-          description: A producer_unknown notification or unknown-state reconciliation marker was emitted.
+          description: A producer_unknown or producer_reconciliation_pending notification, or unknown-state reconciliation marker, was emitted.
           escalation: Stop canary, preserve Redis/Postgres/provider evidence, and reconcile from durable/provider source of truth before retry.
           runbook: docs/runbooks/exchange-execution.md#stage-17-alert-actions
           action: Query notification outbox, order events, reconciliation rows, and provider status for the affected order.

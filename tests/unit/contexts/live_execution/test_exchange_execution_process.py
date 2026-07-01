@@ -474,6 +474,8 @@ def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
     assert order_repository.orders[intent.intent_id].status == "guard_rejected"
     assert order_repository.orders[intent.intent_id].status_reason == "mainnet_hard_block"
     assert order_repository.order_events[0].event_type == "guard_rejected"
+    assert intent_repository.notifications[0].event_type == "producer_order_rejected"
+    assert intent_repository.notifications[0].reason == "mainnet_hard_block"
     assert process_repository.observations[0].status == "guard_rejected"
 
 

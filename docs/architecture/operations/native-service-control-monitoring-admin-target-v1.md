@@ -164,7 +164,10 @@
   - runner heartbeat age,
   - command execution latency,
   - failed runs,
-  - stream lag.
+  - stream lag,
+  - `execution_notification_outbox_total` alerts for rejected signal/order,
+    kill-switch, unknown/reconciliation-pending, run-state, soak, and resource
+    threshold states with owner/escalation/runbook actions.
 - Админ-операции:
   - stop all runs,
   - stop user runs,

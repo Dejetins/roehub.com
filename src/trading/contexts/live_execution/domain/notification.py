@@ -10,10 +10,19 @@ from trading.shared_kernel.primitives import UserId
 
 ExecutionNotificationEventType = Literal[
     "producer_rejected",
+    "producer_signal_rejected",
+    "producer_order_rejected",
     "producer_fill",
+    "producer_manual_exit",
     "producer_unknown",
+    "producer_reconciliation_pending",
     "producer_kill_switch",
     "producer_terminal",
+    "producer_strategy_stopped",
+    "producer_strategy_restarted",
+    "producer_soak_failed",
+    "producer_soak_succeeded",
+    "producer_resource_threshold_breached",
 ]
 ExecutionNotificationSeverity = Literal["info", "warning", "critical"]
 ExecutionNotificationStatus = Literal["pending", "sent", "failed"]
@@ -21,10 +30,19 @@ ExecutionNotificationStatus = Literal["pending", "sent", "failed"]
 SUPPORTED_NOTIFICATION_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "producer_rejected",
+        "producer_signal_rejected",
+        "producer_order_rejected",
         "producer_fill",
+        "producer_manual_exit",
         "producer_unknown",
+        "producer_reconciliation_pending",
         "producer_kill_switch",
         "producer_terminal",
+        "producer_strategy_stopped",
+        "producer_strategy_restarted",
+        "producer_soak_failed",
+        "producer_soak_succeeded",
+        "producer_resource_threshold_breached",
     }
 )
 SUPPORTED_NOTIFICATION_SEVERITIES: frozenset[str] = frozenset({"info", "warning", "critical"})

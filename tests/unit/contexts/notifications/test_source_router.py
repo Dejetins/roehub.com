@@ -113,9 +113,23 @@ def test_synthetic_matrix_routes_every_type_to_fake_log_delivery_candidate() -> 
         "admin_alert",
         "admin_report",
     }
-    assert len(repository.events) == 17
-    assert len(repository.deliveries) >= 17
+    assert len(repository.events) == 26
+    assert len(repository.deliveries) >= 26
     assert len(repository.attempts) == len(repository.deliveries)
+    assert {
+        fact.source_event_type
+        for fact in synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())
+    } >= {
+        "producer_signal_rejected",
+        "producer_order_rejected",
+        "producer_manual_exit",
+        "producer_reconciliation_pending",
+        "producer_strategy_stopped",
+        "producer_strategy_restarted",
+        "producer_soak_failed",
+        "producer_soak_succeeded",
+        "producer_resource_threshold_breached",
+    }
 
 
 def test_router_proves_user_admin_route_separation() -> None:

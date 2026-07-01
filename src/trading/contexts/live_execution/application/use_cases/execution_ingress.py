@@ -11,6 +11,7 @@ from trading.contexts.live_execution.application.ports import (
 )
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
+    ExecutionNotificationEventType,
     ExecutionNotificationOutboxEvent,
     ExecutionOrderModelRejectedError,
     ExecutionProducerOutcomeLink,
@@ -177,6 +178,21 @@ class ExecutionIngressService:
                 outcome_reason=error.reason,
                 intent_id=None,
             )
+            self.emit_notification(
+                command=EmitExecutionNotificationCommand(
+                    owner_user_id=command.owner_user_id,
+                    source_type=event.source_type,
+                    event_type="producer_order_rejected",
+                    severity="warning",
+                    reason=error.reason,
+                    source_event_id=event.source_event_id,
+                    strategy_signal_id=event.strategy_signal_id,
+                    labels={
+                        "source_outcome": "order_model_rejected",
+                        "source_type": event.source_type,
+                    },
+                )
+            )
             self._record_order_model_rejected(source_type=event.source_type, reason=error.reason)
             raise
         now = self._clock.now()
@@ -250,26 +266,25 @@ class ExecutionIngressService:
             intent_id=recorded.intent_id,
         )
         if recorded.risk_status == "rejected":
-            event_type = (
-                "producer_kill_switch"
-                if recorded.risk_reason == "kill_switch_closed"
-                else "producer_rejected"
+            event_type = _rejected_intent_notification_type(event=event, intent=recorded)
+            severity = (
+                "critical"
+                if event_type == "producer_kill_switch"
+                else "info"
+                if event_type == "producer_manual_exit"
+                else "warning"
             )
             self.emit_notification(
                 command=EmitExecutionNotificationCommand(
                     owner_user_id=recorded.owner_user_id,
                     source_type=recorded.source_type,
                     event_type=event_type,
-                    severity="critical" if event_type == "producer_kill_switch" else "warning",
+                    severity=severity,
                     reason=recorded.risk_reason,
                     source_event_id=recorded.source_event_id,
                     intent_id=recorded.intent_id,
                     strategy_signal_id=recorded.strategy_signal_id,
-                    labels={
-                        "risk_status": recorded.risk_status,
-                        "intent_status": recorded.status,
-                        "instrument_key": recorded.instrument_key,
-                    },
+                    labels=_rejected_intent_notification_labels(event=event, intent=recorded),
                 )
             )
         self._record_intent(
@@ -391,3 +406,39 @@ class ExecutionIngressService:
     def _record_notification(self, *, event_type: str, source_type: str, severity: str) -> None:
         if self._on_notification is not None:
             self._on_notification(event_type, source_type, severity)
+
+
+def _rejected_intent_notification_type(
+    *, event: ExecutionSourceEvent, intent: ExecutionIntent
+) -> ExecutionNotificationEventType:
+    if intent.risk_reason == "kill_switch_closed":
+        return "producer_kill_switch"
+    if event.source_type == "strategy_signal":
+        return "producer_signal_rejected"
+    if event.source_type == "manual_request" and _is_manual_exit(event=event):
+        return "producer_manual_exit"
+    return "producer_rejected"
+
+
+def _rejected_intent_notification_labels(
+    *, event: ExecutionSourceEvent, intent: ExecutionIntent
+) -> Mapping[str, object]:
+    labels: dict[str, object] = {
+        "risk_status": intent.risk_status,
+        "intent_status": intent.status,
+        "instrument_key": intent.instrument_key,
+    }
+    action = event.source_ref_json.get("action")
+    mode = event.source_ref_json.get("mode")
+    if action:
+        labels["action"] = action
+    if mode:
+        labels["mode"] = mode
+    return labels
+
+
+def _is_manual_exit(*, event: ExecutionSourceEvent) -> bool:
+    action = event.source_ref_json.get("action", "").strip().lower()
+    if action == "exit":
+        return True
+    return event.source_event_ref.strip().lower().startswith("manual:exit:")
