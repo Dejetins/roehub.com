@@ -1,6 +1,6 @@
 # Stage 12.4: Sustained 6h Soak
 
-Статус: `blocked`.
+Статус: `accepted`.
 
 Дата старта preflight: `2026-06-27` Moscow / `2026-06-26` UTC.
 
@@ -254,32 +254,32 @@ Blocked interval `hour_3`:
 | Redis/DB side-effect guard | passed for observed window | Redis retry/DLQ stayed `1/2`; execution pending stayed `0`; unknown orders stayed `0`; mainnet orders stayed unchanged at historical `2`. |
 | Focused local code gates | not run | No repo code/config/schema changed. |
 | `python -m tools.docs.generate_docs_index --check` | passed | `OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.` |
-| Cold-head artifact review | passed for blocked handoff | Cold self-review fallback completed because independent subagent spawning is disallowed without explicit user request in the active tool policy. |
+| Cold-head artifact review | passed for historical blocked handoff | Cold self-review fallback completed because independent subagent spawning is disallowed without explicit user request in the active tool policy. |
 
 Cold-head review: completed
 Mode: cold self-review fallback
-Review scope: Stage `12.4` blocked report, stage ledger updates, docs index, proof boundary, file manifest, handoff to rerun.
+Review scope: historical Stage `12.4` blocked report, stage ledger updates, docs index, proof boundary, file manifest, handoff to rerun.
 Review instructions: architecture-review/references/cold-head-plan-prompt-pack-review.md
 Verdict: Release after fixes
-Blockers fixed: docs index regenerated; report and ledger now both mark `12.4 blocked`; `12.5` remains closed; accepted-stage publish/deploy is not claimed; durable artifact paths and blocker reason are recorded.
+Blockers fixed for that historical handoff: docs index regenerated; report and ledger both marked `12.4 blocked`; `12.5` remained closed at that point; accepted-stage publish/deploy was not claimed; durable artifact paths and blocker reason were recorded.
 Local follow-up check: completed
 Residual risks: root cause is only localized to observed ClickHouse HTTP reset and stalled selected run; a future repair/rerun must prove ClickHouse/market-data stability before restarting the 6h timer.
 
-## Delivery Status
+## Historical Delivery Status For 20260626 Attempt
 
 | Surface | Status |
 |---|---|
 | Repository docs | Updated locally: Stage `12.4` report, stage ledger, and docs index. |
 | Runtime code deploy | `N/A`; no repo runtime code changed. |
 | Host runtime config | Scoped LaunchAgent override remains applied from pre-start repair; it is non-secret and limited to one owner/strategy, `paper,testnet`, `allow_all=false`. |
-| GitHub/main publish | Not claimed as accepted-stage delivery because Stage `12.4` is blocked. |
-| Stage advancement | `12.5` remains blocked. |
+| GitHub/main publish | Not claimed as accepted-stage delivery because the `20260626T234757Z-6h` attempt was blocked. |
+| Stage advancement | At this historical point, `12.5` remained blocked. |
 
-## Decision
+## Historical Decision For 20260626 Attempt
 
-Final decision: `blocked`.
+Final decision for the `20260626T234757Z-6h` attempt: `blocked`.
 
-Stage `12.4` is not accepted because the collector did not cover 6 elapsed hours with active signal/source-event processing. The run produced valid, measurable signal-path evidence for the first two hours after timer start, but `hour_3` had `0` `StrategySignal` rows and `0` linked `ExecutionSourceEvent` rows. That idle hour cannot count toward acceptance, and the selected run later became `failed`.
+The `20260626T234757Z-6h` attempt was not accepted because the collector did not cover 6 elapsed hours with active signal/source-event processing. The run produced valid, measurable signal-path evidence for the first two hours after timer start, but `hour_3` had `0` `StrategySignal` rows and `0` linked `ExecutionSourceEvent` rows. That idle hour cannot count toward acceptance, and the selected run later became `failed`.
 
 Contract classification:
 
@@ -290,11 +290,11 @@ Contract classification:
 | Host runtime config | `compatible-change` | Re-applied the existing scoped producer LaunchAgent override for one `paper,testnet` owner/strategy; repo defaults stayed fail-closed. |
 | Runtime side effects | `compatible-change` | The soak observed the existing selected Testnet strategy and wrote normal strategy signal/source-event rows before block; no new order test was submitted for this gate. |
 | Browser-visible behavior | `unknown` | Final browser proof was not collected because Stage `12.4` blocked before final acceptance. |
-| Delivery | `blocked` | Report/ledger record the blocked evidence; Stage `12.5` remains closed. |
+| Delivery | `blocked` for this historical attempt | Report/ledger recorded the blocked evidence; Stage `12.5` remained closed at that point. |
 
-## Handoff To Stage 12.5
+## Historical Handoff Before Fixed Rerun
 
-Stage `12.5` remains blocked until Stage `12.4` is accepted.
+At this historical point, Stage `12.5` was blocked until Stage `12.4` could be accepted by a later fixed rerun.
 
 Next `12.4` repair/rerun should start from these requirements:
 
@@ -306,3 +306,195 @@ Next `12.4` repair/rerun should start from these requirements:
 | Keep the same SQL/Prometheus latency/dedup method. | It successfully produced durable p50/p95/p99/max evidence before the run stalled. |
 | Do not count idle intervals toward the 6h timer. | `hour_3` was correctly rejected with no signal/source-event rows. |
 | Full candle-to-order-ack latency remains follow-up after `12.4`/`12.5`. | This gate intentionally did not submit extra testnet orders. |
+
+## Candidate Rerun После Market Data Repair
+
+Дата анализа: `2026-06-30`.
+
+После принятого Stage `06` в `market-data-live-tail-repair-v1` на `macstudio` найден новый candidate artifact для Stage `12.4`:
+
+| Поле | Значение |
+|---|---|
+| artifact root | `/opt/roehub/state/live_execution/stage12-4-sustained-6h-soak/20260630T012705Z-stage07-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757` |
+| `latest_status.json` | `status=passed`, `reason=completed_6h`, `elapsed_seconds=21600`, `snapshot_count=7` |
+| `snapshots.jsonl` | `7` snapshots: `start`, `hour_1`, `hour_2`, `hour_3`, `hour_4`, `hour_5`, `final` |
+| selected run | `c2138129-a14a-40b3-bcf0-9ff4cf5a5757` |
+| selected strategy | `ee15e181-309f-478e-8726-04a299f1292f` |
+| selected profile | `5103b2db-5211-4f62-9e0e-a23605de9b41` |
+| instrument | `binance:spot:BTCUSDT` |
+
+Результат signal path из final snapshot:
+
+| Метрика | Значение |
+|---|---:|
+| cumulative processed candles | `359` |
+| cumulative unique `StrategySignal` | `359` |
+| cumulative unique `ExecutionSourceEvent` | `359` |
+| unlinked signal rows | `0` |
+| duplicate `signal_id` groups | `0` |
+| duplicate `(strategy_run_id, bar_ts_open)` groups | `0` |
+| duplicate source-event idempotency groups | `0` |
+| cumulative DB p99 `candle.bar_ts_close -> StrategySignal.created_at` | `3.123s` |
+| cumulative DB p99 `StrategySignal.created_at -> ExecutionSourceEvent.received_at` | `0.06462636000000001s` |
+| Redis candle pending / lag | `0 / 0` |
+| execution pending / retry / DLQ | `0 / 1 / 2`, unchanged from baseline |
+| unknown orders | `0` |
+| mainnet order count | `2`, unchanged from baseline |
+
+Каждое часовое окно от `hour_1` до `final` записало `60` обработанных свечей, `60` уникальных сигналов и `60` уникальных source events с duplicate counters `0/0/0`. Это сильное candidate evidence, что исходный live-tail blocker не повторился на 6-часовом signal path после Market Data repair.
+
+Бизнес-смысл: стратегия снова выглядит как непрерывный источник сигналов и `ExecutionSourceEvent` в течение 6 часов. Но stage нельзя принимать только по этому признаку, потому что операционная приемка требует еще доказать same-window resource/process и final browser/API proof. Repair observability была проверена отдельно Stage `07`: endpoints и audit table доступны, repair events в candidate window не было.
+
+Service-call coverage для этого report update: `N/A` для новых service calls. Эта секция только классифицирует runtime evidence; она не добавляет код, не вызывает Binance/Bybit, не отправляет orders и не меняет retry/unknown-state behavior. Следующий executor может выполнять только read-only runtime/API/browser checks, если не будет принят отдельный rerun.
+
+Однако этот old candidate artifact оставался `blocked`, пока не был завершен evidence closure:
+
+| Missing / incomplete surface | Почему это блокирует acceptance |
+|---|---|
+| `processes=[]` in every snapshot | Prompt требует CPU/RAM/process RSS evidence. Пустые process rows не считаются process-resource proof. Повторная Stage `07` проверка показала, что collector обрезал broad `ps` output до парсинга, а same-window Prometheus не содержит process CPU/RSS для `strategy-producer` и `exchange-execution`; reliable same-window resource evidence не восстановлено. Требуется rerun 6h collector с точечным per-process collection и fail-closed validation. |
+| Нет final browser/API proof artifact в candidate directory | Финальное user-visible состояние `/strategies` не доказано для accepted state. |
+| Repair metrics/audit отсутствовали в candidate artifact, но проверены отдельно | `strategy-producer` `/metrics` экспонирует `market_data_live_tail_*`, `market_data_clickhouse_repair_circuit_state`, `strategy_live_runner_checkpoint_stall_total`, `strategy_live_runner_deferred_ack_total`; `market-data-ws-worker` экспонирует `market_data_hot_cache_*`; `public.market_data_candle_repair_events` доступна, aggregate `241` rows, `miss=240`, `succeeded=1`, candidate-window repair events `0`. В следующем accepted rerun эти checks должны быть частью collector/report, а не ручной post-fact проверкой. |
+| Repo reports/ledgers требуют синхронизации | Durable docs должны быть обновлены до старта `12.5`; chat или raw JSON не являются source of truth для stage. |
+
+Решение по этому old candidate artifact оставалось `blocked`; `12.5` тогда оставался закрытым. Следующее действие на тот момент — rerun Stage `12.4` через repair Stage `07` с исправленным process collector, встроенными repair metric/audit checks и финальным `/strategies` browser/API proof.
+
+## Fixed Process Collector Rerun
+
+Стартовая запись: `2026-06-30T16:20:58Z`.
+
+User required before start: `nothing`. Используются существующие `macstudio` SSH/runtime access и host-local env sources; секреты, cookies, DSN, exchange keys и raw provider payloads не записываются в отчеты.
+
+Previous stage ledger gate: Strategy Producer ledger маркирует Stage `12.3` как `accepted`, Stage `12.4` как `blocked`, Stage `12.5` как `pending` / закрытый до `12.4 accepted`. Market Data repair ledger маркирует Stage `06` как `accepted` и Stage `07` как rerun с fixed collector.
+
+Preflight `2026-06-30T16:20:20Z` на `macstudio`:
+
+| Surface | Result |
+|---|---|
+| selected run | `c2138129-a14a-40b3-bcf0-9ff4cf5a5757`, state `running`, `last_error_present=false`, checkpoint `2026-06-30T19:19:00+03:00` |
+| producer scope | ready; `enabled=true`, `allow_all=false`, `allowed_user_count=1`, `allowed_strategy_count=1`, modes `paper,testnet` |
+| exchange-execution | ready; `adapter_mode=testnet` |
+| Redis | candle pending `0`; execution pending `0` |
+| Prometheus | `strategy-producer`, `exchange-execution`, Redis, Postgres and node exporter targets up |
+| process rows | non-empty exact `pgrep -f` / `ps -p` rows for `strategy_live_runner`, `exchange_execution`, Redis, Postgres and Prometheus |
+| repair metrics/audit | `strategy-producer` exposes live-tail repair/stall/deferred-ACK families, `market-data-ws-worker` exposes hot-cache metrics, `public.market_data_candle_repair_events` exists with `miss=240`, `succeeded=1` |
+
+Measurement method:
+
+| Evidence | Method |
+|---|---|
+| signal latency | DB timestamp deltas from `strategy_signals.bar_ts_close -> strategy_signals.created_at` and `strategy_signals.created_at -> execution_source_events.received_at`; p50/p95/p99/max per window and cumulative |
+| dedupe | DB duplicate groups for `signal_id`, `(strategy_run_id, bar_ts_open)`, and source-event idempotency groups |
+| resource/process | exact per-process `pgrep -f` / `ps -p` snapshots; collector fails closed when any required tag is empty |
+| Redis | `XPENDING` / `XINFO GROUPS` for candle and execution streams, plus retry/DLQ lengths |
+| Prometheus/Monit | instant Prometheus queries and `monit -c /opt/homebrew/etc/monitrc summary` |
+| repair observability | runtime metrics endpoint family presence plus `market_data_candle_repair_events` aggregate/window counts |
+
+Artifact root: `/opt/roehub/state/live_execution/stage12-4-sustained-6h-soak/20260630T162058Z-stage07-fixed-process-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757`.
+
+Collector launch: `2026-06-30T16:30:17Z`; planned final snapshot: `2026-06-30T22:30:17Z`.
+
+## Fixed Process Collector Final Result
+
+Final decision for Stage `12.4`: `accepted`.
+
+The fixed collector rerun completed the required 6-hour active strategy window and closed the evidence gaps that blocked the earlier candidate. The old `20260630T012705Z-stage07-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757` artifact remains valid historical signal-path evidence, but acceptance is based on the new fixed-collector artifact below.
+
+| Field | Value |
+|---|---|
+| artifact root | `/opt/roehub/state/live_execution/stage12-4-sustained-6h-soak/20260630T162058Z-stage07-fixed-process-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757` |
+| `latest_status.json` | `status=passed`, `phase=completed_6h`, `elapsed_seconds=21600`, `snapshot_count=7` |
+| timer start UTC | `2026-06-30T16:30:17.687519Z` |
+| final snapshot UTC | `2026-06-30T22:30:17.968239Z` |
+| selected run | `c2138129-a14a-40b3-bcf0-9ff4cf5a5757` |
+| selected strategy | `ee15e181-309f-478e-8726-04a299f1292f` |
+| browser/API proof | `/opt/roehub/state/live_execution/stage12-4-sustained-6h-soak/20260630T162058Z-stage07-fixed-process-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757/browser_api_proof.json` |
+| browser screenshot | `/opt/roehub/state/live_execution/stage12-4-sustained-6h-soak/20260630T162058Z-stage07-fixed-process-rerun-c2138129-a14a-40b3-bcf0-9ff4cf5a5757/strategies-final-selected-run.png` |
+
+Snapshot summary:
+
+| Snapshot | Cumulative candles / signals / source events | Window candles / signals / source events | Required process rows | Redis retry / DLQ delta | Decision |
+|---|---:|---:|---:|---:|---|
+| `start` | pre-window `60 / 60 / 60` | pre-window `60 / 60 / 60` | `strategy_live_runner=1`, `exchange_execution=1`, Redis `1`, Postgres `10`, Prometheus `1` | `0 / 0` | pass |
+| `hour_1` | `60 / 60 / 60` | `60 / 60 / 60` | non-empty for all required tags | `0 / 0` | pass |
+| `hour_2` | `120 / 120 / 120` | `60 / 60 / 60` | non-empty for all required tags | `0 / 0` | pass |
+| `hour_3` | `180 / 180 / 180` | `60 / 60 / 60` | non-empty for all required tags | `0 / 0` | pass |
+| `hour_4` | `240 / 240 / 240` | `60 / 60 / 60` | non-empty for all required tags | `0 / 0` | pass |
+| `hour_5` | `300 / 300 / 300` | `60 / 60 / 60` | non-empty for all required tags | `0 / 0` | pass |
+| `final` | `360 / 360 / 360` | `60 / 60 / 60` | `strategy_live_runner=1`, `exchange_execution=1`, Redis `1`, Postgres `10`, Prometheus `1` | `0 / 0` | pass |
+
+Signal-path final cumulative evidence:
+
+| Metric | Value |
+|---|---:|
+| processed candles | `360` |
+| unique `StrategySignal` | `360` |
+| unique `ExecutionSourceEvent` | `360` |
+| unlinked signal rows | `0` |
+| duplicate `signal_id` groups | `0` |
+| duplicate `(strategy_run_id, bar_ts_open)` groups | `0` |
+| duplicate source-event idempotency groups | `0` |
+| DB `candle.bar_ts_close -> StrategySignal.created_at` p50/p95/p99/max | `1.5145s / 3.01615s / 3.14769s / 3.234s` |
+| DB `StrategySignal.created_at -> ExecutionSourceEvent.received_at` p50/p95/p99/max | `0.05146s / 0.060296s / 0.064028s / 0.066287s` |
+
+Safety and observability evidence:
+
+| Surface | Result |
+|---|---|
+| Redis candle pending / lag | final `0 / 0` |
+| execution pending / retry / DLQ | pending `0`; retry and DLQ no growth from baseline |
+| unknown orders | delta `0` |
+| mainnet orders | delta `0` |
+| repair metrics | `strategy-producer` exposes live-tail repair/stall/deferred-ACK families; `market-data-ws-worker` exposes hot-cache families |
+| repair audit | `public.market_data_candle_repair_events` exists; aggregate `miss=240`, `succeeded=1`; fixed-rerun window repair events `0` |
+| Monit/Prometheus | collected in every snapshot with required targets up |
+| secrets/redaction | no secrets, cookies, DSNs, exchange keys, raw credentials, provider payloads, or session values recorded |
+
+Final `/strategies` browser/API proof passed at `2026-06-30T22:39:28.187Z`:
+
+| Surface | Result |
+|---|---|
+| page | `https://roehub.com/strategies?strategy_id=ee15e181-309f-478e-8726-04a299f1292f` |
+| title | `Strategies | Roehub` |
+| selected strategy status | `live` |
+| UI runtime producer | `running: running` |
+| UI selected run state | `running` |
+| dashboard API | `200`, `ok=true` |
+| selected run id | `c2138129-a14a-40b3-bcf0-9ff4cf5a5757` |
+| checkpoint | `2026-06-30T22:38:00Z` |
+| latest signal | `2026-06-30T22:39:00.885000Z` |
+| latest source event | `2026-07-01T01:39:00.915014+03:00` |
+| observed latency gap | `0s` |
+| browser console errors / request failures | `0 / 0` |
+| local proof JSON | `/Users/daniildegtyarev/Projects/roehub.com/output/playwright/stage12-4-fixed-process-rerun/strategies-browser-api-proof.json` |
+| local screenshot | `/Users/daniildegtyarev/Projects/roehub.com/output/playwright/stage12-4-fixed-process-rerun/strategies-final-selected-run.png` |
+
+Known non-blocking dashboard residuals: the final API payload still reports some unrelated dashboard panels as unavailable or not migrated, including `strategy_paper_accounting` unavailable, chart/stat/fills/events panels not migrated, and a stale exchange account projection. These do not block Stage `12.4` because this gate accepts sustained active strategy runtime, signal/source continuity, process/resource evidence, Redis/DB safety counters, repair observability, and `/strategies` runtime/browser/API state. Full `candle -> signal -> source event -> intent -> Redis -> exchange-execution -> testnet order ack` latency remains a later explicit gate after `12.4` / `12.5`.
+
+## Accepted Delivery Status
+
+| Surface | Status |
+|---|---|
+| Repository docs | Updated locally: Stage `12.4` report, Strategy Producer ledger, Market Data Stage `07` report/ledger, prompt handoff artifacts, and docs index check. |
+| Runtime code deploy | `N/A`; no repo runtime code changed during the fixed rerun. |
+| Host runtime artifacts | Fixed collector artifacts and browser/API proof copied under the accepted artifact root on `macstudio`. |
+| GitHub/main publish | Not staged, committed, or pushed in this executor turn. |
+| Stage advancement | Stage `12.4` is `accepted`; Stage `12.5` may start. |
+
+## Handoff To Stage 12.5
+
+Stage `12.5` is now open.
+
+Next prompt:
+
+```text
+.codex/agents/generated/strategy-producer-paper-testnet-trading-v1/12-5-closure.md
+```
+
+Carry forward these constraints:
+
+| Required in `12.5` | Reason |
+|---|---|
+| Use the fixed-rerun artifact root as the accepted Stage `12.4` evidence source. | It is the only 6h artifact with non-empty process rows and final browser/API proof. |
+| Preserve the old candidate as historical signal-path evidence only. | It still has `processes=[]` and cannot independently open downstream stages. |
+| Keep no-mainnet/no-chat-secrets boundaries. | Stage `12.4` accepted without mainnet order growth and without recording credentials. |
+| Do not reinterpret Stage `12.4` as full testnet-order latency proof. | This gate intentionally proved signal/source continuity, not full order ACK attribution. |
