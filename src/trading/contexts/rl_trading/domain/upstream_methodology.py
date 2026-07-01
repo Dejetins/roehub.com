@@ -439,6 +439,7 @@ class FilteredBacktestPolicy:
                 self.selection_strategy == "ensemble_q_filter"
                 and uncertainty is not None
                 and uncertainty >= self.ensemble_max_sigma
+                and rejection_reason is not None
             ):
                 rejection_reason = (
                     "high_ensemble_uncertainty"

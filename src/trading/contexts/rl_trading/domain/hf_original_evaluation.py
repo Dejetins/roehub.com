@@ -5,7 +5,7 @@ import resource
 import time
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -361,6 +361,7 @@ def evaluate_stage08d_grouped_backtest_v1(
     selected_indices, grouping_payload = _grouped_backtest_indices(
         split.signal_times_utc,
         max_parallel_sessions=config.alpha.max_parallel_sessions,
+        agent_session_len=config.alpha.agent_session_len,
     )
     selected_sequences = split.sequences[np.asarray(selected_indices, dtype=np.int64)]
     selected_split = HfOriginalSplitData(
@@ -370,12 +371,6 @@ def evaluate_stage08d_grouped_backtest_v1(
         signal_times_utc=tuple(split.signal_times_utc[idx] for idx in selected_indices),
         source_payload=split.source_payload,
         volatility_scores=tuple(split.volatility_scores[idx] for idx in selected_indices),
-    )
-    backtest_alpha = _position_fraction_alpha(config.alpha)
-    environment = UpstreamTradingEnvironment(
-        sequences=selected_split.sequences,
-        normalization_stats=normalization_stats,
-        config=backtest_alpha,
     )
     filter_policy = FilteredBacktestPolicy.from_config(
         config.alpha,
@@ -390,56 +385,82 @@ def evaluate_stage08d_grouped_backtest_v1(
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
     balance_curve: list[dict[str, object]] = []
-    equity = config.alpha.initial_balance * float(selected_split.sequences.shape[0])
-    peak_equity = equity
+    shared_balance = float(config.alpha.initial_balance)
+    peak_equity = shared_balance
     max_drawdown_pct = 0.0
-    reward_sum = 0.0
+    training_reward_sum = 0.0
+    backtest_reporting_reward_sum = 0.0
     decisions_count = 0
+    position_sizing_samples: list[dict[str, object]] = []
+    trade_balance_update_count = 0
+    risk_management_config = config.alpha
 
-    for session_idx in range(len(environment.sequences)):
-        state, _ = environment.reset(forced_index=session_idx)
+    for selected_order, source_session_idx in enumerate(selected_indices):
+        session = selected_split.sequences[selected_order]
+        symbol = selected_split.symbols[selected_order]
+        signal_time = selected_split.signal_times_utc[selected_order]
+        position_size = shared_balance * config.alpha.position_fraction
+        backtest_alpha = replace(config.alpha, initial_balance=position_size)
+        risk_management_config = backtest_alpha
+        environment = UpstreamTradingEnvironment(
+            sequences=np.ascontiguousarray(session.reshape(1, *session.shape), dtype=np.float32),
+            normalization_stats=normalization_stats,
+            config=backtest_alpha,
+        )
+        position_sizing_samples.append(
+            {
+                "balance_before_session_quote": _round_float(shared_balance),
+                "position_fraction": config.alpha.position_fraction,
+                "position_size_quote": _round_float(position_size),
+                "selected_order": selected_order,
+                "signal_time_utc": signal_time,
+                "source_session_index": int(source_session_idx),
+                "symbol": symbol,
+            }
+        )
+        state, _ = environment.reset(forced_index=0)
         done = False
         latest_info: Mapping[str, object] = {}
         session_net_pnl = 0.0
+        trade_realized_since_open = 0.0
         risk_state = _BacktestRiskManagementState()
         while not done:
             q_values = _q_values_for_state(
                 agent=agent,
                 state=state,
-                cache_key=_cache_key(
-                    symbol=selected_split.symbols[session_idx],
-                    signal_time=selected_split.signal_times_utc[session_idx],
+                cache_key=_upstream_backtest_cache_key(
+                    symbol=symbol,
+                    signal_time=signal_time,
                     step_idx=environment.step_idx,
-                    position_side=environment.state.position_side,
-                    action_history=tuple(environment.action_history),
+                    fallback_idx=int(source_session_idx),
                 ),
             )
             raw_argmax_action = int(np.argmax(q_values))
             raw_argmax_action_counts[ACTION_NAMES_BY_ID_V1[raw_argmax_action]] += 1
             masked_q_values = _mask_q_values(q_values, valid_actions=environment.valid_actions())
             if config.selection_strategy == "ensemble_q_filter":
+                cache_key = _upstream_backtest_cache_key(
+                    symbol=symbol,
+                    signal_time=signal_time,
+                    step_idx=environment.step_idx,
+                    fallback_idx=int(source_session_idx),
+                )
                 q_mean, q_std = agent.predict_ensemble(
                     state,
                     n_samples=config.alpha.ensemble_n_samples,
-                    cache_key=_cache_key(
-                        symbol=selected_split.symbols[session_idx],
-                        signal_time=selected_split.signal_times_utc[session_idx],
-                        step_idx=environment.step_idx,
-                        position_side=environment.state.position_side,
-                        action_history=tuple(environment.action_history),
-                    ),
+                    cache_key=cache_key,
                 )
                 decision = filter_policy.select_from_q_values(
-                    _mask_q_values(q_mean, valid_actions=environment.valid_actions()),
+                    q_mean,
                     q_std=q_std,
                 )
             else:
-                decision = filter_policy.select_from_q_values(masked_q_values)
+                decision = filter_policy.select_from_q_values(q_values)
             requested_action_counts[ACTION_NAMES_BY_ID_V1[decision.requested_action_id]] += 1
             state_before_action = environment.state
             forced_action, risk_reason = _risk_management_action_override_v1(
                 state=state_before_action,
-                session=environment.sequences[session_idx],
+                session=environment.sequences[0],
                 step_idx=environment.step_idx,
                 config=backtest_alpha,
                 risk_state=risk_state,
@@ -464,19 +485,36 @@ def evaluate_stage08d_grouped_backtest_v1(
             action_counts[ACTION_NAMES_BY_ID_V1[effective_action]] += 1
             audit_reason = str(info["audit_reason"])
             audit_reason_counts[audit_reason] = audit_reason_counts.get(audit_reason, 0) + 1
-            equity += pnl_change
             session_net_pnl += pnl_change
-            reward_sum += reward
-            peak_equity = max(peak_equity, equity)
-            drawdown = ((peak_equity - equity) / peak_equity) * 100.0 if peak_equity > 0 else 0.0
+            trade_realized_since_open += pnl_change
+            training_reward_sum += reward
+            if bool(info.get("closed_position", False)):
+                shared_balance += trade_realized_since_open
+                trade_realized_since_open = 0.0
+                trade_balance_update_count += 1
+            peak_equity = max(peak_equity, shared_balance)
+            drawdown = (
+                ((peak_equity - shared_balance) / peak_equity) * 100.0
+                if peak_equity > 0
+                else 0.0
+            )
             max_drawdown_pct = max(max_drawdown_pct, drawdown)
             balance_curve.append(
                 {
-                    "equity_quote": _round_float(equity),
-                    "session_index": session_idx,
-                    "signal_time_utc": selected_split.signal_times_utc[session_idx],
+                    "backtest_reporting_reward": 0.0,
+                    "effective_action_id": effective_action,
+                    "filter_selected_action_id": decision.effective_action_id,
+                    "masked_q_values_hash": hash_json_payload_v1(
+                        {"values": [float(item) for item in masked_q_values]}
+                    ),
+                    "raw_argmax_action_id": raw_argmax_action,
+                    "shared_balance_quote": _round_float(shared_balance),
+                    "signal_time_utc": signal_time,
+                    "source_session_index": int(source_session_idx),
                     "step_idx": environment.step_idx - 1,
-                    "symbol": selected_split.symbols[session_idx],
+                    "symbol": symbol,
+                    "training_reward": _round_float(float(reward)),
+                    "unmasked_filter_action_id": decision.requested_action_id,
                 }
             )
             decisions_count += 1
@@ -506,19 +544,24 @@ def evaluate_stage08d_grouped_backtest_v1(
         action_counts=action_counts,
         audit_reason_counts=audit_reason_counts,
         decisions_count=decisions_count,
-        reward_sum=reward_sum,
-        starting_equity_quote=(
-            config.alpha.initial_balance * float(selected_split.sequences.shape[0])
-        ),
+        reward_sum=backtest_reporting_reward_sum,
+        starting_equity_quote=config.alpha.initial_balance,
         config=config,
         extra={
             "acceptance_backtest": True,
+            "backtest_reporting_reward_sum": _round_float(backtest_reporting_reward_sum),
+            "balance_update_order": (
+                "source-compatible: selected sessions are processed in rolling signal-time order; "
+                "each session uses position_size=shared_balance*position_fraction; shared_balance "
+                "is updated only when a trade closes"
+            ),
             "candidate_checkpoint": config.checkpoint_name,
             "filter_policy": filter_policy.stats_payload(),
             "grouping": grouping_payload,
             "max_drawdown_pct": _round_float(max_drawdown_pct),
             "position_fraction": config.alpha.position_fraction,
-            "position_fraction_application": "initial_balance_scaled_for_session_pnl",
+            "position_fraction_application": "shared_balance_position_fraction",
+            "position_sizing_samples": position_sizing_samples,
             "q_value_cache": agent.q_value_cache.stats_payload(),
             "raw_argmax_action_counts": raw_argmax_action_counts,
             "requested_action_counts": requested_action_counts,
@@ -529,10 +572,26 @@ def evaluate_stage08d_grouped_backtest_v1(
                 decisions_count=decisions_count,
             ),
             "risk_management": _risk_management_payload_v1(
-                config=backtest_alpha,
+                config=risk_management_config,
                 reason_counts=risk_management_reason_counts,
             ),
             "selection_strategy": config.selection_strategy,
+            "shared_balance_final_quote": _round_float(shared_balance),
+            "shared_balance_initial_quote": _round_float(config.alpha.initial_balance),
+            "trace_field_semantics": {
+                "backtest_reporting_reward": "source backtest_step reward; always 0.0",
+                "masked_q_values_hash": (
+                    "diagnostic only; invalid action mask is not applied before the source filter"
+                ),
+                "raw_argmax_action": "argmax over raw unmasked q_values",
+                "training_reward": (
+                    "Stage 02C training reward computed for diagnostics, not compared as "
+                    "source backtest reporting reward"
+                ),
+                "unmasked_filter_action": "action selected by threshold filter over raw q_values",
+            },
+            "training_reward_sum": _round_float(training_reward_sum),
+            "trade_balance_update_count": trade_balance_update_count,
         },
     )
     return {**scorecard, "scorecard_hash": hash_json_payload_v1(scorecard)}, balance_curve
@@ -548,6 +607,7 @@ def evaluate_stage08d_baseline_backtest_v1(
     selected_indices, grouping_payload = _grouped_backtest_indices(
         split.signal_times_utc,
         max_parallel_sessions=config.alpha.max_parallel_sessions,
+        agent_session_len=config.alpha.agent_session_len,
     )
     selected_sequences = split.sequences[np.asarray(selected_indices, dtype=np.int64)]
     selected_split = HfOriginalSplitData(
@@ -558,7 +618,6 @@ def evaluate_stage08d_baseline_backtest_v1(
         source_payload=split.source_payload,
         volatility_scores=tuple(split.volatility_scores[idx] for idx in selected_indices),
     )
-    backtest_alpha = _position_fraction_alpha(config.alpha)
     action_counts = _empty_action_counts()
     audit_reason_counts: dict[str, int] = {}
     risk_management_reason_counts: dict[str, int] = {}
@@ -566,11 +625,18 @@ def evaluate_stage08d_baseline_backtest_v1(
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
     decisions_count = 0
-    reward_sum = 0.0
-    for session_idx, session in enumerate(selected_split.sequences):
-        state = RlTrainingState(balance=backtest_alpha.initial_balance)
-        action_history: list[int | None] = [None] * backtest_alpha.action_history_len
+    training_reward_sum = 0.0
+    backtest_reporting_reward_sum = 0.0
+    shared_balance = float(config.alpha.initial_balance)
+    risk_management_config = config.alpha
+    for selected_order, _source_session_idx in enumerate(selected_indices):
+        session = selected_split.sequences[selected_order]
+        position_size = shared_balance * config.alpha.position_fraction
+        backtest_alpha = replace(config.alpha, initial_balance=position_size)
+        risk_management_config = backtest_alpha
+        state = RlTrainingState(balance=position_size)
         session_pnl = 0.0
+        trade_realized_since_open = 0.0
         latest_closed = 0
         latest_profitable = 0
         risk_state = _BacktestRiskManagementState()
@@ -624,13 +690,16 @@ def evaluate_stage08d_baseline_backtest_v1(
                 closed_position=result.closed_position,
                 config=backtest_alpha,
             )
-            action_history = [*action_history[1:], result.effective_action_id]
             action_counts[ACTION_NAMES_BY_ID_V1[result.effective_action_id]] += 1
             audit_reason_counts[result.audit_reason] = (
                 audit_reason_counts.get(result.audit_reason, 0) + 1
             )
             session_pnl += result.pnl_change
-            reward_sum += result.reward
+            trade_realized_since_open += result.pnl_change
+            training_reward_sum += result.reward
+            if result.closed_position:
+                shared_balance += trade_realized_since_open
+                trade_realized_since_open = 0.0
             latest_closed = result.state.closed_trades
             latest_profitable = result.state.profitable_trades
             decisions_count += 1
@@ -648,21 +717,24 @@ def evaluate_stage08d_baseline_backtest_v1(
         action_counts=action_counts,
         audit_reason_counts=audit_reason_counts,
         decisions_count=decisions_count,
-        reward_sum=reward_sum,
-        starting_equity_quote=(
-            config.alpha.initial_balance * float(selected_split.sequences.shape[0])
-        ),
+        reward_sum=backtest_reporting_reward_sum,
+        starting_equity_quote=config.alpha.initial_balance,
         config=config,
         extra={
             "acceptance_backtest": False,
+            "backtest_reporting_reward_sum": _round_float(backtest_reporting_reward_sum),
             "baseline_policy": policy_name,
             "filter_policy": None,
             "grouping": grouping_payload,
             "position_fraction": config.alpha.position_fraction,
+            "position_fraction_application": "shared_balance_position_fraction",
             "risk_management": _risk_management_payload_v1(
-                config=backtest_alpha,
+                config=risk_management_config,
                 reason_counts=risk_management_reason_counts,
             ),
+            "shared_balance_final_quote": _round_float(shared_balance),
+            "shared_balance_initial_quote": _round_float(config.alpha.initial_balance),
+            "training_reward_sum": _round_float(training_reward_sum),
         },
     )
     return {**scorecard, "scorecard_hash": hash_json_payload_v1(scorecard)}
@@ -1020,25 +1092,71 @@ def _grouped_backtest_indices(
     signal_times: Sequence[str | None],
     *,
     max_parallel_sessions: int,
+    agent_session_len: int,
 ) -> tuple[list[int], dict[str, object]]:
     _positive_int(max_parallel_sessions, "max_parallel_sessions")
-    groups: dict[str, list[int]] = {}
+    _positive_int(agent_session_len, "agent_session_len")
+    groups: dict[datetime, list[int]] = {}
     for idx, signal_time in enumerate(signal_times):
-        key = signal_time if signal_time is not None else f"__missing_signal_time_{idx}"
-        groups.setdefault(str(key), []).append(idx)
+        key = _parse_signal_time(signal_time, fallback_idx=idx)
+        groups.setdefault(key, []).append(idx)
     selected: list[int] = []
     skipped = 0
     max_group_size = 0
-    for key in sorted(groups):
-        indices = groups[key]
+    max_observed_open_sessions = 0
+    open_sessions: list[dict[str, datetime]] = []
+    selected_rows: list[dict[str, object]] = []
+    skipped_rows: list[dict[str, object]] = []
+    for signal_dt in sorted(groups):
+        open_sessions = [row for row in open_sessions if row["end_time"] > signal_dt]
+        max_observed_open_sessions = max(max_observed_open_sessions, len(open_sessions))
+        free_slots = max_parallel_sessions - len(open_sessions)
+        indices = groups[signal_dt]
         max_group_size = max(max_group_size, len(indices))
-        selected.extend(indices[:max_parallel_sessions])
-        skipped += max(0, len(indices) - max_parallel_sessions)
+        if free_slots <= 0:
+            skipped += len(indices)
+            skipped_rows.extend(
+                {
+                    "reason": "rolling_open_sessions_full",
+                    "session_idx": int(index),
+                    "signal_time": _format_utc(signal_dt),
+                }
+                for index in indices
+            )
+            continue
+        selected_for_signal = indices[:free_slots]
+        skipped_for_signal = indices[free_slots:]
+        for index in selected_for_signal:
+            selected.append(index)
+            selected_rows.append(
+                {
+                    "selected_order": len(selected) - 1,
+                    "session_idx": int(index),
+                    "signal_time": _format_utc(signal_dt),
+                }
+            )
+            open_sessions.append({"end_time": signal_dt + timedelta(minutes=agent_session_len)})
+        skipped += len(skipped_for_signal)
+        skipped_rows.extend(
+            {
+                "reason": "rolling_open_sessions_partial",
+                "session_idx": int(index),
+                "signal_time": _format_utc(signal_dt),
+            }
+            for index in skipped_for_signal
+        )
+        max_observed_open_sessions = max(max_observed_open_sessions, len(open_sessions))
     return selected, {
+        "agent_session_len": agent_session_len,
+        "first_selected_sessions": selected_rows[:50],
+        "first_skipped_sessions": skipped_rows[:50],
         "group_count": len(groups),
         "grouping_key": "signal_time_utc",
         "max_group_size": max_group_size,
+        "max_observed_open_sessions": max_observed_open_sessions,
         "max_parallel_sessions": max_parallel_sessions,
+        "scheduling_rule": "rolling_open_sessions",
+        "selected_session_indices": selected,
         "selected_session_count": len(selected),
         "skipped_sessions_due_parallel_cap": skipped,
         "source_session_count": len(signal_times),
@@ -1063,6 +1181,17 @@ def _cache_key(
     action_history: tuple[int | None, ...],
 ) -> tuple[object, ...]:
     return (symbol, signal_time, step_idx, position_side, action_history)
+
+
+def _upstream_backtest_cache_key(
+    *,
+    symbol: str,
+    signal_time: str | None,
+    step_idx: int,
+    fallback_idx: int,
+) -> tuple[str, datetime]:
+    signal_dt = _parse_signal_time(signal_time, fallback_idx=fallback_idx)
+    return symbol, signal_dt + timedelta(minutes=step_idx)
 
 
 def _mask_q_values(q_values: np.ndarray, *, valid_actions: Sequence[int]) -> np.ndarray:
@@ -1167,6 +1296,8 @@ def _risk_management_action_override_v1(
         )
     else:
         return None, None
+    if step_idx == config.agent_session_len - 1:
+        return 3, "risk_management_last_step_forced_close"
     if sl_trigger:
         return 3, "risk_management_stop_loss_forced_close"
     if tp_trigger:
@@ -1536,6 +1667,13 @@ def _json_safe(value: Any) -> Any:
 
 def _format_utc(value: datetime) -> str:
     return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _parse_signal_time(value: str | None, *, fallback_idx: int) -> datetime:
+    if value is None:
+        return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(minutes=fallback_idx)
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(text).astimezone(UTC).replace(microsecond=0)
 
 
 def _payload_int(value: object, field: str) -> int:

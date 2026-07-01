@@ -48,7 +48,6 @@ from trading.contexts.rl_trading.domain.hf_original_evaluation import (  # noqa:
     _load_checkpoint_agent,
     _load_normalization_stats,
     _mask_q_values,
-    _position_fraction_alpha,
     _risk_management_action_override_v1,
     _update_risk_management_state_after_step_v1,
 )
@@ -124,12 +123,14 @@ TRACE_COMPARE_FIELDS = (
     "q_values_hash",
     "raw_argmax_action",
     "masked_q_values_hash",
-    "selected_action",
+    "unmasked_filter_action",
+    "filter_selected_action",
     "effective_action",
     "position_side",
     "entry_price",
     "pnl_change",
-    "reward",
+    "training_reward",
+    "backtest_reporting_reward",
     "balance_or_equity",
     "audit_reason",
 )
@@ -190,6 +191,7 @@ def run_forensic(args: argparse.Namespace) -> dict[str, Any]:
     roehub_schedule = roehub_grouped_schedule_v1(
         split.signal_times_utc,
         max_parallel_sessions=alpha.max_parallel_sessions,
+        agent_session_len=alpha.agent_session_len,
     )
     first_selection_diff = first_schedule_diff_v1(
         source_schedule,
@@ -344,6 +346,19 @@ def source_backtest_schedule_v1(
 
 
 def roehub_grouped_schedule_v1(
+    signal_times: Sequence[str | None],
+    *,
+    max_parallel_sessions: int,
+    agent_session_len: int,
+) -> list[dict[str, Any]]:
+    return source_backtest_schedule_v1(
+        signal_times,
+        max_parallel_sessions=max_parallel_sessions,
+        agent_session_len=agent_session_len,
+    )
+
+
+def legacy_roehub_exact_grouped_schedule_v1(
     signal_times: Sequence[str | None],
     *,
     max_parallel_sessions: int,
@@ -521,12 +536,14 @@ def build_source_backtest_trace_v1(
                     q_values_hash=_hash_array(q_values),
                     raw_argmax_action=raw_argmax_action,
                     masked_q_values_hash=_hash_array(masked_q_values),
-                    selected_action=decision.effective_action_id,
+                    unmasked_filter_action=decision.requested_action_id,
+                    filter_selected_action=decision.effective_action_id,
                     effective_action=result.effective_action_id,
                     position_side=state.position_side,
                     entry_price=state.entry_price,
                     pnl_change=result.pnl_change,
-                    reward=0.0,
+                    training_reward=result.reward,
+                    backtest_reporting_reward=0.0,
                     balance_or_equity=global_balance,
                     audit_reason=risk_reason or result.audit_reason,
                 )
@@ -543,85 +560,89 @@ def build_roehub_backtest_trace_v1(
     alpha: UpstreamAlphaConfig,
 ) -> list[dict[str, Any]]:
     agent.q_value_cache = QValueCache()
-    backtest_alpha = _position_fraction_alpha(alpha)
     filter_policy = FilteredBacktestPolicy.from_config(alpha)
-    sequences = split.sequences[np.asarray(session_indices, dtype=np.int64)]
-    environment = UpstreamTradingEnvironment(
-        sequences=sequences,
-        normalization_stats=normalization_stats,
-        config=backtest_alpha,
-    )
-    equity = alpha.initial_balance * float(len(session_indices))
+    global_balance = float(alpha.initial_balance)
     rows: list[dict[str, Any]] = []
     for selected_order, session_idx in enumerate(session_indices):
-        state_obs, _ = environment.reset(forced_index=selected_order)
+        session = split.sequences[session_idx]
+        symbol = split.symbols[session_idx]
+        signal_dt = _parse_signal_time(
+            split.signal_times_utc[session_idx],
+            fallback_idx=session_idx,
+        )
+        position_size = global_balance * alpha.position_fraction
+        session_alpha = replace(alpha, initial_balance=position_size)
+        environment = UpstreamTradingEnvironment(
+            sequences=np.ascontiguousarray(session.reshape(1, *session.shape), dtype=np.float32),
+            normalization_stats=normalization_stats,
+            config=session_alpha,
+        )
+        state_obs, _ = environment.reset(forced_index=0)
         done = False
+        trade_realized_since_open = 0.0
         risk_state = _BacktestRiskManagementState()
         while not done:
             step_idx = environment.step_idx
-            symbol = split.symbols[session_idx]
-            signal_time = split.signal_times_utc[session_idx]
             q_values = agent.q_value_cache.get_or_compute(
-                (
-                    symbol,
-                    signal_time,
-                    step_idx,
-                    environment.state.position_side,
-                    tuple(environment.action_history),
-                ),
+                (symbol, signal_dt + timedelta(minutes=step_idx)),
                 lambda state_obs=state_obs: agent.predict_q_values(state_obs),
             )
             raw_argmax_action = int(np.argmax(q_values))
             masked_q_values = _mask_q_values(q_values, valid_actions=environment.valid_actions())
-            decision = filter_policy.select_from_q_values(masked_q_values)
+            decision = filter_policy.select_from_q_values(q_values)
             before = environment.state
             forced_action, risk_reason = _risk_management_action_override_v1(
                 state=before,
-                session=environment.sequences[selected_order],
+                session=environment.sequences[0],
                 step_idx=step_idx,
-                config=backtest_alpha,
+                config=session_alpha,
                 risk_state=risk_state,
             )
             action_for_environment = (
                 decision.effective_action_id if forced_action is None else forced_action
             )
             price = session_close_price_v1(
-                environment.sequences[selected_order],
+                environment.sequences[0],
                 step_idx=step_idx,
-                config=backtest_alpha,
+                config=session_alpha,
             )
             next_state, reward, done, _, info = environment.step(action_for_environment)
             pnl_change_value = info["pnl_change"]
             effective_action_value = info["effective_action_id"]
             pnl_change = float(cast(float, pnl_change_value))
-            equity += pnl_change
+            trade_realized_since_open += pnl_change
+            if bool(info.get("closed_position", False)):
+                global_balance += trade_realized_since_open
+                trade_realized_since_open = 0.0
             _update_risk_management_state_after_step_v1(
                 risk_state=risk_state,
                 state_before=before,
                 state_after=environment.state,
                 closed_position=bool(info.get("closed_position", False)),
-                config=backtest_alpha,
+                config=session_alpha,
             )
             rows.append(
                 _trace_row(
-                    implementation="roehub_current",
+                    implementation="roehub_repaired",
                     selected_order=selected_order,
                     session_idx=int(session_idx),
                     symbol=symbol,
-                    signal_time=signal_time,
+                    signal_time=_format_dt(signal_dt),
                     step_idx=step_idx,
                     price=price,
                     state_hash=_hash_array(state_obs),
                     q_values_hash=_hash_array(q_values),
                     raw_argmax_action=raw_argmax_action,
                     masked_q_values_hash=_hash_array(masked_q_values),
-                    selected_action=decision.effective_action_id,
+                    unmasked_filter_action=decision.requested_action_id,
+                    filter_selected_action=decision.effective_action_id,
                     effective_action=int(cast(int, effective_action_value)),
                     position_side=environment.state.position_side,
                     entry_price=environment.state.entry_price,
                     pnl_change=pnl_change,
-                    reward=float(reward),
-                    balance_or_equity=equity,
+                    training_reward=float(reward),
+                    backtest_reporting_reward=0.0,
+                    balance_or_equity=global_balance,
                     audit_reason=risk_reason or str(info["audit_reason"]),
                 )
             )
@@ -717,12 +738,14 @@ def _trace_row(
     q_values_hash: str,
     raw_argmax_action: int,
     masked_q_values_hash: str,
-    selected_action: int,
+    unmasked_filter_action: int,
+    filter_selected_action: int,
     effective_action: int,
     position_side: str | None,
     entry_price: float | None,
     pnl_change: float,
-    reward: float,
+    training_reward: float,
+    backtest_reporting_reward: float,
     balance_or_equity: float,
     audit_reason: str,
 ) -> dict[str, Any]:
@@ -732,6 +755,8 @@ def _trace_row(
         "effective_action": effective_action,
         "effective_action_name": ACTION_NAMES_BY_ID_V1[effective_action],
         "entry_price": None if entry_price is None else _round(entry_price),
+        "filter_selected_action": filter_selected_action,
+        "filter_selected_action_name": ACTION_NAMES_BY_ID_V1[filter_selected_action],
         "implementation": implementation,
         "masked_q_values_hash": masked_q_values_hash,
         "pnl_change": _round(pnl_change),
@@ -740,9 +765,11 @@ def _trace_row(
         "q_values_hash": q_values_hash,
         "raw_argmax_action": raw_argmax_action,
         "raw_argmax_action_name": ACTION_NAMES_BY_ID_V1[raw_argmax_action],
-        "reward": _round(reward),
-        "selected_action": selected_action,
-        "selected_action_name": ACTION_NAMES_BY_ID_V1[selected_action],
+        "backtest_reporting_reward": _round(backtest_reporting_reward),
+        "reward": _round(backtest_reporting_reward),
+        "training_reward": _round(training_reward),
+        "unmasked_filter_action": unmasked_filter_action,
+        "unmasked_filter_action_name": ACTION_NAMES_BY_ID_V1[unmasked_filter_action],
         "selected_order": selected_order,
         "session_idx": session_idx,
         "signal_time": signal_time,

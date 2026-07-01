@@ -32,7 +32,6 @@ from .hf_original_evaluation import (
     _grouped_backtest_indices,
     _limit_split,
     _load_normalization_stats,
-    _position_fraction_alpha,
     _read_json_payload,
     _risk_management_action_override_v1,
     _risk_management_payload_v1,
@@ -266,6 +265,7 @@ def evaluate_stage08f_random_baseline_backtest_v1(
     selected_indices, grouping_payload = _grouped_backtest_indices(
         split.signal_times_utc,
         max_parallel_sessions=config.alpha.max_parallel_sessions,
+        agent_session_len=config.alpha.agent_session_len,
     )
     selected_sequences = split.sequences[np.asarray(selected_indices, dtype=np.int64)]
     selected_split = RoehubNativeSplitData(
@@ -276,7 +276,6 @@ def evaluate_stage08f_random_baseline_backtest_v1(
         source_payload=split.source_payload,
         volatility_scores=tuple(split.volatility_scores[idx] for idx in selected_indices),
     )
-    backtest_alpha = _position_fraction_alpha(config.alpha)
     rng = np.random.default_rng(config.deterministic_random_seed)
     action_counts = _empty_action_counts()
     audit_reason_counts: dict[str, int] = {}
@@ -285,10 +284,17 @@ def evaluate_stage08f_random_baseline_backtest_v1(
     closed_trades: list[int] = []
     profitable_trades: list[int] = []
     decisions_count = 0
-    reward_sum = 0.0
+    training_reward_sum = 0.0
+    backtest_reporting_reward_sum = 0.0
+    shared_balance = float(config.alpha.initial_balance)
+    risk_management_config = config.alpha
     for session in selected_split.sequences:
-        state = RlTrainingState(balance=backtest_alpha.initial_balance)
+        position_size = shared_balance * config.alpha.position_fraction
+        backtest_alpha = replace(config.alpha, initial_balance=position_size)
+        risk_management_config = backtest_alpha
+        state = RlTrainingState(balance=position_size)
         session_pnl = 0.0
+        trade_realized_since_open = 0.0
         latest_closed = 0
         latest_profitable = 0
         risk_state = _BacktestRiskManagementState()
@@ -337,7 +343,11 @@ def evaluate_stage08f_random_baseline_backtest_v1(
                 audit_reason_counts.get(result.audit_reason, 0) + 1
             )
             session_pnl += result.pnl_change
-            reward_sum += result.reward
+            trade_realized_since_open += result.pnl_change
+            training_reward_sum += result.reward
+            if result.closed_position:
+                shared_balance += trade_realized_since_open
+                trade_realized_since_open = 0.0
             latest_closed = result.state.closed_trades
             latest_profitable = result.state.profitable_trades
             decisions_count += 1
@@ -355,22 +365,25 @@ def evaluate_stage08f_random_baseline_backtest_v1(
         action_counts=action_counts,
         audit_reason_counts=audit_reason_counts,
         decisions_count=decisions_count,
-        reward_sum=reward_sum,
-        starting_equity_quote=(
-            config.alpha.initial_balance * float(selected_split.sequences.shape[0])
-        ),
+        reward_sum=backtest_reporting_reward_sum,
+        starting_equity_quote=config.alpha.initial_balance,
         config=config.as_hf_config(),
         extra={
             "acceptance_backtest": False,
+            "backtest_reporting_reward_sum": _round_float(backtest_reporting_reward_sum),
             "baseline_policy": "deterministic_random_valid_action",
             "deterministic_random_seed": config.deterministic_random_seed,
             "filter_policy": None,
             "grouping": grouping_payload,
             "position_fraction": config.alpha.position_fraction,
+            "position_fraction_application": "shared_balance_position_fraction",
             "risk_management": _risk_management_payload_v1(
-                config=backtest_alpha,
+                config=risk_management_config,
                 reason_counts=risk_management_reason_counts,
             ),
+            "shared_balance_final_quote": _round_float(shared_balance),
+            "shared_balance_initial_quote": _round_float(config.alpha.initial_balance),
+            "training_reward_sum": _round_float(training_reward_sum),
         },
     )
     return {**scorecard, "scorecard_hash": hash_json_payload_v1(scorecard)}

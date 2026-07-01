@@ -34,11 +34,18 @@ def test_source_schedule_uses_rolling_open_sessions_not_exact_groups() -> None:
     roehub = stage08i.roehub_grouped_schedule_v1(
         signal_times,
         max_parallel_sessions=2,
+        agent_session_len=10,
+    )
+    legacy_roehub = stage08i.legacy_roehub_exact_grouped_schedule_v1(
+        signal_times,
+        max_parallel_sessions=2,
     )
 
     assert [row["session_idx"] for row in source] == [0, 1, 4]
-    assert [row["session_idx"] for row in roehub] == [0, 1, 2, 3, 4]
-    assert stage08i.first_schedule_diff_v1(source, roehub, compare_limit=5) == {
+    assert [row["session_idx"] for row in roehub] == [0, 1, 4]
+    assert [row["session_idx"] for row in legacy_roehub] == [0, 1, 2, 3, 4]
+    assert stage08i.first_schedule_diff_v1(source, roehub, compare_limit=5) is None
+    assert stage08i.first_schedule_diff_v1(source, legacy_roehub, compare_limit=5) == {
         "diff_type": "session_selection_order",
         "material": True,
         "reason": (

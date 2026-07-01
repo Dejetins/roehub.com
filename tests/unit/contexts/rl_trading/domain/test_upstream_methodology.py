@@ -234,18 +234,28 @@ def test_filtered_policy_rejects_weak_actions_and_records_cache_stats() -> None:
     assert cache.stats_payload() == {"cache_entries": 1, "hits": 1, "misses": 1}
 
 
-def test_ensemble_policy_rejects_high_uncertainty() -> None:
+def test_ensemble_policy_rejects_only_weak_advantage_with_high_uncertainty() -> None:
     config = UpstreamAlphaConfig()
     policy = FilteredBacktestPolicy.from_config(config, selection_strategy="ensemble_q_filter")
 
-    decision = policy.select_from_q_values(
+    confident_decision = policy.select_from_q_values(
         np.asarray([1.0, 1.2, 1.0, 1.0], dtype=np.float32),
         q_std=np.asarray([0.0, 0.2, 0.0, 0.0], dtype=np.float32),
     )
+    weak_uncertain_decision = policy.select_from_q_values(
+        np.asarray([1.0, 1.001, 1.0, 1.0], dtype=np.float32),
+        q_std=np.asarray([0.0, 0.2, 0.0, 0.0], dtype=np.float32),
+    )
 
-    assert decision.requested_action_id == 1
-    assert decision.effective_action_id == 0
-    assert decision.rejection_reason == "high_ensemble_uncertainty"
+    assert confident_decision.requested_action_id == 1
+    assert confident_decision.effective_action_id == 1
+    assert confident_decision.rejection_reason is None
+    assert weak_uncertain_decision.requested_action_id == 1
+    assert weak_uncertain_decision.effective_action_id == 0
+    assert (
+        weak_uncertain_decision.rejection_reason
+        == "weak_advantage_threshold+high_ensemble_uncertainty"
+    )
 
 
 def test_checkpoint_policy_selects_best_and_keeps_final_diagnostic() -> None:

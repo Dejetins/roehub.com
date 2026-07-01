@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -11,9 +12,13 @@ from trading.contexts.rl_trading.domain import (
     HfOriginalEvaluationConfig,
     HfOriginalSplitData,
     HfOriginalTrainingConfig,
+    NormalizationStats,
+    QValueCache,
     UpstreamAlphaConfig,
     alpha_with_evaluation_overrides_v1,
+    compute_train_only_normalization_stats_v1,
     evaluate_stage08d_baseline_backtest_v1,
+    evaluate_stage08d_grouped_backtest_v1,
     run_stage08c_hf_original_training_v1,
     run_stage08d_hf_original_evaluation_v1,
 )
@@ -99,7 +104,8 @@ def test_stage08d_hf_original_evaluation_separates_raw_and_filtered_surfaces(
     assert raw["acceptance_backtest"] is False
     assert filtered["acceptance_backtest"] is True
     assert filtered["grouping"]["max_parallel_sessions"] == alpha.max_parallel_sessions
-    assert filtered["grouping"]["skipped_sessions_due_parallel_cap"] == 0
+    assert filtered["grouping"]["scheduling_rule"] == "rolling_open_sessions"
+    assert filtered["grouping"]["skipped_sessions_due_parallel_cap"] == 2
     assert filtered["filter_policy"]["selection_strategy"] == "advantage_based_filter"
     assert filtered["q_value_cache"]["misses"] > 0
     assert Path(manifest["artifact_hashes"]["scorecards"]["path"]).exists()
@@ -162,6 +168,105 @@ def test_baseline_backtest_applies_risk_management_forced_close() -> None:
     assert risk_management["use_risk_management"] is True
     assert risk_management["reason_counts"]["risk_management_take_profit_forced_close"] > 0
     assert scorecard["closed_trades"] > 0
+
+
+def test_grouped_backtest_uses_rolling_open_sessions_and_shared_balance() -> None:
+    alpha = UpstreamAlphaConfig(
+        initial_balance=100.0,
+        position_fraction=0.5,
+        max_parallel_sessions=2,
+        agent_session_len=10,
+    )
+    split = HfOriginalSplitData(
+        split_name="backtest",
+        sequences=_session_features(4, alpha=alpha),
+        symbols=("BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"),
+        signal_times_utc=(
+            "2026-06-26T00:00:00Z",
+            "2026-06-26T00:00:00Z",
+            "2026-06-26T00:01:00Z",
+            "2026-06-26T00:10:00Z",
+        ),
+        source_payload={"split_name": "backtest", "sha256": "f" * 64},
+    )
+
+    scorecard, _ = evaluate_stage08d_grouped_backtest_v1(
+        split=split,
+        normalization_stats=_fixture_normalization_stats(alpha),
+        agent=cast(Any, _AlwaysLongAgent()),
+        config=HfOriginalEvaluationConfig(alpha=alpha),
+    )
+
+    grouping = scorecard["grouping"]
+    assert grouping["scheduling_rule"] == "rolling_open_sessions"
+    assert grouping["selected_session_indices"] == [0, 1, 3]
+    assert grouping["skipped_sessions_due_parallel_cap"] == 1
+    assert scorecard["starting_equity_quote"] == 100.0
+    assert scorecard["position_fraction_application"] == "shared_balance_position_fraction"
+    sizing = scorecard["position_sizing_samples"]
+    assert sizing[0]["position_size_quote"] == 50.0
+    assert sizing[1]["position_size_quote"] > 50.0
+    assert scorecard["shared_balance_final_quote"] > scorecard["shared_balance_initial_quote"]
+
+
+def test_grouped_backtest_filters_unmasked_q_before_environment_action_mask() -> None:
+    alpha = UpstreamAlphaConfig(
+        initial_balance=100.0,
+        position_fraction=1.0,
+        max_parallel_sessions=1,
+        agent_session_len=10,
+    )
+    split = HfOriginalSplitData(
+        split_name="backtest",
+        sequences=_session_features(1, alpha=alpha),
+        symbols=("BTCUSDT",),
+        signal_times_utc=("2026-06-26T00:00:00Z",),
+        source_payload={"split_name": "backtest", "sha256": "0" * 64},
+    )
+
+    scorecard, balance_curve = evaluate_stage08d_grouped_backtest_v1(
+        split=split,
+        normalization_stats=_fixture_normalization_stats(alpha),
+        agent=cast(Any, _AlwaysLongAgent()),
+        config=HfOriginalEvaluationConfig(alpha=alpha),
+    )
+
+    assert scorecard["requested_action_counts"]["open_long"] == scorecard["decisions_count"]
+    assert scorecard["action_counts"]["open_long"] == 1
+    assert scorecard["action_counts"]["close"] == 1
+    assert scorecard["action_counts"]["hold"] > 0
+    assert scorecard["reward_sum"] == 0.0
+    assert scorecard["backtest_reporting_reward_sum"] == 0.0
+    assert scorecard["training_reward_sum"] != 0.0
+    assert balance_curve[1]["unmasked_filter_action_id"] == 1
+    assert balance_curve[1]["filter_selected_action_id"] == 1
+    assert balance_curve[1]["effective_action_id"] == 0
+    assert balance_curve[1]["backtest_reporting_reward"] == 0.0
+    assert "training_reward" in balance_curve[1]
+
+
+class _AlwaysLongAgent:
+    def __init__(self) -> None:
+        self.q_value_cache = QValueCache()
+
+    def predict_q_values(self, state: np.ndarray) -> np.ndarray:
+        return np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
+
+    def predict_ensemble(
+        self,
+        state: np.ndarray,
+        *,
+        n_samples: int,
+        cache_key: object | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        return self.predict_q_values(state), np.zeros((4,), dtype=np.float32)
+
+
+def _fixture_normalization_stats(alpha: UpstreamAlphaConfig) -> NormalizationStats:
+    return compute_train_only_normalization_stats_v1(
+        _session_features(3, alpha=alpha),
+        config=alpha,
+    )
 
 
 def _session_features(session_count: int, *, alpha: UpstreamAlphaConfig) -> np.ndarray:
