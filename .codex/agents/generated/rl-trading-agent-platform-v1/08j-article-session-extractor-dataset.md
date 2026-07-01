@@ -56,7 +56,11 @@ context_sources:
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i-upstream-evaluator-session-parity-forensic.md
       why: "blocked first-diff evidence that motivated 08I2"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i2-exhaustive-methodology-discrepancy-audit.md
-      why: "accepted exhaustive methodology discrepancy audit prerequisite"
+      why: "complete blocked discrepancy matrix that 08I3/08I4 must repair/recheck"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i3-evaluator-action-reward-parity-repair.md
+      why: "accepted evaluator/action/reward-reporting repair prerequisite"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i4-post-repair-methodology-recheck.md
+      why: "accepted post-repair matrix recheck with 08j_allowed=true"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/06-dataset-qa-session-extractor.md
       why: "historical Stage 06 selector and split/leakage contract"
   task_entrypoints:
@@ -157,7 +161,7 @@ Create a new Roehub-native dataset variant using an article-style event selector
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`.
-- Previous-stage ledger gate: verify `08I2` is `accepted`, every mandatory discrepancy row is checked, no unresolved material evaluator/session blocker remains, and `current_stage=08J`. If not true, write/update `08J` as blocked, update the ledger, and stop.
+- Previous-stage ledger gate: verify `08I3` is `accepted`, `08I4` is `accepted` with `08j_allowed=true`, every `08I2` mandatory discrepancy row has a recheck disposition, no unresolved material evaluator/session/action/reward-reporting blocker remains, and `current_stage=08J`. If not true, write/update `08J` as blocked, update the ledger, and stop.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for `08J`. Do not use username `smoke_e2e_keycloak` and do not read `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Compute and record this prompt hash: `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/08j-article-session-extractor-dataset.md`.
 - Implement selector id `article_future_10m_5pct_contrast_v1` as a separate policy.
@@ -171,6 +175,7 @@ Create a new Roehub-native dataset variant using an article-style event selector
 - Preserve split boundaries, lifecycle availability, gap handling, listing/delisting exclusions, overlap policy and embargo. Overlap is allowed only within a split; split-boundary leakage is a blocker.
 - Materialize under `/opt/roehub/state/rl_trading/` with manifest/hash, counts by split/symbol/month, rejected-window reasons, overlap rate, gap rate, and lifecycle exclusions.
 - Compare distributions for HF-original, Stage `06` current selector, and article selector: session counts, long/short oracle labels, oracle best-return, volatility/range, symbol/month coverage, and supervised past-only sanity.
+- Close or update the `08I4` row ownership for `session_extractor_policy` and `dataset_geometry_and_distribution`; if either remains unresolved after `08J`, block `08K`.
 - Do not run training or `Optuna` in `08J`.
 
 ## Acceptance Criteria

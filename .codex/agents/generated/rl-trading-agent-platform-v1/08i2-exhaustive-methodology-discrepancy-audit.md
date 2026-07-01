@@ -239,7 +239,7 @@ Check every row below before any conclusion:
 - Stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i2-exhaustive-methodology-discrepancy-audit.md`.
 - Report includes prompt hash, upstream commit, source files/hashes, input artifact references, discrepancy matrix summary, runtime/source artifact paths/hashes, repair backlog, file manifest, contract impact, proof boundary, delivery state, and next-stage handoff.
 - Every mandatory matrix row is present and has an allowed row status. Missing rows are a blocker.
-- Ledger advances to `08J` only if `08I2` is accepted and no unresolved material evaluator/session blocker remains. If material gaps remain, keep `08J`, `08K`, and `09` blocked and record the exact repair/recheck path.
+- Original gate: ledger advances to `08J` only if `08I2` is accepted and no unresolved material evaluator/session blocker remains. After the actual blocked `08I2` result, the ledger must advance only to an explicit repair/recheck path, currently `08I3 -> 08I4`, and `08J`, `08K`, and `09` remain blocked until that path accepts its gates.
 - Stage `09` remains blocked unless a later accepted corrective candidate explicitly records `stage09_allowed=true`; `08I2` itself must not open `09`.
 
 ## Final Output

@@ -21,6 +21,22 @@ goal_artifact_required: false
 proof_boundary:
   label: target_host_readiness_pre_main
   changed_code_production_claim_allowed: false
+change_ownership:
+  allowed_files:
+    - src/trading/contexts/rl_trading
+    - scripts/rl_trading
+    - tests/unit/contexts/rl_trading
+    - tests/unit/scripts/rl_trading
+    - docs/architecture/ml/rl-trading-agent-platform-v1.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/10-per-ticker-calibration.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+    - docs/architecture/README.md
+  forbidden_without_user_approval:
+    - exchange execution paths
+    - live_execution behavior
+    - browser-visible UI behavior
+    - database migrations
+    - branch/worktree/stash/local-folder workflow changes
 scope: "Implement per-ticker/per-market calibration thresholds, weights, normalization stats, or heads."
 language:
   implementation: python
@@ -41,6 +57,15 @@ context_sources:
       inspect_symbols:
         - "scorecard"
         - "research candidate decision"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i3-evaluator-action-reward-parity-repair.md
+      why: "accepted evaluator/action/reward-reporting repair prerequisite"
+      inspect_symbols:
+        - "parity verdict"
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08i4-post-repair-methodology-recheck.md
+      why: "accepted post-repair methodology recheck prerequisite"
+      inspect_symbols:
+        - "08j_allowed"
+        - "stage09_allowed"
     - path: docs/architecture/ml/rl-trading-agent-platform-v1.md
       why: "calibration and scorecard contract"
       inspect_symbols:
@@ -227,7 +252,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `09B`, accepted Stage `08I2`, and an accepted corrective research candidate from Stage `08K` or a later explicitly accepted stage with `stage09_allowed=true` in the ledger. Historical Stage `08`, blocked `08F`/`08G`/`08H`, and blocked first-diff-only `08I` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Previous-stage ledger gate: verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `09B`, accepted Stage `08I3`, accepted Stage `08I4`, and an accepted corrective research candidate from Stage `08K` or a later explicitly accepted stage with `stage09_allowed=true` in the ledger. Historical Stage `08`, blocked `08F`/`08G`/`08H`, blocked first-diff-only `08I`, and blocked audit-only `08I2` are rejected/failed evidence and are not sufficient. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Browser/auth anchor: browser QA and authenticated Roehub UI are N/A for Stage `10` unless this prompt is explicitly expanded into browser-visible calibration UI work. Do not use the Roehub smoke Keycloak username `smoke_e2e_keycloak` and do not read the host-local password source `/Users/daniildegtyarev/.config/roehub/roehub.env` key `ROEHUB_SMOKE_E2E_PASSWORD`; if a browser/auth surface unexpectedly appears, stop and record a scope blocker.
 - Credential redaction rule: never write secrets, tokens, cookies, passphrases, ciphertext, API keys, raw provider payloads, signed requests, raw checkpoint tensors, or credentials into prompts, docs, ledgers, traces, screenshots, logs, reports, or runtime artifacts.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/10-per-ticker-calibration.md` and record the prompt path and hash in the stage report.
