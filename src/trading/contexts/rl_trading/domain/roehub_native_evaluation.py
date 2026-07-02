@@ -171,6 +171,7 @@ def run_stage08f_roehub_native_evaluation_v1(
     generated = generated_at_utc or datetime.now(UTC).replace(microsecond=0)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+    dataset_stage = _native_dataset_stage(backtest_limited)
 
     raw_test = _native_scorecard(
         evaluate_stage08d_test_episodes_v1(
@@ -178,7 +179,8 @@ def run_stage08f_roehub_native_evaluation_v1(
             normalization_stats=normalization_stats,
             agent=agent,
             config=hf_config,
-        )
+        ),
+        dataset_stage=dataset_stage,
     )
     filtered_backtest, balance_curve = evaluate_stage08d_grouped_backtest_v1(
         split=backtest_limited,
@@ -186,7 +188,7 @@ def run_stage08f_roehub_native_evaluation_v1(
         agent=agent,
         config=hf_config,
     )
-    filtered_backtest = _native_scorecard(filtered_backtest)
+    filtered_backtest = _native_scorecard(filtered_backtest, dataset_stage=dataset_stage)
     baselines = [
         _native_scorecard(
             evaluate_stage08d_baseline_backtest_v1(
@@ -194,7 +196,8 @@ def run_stage08f_roehub_native_evaluation_v1(
                 config=hf_config,
                 policy_name="hold",
                 fixed_action_id=0,
-            )
+            ),
+            dataset_stage=dataset_stage,
         ),
         _native_scorecard(
             evaluate_stage08d_baseline_backtest_v1(
@@ -202,13 +205,15 @@ def run_stage08f_roehub_native_evaluation_v1(
                 config=hf_config,
                 policy_name="no_trade",
                 fixed_action_id=0,
-            )
+            ),
+            dataset_stage=dataset_stage,
         ),
         _native_scorecard(
             evaluate_stage08f_random_baseline_backtest_v1(
                 split=backtest_limited,
                 config=selected_config,
-            )
+            ),
+            dataset_stage=dataset_stage,
         ),
         _native_scorecard(
             evaluate_stage08d_baseline_backtest_v1(
@@ -216,7 +221,8 @@ def run_stage08f_roehub_native_evaluation_v1(
                 config=hf_config,
                 policy_name="simple_recent_return_threshold",
                 fixed_action_id=None,
-            )
+            ),
+            dataset_stage=dataset_stage,
         ),
     ]
     scorecards = [raw_test, filtered_backtest, *baselines]
@@ -416,6 +422,8 @@ def build_stage08f_evaluation_artifact_v1(
         candidate_manifest=candidate_manifest,
         simulator_accounting_parity_fixture=simulator_accounting_parity_fixture,
     )
+    dataset_stage = _native_dataset_stage(backtest_split)
+    dataset_label = f"Stage {dataset_stage} sessionized"
     payload = {
         "action_state_reward_contract_hash": ACTION_STATE_REWARD_CONTRACT_HASH_V1,
         "architecture_id": UPSTREAM_METHODOLOGY_ARCHITECTURE_ID_V1,
@@ -437,10 +445,10 @@ def build_stage08f_evaluation_artifact_v1(
         "config_hash": config.config_hash(),
         "data_quality_report": {
             "blockers": [],
-            "grain": "roehub_native_stage06_session",
+            "grain": f"roehub_native_stage{dataset_stage.lower()}_session",
             "required_hashes_matched": True,
             "sources": [
-                "Stage 06 sessionized test/backtest artifacts",
+                f"{dataset_label} test/backtest artifacts",
                 "Stage 08E roehub_native_candidate",
             ],
             "status": "pass",
@@ -450,7 +458,7 @@ def build_stage08f_evaluation_artifact_v1(
             "backtest_split": dict(backtest_split.source_payload),
             "test_split": dict(test_split.source_payload),
             "training_source": "binance:futures",
-            "stage": "06",
+            "stage": dataset_stage,
         },
         "delivery_state": (
             "local-only implementation plus target_host_non_production_evaluation_pre_main "
@@ -465,7 +473,7 @@ def build_stage08f_evaluation_artifact_v1(
                 "Roehub-native research-candidate decision only; no promotion or "
                 "runtime activation claim"
             ),
-            "decision_unit": "roehub_native_stage06_session",
+            "decision_unit": f"roehub_native_stage{dataset_stage.lower()}_session",
             "method": "test_episode_rollout_plus_grouped_filtered_backtest",
             "raw_argmax_acceptance": False,
         },
@@ -537,7 +545,12 @@ def _load_stage08e_checkpoint_agent(
     return agent, cast(dict[str, Any], payload)
 
 
-def _native_scorecard(scorecard: Mapping[str, Any]) -> dict[str, Any]:
+def _native_dataset_stage(split: RoehubNativeSplitData) -> str:
+    value = split.source_payload.get("manifest_stage") or split.source_payload.get("stage")
+    return value if isinstance(value, str) and value else "06"
+
+
+def _native_scorecard(scorecard: Mapping[str, Any], *, dataset_stage: str = "06") -> dict[str, Any]:
     out = dict(scorecard)
     name = str(out.get("policy_name", ""))
     name_map = {
@@ -550,12 +563,12 @@ def _native_scorecard(scorecard: Mapping[str, Any]) -> dict[str, Any]:
     out["policy_name"] = name_map.get(name, name)
     out["schema_version"] = STAGE08F_EVALUATION_SCHEMA_VERSION_V1
     surface = str(out.get("evaluation_surface", ""))
-    out["evaluation_surface"] = surface.replace("HF", "Roehub-native Stage 06")
+    out["evaluation_surface"] = surface.replace("HF", f"Roehub-native Stage {dataset_stage}")
     period = out.get("out_of_sample_period")
     if isinstance(period, Mapping):
         out["out_of_sample_period"] = {
             **dict(period),
-            "range_semantics": "Stage 06 signal_time_ms UTC",
+            "range_semantics": f"Stage {dataset_stage} signal_time_ms UTC",
         }
     out["scorecard_hash"] = hash_json_payload_v1(
         {key: value for key, value in out.items() if key != "scorecard_hash"}

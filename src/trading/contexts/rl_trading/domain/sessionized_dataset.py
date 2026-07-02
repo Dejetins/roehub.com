@@ -29,9 +29,14 @@ SESSIONIZED_AGENT_SESSION_LEN_V1 = 10
 SESSIONIZED_SIGNAL_STRIDE_MINUTES_V1 = 30
 SESSIONIZED_EMBARGO_MINUTES_V1 = SESSIONIZED_FULL_SEQ_LEN_V1
 SESSIONIZED_HIGH_VOLATILITY_TOP_FRACTION_V1 = 0.01
-SESSIONIZED_MAX_SESSIONS_PER_SYMBOL_SPLIT_V1 = 64
+SESSIONIZED_MAX_SESSIONS_PER_SYMBOL_SPLIT_V1: int | None = 64
 SESSIONIZED_HIGH_VOLATILITY_RULE_V1 = "pre_signal_realized_volatility_plus_range_v1"
 SESSIONIZED_POLICY_ID_V1 = "binance_futures_high_volatility_sessions_v1"
+SESSIONIZED_ARTICLE_POLICY_ID_V1 = "article_future_10m_5pct_contrast_v1"
+SESSIONIZED_ARTICLE_EVENT_WINDOW_MINUTES_V1 = 10
+SESSIONIZED_ARTICLE_EVENT_MOVE_THRESHOLD_V1 = 0.05
+SESSIONIZED_ARTICLE_CONTRAST_WINDOW_MINUTES_V1 = 90
+SESSIONIZED_ARTICLE_SIMILAR_IMPULSE_THRESHOLD_V1 = 0.05
 SESSIONIZED_MINUTE_MS_V1 = 60_000
 
 SessionizedDatasetStatus = Literal["accepted", "blocked", "partial"]
@@ -52,7 +57,14 @@ class SessionExtractionPolicy:
     signal_stride_minutes: int = SESSIONIZED_SIGNAL_STRIDE_MINUTES_V1
     embargo_minutes: int = SESSIONIZED_EMBARGO_MINUTES_V1
     high_volatility_top_fraction: float = SESSIONIZED_HIGH_VOLATILITY_TOP_FRACTION_V1
-    max_sessions_per_symbol_split: int = SESSIONIZED_MAX_SESSIONS_PER_SYMBOL_SPLIT_V1
+    max_sessions_per_symbol_split: int | None = SESSIONIZED_MAX_SESSIONS_PER_SYMBOL_SPLIT_V1
+    policy_id: str = SESSIONIZED_POLICY_ID_V1
+    article_event_window_minutes: int = SESSIONIZED_ARTICLE_EVENT_WINDOW_MINUTES_V1
+    article_event_move_threshold: float = SESSIONIZED_ARTICLE_EVENT_MOVE_THRESHOLD_V1
+    article_contrast_window_minutes: int = SESSIONIZED_ARTICLE_CONTRAST_WINDOW_MINUTES_V1
+    article_similar_impulse_threshold: float = (
+        SESSIONIZED_ARTICLE_SIMILAR_IMPULSE_THRESHOLD_V1
+    )
 
     def __post_init__(self) -> None:
         if self.pre_signal_len <= 0:
@@ -71,10 +83,35 @@ class SessionExtractionPolicy:
                 reason="invalid_high_volatility_top_fraction",
                 field="high_volatility_top_fraction",
             )
-        if self.max_sessions_per_symbol_split <= 0:
+        if (
+            self.max_sessions_per_symbol_split is not None
+            and self.max_sessions_per_symbol_split <= 0
+        ):
             raise SessionizedDatasetError(
                 reason="invalid_max_sessions_per_symbol_split",
                 field="max_sessions_per_symbol_split",
+            )
+        if self.policy_id not in {SESSIONIZED_POLICY_ID_V1, SESSIONIZED_ARTICLE_POLICY_ID_V1}:
+            raise SessionizedDatasetError(reason="unsupported_session_policy_id", field="policy_id")
+        if self.article_event_window_minutes <= 1:
+            raise SessionizedDatasetError(
+                reason="invalid_article_event_window_minutes",
+                field="article_event_window_minutes",
+            )
+        if not 0.0 < self.article_event_move_threshold < 1.0:
+            raise SessionizedDatasetError(
+                reason="invalid_article_event_move_threshold",
+                field="article_event_move_threshold",
+            )
+        if self.article_contrast_window_minutes < self.article_event_window_minutes:
+            raise SessionizedDatasetError(
+                reason="invalid_article_contrast_window_minutes",
+                field="article_contrast_window_minutes",
+            )
+        if not 0.0 < self.article_similar_impulse_threshold < 1.0:
+            raise SessionizedDatasetError(
+                reason="invalid_article_similar_impulse_threshold",
+                field="article_similar_impulse_threshold",
             )
 
     @property
@@ -82,7 +119,7 @@ class SessionExtractionPolicy:
         return self.pre_signal_len + self.post_signal_len
 
     def as_payload(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "agent_history_len": SESSIONIZED_AGENT_HISTORY_LEN_V1,
             "agent_session_len": SESSIONIZED_AGENT_SESSION_LEN_V1,
             "embargo_minutes": self.embargo_minutes,
@@ -90,12 +127,34 @@ class SessionExtractionPolicy:
             "high_volatility_rule": SESSIONIZED_HIGH_VOLATILITY_RULE_V1,
             "high_volatility_top_fraction": self.high_volatility_top_fraction,
             "max_sessions_per_symbol_split": self.max_sessions_per_symbol_split,
-            "policy_id": SESSIONIZED_POLICY_ID_V1,
+            "policy_id": self.policy_id,
             "post_signal_len": self.post_signal_len,
             "pre_signal_len": self.pre_signal_len,
             "score_uses_post_signal_rows": False,
             "signal_stride_minutes": self.signal_stride_minutes,
         }
+        if self.policy_id == SESSIONIZED_ARTICLE_POLICY_ID_V1:
+            payload.update(
+                {
+                    "article_contrast_rule": (
+                        "no 10m absolute move >= 5pct in the 90m context before "
+                        "the selected event window"
+                    ),
+                    "article_contrast_window_minutes": self.article_contrast_window_minutes,
+                    "article_event_move_threshold": self.article_event_move_threshold,
+                    "article_event_window_minutes": self.article_event_window_minutes,
+                    "article_formula": (
+                        "abs(close[event_end_idx-1] / open[event_end_idx-10] - 1) >= 0.05; "
+                        "event_end_t = signal_ts_open"
+                    ),
+                    "article_similar_impulse_threshold": (
+                        self.article_similar_impulse_threshold
+                    ),
+                    "high_volatility_rule": None,
+                    "selector_score": "abs_article_event_return",
+                }
+            )
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +193,12 @@ class SessionCandidate:
     pre_signal_log_return: float
     pre_signal_realized_volatility: float
     pre_signal_range_ratio: float
+    selector_id: str = SESSIONIZED_POLICY_ID_V1
+    article_event_start_ms: int | None = None
+    article_event_end_ms: int | None = None
+    article_event_return: float | None = None
+    article_event_abs_return: float | None = None
+    article_contrast_max_abs_return: float | None = None
 
     def session_key(self) -> str:
         return "|".join(
@@ -149,7 +214,7 @@ class SessionCandidate:
         )
 
     def as_payload(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "dataset_version": self.dataset_version,
             "exchange_name": "binance",
             "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
@@ -163,12 +228,40 @@ class SessionCandidate:
             "signal_ts_open": _format_utc_from_ms(self.signal_ts_open_ms),
             "split": self.split,
             "symbol": self.symbol,
+            "selector_id": self.selector_id,
             "volatility_score": _round_float(self.volatility_score),
         }
+        if self.article_event_start_ms is not None:
+            payload["article_event_start_utc"] = _format_utc_from_ms(
+                self.article_event_start_ms
+            )
+        if self.article_event_end_ms is not None:
+            payload["article_event_end_utc"] = _format_utc_from_ms(self.article_event_end_ms)
+        if self.article_event_return is not None:
+            payload["article_event_return"] = _round_float(self.article_event_return)
+        if self.article_event_abs_return is not None:
+            payload["article_event_abs_return"] = _round_float(self.article_event_abs_return)
+        if self.article_contrast_max_abs_return is not None:
+            payload["article_contrast_max_abs_return"] = _round_float(
+                self.article_contrast_max_abs_return
+            )
+        return payload
 
 
 def default_session_extraction_policy_v1() -> SessionExtractionPolicy:
     return SessionExtractionPolicy()
+
+
+def article_session_extraction_policy_v1(
+    *,
+    max_sessions_per_symbol_split: int | None = None,
+) -> SessionExtractionPolicy:
+    return SessionExtractionPolicy(
+        high_volatility_top_fraction=1.0,
+        max_sessions_per_symbol_split=max_sessions_per_symbol_split,
+        policy_id=SESSIONIZED_ARTICLE_POLICY_ID_V1,
+        signal_stride_minutes=1,
+    )
 
 
 def assert_sessionized_trainable_source_v1(*, exchange: str, market_type: str) -> None:
@@ -343,6 +436,106 @@ def select_high_volatility_session_candidates_v1(
                     score_payload["realized_volatilities"][offset]
                 ),
                 pre_signal_range_ratio=float(score_payload["range_ratios"][offset]),
+            )
+        )
+    return tuple(candidates)
+
+
+def select_article_future_impulse_session_candidates_v1(
+    *,
+    slab: RawFeatureSlab,
+    split_window: SessionSplitWindow,
+    symbol: str,
+    policy: SessionExtractionPolicy | None = None,
+) -> tuple[SessionCandidate, ...]:
+    selected_policy = article_session_extraction_policy_v1() if policy is None else policy
+    if selected_policy.policy_id != SESSIONIZED_ARTICLE_POLICY_ID_V1:
+        raise SessionizedDatasetError(reason="article_selector_policy_required", field="policy_id")
+    _validate_slab_for_sessions(slab=slab, policy=selected_policy)
+
+    signal_start_ms = _parse_utc_ms(split_window.signal_start_utc)
+    signal_end_ms = _parse_utc_ms(split_window.signal_end_utc)
+    if signal_end_ms <= signal_start_ms:
+        raise SessionizedDatasetError(
+            reason="invalid_split_signal_window",
+            field=split_window.split,
+        )
+
+    open_time_ms = slab.open_time_ms
+    signal_start_idx = int(np.searchsorted(open_time_ms, signal_start_ms, side="left"))
+    signal_end_idx = int(np.searchsorted(open_time_ms, signal_end_ms, side="left"))
+    signal_indices = np.arange(
+        signal_start_idx,
+        signal_end_idx,
+        selected_policy.signal_stride_minutes,
+        dtype=np.int64,
+    )
+    if signal_indices.size == 0:
+        return ()
+    event_len = selected_policy.article_event_window_minutes
+    in_bounds = (
+        (signal_indices >= selected_policy.pre_signal_len)
+        & (signal_indices >= event_len)
+        & (signal_indices + selected_policy.post_signal_len <= slab.row_count())
+    )
+    signal_indices = signal_indices[in_bounds]
+    if signal_indices.size == 0:
+        return ()
+
+    score_payload = _score_article_event_windows(
+        slab=slab,
+        signal_indices=signal_indices,
+        policy=selected_policy,
+    )
+    valid_signal_indices = score_payload["signal_indices"]
+    if valid_signal_indices.size == 0:
+        return ()
+
+    selected_offsets = _select_article_candidate_offsets(
+        abs_event_returns=score_payload["abs_event_returns"],
+        signal_times_ms=open_time_ms[valid_signal_indices],
+        policy=selected_policy,
+    )
+    selected_offsets = selected_offsets[
+        np.argsort(open_time_ms[valid_signal_indices[selected_offsets]], kind="stable")
+    ]
+
+    upper_symbol = symbol.upper()
+    candidates: list[SessionCandidate] = []
+    for offset in selected_offsets:
+        offset_int = int(offset)
+        signal_idx = int(valid_signal_indices[offset_int])
+        session_start_idx = signal_idx - selected_policy.pre_signal_len
+        session_end_idx = signal_idx + selected_policy.post_signal_len
+        event_start_idx = signal_idx - selected_policy.article_event_window_minutes
+        signal_ts_ms = int(open_time_ms[signal_idx])
+        session_start_ms = int(open_time_ms[session_start_idx])
+        session_end_ms = int(open_time_ms[session_end_idx - 1]) + SESSIONIZED_MINUTE_MS_V1
+        candidates.append(
+            SessionCandidate(
+                dataset_version=split_window.dataset_version,
+                split=split_window.split,
+                symbol=upper_symbol,
+                signal_index=signal_idx,
+                signal_ts_open_ms=signal_ts_ms,
+                session_start_ms=session_start_ms,
+                session_end_ms=session_end_ms,
+                score_window_start_ms=session_start_ms,
+                score_window_end_ms=signal_ts_ms,
+                volatility_score=float(score_payload["abs_event_returns"][offset_int]),
+                pre_signal_log_return=float(score_payload["log_returns"][offset_int]),
+                pre_signal_realized_volatility=float(
+                    score_payload["realized_volatilities"][offset_int]
+                ),
+                pre_signal_range_ratio=float(score_payload["range_ratios"][offset_int]),
+                selector_id=SESSIONIZED_ARTICLE_POLICY_ID_V1,
+                article_event_start_ms=int(open_time_ms[event_start_idx]),
+                article_event_end_ms=signal_ts_ms,
+                article_event_return=float(score_payload["event_returns"][offset_int]),
+                article_event_abs_return=float(score_payload["abs_event_returns"][offset_int]),
+                article_contrast_max_abs_return=float(
+                    score_payload["contrast_max_abs_returns"][offset_int]
+                ),
             )
         )
     return tuple(candidates)
@@ -526,6 +719,7 @@ def build_sessionized_dataset_manifest_v1(
     leakage_report: Mapping[str, object],
     build_scope: Mapping[str, object],
     policy: SessionExtractionPolicy | None = None,
+    stage: str = "06",
 ) -> dict[str, object]:
     selected_policy = default_session_extraction_policy_v1() if policy is None else policy
     entries = sorted(
@@ -542,7 +736,7 @@ def build_sessionized_dataset_manifest_v1(
     return {
         "schema_version": SESSIONIZED_DATASET_SCHEMA_VERSION_V1,
         "manifest_kind": SESSIONIZED_DATASET_MANIFEST_KIND_V1,
-        "stage": "06",
+        "stage": stage,
         "status": status,
         "generated_at_utc": _format_utc(generated_at_utc),
         "market": "binance:futures",
@@ -738,6 +932,140 @@ def _score_pre_signal_windows(
     }
 
 
+def _score_article_event_windows(
+    *,
+    slab: RawFeatureSlab,
+    signal_indices: np.ndarray,
+    policy: SessionExtractionPolicy,
+) -> dict[str, np.ndarray]:
+    open_idx = FEATURE_NAMES_V1.index("open")
+    close_idx = FEATURE_NAMES_V1.index("close")
+    high_idx = FEATURE_NAMES_V1.index("high")
+    low_idx = FEATURE_NAMES_V1.index("low")
+    open_ = np.asarray(slab.features_f32[:, open_idx], dtype=np.float64)
+    close = np.asarray(slab.features_f32[:, close_idx], dtype=np.float64)
+    high = np.asarray(slab.features_f32[:, high_idx], dtype=np.float64)
+    low = np.asarray(slab.features_f32[:, low_idx], dtype=np.float64)
+
+    finite_price = (
+        np.isfinite(open_)
+        & np.isfinite(close)
+        & np.isfinite(high)
+        & np.isfinite(low)
+        & (open_ > 0.0)
+        & (close > 0.0)
+    )
+    valid_price_prefix = np.concatenate(
+        (np.asarray([0], dtype=np.int64), np.cumsum(~finite_price, dtype=np.int64))
+    )
+    pre_invalid_count = (
+        valid_price_prefix[signal_indices]
+        - valid_price_prefix[signal_indices - policy.pre_signal_len]
+    )
+    valid_signal_mask = pre_invalid_count == 0
+    if not np.any(valid_signal_mask):
+        return _empty_article_score_payload()
+
+    signal_indices = signal_indices[valid_signal_mask]
+    event_start = signal_indices - policy.article_event_window_minutes
+    event_end_last = signal_indices - 1
+    event_returns = (close[event_end_last] / open_[event_start]) - 1.0
+    abs_event_returns = np.abs(event_returns)
+
+    similar_impulses = _rolling_article_impulse_abs_returns(
+        open_prices=open_,
+        close_prices=close,
+        policy=policy,
+    )
+    rolling_contrast_max = _rolling_max_previous_article_impulse(
+        abs_impulses=similar_impulses,
+        contrast_window_minutes=policy.article_contrast_window_minutes,
+        event_window_minutes=policy.article_event_window_minutes,
+    )
+    contrast_max = rolling_contrast_max[signal_indices]
+    event_mask = (
+        (abs_event_returns >= policy.article_event_move_threshold)
+        & (contrast_max < policy.article_similar_impulse_threshold)
+        & np.isfinite(event_returns)
+        & np.isfinite(abs_event_returns)
+        & np.isfinite(contrast_max)
+    )
+    if not np.any(event_mask):
+        return _empty_article_score_payload()
+
+    selected_signal_indices = signal_indices[event_mask]
+    pre_scores = _score_pre_signal_windows(
+        slab=slab,
+        signal_indices=selected_signal_indices,
+        policy=policy,
+    )
+    if pre_scores["signal_indices"].size == 0:
+        return _empty_article_score_payload()
+    score_by_signal = {
+        int(signal_idx): idx for idx, signal_idx in enumerate(selected_signal_indices.tolist())
+    }
+    selected_offsets = np.asarray(
+        [score_by_signal[int(signal_idx)] for signal_idx in pre_scores["signal_indices"]],
+        dtype=np.int64,
+    )
+    return {
+        "signal_indices": pre_scores["signal_indices"],
+        "event_returns": event_returns[event_mask][selected_offsets],
+        "abs_event_returns": abs_event_returns[event_mask][selected_offsets],
+        "contrast_max_abs_returns": contrast_max[event_mask][selected_offsets],
+        "log_returns": pre_scores["log_returns"],
+        "realized_volatilities": pre_scores["realized_volatilities"],
+        "range_ratios": pre_scores["range_ratios"],
+    }
+
+
+def _rolling_article_impulse_abs_returns(
+    *,
+    open_prices: np.ndarray,
+    close_prices: np.ndarray,
+    policy: SessionExtractionPolicy,
+) -> np.ndarray:
+    out = np.full(open_prices.shape[0], np.nan, dtype=np.float64)
+    event_len = policy.article_event_window_minutes
+    if open_prices.shape[0] <= event_len:
+        return out
+    starts = np.arange(0, open_prices.shape[0] - event_len, dtype=np.int64)
+    ends = starts + event_len - 1
+    valid = (
+        np.isfinite(open_prices[starts])
+        & np.isfinite(close_prices[ends])
+        & (open_prices[starts] > 0.0)
+        & (close_prices[ends] > 0.0)
+    )
+    returns = np.full(starts.shape[0], np.nan, dtype=np.float64)
+    returns[valid] = np.abs((close_prices[ends[valid]] / open_prices[starts[valid]]) - 1.0)
+    out[starts] = returns
+    return out
+
+
+def _rolling_max_previous_article_impulse(
+    *,
+    abs_impulses: np.ndarray,
+    contrast_window_minutes: int,
+    event_window_minutes: int,
+) -> np.ndarray:
+    lookback = contrast_window_minutes - event_window_minutes
+    if lookback <= 0 or abs_impulses.size == 0:
+        return np.zeros(abs_impulses.shape[0], dtype=np.float64)
+    finite_impulses = np.where(np.isfinite(abs_impulses), abs_impulses, -np.inf)
+    padded = np.concatenate(
+        (np.full(lookback, -np.inf, dtype=np.float64), finite_impulses)
+    )
+    windows = np.lib.stride_tricks.sliding_window_view(padded, window_shape=lookback)
+    by_event_start = np.max(windows[: abs_impulses.shape[0]], axis=1)
+    by_event_start = np.where(np.isfinite(by_event_start), by_event_start, 0.0)
+    event_starts = np.arange(abs_impulses.shape[0], dtype=np.int64) - event_window_minutes
+    values = np.zeros(abs_impulses.shape[0], dtype=np.float64)
+    valid = event_starts >= 0
+    values[valid] = by_event_start[event_starts[valid]]
+    return values
+
+
 def _empty_score_payload() -> dict[str, np.ndarray]:
     return {
         "signal_indices": np.asarray([], dtype=np.int64),
@@ -745,6 +1073,18 @@ def _empty_score_payload() -> dict[str, np.ndarray]:
         "realized_volatilities": np.asarray([], dtype=np.float64),
         "range_ratios": np.asarray([], dtype=np.float64),
         "volatility_scores": np.asarray([], dtype=np.float64),
+    }
+
+
+def _empty_article_score_payload() -> dict[str, np.ndarray]:
+    return {
+        "signal_indices": np.asarray([], dtype=np.int64),
+        "event_returns": np.asarray([], dtype=np.float64),
+        "abs_event_returns": np.asarray([], dtype=np.float64),
+        "contrast_max_abs_returns": np.asarray([], dtype=np.float64),
+        "log_returns": np.asarray([], dtype=np.float64),
+        "realized_volatilities": np.asarray([], dtype=np.float64),
+        "range_ratios": np.asarray([], dtype=np.float64),
     }
 
 
@@ -758,9 +1098,22 @@ def _select_top_candidate_offsets(
         1,
         math.ceil(int(volatility_scores.size) * policy.high_volatility_top_fraction),
     )
-    target_count = min(target_count, policy.max_sessions_per_symbol_split)
+    if policy.max_sessions_per_symbol_split is not None:
+        target_count = min(target_count, policy.max_sessions_per_symbol_split)
     ranked_offsets = np.lexsort((signal_times_ms, -volatility_scores))
     return ranked_offsets[:target_count]
+
+
+def _select_article_candidate_offsets(
+    *,
+    abs_event_returns: np.ndarray,
+    signal_times_ms: np.ndarray,
+    policy: SessionExtractionPolicy,
+) -> np.ndarray:
+    ranked_offsets = np.lexsort((signal_times_ms, -abs_event_returns))
+    if policy.max_sessions_per_symbol_split is None:
+        return ranked_offsets
+    return ranked_offsets[: policy.max_sessions_per_symbol_split]
 
 
 def _split_window_embargo_violations(

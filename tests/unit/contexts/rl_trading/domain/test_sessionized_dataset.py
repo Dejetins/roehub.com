@@ -9,17 +9,20 @@ import pytest
 from trading.contexts.rl_trading.domain import (
     FEATURE_CONTRACT_HASH_V1,
     FEATURE_NAMES_V1,
+    SESSIONIZED_ARTICLE_POLICY_ID_V1,
     RawFeatureSlab,
     SessionExtractionPolicy,
     SessionizedDatasetError,
     SessionSplitWindow,
     apply_session_split_embargo_v1,
+    article_session_extraction_policy_v1,
     assert_sessionized_trainable_source_v1,
     build_gap_report_v1,
     build_leakage_report_v1,
     build_sessionized_dataset_manifest_v1,
     build_split_artifact_entry_v1,
     materialize_session_features_v1,
+    select_article_future_impulse_session_candidates_v1,
     select_high_volatility_session_candidates_v1,
     session_signal_time_array_v1,
     session_split_windows_from_stage04c_v1,
@@ -183,6 +186,58 @@ def test_split_embargo_shifts_right_split_signal_start() -> None:
     assert report["embargo_violations_count"] == 0
 
 
+def test_article_selector_uses_future_10m_event_end_as_signal() -> None:
+    slab = _slab_with_article_impulse()
+    policy = article_session_extraction_policy_v1()
+    split_window = SessionSplitWindow(
+        dataset_version="hf_period_rebuild_current_trading",
+        split="train",
+        signal_start_utc="1970-01-01T02:00:00Z",
+        signal_end_utc="1970-01-01T02:01:00Z",
+        source_start_utc="1970-01-01T00:00:00Z",
+        source_end_utc="1970-01-01T04:20:00Z",
+    )
+
+    candidates = select_article_future_impulse_session_candidates_v1(
+        slab=slab,
+        split_window=split_window,
+        symbol="BTCUSDT",
+        policy=policy,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    payload = candidate.as_payload()
+    assert candidate.signal_ts_open_ms == 120 * 60_000
+    assert candidate.score_window_end_ms == candidate.signal_ts_open_ms
+    assert payload["selector_id"] == SESSIONIZED_ARTICLE_POLICY_ID_V1
+    assert payload["article_event_start_utc"] == "1970-01-01T01:50:00Z"
+    assert payload["article_event_end_utc"] == "1970-01-01T02:00:00Z"
+    assert float(cast(float, payload["article_event_abs_return"])) >= 0.05
+
+
+def test_article_selector_contrast_blocks_repeated_prior_impulse() -> None:
+    slab = _slab_with_article_impulse(prior_impulse=True)
+    policy = article_session_extraction_policy_v1()
+    split_window = SessionSplitWindow(
+        dataset_version="hf_period_rebuild_current_trading",
+        split="train",
+        signal_start_utc="1970-01-01T02:00:00Z",
+        signal_end_utc="1970-01-01T02:01:00Z",
+        source_start_utc="1970-01-01T00:00:00Z",
+        source_end_utc="1970-01-01T04:20:00Z",
+    )
+
+    candidates = select_article_future_impulse_session_candidates_v1(
+        slab=slab,
+        split_window=split_window,
+        symbol="BTCUSDT",
+        policy=policy,
+    )
+
+    assert candidates == ()
+
+
 def test_split_entry_and_dataset_manifest_capture_hashes_policy_and_safety() -> None:
     slab = _slab_with_known_pre_signal_volatility()
     policy = SessionExtractionPolicy(
@@ -248,6 +303,30 @@ def _slab_with_known_pre_signal_volatility() -> RawFeatureSlab:
     close[41:62:2] = 92.0
     close[180:240] = np.linspace(100.0, 160.0, 60, dtype=np.float32)
     open_ = close.copy()
+    high = np.maximum(open_, close) + 0.5
+    low = np.minimum(open_, close) - 0.5
+    volume = np.full(minutes, 10.0, dtype=np.float32)
+    trades = np.full(minutes, 5.0, dtype=np.float32)
+    features = np.column_stack((open_, high, close, low, close, volume, trades)).astype(np.float32)
+    return RawFeatureSlab(
+        open_time_ms=open_time_ms,
+        close_time_ms=open_time_ms + 60_000,
+        features_f32=features,
+    )
+
+
+def _slab_with_article_impulse(*, prior_impulse: bool = False) -> RawFeatureSlab:
+    minutes = 260
+    open_time_ms = np.arange(minutes, dtype=np.int64) * 60_000
+    close = np.full(minutes, 100.0, dtype=np.float32)
+    close[110:119] = np.linspace(100.0, 104.5, 9, dtype=np.float32)
+    close[119] = 106.0
+    if prior_impulse:
+        close[30:39] = np.linspace(100.0, 104.5, 9, dtype=np.float32)
+        close[39] = 106.0
+    open_ = np.empty_like(close)
+    open_[0] = close[0]
+    open_[1:] = close[:-1]
     high = np.maximum(open_, close) + 0.5
     low = np.minimum(open_, close) - 0.5
     volume = np.full(minutes, 10.0, dtype=np.float32)

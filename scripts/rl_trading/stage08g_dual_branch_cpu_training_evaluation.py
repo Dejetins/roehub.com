@@ -41,6 +41,7 @@ DEFAULT_ORCHESTRATOR_OUTPUT_ROOT = (
     / "dual_branch_runs"
 )
 DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+DEFAULT_STAGE08J_MANIFEST_PATH = optuna_cli.DEFAULT_STAGE08J_MANIFEST_PATH
 
 
 class Stage08GDualBranchRunError(ValueError):
@@ -68,17 +69,23 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         if args.generated_at_utc is not None
         else datetime.now(UTC).replace(microsecond=0)
     )
+    _apply_stage_defaults(args)
+    if args.output_root == DEFAULT_ORCHESTRATOR_OUTPUT_ROOT:
+        args.output_root = _default_orchestrator_output_root(args.stage_label)
     run_id = args.run_id or _default_run_id(args=args)
     run_dir = args.output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     hf_training_output_root = args.hf_training_output_root or (
-        DEFAULT_TRAINING_OUTPUT_ROOT / "hf_original"
+        _default_training_output_root(args.stage_label) / "hf_original"
     )
     native_training_output_root = args.native_training_output_root or (
-        DEFAULT_TRAINING_OUTPUT_ROOT / "roehub_native"
+        _default_training_output_root(args.stage_label) / "roehub_native"
     )
-    evaluation_output_root = args.evaluation_output_root or optuna_cli.DEFAULT_OUTPUT_ROOT
+    evaluation_output_root = (
+        args.evaluation_output_root
+        or optuna_cli.default_output_root_for_stage(args.stage_label)
+    )
 
     steps: list[dict[str, Any]] = []
     try:
@@ -293,6 +300,8 @@ def _native_training_command(
         "run",
         "--stage06-manifest-path",
         str(args.stage06_manifest_path),
+        "--sessionized-manifest-stage",
+        args.sessionized_manifest_stage,
         "--dataset-version",
         args.dataset_version,
         "--train-split",
@@ -409,6 +418,8 @@ def _optuna_command(
         args.hf_final_split,
         "--stage06-manifest-path",
         str(args.stage06_manifest_path),
+        "--sessionized-manifest-stage",
+        args.sessionized_manifest_stage,
         "--dataset-version",
         args.dataset_version,
         "--native-calibration-split",
@@ -440,24 +451,29 @@ def _summary_payload(
 ) -> dict[str, Any]:
     hf_stage09 = hf_optuna.get("status") == "accepted_for_research"
     native_stage09 = native_optuna.get("status") == "accepted_for_research"
+    stage09_allowed = (
+        native_stage09 if args.stage_label == "08K" else bool(hf_stage09 and native_stage09)
+    )
     status = (
         "planned"
         if args.dry_run
         else "accepted_for_research"
-        if hf_stage09 and native_stage09
+        if stage09_allowed
         else "completed"
     )
+    hf_branch_name = _hf_branch_name(args.stage_label)
+    native_branch_name = _native_branch_name(args.stage_label)
     payload = {
         "artifact_kind": _dual_branch_artifact_kind(args.stage_label),
-        "branch_order": ["hf_original", "roehub_native"],
+        "branch_order": [hf_branch_name, native_branch_name],
         "branches": {
-            "hf_original": {
+            hf_branch_name: {
                 "candidate_manifest_path": hf_training.get("candidate_manifest_path"),
                 "optuna_summary_path": hf_optuna.get("summary_path"),
                 "stage09_allowed": hf_stage09,
                 "training_run_dir": hf_training.get("run_dir"),
             },
-            "roehub_native": {
+            native_branch_name: {
                 "candidate_manifest_path": native_training.get("candidate_manifest_path"),
                 "optuna_summary_path": native_optuna.get("summary_path"),
                 "stage09_allowed": native_stage09,
@@ -469,7 +485,7 @@ def _summary_payload(
         "methodology": {
             "device_policy": args.device_policy,
             "hf_training_dataset": "original_hf_stage04_dataset",
-            "native_training_dataset": "accepted_stage06_roehub_sessionized_dataset",
+            "native_training_dataset": _native_dataset_label(args),
             "optuna_trials_default_source": "Habr workflow command uses --trials 100 --jobs 1",
             "parallel_training": False,
             "parallel_training_reason": (
@@ -481,13 +497,14 @@ def _summary_payload(
             },
             "stage06_training_split": args.native_train_split,
             "stage06_validation_split": args.native_validation_split,
+            "sessionized_manifest_stage": args.sessionized_manifest_stage,
             "upstream_source_sha": "f71130903f8237351164f4b875494185465bf1ea",
         },
         "run_dir": str(run_dir),
         "run_id": run_id,
         "schema_version": STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1,
         "stage": args.stage_label,
-        "stage09_allowed": bool(hf_stage09 and native_stage09),
+        "stage09_allowed": stage09_allowed,
         "status": status,
         "steps": list(steps),
     }
@@ -568,7 +585,8 @@ def _default_run_id(*, args: argparse.Namespace) -> str:
             "agent_session_len": args.agent_session_len,
             "selection_strategy": args.selection_strategy,
             "stage": args.stage_label,
-            "stage06_manifest_path": str(args.stage06_manifest_path),
+            "sessionized_manifest_path": str(args.stage06_manifest_path),
+            "sessionized_manifest_stage": args.sessionized_manifest_stage,
             "trials": args.trials,
         }
     )
@@ -579,6 +597,43 @@ def _dual_branch_artifact_kind(stage_label: str) -> str:
     if stage_label == "08G":
         return STAGE08G_DUAL_BRANCH_RUN_KIND_V1
     return f"rl_trading_stage{stage_label.lower()}_dual_branch_cpu_run"
+
+
+def _default_training_output_root(stage_label: str) -> Path:
+    return (
+        Path(STAGE07A_RUNTIME_ARTIFACT_ROOT_V1)
+        / "training_runs"
+        / optuna_cli.runtime_artifact_subdir_for_stage(stage_label)
+    )
+
+
+def _default_orchestrator_output_root(stage_label: str) -> Path:
+    return optuna_cli.default_output_root_for_stage(stage_label) / "dual_branch_runs"
+
+
+def _hf_branch_name(stage_label: str) -> str:
+    return "hf_original_control_30_10" if stage_label == "08K" else "hf_original"
+
+
+def _native_branch_name(stage_label: str) -> str:
+    if stage_label == "08K":
+        return "roehub_native_article_selector_30_10"
+    return "roehub_native"
+
+
+def _native_dataset_label(args: argparse.Namespace) -> str:
+    if args.sessionized_manifest_stage == "08J":
+        return "accepted_stage08j_article_selector_sessionized_dataset"
+    return "accepted_stage06_roehub_sessionized_dataset"
+
+
+def _apply_stage_defaults(args: argparse.Namespace) -> None:
+    if args.stage_label != "08K":
+        return
+    if args.sessionized_manifest_stage == "06":
+        args.sessionized_manifest_stage = "08J"
+    if args.stage06_manifest_path == native_train_cli.DEFAULT_STAGE06_MANIFEST_PATH:
+        args.stage06_manifest_path = DEFAULT_STAGE08J_MANIFEST_PATH
 
 
 def _append_optional(command: list[str], option: str, value: object | None) -> None:
@@ -656,7 +711,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--generated-at-utc", type=str, default=None)
-    parser.add_argument("--stage-label", choices=("08G", "08H"), default="08G")
+    parser.add_argument("--stage-label", choices=("08G", "08H", "08K"), default="08G")
     parser.add_argument(
         "--execution-mode",
         choices=("sequential_cpu",),
@@ -675,6 +730,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stage06-manifest-path",
         type=Path,
         default=native_train_cli.DEFAULT_STAGE06_MANIFEST_PATH,
+    )
+    parser.add_argument(
+        "--sessionized-manifest-stage",
+        choices=("06", "08J"),
+        default="06",
     )
     parser.add_argument("--native-training-output-root", type=Path, default=None)
     parser.add_argument("--native-training-run-id", type=str, default=None)

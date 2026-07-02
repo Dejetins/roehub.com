@@ -100,6 +100,7 @@ def _run_command(args: argparse.Namespace) -> dict[str, Any]:
         max_sessions=args.max_test_sessions,
         max_artifacts=args.max_test_artifacts,
         allow_fixture_hashes=args.allow_fixture_hashes,
+        accepted_stages=(args.sessionized_manifest_stage,),
     )
     backtest_split = _load_stage06_split(
         manifest=stage06_manifest,
@@ -110,6 +111,7 @@ def _run_command(args: argparse.Namespace) -> dict[str, Any]:
         max_sessions=args.max_backtest_sessions,
         max_artifacts=args.max_backtest_artifacts,
         allow_fixture_hashes=args.allow_fixture_hashes,
+        accepted_stages=(args.sessionized_manifest_stage,),
     )
     alpha = UpstreamAlphaConfig(
         long_action_threshold=args.long_action_threshold,
@@ -183,8 +185,9 @@ def _load_stage06_split(
     max_sessions: int | None,
     max_artifacts: int | None,
     allow_fixture_hashes: bool,
+    accepted_stages: Sequence[str] = ("06",),
 ) -> RoehubNativeSplitData:
-    _validate_stage06_manifest(manifest)
+    _validate_stage06_manifest(manifest, accepted_stages=accepted_stages)
     entries = [
         entry
         for entry in _split_artifact_entries(manifest)
@@ -303,8 +306,10 @@ def _load_stage06_split(
         ),
         "manifest_path": str(manifest_path),
         "manifest_sha256": manifest_sha256,
+        "manifest_stage": manifest.get("stage"),
         "max_artifacts": max_artifacts,
         "max_sessions": max_sessions,
+        "selector_id": _policy_id_from_manifest(manifest),
         "selected_session_count": selected_session_count,
         "split_artifact_count_selected": len(artifact_summary),
         "split_artifact_count_total": len(entries),
@@ -322,8 +327,12 @@ def _load_stage06_split(
     )
 
 
-def _validate_stage06_manifest(manifest: Mapping[str, Any]) -> None:
-    if manifest.get("stage") != "06":
+def _validate_stage06_manifest(
+    manifest: Mapping[str, Any],
+    *,
+    accepted_stages: Sequence[str] = ("06",),
+) -> None:
+    if manifest.get("stage") not in set(accepted_stages):
         raise RoehubNativeEvaluationError(reason="unexpected_stage06_manifest_stage")
     if manifest.get("status") != "accepted":
         raise RoehubNativeEvaluationError(reason="stage06_manifest_not_accepted")
@@ -331,6 +340,14 @@ def _validate_stage06_manifest(manifest: Mapping[str, Any]) -> None:
         raise RoehubNativeEvaluationError(reason="unexpected_stage06_manifest_kind")
     if manifest.get("market") != "binance:futures":
         raise RoehubNativeEvaluationError(reason="unexpected_stage06_manifest_market")
+
+
+def _policy_id_from_manifest(manifest: Mapping[str, Any]) -> str | None:
+    policy = manifest.get("policy")
+    if not isinstance(policy, Mapping):
+        return None
+    value = policy.get("policy_id")
+    return str(value) if isinstance(value, str) and value else None
 
 
 def _split_artifact_entries(manifest: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
@@ -488,6 +505,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_CANDIDATE_MANIFEST_SHA256,
     )
     parser.add_argument("--stage06-manifest-path", type=Path, default=DEFAULT_STAGE06_MANIFEST_PATH)
+    parser.add_argument(
+        "--sessionized-manifest-stage",
+        choices=("06", "08J"),
+        default="06",
+    )
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--allow-fixture-hashes", action="store_true")

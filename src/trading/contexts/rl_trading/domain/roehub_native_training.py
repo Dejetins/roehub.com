@@ -589,7 +589,7 @@ def _build_report_payload(
         "resource_usage": dict(resource_usage),
         "run_dir": str(run_dir),
         "run_id": run_id,
-        "safety": _safety_payload(),
+        "safety": _safety_payload(dataset_stage=str(dataset_dependency.get("stage", "06"))),
         "schema_version": STAGE08E_SCHEMA_VERSION_V1,
         "stage": "08E",
         "status": "completed",
@@ -646,7 +646,7 @@ def _build_manifest_payload(
         "resource_summary": dict(resource_usage),
         "run_dir": str(run_dir),
         "run_id": run_id,
-        "safety": _safety_payload(),
+        "safety": _safety_payload(dataset_stage=str(dataset_dependency.get("stage", "06"))),
         "schema_version": STAGE08E_SCHEMA_VERSION_V1,
         "stage": "08E",
         "status": "completed",
@@ -762,7 +762,7 @@ def _resource_usage_payload(
 
 
 def _validate_stage06_dataset_dependency(value: Mapping[str, Any]) -> None:
-    if value.get("stage") != "06":
+    if value.get("stage") not in {"06", "08J"}:
         raise RoehubNativeTrainingError(reason="unexpected_dataset_dependency_stage")
     if value.get("source_market") != "binance:futures":
         raise RoehubNativeTrainingError(reason="unexpected_dataset_dependency_market")
@@ -832,7 +832,7 @@ def _stage08d_warning_register_payload() -> list[dict[str, object]]:
     ]
 
 
-def _safety_payload() -> dict[str, object]:
+def _safety_payload(*, dataset_stage: str = "06") -> dict[str, object]:
     return {
         "allow_browser_runtime_verification": False,
         "allow_exchange_side_effects": False,
@@ -842,7 +842,8 @@ def _safety_payload() -> dict[str, object]:
         "contains_secrets": False,
         "hf_original_data_used": False,
         "register_promote_activate_trade": False,
-        "stage06_roehub_native_data_used": True,
+        "stage06_roehub_native_data_used": dataset_stage == "06",
+        "stage08j_article_selector_data_used": dataset_stage == "08J",
         "stage08f_evaluation_run": False,
     }
 

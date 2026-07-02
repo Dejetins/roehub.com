@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from argparse import Namespace
 
 import pytest
 
@@ -25,8 +25,8 @@ def test_stage08g_optuna_objective_does_not_reward_fewer_trades() -> None:
 
 
 def test_stage08g_optuna_selects_trade_sufficient_best_return_trial() -> None:
-    zero_trade = SimpleNamespace(number=1, values=[0.0, 0.0], params={})
-    profitable = SimpleNamespace(number=82, values=[0.1704538, 0.55910736], params={})
+    zero_trade = Namespace(number=1, values=[0.0, 0.0], params={})
+    profitable = Namespace(number=82, values=[0.1704538, 0.55910736], params={})
     records = [
         {
             "trial_number": 1,
@@ -62,7 +62,7 @@ def test_stage08g_optuna_selects_trade_sufficient_best_return_trial() -> None:
 
 
 def test_stage08g_optuna_blocks_when_no_trade_sufficient_trial_exists() -> None:
-    trial = SimpleNamespace(number=1, values=[0.0, 0.0], params={})
+    trial = Namespace(number=1, values=[0.0, 0.0], params={})
 
     with pytest.raises(stage08g_optuna.Stage08GOptunaError) as exc:
         stage08g_optuna._select_best_trial(  # noqa: SLF001
@@ -81,3 +81,97 @@ def test_stage08g_optuna_blocks_when_no_trade_sufficient_trial_exists() -> None:
         )
 
     assert exc.value.reason == "optuna_no_trade_sufficient_trials"
+
+
+def test_stage08k_native_final_gate_requires_strict_baseline_and_distribution_checks() -> None:
+    args = Namespace(stage_label="08K", min_calibration_closed_trades=100)
+    final_scorecard = {
+        "action_counts": {"close": 120, "hold": 760, "open_long": 60, "open_short": 60},
+        "closed_trades": 120,
+        "metrics_by_period": [
+            {"net_pnl_after_costs_quote": 60.0, "period": "2026-01"},
+            {"net_pnl_after_costs_quote": 40.0, "period": "2026-02"},
+            {"net_pnl_after_costs_quote": -10.0, "period": "2026-03"},
+        ],
+        "metrics_by_volatility_bucket": [
+            {"bucket": "low", "net_pnl_after_costs_quote": 25.0},
+            {"bucket": "medium", "net_pnl_after_costs_quote": 35.0},
+            {"bucket": "high", "net_pnl_after_costs_quote": 30.0},
+        ],
+        "net_pnl_after_costs_quote": 90.0,
+        "stability_by_ticker": [
+            {"net_pnl_after_costs_quote": 30.0, "symbol": "BTCUSDT"},
+            {"net_pnl_after_costs_quote": 35.0, "symbol": "ETHUSDT"},
+            {"net_pnl_after_costs_quote": 25.0, "symbol": "SOLUSDT"},
+        ],
+    }
+    final_manifest = {
+        "scorecards": [
+            final_scorecard | {
+                "policy_kind": "candidate",
+                "policy_name": "roehub_native_candidate_filtered_backtest",
+            },
+            {
+                "net_pnl_after_costs_quote": 25.0,
+                "policy_kind": "baseline",
+                "policy_name": "hold",
+            },
+        ]
+    }
+
+    gate = stage08g_optuna._final_holdout_gate(  # noqa: SLF001
+        args=args,
+        branch="roehub_native",
+        final_scorecard=final_scorecard,
+        final_manifest=final_manifest,
+    )
+
+    assert gate["stage09_allowed"] is True
+    assert gate["blockers"] == []
+
+
+def test_stage08k_native_final_gate_blocks_baseline_loser() -> None:
+    args = Namespace(stage_label="08K", min_calibration_closed_trades=100)
+    final_scorecard = {
+        "action_counts": {"close": 120, "hold": 760, "open_long": 60, "open_short": 60},
+        "closed_trades": 120,
+        "metrics_by_period": [
+            {"net_pnl_after_costs_quote": 40.0, "period": "2026-01"},
+            {"net_pnl_after_costs_quote": 30.0, "period": "2026-02"},
+            {"net_pnl_after_costs_quote": 20.0, "period": "2026-03"},
+        ],
+        "metrics_by_volatility_bucket": [
+            {"bucket": "low", "net_pnl_after_costs_quote": 30.0},
+            {"bucket": "medium", "net_pnl_after_costs_quote": 30.0},
+            {"bucket": "high", "net_pnl_after_costs_quote": 30.0},
+        ],
+        "net_pnl_after_costs_quote": 90.0,
+        "stability_by_ticker": [
+            {"net_pnl_after_costs_quote": 30.0, "symbol": "BTCUSDT"},
+            {"net_pnl_after_costs_quote": 30.0, "symbol": "ETHUSDT"},
+            {"net_pnl_after_costs_quote": 30.0, "symbol": "SOLUSDT"},
+        ],
+    }
+    final_manifest = {
+        "scorecards": [
+            final_scorecard | {
+                "policy_kind": "candidate",
+                "policy_name": "roehub_native_candidate_filtered_backtest",
+            },
+            {
+                "net_pnl_after_costs_quote": 120.0,
+                "policy_kind": "baseline",
+                "policy_name": "simple_recent_return_threshold",
+            },
+        ]
+    }
+
+    gate = stage08g_optuna._final_holdout_gate(  # noqa: SLF001
+        args=args,
+        branch="roehub_native",
+        final_scorecard=final_scorecard,
+        final_manifest=final_manifest,
+    )
+
+    assert gate["stage09_allowed"] is False
+    assert "candidate_does_not_clear_best_sanity_baseline" in gate["blockers"]

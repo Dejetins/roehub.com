@@ -105,6 +105,7 @@ def _run_command(args: argparse.Namespace) -> int:
             max_sessions=args.max_train_sessions,
             max_artifacts=args.max_train_artifacts,
             allow_fixture_hashes=args.allow_fixture_hashes,
+            accepted_stages=(args.sessionized_manifest_stage,),
         )
         validation, validation_payload = _load_stage06_split_features(
             manifest=manifest,
@@ -115,11 +116,14 @@ def _run_command(args: argparse.Namespace) -> int:
             max_sessions=args.max_validation_sessions,
             max_artifacts=args.max_validation_artifacts,
             allow_fixture_hashes=args.allow_fixture_hashes,
+            accepted_stages=(args.sessionized_manifest_stage,),
         )
         dataset_dependency = {
             "allow_fixture_hashes": bool(args.allow_fixture_hashes),
             "dataset_version": args.dataset_version,
             "leakage_report_status": _mapping_field(manifest, "leakage_report").get("status"),
+            "selector_id": _policy_id_from_manifest(manifest),
+            "sessionized_manifest_stage": args.sessionized_manifest_stage,
             "sessionized_manifest_path": str(args.stage06_manifest_path),
             "sessionized_manifest_rebuild_hash": manifest.get("deterministic_rebuild_hash"),
             "sessionized_manifest_sha256": manifest_sha256,
@@ -129,10 +133,16 @@ def _run_command(args: argparse.Namespace) -> int:
                 "train": train_payload,
                 "validation": validation_payload,
             },
-            "stage": "06",
+            "stage": args.sessionized_manifest_stage,
             "stage06_report": (
                 "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/"
                 "06-dataset-qa-session-extractor.md"
+            ),
+            "stage08j_report": (
+                "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/"
+                "08j-article-session-extractor-dataset.md"
+                if args.sessionized_manifest_stage == "08J"
+                else None
             ),
             "total_stage06_sessions": manifest.get("total_sessions"),
         }
@@ -239,8 +249,9 @@ def _load_stage06_split_features(
     max_sessions: int | None,
     max_artifacts: int | None,
     allow_fixture_hashes: bool,
+    accepted_stages: Sequence[str] = ("06",),
 ) -> tuple[np.ndarray, dict[str, object]]:
-    _validate_stage06_manifest(manifest)
+    _validate_stage06_manifest(manifest, accepted_stages=accepted_stages)
     entries = [
         entry
         for entry in _split_artifact_entries(manifest)
@@ -330,8 +341,10 @@ def _load_stage06_split_features(
         ),
         "manifest_path": str(manifest_path),
         "manifest_sha256": manifest_sha256,
+        "manifest_stage": manifest.get("stage"),
         "max_artifacts": max_artifacts,
         "max_sessions": max_sessions,
+        "selector_id": _policy_id_from_manifest(manifest),
         "selected_session_count": selected_session_count,
         "split": split,
         "split_artifact_count_selected": len(artifact_summary),
@@ -341,8 +354,12 @@ def _load_stage06_split_features(
     }
 
 
-def _validate_stage06_manifest(manifest: Mapping[str, Any]) -> None:
-    if manifest.get("stage") != "06":
+def _validate_stage06_manifest(
+    manifest: Mapping[str, Any],
+    *,
+    accepted_stages: Sequence[str] = ("06",),
+) -> None:
+    if manifest.get("stage") not in set(accepted_stages):
         raise RoehubNativeTrainingError(reason="unexpected_stage06_manifest_stage")
     if manifest.get("status") != "accepted":
         raise RoehubNativeTrainingError(reason="stage06_manifest_not_accepted")
@@ -350,6 +367,14 @@ def _validate_stage06_manifest(manifest: Mapping[str, Any]) -> None:
         raise RoehubNativeTrainingError(reason="unexpected_stage06_manifest_kind")
     if manifest.get("market") != "binance:futures":
         raise RoehubNativeTrainingError(reason="unexpected_stage06_manifest_market")
+
+
+def _policy_id_from_manifest(manifest: Mapping[str, Any]) -> str | None:
+    policy = manifest.get("policy")
+    if not isinstance(policy, Mapping):
+        return None
+    value = policy.get("policy_id")
+    return str(value) if isinstance(value, str) and value else None
 
 
 def _split_artifact_entries(manifest: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
@@ -503,6 +528,11 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     run = subparsers.add_parser("run", help="Run or resume Stage 08E Roehub-native training.")
     run.add_argument("--stage06-manifest-path", type=Path, default=DEFAULT_STAGE06_MANIFEST_PATH)
+    run.add_argument(
+        "--sessionized-manifest-stage",
+        choices=("06", "08J"),
+        default="06",
+    )
     run.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     run.add_argument("--run-id", type=str, default=None)
     run.add_argument("--resume", action="store_true")

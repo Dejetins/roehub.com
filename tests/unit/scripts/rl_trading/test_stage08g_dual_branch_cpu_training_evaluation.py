@@ -188,6 +188,41 @@ def test_stage08g_dual_branch_dry_run_can_use_mps_training_device_policy(
     assert "--device-policy mps_preferred_cpu_fallback" in commands[2]
 
 
+def test_stage08k_dual_branch_dry_run_defaults_to_article_selector_dataset(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    result = stage08g.main(
+        [
+            "--dry-run",
+            "--stage-label",
+            "08K",
+            "--output-root",
+            str(tmp_path / "runs"),
+            "--generated-at-utc",
+            "2026-07-02T12:00:00Z",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    summary = json.loads(Path(payload["summary_path"]).read_text(encoding="utf-8"))
+    commands = [step["command"] for step in summary["steps"]]
+
+    assert result == 0
+    assert summary["branch_order"] == [
+        "hf_original_control_30_10",
+        "roehub_native_article_selector_30_10",
+    ]
+    assert (
+        summary["methodology"]["native_training_dataset"]
+        == "accepted_stage08j_article_selector_sessionized_dataset"
+    )
+    assert "--sessionized-manifest-stage 08J" in commands[2]
+    assert "--sessionized-manifest-stage 08J" in commands[3]
+    assert "stage08j_article_sessionized_manifest.json" in commands[2]
+    assert "stage08j_article_sessionized_manifest.json" in commands[3]
+
+
 def _completed_training(
     *,
     tmp_path: Path,

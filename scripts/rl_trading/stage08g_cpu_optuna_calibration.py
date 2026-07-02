@@ -24,6 +24,9 @@ from scripts.rl_trading import (  # noqa: E402
 from scripts.rl_trading import (  # noqa: E402
     stage08f_roehub_native_backtest_evaluation as native_eval_cli,
 )
+from scripts.rl_trading import (  # noqa: E402
+    stage08j_article_session_extractor_dataset as article_dataset_cli,
+)
 from trading.contexts.rl_trading.domain import (  # noqa: E402
     STAGE07A_RUNTIME_ARTIFACT_ROOT_V1,
     HfOriginalEvaluationConfig,
@@ -39,14 +42,22 @@ from trading.contexts.rl_trading.domain import (  # noqa: E402
 )
 
 STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1 = "stage08g_dual_branch_cpu_optuna_training_evaluation_v1"
+STAGE08K_RUNTIME_ARTIFACT_SUBDIR_V1 = "stage08k_article_demo_profile_training_evaluation_v1"
 
 DEFAULT_OUTPUT_ROOT = (
     Path(STAGE07A_RUNTIME_ARTIFACT_ROOT_V1)
     / "evaluation_runs"
     / STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1
 )
+DEFAULT_STAGE08J_MANIFEST_PATH = Path(
+    "/opt/roehub/state/rl_trading/datasets/"
+    "stage08j_article_sessionized_dataset_v1/stage08j_article_sessionized_manifest.json"
+)
 DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
 DEFAULT_MIN_CALIBRATION_CLOSED_TRADES = 100
+STAGE08K_DOMINANCE_SHARE_LIMIT = 0.80
+STAGE08K_MIN_GROUP_POSITIVE_RATIO = 0.25
+STAGE08K_MAX_OPEN_SIDE_SHARE = 0.95
 
 BranchName = str
 
@@ -74,6 +85,9 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     optuna = _load_optuna()
     stage_label = str(args.stage_label)
     stage_label_lower = stage_label.lower()
+    _apply_stage_defaults(args)
+    if args.output_root == DEFAULT_OUTPUT_ROOT:
+        args.output_root = default_output_root_for_stage(stage_label)
     generated = (
         _parse_utc(args.generated_at_utc)
         if args.generated_at_utc is not None
@@ -277,6 +291,30 @@ def _load_branch_splits(
     if args.branch == "roehub_native":
         manifest = native_eval_cli._read_json(args.stage06_manifest_path)
         manifest_sha256 = native_eval_cli.compute_file_sha256(args.stage06_manifest_path)
+        if args.sessionized_manifest_stage == "08J":
+            calibration = article_dataset_cli._load_sessionized_split(
+                manifest=manifest,
+                manifest_path=args.stage06_manifest_path,
+                manifest_sha256=manifest_sha256,
+                dataset_version=args.dataset_version,
+                split=args.native_calibration_split,
+                max_sessions=args.max_calibration_sessions,
+                max_artifacts=args.max_calibration_artifacts,
+                allow_fixture_hashes=args.allow_fixture_hashes,
+                accepted_stages=("08J",),
+            )
+            final = article_dataset_cli._load_sessionized_split(
+                manifest=manifest,
+                manifest_path=args.stage06_manifest_path,
+                manifest_sha256=manifest_sha256,
+                dataset_version=args.dataset_version,
+                split=args.native_final_split,
+                max_sessions=args.max_final_sessions,
+                max_artifacts=args.max_final_artifacts,
+                allow_fixture_hashes=args.allow_fixture_hashes,
+                accepted_stages=("08J",),
+            )
+            return calibration, final
         calibration = native_eval_cli._load_stage06_split(
             manifest=manifest,
             manifest_path=args.stage06_manifest_path,
@@ -286,6 +324,7 @@ def _load_branch_splits(
             max_sessions=args.max_calibration_sessions,
             max_artifacts=args.max_calibration_artifacts,
             allow_fixture_hashes=args.allow_fixture_hashes,
+            accepted_stages=(args.sessionized_manifest_stage,),
         )
         final = native_eval_cli._load_stage06_split(
             manifest=manifest,
@@ -296,6 +335,7 @@ def _load_branch_splits(
             max_sessions=args.max_final_sessions,
             max_artifacts=args.max_final_artifacts,
             allow_fixture_hashes=args.allow_fixture_hashes,
+            accepted_stages=(args.sessionized_manifest_stage,),
         )
         return calibration, final
     raise Stage08GOptunaError(reason="unsupported_branch", field=str(args.branch))
@@ -520,9 +560,15 @@ def _summary_payload(
     final_manifest: Mapping[str, Any],
 ) -> dict[str, Any]:
     final_scorecard = _candidate_scorecard(final_manifest, branch=branch)
+    final_gate = _final_holdout_gate(
+        args=args,
+        branch=branch,
+        final_scorecard=final_scorecard,
+        final_manifest=final_manifest,
+    )
     status = (
         "accepted_for_research"
-        if _final_holdout_allows_stage09(final_scorecard)
+        if final_gate["stage09_allowed"]
         else "completed"
     )
     payload = {
@@ -544,6 +590,7 @@ def _summary_payload(
             "return_pct_after_costs": final_scorecard.get("return_pct_after_costs"),
             "win_rate": final_scorecard.get("win_rate"),
         },
+        "final_strict_research_gate": final_gate,
         "final_split": dict(final_split.source_payload),
         "generated_at_utc": _format_utc(generated_at_utc),
         "max_parallel_sessions_decision": {
@@ -591,6 +638,150 @@ def _summary_payload(
 
 def _final_holdout_allows_stage09(scorecard: Mapping[str, Any]) -> bool:
     return float(scorecard.get("net_pnl_after_costs_quote", 0.0)) > 0.0
+
+
+def _final_holdout_gate(
+    *,
+    args: argparse.Namespace,
+    branch: BranchName,
+    final_scorecard: Mapping[str, Any],
+    final_manifest: Mapping[str, Any],
+) -> dict[str, Any]:
+    if str(args.stage_label) != "08K" or branch != "roehub_native":
+        return {
+            "blockers": []
+            if _final_holdout_allows_stage09(final_scorecard)
+            else ["candidate_non_positive_final_holdout_pnl"],
+            "legacy_positive_pnl_gate": True,
+            "stage09_allowed": _final_holdout_allows_stage09(final_scorecard),
+            "status": "accepted_for_research"
+            if _final_holdout_allows_stage09(final_scorecard)
+            else "completed",
+        }
+
+    candidate_pnl = float(final_scorecard.get("net_pnl_after_costs_quote", 0.0))
+    closed_trades = int(final_scorecard.get("closed_trades", 0))
+    best_baseline = _best_baseline_net_pnl(final_manifest)
+    dominance = {
+        "monthly": _dominance_payload(
+            rows=final_scorecard.get("metrics_by_period"),
+            label_key="period",
+        ),
+        "ticker": _dominance_payload(
+            rows=final_scorecard.get("stability_by_ticker"),
+            label_key="symbol",
+        ),
+        "volatility_bucket": _dominance_payload(
+            rows=final_scorecard.get("metrics_by_volatility_bucket"),
+            label_key="bucket",
+        ),
+    }
+    monthly_positive_ratio = _positive_group_ratio(final_scorecard.get("metrics_by_period"))
+    ticker_positive_ratio = _positive_group_ratio(final_scorecard.get("stability_by_ticker"))
+    action_balance = _action_balance_payload(final_scorecard.get("action_counts"))
+    blockers: list[str] = []
+    if candidate_pnl <= 0.0:
+        blockers.append("candidate_non_positive_final_holdout_pnl")
+    if candidate_pnl <= best_baseline:
+        blockers.append("candidate_does_not_clear_best_sanity_baseline")
+    if closed_trades < int(args.min_calibration_closed_trades):
+        blockers.append("final_closed_trades_below_report_minimum")
+    if any(item["dominance_share"] > STAGE08K_DOMINANCE_SHARE_LIMIT for item in dominance.values()):
+        blockers.append("single_group_dominates_final_result")
+    if monthly_positive_ratio < STAGE08K_MIN_GROUP_POSITIVE_RATIO:
+        blockers.append("monthly_stability_obviously_broken")
+    if ticker_positive_ratio < STAGE08K_MIN_GROUP_POSITIVE_RATIO:
+        blockers.append("ticker_stability_obviously_broken")
+    if action_balance["open_side_dominance_share"] > STAGE08K_MAX_OPEN_SIDE_SHARE:
+        blockers.append("action_distribution_pathologically_one_sided")
+    allowed = not blockers
+    return {
+        "action_balance": action_balance,
+        "best_baseline_net_pnl_after_costs_quote": best_baseline,
+        "blockers": sorted(set(blockers)),
+        "candidate_beats_best_sanity_baseline": candidate_pnl > best_baseline,
+        "candidate_net_pnl_after_costs_quote": candidate_pnl,
+        "candidate_positive_after_costs": candidate_pnl > 0.0,
+        "closed_trades": closed_trades,
+        "dominance": dominance,
+        "dominance_share_limit": STAGE08K_DOMINANCE_SHARE_LIMIT,
+        "min_closed_trades": int(args.min_calibration_closed_trades),
+        "monthly_positive_group_ratio": monthly_positive_ratio,
+        "open_side_share_limit": STAGE08K_MAX_OPEN_SIDE_SHARE,
+        "positive_group_ratio_minimum": STAGE08K_MIN_GROUP_POSITIVE_RATIO,
+        "stage09_allowed": allowed,
+        "status": "accepted_for_research" if allowed else "blocked",
+        "ticker_positive_group_ratio": ticker_positive_ratio,
+    }
+
+
+def _dominance_payload(*, rows: object, label_key: str) -> dict[str, Any]:
+    if not isinstance(rows, list) or not rows:
+        return {"dominance_share": 0.0, "dominant_group": None, "group_count": 0}
+    parsed = [row for row in rows if isinstance(row, Mapping)]
+    abs_values = [
+        abs(float(row.get("net_pnl_after_costs_quote", 0.0))) for row in parsed
+    ]
+    denominator = sum(abs_values)
+    if denominator <= 0.0 or not parsed:
+        return {"dominance_share": 0.0, "dominant_group": None, "group_count": len(parsed)}
+    max_index = max(range(len(parsed)), key=lambda idx: abs_values[idx])
+    return {
+        "dominance_share": abs_values[max_index] / denominator,
+        "dominant_group": parsed[max_index].get(label_key),
+        "group_count": len(parsed),
+    }
+
+
+def _positive_group_ratio(rows: object) -> float:
+    if not isinstance(rows, list) or not rows:
+        return 0.0
+    parsed = [row for row in rows if isinstance(row, Mapping)]
+    if not parsed:
+        return 0.0
+    positive = sum(
+        1 for row in parsed if float(row.get("net_pnl_after_costs_quote", 0.0)) > 0.0
+    )
+    return positive / len(parsed)
+
+
+def _action_balance_payload(action_counts: object) -> dict[str, Any]:
+    if not isinstance(action_counts, Mapping):
+        return {"open_side_dominance_share": 1.0, "open_total": 0}
+    long_count = int(action_counts.get("open_long", 0))
+    short_count = int(action_counts.get("open_short", 0))
+    open_total = long_count + short_count
+    share = 1.0 if open_total <= 0 else max(long_count, short_count) / open_total
+    return {
+        "open_long": long_count,
+        "open_short": short_count,
+        "open_side_dominance_share": share,
+        "open_total": open_total,
+    }
+
+
+def runtime_artifact_subdir_for_stage(stage_label: str) -> str:
+    if stage_label == "08K":
+        return STAGE08K_RUNTIME_ARTIFACT_SUBDIR_V1
+    return STAGE08G_RUNTIME_ARTIFACT_SUBDIR_V1
+
+
+def default_output_root_for_stage(stage_label: str) -> Path:
+    return (
+        Path(STAGE07A_RUNTIME_ARTIFACT_ROOT_V1)
+        / "evaluation_runs"
+        / runtime_artifact_subdir_for_stage(stage_label)
+    )
+
+
+def _apply_stage_defaults(args: argparse.Namespace) -> None:
+    if args.stage_label != "08K":
+        return
+    if args.branch == "roehub_native":
+        if args.sessionized_manifest_stage == "06":
+            args.sessionized_manifest_stage = "08J"
+        if args.stage06_manifest_path == native_eval_cli.DEFAULT_STAGE06_MANIFEST_PATH:
+            args.stage06_manifest_path = DEFAULT_STAGE08J_MANIFEST_PATH
 
 
 def _default_run_id(
@@ -693,7 +884,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--allow-fixture-hashes", action="store_true")
-    parser.add_argument("--stage-label", choices=("08G", "08H"), default="08G")
+    parser.add_argument("--stage-label", choices=("08G", "08H", "08K"), default="08G")
     parser.add_argument("--trials", type=int, default=100)
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--optuna-seed", type=int, default=1708)
@@ -728,6 +919,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stage06-manifest-path",
         type=Path,
         default=native_eval_cli.DEFAULT_STAGE06_MANIFEST_PATH,
+    )
+    parser.add_argument(
+        "--sessionized-manifest-stage",
+        choices=("06", "08J"),
+        default="06",
     )
     parser.add_argument(
         "--dataset-version",
