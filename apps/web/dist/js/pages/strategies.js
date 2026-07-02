@@ -729,6 +729,149 @@ function renderExecutionOutcomes(root, executionOutcomes) {
     .join("");
 }
 
+function renderOutcomeRows(root, selector, outcomes) {
+  const target = qs(selector, root);
+  if (!target) {
+    return;
+  }
+  const items = outcomes?.items || [];
+  if (!items.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="8">${escapeHtml(panelStatusText(outcomes?.state, outcomes?.degradation_reason, outcomes?.source))}</td></tr>`;
+    return;
+  }
+  target.innerHTML = items
+    .map((item) => `
+      <tr data-source-event-id="${escapeHtml(item.source_event_id)}">
+        <td>${escapeHtml(item.strategy_signal_id || item.source_event_ref)}</td>
+        <td>${escapeHtml(`${item.source_type}: ${item.outcome} / ${item.outcome_reason}`)}<br><span class="strategies-source-cell">${escapeHtml(localTime(item.source_event_received_at))}</span></td>
+        <td>${escapeHtml(item.intent_id ? `${item.intent_status || "--"} / ${item.risk_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.order_status ? `${item.order_status} / ${item.order_status_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.fill_count === null || item.fill_count === undefined ? "--" : `${item.fill_count} / ${localTime(item.latest_fill_at)}`)}</td>
+        <td>${escapeHtml(item.reconciliation_status ? `${item.reconciliation_status} / ${item.reconciliation_reason || "--"}` : "--")}</td>
+        <td>${escapeHtml(item.latency_gap_status === "observed" ? durationText(item.latency_gap_seconds) : "--")}</td>
+        <td>${escapeHtml(item.notification_event_type ? `${item.notification_event_type} / ${item.notification_reason || "--"}` : "--")}</td>
+      </tr>
+    `)
+    .join("");
+}
+
+function renderRlMlTab(root, rlMl) {
+  const model = rlMl?.model_status || {};
+  const slots = rlMl?.ticker_slots || {};
+  const modes = rlMl?.modes || {};
+  const risk = rlMl?.risk_config || {};
+  const operator = rlMl?.operator_controls || {};
+  setText("[data-rl-state]", panelStatusText(rlMl?.state, rlMl?.degradation_reason, rlMl?.source), root);
+  setText("[data-rl-model-state]", panelStatusText(model.state, model.degradation_reason, model.source), root);
+  setText("[data-rl-model-family]", model.model_family || "--", root);
+  setText("[data-rl-model-champion]", model.champion_model_id || t("common.unavailable"), root);
+  setText("[data-rl-model-registry]", model.registry_status || "--", root);
+  setText("[data-rl-model-activation]", model.activation_status || "--", root);
+  setText("[data-rl-model-calibration]", model.calibration_pack_id || t("common.unavailable"), root);
+  setText("[data-rl-model-artifact-root]", model.artifact_root || "--", root);
+  setText("[data-rl-mode-state]", panelStatusText(modes.state, modes.degradation_reason, modes.source), root);
+  setText("[data-rl-active-mode]", modes.active_mode || "monitor_only", root);
+  setText(
+    "[data-rl-mode-options]",
+    (modes.options || [])
+      .map((option) => `${option.mode}:${option.enabled ? "enabled" : "blocked"}`)
+      .join(" / ") || "--",
+    root,
+  );
+  setText("[data-rl-mode-reason]", modes.degradation_reason || "--", root);
+  setText("[data-rl-risk-state]", panelStatusText(risk.state, risk.degradation_reason, risk.source), root);
+  setText("[data-rl-risk-sizing]", risk.sizing_policy || "--", root);
+  setText("[data-rl-risk-gate]", risk.risk_gate_status || "--", root);
+  setText(
+    "[data-rl-risk-max-notional]",
+    `${valueOrUnavailable(risk.max_position_notional)} / ${valueOrUnavailable(risk.max_notional_per_run)} / ${valueOrUnavailable(risk.max_orders_per_run)}`,
+    root,
+  );
+  setText("[data-rl-risk-notes]", (risk.notes || []).join(" / ") || "--", root);
+  setText("[data-rl-operator-state]", panelStatusText(operator.state, operator.degradation_reason, operator.source), root);
+  setText("[data-rl-operator-reason]", operator.degradation_reason || "--", root);
+  renderRlOperatorControls(root, operator);
+  renderRlTickerSlots(root, slots);
+  setText(
+    "[data-rl-outcomes-state]",
+    rlMl?.source_event_outcomes?.state || t("strategies.panel.unavailable"),
+    root,
+  );
+  renderOutcomeRows(root, "[data-rl-outcome-rows]", rlMl?.source_event_outcomes);
+}
+
+function renderRlOperatorControls(root, operator) {
+  const target = qs("[data-rl-operator-controls]", root);
+  if (!target) {
+    return;
+  }
+  const controls = operator?.controls || [];
+  if (!controls.length) {
+    target.innerHTML = `<span class="strategies-empty-block">${escapeHtml(panelStatusText(operator?.state, operator?.degradation_reason, operator?.source))}</span>`;
+    return;
+  }
+  target.innerHTML = controls
+    .filter((control) => control.visible !== false)
+    .map((control) => `
+      <button
+        class="rh-button rh-button--secondary rh-button--compact"
+        type="button"
+        data-rl-operator-action="${escapeHtml(control.action)}"
+        title="${escapeHtml(control.blocked_reason || "")}"
+        ${control.enabled ? "" : "disabled"}
+      >
+        ${escapeHtml(control.label || control.action)}
+      </button>
+    `)
+    .join("");
+}
+
+function renderRlTickerSlots(root, slots) {
+  setText("[data-rl-slots-state]", panelStatusText(slots?.state, slots?.degradation_reason, slots?.source), root);
+  setText("[data-rl-paid-level]", slots?.paid_level || "--", root);
+  setText("[data-rl-product-label]", slots?.product_label || "--", root);
+  setText(
+    "[data-rl-live-slots]",
+    `${valueOrUnavailable(slots?.live_slots_used)} / ${valueOrUnavailable(slots?.live_slots_allowed)}`,
+    root,
+  );
+  setText("[data-rl-slots-reason]", slots?.degradation_reason || "--", root);
+  const target = qs("[data-rl-slot-rows]", root);
+  if (!target) {
+    return;
+  }
+  const rows = slots?.items || [];
+  if (!rows.length) {
+    target.innerHTML = `<tr><td class="strategies-empty-row" colspan="6">${escapeHtml(panelStatusText(slots?.state, slots?.degradation_reason, slots?.source))}</td></tr>`;
+    return;
+  }
+  target.innerHTML = rows
+    .map((row) => `
+      <tr>
+        <td>${escapeHtml(row.symbol)}</td>
+        <td>${escapeHtml(row.exchange_name)}</td>
+        <td>${escapeHtml(row.market_type)}</td>
+        <td>${escapeHtml(row.mode)}</td>
+        <td>${escapeHtml(row.slot_state)}</td>
+        <td>${escapeHtml(row.readiness_reason)}</td>
+      </tr>
+    `)
+    .join("");
+}
+
+function syncStrategiesMode(root, activeMode) {
+  qsa("[data-strategies-mode]", root).forEach((button) => {
+    const isActive = button.dataset.strategiesMode === activeMode;
+    button.classList.toggle("strategies-tab--active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  qsa("[data-strategies-mode-panel]", root).forEach((panel) => {
+    if (panel instanceof HTMLElement) {
+      panel.hidden = panel.dataset.strategiesModePanel !== activeMode;
+    }
+  });
+}
+
 function renderFooter(summary) {
   const footer = summary?.footer_status || {};
   setText("[data-footer-connection]", footer.connection_status || "--", document);
@@ -780,7 +923,9 @@ function renderDashboard(root, summary, state = {}) {
   renderHours(root, summary.hourly_results);
   renderSignalJournal(root, summary.signal_journal);
   renderExecutionOutcomes(root, summary.execution_outcomes);
+  renderRlMlTab(root, summary.rl_ml);
   renderTrades(root, summary.trades);
+  syncStrategiesMode(root, state.activeMode || "classic");
   renderFooter(summary);
   renderFreshness(summary);
   setText("[data-strategies-refresh-status]", summary.refresh_status || t("refresh.idle"), document);
@@ -805,6 +950,7 @@ function initStrategies(root) {
     savedQuery: "",
     chartMode: "trades",
     statMode: "overall",
+    activeMode: "classic",
   };
   let activeRequest = null;
   let poller = null;
@@ -1034,6 +1180,12 @@ function initStrategies(root) {
     if (statMode instanceof HTMLElement) {
       state.statMode = statMode.dataset.statMode || "overall";
       syncStatWorkspace(root, state.statMode);
+      return;
+    }
+    const strategiesMode = event.target.closest("[data-strategies-mode]");
+    if (strategiesMode instanceof HTMLElement) {
+      state.activeMode = strategiesMode.dataset.strategiesMode || "classic";
+      syncStrategiesMode(root, state.activeMode);
       return;
     }
   });

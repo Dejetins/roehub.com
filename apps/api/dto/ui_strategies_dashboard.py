@@ -19,6 +19,8 @@ StrategyRuntimeEnvironment = Literal[
     "unknown",
 ]
 StrategyProducerStatus = Literal["running", "stopped", "blocked", "unknown"]
+RlMlSurfaceStatus = Literal["ready", "blocked", "pending", "not_configured"]
+RlMlMode = Literal["monitor_only", "paper", "testnet", "live"]
 
 
 class StrategyDashboardSourceResponse(BaseModel):
@@ -462,6 +464,116 @@ class StrategyExecutionOutcomeLinksResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyRlMlModelStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    source: str
+    state: PanelState
+    model_family: str
+    champion_model_id: str | None
+    champion_version: str | None
+    registry_status: RlMlSurfaceStatus
+    activation_status: RlMlSurfaceStatus
+    artifact_root: str
+    calibration_pack_id: str | None
+    updated_at: datetime | None
+    degradation_reason: str | None = None
+
+
+class StrategyRlMlTickerSlotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str
+    exchange_name: str
+    market_type: str
+    mode: RlMlMode
+    slot_state: RlMlSurfaceStatus
+    readiness_reason: str
+    strategy_run_id: str | None = None
+
+
+class StrategyRlMlTickerSlotsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    paid_level: str
+    product_label: str
+    live_slots_allowed: int
+    live_slots_used: int
+    items: list[StrategyRlMlTickerSlotResponse]
+    degradation_reason: str | None = None
+
+
+class StrategyRlMlModeOptionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: RlMlMode
+    enabled: bool
+    reason: str
+
+
+class StrategyRlMlModeSurfaceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    active_mode: RlMlMode
+    options: list[StrategyRlMlModeOptionResponse]
+    degradation_reason: str | None = None
+
+
+class StrategyRlMlRiskConfigResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    sizing_policy: str
+    risk_gate_status: RlMlSurfaceStatus
+    max_position_notional: Decimal | None
+    max_orders_per_run: int | None
+    max_notional_per_run: Decimal | None
+    notes: list[str]
+    degradation_reason: str | None = None
+
+
+class StrategyRlMlOperatorControlResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["request_retraining", "request_rollback"]
+    label: str
+    visible: bool
+    enabled: bool
+    guard_status: RlMlSurfaceStatus
+    blocked_reason: str
+
+
+class StrategyRlMlOperatorControlsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    state: PanelState
+    guard_available: bool
+    operator_authorized: bool
+    controls: list[StrategyRlMlOperatorControlResponse]
+    degradation_reason: str | None = None
+
+
+class StrategyRlMlTabResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    source: str
+    state: PanelState
+    title: str
+    model_status: StrategyRlMlModelStatusResponse
+    ticker_slots: StrategyRlMlTickerSlotsResponse
+    modes: StrategyRlMlModeSurfaceResponse
+    risk_config: StrategyRlMlRiskConfigResponse
+    operator_controls: StrategyRlMlOperatorControlsResponse
+    source_event_outcomes: StrategyExecutionOutcomeLinksResponse
+    degradation_reason: str | None = None
+
+
 class StrategyDashboardFooterStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -514,5 +626,6 @@ class StrategyDashboardResponse(BaseModel):
     signal_journal: StrategySignalJournalResponse
     paper_accounting: StrategyDashboardPaperAccountingResponse
     execution_outcomes: StrategyExecutionOutcomeLinksResponse
+    rl_ml: StrategyRlMlTabResponse
     footer_status: StrategyDashboardFooterStatusResponse
     refresh_control: StrategyDashboardRefreshControlResponse

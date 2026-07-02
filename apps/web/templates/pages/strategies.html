@@ -23,7 +23,34 @@
   >
     {% include "fragments/strategies/loading_state.html" %}
 
-    <div class="strategies-grid">
+    <div class="strategies-mode-tabbar" role="tablist" aria-label="{{ t('strategies.mode_tabs.label') }}">
+      <button
+        class="strategies-tab strategies-tab--active"
+        type="button"
+        id="strategies-classic-tab"
+        role="tab"
+        aria-selected="true"
+        aria-controls="strategies-classic-panel"
+        data-strategies-mode="classic"
+      >{{ t("strategies.mode_tabs.classic") }}</button>
+      <button
+        class="strategies-tab"
+        type="button"
+        id="strategies-rl-ml-tab"
+        role="tab"
+        aria-selected="false"
+        aria-controls="strategies-rl-ml-panel"
+        data-strategies-mode="rl_ml"
+      >{{ t("strategies.mode_tabs.rl_ml") }}</button>
+    </div>
+
+    <div
+      class="strategies-grid"
+      id="strategies-classic-panel"
+      role="tabpanel"
+      aria-labelledby="strategies-classic-tab"
+      data-strategies-mode-panel="classic"
+    >
       <section class="terminal-panel strategies-statistics" data-strategies-panel="statistics_workspace">
         <header class="panel-heading panel-heading--with-tools">
           <div class="strategies-panel-title-group">
@@ -474,6 +501,121 @@
         </div>
       </section>
 
+    </div>
+
+    <div
+      class="strategies-grid strategies-rl-grid"
+      id="strategies-rl-ml-panel"
+      role="tabpanel"
+      aria-labelledby="strategies-rl-ml-tab"
+      data-strategies-mode-panel="rl_ml"
+      hidden
+    >
+      <section class="terminal-panel strategies-rl-overview" data-strategies-panel="rl_ml_model_status">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.rl_ml.title") }}</h2>
+          <span class="strategies-pill" data-rl-state>--</span>
+        </header>
+        <div class="strategies-rl-cards">
+          <section class="strategies-rl-card" aria-label="{{ t('strategies.rl_ml.model_status') }}">
+            <header>
+              <h3>{{ t("strategies.rl_ml.model_status") }}</h3>
+              <span class="strategies-pill" data-rl-model-state>--</span>
+            </header>
+            <dl class="strategies-kv strategies-kv--profile">
+              <div><dt>{{ t("strategies.rl_ml.model_family") }}</dt><dd data-rl-model-family>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.champion") }}</dt><dd data-rl-model-champion>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.registry") }}</dt><dd data-rl-model-registry>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.activation") }}</dt><dd data-rl-model-activation>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.calibration") }}</dt><dd data-rl-model-calibration>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.artifact_root") }}</dt><dd data-rl-model-artifact-root>--</dd></div>
+            </dl>
+          </section>
+          <section class="strategies-rl-card" aria-label="{{ t('strategies.rl_ml.modes') }}">
+            <header>
+              <h3>{{ t("strategies.rl_ml.modes") }}</h3>
+              <span class="strategies-pill" data-rl-mode-state>--</span>
+            </header>
+            <dl class="strategies-kv strategies-kv--profile">
+              <div><dt>{{ t("strategies.rl_ml.active_mode") }}</dt><dd data-rl-active-mode>monitor_only</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.mode_options") }}</dt><dd data-rl-mode-options>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.reason") }}</dt><dd data-rl-mode-reason>--</dd></div>
+            </dl>
+          </section>
+          <section class="strategies-rl-card" aria-label="{{ t('strategies.rl_ml.risk_config') }}">
+            <header>
+              <h3>{{ t("strategies.rl_ml.risk_config") }}</h3>
+              <span class="strategies-pill" data-rl-risk-state>--</span>
+            </header>
+            <dl class="strategies-kv strategies-kv--profile">
+              <div><dt>{{ t("strategies.rl_ml.sizing_policy") }}</dt><dd data-rl-risk-sizing>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.risk_gate") }}</dt><dd data-rl-risk-gate>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.max_notional") }}</dt><dd data-rl-risk-max-notional>--</dd></div>
+              <div><dt>{{ t("strategies.rl_ml.notes") }}</dt><dd data-rl-risk-notes>--</dd></div>
+            </dl>
+          </section>
+          <section class="strategies-rl-card" aria-label="{{ t('strategies.rl_ml.operator_controls') }}">
+            <header>
+              <h3>{{ t("strategies.rl_ml.operator_controls") }}</h3>
+              <span class="strategies-pill" data-rl-operator-state>--</span>
+            </header>
+            <div class="strategies-rl-operator-actions" data-rl-operator-controls></div>
+            <p class="strategies-rl-note" data-rl-operator-reason>--</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-rl-slots" data-strategies-panel="rl_ml_ticker_slots">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.rl_ml.ticker_slots") }}</h2>
+          <span class="strategies-pill" data-rl-slots-state>--</span>
+        </header>
+        <dl class="strategies-kv strategies-kv--summary">
+          <div><dt>{{ t("strategies.rl_ml.paid_level") }}</dt><dd data-rl-paid-level>--</dd></div>
+          <div><dt>{{ t("strategies.rl_ml.product_label") }}</dt><dd data-rl-product-label>--</dd></div>
+          <div><dt>{{ t("strategies.rl_ml.live_slots") }}</dt><dd data-rl-live-slots>--</dd></div>
+          <div><dt>{{ t("strategies.rl_ml.reason") }}</dt><dd data-rl-slots-reason>--</dd></div>
+        </dl>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--rl-slots">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.trades.symbol") }}</th>
+                <th>{{ t("strategies.selected.exchange") }}</th>
+                <th>{{ t("strategies.selected.market") }}</th>
+                <th>{{ t("strategies.profile.mode") }}</th>
+                <th>{{ t("strategies.status.unknown") }}</th>
+                <th>{{ t("strategies.profile.reason") }}</th>
+              </tr>
+            </thead>
+            <tbody data-rl-slot-rows></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="terminal-panel strategies-rl-outcomes" data-strategies-panel="rl_ml_source_event_outcomes">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("strategies.rl_ml.ml_agent_decision_outcomes") }}</h2>
+          <span class="strategies-pill" data-rl-outcomes-state>--</span>
+        </header>
+        <div class="strategies-table-wrap">
+          <table class="strategies-table strategies-table--outcomes">
+            <thead>
+              <tr>
+                <th>{{ t("strategies.execution_outcomes.signal") }}</th>
+                <th>{{ t("strategies.execution_outcomes.source") }}</th>
+                <th>{{ t("strategies.execution_outcomes.intent") }}</th>
+                <th>{{ t("strategies.execution_outcomes.execution") }}</th>
+                <th>{{ t("strategies.execution_outcomes.fill") }}</th>
+                <th>{{ t("strategies.execution_outcomes.reconciliation") }}</th>
+                <th>{{ t("strategies.execution_outcomes.latency_gap") }}</th>
+                <th>{{ t("strategies.execution_outcomes.notification") }}</th>
+              </tr>
+            </thead>
+            <tbody data-rl-outcome-rows></tbody>
+          </table>
+        </div>
+      </section>
     </div>
   </section>
 {% endblock %}

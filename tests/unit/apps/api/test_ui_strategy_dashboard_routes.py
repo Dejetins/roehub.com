@@ -154,6 +154,46 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert source_statuses["strategy_run_metadata"] == "available"
     assert source_statuses["strategy_stat_projections"] == "unavailable"
     assert source_statuses["execution_fills"] == "unavailable"
+    assert payload["rl_ml"]["state"] == "degraded"
+    assert payload["rl_ml"]["model_status"]["model_family"] == "rl-trading-agent-platform-v1"
+    assert payload["rl_ml"]["model_status"]["artifact_root"] == (
+        "/opt/roehub/state/rl_trading/"
+    )
+    assert payload["rl_ml"]["model_status"]["registry_status"] == "not_configured"
+    assert payload["rl_ml"]["ticker_slots"]["paid_level"] == "free"
+    assert payload["rl_ml"]["ticker_slots"]["live_slots_allowed"] == 0
+    assert payload["rl_ml"]["ticker_slots"]["degradation_reason"] == (
+        "stage12_entitlement_mapping_pending"
+    )
+    assert payload["rl_ml"]["ticker_slots"]["items"][0]["symbol"] == "BTCUSDT"
+    assert payload["rl_ml"]["modes"]["active_mode"] == "monitor_only"
+    assert payload["rl_ml"]["modes"]["options"][0] == {
+        "mode": "monitor_only",
+        "enabled": True,
+        "reason": "safe_read_only_mode_available",
+    }
+    assert payload["rl_ml"]["modes"]["options"][1]["reason"] == (
+        "stage15_classic_paper_prerequisites_blocked"
+    )
+    assert payload["rl_ml"]["risk_config"]["risk_gate_status"] == "blocked"
+    assert payload["rl_ml"]["risk_config"]["notes"] == [
+        "stage10a_no_auto_promotion",
+        "stage11_no_order_intents",
+        "live_execution_risk_gate_required_before_execution",
+    ]
+    assert payload["rl_ml"]["operator_controls"]["guard_available"] is False
+    assert payload["rl_ml"]["operator_controls"]["operator_authorized"] is False
+    assert {
+        control["action"]: (control["enabled"], control["blocked_reason"])
+        for control in payload["rl_ml"]["operator_controls"]["controls"]
+    } == {
+        "request_retraining": (False, "operator_admin_guard_not_available"),
+        "request_rollback": (False, "operator_admin_guard_not_available"),
+    }
+    assert payload["rl_ml"]["source_event_outcomes"]["state"] == "empty"
+    assert payload["rl_ml"]["source_event_outcomes"]["degradation_reason"] == (
+        "ml_agent_decision_outcomes_empty"
+    )
     source_freshness = {source["name"]: source["age_seconds"] for source in payload["sources"]}
     assert isinstance(source_freshness["strategy_strategies"], int)
     assert isinstance(source_freshness["strategy_runs"], int)
@@ -212,6 +252,30 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
                     notification_reason="order_filled",
                     updated_at=execution_updated_at,
                 ),
+                ExecutionProducerOutcomeLink(
+                    source_event_id=UUID("00000000-0000-0000-0000-000000006402"),
+                    owner_user_id=strategy.user_id,
+                    source_type="ml_agent_decision",
+                    source_event_ref="rl-decision-202605060902",
+                    source_event_received_at=source_event_received_at + timedelta(seconds=1),
+                    strategy_signal_id=None,
+                    outcome="no_intent",
+                    outcome_reason="monitor_only_no_intent",
+                    intent_id=None,
+                    intent_status=None,
+                    intent_status_reason=None,
+                    risk_status=None,
+                    risk_reason=None,
+                    order_status=None,
+                    order_status_reason=None,
+                    fill_count=0,
+                    latest_fill_at=None,
+                    reconciliation_status=None,
+                    reconciliation_reason=None,
+                    notification_event_type="ml_agent_decision",
+                    notification_reason="monitor_only_journal",
+                    updated_at=execution_updated_at + timedelta(seconds=1),
+                ),
             )
         ),
     )
@@ -231,8 +295,8 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
     assert payload["runtime_status"]["producer_reason"] == "starting"
     assert payload["runtime_status"]["mainnet_available"] is False
     assert payload["runtime_status"]["latest_signal_at"] == "2026-05-06T09:02:00Z"
-    assert payload["runtime_status"]["latest_source_event_at"] == "2026-05-06T09:02:03Z"
-    assert payload["runtime_status"]["latest_execution_update_at"] == "2026-05-06T09:02:10Z"
+    assert payload["runtime_status"]["latest_source_event_at"] == "2026-05-06T09:02:04Z"
+    assert payload["runtime_status"]["latest_execution_update_at"] == "2026-05-06T09:02:11Z"
     assert payload["runtime_status"]["observed_latency_gap_seconds"] == 7
     assert payload["runtime_status"]["observed_latency_gap_status"] == "observed"
     outcome = payload["execution_outcomes"]["items"][0]
@@ -244,6 +308,14 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
     assert outcome["latency_gap_seconds"] == 7
     assert outcome["latency_gap_status"] == "observed"
     assert outcome["latency_gap_reason"] == "source_event_to_latest_update"
+    rl_outcomes = payload["rl_ml"]["source_event_outcomes"]
+    assert rl_outcomes["source"] == "execution_producer_outcomes"
+    assert rl_outcomes["state"] == "ready"
+    assert len(rl_outcomes["items"]) == 1
+    assert rl_outcomes["items"][0]["source_type"] == "ml_agent_decision"
+    assert rl_outcomes["items"][0]["strategy_signal_id"] is None
+    assert rl_outcomes["items"][0]["outcome_reason"] == "monitor_only_no_intent"
+    assert rl_outcomes["items"][0]["latency_gap_status"] == "observed"
 
 
 def test_strategy_dashboard_auth_failure_uses_auth_required_code() -> None:
@@ -448,7 +520,10 @@ class _FakeExecutionOutcomeService:
             for link in self._links
             if link.owner_user_id == owner_user_id
             and link.source_event_ref
-            and link.strategy_signal_id is not None
+            and (
+                link.strategy_signal_id is not None
+                or link.source_type == "ml_agent_decision"
+            )
             and strategy_id == _STRATEGY_ID
         )
 

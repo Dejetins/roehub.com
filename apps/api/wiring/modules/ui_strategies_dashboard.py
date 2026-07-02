@@ -40,6 +40,15 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyMetricGridResponse,
     StrategyMetricResponse,
     StrategyMonthlyStatsResponse,
+    StrategyRlMlModelStatusResponse,
+    StrategyRlMlModeOptionResponse,
+    StrategyRlMlModeSurfaceResponse,
+    StrategyRlMlOperatorControlResponse,
+    StrategyRlMlOperatorControlsResponse,
+    StrategyRlMlRiskConfigResponse,
+    StrategyRlMlTabResponse,
+    StrategyRlMlTickerSlotResponse,
+    StrategyRlMlTickerSlotsResponse,
     StrategySeriesPanelResponse,
     StrategySignalJournalResponse,
     StrategySignalJournalRowResponse,
@@ -119,6 +128,14 @@ _EXCHANGE_ACCOUNT_SOURCE = "exchange_account_projection"
 _SIGNAL_JOURNAL_SOURCE = "strategy_signals"
 _PAPER_ACCOUNTING_SOURCE = "strategy_paper_accounting"
 _EXECUTION_OUTCOMES_SOURCE = "execution_producer_outcomes"
+_RL_ML_TAB_SOURCE = "rl_ml_strategy_dashboard"
+_RL_MODEL_REGISTRY_SOURCE = "rl_model_registry"
+_RL_TICKER_SLOTS_SOURCE = "rl_live_ticker_slots"
+_RL_MODE_SOURCE = "rl_strategy_modes"
+_RL_RISK_SOURCE = "rl_risk_config"
+_RL_OPERATOR_SOURCE = "rl_operator_controls"
+_RL_ARTIFACT_ROOT = "/opt/roehub/state/rl_trading/"
+_ML_AGENT_DECISION_SOURCE_TYPE = "ml_agent_decision"
 _SIGNAL_JOURNAL_LIMIT = 20
 _EXECUTION_OUTCOME_LIMIT = 20
 
@@ -364,6 +381,13 @@ class StrategyDashboardQueryService:
             signal_journal=signal_journal,
             paper_accounting=paper_accounting,
             execution_outcomes=execution_outcomes,
+            rl_ml=_build_rl_ml_tab(
+                principal=principal,
+                strategy=selected_strategy,
+                profile=live_profile,
+                run=selected_run,
+                execution_outcomes=execution_outcomes,
+            ),
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
                 data_status="degraded" if _has_degraded_sources(sources) else "actual",
@@ -1618,6 +1642,209 @@ def _runtime_observed_gap_seconds(
     if latest_source_event_at is None or latest_execution_update_at is None:
         return None
     return max(0, int((latest_execution_update_at - latest_source_event_at).total_seconds()))
+
+
+def _build_rl_ml_tab(
+    *,
+    principal: CurrentUserPrincipal,
+    strategy: Strategy | None,
+    profile: LiveStrategyProfile | None,
+    run: StrategyRun | None,
+    execution_outcomes: StrategyExecutionOutcomeLinksResponse,
+) -> StrategyRlMlTabResponse:
+    ml_outcomes = _filter_ml_agent_decision_outcomes(execution_outcomes=execution_outcomes)
+    return StrategyRlMlTabResponse(
+        source=_RL_ML_TAB_SOURCE,
+        state="degraded",
+        title="RL/ML",
+        model_status=_build_rl_model_status(),
+        ticker_slots=_build_rl_ticker_slots(
+            principal=principal,
+            strategy=strategy,
+            profile=profile,
+            run=run,
+        ),
+        modes=_build_rl_modes(profile=profile),
+        risk_config=_build_rl_risk_config(profile=profile),
+        operator_controls=_build_rl_operator_controls(),
+        source_event_outcomes=ml_outcomes,
+        degradation_reason="rl_runtime_activation_pending",
+    )
+
+
+def _build_rl_model_status() -> StrategyRlMlModelStatusResponse:
+    return StrategyRlMlModelStatusResponse(
+        source=_RL_MODEL_REGISTRY_SOURCE,
+        state="degraded",
+        model_family="rl-trading-agent-platform-v1",
+        champion_model_id=None,
+        champion_version=None,
+        registry_status="not_configured",
+        activation_status="blocked",
+        artifact_root=_RL_ARTIFACT_ROOT,
+        calibration_pack_id=None,
+        updated_at=None,
+        degradation_reason="rl_model_registry_read_model_not_configured",
+    )
+
+
+def _build_rl_ticker_slots(
+    *,
+    principal: CurrentUserPrincipal,
+    strategy: Strategy | None,
+    profile: LiveStrategyProfile | None,
+    run: StrategyRun | None,
+) -> StrategyRlMlTickerSlotsResponse:
+    paid_level = str(principal.paid_level)
+    symbol = _selected_symbol(strategy=strategy) or "BTCUSDT"
+    exchange, market_type, _parsed_symbol = (
+        _parse_instrument_key(strategy.spec.instrument_key)
+        if strategy is not None
+        else (None, None, None)
+    )
+    mode = _profile_mode_or_monitor(profile=profile)
+    items = [
+        StrategyRlMlTickerSlotResponse(
+            symbol=symbol,
+            exchange_name=exchange or "binance",
+            market_type=market_type or "futures",
+            mode=mode,
+            slot_state="blocked",
+            readiness_reason="stage12_entitlement_mapping_pending",
+            strategy_run_id=str(run.run_id) if run is not None else None,
+        )
+    ]
+    return StrategyRlMlTickerSlotsResponse(
+        source=_RL_TICKER_SLOTS_SOURCE,
+        state="degraded",
+        paid_level=paid_level,
+        product_label=_product_label_for_paid_level(paid_level),
+        live_slots_allowed=0,
+        live_slots_used=0,
+        items=items,
+        degradation_reason="stage12_entitlement_mapping_pending",
+    )
+
+
+def _build_rl_modes(*, profile: LiveStrategyProfile | None) -> StrategyRlMlModeSurfaceResponse:
+    active_mode = _profile_mode_or_monitor(profile=profile)
+    return StrategyRlMlModeSurfaceResponse(
+        source=_RL_MODE_SOURCE,
+        state="degraded",
+        active_mode=active_mode,
+        options=[
+            StrategyRlMlModeOptionResponse(
+                mode="monitor_only",
+                enabled=True,
+                reason="safe_read_only_mode_available",
+            ),
+            StrategyRlMlModeOptionResponse(
+                mode="paper",
+                enabled=False,
+                reason="stage15_classic_paper_prerequisites_blocked",
+            ),
+            StrategyRlMlModeOptionResponse(
+                mode="testnet",
+                enabled=False,
+                reason="stage16_classic_testnet_prerequisites_blocked",
+            ),
+            StrategyRlMlModeOptionResponse(
+                mode="live",
+                enabled=False,
+                reason="mainnet_blocked_until_stage19_20_approval",
+            ),
+        ],
+        degradation_reason="rl_execution_modes_pending_later_stage_gates",
+    )
+
+
+def _build_rl_risk_config(
+    *, profile: LiveStrategyProfile | None
+) -> StrategyRlMlRiskConfigResponse:
+    return StrategyRlMlRiskConfigResponse(
+        source=_RL_RISK_SOURCE,
+        state="degraded",
+        sizing_policy=profile.sizing_method if profile is not None else "fixed_quote",
+        risk_gate_status="blocked",
+        max_position_notional=(
+            profile.max_position_notional if profile is not None else None
+        ),
+        max_orders_per_run=profile.max_orders_per_run if profile is not None else None,
+        max_notional_per_run=profile.max_notional_per_run if profile is not None else None,
+        notes=[
+            "stage10a_no_auto_promotion",
+            "stage11_no_order_intents",
+            "live_execution_risk_gate_required_before_execution",
+        ],
+        degradation_reason="rl_risk_runtime_config_placeholder",
+    )
+
+
+def _build_rl_operator_controls() -> StrategyRlMlOperatorControlsResponse:
+    controls = [
+        StrategyRlMlOperatorControlResponse(
+            action="request_retraining",
+            label="Request retraining",
+            visible=True,
+            enabled=False,
+            guard_status="not_configured",
+            blocked_reason="operator_admin_guard_not_available",
+        ),
+        StrategyRlMlOperatorControlResponse(
+            action="request_rollback",
+            label="Request rollback",
+            visible=True,
+            enabled=False,
+            guard_status="not_configured",
+            blocked_reason="operator_admin_guard_not_available",
+        ),
+    ]
+    return StrategyRlMlOperatorControlsResponse(
+        source=_RL_OPERATOR_SOURCE,
+        state="degraded",
+        guard_available=False,
+        operator_authorized=False,
+        controls=controls,
+        degradation_reason="operator_admin_guard_not_available",
+    )
+
+
+def _filter_ml_agent_decision_outcomes(
+    *,
+    execution_outcomes: StrategyExecutionOutcomeLinksResponse,
+) -> StrategyExecutionOutcomeLinksResponse:
+    items = [
+        item
+        for item in execution_outcomes.items
+        if item.source_type == _ML_AGENT_DECISION_SOURCE_TYPE
+    ]
+    return StrategyExecutionOutcomeLinksResponse(
+        source=_EXECUTION_OUTCOMES_SOURCE,
+        state="ready" if items else "empty",
+        limit=execution_outcomes.limit,
+        items=items,
+        degradation_reason=None if items else "ml_agent_decision_outcomes_empty",
+    )
+
+
+def _profile_mode_or_monitor(
+    *,
+    profile: LiveStrategyProfile | None,
+) -> Literal["monitor_only", "paper", "testnet", "live"]:
+    if profile is None:
+        return "monitor_only"
+    if profile.mode == "live":
+        return "live"
+    return profile.mode
+
+
+def _product_label_for_paid_level(paid_level: str) -> str:
+    return {
+        "free": "Free",
+        "pro": "Pro",
+        "ultra": "Premium",
+        "base": "internal/base",
+    }.get(paid_level, "unknown")
 
 
 def _build_strategy_selector(
