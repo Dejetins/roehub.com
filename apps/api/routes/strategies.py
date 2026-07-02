@@ -36,6 +36,10 @@ from trading.contexts.live_execution.domain import (
     ExecutionRiskContext,
     ExecutionSourceValidationError,
 )
+from trading.contexts.rl_trading.domain.live_entitlements import (
+    RlLiveTickerEntitlementService,
+    RlLiveTickerIdentity,
+)
 from trading.contexts.strategy.application.ports.current_user import (
     CurrentUser,
     CurrentUserProvider,
@@ -385,6 +389,7 @@ def build_strategies_router(
     create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
     strategy_run_repository: StrategyRunRepository | None = None,
     live_profile_repository: LiveStrategyProfileRepository | None = None,
+    rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None = None,
     execution_ingress_service: ExecutionIngressService | None = None,
     execution_dispatch_service: ExecutionDispatchService | None = None,
     paper_accounting_service: CapitalReservationPaperAccountingService | None = None,
@@ -562,6 +567,14 @@ def build_strategies_router(
                 principal_dependency=current_user_principal_dependency,
             ),
         )
+        profile = _apply_rl_live_ticker_entitlement(
+            profile=profile,
+            strategy=create_result.strategy,
+            request=request,
+            principal_dependency=current_user_principal_dependency,
+            entitlement_service=rl_live_ticker_entitlement_service,
+            profile_repository=live_profile_repository,
+        )
         if profile.readiness_status != "ready":
             raise RoehubError(
                 code="strategy_launch.readiness_blocked",
@@ -649,6 +662,7 @@ def build_strategies_router(
                 current_user=current_user,
             )
         else:
+            strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
             profile = service.update_profile(
                 strategy_id=strategy_id,
                 current_user=current_user,
@@ -657,6 +671,14 @@ def build_strategies_router(
                     request=request,
                     principal_dependency=current_user_principal_dependency,
                 ),
+            )
+            profile = _apply_rl_live_ticker_entitlement(
+                profile=profile,
+                strategy=strategy,
+                request=request,
+                principal_dependency=current_user_principal_dependency,
+                entitlement_service=rl_live_ticker_entitlement_service,
+                profile_repository=live_profile_repository,
             )
         record_live_strategy_profile_readiness(
             status=profile.readiness_status,
@@ -692,6 +714,7 @@ def build_strategies_router(
     ) -> LiveStrategyProfileResponse:
         service = _require_live_profile_service(service=live_profile_service)
         current_user = current_user_provider.require_current_user()
+        strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
         profile = service.update_profile(
             strategy_id=strategy_id,
             current_user=current_user,
@@ -700,6 +723,14 @@ def build_strategies_router(
                 request=request,
                 principal_dependency=current_user_principal_dependency,
             ),
+        )
+        profile = _apply_rl_live_ticker_entitlement(
+            profile=profile,
+            strategy=strategy,
+            request=request,
+            principal_dependency=current_user_principal_dependency,
+            entitlement_service=rl_live_ticker_entitlement_service,
+            profile_repository=live_profile_repository,
         )
         record_live_strategy_profile_readiness(
             status=profile.readiness_status,
@@ -718,6 +749,7 @@ def build_strategies_router(
     ) -> LiveStrategyProfileResponse:
         service = _require_live_profile_service(service=live_profile_service)
         current_user = current_user_provider.require_current_user()
+        strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
         profile = service.refresh_readiness(
             strategy_id=strategy_id,
             current_user=current_user,
@@ -725,6 +757,14 @@ def build_strategies_router(
                 request=request,
                 principal_dependency=current_user_principal_dependency,
             ),
+        )
+        profile = _apply_rl_live_ticker_entitlement(
+            profile=profile,
+            strategy=strategy,
+            request=request,
+            principal_dependency=current_user_principal_dependency,
+            entitlement_service=rl_live_ticker_entitlement_service,
+            profile_repository=live_profile_repository,
         )
         record_live_strategy_profile_readiness(
             status=profile.readiness_status,
@@ -997,6 +1037,109 @@ def _profile_request_to_config(
         max_orders_per_run=request.max_orders_per_run,
         max_notional_per_run=request.max_notional_per_run,
     )
+
+
+def _apply_rl_live_ticker_entitlement(
+    *,
+    profile: LiveStrategyProfile,
+    strategy: Strategy,
+    request: Request,
+    principal_dependency: CurrentUserPrincipalDependency | None,
+    entitlement_service: RlLiveTickerEntitlementService | None,
+    profile_repository: LiveStrategyProfileRepository | None,
+) -> LiveStrategyProfile:
+    if entitlement_service is None:
+        return profile
+    principal = _resolve_current_principal(
+        request=request,
+        principal_dependency=principal_dependency,
+    )
+    if principal is None or principal.user_id != profile.owner_user_id:
+        return _persist_profile_readiness(
+            profile=profile,
+            profile_repository=profile_repository,
+            readiness_status="blocked",
+            readiness_reason="rl_live_ticker_current_principal_unavailable",
+        )
+    requested_ticker = _rl_live_ticker_identity(
+        owner_user_id=profile.owner_user_id,
+        strategy=strategy,
+    )
+    snapshot = entitlement_service.sync_profile(
+        owner_user_id=profile.owner_user_id,
+        paid_level=str(principal.paid_level),
+        strategy_id=profile.strategy_id,
+        live_profile_id=profile.profile_id,
+        mode=profile.mode,
+        requested_ticker=requested_ticker,
+        profile_ready=profile.readiness_status == "ready",
+        observed_at=profile.updated_at,
+    )
+    if profile.mode != "live" or profile.readiness_status != "ready" or snapshot.eligible:
+        return profile
+    return _persist_profile_readiness(
+        profile=profile,
+        profile_repository=profile_repository,
+        readiness_status="blocked",
+        readiness_reason=snapshot.readiness_reason,
+    )
+
+
+def _resolve_current_principal(
+    *,
+    request: Request,
+    principal_dependency: CurrentUserPrincipalDependency | None,
+) -> CurrentUserPrincipal | None:
+    if principal_dependency is None:
+        return None
+    return principal_dependency(request)
+
+
+def _persist_profile_readiness(
+    *,
+    profile: LiveStrategyProfile,
+    profile_repository: LiveStrategyProfileRepository | None,
+    readiness_status: Literal["ready", "blocked"],
+    readiness_reason: str,
+) -> LiveStrategyProfile:
+    updated = profile.with_readiness(
+        readiness_status=readiness_status,
+        readiness_reason=readiness_reason,
+        updated_at=profile.updated_at,
+    )
+    if profile_repository is None:
+        return updated
+    return profile_repository.update(profile=updated)
+
+
+def _rl_live_ticker_identity(
+    *,
+    owner_user_id,
+    strategy: Strategy,
+) -> RlLiveTickerIdentity:
+    exchange_name, market_type, symbol = _parse_strategy_instrument(
+        instrument_key=strategy.spec.instrument_key,
+        fallback_market_type=strategy.spec.market_type,
+        fallback_symbol=str(strategy.spec.instrument_id.symbol),
+    )
+    return RlLiveTickerIdentity(
+        owner_user_id=owner_user_id,
+        exchange_name=exchange_name,
+        market_type=market_type,
+        symbol=symbol,
+    )
+
+
+def _parse_strategy_instrument(
+    *,
+    instrument_key: str,
+    fallback_market_type: str,
+    fallback_symbol: str,
+) -> tuple[str, str, str]:
+    parts = [part.strip() for part in instrument_key.split(":") if part.strip()]
+    if len(parts) >= 3:
+        return parts[0].lower(), parts[1].lower(), parts[2].upper()
+    return "binance", fallback_market_type.strip().lower(), fallback_symbol.strip().upper()
 
 
 def _require_live_profile_service(

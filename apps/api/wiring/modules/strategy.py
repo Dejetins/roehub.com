@@ -57,6 +57,13 @@ from trading.contexts.live_execution.domain import (
     ExchangePositionSnapshot,
     ExpectedInstrumentConfig,
 )
+from trading.contexts.rl_trading.adapters.outbound.persistence import (
+    InMemoryRlLiveTickerEntitlementRepository,
+    PostgresRlLiveTickerEntitlementRepository,
+)
+from trading.contexts.rl_trading.domain.live_entitlements import (
+    RlLiveTickerEntitlementService,
+)
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -592,6 +599,9 @@ def build_strategy_router(
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, event_repository = _build_repositories(settings=settings)
     profile_repository = _build_live_profile_repository(settings=settings)
+    rl_live_ticker_entitlement_service = _build_rl_live_ticker_entitlement_service(
+        settings=settings,
+    )
     position_ownership_coordinator = _build_position_ownership_coordinator(
         settings=settings,
     )
@@ -688,6 +698,7 @@ def build_strategy_router(
         create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
         strategy_run_repository=run_repository,
         live_profile_repository=profile_repository,
+        rl_live_ticker_entitlement_service=rl_live_ticker_entitlement_service,
         execution_ingress_service=_execution_ingress_service(
             live_execution_services=live_execution_services,
         ),
@@ -765,6 +776,25 @@ def _build_live_profile_repository(
             f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
         )
     return InMemoryLiveStrategyProfileRepository()
+
+
+def _build_rl_live_ticker_entitlement_service(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> RlLiveTickerEntitlementService:
+    if settings.postgres_dsn:
+        return RlLiveTickerEntitlementService(
+            repository=PostgresRlLiveTickerEntitlementRepository(
+                gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+            )
+        )
+    if settings.fail_fast:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
+        )
+    return RlLiveTickerEntitlementService(
+        repository=InMemoryRlLiveTickerEntitlementRepository()
+    )
 
 
 def _build_backtest_job_repository(

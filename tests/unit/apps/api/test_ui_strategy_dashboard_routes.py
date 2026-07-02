@@ -20,6 +20,12 @@ from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTMarketReadinessReport,
     BTCUSDTMarketReadinessRow,
 )
+from trading.contexts.rl_trading.adapters.outbound.persistence import (
+    InMemoryRlLiveTickerEntitlementRepository,
+)
+from trading.contexts.rl_trading.domain.live_entitlements import (
+    RlLiveTickerEntitlementService,
+)
 from trading.contexts.strategy.domain.entities import (
     LiveStrategyProfile,
     Strategy,
@@ -82,6 +88,9 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         run_repository=_FakeRunRepository(runs=(run,)),
         signal_repository=_FakeSignalRepository(signals=(_signal(strategy=strategy, run=run),)),
         btcusdt_market_readiness_service=_FakeBTCUSDTMarketReadinessService(),  # type: ignore[arg-type]
+        rl_live_ticker_entitlement_service=RlLiveTickerEntitlementService(
+            repository=InMemoryRlLiveTickerEntitlementRepository(),
+        ),
     )
     client = _build_client(service=service)
 
@@ -161,11 +170,15 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     )
     assert payload["rl_ml"]["model_status"]["registry_status"] == "not_configured"
     assert payload["rl_ml"]["ticker_slots"]["paid_level"] == "free"
-    assert payload["rl_ml"]["ticker_slots"]["live_slots_allowed"] == 0
-    assert payload["rl_ml"]["ticker_slots"]["degradation_reason"] == (
-        "stage12_entitlement_mapping_pending"
-    )
+    assert payload["rl_ml"]["ticker_slots"]["product_label"] == "Free"
+    assert payload["rl_ml"]["ticker_slots"]["entitlement_source"] == "paid_level"
+    assert payload["rl_ml"]["ticker_slots"]["live_slots_allowed"] == 1
+    assert payload["rl_ml"]["ticker_slots"]["live_slots_used"] == 0
+    assert payload["rl_ml"]["ticker_slots"]["degradation_reason"] is None
     assert payload["rl_ml"]["ticker_slots"]["items"][0]["symbol"] == "BTCUSDT"
+    assert payload["rl_ml"]["ticker_slots"]["items"][0]["readiness_reason"] == (
+        "rl_live_ticker_not_counted_for_mode"
+    )
     assert payload["rl_ml"]["modes"]["active_mode"] == "monitor_only"
     assert payload["rl_ml"]["modes"]["options"][0] == {
         "mode": "monitor_only",
@@ -377,9 +390,10 @@ class _HeaderCurrentUserDependency:
                     "message": "Authentication required",
                 },
             )
+        raw_paid_level = request.headers.get("x-paid-level", "free")
         return CurrentUserPrincipal(
             user_id=UserId.from_string(raw_user_id),
-            paid_level=PaidLevel.free(),
+            paid_level=PaidLevel(raw_paid_level),
         )
 
 

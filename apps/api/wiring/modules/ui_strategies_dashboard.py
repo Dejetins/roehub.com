@@ -66,6 +66,7 @@ from apps.api.wiring.modules.strategy import (
     _build_compatibility_readiness_service,
     _build_live_profile_repository,
     _build_repositories,
+    _build_rl_live_ticker_entitlement_service,
     _build_signal_repository,
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
@@ -90,6 +91,11 @@ from trading.contexts.live_execution.domain import (
 )
 from trading.contexts.market_data.application.dto.reference_api import BTCUSDTMarketReadinessRow
 from trading.contexts.market_data.application.use_cases import BTCUSDTMarketReadinessUseCase
+from trading.contexts.rl_trading.domain.live_entitlements import (
+    RlLiveTickerEntitlementService,
+    RlLiveTickerIdentity,
+    evaluate_rl_live_ticker_entitlement,
+)
 from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
 from trading.contexts.strategy.application import (
     CurrentUser,
@@ -222,6 +228,7 @@ class StrategyDashboardQueryService:
         account_projection_service: AccountProjectionReadinessService | None = None,
         paper_accounting_service: PaperAccountingReadService | None = None,
         execution_outcome_service: ExecutionOutcomeReadService | None = None,
+        rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -233,6 +240,7 @@ class StrategyDashboardQueryService:
         self._account_projection_service = account_projection_service
         self._paper_accounting_service = paper_accounting_service
         self._execution_outcome_service = execution_outcome_service
+        self._rl_live_ticker_entitlement_service = rl_live_ticker_entitlement_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -387,6 +395,9 @@ class StrategyDashboardQueryService:
                 profile=live_profile,
                 run=selected_run,
                 execution_outcomes=execution_outcomes,
+                rl_live_ticker_entitlement_service=(
+                    self._rl_live_ticker_entitlement_service
+                ),
             ),
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
@@ -1100,6 +1111,7 @@ def build_strategy_dashboard_service(
             account_projection_service=None,
             paper_accounting_service=None,
             execution_outcome_service=None,
+            rl_live_ticker_entitlement_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -1123,6 +1135,9 @@ def build_strategy_dashboard_service(
         account_projection_service=_build_account_projection_service(settings=settings),
         paper_accounting_service=_build_paper_accounting_service(settings=settings),
         execution_outcome_service=_build_execution_outcome_service(settings=settings),
+        rl_live_ticker_entitlement_service=_build_rl_live_ticker_entitlement_service(
+            settings=settings,
+        ),
     )
 
 
@@ -1651,6 +1666,7 @@ def _build_rl_ml_tab(
     profile: LiveStrategyProfile | None,
     run: StrategyRun | None,
     execution_outcomes: StrategyExecutionOutcomeLinksResponse,
+    rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None,
 ) -> StrategyRlMlTabResponse:
     ml_outcomes = _filter_ml_agent_decision_outcomes(execution_outcomes=execution_outcomes)
     return StrategyRlMlTabResponse(
@@ -1663,6 +1679,7 @@ def _build_rl_ml_tab(
             strategy=strategy,
             profile=profile,
             run=run,
+            rl_live_ticker_entitlement_service=rl_live_ticker_entitlement_service,
         ),
         modes=_build_rl_modes(profile=profile),
         risk_config=_build_rl_risk_config(profile=profile),
@@ -1694,6 +1711,7 @@ def _build_rl_ticker_slots(
     strategy: Strategy | None,
     profile: LiveStrategyProfile | None,
     run: StrategyRun | None,
+    rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None,
 ) -> StrategyRlMlTickerSlotsResponse:
     paid_level = str(principal.paid_level)
     symbol = _selected_symbol(strategy=strategy) or "BTCUSDT"
@@ -1703,26 +1721,51 @@ def _build_rl_ticker_slots(
         else (None, None, None)
     )
     mode = _profile_mode_or_monitor(profile=profile)
+    requested_ticker = RlLiveTickerIdentity(
+        owner_user_id=principal.user_id,
+        exchange_name=exchange or "binance",
+        market_type=market_type or "futures",
+        symbol=symbol,
+    )
+    if rl_live_ticker_entitlement_service is None:
+        snapshot = evaluate_rl_live_ticker_entitlement(
+            paid_level="unknown",
+            mode=mode,
+            requested_ticker=requested_ticker,
+            active_tickers=(),
+        )
+        state: PanelState = "degraded"
+        degradation_reason = "rl_live_ticker_entitlement_repository_unavailable"
+    else:
+        snapshot = rl_live_ticker_entitlement_service.snapshot(
+            owner_user_id=principal.user_id,
+            paid_level=paid_level,
+            mode=mode,
+            requested_ticker=requested_ticker,
+        )
+        state = "ready" if snapshot.eligible else "degraded"
+        degradation_reason = None if snapshot.eligible else snapshot.readiness_reason
     items = [
         StrategyRlMlTickerSlotResponse(
             symbol=symbol,
             exchange_name=exchange or "binance",
             market_type=market_type or "futures",
             mode=mode,
-            slot_state="blocked",
-            readiness_reason="stage12_entitlement_mapping_pending",
+            slot_state="ready" if snapshot.eligible else "blocked",
+            readiness_reason=snapshot.readiness_reason,
             strategy_run_id=str(run.run_id) if run is not None else None,
         )
     ]
     return StrategyRlMlTickerSlotsResponse(
         source=_RL_TICKER_SLOTS_SOURCE,
-        state="degraded",
-        paid_level=paid_level,
-        product_label=_product_label_for_paid_level(paid_level),
-        live_slots_allowed=0,
-        live_slots_used=0,
+        state=state,
+        paid_level=snapshot.paid_level,
+        product_label=snapshot.product_label,
+        entitlement_source=snapshot.entitlement_source,
+        live_slots_allowed=snapshot.live_slots_allowed,
+        live_slots_used=snapshot.live_slots_used,
         items=items,
-        degradation_reason="stage12_entitlement_mapping_pending",
+        degradation_reason=degradation_reason,
     )
 
 
@@ -1836,15 +1879,6 @@ def _profile_mode_or_monitor(
     if profile.mode == "live":
         return "live"
     return profile.mode
-
-
-def _product_label_for_paid_level(paid_level: str) -> str:
-    return {
-        "free": "Free",
-        "pro": "Pro",
-        "ultra": "Premium",
-        "base": "internal/base",
-    }.get(paid_level, "unknown")
 
 
 def _build_strategy_selector(

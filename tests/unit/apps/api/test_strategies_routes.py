@@ -17,6 +17,12 @@ from trading.contexts.live_execution.application import (
     CapitalReservationPaperAccountingService,
     ExecutionIngressService,
 )
+from trading.contexts.rl_trading.adapters.outbound.persistence import (
+    InMemoryRlLiveTickerEntitlementRepository,
+)
+from trading.contexts.rl_trading.domain.live_entitlements import (
+    RlLiveTickerEntitlementService,
+)
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -175,9 +181,10 @@ class _HeaderCurrentUserPrincipalDependency:
         raw_user_id = request.headers.get("x-user-id")
         if raw_user_id is None:
             raise ValueError("x-user-id header is required for strategy route tests")
+        raw_paid_level = request.headers.get("x-paid-level", "free")
         return CurrentUserPrincipal(
             user_id=UserId.from_string(raw_user_id),
-            paid_level=PaidLevel.free(),
+            paid_level=PaidLevel(raw_paid_level),
             session_created_at=self._session_created_at,
         )
 
@@ -309,6 +316,7 @@ def _build_live_profile_client(
     event_repository = InMemoryStrategyEventRepository()
     run_repository = InMemoryStrategyRunRepository()
     profile_repository = InMemoryLiveStrategyProfileRepository()
+    rl_entitlement_repository = InMemoryRlLiveTickerEntitlementRepository()
     clock = _SequenceClock(
         start=datetime(2026, 5, 30, 12, 0, tzinfo=timezone.utc),
         steps=60,
@@ -376,6 +384,9 @@ def _build_live_profile_client(
             create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
             strategy_run_repository=run_repository,
             live_profile_repository=profile_repository,
+            rl_live_ticker_entitlement_service=RlLiveTickerEntitlementService(
+                repository=rl_entitlement_repository,
+            ),
         )
     )
     return TestClient(app)
@@ -583,7 +594,168 @@ def test_live_strategy_profile_allows_paper_and_recent_auth_live_with_ready_conn
     )
     assert live.status_code == 200
     assert live.json()["readiness_status"] == "ready"
-    assert live.json()["readiness_reason"] == "live_ready_recent_auth_and_connection"
+
+
+def test_live_strategy_profile_blocks_second_free_rl_live_ticker() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000001434",
+        "x-paid-level": "free",
+    }
+    first_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    second_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="ETHUSDT"),
+        headers=headers,
+    )
+    assert first_strategy.status_code == 201
+    assert second_strategy.status_code == 201
+
+    first_live = client.put(
+        f"/strategies/{first_strategy.json()['strategy_id']}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e101",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert first_live.status_code == 200
+    assert first_live.json()["readiness_status"] == "ready"
+
+    second_live = client.put(
+        f"/strategies/{second_strategy.json()['strategy_id']}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e102",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert second_live.status_code == 200
+    assert second_live.json()["mode"] == "live"
+    assert second_live.json()["readiness_status"] == "blocked"
+    assert second_live.json()["readiness_reason"] == "rl_live_ticker_quota_exceeded"
+
+
+def test_live_strategy_profile_does_not_count_paper_and_releases_stopped_slot() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000001435",
+        "x-paid-level": "free",
+    }
+    first_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    second_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="ETHUSDT"),
+        headers=headers,
+    )
+    assert first_strategy.status_code == 201
+    assert second_strategy.status_code == 201
+    first_id = first_strategy.json()["strategy_id"]
+    second_id = second_strategy.json()["strategy_id"]
+
+    paper = client.put(
+        f"/strategies/{first_id}/live-profile",
+        json={
+            "mode": "paper",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert paper.status_code == 200
+    assert paper.json()["readiness_status"] == "ready"
+
+    second_live = client.put(
+        f"/strategies/{second_id}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e202",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert second_live.status_code == 200
+    assert second_live.json()["readiness_status"] == "ready"
+
+    stopped = client.put(
+        f"/strategies/{second_id}/live-profile",
+        json={
+            "mode": "monitor_only",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "0",
+            "max_orders_per_run": 0,
+            "max_notional_per_run": "0",
+        },
+        headers=headers,
+    )
+    assert stopped.status_code == 200
+    assert stopped.json()["readiness_reason"] == "monitor_only_no_exchange_submit"
+
+    first_live = client.put(
+        f"/strategies/{first_id}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e201",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert first_live.status_code == 200
+    assert first_live.json()["readiness_status"] == "ready"
+
+
+def test_live_strategy_profile_blocks_base_paid_level_fail_closed() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {
+        "x-user-id": "00000000-0000-0000-0000-000000001436",
+        "x-paid-level": "base",
+    }
+    created_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    assert created_strategy.status_code == 201
+
+    live = client.put(
+        f"/strategies/{created_strategy.json()['strategy_id']}/live-profile",
+        json={
+            "mode": "live",
+            "exchange_connection_id": "00000000-0000-0000-0000-00000000e301",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "10",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "10",
+        },
+        headers=headers,
+    )
+    assert live.status_code == 200
+    assert live.json()["readiness_status"] == "blocked"
+    assert live.json()["readiness_reason"] == "rl_live_ticker_paid_level_base_fail_closed"
 
 
 def test_launch_from_backtest_variant_creates_profile_and_run_config() -> None:
