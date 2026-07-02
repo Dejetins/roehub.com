@@ -252,6 +252,66 @@ Operational rules:
 - trainer, inference and backtest concurrency must follow the profile limits before
   any Stage `07+` runtime job is enabled.
 
+## RL/ML local artifact backup and restore drill
+
+Stage `09B` owns the first local backup/restore command surface for accepted RL
+metadata artifacts under `/opt/roehub/state/rl_trading/`. It is a non-production
+artifact drill, not `/opt/roehub/app` deploy proof and not model activation.
+
+Default command:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage09b_local_artifact_backup_restore.py run-drill \
+  --run-id stage09b_macstudio_YYYYMMDDtHHMMSSz \
+  --generated-at-utc YYYY-MM-DDTHH:MM:SSZ
+```
+
+Outputs stay outside git:
+
+- backup root:
+  `/opt/roehub/state/rl_trading/backups/stage09b_local_artifact_backup_restore_v1/<run_id>/`;
+- restore drill root:
+  `/opt/roehub/state/rl_trading/restore_drills/stage09b_local_artifact_backup_restore_v1/<run_id>/`;
+- backup manifest:
+  `stage09b_backup_manifest.json`;
+- registry metadata dump:
+  `metadata/stage09b_registry_metadata_dump.json`;
+- rollback manifest:
+  `metadata/stage09b_rollback_manifest.json`;
+- restore report:
+  `stage09b_restore_report.json`.
+
+The command validates sha256 before backup, after backup, and after restore. It
+copies only compact accepted manifests/summaries and stage-local metadata, not
+large datasets, raw checkpoint tensors, secrets, provider payloads, cookies or
+credentials.
+
+Retention policy:
+
+- retain forever: accepted champion manifest/scorecard, source manifests,
+  `stage09b_backup_manifest.json`, registry metadata dump and rollback manifest;
+- retain for `30` days by default: restored drill copies and calibration-status
+  metadata created only to replay the drill;
+- removable after evidence capture: scratch outputs that are not referenced by
+  the backup manifest or restore report.
+
+Rollback dry-run command:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage09b_local_artifact_backup_restore.py rollback-dry-run \
+  --registry-metadata-dump /opt/roehub/state/rl_trading/backups/stage09b_local_artifact_backup_restore_v1/<run_id>/metadata/stage09b_registry_metadata_dump.json \
+  --expected-current-model-version-id stage08m_a3823cbd01143878_fd7c614b \
+  --to-model-version-id stage09b_previous_accepted_champion_restore_drill \
+  --reason stage09b_restore_drill
+```
+
+Residual risk: when backup and restore roots are on the same physical disk, this
+protects against corruption/operator error of the active copy but is not disaster
+recovery. Stage `19`/`21` must either prove a second-disk/off-host backup path or
+explicitly accept this single-host disk risk.
+
 ClickHouse partition dedup (safe full-history run):
 
 ```bash
