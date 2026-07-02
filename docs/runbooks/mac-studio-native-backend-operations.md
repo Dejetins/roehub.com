@@ -121,6 +121,82 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_backtest_job_runner
 ```
 
+## RL/ML host-local lifecycle commands
+
+Stage `10A` RL retraining/promotion lifecycle is host-local and artifact-only.
+It does not use browser auth, exchange credentials, paper/testnet/live/mainnet
+submission, or `/opt/roehub/app` runtime mutation. Runtime artifacts stay under
+`/opt/roehub/state/rl_trading/`.
+
+Manual candidate retrain planning:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage10a_retraining_promotion_lifecycle.py \
+  plan-retrain \
+  --mode full_retrain \
+  --trigger manual \
+  --run-id stage10a_manual_operator_YYYYMMDDtHHMMSSz \
+  --requested-by-ref-hash <sha256-of-operator-reference>
+```
+
+Scheduled trigger proof. The default is disabled unless an operator explicitly
+enables a bounded schedule in `configs/*/rl_trading_ml_runtime.yaml`:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage10a_retraining_promotion_lifecycle.py \
+  plan-retrain \
+  --mode fine_tune \
+  --trigger scheduled \
+  --run-id stage10a_scheduled_disabled_check_YYYYMMDDtHHMMSSz
+```
+
+Expected disabled default result is JSON `status=blocked` with blocker
+`schedule_disabled_by_default`.
+
+Promotion check is a hard approval gate. Even when every metric passes, the
+command writes a promotion check artifact only; it does not perform registry
+write or runtime activation.
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage10a_retraining_promotion_lifecycle.py \
+  promotion-check \
+  --candidate-model-version-id <candidate-model-version-id> \
+  --candidate-manifest-path /opt/roehub/state/rl_trading/.../candidate_manifest.json \
+  --expected-candidate-manifest-sha256 <sha256> \
+  --calibration-pack-path /opt/roehub/state/rl_trading/.../calibration_pack.json \
+  --expected-calibration-pack-sha256 <sha256> \
+  --pnl-after-fees-funding-slippage-quote <number> \
+  --max-drawdown-quote <number> \
+  --trades-count <integer> \
+  --ticker-positive-group-ratio <number> \
+  --out-of-sample-days <integer> \
+  --overfit-ratio <number> \
+  --latency-p95-ms <number> \
+  --resource-rss-mb <number> \
+  --artifact-integrity-ok \
+  --registry-integrity-ok \
+  --operator-ref-hash <sha256-of-operator-approval-reference> \
+  --admin-ref-hash <sha256-of-admin-approval-reference>
+```
+
+Rollback dry-run writes a rollback manifest and command line, with no artifact
+deletion and no registry mutation:
+
+```bash
+cd /Users/daniildegtyarev/Projects/roehub.com
+uv run python scripts/rl_trading/stage10a_retraining_promotion_lifecycle.py \
+  rollback-dry-run \
+  --to-model-version-id <previous-model-version-id> \
+  --to-calibration-pack-id <previous-calibration-pack-id> \
+  --current-registry-metadata-sha256 <sha256> \
+  --previous-champion-manifest-sha256 <sha256> \
+  --previous-calibration-pack-sha256 <sha256> \
+  --operator-ref-hash <sha256-of-operator-approval-reference>
+```
+
 Monit launchd wrapper semantics:
 
 - `start` runs `launchctl enable`, then `bootstrap` when needed, then `kickstart`;

@@ -30,7 +30,25 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["runtime_artifacts"]["commit_to_git"] is False
         assert config["trainer"]["enabled"] is False
         assert config["inference"]["enabled"] is False
+        assert config["retraining"]["enabled"] is False
+        assert config["retraining"]["manual_trigger"]["enabled"] is False
+        assert config["retraining"]["manual_trigger"]["host_local_cli_only"] is True
+        assert config["retraining"]["scheduled_trigger"]["enabled"] is False
+        assert config["retraining"]["scheduled_trigger"]["schedule_id"] is None
+        assert config["retraining"]["drift_trigger"]["creates_candidate_task"] is True
+        assert config["retraining"]["drift_trigger"]["auto_promote"] is False
+        assert config["retraining"]["allowed_modes"] == ["full_retrain", "fine_tune"]
+        assert config["promotion"]["auto_promote"] is False
+        assert config["promotion"]["require_operator_approval"] is True
+        assert config["promotion"]["require_admin_approval"] is True
+        assert (
+            config["promotion"]["threshold_profile"]
+            == "stage10a_promotion_threshold_profile_v1"
+        )
+        assert config["rollback"]["host_local_command_enabled"] is True
+        assert config["rollback"]["delete_artifacts_on_rollback"] is False
         assert config["trainer"]["max_concurrent_jobs"] == 1
         assert config["inference"]["max_concurrent_processes"] == 1
+        assert config["retraining"]["max_concurrent_candidate_jobs"] == 1
         assert config["disk"]["cleanup_may_delete_accepted_artifacts"] is False
         assert config["disk"]["block_training_below_free_gb"] >= config["disk"]["min_free_gb"]

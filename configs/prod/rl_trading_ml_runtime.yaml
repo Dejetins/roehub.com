@@ -9,6 +9,29 @@ trainer:
   torch_num_interop_threads: 1
   max_rss_mb: 32768
   nice: 10
+retraining:
+  enabled: false
+  manual_trigger:
+    enabled: false
+    host_local_cli_only: true
+  scheduled_trigger:
+    enabled: false
+    schedule_id: null
+  drift_trigger:
+    creates_candidate_task: true
+    auto_promote: false
+  allowed_modes:
+    - full_retrain
+    - fine_tune
+  max_concurrent_candidate_jobs: 1
+promotion:
+  auto_promote: false
+  require_operator_approval: true
+  require_admin_approval: true
+  threshold_profile: stage10a_promotion_threshold_profile_v1
+rollback:
+  host_local_command_enabled: true
+  delete_artifacts_on_rollback: false
 inference:
   enabled: false
   max_concurrent_processes: 1
