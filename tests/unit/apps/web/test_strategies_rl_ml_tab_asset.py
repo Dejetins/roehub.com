@@ -18,6 +18,8 @@ def test_strategies_template_exposes_rl_ml_tab_hooks() -> None:
         "data-rl-slot-rows",
         "data-rl-operator-controls",
         "data-rl-outcome-rows",
+        "data-rl-risk-synthetic-exits",
+        "data-rl-risk-reasons",
         "ml_agent_decision_outcomes",
     ]
     for literal in required_literals:
@@ -29,6 +31,8 @@ def test_strategies_asset_renders_rl_ml_from_backend_state_only() -> None:
 
     assert "renderRlMlTab(root, summary.rl_ml)" in asset
     assert "renderRlOperatorControls(root, operator)" in asset
+    assert "renderSyntheticExitText(risk.synthetic_exit_rules || [])" in asset
+    assert "data-rl-risk-reasons" in asset
     assert "control.enabled ? \"\" : \"disabled\"" in asset
     assert "data-rl-operator-action" in asset
     assert "syncStrategiesMode(root, state.activeMode || \"classic\")" in asset
@@ -43,6 +47,7 @@ def test_strategies_css_keeps_rl_ml_tab_responsive() -> None:
     assert "#strategies-rl-ml-panel .strategies-pill" in css
     assert "overflow-wrap: anywhere" in css
     assert ".strategies-rl-slots" in css
+    assert ".strategies-rl-risk-rules" in css
     assert "overflow: hidden" in css
     assert "max-width: 100%" in css
     assert "@media (max-width: 720px)" in css

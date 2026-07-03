@@ -547,12 +547,38 @@
   white-space: normal;
 }
 
+#strategies-rl-ml-panel .strategies-rl-card header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+#strategies-rl-ml-panel .strategies-rl-card h3 {
+  overflow: visible;
+  line-height: 1.15;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+#strategies-rl-ml-panel .strategies-kv dd {
+  overflow: visible;
+  line-height: 1.35;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .strategies-rl-note {
   overflow-wrap: anywhere;
   margin: 0;
   color: var(--rh-muted);
   font-size: 10px;
   line-height: 1.35;
+}
+
+.strategies-rl-risk-rules {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .strategies-rl-operator-actions {

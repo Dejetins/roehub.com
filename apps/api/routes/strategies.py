@@ -8,7 +8,7 @@ Docs:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Literal, Mapping
 from uuid import UUID
@@ -39,6 +39,13 @@ from trading.contexts.live_execution.domain import (
 from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerEntitlementService,
     RlLiveTickerIdentity,
+)
+from trading.contexts.rl_trading.domain.risk_sizing_policy import (
+    RlRiskSizingPolicyConfig,
+    RlRiskSizingPolicyKey,
+    RlRiskSizingPolicyRecord,
+    RlRiskSizingPolicyService,
+    RlSyntheticExitRule,
 )
 from trading.contexts.strategy.application.ports.current_user import (
     CurrentUser,
@@ -372,6 +379,62 @@ class ManualStrategyExecutionResponse(BaseModel):
     outcome_reason: str
 
 
+class RlSyntheticExitRuleResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rule_type: Literal["take_profit", "stop_loss", "trailing_stop"]
+    trigger_pct: Decimal
+    platform_side: bool
+    creates_intent_action: Literal["close"]
+
+
+class RlRiskSizingPolicyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active: bool = True
+    sizing_method: Literal["fixed_quote", "fixed_equity_pct"] = "fixed_quote"
+    base_quote_notional: Decimal = Field(default=Decimal("0"), ge=0)
+    max_position_notional: Decimal = Field(default=Decimal("0"), ge=0)
+    max_daily_loss_notional: Decimal = Field(default=Decimal("0"), ge=0)
+    max_drawdown_pct: Decimal = Field(default=Decimal("0"), ge=0, le=1)
+    max_turnover_notional: Decimal = Field(default=Decimal("0"), ge=0)
+    max_exposure_notional: Decimal = Field(default=Decimal("0"), ge=0)
+    min_expected_pnl_pct: Decimal = Field(default=Decimal("0"), ge=0, le=1)
+    min_confidence: Decimal | None = Field(default=None, ge=0, le=1)
+    take_profit_pct: Decimal | None = Field(default=None, ge=0, le=1)
+    stop_loss_pct: Decimal | None = Field(default=None, ge=0, le=1)
+    trailing_stop_pct: Decimal | None = Field(default=None, ge=0, le=1)
+
+
+class RlRiskSizingPolicyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    policy_id: UUID | None
+    owner_user_id: UUID
+    strategy_id: UUID
+    exchange_name: str
+    market_type: str
+    symbol: str
+    active: bool
+    sizing_method: Literal["fixed_quote", "fixed_equity_pct"]
+    base_quote_notional: Decimal
+    max_position_notional: Decimal
+    max_daily_loss_notional: Decimal
+    max_drawdown_pct: Decimal
+    max_turnover_notional: Decimal
+    max_exposure_notional: Decimal
+    min_expected_pnl_pct: Decimal
+    min_confidence: Decimal | None
+    take_profit_pct: Decimal | None
+    stop_loss_pct: Decimal | None
+    trailing_stop_pct: Decimal | None
+    validation_status: Literal["ready", "blocked"]
+    validation_reasons: list[str]
+    synthetic_exit_rules: list[RlSyntheticExitRuleResponse]
+    created_at: datetime | None
+    updated_at: datetime | None
+
+
 def build_strategies_router(
     *,
     create_use_case: CreateStrategyUseCase,
@@ -390,6 +453,7 @@ def build_strategies_router(
     strategy_run_repository: StrategyRunRepository | None = None,
     live_profile_repository: LiveStrategyProfileRepository | None = None,
     rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None = None,
+    rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None = None,
     execution_ingress_service: ExecutionIngressService | None = None,
     execution_dispatch_service: ExecutionDispatchService | None = None,
     paper_accounting_service: CapitalReservationPaperAccountingService | None = None,
@@ -568,7 +632,12 @@ def build_strategies_router(
             ),
         )
         profile = _apply_rl_live_ticker_entitlement(
-            profile=profile,
+            profile=_apply_rl_risk_policy_readiness(
+                profile=profile,
+                strategy=create_result.strategy,
+                risk_policy_service=rl_risk_sizing_policy_service,
+                profile_repository=live_profile_repository,
+            ),
             strategy=create_result.strategy,
             request=request,
             principal_dependency=current_user_principal_dependency,
@@ -618,6 +687,39 @@ def build_strategies_router(
             ),
             launch_config=launch_config,
         )
+
+    @router.get(
+        "/strategies/{strategy_id}/rl-risk-policy",
+        response_model=RlRiskSizingPolicyResponse,
+    )
+    def get_strategy_rl_risk_policy(
+        strategy_id: UUID,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> RlRiskSizingPolicyResponse:
+        current_user = current_user_provider.require_current_user()
+        strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
+        service = _require_rl_risk_policy_service(service=rl_risk_sizing_policy_service)
+        record = service.get_policy(key=_rl_risk_policy_key(strategy=strategy))
+        return _to_rl_risk_policy_response(record=record)
+
+    @router.put(
+        "/strategies/{strategy_id}/rl-risk-policy",
+        response_model=RlRiskSizingPolicyResponse,
+    )
+    def put_strategy_rl_risk_policy(
+        strategy_id: UUID,
+        payload: RlRiskSizingPolicyRequest,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> RlRiskSizingPolicyResponse:
+        current_user = current_user_provider.require_current_user()
+        strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
+        service = _require_rl_risk_policy_service(service=rl_risk_sizing_policy_service)
+        record = service.upsert_policy(
+            key=_rl_risk_policy_key(strategy=strategy),
+            config=_risk_policy_request_to_config(request=payload),
+            observed_at=datetime.now(timezone.utc),
+        )
+        return _to_rl_risk_policy_response(record=record)
 
     @router.get("/strategies/{strategy_id}", response_model=StrategyResponse)
     def get_strategy_by_id(
@@ -673,7 +775,12 @@ def build_strategies_router(
                 ),
             )
             profile = _apply_rl_live_ticker_entitlement(
-                profile=profile,
+                profile=_apply_rl_risk_policy_readiness(
+                    profile=profile,
+                    strategy=strategy,
+                    risk_policy_service=rl_risk_sizing_policy_service,
+                    profile_repository=live_profile_repository,
+                ),
                 strategy=strategy,
                 request=request,
                 principal_dependency=current_user_principal_dependency,
@@ -725,7 +832,12 @@ def build_strategies_router(
             ),
         )
         profile = _apply_rl_live_ticker_entitlement(
-            profile=profile,
+            profile=_apply_rl_risk_policy_readiness(
+                profile=profile,
+                strategy=strategy,
+                risk_policy_service=rl_risk_sizing_policy_service,
+                profile_repository=live_profile_repository,
+            ),
             strategy=strategy,
             request=request,
             principal_dependency=current_user_principal_dependency,
@@ -759,7 +871,12 @@ def build_strategies_router(
             ),
         )
         profile = _apply_rl_live_ticker_entitlement(
-            profile=profile,
+            profile=_apply_rl_risk_policy_readiness(
+                profile=profile,
+                strategy=strategy,
+                risk_policy_service=rl_risk_sizing_policy_service,
+                profile_repository=live_profile_repository,
+            ),
             strategy=strategy,
             request=request,
             principal_dependency=current_user_principal_dependency,
@@ -1039,6 +1156,50 @@ def _profile_request_to_config(
     )
 
 
+def _risk_policy_request_to_config(
+    *, request: RlRiskSizingPolicyRequest
+) -> RlRiskSizingPolicyConfig:
+    return RlRiskSizingPolicyConfig(
+        active=request.active,
+        sizing_method=request.sizing_method,
+        base_quote_notional=request.base_quote_notional,
+        max_position_notional=request.max_position_notional,
+        max_daily_loss_notional=request.max_daily_loss_notional,
+        max_drawdown_pct=request.max_drawdown_pct,
+        max_turnover_notional=request.max_turnover_notional,
+        max_exposure_notional=request.max_exposure_notional,
+        min_expected_pnl_pct=request.min_expected_pnl_pct,
+        min_confidence=request.min_confidence,
+        take_profit_pct=request.take_profit_pct,
+        stop_loss_pct=request.stop_loss_pct,
+        trailing_stop_pct=request.trailing_stop_pct,
+    )
+
+
+def _apply_rl_risk_policy_readiness(
+    *,
+    profile: LiveStrategyProfile,
+    strategy: Strategy,
+    risk_policy_service: RlRiskSizingPolicyService | None,
+    profile_repository: LiveStrategyProfileRepository | None,
+) -> LiveStrategyProfile:
+    if profile.mode == "monitor_only" or profile.readiness_status != "ready":
+        return profile
+    if risk_policy_service is None:
+        return profile
+    record = risk_policy_service.get_policy(key=_rl_risk_policy_key(strategy=strategy))
+    if record.policy_id is None:
+        return profile
+    if record.validation.ready:
+        return profile
+    return _persist_profile_readiness(
+        profile=profile,
+        profile_repository=profile_repository,
+        readiness_status="blocked",
+        readiness_reason=record.validation.reasons[0],
+    )
+
+
 def _apply_rl_live_ticker_entitlement(
     *,
     profile: LiveStrategyProfile,
@@ -1112,6 +1273,21 @@ def _persist_profile_readiness(
     return profile_repository.update(profile=updated)
 
 
+def _rl_risk_policy_key(*, strategy: Strategy) -> RlRiskSizingPolicyKey:
+    exchange_name, market_type, symbol = _parse_strategy_instrument(
+        instrument_key=strategy.spec.instrument_key,
+        fallback_market_type=strategy.spec.market_type,
+        fallback_symbol=str(strategy.spec.instrument_id.symbol),
+    )
+    return RlRiskSizingPolicyKey(
+        owner_user_id=strategy.user_id,
+        strategy_id=strategy.strategy_id,
+        exchange_name=exchange_name,
+        market_type=market_type,
+        symbol=symbol,
+    )
+
+
 def _rl_live_ticker_identity(
     *,
     owner_user_id,
@@ -1142,6 +1318,51 @@ def _parse_strategy_instrument(
     return "binance", fallback_market_type.strip().lower(), fallback_symbol.strip().upper()
 
 
+def _to_rl_risk_policy_response(
+    *, record: RlRiskSizingPolicyRecord
+) -> RlRiskSizingPolicyResponse:
+    return RlRiskSizingPolicyResponse(
+        policy_id=record.policy_id,
+        owner_user_id=UUID(str(record.key.owner_user_id)),
+        strategy_id=record.key.strategy_id,
+        exchange_name=record.key.exchange_name,
+        market_type=record.key.market_type,
+        symbol=record.key.symbol,
+        active=record.config.active,
+        sizing_method=record.config.sizing_method,
+        base_quote_notional=record.config.base_quote_notional,
+        max_position_notional=record.config.max_position_notional,
+        max_daily_loss_notional=record.config.max_daily_loss_notional,
+        max_drawdown_pct=record.config.max_drawdown_pct,
+        max_turnover_notional=record.config.max_turnover_notional,
+        max_exposure_notional=record.config.max_exposure_notional,
+        min_expected_pnl_pct=record.config.min_expected_pnl_pct,
+        min_confidence=record.config.min_confidence,
+        take_profit_pct=record.config.take_profit_pct,
+        stop_loss_pct=record.config.stop_loss_pct,
+        trailing_stop_pct=record.config.trailing_stop_pct,
+        validation_status=record.validation.status,
+        validation_reasons=list(record.validation.reasons),
+        synthetic_exit_rules=[
+            _to_synthetic_exit_rule_response(rule=rule)
+            for rule in record.validation.synthetic_exit_rules
+        ],
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
+def _to_synthetic_exit_rule_response(
+    *, rule: RlSyntheticExitRule
+) -> RlSyntheticExitRuleResponse:
+    return RlSyntheticExitRuleResponse(
+        rule_type=rule.rule_type,
+        trigger_pct=rule.trigger_pct,
+        platform_side=rule.platform_side,
+        creates_intent_action=rule.creates_intent_action,
+    )
+
+
 def _require_live_profile_service(
     *, service: LiveStrategyProfileService | None
 ) -> LiveStrategyProfileService:
@@ -1152,6 +1373,18 @@ def _require_live_profile_service(
             code="live_strategy_profile_unavailable",
             message="Live strategy profile service is not configured",
             details={},
+        )
+    return service
+
+
+def _require_rl_risk_policy_service(
+    *, service: RlRiskSizingPolicyService | None
+) -> RlRiskSizingPolicyService:
+    if service is None:
+        raise RoehubError(
+            code="rl_risk_policy.unavailable",
+            message="RL risk policy service is not configured",
+            details={"reason": "rl_risk_policy_repository_unavailable"},
         )
     return service
 

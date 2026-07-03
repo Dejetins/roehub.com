@@ -22,9 +22,15 @@ from trading.contexts.market_data.application.dto.reference_api import (
 )
 from trading.contexts.rl_trading.adapters.outbound.persistence import (
     InMemoryRlLiveTickerEntitlementRepository,
+    InMemoryRlRiskSizingPolicyRepository,
 )
 from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerEntitlementService,
+)
+from trading.contexts.rl_trading.domain.risk_sizing_policy import (
+    RlRiskSizingPolicyConfig,
+    RlRiskSizingPolicyKey,
+    RlRiskSizingPolicyService,
 )
 from trading.contexts.strategy.domain.entities import (
     LiveStrategyProfile,
@@ -83,6 +89,20 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
             },
         },
     )
+    risk_policy_service = RlRiskSizingPolicyService(
+        repository=InMemoryRlRiskSizingPolicyRepository(),
+    )
+    risk_policy_service.upsert_policy(
+        key=RlRiskSizingPolicyKey(
+            owner_user_id=strategy.user_id,
+            strategy_id=strategy.strategy_id,
+            exchange_name="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        config=_valid_risk_policy_config(),
+        observed_at=datetime(2026, 5, 6, 8, 59, tzinfo=UTC),
+    )
     service = StrategyDashboardQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
@@ -91,6 +111,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         rl_live_ticker_entitlement_service=RlLiveTickerEntitlementService(
             repository=InMemoryRlLiveTickerEntitlementRepository(),
         ),
+        rl_risk_sizing_policy_service=risk_policy_service,
     )
     client = _build_client(service=service)
 
@@ -188,10 +209,22 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["rl_ml"]["modes"]["options"][1]["reason"] == (
         "stage15_classic_paper_prerequisites_blocked"
     )
-    assert payload["rl_ml"]["risk_config"]["risk_gate_status"] == "blocked"
+    assert payload["rl_ml"]["risk_config"]["risk_gate_status"] == "ready"
+    assert payload["rl_ml"]["risk_config"]["policy_status"] == "ready"
+    assert payload["rl_ml"]["risk_config"]["base_quote_notional"] == "25"
+    assert payload["rl_ml"]["risk_config"]["validation_reasons"] == ["rl_risk_policy_ready"]
+    synthetic_rule_types = [
+        rule["rule_type"]
+        for rule in payload["rl_ml"]["risk_config"]["synthetic_exit_rules"]
+    ]
+    assert synthetic_rule_types == [
+        "take_profit",
+        "stop_loss",
+        "trailing_stop",
+    ]
     assert payload["rl_ml"]["risk_config"]["notes"] == [
-        "stage10a_no_auto_promotion",
-        "stage11_no_order_intents",
+        "stage14_synthetic_exits_platform_side_only",
+        "stage14_no_exchange_submit",
         "live_execution_risk_gate_required_before_execution",
     ]
     assert payload["rl_ml"]["operator_controls"]["guard_available"] is False
@@ -684,6 +717,23 @@ def _profile(
         readiness_reason="ready_for_paper",
         created_at=datetime(2026, 5, 6, 8, 50, tzinfo=UTC),
         updated_at=datetime(2026, 5, 6, 8, 55, tzinfo=UTC),
+    )
+
+
+def _valid_risk_policy_config() -> RlRiskSizingPolicyConfig:
+    return RlRiskSizingPolicyConfig(
+        sizing_method="fixed_quote",
+        base_quote_notional=Decimal("25"),
+        max_position_notional=Decimal("100"),
+        max_daily_loss_notional=Decimal("50"),
+        max_drawdown_pct=Decimal("0.10"),
+        max_turnover_notional=Decimal("500"),
+        max_exposure_notional=Decimal("250"),
+        min_expected_pnl_pct=Decimal("0.01"),
+        min_confidence=Decimal("0.80"),
+        take_profit_pct=Decimal("0.05"),
+        stop_loss_pct=Decimal("0.02"),
+        trailing_stop_pct=Decimal("0.03"),
     )
 
 

@@ -74,6 +74,17 @@ function valueOrUnavailable(value) {
   return value;
 }
 
+function pctOrUnavailable(value) {
+  if (value === null || value === undefined || value === "") {
+    return t("common.unavailable");
+  }
+  const numberValue = Number(value);
+  if (Number.isNaN(numberValue)) {
+    return value;
+  }
+  return `${(numberValue * 100).toFixed(2)}%`;
+}
+
 function durationText(seconds) {
   if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
     return "--";
@@ -781,12 +792,25 @@ function renderRlMlTab(root, rlMl) {
   setText("[data-rl-mode-reason]", modes.degradation_reason || "--", root);
   setText("[data-rl-risk-state]", panelStatusText(risk.state, risk.degradation_reason, risk.source), root);
   setText("[data-rl-risk-sizing]", risk.sizing_policy || "--", root);
-  setText("[data-rl-risk-gate]", risk.risk_gate_status || "--", root);
+  setText("[data-rl-risk-gate]", `${risk.risk_gate_status || "--"} / ${risk.policy_status || "--"}`, root);
+  setText("[data-rl-risk-base-size]", valueOrUnavailable(risk.base_quote_notional), root);
   setText(
     "[data-rl-risk-max-notional]",
-    `${valueOrUnavailable(risk.max_position_notional)} / ${valueOrUnavailable(risk.max_notional_per_run)} / ${valueOrUnavailable(risk.max_orders_per_run)}`,
+    `${valueOrUnavailable(risk.max_position_notional)} / ${valueOrUnavailable(risk.max_exposure_notional)} / ${valueOrUnavailable(risk.max_turnover_notional)}`,
     root,
   );
+  setText(
+    "[data-rl-risk-loss-drawdown]",
+    `${valueOrUnavailable(risk.max_daily_loss_notional)} / ${pctOrUnavailable(risk.max_drawdown_pct)}`,
+    root,
+  );
+  setText(
+    "[data-rl-risk-confidence]",
+    `${pctOrUnavailable(risk.min_confidence)} / ${pctOrUnavailable(risk.min_expected_pnl_pct)}`,
+    root,
+  );
+  setText("[data-rl-risk-synthetic-exits]", renderSyntheticExitText(risk.synthetic_exit_rules || []), root);
+  setText("[data-rl-risk-reasons]", (risk.validation_reasons || []).join(" / ") || "--", root);
   setText("[data-rl-risk-notes]", (risk.notes || []).join(" / ") || "--", root);
   setText("[data-rl-operator-state]", panelStatusText(operator.state, operator.degradation_reason, operator.source), root);
   setText("[data-rl-operator-reason]", operator.degradation_reason || "--", root);
@@ -798,6 +822,15 @@ function renderRlMlTab(root, rlMl) {
     root,
   );
   renderOutcomeRows(root, "[data-rl-outcome-rows]", rlMl?.source_event_outcomes);
+}
+
+function renderSyntheticExitText(rules) {
+  if (!rules.length) {
+    return "--";
+  }
+  return rules
+    .map((rule) => `${rule.rule_type}:${pctOrUnavailable(rule.trigger_pct)}:${rule.creates_intent_action}`)
+    .join(" / ");
 }
 
 function renderRlOperatorControls(root, operator) {

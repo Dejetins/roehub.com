@@ -19,10 +19,12 @@ from trading.contexts.live_execution.application import (
 )
 from trading.contexts.rl_trading.adapters.outbound.persistence import (
     InMemoryRlLiveTickerEntitlementRepository,
+    InMemoryRlRiskSizingPolicyRepository,
 )
 from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerEntitlementService,
 )
+from trading.contexts.rl_trading.domain.risk_sizing_policy import RlRiskSizingPolicyService
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -292,6 +294,9 @@ def _build_client() -> TestClient:
         current_user_principal_dependency=_HeaderCurrentUserPrincipalDependency(
             session_created_at=datetime.now(timezone.utc),
         ),
+        rl_risk_sizing_policy_service=RlRiskSizingPolicyService(
+            repository=InMemoryRlRiskSizingPolicyRepository(),
+        ),
     )
 
     app = FastAPI()
@@ -386,6 +391,9 @@ def _build_live_profile_client(
             live_profile_repository=profile_repository,
             rl_live_ticker_entitlement_service=RlLiveTickerEntitlementService(
                 repository=rl_entitlement_repository,
+            ),
+            rl_risk_sizing_policy_service=RlRiskSizingPolicyService(
+                repository=InMemoryRlRiskSizingPolicyRepository(),
             ),
         )
     )
@@ -552,6 +560,100 @@ def test_live_profile_defaults_to_monitor_only_and_blocks_live_without_recent_au
     assert blocked_payload["readiness_status"] == "blocked"
     assert blocked_payload["readiness_reason"] == "recent_auth_required"
     assert "api_secret" not in blocked_live.text
+
+
+def test_stage14_rl_risk_policy_api_persists_valid_policy_and_synthetic_exits() -> None:
+    client = _build_client()
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000001444"}
+    created_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    strategy_id = created_strategy.json()["strategy_id"]
+
+    response = client.put(
+        f"/strategies/{strategy_id}/rl-risk-policy",
+        json={
+            "active": True,
+            "sizing_method": "fixed_quote",
+            "base_quote_notional": "25",
+            "max_position_notional": "100",
+            "max_daily_loss_notional": "50",
+            "max_drawdown_pct": "0.10",
+            "max_turnover_notional": "500",
+            "max_exposure_notional": "250",
+            "min_expected_pnl_pct": "0.01",
+            "min_confidence": "0.80",
+            "take_profit_pct": "0.05",
+            "stop_loss_pct": "0.02",
+            "trailing_stop_pct": "0.03",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["validation_status"] == "ready"
+    assert payload["exchange_name"] == "binance"
+    assert payload["market_type"] == "spot"
+    assert payload["symbol"] == "BTCUSDT"
+    assert [rule["rule_type"] for rule in payload["synthetic_exit_rules"]] == [
+        "take_profit",
+        "stop_loss",
+        "trailing_stop",
+    ]
+    assert all(rule["platform_side"] for rule in payload["synthetic_exit_rules"])
+
+    loaded = client.get(f"/strategies/{strategy_id}/rl-risk-policy", headers=headers)
+    assert loaded.status_code == 200
+    assert loaded.json()["policy_id"] == payload["policy_id"]
+
+
+def test_stage14_invalid_saved_policy_blocks_activation_without_exchange_submit() -> None:
+    client = _build_live_profile_client(session_created_at=datetime.now(timezone.utc))
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000001445"}
+    created_strategy = client.post(
+        "/strategies",
+        json=_build_create_payload(symbol="BTCUSDT"),
+        headers=headers,
+    )
+    strategy_id = created_strategy.json()["strategy_id"]
+
+    invalid_policy = client.put(
+        f"/strategies/{strategy_id}/rl-risk-policy",
+        json={
+            "active": True,
+            "sizing_method": "fixed_quote",
+            "base_quote_notional": "25",
+            "max_position_notional": "100",
+            "max_daily_loss_notional": "50",
+            "max_drawdown_pct": "0.10",
+            "max_turnover_notional": "500",
+            "max_exposure_notional": "250",
+            "min_expected_pnl_pct": "0.01",
+        },
+        headers=headers,
+    )
+    assert invalid_policy.status_code == 200
+    assert invalid_policy.json()["validation_status"] == "blocked"
+    assert "rl_risk_policy_stop_loss_required" in invalid_policy.json()["validation_reasons"]
+
+    paper = client.put(
+        f"/strategies/{strategy_id}/live-profile",
+        json={
+            "mode": "paper",
+            "sizing_method": "fixed_quote",
+            "sizing_value": "25",
+            "max_orders_per_run": 1,
+            "max_notional_per_run": "25",
+        },
+        headers=headers,
+    )
+
+    assert paper.status_code == 200
+    assert paper.json()["readiness_status"] == "blocked"
+    assert paper.json()["readiness_reason"] == "rl_risk_policy_stop_loss_required"
 
 
 def test_live_strategy_profile_allows_paper_and_recent_auth_live_with_ready_connection() -> None:

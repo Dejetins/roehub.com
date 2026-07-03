@@ -524,6 +524,15 @@ class StrategyRlMlModeSurfaceResponse(BaseModel):
     degradation_reason: str | None = None
 
 
+class StrategyRlMlSyntheticExitRuleResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rule_type: Literal["take_profit", "stop_loss", "trailing_stop"]
+    trigger_pct: Decimal
+    platform_side: bool
+    creates_intent_action: Literal["close"]
+
+
 class StrategyRlMlRiskConfigResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -531,9 +540,19 @@ class StrategyRlMlRiskConfigResponse(BaseModel):
     state: PanelState
     sizing_policy: str
     risk_gate_status: RlMlSurfaceStatus
+    policy_status: RlMlSurfaceStatus
+    validation_reasons: list[str]
+    base_quote_notional: Decimal | None
     max_position_notional: Decimal | None
+    max_daily_loss_notional: Decimal | None
+    max_drawdown_pct: Decimal | None
+    max_turnover_notional: Decimal | None
+    max_exposure_notional: Decimal | None
     max_orders_per_run: int | None
     max_notional_per_run: Decimal | None
+    min_expected_pnl_pct: Decimal | None
+    min_confidence: Decimal | None
+    synthetic_exit_rules: list[StrategyRlMlSyntheticExitRuleResponse]
     notes: list[str]
     degradation_reason: str | None = None
 

@@ -59,11 +59,14 @@ from trading.contexts.live_execution.domain import (
 )
 from trading.contexts.rl_trading.adapters.outbound.persistence import (
     InMemoryRlLiveTickerEntitlementRepository,
+    InMemoryRlRiskSizingPolicyRepository,
     PostgresRlLiveTickerEntitlementRepository,
+    PostgresRlRiskSizingPolicyRepository,
 )
 from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerEntitlementService,
 )
+from trading.contexts.rl_trading.domain.risk_sizing_policy import RlRiskSizingPolicyService
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryLiveStrategyProfileRepository,
     InMemoryStrategyEventRepository,
@@ -602,6 +605,9 @@ def build_strategy_router(
     rl_live_ticker_entitlement_service = _build_rl_live_ticker_entitlement_service(
         settings=settings,
     )
+    rl_risk_sizing_policy_service = _build_rl_risk_sizing_policy_service(
+        settings=settings,
+    )
     position_ownership_coordinator = _build_position_ownership_coordinator(
         settings=settings,
     )
@@ -699,6 +705,7 @@ def build_strategy_router(
         strategy_run_repository=run_repository,
         live_profile_repository=profile_repository,
         rl_live_ticker_entitlement_service=rl_live_ticker_entitlement_service,
+        rl_risk_sizing_policy_service=rl_risk_sizing_policy_service,
         execution_ingress_service=_execution_ingress_service(
             live_execution_services=live_execution_services,
         ),
@@ -795,6 +802,23 @@ def _build_rl_live_ticker_entitlement_service(
     return RlLiveTickerEntitlementService(
         repository=InMemoryRlLiveTickerEntitlementRepository()
     )
+
+
+def _build_rl_risk_sizing_policy_service(
+    *,
+    settings: StrategyRuntimeSettings,
+) -> RlRiskSizingPolicyService:
+    if settings.postgres_dsn:
+        return RlRiskSizingPolicyService(
+            repository=PostgresRlRiskSizingPolicyRepository(
+                gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+            )
+        )
+    if settings.fail_fast:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when strategy fail-fast mode is enabled"
+        )
+    return RlRiskSizingPolicyService(repository=InMemoryRlRiskSizingPolicyRepository())
 
 
 def _build_backtest_job_repository(

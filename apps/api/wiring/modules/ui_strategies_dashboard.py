@@ -46,6 +46,7 @@ from apps.api.dto.ui_strategies_dashboard import (
     StrategyRlMlOperatorControlResponse,
     StrategyRlMlOperatorControlsResponse,
     StrategyRlMlRiskConfigResponse,
+    StrategyRlMlSyntheticExitRuleResponse,
     StrategyRlMlTabResponse,
     StrategyRlMlTickerSlotResponse,
     StrategyRlMlTickerSlotsResponse,
@@ -67,6 +68,7 @@ from apps.api.wiring.modules.strategy import (
     _build_live_profile_repository,
     _build_repositories,
     _build_rl_live_ticker_entitlement_service,
+    _build_rl_risk_sizing_policy_service,
     _build_signal_repository,
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
@@ -95,6 +97,10 @@ from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerEntitlementService,
     RlLiveTickerIdentity,
     evaluate_rl_live_ticker_entitlement,
+)
+from trading.contexts.rl_trading.domain.risk_sizing_policy import (
+    RlRiskSizingPolicyKey,
+    RlRiskSizingPolicyService,
 )
 from trading.contexts.strategy.adapters.outbound import SystemStrategyClock
 from trading.contexts.strategy.application import (
@@ -229,6 +235,7 @@ class StrategyDashboardQueryService:
         paper_accounting_service: PaperAccountingReadService | None = None,
         execution_outcome_service: ExecutionOutcomeReadService | None = None,
         rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None = None,
+        rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -241,6 +248,7 @@ class StrategyDashboardQueryService:
         self._paper_accounting_service = paper_accounting_service
         self._execution_outcome_service = execution_outcome_service
         self._rl_live_ticker_entitlement_service = rl_live_ticker_entitlement_service
+        self._rl_risk_sizing_policy_service = rl_risk_sizing_policy_service
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -398,6 +406,7 @@ class StrategyDashboardQueryService:
                 rl_live_ticker_entitlement_service=(
                     self._rl_live_ticker_entitlement_service
                 ),
+                rl_risk_sizing_policy_service=self._rl_risk_sizing_policy_service,
             ),
             footer_status=StrategyDashboardFooterStatusResponse(
                 connection_status="degraded" if _has_degraded_sources(sources) else "ok",
@@ -1112,6 +1121,7 @@ def build_strategy_dashboard_service(
             paper_accounting_service=None,
             execution_outcome_service=None,
             rl_live_ticker_entitlement_service=None,
+            rl_risk_sizing_policy_service=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -1136,6 +1146,9 @@ def build_strategy_dashboard_service(
         paper_accounting_service=_build_paper_accounting_service(settings=settings),
         execution_outcome_service=_build_execution_outcome_service(settings=settings),
         rl_live_ticker_entitlement_service=_build_rl_live_ticker_entitlement_service(
+            settings=settings,
+        ),
+        rl_risk_sizing_policy_service=_build_rl_risk_sizing_policy_service(
             settings=settings,
         ),
     )
@@ -1620,6 +1633,21 @@ def _selected_symbol(*, strategy: Strategy | None) -> str | None:
     return symbol
 
 
+def _rl_risk_policy_key(
+    *,
+    principal: CurrentUserPrincipal,
+    strategy: Strategy,
+) -> RlRiskSizingPolicyKey:
+    exchange, market_type, symbol = _parse_instrument_key(strategy.spec.instrument_key)
+    return RlRiskSizingPolicyKey(
+        owner_user_id=principal.user_id,
+        strategy_id=strategy.strategy_id,
+        exchange_name=exchange or "binance",
+        market_type=market_type or strategy.spec.market_type,
+        symbol=symbol,
+    )
+
+
 def _latest_signal_at(
     *, signal_journal: StrategySignalJournalResponse
 ) -> datetime | None:
@@ -1667,6 +1695,7 @@ def _build_rl_ml_tab(
     run: StrategyRun | None,
     execution_outcomes: StrategyExecutionOutcomeLinksResponse,
     rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None,
+    rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None,
 ) -> StrategyRlMlTabResponse:
     ml_outcomes = _filter_ml_agent_decision_outcomes(execution_outcomes=execution_outcomes)
     return StrategyRlMlTabResponse(
@@ -1682,7 +1711,12 @@ def _build_rl_ml_tab(
             rl_live_ticker_entitlement_service=rl_live_ticker_entitlement_service,
         ),
         modes=_build_rl_modes(profile=profile),
-        risk_config=_build_rl_risk_config(profile=profile),
+        risk_config=_build_rl_risk_config(
+            principal=principal,
+            strategy=strategy,
+            profile=profile,
+            rl_risk_sizing_policy_service=rl_risk_sizing_policy_service,
+        ),
         operator_controls=_build_rl_operator_controls(),
         source_event_outcomes=ml_outcomes,
         degradation_reason="rl_runtime_activation_pending",
@@ -1802,24 +1836,69 @@ def _build_rl_modes(*, profile: LiveStrategyProfile | None) -> StrategyRlMlModeS
 
 
 def _build_rl_risk_config(
-    *, profile: LiveStrategyProfile | None
+    *,
+    principal: CurrentUserPrincipal,
+    strategy: Strategy | None,
+    profile: LiveStrategyProfile | None,
+    rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None,
 ) -> StrategyRlMlRiskConfigResponse:
+    policy_record = None
+    if strategy is not None and rl_risk_sizing_policy_service is not None:
+        policy_record = rl_risk_sizing_policy_service.get_policy(
+            key=_rl_risk_policy_key(principal=principal, strategy=strategy),
+        )
+    validation_reasons = (
+        list(policy_record.validation.reasons)
+        if policy_record is not None
+        else ["rl_risk_policy_repository_unavailable"]
+    )
+    synthetic_exit_rules = (
+        [
+            StrategyRlMlSyntheticExitRuleResponse(
+                rule_type=rule.rule_type,
+                trigger_pct=rule.trigger_pct,
+                platform_side=rule.platform_side,
+                creates_intent_action=rule.creates_intent_action,
+            )
+            for rule in policy_record.validation.synthetic_exit_rules
+        ]
+        if policy_record is not None
+        else []
+    )
+    config = policy_record.config if policy_record is not None else None
+    policy_ready = policy_record is not None and policy_record.validation.ready
     return StrategyRlMlRiskConfigResponse(
         source=_RL_RISK_SOURCE,
-        state="degraded",
-        sizing_policy=profile.sizing_method if profile is not None else "fixed_quote",
-        risk_gate_status="blocked",
-        max_position_notional=(
-            profile.max_position_notional if profile is not None else None
+        state="ready" if policy_ready else "degraded",
+        sizing_policy=(
+            config.sizing_method
+            if config is not None
+            else (profile.sizing_method if profile is not None else "fixed_quote")
         ),
+        risk_gate_status="ready" if policy_ready else "blocked",
+        policy_status="ready" if policy_ready else "blocked",
+        validation_reasons=validation_reasons,
+        base_quote_notional=config.base_quote_notional if config is not None else None,
+        max_position_notional=(
+            config.max_position_notional
+            if config is not None
+            else (profile.max_position_notional if profile is not None else None)
+        ),
+        max_daily_loss_notional=config.max_daily_loss_notional if config is not None else None,
+        max_drawdown_pct=config.max_drawdown_pct if config is not None else None,
+        max_turnover_notional=config.max_turnover_notional if config is not None else None,
+        max_exposure_notional=config.max_exposure_notional if config is not None else None,
         max_orders_per_run=profile.max_orders_per_run if profile is not None else None,
         max_notional_per_run=profile.max_notional_per_run if profile is not None else None,
+        min_expected_pnl_pct=config.min_expected_pnl_pct if config is not None else None,
+        min_confidence=config.min_confidence if config is not None else None,
+        synthetic_exit_rules=synthetic_exit_rules,
         notes=[
-            "stage10a_no_auto_promotion",
-            "stage11_no_order_intents",
+            "stage14_synthetic_exits_platform_side_only",
+            "stage14_no_exchange_submit",
             "live_execution_risk_gate_required_before_execution",
         ],
-        degradation_reason="rl_risk_runtime_config_placeholder",
+        degradation_reason=None if policy_ready else validation_reasons[0],
     )
 
 
